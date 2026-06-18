@@ -16,6 +16,7 @@ export type LoginResponse = {
   user: { id: string; email: string; displayName: string; serverRole: string }
   keyBag: KeyBag
 }
+export type UserSummary = LoginResponse['user']
 export type PersonalScopeGrant = {
   scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
@@ -24,7 +25,7 @@ export type PersonalScopeGrant = {
 
 export type UnlockedSession = {
   sessionToken: string
-  user: LoginResponse['user']
+  user: UserSummary
   identity: v1.Identity['priv']
   identityPublicKey: KeyBag['identityPublicKey']
   masterKey: Uint8Array
@@ -68,9 +69,20 @@ export async function logout(apiBase: string, sessionToken: string): Promise<voi
 }
 
 /** Proves the session resolves on the server. */
-export async function fetchCurrentUser(apiBase: string, sessionToken: string): Promise<LoginResponse['user']> {
+export async function fetchCurrentUser(apiBase: string, sessionToken: string): Promise<UserSummary> {
   const res = await fetch(`${apiBase}/api/me`, { headers: { authorization: `Bearer ${sessionToken}` } })
   if (!res.ok) throw new Error(`me failed: ${res.status}`)
+  return res.json()
+}
+
+/** Update low-sensitivity server-visible profile fields. Content and key material stay untouched. */
+export async function updateProfile(apiBase: string, sessionToken: string, displayName: string): Promise<UserSummary> {
+  const res = await fetch(`${apiBase}/api/me/profile`, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${sessionToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ displayName }),
+  })
+  if (!res.ok) throw await apiError(res, 'profile')
   return res.json()
 }
 

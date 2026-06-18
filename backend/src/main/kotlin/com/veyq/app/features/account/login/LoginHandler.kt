@@ -8,6 +8,7 @@ import com.veyq.app.generated.model.LoginRequest
 import com.veyq.app.generated.model.LoginResponse
 import com.veyq.app.generated.model.MasterKeyWrap
 import com.veyq.app.generated.model.PersonalScopeGrant
+import com.veyq.app.generated.model.UpdateProfileRequest
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.Argon2Verifier
@@ -86,6 +87,14 @@ class LoginHandler(
     fun currentUser(authorization: String?): UserSummary {
         val userId = sessions.resolve(authorization) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
+        return user.toSummary()
+    }
+
+    @Transactional
+    fun updateProfile(authorization: String?, req: UpdateProfileRequest): UserSummary {
+        val userId = sessions.resolve(authorization) ?: throw unauthorized()
+        val user = users.findById(userId) ?: throw unauthorized()
+        user.displayName = req.displayName.trim()
         return user.toSummary()
     }
 

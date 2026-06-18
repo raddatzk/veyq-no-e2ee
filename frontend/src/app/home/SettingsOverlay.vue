@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { applyTheme, session, setUnlocked } from '../session'
-import { logout } from '../../features/account/login/login'
+import { logout, updateProfile } from '../../features/account/login/login'
 import { rotateIdentity } from '../../features/keys/rotateIdentity'
 import { deviceUnlockEnabled, disableDeviceUnlock } from '../../features/account/deviceUnlock/deviceUnlock'
 import { mapTilesConsent } from '../../features/account/privacy/mapConsent'
@@ -10,9 +10,31 @@ import { i18n, setLocale, t } from '../../i18n/i18n'
 const emit = defineEmits<{ close: [] }>()
 const host = window.location.host
 const deviceUnlock = ref(deviceUnlockEnabled())
+const displayName = ref(session.unlocked?.user.displayName ?? '')
+const profileSaving = ref(false)
+const profileError = ref('')
+const profileSaved = ref(false)
+const profileDirty = computed(() => displayName.value.trim() !== (session.unlocked?.user.displayName ?? ''))
 function forgetDevice() {
   disableDeviceUnlock()
   deviceUnlock.value = false
+}
+
+async function saveProfile() {
+  if (!session.unlocked) return
+  profileSaving.value = true
+  profileError.value = ''
+  profileSaved.value = false
+  try {
+    const user = await updateProfile(session.apiBase, session.unlocked.sessionToken, displayName.value)
+    session.unlocked.user = user
+    displayName.value = user.displayName
+    profileSaved.value = true
+  } catch (e) {
+    profileError.value = (e as Error).message
+  } finally {
+    profileSaving.value = false
+  }
 }
 
 // Identity rotation: re-keys every grant to a fresh identity (auth/master key unchanged). It leaves the
@@ -78,12 +100,23 @@ async function signOut() {
       </div>
 
       <div class="settings-section">{{ t('settings.account') }}</div>
-      <div class="settings-row">
+      <form class="settings-profile" @submit.prevent="saveProfile">
         <span class="settings-account">
           <strong>{{ session.unlocked?.user.displayName }}</strong>
           <small>{{ session.unlocked?.user.email }}</small>
         </span>
-      </div>
+        <label class="settings-field">
+          <span>{{ t('settings.displayName') }}</span>
+          <input v-model="displayName" maxlength="120" autocomplete="name" />
+        </label>
+        <div class="settings-profile-actions">
+          <button class="btn btn-primary" type="submit" :disabled="profileSaving || !profileDirty || !displayName.trim()">
+            {{ profileSaving ? t('settings.saving') : t('common.save') }}
+          </button>
+        </div>
+        <div v-if="profileError" class="auth-msg auth-msg-error">{{ profileError }}</div>
+        <div v-else-if="profileSaved" class="auth-msg auth-msg-success">{{ t('settings.profileSaved') }}</div>
+      </form>
 
       <template v-if="deviceUnlock">
         <div class="settings-section">{{ t('settings.deviceUnlock') }}</div>

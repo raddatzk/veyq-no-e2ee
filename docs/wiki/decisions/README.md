@@ -37,6 +37,7 @@
 | AD-25 | **Crypto primitives & post-quantum**: content = **AES-256**; key wraps = **HPKE-style N-recipient with a hybrid KEM (X25519 + ML-KEM-768) from v1** (harvest-now-decrypt-later on decades-long memories); password→key = **Argon2id** over password + Secret Key; signatures Ed25519 → **ML-DSA** (hybrid) later. **Crypto-agility mandatory** — versioned suite id negotiated via capability discovery; no home-grown crypto. | Accepted | See [Security Model → Crypto primitives](../crosscutting/security-model.md). |
 | AD-29 | **Legacy web UI over the E2EE core**: use the legacy web client as the UX baseline, but bind it to the Greenfield E2EE client/domain core through decrypted view-model adapters; old plaintext API/data assumptions do not return. | Accepted | See [ADR 0029](0029-legacy-web-ui-over-e2ee-core.md). |
 | AD-30 | **Public-share upload capability**: guest upload writes require `shareId` plus a blind upload-capability token derived from the share unwrap key; the server stores only `SHA-256(token)`. | Accepted | Prevents `shareId`-only sealed-junk uploads while preserving the blind server. See [ADR 0030](0030-public-share-upload-capability.md). |
+| AD-31 | **Profile fields are server-visible identity metadata**: profile writes are limited to low-sensitivity account metadata; credential/device changes stay separate key-wrap flows. | Accepted | Enables member rosters/settings without weakening content E2EE. See [ADR 0031](0031-profile-fields-server-visible.md). |
 
 ## ADR template (for new ADR files)
 

@@ -60,7 +60,10 @@ class LoginSliceTest {
     @BeforeEach
     fun seed() {
         QuarkusTransaction.requiringNew().run {
-            if (users.findByEmail(email) != null) return@run
+            users.findByEmail(email)?.let {
+                it.displayName = "Login User"
+                return@run
+            }
             val now = Instant.now()
             val user = User().apply {
                 id = "login-user"; this.email = this@LoginSliceTest.email
@@ -157,6 +160,40 @@ class LoginSliceTest {
             .then().statusCode(401)
         given().header("Authorization", "Bearer nope")
             .get("/api/me/personal-scope")
+            .then().statusCode(401)
+    }
+
+    @Test
+    fun updatesCurrentProfileDisplayName() {
+        val sessionToken = given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","password":"$password"}""")
+            .post("/api/login")
+            .then().statusCode(200)
+            .extract().path<String>("sessionToken")
+
+        given().contentType(ContentType.JSON)
+            .header("Authorization", "Bearer $sessionToken")
+            .body("""{"displayName":"  Curator Name  "}""")
+            .patch("/api/me/profile")
+            .then().statusCode(200)
+            .body("email", `is`(email))
+            .body("displayName", `is`("Curator Name"))
+
+        given().header("Authorization", "Bearer $sessionToken")
+            .get("/api/me")
+            .then().statusCode(200)
+            .body("displayName", `is`("Curator Name"))
+
+        given().contentType(ContentType.JSON)
+            .header("Authorization", "Bearer $sessionToken")
+            .body("""{"displayName":""}""")
+            .patch("/api/me/profile")
+            .then().statusCode(400)
+
+        given().contentType(ContentType.JSON)
+            .header("Authorization", "Bearer nope")
+            .body("""{"displayName":"Nobody"}""")
+            .patch("/api/me/profile")
             .then().statusCode(401)
     }
 }

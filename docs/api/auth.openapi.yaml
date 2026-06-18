@@ -43,6 +43,29 @@ paths:
             application/json:
               schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/profile:
+    patch:
+      tags: [Login]
+      operationId: updateCurrentProfile
+      summary: Update low-sensitivity profile fields for the authenticated user.
+      description: >
+        Updates server-visible identity metadata. This endpoint intentionally does not change email,
+        credentials or device wraps; those require their own verification/key-wrap flows.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          description: The updated current user.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/me/session:
     delete:
       tags: [Login]
@@ -150,6 +173,11 @@ components:
         sessionToken: { type: string }
         user: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         keyBag: { $ref: '#/components/schemas/KeyBag' }
+    UpdateProfileRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
     KeyBag:
       type: object
       description: The wrapped key material needed to unlock the master key client-side.
