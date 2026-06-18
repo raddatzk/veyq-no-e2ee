@@ -15,3 +15,4 @@ depends on them.
 ## Use-cases
 - ★ [Rate-limit abusive traffic](use-cases/uc.platform.rate-limiting.md)
 - ★ [Boot the web app shell](use-cases/uc.platform.app-shell.md)
+- ★ [Seed local smoke data](use-cases/uc.platform.local-smoke.md)
