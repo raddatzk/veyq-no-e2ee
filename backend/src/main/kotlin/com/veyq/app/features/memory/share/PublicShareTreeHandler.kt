@@ -3,6 +3,8 @@ package com.veyq.app.features.memory.share
 import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.MemoryJournal
 import com.veyq.app.generated.model.MemoryNodeList
+import com.veyq.app.generated.model.MemoryPlaylist as ApiPlaylist
+import com.veyq.app.generated.model.MemoryPlaylistList
 import com.veyq.app.generated.model.MemoryTrack as ApiMemoryTrack
 import com.veyq.app.generated.model.MemoryTrackList
 import com.veyq.app.generated.model.PublicShare
@@ -10,6 +12,8 @@ import com.veyq.app.generated.model.ShareNotice
 import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.features.memory.journal.JournalHandler
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.MemoryPlaylist
+import com.veyq.app.shared.content.MemoryPlaylistRepository
 import com.veyq.app.shared.content.MemoryTrack
 import com.veyq.app.shared.content.MemoryTrackRepository
 import com.veyq.app.shared.content.NodeRepository
@@ -33,6 +37,7 @@ class PublicShareTreeHandler(
     private val shares: ShareRepository,
     private val nodes: NodeRepository,
     private val tracks: MemoryTrackRepository,
+    private val playlists: MemoryPlaylistRepository,
     private val journals: JournalHandler,
     private val scopes: ScopeRepository,
     private val tenants: TenantRepository,
@@ -113,6 +118,22 @@ class PublicShareTreeHandler(
             sealedContent = Blob(suiteId = t.suiteId, bytes = enc.encodeToString(t.sealedContent)),
             createdAt = OffsetDateTime.ofInstant(t.createdAt, ZoneOffset.UTC),
         )
+
+    // Playlists are READ-ONLY over a share (the owner manages them via the authed endpoint). Same gate as tracks.
+    @Transactional
+    fun listSharePlaylists(shareId: String, nodeId: String): MemoryPlaylistList {
+        val share = shareOr404(shareId)
+        if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
+        requireSubtree(share, nodeId)
+        return MemoryPlaylistList(playlists = playlists.listByNodeId(nodeId).map { p ->
+            ApiPlaylist(
+                id = p.id, nodeId = p.nodeId,
+                sealedContent = Blob(suiteId = p.suiteId, bytes = enc.encodeToString(p.sealedContent)),
+                featured = p.featured,
+                createdAt = OffsetDateTime.ofInstant(p.createdAt, ZoneOffset.UTC),
+            )
+        })
+    }
 
     private fun shareOr404(shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")

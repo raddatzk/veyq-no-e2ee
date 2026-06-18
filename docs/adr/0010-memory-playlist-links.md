@@ -2,7 +2,14 @@
 
 ## Status
 
-Accepted
+Accepted — **revised 2026-06-18 (operator-blind):** the playlist payload `{provider, url, title, note}` is now
+**sealed under the scope content key** (AEAD, like tracks/journal), not stored in cleartext as originally
+written below. The server stores ciphertext + a benign server-visible `featured` flag (so a header can surface
+one without decryption) and is blind to the link/title/note. Provider detection happens client-side. Backend:
+`veyq_memory_playlist` (V30, sealed_content + featured), `MemoryPlaylist` tag (list/create/update/delete,
+own-scope), read-only guest list under `/api/public/shares/{id}/nodes/{nodeId}/playlists`. The `provider`
+enum + URL-based model below still hold; only the storage location (sealed, not DB columns) changed to match
+the operator-blind redesign.
 
 ## Context
 
