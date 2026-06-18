@@ -384,7 +384,7 @@ struct MemoryDetailView: View {
                 await store.upload(datas)
             }
         }
-        .task { await store.load(); await store.loadChildren() }
+        .task { await store.load(); await store.loadChildren(); await store.loadTracks() }
         .onChange(of: tab) { _, t in
             if t == 2 { Task { await store.loadTracks() } }
             if t == 3 { Task { await store.loadTracks(); await store.loadChildren() } }
@@ -484,6 +484,7 @@ struct MemoryDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
             }
             Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
+            metadataPills
             Picker("", selection: $tab) {
                 Text(T("detail.gallery")).tag(0)
                 if !store.children.isEmpty { Text(T("detail.chapters")).tag(5) }
@@ -582,6 +583,22 @@ struct MemoryDetailView: View {
                 }
             }
         }
+    }
+
+    // At-a-glance counts under the title (Legacy header pills): photos, chapters, tracks, mapped media.
+    @ViewBuilder private var metadataPills: some View {
+        let mapped = store.tiles.filter { $0.lat != nil && $0.lng != nil }.count
+        HStack(spacing: 6) {
+            pill("🖼", store.tiles.count)
+            if store.chapterCount > 0 { pill("📖", store.chapterCount) }
+            if !store.tracks.isEmpty { pill("🛤", store.tracks.count) }
+            if mapped > 0 { pill("📍", mapped) }
+        }
+    }
+    private func pill(_ icon: String, _ count: Int) -> some View {
+        Text("\(icon) \(count)").font(.caption).foregroundStyle(VeyqStyle.muted)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(VeyqStyle.surface, in: Capsule())
     }
 
     @ViewBuilder private var chaptersTab: some View {

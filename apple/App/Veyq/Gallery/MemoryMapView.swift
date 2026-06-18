@@ -82,6 +82,13 @@ struct MemoryMapView: View {
             }
             .onMapCameraChange(frequency: .onEnd) { ctx in mapRect = ctx.rect }
             .onAppear { viewport = geo.size; camera = .region(region) }
+            // Recenter: re-frame to all media + tracks (Legacy parity).
+            .overlay(alignment: .bottomTrailing) {
+                Button { withAnimation { camera = .region(region) } } label: {
+                    Image(systemName: "scope").padding(8).background(.thinMaterial, in: Circle())
+                }
+                .tint(VeyqStyle.accent).padding(10)
+            }
         }
         .frame(height: 420)
         .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
