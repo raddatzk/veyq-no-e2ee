@@ -19,6 +19,7 @@ import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
+import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
@@ -353,12 +354,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <div v-if="!contribBuckets.length" class="home-empty">{{ t('contrib.empty') }}</div>
     </section>
 
-    <section v-if="tab === 'info'" class="memory-info">
-      <div class="info-row"><span>{{ t('detail.gallery') }}</span><strong>{{ tiles.length }}</strong></div>
-      <div v-if="dateRange" class="info-row"><span>{{ t('info.dateRange') }}</span><strong>{{ dateRange }}</strong></div>
-      <div class="info-row"><span>{{ t('detail.map') }}</span><strong>{{ tracks.length }}</strong></div>
-      <div class="info-row"><span>{{ t('info.chapters') }}</span><strong>{{ chapterChildCount() }}</strong></div>
-    </section>
+    <MemoryInfoSection
+      v-if="tab === 'info'"
+      :media-count="tiles.length"
+      :date-range="dateRange"
+      :track-count="tracks.length"
+      :chapter-count="chapterChildCount()"
+    />
 
     <!-- child chapters/folders/memories, browsable from their own tab (Legacy parity) -->
     <section v-if="tab === 'chapters' && childNodes.length" class="memory-children">
