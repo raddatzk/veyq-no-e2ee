@@ -4,7 +4,7 @@
 // operator-blind store (sealed snapshot + sealed update log); local edits are broadcast live AND appended to
 // the store (coalesced); on close we compact (fresh snapshot + Markdown reader projection). So non-overlapping
 // sessions converge. Heavy deps (yjs/codemirror) load only when this component mounts.
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import * as Y from 'yjs'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
@@ -52,6 +52,12 @@ function chipText(e: JournalEmbed): string {
 function typeLabels(): Record<JournalEmbedKind, string> {
   return { media: t('journal.embedKind.media'), track: t('journal.embedKind.track'), chapter: t('journal.embedKind.chapter'), playlist: t('journal.embedKind.playlist') }
 }
+const embedOptions = computed<{ kind: JournalEmbedKind; icon: string; label: string }[]>(() => [
+  { kind: 'media', icon: '🖼', label: t('journal.embedKind.media') },
+  { kind: 'track', icon: '🛤', label: t('journal.embedKind.track') },
+  { kind: 'chapter', icon: '🗂', label: t('journal.embedKind.chapter') },
+  { kind: 'playlist', icon: '🎵', label: t('journal.embedKind.playlist') },
+])
 function openInsert(kind: JournalEmbedKind, from: number, to: number) {
   embedMenuOpen.value = false
   picker.value = { kind, range: { from, to }, editing: false, ids: [], label: '' }
@@ -211,12 +217,15 @@ function close() {
       <span v-if="peers > 0" class="live-peers">· {{ t('journal.peers', { n: peers }) }}</span>
       <span class="live-spacer" />
       <div class="journal-embed-menu">
-        <button class="btn btn-ghost" type="button" @click="embedMenuOpen = !embedMenuOpen">＋ {{ t('journal.embed') }}</button>
-        <div v-if="embedMenuOpen" class="journal-embed-menu-pop" @click.self="embedMenuOpen = false">
-          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('media')">🖼 {{ t('journal.embedKind.media') }}</button>
-          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('track')">🛤 {{ t('journal.embedKind.track') }}</button>
-          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('chapter')">🗂 {{ t('journal.embedKind.chapter') }}</button>
-          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('playlist')">🎵 {{ t('journal.embedKind.playlist') }}</button>
+        <button class="btn btn-ghost journal-embed-trigger" type="button" aria-haspopup="menu" :aria-expanded="embedMenuOpen" @click="embedMenuOpen = !embedMenuOpen">
+          <span class="journal-embed-trigger-icon" aria-hidden="true">＋</span>
+          <span>{{ t('journal.embed') }}</span>
+        </button>
+        <div v-if="embedMenuOpen" class="journal-embed-menu-pop" role="menu" @click.self="embedMenuOpen = false">
+          <button v-for="option in embedOptions" :key="option.kind" class="btn btn-ghost journal-embed-option" type="button" role="menuitem" @click="insertAtCursor(option.kind)">
+            <span class="journal-embed-option-icon" aria-hidden="true">{{ option.icon }}</span>
+            <span class="journal-embed-option-label">{{ option.label }}</span>
+          </button>
         </div>
       </div>
       <button class="btn btn-ghost" type="button" @click="close">{{ t('journal.done') }}</button>

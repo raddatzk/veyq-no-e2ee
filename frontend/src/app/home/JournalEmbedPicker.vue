@@ -25,7 +25,9 @@ function toggle(id: string) {
     <div class="settings-panel journal-picker">
       <div class="settings-head">
         <h2 class="settings-title">{{ title }}</h2>
-        <button class="btn btn-ghost" type="button" @click="emit('cancel')">{{ t('common.close') }}</button>
+        <button class="btn btn-ghost journal-picker-close" type="button" :aria-label="t('common.close')" @click="emit('cancel')">
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
       <label class="journal-picker-field">
         <span>{{ t('journal.label') }}</span>
@@ -33,7 +35,7 @@ function toggle(id: string) {
       </label>
       <ul v-if="items.length" class="search-results">
         <li v-for="it in items" :key="it.id">
-          <button class="search-hit" :class="{ selected: selected.includes(it.id) }" @click="toggle(it.id)">
+          <button class="search-hit" :class="{ selected: selected.includes(it.id) }" type="button" :aria-pressed="selected.includes(it.id)" @click="toggle(it.id)">
             <span class="search-hit-icon">{{ icon }}</span>
             <span class="search-hit-name">{{ it.name }}</span>
             <span v-if="selected.includes(it.id)" class="journal-picker-check">✓</span>
@@ -42,7 +44,7 @@ function toggle(id: string) {
       </ul>
       <p v-else class="home-empty">{{ t('journal.pickerEmpty') }}</p>
       <div class="journal-picker-actions">
-        <button v-if="editing" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="emit('remove')">{{ t('common.delete') }}</button>
+        <button v-if="editing" class="btn btn-ghost journal-picker-delete" type="button" @click="emit('remove')">{{ t('common.delete') }}</button>
         <span class="live-spacer" />
         <button class="btn btn-ghost" type="button" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn btn-primary" type="button" :disabled="!selected.length" @click="emit('confirm', selected, label)">{{ t('journal.insert') }}</button>

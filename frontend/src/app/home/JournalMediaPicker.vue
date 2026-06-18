@@ -21,7 +21,9 @@ function toggle(id: string) {
     <div class="settings-panel journal-picker">
       <div class="settings-head">
         <h2 class="settings-title">{{ t('journal.mediaPickerTitle') }}</h2>
-        <button class="btn btn-ghost" type="button" @click="emit('cancel')">{{ t('common.close') }}</button>
+        <button class="btn btn-ghost journal-picker-close" type="button" :aria-label="t('common.close')" @click="emit('cancel')">
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
       <label class="journal-picker-field">
         <span>{{ t('journal.caption') }}</span>
@@ -34,6 +36,7 @@ function toggle(id: string) {
           type="button"
           class="journal-picker-thumb"
           :class="{ selected: selected.includes(tile.id) }"
+          :aria-pressed="selected.includes(tile.id)"
           @click="toggle(tile.id)"
         >
           <img :src="tile.url" alt="" />
@@ -42,7 +45,7 @@ function toggle(id: string) {
       </div>
       <p v-else class="home-empty">{{ t('journal.mediaPickerEmpty') }}</p>
       <div class="journal-picker-actions">
-        <button v-if="editing" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="emit('remove')">{{ t('common.delete') }}</button>
+        <button v-if="editing" class="btn btn-ghost journal-picker-delete" type="button" @click="emit('remove')">{{ t('common.delete') }}</button>
         <span class="live-spacer" />
         <button class="btn btn-ghost" type="button" @click="emit('cancel')">{{ t('common.cancel') }}</button>
         <button class="btn btn-primary" type="button" :disabled="!selected.length" @click="emit('confirm', selected, caption)">{{ t('journal.insert') }}</button>
