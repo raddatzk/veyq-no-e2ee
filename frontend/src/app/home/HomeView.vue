@@ -22,6 +22,7 @@ import InviteModal from './InviteModal.vue'
 import OpenInApp from '../auth/OpenInApp.vue'
 import HomeSidebar from './HomeSidebar.vue'
 import HomeTopbar from './HomeTopbar.vue'
+import MemoryLevelGrid from './MemoryLevelGrid.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
@@ -324,47 +325,19 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
       <!-- :key forces a remount when the memory changes (e.g. search-selecting a different one without going
            through openLevel), so the gallery/journal/tracks reload instead of showing the previous memory's. -->
       <MemoryDetailView v-if="selectedMemory && active" :key="selectedMemory.node.id" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="closeMemory" />
-      <template v-else>
-        <div v-if="error" class="home-empty">{{ error }}</div>
-
-        <div class="content-head"><span class="content-title">{{ t('home.memories') }}</span><span class="content-count">{{ memories.length }}</span></div>
-        <div class="card-grid">
-          <button
-            v-for="m in memories"
-            :key="m.node.id"
-            class="memory-card"
-            draggable="true"
-            @click="openMemory(m)"
-            @dragstart="onDragStart(m, 'M')"
-            @dragover.prevent
-            @drop="onReorderDrop(m, 'M')"
-          >
-            <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
-            <div v-else class="memory-cover placeholder">…</div>
-            <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
-            <span class="card-more" @click.stop="menuTarget = m">⋯</span>
-          </button>
-          <button class="create-card" @click="createType = 'MEMORY'"><span class="create-plus">＋</span>{{ t('home.createMemory') }}</button>
-        </div>
-
-        <div class="content-head"><span class="content-title">{{ t('home.folders') }}</span><span class="content-count">{{ folders.length }}</span></div>
-        <div class="card-grid">
-          <button
-            v-for="f in folders"
-            :key="f.node.id"
-            class="folder-card"
-            draggable="true"
-            @click="openFolder(f)"
-            @dragstart="onDragStart(f, 'F')"
-            @dragover.prevent
-            @drop="onReorderDrop(f, 'F')"
-          >
-            <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
-            <span class="card-more" @click.stop="menuTarget = f">⋯</span>
-          </button>
-          <button class="create-card create-card-row" @click="createType = 'FOLDER'"><span class="create-plus">＋</span>{{ t('home.createFolder') }}</button>
-        </div>
-      </template>
+      <MemoryLevelGrid
+        v-else
+        :error="error"
+        :memories="memories"
+        :folders="folders"
+        :covers="covers"
+        @open-memory="openMemory"
+        @open-folder="openFolder"
+        @create="createType = $event"
+        @open-menu="menuTarget = $event"
+        @drag-start="onDragStart"
+        @reorder-drop="onReorderDrop"
+      />
     </main>
 
     <CreateModal
