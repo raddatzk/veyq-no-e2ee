@@ -361,13 +361,24 @@
   font-weight: 800;
 }
 
-.journal { max-width: 760px; }
-.journal-bar { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
-.journal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+.journal {
+  display: grid;
+  gap: 1rem;
+  max-width: 920px;
+}
+
+.journal-bar,
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .journal-editor {
   width: 100%;
-  min-height: 320px;
-  padding: 0.9rem 1rem;
+  min-height: 260px;
+  padding: 0.85rem;
   font: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.92rem;
@@ -375,25 +386,53 @@
   color: var(--app-text);
   background: var(--app-surface);
   border: 1px solid var(--app-line);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-sm);
   resize: vertical;
   outline: none;
 }
 .journal-editor:focus { border-color: var(--app-accent); }
-.journal-body { line-height: 1.65; color: var(--app-text); }
+.journal-body {
+  color: var(--app-text);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.journal-body > :first-child { margin-top: 0; }
+.journal-body > :last-child { margin-bottom: 0; }
+.journal-body > div:first-child > :first-child { margin-top: 0; }
+.journal-body > div:last-child > :last-child { margin-bottom: 0; }
+.journal-body h1,
+.journal-body h2,
+.journal-body h3 {
+  color: var(--app-text);
+  line-height: 1.2;
+  letter-spacing: 0;
+}
 .journal-body h1 { font-size: 1.5rem; margin: 1.2rem 0 0.6rem; }
 .journal-body h2 { font-size: 1.25rem; margin: 1.1rem 0 0.5rem; }
 .journal-body h3 { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
 .journal-body p { margin: 0.6rem 0; }
 .journal-body ul, .journal-body ol { margin: 0.6rem 0; padding-left: 1.4rem; }
 .journal-body li { margin: 0.2rem 0; }
-.journal-body a { color: var(--app-accent); }
+.journal-body a {
+  color: var(--app-success);
+  font-weight: 650;
+}
 .journal-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.88em;
   background: var(--app-surface-muted);
   padding: 0.1rem 0.3rem;
   border-radius: 5px;
+}
+.journal > .home-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  padding: 1rem;
+  color: var(--app-muted);
+  background: var(--app-surface);
+  border: 1px dashed var(--app-line);
+  border-radius: var(--app-radius);
 }
 
 .memory-map-wrap { width: 100%; }

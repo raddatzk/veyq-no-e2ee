@@ -26,7 +26,7 @@ const step = (d: number) => { idx.value = (idx.value + d + props.tiles.length) %
 <style scoped>
 .jcar { position: relative; display: flex; justify-content: center; }
 .jcar-img { padding: 0; border: none; background: none; cursor: pointer; max-width: 100%; }
-.jcar-img img { display: block; max-height: 360px; max-width: 100%; object-fit: contain; border-radius: var(--app-radius-sm); }
+.jcar-img img { display: block; max-height: 520px; max-width: 100%; object-fit: contain; border-radius: var(--app-radius); }
 .jcar-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
   width: 2rem; height: 2rem; border: none; border-radius: 999px;

@@ -94,12 +94,40 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
 </template>
 
 <style scoped>
-.journal-embed { margin: 0.9rem 0; }
-.journal-embed-caption { margin-top: 0.4rem; font-size: 0.85rem; color: var(--app-muted); text-align: center; }
+.journal-embed {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.1rem 0;
+}
+.journal-embed-media,
+.journal-embed-track {
+  max-width: 760px;
+}
+.journal-embed-caption {
+  margin-top: 0;
+  font-size: 0.9rem;
+  color: var(--app-muted);
+}
 .journal-embed-missing { font-size: 0.85rem; color: var(--app-muted); font-style: italic; }
 
-.journal-embed-track :deep(.memory-map) { height: min(40vh, 320px); }
-.journal-track-stats { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.journal-embed-track {
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+}
+.journal-embed-track :deep(.memory-map) {
+  height: min(40vh, 320px);
+  border: 0;
+  border-radius: 0;
+}
+.journal-track-stats {
+  display: grid;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0 0.85rem 0.85rem;
+}
 .journal-track-stats li { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: baseline; font-size: 0.85rem; }
 .journal-track-stats .track-name { font-weight: 600; color: var(--app-text); }
 .journal-track-stats .track-stat { color: var(--app-muted); }
@@ -107,12 +135,17 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
 .journal-chapter-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem;
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
   font-size: 0.95rem;
-  color: var(--app-accent);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  vertical-align: middle;
 }
 .journal-chapter-icon { opacity: 0.85; text-decoration: none; }
 
@@ -120,11 +153,21 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem;
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
   font-size: 0.95rem;
-  color: var(--app-accent);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  vertical-align: middle;
+}
+.journal-chapter-link:hover,
+.journal-playlist-link:hover {
+  border-color: var(--app-success);
+  color: var(--app-success);
 }
 .journal-playlist-provider {
   font-size: 0.75rem;
