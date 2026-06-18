@@ -79,6 +79,11 @@ function lightboxStep(d: number) {
   openLightbox(tiles.value[(i + d + tiles.value.length) % tiles.value.length])
 }
 const chapterChildCount = () => childNodes.value.filter((n) => n.type === 'CHAPTER').length
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
 
 const hasHighlights = () => allTiles.value.some((tl) => tl.highlighted)
 function applyTileFilter() { tiles.value = showHighlights.value ? allTiles.value.filter((tl) => tl.highlighted) : allTiles.value }
@@ -294,6 +299,11 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
         <div><span>{{ t('info.takenAt') }}</span><strong>{{ new Date(lightboxTile.takenAt).toLocaleString() }}</strong></div>
         <div><span>{{ t('info.type') }}</span><strong>{{ lightboxTile.mimeType }}</strong></div>
         <div v-if="lightboxTile.lat != null"><span>{{ t('info.location') }}</span><strong>{{ lightboxTile.lat!.toFixed(5) }}, {{ lightboxTile.lng!.toFixed(5) }}</strong></div>
+        <div v-if="lightboxTile.cameraModel"><span>{{ t('info.camera') }}</span><strong>{{ [lightboxTile.cameraMake, lightboxTile.cameraModel].filter(Boolean).join(' ') }}</strong></div>
+        <div v-if="lightboxTile.lens"><span>{{ t('info.lens') }}</span><strong>{{ lightboxTile.lens }}</strong></div>
+        <div v-if="lightboxTile.width && lightboxTile.height"><span>{{ t('info.dimensions') }}</span><strong>{{ lightboxTile.width }}×{{ lightboxTile.height }}</strong></div>
+        <div v-if="lightboxTile.fileSize"><span>{{ t('info.fileSize') }}</span><strong>{{ formatBytes(lightboxTile.fileSize) }}</strong></div>
+        <div v-for="(val, key) in (lightboxTile.exif ?? {})" :key="key"><span>{{ key }}</span><strong>{{ val }}</strong></div>
       </div>
       <div class="lightbox-actions" @click.stop>
         <slot name="lightbox-actions" :tile="lightboxTile" />

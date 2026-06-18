@@ -51,5 +51,12 @@ export async function fileToNewMedia(file: File): Promise<NewMedia> {
     mimeType,
     lat: exif.lat,
     lng: exif.lng,
+    cameraMake: exif.cameraMake,
+    cameraModel: exif.cameraModel,
+    lens: exif.lens,
+    width: exif.width,
+    height: exif.height,
+    fileSize: bytes.length,
+    exif: exif.exif,
   }
 }

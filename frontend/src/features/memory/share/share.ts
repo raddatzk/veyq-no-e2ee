@@ -191,7 +191,12 @@ export async function loadShareTiles(ctx: ShareContext, nodeId: string): Promise
     const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
     const bytes = await downloadShareBlob(ctx, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original }
+    return {
+      id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType,
+      takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original,
+      cameraMake: meta.cameraMake, cameraModel: meta.cameraModel, lens: meta.lens,
+      width: meta.width, height: meta.height, fileSize: meta.fileSize, exif: meta.exif,
+    }
   })
 }
 

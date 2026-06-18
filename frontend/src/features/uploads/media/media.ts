@@ -33,9 +33,36 @@ export type MediaItem = {
   highlighted: boolean
   createdAt: string
 }
-/** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
-export type MediaMeta = { takenAt: string; lat?: number; lng?: number }
-export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; preview?: Uint8Array; takenAt: string; mimeType: string; lat?: number; lng?: number }
+/** Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
+ *  best-effort set of EXIF camera details (operator-blind — sealed with everything else). */
+export type MediaMeta = {
+  takenAt: string
+  lat?: number
+  lng?: number
+  cameraMake?: string
+  cameraModel?: string
+  lens?: string
+  width?: number
+  height?: number
+  fileSize?: number
+  exif?: Record<string, string>
+}
+export type NewMedia = {
+  bytes: Uint8Array
+  thumb?: Uint8Array
+  preview?: Uint8Array
+  takenAt: string
+  mimeType: string
+  lat?: number
+  lng?: number
+  cameraMake?: string
+  cameraModel?: string
+  lens?: string
+  width?: number
+  height?: number
+  fileSize?: number
+  exif?: Record<string, string>
+}
 
 /** Seal {takenAt, lat?, lng?} into a sealedMeta blob (nonce || AEAD) for the create request. */
 export function sealMediaMeta(contentKey: Uint8Array, meta: MediaMeta): { suiteId: string; bytes: string } {
@@ -219,7 +246,11 @@ export async function uploadMedia(apiBase: string, session: UnlockedSession, sco
     const preview = await uploadBlob(apiBase, session, scopeId, contentKey, m.preview, chunkSize)
     derivatives.push({ kind: 'PREVIEW', blobId: preview.blobId })
   }
-  const sealedMeta = sealMediaMeta(contentKey, { takenAt: m.takenAt, lat: m.lat, lng: m.lng })
+  const sealedMeta = sealMediaMeta(contentKey, {
+    takenAt: m.takenAt, lat: m.lat, lng: m.lng,
+    cameraMake: m.cameraMake, cameraModel: m.cameraModel, lens: m.lens,
+    width: m.width, height: m.height, fileSize: m.fileSize, exif: m.exif,
+  })
   return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives })
 }
 
