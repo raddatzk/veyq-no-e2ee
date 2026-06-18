@@ -28,6 +28,7 @@ export function useGallery(opts: UseGalleryOptions) {
   const lightbox = ref<string | null>(null)
   const lightboxTile = ref<GalleryTile | null>(null)
   const downloading = ref(false)
+  const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
   let ro: ResizeObserver | null = null
 
   // Group the (takenAt-ordered) tiles into day buckets, each with its own justified layout — a dated timeline.
@@ -38,8 +39,8 @@ export function useGallery(opts: UseGalleryOptions) {
       layout: calculateJustifiedLayout({
         items: b.items.map((t) => ({ id: t.id, aspectRatio: t.aspectRatio })),
         containerWidth: containerWidth.value,
-        targetHeight: 220,
-        gap: 6,
+        targetHeight: targetTileHeight.value,
+        gap: 8,
       }),
     })),
   )
