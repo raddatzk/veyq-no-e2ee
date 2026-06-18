@@ -19,6 +19,7 @@ import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
+import MemoryContributionsSection from './MemoryContributionsSection.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
@@ -337,22 +338,18 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       @remove="removePlaylist"
     />
 
-    <section v-if="tab === 'contributions'" class="memory-contributions">
-      <ul class="bucket-list">
-        <li v-for="b in contribBuckets" :key="b.id" class="bucket-row" :class="{ sub: !b.primary }">
-          <button class="bucket-open" type="button" @click="openBucket(b)">
-            <span class="bucket-name">{{ b.primary ? '👤' : '📁' }} {{ bucketLabel?.(b) || (b.primary ? t('contrib.member') : '—') }}</span>
-            <span class="bucket-count">{{ bucketCount(b) }}</span>
-          </button>
-          <span v-if="isOwnBucket(b)" class="bucket-actions">
-            <button v-if="!b.primary" class="btn btn-ghost" type="button" @click="renameOwnBucket(b)">{{ t('common.rename') }}</button>
-            <button v-if="!b.primary" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="deleteOwnBucket(b)">{{ t('common.delete') }}</button>
-            <button v-if="b.primary && createBucket" class="btn btn-ghost" type="button" @click="newSubBucket">+ {{ t('contrib.newBucket') }}</button>
-          </span>
-        </li>
-      </ul>
-      <div v-if="!contribBuckets.length" class="home-empty">{{ t('contrib.empty') }}</div>
-    </section>
+    <MemoryContributionsSection
+      v-if="tab === 'contributions'"
+      :buckets="contribBuckets"
+      :can-create-bucket="!!createBucket"
+      :bucket-label="bucketLabel"
+      :bucket-count="bucketCount"
+      :is-own-bucket="isOwnBucket"
+      @open-bucket="openBucket"
+      @rename-bucket="renameOwnBucket"
+      @delete-bucket="deleteOwnBucket"
+      @create-bucket="newSubBucket"
+    />
 
     <MemoryInfoSection
       v-if="tab === 'info'"

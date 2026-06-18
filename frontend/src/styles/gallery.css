@@ -182,6 +182,7 @@
 .bucket-name { font-weight: 600; }
 .bucket-count { color: var(--app-muted); font-size: 0.85rem; }
 .bucket-actions { display: flex; gap: 0.3rem; }
+.bucket-delete { color: var(--app-danger); }
 .bucket-camera-filter, .bucket-move {
   background: var(--app-surface); color: var(--app-text); border: 1px solid var(--app-line);
   border-radius: var(--app-radius-sm); padding: 0.35rem 0.5rem; font: inherit;
