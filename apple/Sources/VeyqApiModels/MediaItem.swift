@@ -21,9 +21,11 @@ public struct MediaItem: Codable {
     public private(set) var original: BlobRef
     public private(set) var derivatives: [MediaDerivativeOut]
     public private(set) var highlighted: Bool
+    public private(set) var createdBy: String
+    public private(set) var bucketId: String?
     public private(set) var createdAt: Date
 
-    public init(id: String, scopeId: String, nodeId: String, sealedMeta: Blob, mimeType: String, original: BlobRef, derivatives: [MediaDerivativeOut], highlighted: Bool, createdAt: Date) {
+    public init(id: String, scopeId: String, nodeId: String, sealedMeta: Blob, mimeType: String, original: BlobRef, derivatives: [MediaDerivativeOut], highlighted: Bool, createdBy: String, bucketId: String? = nil, createdAt: Date) {
         self.id = id
         self.scopeId = scopeId
         self.nodeId = nodeId
@@ -32,6 +34,8 @@ public struct MediaItem: Codable {
         self.original = original
         self.derivatives = derivatives
         self.highlighted = highlighted
+        self.createdBy = createdBy
+        self.bucketId = bucketId
         self.createdAt = createdAt
     }
 
@@ -44,6 +48,8 @@ public struct MediaItem: Codable {
         case original
         case derivatives
         case highlighted
+        case createdBy
+        case bucketId
         case createdAt
     }
 
@@ -59,6 +65,8 @@ public struct MediaItem: Codable {
         try container.encode(original, forKey: .original)
         try container.encode(derivatives, forKey: .derivatives)
         try container.encode(highlighted, forKey: .highlighted)
+        try container.encode(createdBy, forKey: .createdBy)
+        try container.encodeIfPresent(bucketId, forKey: .bucketId)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }

@@ -16,12 +16,14 @@ public struct CreateMediaRequest: Codable {
     public private(set) var originalBlobId: String
     public private(set) var sealedMeta: Blob
     public private(set) var mimeType: String
+    public private(set) var bucketId: String?
     public private(set) var derivatives: [MediaDerivativeInput]?
 
-    public init(originalBlobId: String, sealedMeta: Blob, mimeType: String, derivatives: [MediaDerivativeInput]? = nil) {
+    public init(originalBlobId: String, sealedMeta: Blob, mimeType: String, bucketId: String? = nil, derivatives: [MediaDerivativeInput]? = nil) {
         self.originalBlobId = originalBlobId
         self.sealedMeta = sealedMeta
         self.mimeType = mimeType
+        self.bucketId = bucketId
         self.derivatives = derivatives
     }
 
@@ -29,6 +31,7 @@ public struct CreateMediaRequest: Codable {
         case originalBlobId
         case sealedMeta
         case mimeType
+        case bucketId
         case derivatives
     }
 
@@ -39,6 +42,7 @@ public struct CreateMediaRequest: Codable {
         try container.encode(originalBlobId, forKey: .originalBlobId)
         try container.encode(sealedMeta, forKey: .sealedMeta)
         try container.encode(mimeType, forKey: .mimeType)
+        try container.encodeIfPresent(bucketId, forKey: .bucketId)
         try container.encodeIfPresent(derivatives, forKey: .derivatives)
     }
 }

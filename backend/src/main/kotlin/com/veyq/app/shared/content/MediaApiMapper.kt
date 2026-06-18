@@ -40,6 +40,8 @@ class MediaApiMapper(
                 original = ref(m.originalBlobId),
                 derivatives = derivsByMedia[m.id].orEmpty().map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = ref(it.blobId)) },
                 highlighted = m.highlighted,
+                createdBy = m.createdBy,
+                bucketId = m.bucketId,
                 createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
             )
         }

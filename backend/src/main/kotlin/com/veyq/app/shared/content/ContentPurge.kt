@@ -17,6 +17,7 @@ import jakarta.enterprise.context.ApplicationScoped
 class ContentPurge(
     private val nodes: NodeRepository,
     private val media: MediaRepository,
+    private val mediaBuckets: MediaBucketRepository,
     private val derivatives: MediaDerivativeRepository,
     private val journals: MemoryJournalRepository,
     private val journalUpdates: MemoryJournalUpdateRepository,
@@ -33,6 +34,7 @@ class ContentPurge(
         val mediaIds = media.listByNodeIds(nodeIds).map { it.id }
         derivatives.deleteByMediaIds(mediaIds)
         media.deleteByNodeIds(nodeIds)
+        mediaBuckets.deleteByNodeIds(nodeIds)
         journals.deleteByNodeIds(nodeIds)
         journalUpdates.deleteByNodeIds(nodeIds)
         tracks.deleteByNodeIds(nodeIds)
@@ -46,6 +48,7 @@ class ContentPurge(
         val mediaIds = media.listByScopeId(scopeId).map { it.id }
         derivatives.deleteByMediaIds(mediaIds)
         media.deleteByScopeId(scopeId)
+        mediaBuckets.deleteByScopeId(scopeId)
         journals.deleteByScopeId(scopeId)
         journalUpdates.deleteByScopeId(scopeId)
         tracks.deleteByScopeId(scopeId)

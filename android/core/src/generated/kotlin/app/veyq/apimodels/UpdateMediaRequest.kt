@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  *
  * @param highlighted 
  * @param sealedMeta 
+ * @param bucketId 
  */
 @Serializable
 
@@ -44,7 +45,10 @@ data class UpdateMediaRequest (
     val highlighted: kotlin.Boolean? = null,
 
     @SerialName(value = "sealedMeta")
-    val sealedMeta: Blob? = null
+    val sealedMeta: Blob? = null,
+
+    @SerialName(value = "bucketId")
+    val bucketId: kotlin.String? = null
 
 ) {
 

@@ -43,7 +43,9 @@ import kotlinx.serialization.Contextual
  * @param original 
  * @param derivatives 
  * @param highlighted 
+ * @param createdBy 
  * @param createdAt 
+ * @param bucketId 
  */
 @Serializable
 
@@ -73,8 +75,14 @@ data class MediaItem (
     @SerialName(value = "highlighted")
     val highlighted: kotlin.Boolean,
 
+    @SerialName(value = "createdBy")
+    val createdBy: kotlin.String,
+
     @Contextual @SerialName(value = "createdAt")
-    val createdAt: java.time.OffsetDateTime
+    val createdAt: java.time.OffsetDateTime,
+
+    @SerialName(value = "bucketId")
+    val bucketId: kotlin.String? = null
 
 ) {
 

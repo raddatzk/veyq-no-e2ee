@@ -15,15 +15,18 @@ public struct UpdateMediaRequest: Codable {
 
     public private(set) var highlighted: Bool?
     public private(set) var sealedMeta: Blob?
+    public private(set) var bucketId: String?
 
-    public init(highlighted: Bool? = nil, sealedMeta: Blob? = nil) {
+    public init(highlighted: Bool? = nil, sealedMeta: Blob? = nil, bucketId: String? = nil) {
         self.highlighted = highlighted
         self.sealedMeta = sealedMeta
+        self.bucketId = bucketId
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case highlighted
         case sealedMeta
+        case bucketId
     }
 
     // Encodable protocol methods
@@ -32,6 +35,7 @@ public struct UpdateMediaRequest: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(highlighted, forKey: .highlighted)
         try container.encodeIfPresent(sealedMeta, forKey: .sealedMeta)
+        try container.encodeIfPresent(bucketId, forKey: .bucketId)
     }
 }
 

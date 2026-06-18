@@ -51,7 +51,9 @@ class PublicShareContributeHandler(
         val owner = "share:${share.id}"
         requireFromThisShare(share.scopeId, req.originalBlobId, owner)
         req.derivatives.orEmpty().forEach { requireFromThisShare(share.scopeId, it.blobId, owner) }
-        return media.createMediaAs(share.scopeId, nodeId, req)
+        // Attribute the medium to this share's contribution bucket (ADR 0023). Per-guest naming (a
+        // "share:<id>:<contributorId>" key) lands in a follow-up; for now all of a share's uploads group here.
+        return media.createMediaAs(share.scopeId, nodeId, req, owner)
     }
 
     private fun requireFromThisShare(scopeId: String, blobId: String, owner: String) {

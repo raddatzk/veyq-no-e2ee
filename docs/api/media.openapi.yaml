@@ -179,6 +179,71 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/buckets:
+    get:
+      tags: [MemoryBucket]
+      operationId: listBuckets
+      summary: List a Memory's contribution buckets (per-contributor primary + sub-buckets) with media counts.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The buckets., content: { application/json: { schema: { $ref: '#/components/schemas/MediaBucketList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [MemoryBucket]
+      operationId: createBucket
+      summary: Create a sub-bucket under the caller's own primary bucket (sealed name); persists the primary.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateBucketRequest' } } }
+      responses:
+        '200': { description: The created bucket., content: { application/json: { schema: { $ref: '#/components/schemas/MediaBucket' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/buckets/{bucketId}:
+    patch:
+      tags: [MemoryBucket]
+      operationId: renameBucket
+      summary: Rename one of the caller's own buckets (re-seal the name).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: bucketId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateBucketRequest' } } }
+      responses:
+        '200': { description: The updated bucket., content: { application/json: { schema: { $ref: '#/components/schemas/MediaBucket' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    delete:
+      tags: [MemoryBucket]
+      operationId: deleteBucket
+      summary: Delete one of the caller's own sub-buckets; its media fall back to the owner's primary bucket.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: bucketId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/public/shares/{shareId}/nodes/{nodeId}/media:
     get:
       tags: [PublicShareMedia]
@@ -362,6 +427,8 @@ components:
         originalBlobId: { type: string }
         sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         mimeType: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
+        # Optional target bucket (ADR 0023). Omitted → the contributor's primary bucket.
+        bucketId: { type: string }
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeInput' }
@@ -370,9 +437,11 @@ components:
       properties:
         highlighted: { type: boolean }
         sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        # Move the medium to another of the CALLER'S OWN buckets (ADR 0023). Server rejects cross-owner moves.
+        bucketId: { type: string }
     MediaItem:
       type: object
-      required: [id, scopeId, nodeId, sealedMeta, mimeType, original, derivatives, highlighted, createdAt]
+      required: [id, scopeId, nodeId, sealedMeta, mimeType, original, derivatives, highlighted, createdBy, createdAt]
       properties:
         id: { type: string }
         scopeId: { type: string }
@@ -384,9 +453,40 @@ components:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeOut' }
         highlighted: { type: boolean }
+        # Contribution attribution (ADR 0023): who added this medium + which bucket it sits in (null = primary).
+        createdBy: { type: string }
+        bucketId: { type: string }
         createdAt: { type: string, format: date-time }
     MediaList:
       type: object
       required: [media]
       properties:
         media: { type: array, items: { $ref: '#/components/schemas/MediaItem' } }
+    MediaBucket:
+      type: object
+      required: [id, ownerKey, primary, mediaCount]
+      properties:
+        id: { type: string }
+        ownerKey: { type: string }                               # "user:<id>" or "share:<shareId>:<contributorId>"
+        parentBucketId: { type: string }                         # absent ⇒ primary/user bucket
+        # Sealed bucket name (AEAD under the content key). Absent for a synthesized member primary bucket —
+        # the client resolves the member's display name from the membership list (ADR 0023).
+        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        primary: { type: boolean }
+        mediaCount: { type: integer }
+    MediaBucketList:
+      type: object
+      required: [buckets]
+      properties:
+        buckets: { type: array, items: { $ref: '#/components/schemas/MediaBucket' } }
+    CreateBucketRequest:
+      type: object
+      required: [sealedName]
+      properties:
+        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed sub-bucket name
+        parentBucketId: { type: string }                         # the caller's primary bucket id (omit ⇒ own primary)
+    UpdateBucketRequest:
+      type: object
+      required: [sealedName]
+      properties:
+        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

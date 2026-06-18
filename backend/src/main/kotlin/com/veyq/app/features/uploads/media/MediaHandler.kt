@@ -13,6 +13,7 @@ import com.veyq.app.shared.content.DerivativeKind
 import com.veyq.app.shared.content.Media
 import com.veyq.app.shared.content.MediaDerivative
 import com.veyq.app.shared.content.MediaApiMapper
+import com.veyq.app.shared.content.MediaBucketRepository
 import com.veyq.app.shared.content.MediaDerivativeRepository
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
@@ -36,6 +37,7 @@ class MediaHandler(
     private val nodes: NodeRepository,
     private val blobs: BlobRepository,
     private val media: MediaRepository,
+    private val buckets: MediaBucketRepository,
     private val derivatives: MediaDerivativeRepository,
     private val mapper: MediaApiMapper,
     private val guard: ScopeAccessGuard,
@@ -52,22 +54,25 @@ class MediaHandler(
 
     @Transactional
     fun createMedia(auth: String?, scopeId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
-        requireKeyHolder(scopeId, auth)
-        return createMediaAs(scopeId, nodeId, req)
+        val uid = requireKeyHolder(scopeId, auth)
+        return createMediaAs(scopeId, nodeId, req, "user:$uid")
     }
 
-    /** Attach media for an already-authorized writer (a session key holder or a CONTRIBUTOR share). */
+    /** Attach media for an already-authorized writer (a session key holder or a CONTRIBUTOR share). The
+     * [createdBy] contributor key ("user:<id>" / "share:<shareId>:<contributorId>") attributes the medium to a
+     * contribution bucket (ADR 0023); an explicit req.bucketId must be one of that contributor's OWN buckets. */
     @Transactional
-    fun createMediaAs(scopeId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
+    fun createMediaAs(scopeId: String, nodeId: String, req: CreateMediaRequest, createdBy: String): MediaItem {
         requireMemoryNode(scopeId, nodeId)
         requireBlob(scopeId, req.originalBlobId)
         if (!suites.isKnown(req.sealedMeta.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        val bucketId = resolveOwnBucket(nodeId, req.bucketId, createdBy)
 
         val item = Media().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
             originalBlobId = req.originalBlobId
             sealedMeta = dec.decode(req.sealedMeta.bytes); suiteId = req.sealedMeta.suiteId
-            mimeType = req.mimeType; createdAt = Instant.now()
+            mimeType = req.mimeType; this.createdBy = createdBy; this.bucketId = bucketId; createdAt = Instant.now()
         }
         media.persist(item)
         req.derivatives.orEmpty().forEach { d ->
@@ -90,19 +95,39 @@ class MediaHandler(
                 MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = blobRef(it.blobId))
             },
             highlighted = m.highlighted,
+            createdBy = m.createdBy,
+            bucketId = m.bucketId,
             createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
         )
+
+    /** Validate that an explicit target [bucketId] is one of [createdBy]'s OWN buckets in [nodeId]; null/blank
+     * or a synthetic "primary:<key>" id means the contributor's primary bucket (stored as null). 400/403 else. */
+    private fun resolveOwnBucket(nodeId: String, bucketId: String?, createdBy: String): String? {
+        val raw = bucketId?.trim().orEmpty()
+        if (raw.isEmpty() || raw == "primary:$createdBy") return null
+        if (raw.startsWith("primary:")) throw ApiException(403, "NOT_YOUR_BUCKET", "Not your bucket")
+        val b = buckets.findById(raw) ?: throw ApiException(404, "BUCKET_NOT_FOUND", "Bucket not found")
+        if (b.nodeId != nodeId) throw ApiException(404, "BUCKET_NOT_FOUND", "Bucket not in this node")
+        if (b.ownerKey != createdBy) throw ApiException(403, "NOT_YOUR_BUCKET", "You can only use your own buckets")
+        return b.id
+    }
 
     /** Toggle the highlight flag and/or replace the (re-sealed) metadata of a medium — any scope key holder. */
     @Transactional
     fun updateMedia(auth: String?, scopeId: String, nodeId: String, mediaId: String, req: com.veyq.app.generated.model.UpdateMediaRequest): MediaItem {
-        requireKeyHolder(scopeId, auth)
+        val uid = requireKeyHolder(scopeId, auth)
         val item = media.findById(mediaId) ?: throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found")
         if (item.scopeId != scopeId || item.nodeId != nodeId) throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found here")
-        req.highlighted?.let { item.highlighted = it }
-        req.sealedMeta?.let {
+        req.highlighted?.let { item.highlighted = it } // benign favourite — any key holder
+        req.sealedMeta?.let { // capture-date / location re-seal — any key holder
             if (!suites.isKnown(it.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
             item.sealedMeta = dec.decode(it.bytes); item.suiteId = it.suiteId
+        }
+        // Move between the CALLER'S OWN buckets only: the medium must be theirs and the target their own bucket.
+        req.bucketId?.let { target ->
+            val callerKey = "user:$uid"
+            if (item.createdBy != callerKey) throw ApiException(403, "NOT_YOUR_MEDIA", "You can only move your own media")
+            item.bucketId = resolveOwnBucket(nodeId, target, callerKey)
         }
         return toApi(item)
     }
@@ -138,7 +163,6 @@ class MediaHandler(
         }
     }
 
-    private fun requireKeyHolder(scopeId: String, auth: String?) {
+    private fun requireKeyHolder(scopeId: String, auth: String?): String =
         guard.requireKeyHolder(auth, scopeId)
-    }
 }
