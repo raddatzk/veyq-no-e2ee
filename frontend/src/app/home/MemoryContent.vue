@@ -13,15 +13,14 @@ import type { GalleryTile } from '../../features/gallery/gallery'
 import type { Bucket } from '../../features/memory/buckets/buckets'
 import type { Playlist } from '../../features/memory/playlist/playlist'
 import type { Track } from '../../features/memory/track/track'
-import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import JournalBody from './JournalBody.vue'
-import MemoryMap from './MemoryMap.vue'
 import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
+import MemoryMapSection from './MemoryMapSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
@@ -367,23 +366,22 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       @navigate="navigate"
     />
 
-    <section v-if="tab === 'map'" class="memory-map-wrap">
-      <slot name="map-toolbar" :node-id="currentNodeId" />
-      <MemoryMap v-if="geoPoints().length || visibleTracks.length" :points="geoPoints()" :tracks="visibleTracks" @select="openMapPin" />
-      <div v-else class="home-empty">{{ t('map.empty') }}</div>
-      <ul v-if="tracks.length" class="track-list">
-        <li v-for="tr in tracks" :key="tr.id" class="track-row">
-          <span class="track-meta">
-            <label class="track-vis"><input type="checkbox" :checked="!hiddenTracks.has(tr.id)" @change="toggleTrack(tr.id)" /></label>
-            <span class="track-name">🛤 {{ tr.name }}</span>
-            <span class="track-stat">{{ formatDistance(trackStats(tr.points).distanceM) }}</span>
-            <span v-if="trackStats(tr.points).durationS" class="track-stat">{{ formatDuration(trackStats(tr.points).durationS!) }}</span>
-            <span v-if="formatElevation(trackStats(tr.points))" class="track-stat">{{ formatElevation(trackStats(tr.points)) }}</span>
-          </span>
-          <slot name="track-actions" :track="tr" />
-        </li>
-      </ul>
-    </section>
+    <MemoryMapSection
+      v-if="tab === 'map'"
+      :points="geoPoints()"
+      :tracks="tracks"
+      :visible-tracks="visibleTracks"
+      :hidden-track-ids="hiddenTracks"
+      @select-pin="openMapPin"
+      @toggle-track="toggleTrack"
+    >
+      <template #map-toolbar>
+        <slot name="map-toolbar" :node-id="currentNodeId" />
+      </template>
+      <template #track-actions="{ track }">
+        <slot name="track-actions" :track="track" />
+      </template>
+    </MemoryMapSection>
 
     <section v-if="tab === 'journal'" class="journal">
       <slot v-if="journalEditing" name="journal-edit" :node-id="currentNodeId" :markdown="journalMarkdown" />
