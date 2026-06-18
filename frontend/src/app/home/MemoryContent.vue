@@ -17,6 +17,7 @@ import { trackStats, formatDistance, formatDuration, formatElevation } from '../
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
+import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
@@ -359,16 +360,12 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :chapter-count="chapterChildCount()"
     />
 
-    <!-- child chapters/folders/memories, browsable from their own tab (Legacy parity) -->
-    <section v-if="tab === 'chapters' && childNodes.length" class="memory-children">
-      <div class="card-grid">
-        <button v-for="n in childNodes" :key="n.id" class="memory-card child-card" @click="navigate(n.id, n.name)">
-          <img v-if="childCovers[n.id]" class="memory-cover" :src="childCovers[n.id]" alt="" />
-          <div v-else class="memory-cover placeholder">{{ n.type === 'FOLDER' ? '📁' : n.type === 'CHAPTER' ? '🗂' : '🖼' }}</div>
-          <div class="memory-label"><div class="memory-name">{{ n.name }}</div></div>
-        </button>
-      </div>
-    </section>
+    <MemoryChaptersSection
+      v-if="tab === 'chapters' && childNodes.length"
+      :nodes="childNodes"
+      :covers="childCovers"
+      @navigate="navigate"
+    />
 
     <section v-if="tab === 'map'" class="memory-map-wrap">
       <slot name="map-toolbar" :node-id="currentNodeId" />
