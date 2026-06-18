@@ -17,6 +17,7 @@ import { trackStats, formatDistance, formatDuration, formatElevation } from '../
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
+import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
@@ -304,19 +305,17 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
 
 <template>
   <div class="memory-detail">
-    <img v-if="heroUrl" class="detail-hero" :src="heroUrl" alt="" />
-    <div class="detail-head">
-      <button v-if="showBack" class="crumb" @click="emit('back')">{{ t('common.back') }}</button>
-      <nav v-if="crumbs.length > 1" class="crumbs detail-crumbs">
-        <template v-for="(c, i) in crumbs" :key="c.id">
-          <span v-if="i > 0" class="crumb-sep">/</span>
-          <button class="crumb" :class="{ current: i === crumbs.length - 1 }" @click="navigate(c.id)">{{ c.name }}</button>
-        </template>
-      </nav>
-      <h1 class="detail-title">{{ currentName }}</h1>
-      <span class="content-count">{{ t('detail.mediaCount', { n: tiles.length }) }}</span>
+    <MemoryDetailHeader
+      :hero-url="heroUrl"
+      :show-back="showBack"
+      :crumbs="crumbs"
+      :current-name="currentName"
+      :media-count="tiles.length"
+      @back="emit('back')"
+      @navigate="navigate"
+    >
       <slot name="head-actions" :node-id="currentNodeId" :tab="tab" />
-    </div>
+    </MemoryDetailHeader>
 
     <MemoryDetailTabs
       :tab="tab"
