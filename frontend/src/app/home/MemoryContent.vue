@@ -17,6 +17,7 @@ import { trackStats, formatDistance, formatDuration, formatElevation } from '../
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
+import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
 
@@ -56,7 +57,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
 
-const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters' | 'playlists'>('gallery')
+const tab = ref<MemoryDetailTab>('gallery')
 const currentNodeId = ref(props.rootNodeId)
 const currentName = ref(props.rootName)
 const crumbs = ref<{ id: string; name: string }[]>([{ id: props.rootNodeId, name: props.rootName }])
@@ -261,7 +262,7 @@ async function ensureTracks() {
   tracksLoaded.value = true
 }
 
-async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters' | 'playlists') {
+async function openTab(which: MemoryDetailTab) {
   tab.value = which
   try {
     if (which === 'journal') await ensureJournal()
@@ -317,15 +318,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <slot name="head-actions" :node-id="currentNodeId" :tab="tab" />
     </div>
 
-    <div class="detail-tabs">
-      <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="openTab('gallery')">{{ t('detail.gallery') }}</button>
-      <button v-if="childNodes.length" class="detail-tab" :class="{ active: tab === 'chapters' }" @click="openTab('chapters')">{{ t('detail.chapters') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openTab('map')">{{ t('detail.map') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openTab('journal')">{{ t('detail.journal') }}</button>
-      <button v-if="loadBuckets" class="detail-tab" :class="{ active: tab === 'contributions' }" @click="openTab('contributions')">{{ t('detail.contributions') }}</button>
-      <button v-if="loadPlaylists" class="detail-tab" :class="{ active: tab === 'playlists' }" @click="openTab('playlists')">{{ t('detail.playlists') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'info' }" @click="openTab('info')">{{ t('detail.info') }}</button>
-    </div>
+    <MemoryDetailTabs
+      :tab="tab"
+      :has-children="!!childNodes.length"
+      :has-buckets="!!loadBuckets"
+      :has-playlists="!!loadPlaylists"
+      @open="openTab"
+    />
 
     <section v-if="tab === 'playlists'" class="memory-playlists">
       <button v-if="addPlaylist" class="btn btn-primary" type="button" @click="addPlaylist">+ {{ t('playlist.add') }}</button>
