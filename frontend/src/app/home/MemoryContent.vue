@@ -104,6 +104,7 @@ function toggleTrack(id: string) {
 }
 const geoPoints = () => tiles.value.filter((tl) => tl.lat != null && tl.lng != null).map((tl) => ({ id: tl.id, lat: tl.lat!, lng: tl.lng! }))
 const tracksById = () => Object.fromEntries(tracks.value.map((tr) => [tr.id, tr]))
+const playlistById = () => Object.fromEntries(playlists.value.map((p) => [p.id, p]))
 function openMapPin(id: string) { const tile = tileById.value[id]; if (tile) openLightbox(tile) }
 
 // Cover hero = the current node's first photo (by takenAt); lightbox prev/next over the takenAt-ordered tiles.
@@ -402,6 +403,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
           :tile-by-id="tileById"
           :tracks-by-id="tracksById()"
           :chapter-by-id="chapterById"
+          :playlist-by-id="playlistById()"
           @open-media="openLightbox"
           @open-chapter="(id) => navigate(id)"
         />

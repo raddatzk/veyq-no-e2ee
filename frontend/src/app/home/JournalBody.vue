@@ -11,6 +11,7 @@ import { splitJournalBlocks } from '../../features/memory/journal/journalEmbed'
 import type { GalleryTile } from '../../features/gallery/gallery'
 import type { Track } from '../../features/memory/track/track'
 import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
+import { PROVIDER_LABEL, type Playlist } from '../../features/memory/playlist/playlist'
 import MemoryMap from './MemoryMap.vue'
 import JournalMediaCarousel from './JournalMediaCarousel.vue'
 
@@ -19,6 +20,7 @@ const props = defineProps<{
   tileById: Record<string, GalleryTile>
   tracksById: Record<string, Track>
   chapterById: Record<string, { name: string }>
+  playlistById?: Record<string, Playlist>
 }>()
 const emit = defineEmits<{ openMedia: [tile: GalleryTile]; openChapter: [nodeId: string] }>()
 
@@ -72,6 +74,21 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
         </a>
         <span v-else class="journal-embed-missing">{{ t('journal.embedMissing') }}</span>
       </p>
+
+      <!-- playlist: a card linking out to the streaming provider -->
+      <p v-else-if="block.type === 'embed' && block.embed.kind === 'playlist'" class="journal-embed journal-embed-playlist">
+        <a
+          v-if="playlistById && playlistById[block.embed.ids[0]]"
+          class="journal-playlist-link"
+          :href="playlistById[block.embed.ids[0]].url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="journal-playlist-provider">{{ PROVIDER_LABEL[playlistById[block.embed.ids[0]].provider] }}</span>
+          <span>{{ block.embed.label || playlistById[block.embed.ids[0]].title || playlistById[block.embed.ids[0]].url }}</span>
+        </a>
+        <span v-else class="journal-embed-missing">{{ t('journal.embedMissing') }}</span>
+      </p>
     </template>
   </div>
 </template>
@@ -98,4 +115,24 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
   text-underline-offset: 2px;
 }
 .journal-chapter-icon { opacity: 0.85; text-decoration: none; }
+
+.journal-playlist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--app-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.journal-playlist-provider {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-muted);
+  background: var(--app-surface);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  text-decoration: none;
+}
 </style>

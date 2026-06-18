@@ -15,7 +15,7 @@ function makeView(doc: string): EditorView {
       doc,
       extensions: [journalEmbedEditing({
         chipText: (e) => `${e.kind}:${e.ids.join(',')}`,
-        typeLabels: () => ({ media: 'Media', track: 'Track', chapter: 'Chapter' }),
+        typeLabels: () => ({ media: 'Media', track: 'Track', chapter: 'Chapter', playlist: 'Playlist' }),
         onInsert: () => {},
         onEdit: () => {},
       })],

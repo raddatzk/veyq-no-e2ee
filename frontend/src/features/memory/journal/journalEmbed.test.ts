@@ -41,8 +41,9 @@ describe('parseJournalEmbeds', () => {
     expect(parseJournalEmbeds('::media: nothing')).toHaveLength(0)
   })
 
-  it('does not parse a not-yet-supported playlist kind', () => {
-    expect(parseJournalEmbeds('::playlist:x My mix')).toHaveLength(0)
+  it('parses a playlist token and keeps only the first id', () => {
+    const e = parseJournalEmbeds('::playlist:pl1,ignored My mix')
+    expect(e[0]).toMatchObject({ kind: 'playlist', ids: ['pl1'], label: 'My mix' })
   })
 })
 

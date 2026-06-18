@@ -130,7 +130,7 @@ export function journalEmbedEditing(config: JournalEmbedEditorConfig): Extension
       if (!m || (m.from === m.to && !ctx.explicit)) return null
       const query = m.text.slice(2).toLowerCase()
       const labels = config.typeLabels()
-      const kinds: JournalEmbedKind[] = ['media', 'track', 'chapter']
+      const kinds: JournalEmbedKind[] = ['media', 'track', 'chapter', 'playlist']
       const options: Completion[] = kinds
         .filter((k) => !query || k.startsWith(query) || labels[k].toLowerCase().startsWith(query))
         .map((k) => ({ label: labels[k], type: `veyq-${k}`, apply: () => config.onInsert(k, m.from, ctx.pos) }))

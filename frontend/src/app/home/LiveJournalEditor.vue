@@ -19,6 +19,7 @@ import { journalEmbedEditing, refreshChips, replaceEmbed, type EmbedRange } from
 import { journalEmbedMarkdown, type JournalEmbed, type JournalEmbedKind } from '../../features/memory/journal/journalEmbed'
 import { loadGalleryTiles, type GalleryTile } from '../../features/gallery/gallery'
 import { getTracks, type Track } from '../../features/memory/track/track'
+import { listPlaylists, PROVIDER_LABEL, type Playlist } from '../../features/memory/playlist/playlist'
 import { loadLevel, type ActiveSpace } from '../../features/home/home'
 import JournalMediaPicker from './JournalMediaPicker.vue'
 import JournalEmbedPicker from './JournalEmbedPicker.vue'
@@ -30,8 +31,10 @@ const emit = defineEmits<{ close: [markdown: string]; }>()
 const tiles = ref<GalleryTile[]>([])
 const tracks = ref<Track[]>([])
 const chapters = ref<{ id: string; name: string }[]>([])
+const playlists = ref<Playlist[]>([])
 const trackName = (id: string) => tracks.value.find((tr) => tr.id === id)?.name
 const chapterName = (id: string) => chapters.value.find((c) => c.id === id)?.name
+const playlistName = (id: string) => { const p = playlists.value.find((x) => x.id === id); return p ? (p.title || p.url) : undefined }
 
 // ---- picker state ---------------------------------------------------------------------------------------
 const picker = ref<{ kind: JournalEmbedKind; range: { from: number; to: number }; editing: boolean; ids: string[]; label: string } | null>(null)
@@ -43,10 +46,11 @@ function chipText(e: JournalEmbed): string {
     const fallback = e.ids.length > 1 ? t('journal.chipTrackCount', { n: e.ids.length }) : (trackName(e.ids[0]) ?? e.ids[0])
     return `🛤 ${e.label || fallback}`
   }
+  if (e.kind === 'playlist') return `🎵 ${e.label || playlistName(e.ids[0]) || e.ids[0]}`
   return `🗂 ${e.label || chapterName(e.ids[0]) || e.ids[0]}`
 }
 function typeLabels(): Record<JournalEmbedKind, string> {
-  return { media: t('journal.embedKind.media'), track: t('journal.embedKind.track'), chapter: t('journal.embedKind.chapter') }
+  return { media: t('journal.embedKind.media'), track: t('journal.embedKind.track'), chapter: t('journal.embedKind.chapter'), playlist: t('journal.embedKind.playlist') }
 }
 function openInsert(kind: JournalEmbedKind, from: number, to: number) {
   embedMenuOpen.value = false
@@ -154,14 +158,16 @@ onMounted(async () => {
 /** Load this memory's media/tracks/chapters for chip labels + pickers, then refresh the rendered chips. */
 async function loadEmbedData() {
   try {
-    const [t1, t2, lvl] = await Promise.all([
+    const [t1, t2, lvl, pls] = await Promise.all([
       loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.nodeId),
       getTracks(session.apiBase, session.unlocked!, props.active, props.nodeId),
       loadLevel(session.apiBase, session.unlocked!, props.active, props.nodeId),
+      listPlaylists(session.apiBase, session.unlocked!, props.active, props.nodeId).catch(() => []),
     ])
     tiles.value = t1
     tracks.value = t2
     chapters.value = lvl.filter((e) => e.node.type === 'CHAPTER').map((e) => ({ id: e.node.id, name: e.name }))
+    playlists.value = pls
     view?.dispatch({ effects: refreshChips.of() })
   } catch { /* labels fall back to ids; pickers show empty states */ }
 }
@@ -210,6 +216,7 @@ function close() {
           <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('media')">🖼 {{ t('journal.embedKind.media') }}</button>
           <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('track')">🛤 {{ t('journal.embedKind.track') }}</button>
           <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('chapter')">🗂 {{ t('journal.embedKind.chapter') }}</button>
+          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('playlist')">🎵 {{ t('journal.embedKind.playlist') }}</button>
         </div>
       </div>
       <button class="btn btn-ghost" type="button" @click="close">{{ t('journal.done') }}</button>
@@ -241,6 +248,17 @@ function close() {
       v-else-if="picker && picker.kind === 'chapter'"
       kind="chapter"
       :items="chapters"
+      :selected-ids="picker.ids"
+      :label="picker.label"
+      :editing="picker.editing"
+      @confirm="applyPicker"
+      @remove="removePicker"
+      @cancel="picker = null"
+    />
+    <JournalEmbedPicker
+      v-else-if="picker && picker.kind === 'playlist'"
+      kind="playlist"
+      :items="playlists.map((p) => ({ id: p.id, name: (p.title || p.url) + ' · ' + PROVIDER_LABEL[p.provider] }))"
       :selected-ids="picker.ids"
       :label="picker.label"
       :editing="picker.editing"
