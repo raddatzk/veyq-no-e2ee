@@ -11,6 +11,7 @@ import { t } from '../../i18n/i18n'
 import { useGallery } from '../../features/gallery/useGallery'
 import type { GalleryTile } from '../../features/gallery/gallery'
 import type { Track } from '../../features/memory/track/track'
+import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
@@ -227,7 +228,12 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <div v-else class="home-empty">{{ t('map.empty') }}</div>
       <ul v-if="tracks.length" class="track-list">
         <li v-for="tr in tracks" :key="tr.id" class="track-row">
-          <span class="track-name">🛤 {{ tr.name }}</span>
+          <span class="track-meta">
+            <span class="track-name">🛤 {{ tr.name }}</span>
+            <span class="track-stat">{{ formatDistance(trackStats(tr.points).distanceM) }}</span>
+            <span v-if="trackStats(tr.points).durationS" class="track-stat">{{ formatDuration(trackStats(tr.points).durationS!) }}</span>
+            <span v-if="formatElevation(trackStats(tr.points))" class="track-stat">{{ formatElevation(trackStats(tr.points)) }}</span>
+          </span>
           <slot name="track-actions" :track="tr" />
         </li>
       </ul>
