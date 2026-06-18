@@ -48,3 +48,28 @@ acceptanceCriteria:
           - testName: testResolvesACleanSlugPathClientSide
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/BrowseE2ETests.swift
+  - id: uc.memory.browse.gallery-day-buckets
+    statement: "The gallery derives a local calendar-day key per medium and groups consecutive same-day runs into buckets (re-opening a bucket for a non-consecutive return), byte-compatibly with the web dateBuckets (which is covered under uc.platform.web-views.gallery-layout)."
+    coverage:
+      apple:
+        unit:
+          - testName: testGroupsConsecutiveRunsAndReopensForNonConsecutive
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/DayBucketsTests.swift
+          - testName: testFallsBackToPlaceholderForInvalidTimestamps
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/DayBucketsTests.swift
+          - testName: testDayKeyHasIsoDateShape
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/DayBucketsTests.swift
+      android:
+        unit:
+          - testName: groupsConsecutiveRunsAndReopensForNonConsecutive
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/DayBucketsTest.kt
+          - testName: fallsBackToPlaceholderForInvalidTimestamps
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/DayBucketsTest.kt
+          - testName: dayKeyHasIsoDateShape
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/DayBucketsTest.kt

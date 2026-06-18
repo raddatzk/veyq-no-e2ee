@@ -1,30 +1,12 @@
 import Foundation
+import VeyqCrypto
 
-/// Groups gallery media into day buckets by capture date (takenAt), mirroring the web `dateBuckets` logic,
-/// so the gallery reads as a dated timeline. Locale-aware labels via the active app locale.
+/// Localized gallery day labels. The day-key derivation + consecutive grouping live in VeyqCrypto.DayBuckets
+/// (shared + unit-tested); the labels here are locale-formatted via the active app locale.
 enum DateBuckets {
-    static func parse(_ takenAt: String) -> Date? {
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return withFraction.date(from: takenAt) ?? ISO8601DateFormatter().date(from: takenAt)
-    }
-
-    /// Local calendar-day key (YYYY-MM-DD), or nil for unparseable timestamps.
-    static func dayKey(_ takenAt: String) -> String? {
-        guard let date = parse(takenAt) else { return nil }
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
-    }
-
-    /// Split items (already ordered by takenAt) into consecutive day buckets, preserving order.
+    static func dayKey(_ takenAt: String) -> String? { DayBuckets.dayKey(takenAt) }
     static func groupByDay<T>(_ items: [T], takenAt: (T) -> String) -> [(key: String, items: [T])] {
-        var buckets: [(key: String, items: [T])] = []
-        for item in items {
-            let key = dayKey(takenAt(item)) ?? "—"
-            if buckets.last?.key == key { buckets[buckets.count - 1].items.append(item) }
-            else { buckets.append((key: key, items: [item])) }
-        }
-        return buckets
+        DayBuckets.groupByDay(items, takenAt: takenAt)
     }
 
     private static func localeFormatter() -> DateFormatter {

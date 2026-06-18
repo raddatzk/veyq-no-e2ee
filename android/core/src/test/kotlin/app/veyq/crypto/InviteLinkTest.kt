@@ -41,4 +41,16 @@ class InviteLinkTest {
         assertNull(InviteLink.parse("#foo=bar"))
         assertNull(InviteLink.parse("not a link"))
     }
+
+    @Test fun parsesInviteDeepLinkWithInstance() {
+        val dl = InviteLink.parseDeepLink("veyq://invite#invite=i1&s=boot&k=tkey&api=https://veyq.example/")
+        assertEquals("https://veyq.example", dl?.apiBase)  // the banner carries the instance; trailing slash trimmed
+        assertEquals("i1", dl?.parts?.inviteId)
+        assertEquals("tkey", dl?.parts?.tempPrivateKey)
+    }
+
+    @Test fun deepLinkRequiresInstanceAndInvite() {
+        assertNull(InviteLink.parseDeepLink("veyq://invite#invite=i1&s=boot&k=tkey"))         // no api= → not a deep link
+        assertNull(InviteLink.parseDeepLink("veyq://open#path=/x&api=https://veyq.example"))  // not an invite
+    }
 }

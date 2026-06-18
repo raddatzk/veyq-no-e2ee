@@ -37,4 +37,16 @@ final class InviteLinkTests: XCTestCase {
         XCTAssertNil(InviteLink.parse("#foo=bar"))
         XCTAssertNil(InviteLink.parse("not a link"))
     }
+
+    func testParsesInviteDeepLinkWithInstance() {
+        let dl = InviteLink.parseDeepLink("veyq://invite#invite=i1&s=boot&k=tkey&api=https://veyq.example/")
+        XCTAssertEqual(dl?.apiBase, "https://veyq.example")  // the banner carries the instance; trailing slash trimmed
+        XCTAssertEqual(dl?.parts.inviteId, "i1")
+        XCTAssertEqual(dl?.parts.tempPrivateKey, "tkey")
+    }
+
+    func testDeepLinkRequiresInstanceAndInvite() {
+        XCTAssertNil(InviteLink.parseDeepLink("veyq://invite#invite=i1&s=boot&k=tkey"))         // no api= → not a deep link
+        XCTAssertNil(InviteLink.parseDeepLink("veyq://open#path=/x&api=https://veyq.example"))  // not an invite
+    }
 }

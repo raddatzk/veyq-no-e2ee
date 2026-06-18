@@ -20,6 +20,12 @@ acceptanceCriteria:
           - testName: testReturnsNilForNonInviteHashes
             kind: negative
             ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+          - testName: testParsesInviteDeepLinkWithInstance
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+          - testName: testDeepLinkRequiresInstanceAndInvite
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
       android:
         unit:
           - testName: roundTripsPragmaticInviteThroughFragment
@@ -28,8 +34,33 @@ acceptanceCriteria:
           - testName: returnsNullForNonInviteHashes
             kind: negative
             ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+          - testName: parsesInviteDeepLinkWithInstance
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+          - testName: deepLinkRequiresInstanceAndInvite
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+  - id: uc.mobile.open-in-app.route-and-slug
+    statement: "The 'open' path's space selector (~me / @group / tenant) and the group-name slug parse byte-compatibly with the web, so a member 'open in app' link resolves to the right space."
+    coverage:
+      apple:
+        unit:
+          - testName: testParsesPersonalGroupAndTenantPrefixes
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/SpacePathTests.swift
+          - testName: testSlugifyMatchesWebRoundTrip
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/SpacePathTests.swift
+      android:
+        unit:
+          - testName: parsesPersonalGroupAndTenantPrefixes
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SpacePathTest.kt
+          - testName: slugifyMatchesWebRoundTrip
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SpacePathTest.kt
   - id: uc.mobile.open-in-app.os-dispatch
     statement: "The OS delivers a veyq:// link to the app (iOS onOpenURL / Android intent-filter) and the app routes to the target — an invite-accept flow or an in-app destination."
     gaps:
-      - reason: "OS deep-link delivery (onOpenURL / intent-filter) and the in-app navigation dispatch are platform/UI integration with no isolated unit test; only the link parsing (above) is unit-tested."
-        followUp: "Cover via an instrumented / UI test if the routing dispatch grows non-trivial."
+      - reason: "Invite parsing + instance extraction and the 'open' path's selector/slug are now unit-tested cross-platform; what remains is the thin per-platform URL extraction (URLComponents / android.net.Uri) and the OS delivery itself (onOpenURL / intent-filter) plus the in-app navigation — no isolated unit test."
+        followUp: "Cover OS delivery + navigation with an instrumented/UI test if the dispatch grows non-trivial."

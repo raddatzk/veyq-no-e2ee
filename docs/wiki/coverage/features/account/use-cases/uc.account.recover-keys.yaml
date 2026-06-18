@@ -160,6 +160,15 @@ acceptanceCriteria:
           - testName: testBreachCountZeroWhenAbsent
             kind: negative
             ref: apple/Tests/VeyqCryptoTests/PwnedTests.swift
+          - testName: testMinimumLengthIs10
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PasswordPolicyTests.swift
+          - testName: testTooShortOnlyFlagsNonEmptyBelowMinimum
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PasswordPolicyTests.swift
+          - testName: testHintKeyFollowsLengthTiers
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PasswordPolicyTests.swift
       android:
         unit:
           - testName: sha1HexUpperKnownVector
@@ -171,3 +180,12 @@ acceptanceCriteria:
           - testName: breachCountZeroWhenAbsent
             kind: negative
             ref: android/core/src/test/kotlin/app/veyq/crypto/PwnedTest.kt
+          - testName: minimumLengthIs10
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PasswordPolicyTest.kt
+          - testName: tooShortOnlyFlagsNonEmptyBelowMinimum
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PasswordPolicyTest.kt
+          - testName: hintKeyFollowsLengthTiers
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PasswordPolicyTest.kt

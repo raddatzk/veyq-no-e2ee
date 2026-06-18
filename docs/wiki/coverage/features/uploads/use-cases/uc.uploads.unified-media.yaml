@@ -171,9 +171,20 @@ acceptanceCriteria:
           - testName: "seals + reads back GPS location"
             kind: positive
             ref: frontend/src/features/uploads/media/geo.e2e.test.ts
+      apple:
+        unit:
+          - testName: testExtractsSignedGpsFromHemisphereRefs
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
+          - testName: testKeepsNorthAndEastPositive
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
+          - testName: testReturnsFallbackForNonImageBytes
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
     gaps:
-      - reason: "EXIF GPS extraction is unit-tested only on web (exifGps.ts), which hand-rolls a JPEG/TIFF parser because browsers have no EXIF API; iOS/Android delegate to the platform readers (ImageIO / androidx ExifInterface), so there is no shared pure parser to unit-test natively. The sealed GPS round-trip itself is covered cross-platform by the unified-media media e2e."
-        followUp: "None — architectural difference; revisit only if a shared native EXIF parser is introduced."
+      - reason: "GPS hemisphere->sign mapping + DateTimeOriginal parsing are now unit-tested on web (hand-rolled byte parser) and iOS (Media.extractMeta over ImageIO, self-contained fixture round-trip). Android still extracts inline in the app UI via androidx ExifInterface — testing it needs an instrumented/Robolectric test, since the Android EXIF reader cannot run in the pure-JVM core module."
+        followUp: "Add a Robolectric/instrumented test for the Android ExifInterface GPS mapping, or extract it behind a thin interface."
   - id: uc.uploads.unified-media.update-metadata
     statement: "Media metadata can be updated (e.g. toggling highlight) and is re-sealed under the content key."
     coverage:
