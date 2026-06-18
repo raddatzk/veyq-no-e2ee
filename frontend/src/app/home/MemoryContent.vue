@@ -10,6 +10,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '../../i18n/i18n'
 import { useGallery } from '../../features/gallery/useGallery'
 import type { GalleryTile } from '../../features/gallery/gallery'
+import type { Bucket } from '../../features/memory/buckets/buckets'
 import type { Track } from '../../features/memory/track/track'
 import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -37,10 +38,19 @@ const props = defineProps<{
   downloadFileName?: (tile: GalleryTile, ext: string) => string
   /** Optional: a child node's cover thumbnail (object URL) for the chapter cards; null/absent → emoji card. */
   loadChildCover?: (nodeId: string) => Promise<string | null>
+  // Contribution buckets (ADR 0023). When loadBuckets is provided the Contributions tab shows; the rest enable
+  // managing the caller's OWN buckets. The member wrapper supplies these (crypto/identity stay there).
+  loadBuckets?: (nodeId: string) => Promise<Bucket[]>
+  bucketLabel?: (bucket: Bucket) => string
+  ownerKey?: string
+  createBucket?: (nodeId: string, name: string) => Promise<void>
+  renameBucket?: (nodeId: string, bucketId: string, name: string) => Promise<void>
+  deleteBucket?: (nodeId: string, bucketId: string) => Promise<void>
+  moveMedia?: (mediaId: string, bucketId: string) => Promise<void>
 }>()
 const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
 
-const tab = ref<'gallery' | 'map' | 'journal' | 'info'>('gallery')
+const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions'>('gallery')
 const currentNodeId = ref(props.rootNodeId)
 const currentName = ref(props.rootName)
 const crumbs = ref<{ id: string; name: string }[]>([{ id: props.rootNodeId, name: props.rootName }])
@@ -56,6 +66,11 @@ const journalLoaded = ref(false)
 const chapterById = ref<Record<string, { name: string }>>({})
 const tracks = ref<Track[]>([])
 const tracksLoaded = ref(false)
+// Contribution buckets + the current filter (a selected bucket scopes the gallery + camera filter).
+const contribBuckets = ref<Bucket[]>([])
+const bucketsLoaded = ref(false)
+const selectedBucketId = ref<string | null>(null)
+const cameraFilter = ref<string | null>(null)
 
 const lightboxInfo = ref(false)
 const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, observe, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
@@ -86,8 +101,55 @@ function formatBytes(n: number): string {
 }
 
 const hasHighlights = () => allTiles.value.some((tl) => tl.highlighted)
-function applyTileFilter() { tiles.value = showHighlights.value ? allTiles.value.filter((tl) => tl.highlighted) : allTiles.value }
+// A tile belongs to a bucket: a sub-bucket matches bucketId; a primary matches the contributor's un-bucketed media.
+function tileInBucket(tl: GalleryTile, b: Bucket): boolean {
+  return b.primary ? tl.createdBy === b.ownerKey && (tl.bucketId == null) : tl.bucketId === b.id
+}
+const selectedBucket = computed(() => contribBuckets.value.find((b) => b.id === selectedBucketId.value) ?? null)
+function cameraOf(tl: GalleryTile): string { return [tl.cameraMake, tl.cameraModel].filter(Boolean).join(' ').trim() }
+// Distinct cameras among the currently-selected bucket's tiles (for the in-bucket camera filter).
+const cameraOptions = computed(() => {
+  const b = selectedBucket.value
+  if (!b) return [] as string[]
+  return [...new Set(allTiles.value.filter((tl) => tileInBucket(tl, b)).map(cameraOf).filter(Boolean))].sort()
+})
+function applyTileFilter() {
+  let v = allTiles.value
+  if (showHighlights.value) v = v.filter((tl) => tl.highlighted)
+  const b = selectedBucket.value
+  if (b) v = v.filter((tl) => tileInBucket(tl, b))
+  if (cameraFilter.value) v = v.filter((tl) => cameraOf(tl) === cameraFilter.value)
+  tiles.value = v
+}
 function toggleHighlightFilter() { showHighlights.value = !showHighlights.value; applyTileFilter() }
+function bucketCount(b: Bucket): number { return allTiles.value.filter((tl) => tileInBucket(tl, b)).length }
+function isOwnBucket(b: Bucket): boolean { return !!props.ownerKey && b.ownerKey === props.ownerKey }
+async function loadContribBuckets() {
+  if (!props.loadBuckets) return
+  try { contribBuckets.value = await props.loadBuckets(currentNodeId.value); bucketsLoaded.value = true } catch (e) { emit('error', (e as Error).message) }
+}
+function openBucket(b: Bucket) { selectedBucketId.value = b.id; cameraFilter.value = null; tab.value = 'gallery'; applyTileFilter() }
+function clearBucket() { selectedBucketId.value = null; cameraFilter.value = null; applyTileFilter() }
+async function newSubBucket() {
+  if (!props.createBucket) return
+  const name = window.prompt(t('contrib.newBucketPrompt'))?.trim()
+  if (!name) return
+  try { await props.createBucket(currentNodeId.value, name); await loadContribBuckets() } catch (e) { emit('error', (e as Error).message) }
+}
+async function renameOwnBucket(b: Bucket) {
+  if (!props.renameBucket) return
+  const name = window.prompt(t('contrib.renamePrompt'), props.bucketLabel?.(b) ?? '')?.trim()
+  if (!name) return
+  try { await props.renameBucket(currentNodeId.value, b.id, name); await loadContribBuckets() } catch (e) { emit('error', (e as Error).message) }
+}
+async function deleteOwnBucket(b: Bucket) {
+  if (!props.deleteBucket || !window.confirm(t('contrib.deleteConfirm'))) return
+  try { await props.deleteBucket(currentNodeId.value, b.id); if (selectedBucketId.value === b.id) clearBucket(); await loadContribBuckets(); await reloadTiles() } catch (e) { emit('error', (e as Error).message) }
+}
+async function moveToBucket(tile: GalleryTile | null, bucketId: string) {
+  if (!tile || !props.moveMedia) return
+  try { await props.moveMedia(tile.id, bucketId); await loadContribBuckets(); await reloadTiles() } catch (e) { emit('error', (e as Error).message) }
+}
 function revokeAllTiles() { allTiles.value.forEach((tl) => URL.revokeObjectURL(tl.url)); allTiles.value = [] }
 
 function revokeChildCovers() { for (const u of Object.values(childCovers.value)) URL.revokeObjectURL(u); childCovers.value = {} }
@@ -104,6 +166,10 @@ async function loadCurrent() {
   stopLiveJournal()
   journalLoaded.value = false
   tracksLoaded.value = false
+  bucketsLoaded.value = false
+  selectedBucketId.value = null
+  cameraFilter.value = null
+  contribBuckets.value = []
   journalMarkdown.value = ''
   tracks.value = []
   revokeAllTiles()
@@ -116,6 +182,7 @@ async function loadCurrent() {
     childNodes.value = kids
     loadChildCovers()
     observe()
+    if (props.loadBuckets) await loadContribBuckets() // needed for the move-to-bucket control + counts
     if (tab.value === 'journal') await ensureJournal()
     if (tab.value === 'map' || tab.value === 'info') await ensureTracks()
   } catch (e) {
@@ -148,11 +215,12 @@ async function ensureTracks() {
   tracksLoaded.value = true
 }
 
-async function openTab(which: 'gallery' | 'map' | 'journal' | 'info') {
+async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions') {
   tab.value = which
   try {
     if (which === 'journal') await ensureJournal()
     if (which === 'map' || which === 'info') await ensureTracks() // info shows the track count
+    if (which === 'contributions' && !bucketsLoaded.value) await loadContribBuckets()
   } catch (e) {
     emit('error', (e as Error).message)
   }
@@ -206,8 +274,26 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="openTab('gallery')">{{ t('detail.gallery') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openTab('map')">{{ t('detail.map') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openTab('journal')">{{ t('detail.journal') }}</button>
+      <button v-if="loadBuckets" class="detail-tab" :class="{ active: tab === 'contributions' }" @click="openTab('contributions')">{{ t('detail.contributions') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'info' }" @click="openTab('info')">{{ t('detail.info') }}</button>
     </div>
+
+    <section v-if="tab === 'contributions'" class="memory-contributions">
+      <ul class="bucket-list">
+        <li v-for="b in contribBuckets" :key="b.id" class="bucket-row" :class="{ sub: !b.primary }">
+          <button class="bucket-open" type="button" @click="openBucket(b)">
+            <span class="bucket-name">{{ b.primary ? '👤' : '📁' }} {{ bucketLabel?.(b) || (b.primary ? t('contrib.member') : '—') }}</span>
+            <span class="bucket-count">{{ bucketCount(b) }}</span>
+          </button>
+          <span v-if="isOwnBucket(b)" class="bucket-actions">
+            <button v-if="!b.primary" class="btn btn-ghost" type="button" @click="renameOwnBucket(b)">{{ t('common.rename') }}</button>
+            <button v-if="!b.primary" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="deleteOwnBucket(b)">{{ t('common.delete') }}</button>
+            <button v-if="b.primary && createBucket" class="btn btn-ghost" type="button" @click="newSubBucket">+ {{ t('contrib.newBucket') }}</button>
+          </span>
+        </li>
+      </ul>
+      <div v-if="!contribBuckets.length" class="home-empty">{{ t('contrib.empty') }}</div>
+    </section>
 
     <section v-if="tab === 'info'" class="memory-info">
       <div class="info-row"><span>{{ t('detail.gallery') }}</span><strong>{{ tiles.length }}</strong></div>
@@ -261,8 +347,15 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       </template>
     </section>
 
-    <div v-if="tab === 'gallery' && (dateRange || hasHighlights())" class="detail-gallery-bar">
+    <div v-if="tab === 'gallery' && (dateRange || hasHighlights() || selectedBucket)" class="detail-gallery-bar">
       <span v-if="dateRange" class="detail-daterange">{{ dateRange }}</span>
+      <button v-if="selectedBucket" class="btn btn-ghost gallery-filter active" type="button" @click="clearBucket">
+        {{ bucketLabel?.(selectedBucket) || t('contrib.member') }} ✕
+      </button>
+      <select v-if="selectedBucket && cameraOptions.length" v-model="cameraFilter" class="bucket-camera-filter" @change="applyTileFilter">
+        <option :value="null">{{ t('contrib.allCameras') }}</option>
+        <option v-for="cam in cameraOptions" :key="cam" :value="cam">{{ cam }}</option>
+      </select>
       <button v-if="hasHighlights()" class="btn btn-ghost gallery-filter" :class="{ active: showHighlights }" type="button" @click="toggleHighlightFilter">
         ★ {{ t('detail.highlights') }}
       </button>
@@ -307,6 +400,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       </div>
       <div class="lightbox-actions" @click.stop>
         <slot name="lightbox-actions" :tile="lightboxTile" />
+        <select
+          v-if="moveMedia && lightboxTile && lightboxTile.createdBy === ownerKey"
+          class="bucket-move" :value="lightboxTile.bucketId ?? `primary:${ownerKey}`"
+          @change="moveToBucket(lightboxTile, ($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="b in contribBuckets.filter(isOwnBucket)" :key="b.id" :value="b.id">{{ b.primary ? t('contrib.moveToPrimary') : (bucketLabel?.(b) || '—') }}</option>
+        </select>
         <button class="btn btn-ghost" type="button" @click="lightboxInfo = !lightboxInfo">{{ t('info.info') }}</button>
         <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
         <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>

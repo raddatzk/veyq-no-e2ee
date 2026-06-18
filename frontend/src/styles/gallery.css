@@ -172,6 +172,20 @@
 .track-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; min-width: 0; }
 .track-name { font-weight: 600; font-size: 0.92rem; }
 .track-meta .track-stat { color: var(--app-muted); font-size: 0.85rem; }
+
+/* Contributions (per-contributor buckets) */
+.memory-contributions { margin-top: 0.8rem; }
+.bucket-list { list-style: none; margin: 0; padding: 0; }
+.bucket-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); margin-bottom: 0.4rem; }
+.bucket-row.sub { margin-left: 1.4rem; }
+.bucket-open { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; background: none; border: 0; color: var(--app-text); cursor: pointer; font: inherit; text-align: left; }
+.bucket-name { font-weight: 600; }
+.bucket-count { color: var(--app-muted); font-size: 0.85rem; }
+.bucket-actions { display: flex; gap: 0.3rem; }
+.bucket-camera-filter, .bucket-move {
+  background: var(--app-surface); color: var(--app-text); border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm); padding: 0.35rem 0.5rem; font: inherit;
+}
 .track-del { color: var(--app-danger); padding: 0.3rem 0.6rem; }
 .memory-map {
   width: 100%;

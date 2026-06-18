@@ -10,6 +10,7 @@ import { loadGalleryTiles, loadOriginal, loadPreview, type GalleryTile } from '.
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { deleteMedia, sealMediaMeta, updateMedia, uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
+import { listBuckets, createBucket, renameBucket, deleteBucket, bucketName, type Bucket } from '../../features/memory/buckets/buckets'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
@@ -155,6 +156,21 @@ async function onLiveClosed() {
   journalLive.value = false
   await content.value?.reloadJournal()
 }
+
+// ---- contribution buckets (ADR 0023) ----
+const ownerKey = `user:${session.unlocked!.user.id}`
+const loadBuckets = (nodeId: string) => listBuckets(session.apiBase, s(), props.active, nodeId)
+// Label a bucket: own primary → my display name; persisted (sub / guest primary) → its sealed name; else generic.
+function bucketLabel(b: Bucket): string {
+  if (b.primary && b.ownerKey === ownerKey) return session.unlocked!.user.displayName
+  return bucketName(props.active.contentKey, b)
+}
+const createBucketFn = (nodeId: string, name: string) => createBucket(session.apiBase, s(), props.active, nodeId, name).then(() => undefined)
+const renameBucketFn = (nodeId: string, bucketId: string, name: string) => renameBucket(session.apiBase, s(), props.active, nodeId, bucketId, name).then(() => undefined)
+const deleteBucketFn = (nodeId: string, bucketId: string) => deleteBucket(session.apiBase, s(), props.active, nodeId, bucketId)
+const moveMedia = async (mediaId: string, bucketId: string) => {
+  await updateMedia(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, mediaId, { bucketId })
+}
 </script>
 
 <template>
@@ -174,6 +190,13 @@ async function onLiveClosed() {
       :load-child-nodes="loadChildNodes"
       :resolve-chapter-names="resolveChapterNames"
       :load-child-cover="loadChildCover"
+      :load-buckets="loadBuckets"
+      :bucket-label="bucketLabel"
+      :owner-key="ownerKey"
+      :create-bucket="createBucketFn"
+      :rename-bucket="renameBucketFn"
+      :delete-bucket="deleteBucketFn"
+      :move-media="moveMedia"
       :load-preview="(tile) => loadPreview(session.apiBase, s(), active, tile)"
       :load-original="(tile) => loadOriginal(session.apiBase, s(), active, tile)"
       :download-file-name="(tile, ext) => `${name}-${tile.id.slice(0, 8)}.${ext}`"

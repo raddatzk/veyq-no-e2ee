@@ -12,6 +12,8 @@ import { galleryDisplayAspectRatio } from './justifiedLayout'
 export type GalleryTile = {
   id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; lat?: number; lng?: number
   highlighted: boolean; preview: BlobRef; original: BlobRef
+  // Contribution attribution (ADR 0023): who added it + which bucket it sits in (undefined = primary).
+  createdBy?: string; bucketId?: string
   // Best-effort EXIF (operator-blind, decoded from sealedMeta): canonical camera fields + a generic tag map.
   cameraMake?: string; cameraModel?: string; lens?: string; width?: number; height?: number; fileSize?: number
   exif?: Record<string, string>
@@ -41,6 +43,7 @@ export async function loadGalleryTiles(apiBase: string, session: UnlockedSession
     return {
       id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType,
       takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original,
+      createdBy: m.createdBy, bucketId: m.bucketId ?? undefined,
       cameraMake: meta.cameraMake, cameraModel: meta.cameraModel, lens: meta.lens,
       width: meta.width, height: meta.height, fileSize: meta.fileSize, exif: meta.exif,
     }

@@ -31,6 +31,8 @@ export type MediaItem = {
   original: BlobRef
   derivatives: { kind: DerivativeKind; blob: BlobRef }[]
   highlighted: boolean
+  createdBy?: string
+  bucketId?: string | null
   createdAt: string
 }
 /** Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
@@ -214,7 +216,7 @@ export async function createMedia(apiBase: string, session: UnlockedSession, sco
 }
 
 /** Toggle a medium's highlight (favourite) and/or replace its re-sealed metadata (e.g. an edited capture date). */
-export async function updateMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string, req: { highlighted?: boolean; sealedMeta?: { suiteId: string; bytes: string } }): Promise<MediaItem> {
+export async function updateMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string, req: { highlighted?: boolean; sealedMeta?: { suiteId: string; bytes: string }; bucketId?: string }): Promise<MediaItem> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', ...auth(session) },

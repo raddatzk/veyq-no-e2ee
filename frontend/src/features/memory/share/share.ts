@@ -194,6 +194,7 @@ export async function loadShareTiles(ctx: ShareContext, nodeId: string): Promise
     return {
       id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType,
       takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original,
+      createdBy: m.createdBy, bucketId: m.bucketId ?? undefined,
       cameraMake: meta.cameraMake, cameraModel: meta.cameraModel, lens: meta.lens,
       width: meta.width, height: meta.height, fileSize: meta.fileSize, exif: meta.exif,
     }
