@@ -30,6 +30,7 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-h2") // dev/slice store (DB_KIND=h2, the default)
     implementation("io.quarkus:quarkus-jdbc-mariadb") // production store (DB_KIND=mariadb, see infra/docker-compose.yml)
     implementation("io.quarkus:quarkus-flyway")
+    implementation("org.flywaydb:flyway-mysql") // Flyway 12 keeps MariaDB/MySQL support out of flyway-core — required whenever DB_KIND=mariadb (dev profile + the docker-compose deployment), else Flyway can't identify the DB at migrate-at-start
     implementation("io.quarkus:quarkus-scheduler") // periodic GC of expired sessions
     implementation("io.quarkus:quarkus-mailer") // outbound mail: email invites (the operator supplies SMTP)
     implementation("io.quarkus:quarkus-websockets-next") // operator-blind relay for live-journal CRDT (ciphertext only)
