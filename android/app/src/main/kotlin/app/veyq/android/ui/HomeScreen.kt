@@ -85,6 +85,8 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
 
     var spaces by mutableStateOf<List<JSONObject>>(emptyList())
     var activeScopeId by mutableStateOf<String?>(null)
+    /** The active space's tenantId (group/tenant scopes) — enables resolving other members' bucket names. */
+    val activeTenantId: String? get() = spaces.firstOrNull { it.optString("scopeId") == activeScopeId }?.optString("tenantId")?.ifEmpty { null }
     var folders by mutableStateOf<List<Entry>>(emptyList())
     var memories by mutableStateOf<List<Entry>>(emptyList())
     var covers by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
@@ -516,7 +518,7 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
     val activeScope = controller.scope
     val activeKey = controller.contentKey
     if (openMemory != null && activeScope != null && activeKey != null) {
-        GalleryScreen(apiBase, session, activeScope.scopeId, activeKey, openMemory.id, openMemory.name) { detail = null }
+        GalleryScreen(apiBase, session, activeScope.scopeId, activeKey, openMemory.id, openMemory.name, controller.activeTenantId) { detail = null }
         return
     }
 

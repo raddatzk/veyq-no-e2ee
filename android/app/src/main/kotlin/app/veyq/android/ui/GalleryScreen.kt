@@ -106,6 +106,7 @@ class GalleryController(
     private val scopeId: String,
     private val contentKey: ByteArray,
     private val nodeId: String,
+    private val tenantId: String? = null,   // set for group/tenant scopes → resolve other members' bucket names
 ) {
     // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
     // an explicit download. Both refs fall back to the original for media without that derivative.
@@ -238,14 +239,31 @@ class GalleryController(
 
     // ---- contribution buckets (ADR 0023) ----
     var buckets by mutableStateOf<List<Buckets.Bucket>>(emptyList())
+    private var memberNames = mapOf<String, String>()   // userId → display name (group scopes), other members
+    private var memberNamesLoaded = false
     val ownerKey: String get() = "user:${session.userId}"
 
     suspend fun loadBuckets() {
         runCatching { withContext(Dispatchers.IO) { Buckets.list(apiBase, session, scopeId, nodeId) } }.onSuccess { buckets = it }
+        // Resolve other members' names from the group directory (account-level, server-visible) — operator-blind
+        // re: content; the server never sees the sealed bucket names. Mirrors what Legacy returned server-side.
+        val tid = tenantId
+        if (!memberNamesLoaded && tid != null) {
+            memberNamesLoaded = true
+            runCatching {
+                withContext(Dispatchers.IO) { Groups.listGroupMembers(apiBase, session, tid, scopeId) }
+            }.onSuccess { arr ->
+                memberNames = (0 until arr.length()).associate { arr.getJSONObject(it).let { o -> o.getString("userId") to o.getString("displayName") } }
+            }
+        }
     }
-    fun bucketLabel(b: Buckets.Bucket): String =
-        if (b.primary && b.ownerKey == ownerKey) session.displayName.ifEmpty { session.email.substringBefore("@") }
-        else Buckets.name(contentKey, b)
+    fun bucketLabel(b: Buckets.Bucket): String {
+        if (b.primary && b.ownerKey == ownerKey) return session.displayName.ifEmpty { session.email.substringBefore("@") }
+        val sealed = Buckets.name(contentKey, b)
+        if (sealed.isNotEmpty()) return sealed
+        if (b.ownerKey.startsWith("user:")) return memberNames[b.ownerKey.removePrefix("user:")] ?: ""
+        return ""
+    }
     fun isOwnBucket(b: Buckets.Bucket) = b.ownerKey == ownerKey
     /** A tile belongs to a bucket: sub-bucket matches bucketId; primary matches the contributor's un-bucketed media. */
     fun tileInBucket(t: Tile, b: Buckets.Bucket): Boolean =
@@ -395,8 +413,8 @@ class GalleryController(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
-    val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
+fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, tenantId: String? = null, onBack: () -> Unit) {
+    val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId, tenantId) }
     var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
     var lightboxPreview by remember { mutableStateOf<ImageBitmap?>(null) } // higher-res preview, loaded async
     var mediaDelArm by remember { mutableStateOf(false) }
@@ -488,7 +506,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
 
     // Navigate into a child chapter/folder/memory by recursively rendering its own gallery screen.
     childNav?.let { child ->
-        GalleryScreen(apiBase, session, scopeId, contentKey, child.id, child.name, onBack = { childNav = null })
+        GalleryScreen(apiBase, session, scopeId, contentKey, child.id, child.name, tenantId, onBack = { childNav = null })
         return
     }
     fun onOpenChild(child: GalleryController.Child) { childNav = child }

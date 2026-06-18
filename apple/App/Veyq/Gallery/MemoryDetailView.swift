@@ -24,6 +24,7 @@ final class GalleryStore: ObservableObject {
     let scopeId: String
     let contentKey: Data
     let nodeId: String
+    let tenantId: String?   // set for group/tenant scopes → enables resolving other members' bucket names
 
     @Published var tiles: [Tile] = []
     @Published var loading = true
@@ -35,8 +36,8 @@ final class GalleryStore: ObservableObject {
     @Published var importing = false
     private var tracksLoaded = false
 
-    init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String) {
-        self.apiBase = apiBase; self.session = session; self.scopeId = scopeId; self.contentKey = contentKey; self.nodeId = nodeId
+    init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, tenantId: String? = nil) {
+        self.apiBase = apiBase; self.session = session; self.scopeId = scopeId; self.contentKey = contentKey; self.nodeId = nodeId; self.tenantId = tenantId
     }
 
     func load() async {
@@ -80,14 +81,27 @@ final class GalleryStore: ObservableObject {
 
     // ---- contribution buckets (ADR 0023) ----
     @Published var buckets: [Buckets.Bucket] = []
+    @Published var memberNames: [String: String] = [:]   // userId → display name (group scopes), for other members
+    private var memberNamesLoaded = false
     var ownerKey: String { "user:\(session.user.id)" }
 
     func loadBuckets() async {
         if let b = try? await Buckets.list(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId) { buckets = b }
+        // Resolve other members' names from the group directory (account-level, server-visible) — operator-blind
+        // re: content; the server never sees the sealed bucket names. Mirrors what Legacy returned server-side.
+        if !memberNamesLoaded, let tid = tenantId {
+            memberNamesLoaded = true
+            if let members = try? await Groups.listGroupMembers(apiBase: apiBase, session: session, tenantId: tid, scopeId: scopeId) {
+                memberNames = Dictionary(uniqueKeysWithValues: members.map { ($0.userId, $0.displayName) })
+            }
+        }
     }
     func bucketLabel(_ b: Buckets.Bucket) -> String {
         if b.primary && b.ownerKey == ownerKey { return session.user.displayName }
-        return Buckets.name(contentKey: contentKey, bucket: b)
+        let sealed = Buckets.name(contentKey: contentKey, bucket: b)
+        if !sealed.isEmpty { return sealed }
+        if b.ownerKey.hasPrefix("user:") { return memberNames[String(b.ownerKey.dropFirst(5))] ?? "" }
+        return ""
     }
     func isOwnBucket(_ b: Buckets.Bucket) -> Bool { b.ownerKey == ownerKey }
     /// A tile belongs to a bucket: sub-bucket matches bucketId; primary matches the contributor's un-bucketed media.
@@ -331,8 +345,8 @@ struct MemoryDetailView: View {
     @State private var showGpxImporter = false
     @State private var showShareRole = false
 
-    init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
-        _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
+    init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String, tenantId: String? = nil) {
+        _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id, tenantId: tenantId))
         self.name = name
     }
 
@@ -397,7 +411,7 @@ struct MemoryDetailView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $chapterNav) { child in
-            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
+            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name, tenantId: store.tenantId)
         }
         .toolbar { detailToolbar }
         .task { await store.loadBuckets() }
@@ -536,7 +550,7 @@ struct MemoryDetailView: View {
                 HStack(spacing: 10) {
                     ForEach(store.children) { child in
                         NavigationLink {
-                            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
+                            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name, tenantId: store.tenantId)
                         } label: { childCard(child) }
                         .buttonStyle(.plain)
                     }

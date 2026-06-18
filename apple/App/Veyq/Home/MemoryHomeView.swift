@@ -48,7 +48,7 @@ struct MemoryHomeView: View {
         .sheet(item: $deepMemory) { entry in
             if let scope = store.scope, let key = store.contentKey {
                 NavigationStack {
-                    MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: entry.node, name: entry.name)
+                    MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: entry.node, name: entry.name, tenantId: store.activeEntry?.tenantId)
                         .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.close")) { deepMemory = nil } } }
                 }
             }
@@ -330,7 +330,7 @@ struct MemoryHomeView: View {
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
         if hit.node.type == "MEMORY", let scope = store.scope, let key = store.contentKey {
             NavigationLink {
-                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: hit.node, name: hit.name)
+                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: hit.node, name: hit.name, tenantId: store.activeEntry?.tenantId)
             } label: { searchRowLabel(hit, icon: "photo", type: T("search.memory")) }
             .buttonStyle(.plain)
         } else {
@@ -380,7 +380,7 @@ struct MemoryHomeView: View {
     private func memoryCard(_ m: HomeStore.Entry) -> some View {
         NavigationLink {
             if let scope = store.scope, let key = store.contentKey {
-                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: m.node, name: m.name)
+                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: m.node, name: m.name, tenantId: store.activeEntry?.tenantId)
             }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
