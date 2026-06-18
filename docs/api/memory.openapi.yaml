@@ -225,6 +225,28 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/tracks/{trackId}:
+    patch:
+      tags: [MemoryTrack]
+      operationId: updateTrack
+      summary: Replace a track's sealed content (e.g. rename — the client re-seals {name, points}).
+      description: >
+        The client re-seals the track's {name, points} (typically just a new name, same points) and PUTs the
+        new ciphertext. The server stays blind — it only swaps the stored blob, keeping the track id (so journal
+        ::track embeds keep resolving).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: trackId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateTrackRequest' } } }
+      responses:
+        '200': { description: The updated track., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrack' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
     delete:
       tags: [MemoryTrack]
       operationId: deleteTrack
@@ -480,6 +502,11 @@ components:
           type: array
           items: { $ref: '#/components/schemas/MemoryTrack' }
     CreateTrackRequest:
+      type: object
+      required: [sealedContent]
+      properties:
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    UpdateTrackRequest:
       type: object
       required: [sealedContent]
       properties:

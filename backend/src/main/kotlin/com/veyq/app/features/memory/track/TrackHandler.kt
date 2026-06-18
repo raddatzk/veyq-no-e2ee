@@ -56,6 +56,17 @@ class TrackHandler(
     }
 
     @Transactional
+    fun updateTrack(auth: String?, scopeId: String, nodeId: String, trackId: String, req: com.veyq.app.generated.model.UpdateTrackRequest): ApiMemoryTrack {
+        requireKeyHolder(scopeId, auth)
+        val track = tracks.findById(trackId) ?: throw ApiException(404, "TRACK_NOT_FOUND", "Track not found")
+        if (track.scopeId != scopeId || track.nodeId != nodeId) throw ApiException(404, "TRACK_NOT_FOUND", "Track not found here")
+        if (!suites.isKnown(req.sealedContent.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        track.suiteId = req.sealedContent.suiteId
+        track.sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedContent.bytes, content.maxSealedBytes(), dec)
+        return toApi(track)
+    }
+
+    @Transactional
     fun deleteTrack(auth: String?, scopeId: String, nodeId: String, trackId: String) {
         requireKeyHolder(scopeId, auth)
         val track = tracks.findById(trackId) ?: throw ApiException(404, "TRACK_NOT_FOUND", "Track not found")

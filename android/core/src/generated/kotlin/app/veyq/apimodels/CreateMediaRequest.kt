@@ -38,6 +38,8 @@ import kotlinx.serialization.Contextual
  * @param sealedMeta 
  * @param mimeType 
  * @param bucketId 
+ * @param contributorId 
+ * @param contributorName 
  * @param derivatives 
  */
 @Serializable
@@ -55,6 +57,12 @@ data class CreateMediaRequest (
 
     @SerialName(value = "bucketId")
     val bucketId: kotlin.String? = null,
+
+    @SerialName(value = "contributorId")
+    val contributorId: kotlin.String? = null,
+
+    @SerialName(value = "contributorName")
+    val contributorName: Blob? = null,
 
     @SerialName(value = "derivatives")
     val derivatives: kotlin.collections.List<MediaDerivativeInput>? = null

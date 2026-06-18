@@ -50,7 +50,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
 
-const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions'>('gallery')
+const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters'>('gallery')
 const currentNodeId = ref(props.rootNodeId)
 const currentName = ref(props.rootName)
 const crumbs = ref<{ id: string; name: string }[]>([{ id: props.rootNodeId, name: props.rootName }])
@@ -73,6 +73,11 @@ const selectedBucketId = ref<string | null>(null)
 const cameraFilter = ref<string | null>(null)
 
 const lightboxInfo = ref(false)
+const lightboxImg = ref<HTMLImageElement | null>(null)
+function toggleFullscreen() {
+  if (document.fullscreenElement) void document.exitFullscreen()
+  else void lightboxImg.value?.requestFullscreen?.()
+}
 const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, observe, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
   loadPreview: (tile) => props.loadPreview(tile),
   loadOriginal: (tile) => props.loadOriginal(tile),
@@ -81,6 +86,14 @@ const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRang
   onError: (e) => emit('error', e.message),
 })
 
+// Per-track map visibility (toggled in the track list); hidden tracks aren't drawn.
+const hiddenTracks = ref<Set<string>>(new Set())
+const visibleTracks = computed(() => tracks.value.filter((tr) => !hiddenTracks.value.has(tr.id)))
+function toggleTrack(id: string) {
+  const next = new Set(hiddenTracks.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  hiddenTracks.value = next
+}
 const geoPoints = () => tiles.value.filter((tl) => tl.lat != null && tl.lng != null).map((tl) => ({ id: tl.id, lat: tl.lat!, lng: tl.lng! }))
 const tracksById = () => Object.fromEntries(tracks.value.map((tr) => [tr.id, tr]))
 function openMapPin(id: string) { const tile = tileById.value[id]; if (tile) openLightbox(tile) }
@@ -215,7 +228,7 @@ async function ensureTracks() {
   tracksLoaded.value = true
 }
 
-async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions') {
+async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters') {
   tab.value = which
   try {
     if (which === 'journal') await ensureJournal()
@@ -272,6 +285,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
 
     <div class="detail-tabs">
       <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="openTab('gallery')">{{ t('detail.gallery') }}</button>
+      <button v-if="childNodes.length" class="detail-tab" :class="{ active: tab === 'chapters' }" @click="openTab('chapters')">{{ t('detail.chapters') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openTab('map')">{{ t('detail.map') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openTab('journal')">{{ t('detail.journal') }}</button>
       <button v-if="loadBuckets" class="detail-tab" :class="{ active: tab === 'contributions' }" @click="openTab('contributions')">{{ t('detail.contributions') }}</button>
@@ -302,8 +316,8 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <div class="info-row"><span>{{ t('info.chapters') }}</span><strong>{{ chapterChildCount() }}</strong></div>
     </section>
 
-    <!-- child chapters/folders/memories, so the subtree is browsable from the gallery tab -->
-    <section v-if="tab === 'gallery' && childNodes.length" class="memory-children">
+    <!-- child chapters/folders/memories, browsable from their own tab (Legacy parity) -->
+    <section v-if="tab === 'chapters' && childNodes.length" class="memory-children">
       <div class="card-grid">
         <button v-for="n in childNodes" :key="n.id" class="memory-card child-card" @click="navigate(n.id, n.name)">
           <img v-if="childCovers[n.id]" class="memory-cover" :src="childCovers[n.id]" alt="" />
@@ -315,11 +329,12 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
 
     <section v-if="tab === 'map'" class="memory-map-wrap">
       <slot name="map-toolbar" :node-id="currentNodeId" />
-      <MemoryMap v-if="geoPoints().length || tracks.length" :points="geoPoints()" :tracks="tracks" @select="openMapPin" />
+      <MemoryMap v-if="geoPoints().length || visibleTracks.length" :points="geoPoints()" :tracks="visibleTracks" @select="openMapPin" />
       <div v-else class="home-empty">{{ t('map.empty') }}</div>
       <ul v-if="tracks.length" class="track-list">
         <li v-for="tr in tracks" :key="tr.id" class="track-row">
           <span class="track-meta">
+            <label class="track-vis"><input type="checkbox" :checked="!hiddenTracks.has(tr.id)" @change="toggleTrack(tr.id)" /></label>
             <span class="track-name">🛤 {{ tr.name }}</span>
             <span class="track-stat">{{ formatDistance(trackStats(tr.points).distanceM) }}</span>
             <span v-if="trackStats(tr.points).durationS" class="track-stat">{{ formatDuration(trackStats(tr.points).durationS!) }}</span>
@@ -386,7 +401,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox">
       <button v-if="tiles.length > 1" class="lightbox-nav lightbox-prev" type="button" @click.stop="lightboxStep(-1)">‹</button>
-      <img :src="lightbox" alt="" @click.stop />
+      <img ref="lightboxImg" :src="lightbox" alt="" @click.stop="toggleFullscreen" />
       <button v-if="tiles.length > 1" class="lightbox-nav lightbox-next" type="button" @click.stop="lightboxStep(1)">›</button>
       <div v-if="lightboxInfo && lightboxTile" class="lightbox-info" @click.stop>
         <div><span>{{ t('info.takenAt') }}</span><strong>{{ new Date(lightboxTile.takenAt).toLocaleString() }}</strong></div>
@@ -407,6 +422,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
         >
           <option v-for="b in contribBuckets.filter(isOwnBucket)" :key="b.id" :value="b.id">{{ b.primary ? t('contrib.moveToPrimary') : (bucketLabel?.(b) || '—') }}</option>
         </select>
+        <button class="btn btn-ghost" type="button" @click="toggleFullscreen">{{ t('detail.fullscreen') }}</button>
         <button class="btn btn-ghost" type="button" @click="lightboxInfo = !lightboxInfo">{{ t('info.info') }}</button>
         <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
         <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>

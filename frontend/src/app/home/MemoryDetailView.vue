@@ -15,7 +15,7 @@ import { listGroupMembers } from '../../features/spaces/groups/groupSpaces'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
-import { createTrack, deleteTrack, getTracks, type Track } from '../../features/memory/track/track'
+import { createTrack, deleteTrack, getTracks, updateTrack, type Track } from '../../features/memory/track/track'
 import { parseGpx } from '../../features/memory/track/gpx'
 import { loadCover, loadLevel, loadMemoryById, type ActiveSpace, type MemoryNode } from '../../features/home/home'
 import DownloadModal from './DownloadModal.vue'
@@ -138,6 +138,16 @@ async function removeTrack(id: string) {
   await deleteTrack(session.apiBase, s(), props.active, currentNodeId.value, id)
   await content.value?.reloadTracks()
 }
+async function renameTrack(track: Track) {
+  const name = window.prompt(t('track.renamePrompt'), track.name)?.trim()
+  if (!name || name === track.name) return
+  try {
+    await updateTrack(session.apiBase, s(), props.active, currentNodeId.value, track.id, { name, points: track.points })
+    await content.value?.reloadTracks()
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
 
 function startEditJournal(markdown: string) {
   journalDraft.value = markdown
@@ -242,6 +252,7 @@ const moveMedia = async (mediaId: string, bucketId: string) => {
         </div>
       </template>
       <template #track-actions="{ track }">
+        <button class="btn btn-ghost" type="button" @click="renameTrack(track)">{{ t('common.rename') }}</button>
         <button class="btn btn-ghost track-del" type="button" @click="removeTrack(track.id)">{{ t('track.delete') }}</button>
       </template>
 

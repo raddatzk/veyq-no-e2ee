@@ -39,6 +39,18 @@ export async function createTrack(apiBase: string, session: UnlockedSession, act
 }
 
 /** Remove a track. */
+/** Rename (re-seal) a track: the client re-seals {name, points} and PATCHes it; the track id is preserved. */
+export async function updateTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, trackId: string, route: { name: string; points: Track['points'] }): Promise<void> {
+  const nonce = v1.randomBytes(12)
+  const sealed = v1.concat(nonce, v1.aeadSeal(active.contentKey, nonce, v1.utf8(JSON.stringify(route)), EMPTY))
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
+  })
+  if (!res.ok) throw await apiError(res, 'rename track')
+}
+
 export async function deleteTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, trackId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
     method: 'DELETE',

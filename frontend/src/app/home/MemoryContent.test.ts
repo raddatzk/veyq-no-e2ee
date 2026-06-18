@@ -27,7 +27,7 @@ describe('MemoryContent', () => {
     const w = mount(MemoryContent, { props })
     await flushPromises()
     expect(w.find('.detail-title').text()).toBe('My Memory')
-    expect(w.findAll('.detail-tab')).toHaveLength(4) // Galerie / Map / Journal / Info
+    expect(w.findAll('.detail-tab')).toHaveLength(5) // Galerie / Kapitel / Map / Journal / Info (fixture has a child)
     // (the justified grid needs a real measured width, unavailable in happy-dom — assert the load instead)
     expect(props.loadTiles).toHaveBeenCalledWith('root')
     expect(props.loadChildNodes).toHaveBeenCalledWith('root')
@@ -38,7 +38,7 @@ describe('MemoryContent', () => {
     const w = mount(MemoryContent, { props })
     await flushPromises()
     expect(props.loadJournalMarkdown).not.toHaveBeenCalled() // gallery is the default tab
-    await w.findAll('.detail-tab')[2].trigger('click') // Journal
+    await w.findAll('.detail-tab')[3].trigger('click') // Journal
     await flushPromises()
     expect(props.loadJournalMarkdown).toHaveBeenCalledWith('root')
     // the ::media:a embed resolves against the loaded gallery tile (rendered in the carousel)
@@ -49,6 +49,7 @@ describe('MemoryContent', () => {
     const props = makeProps()
     const w = mount(MemoryContent, { props })
     await flushPromises()
+    await w.findAll('.detail-tab')[1].trigger('click') // Kapitel (children moved to their own tab)
     await w.find('.memory-children .child-card').trigger('click')
     await flushPromises()
     expect(props.loadTiles).toHaveBeenLastCalledWith('ch1')
@@ -76,7 +77,7 @@ describe('MemoryContent', () => {
     const props = makeProps({ liveJournal })
     const w = mount(MemoryContent, { props })
     await flushPromises()
-    await w.findAll('.detail-tab')[2].trigger('click') // Journal
+    await w.findAll('.detail-tab')[3].trigger('click') // Journal
     await flushPromises()
     expect(liveJournal).toHaveBeenCalledWith('root', expect.any(Function))
     expect(props.loadJournalMarkdown).not.toHaveBeenCalled()
@@ -91,7 +92,7 @@ describe('MemoryContent', () => {
       slots: { 'journal-edit': '<div class="my-editor">editing</div>' },
     })
     await flushPromises()
-    await w.findAll('.detail-tab')[2].trigger('click')
+    await w.findAll('.detail-tab')[3].trigger('click')
     await flushPromises()
     expect(w.find('.my-editor').exists()).toBe(true)
     expect(w.find('.journal-media-thumb').exists()).toBe(false)
