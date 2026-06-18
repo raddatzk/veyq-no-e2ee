@@ -21,9 +21,13 @@ const emit = defineEmits<{
 <template>
   <section class="memory-contributions">
     <ul class="bucket-list">
-      <li v-for="bucket in buckets" :key="bucket.id" class="bucket-row" :class="{ sub: !bucket.primary }">
+      <li v-for="bucket in buckets" :key="bucket.id" class="bucket-row" :class="{ 'bucket-row-child': !bucket.primary }">
         <button class="bucket-open" type="button" @click="emit('openBucket', bucket)">
-          <span class="bucket-name">{{ bucket.primary ? '👤' : '📁' }} {{ bucketLabel?.(bucket) || (bucket.primary ? t('contrib.member') : '—') }}</span>
+          <span class="bucket-icon" :class="{ 'bucket-icon-member': bucket.primary, 'bucket-icon-folder': !bucket.primary }" aria-hidden="true"></span>
+          <span class="bucket-copy">
+            <span class="bucket-name">{{ bucketLabel?.(bucket) || (bucket.primary ? t('contrib.member') : '—') }}</span>
+            <span class="bucket-kind">{{ bucket.primary ? t('contrib.member') : t('contrib.newBucket') }}</span>
+          </span>
           <span class="bucket-count">{{ bucketCount(bucket) }}</span>
         </button>
         <span v-if="isOwnBucket(bucket)" class="bucket-actions">

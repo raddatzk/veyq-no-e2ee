@@ -576,7 +576,11 @@
 }
 
 /* Contributions (per-contributor buckets) */
-.memory-contributions { margin-top: 0.8rem; }
+.memory-contributions {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
 .bucket-list { list-style: none; margin: 0; padding: 0; }
 .bucket-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); margin-bottom: 0.4rem; }
 .bucket-row.sub { margin-left: 1.4rem; }
@@ -585,6 +589,136 @@
 .bucket-count { color: var(--app-muted); font-size: 0.85rem; }
 .bucket-actions { display: flex; gap: 0.3rem; }
 .bucket-delete { color: var(--app-danger); }
+.memory-contributions .bucket-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.memory-contributions .bucket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--app-surface);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.memory-contributions .bucket-row:hover {
+  border-color: var(--memory-active-border);
+  background: var(--memory-active-surface);
+  box-shadow: 0 8px 22px rgb(15 23 42 / 0.08);
+}
+.memory-contributions .bucket-row-child {
+  border-style: dashed;
+}
+.memory-contributions .bucket-open {
+  display: grid;
+  grid-template-columns: 1.55rem minmax(0, 1fr) auto;
+  justify-content: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0.65rem 0.85rem;
+}
+.memory-contributions .bucket-copy {
+  display: grid;
+  min-width: 0;
+}
+.memory-contributions .bucket-name {
+  overflow: hidden;
+  color: var(--app-text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memory-contributions .bucket-kind {
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memory-contributions .bucket-count {
+  justify-self: end;
+  min-width: 1.85rem;
+  padding: 0.14rem 0.45rem;
+  color: var(--app-muted);
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+.memory-contributions .bucket-icon {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 8px;
+  background: var(--app-success-soft);
+  border: 1px solid var(--app-success-line);
+}
+.memory-contributions .bucket-icon-member::before,
+.memory-contributions .bucket-icon-member::after,
+.memory-contributions .bucket-icon-folder::before,
+.memory-contributions .bucket-icon-folder::after {
+  position: absolute;
+  content: '';
+}
+.memory-contributions .bucket-icon-member::before {
+  top: 0.31rem;
+  left: 0.53rem;
+  width: 0.38rem;
+  height: 0.38rem;
+  background: var(--app-success);
+  border-radius: 999px;
+}
+.memory-contributions .bucket-icon-member::after {
+  right: 0.35rem;
+  bottom: 0.33rem;
+  left: 0.35rem;
+  height: 0.5rem;
+  background: var(--app-success);
+  border-radius: 999px 999px 0.2rem 0.2rem;
+}
+.memory-contributions .bucket-icon-folder::before {
+  top: 0.39rem;
+  left: 0.28rem;
+  width: 0.48rem;
+  height: 0.24rem;
+  background: var(--app-success);
+  border-radius: 0.14rem 0.14rem 0 0;
+}
+.memory-contributions .bucket-icon-folder::after {
+  right: 0.25rem;
+  bottom: 0.35rem;
+  left: 0.25rem;
+  height: 0.62rem;
+  background: var(--app-success);
+  border-radius: 0.16rem;
+}
+.memory-contributions .bucket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-right: 0.55rem;
+}
+.memory-contributions .home-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  padding: 1rem;
+  color: var(--app-muted);
+  background: var(--app-surface);
+  border: 1px dashed var(--app-line);
+  border-radius: var(--app-radius);
+}
 .bucket-camera-filter, .bucket-move {
   background: var(--app-surface); color: var(--app-text); border: 1px solid var(--app-line);
   border-radius: var(--app-radius-sm); padding: 0.35rem 0.5rem; font: inherit;
