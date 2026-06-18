@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
+import app.veyq.crypto.MediaExif
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -363,26 +364,35 @@ class GalleryController(
         return runCatching {
             val ex = ExifInterface(java.io.ByteArrayInputStream(data))
             val ll = ex.latLong
-            val takenAt = ex.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)?.let {
-                runCatching { java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).parse(it)?.toInstant()?.toString() }.getOrNull()
-            } ?: fallback
             fun s(tag: String) = ex.getAttribute(tag)?.trim()?.ifEmpty { null }
-            fun trim(n: Double) = (Math.round(n * 100) / 100.0).let { if (it == Math.floor(it)) it.toInt().toString() else it.toString() }
-            val exif = linkedMapOf<String, String>()
-            ex.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }?.let { exif["Aperture"] = "f/${trim(it)}" }
-            ex.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }?.let { exif["Exposure"] = if (it < 1) "1/${Math.round(1 / it)} s" else "${trim(it)} s" }
-            s(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { exif["ISO"] = it }
-            ex.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }?.let { exif["Focal length"] = "${trim(it)} mm" }
-            s(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM)?.let { exif["Focal length (35mm)"] = "$it mm" }
-            ex.getAttributeInt(ExifInterface.TAG_FLASH, -1).takeIf { it >= 0 }?.let { exif["Flash"] = if (it and 1 != 0) "On" else "Off" }
-            s(ExifInterface.TAG_SOFTWARE)?.let { exif["Software"] = it }
-            ex.getAltitude(Double.NaN).takeIf { !it.isNaN() }?.let { exif["Altitude"] = "${trim(it)} m" }
             val w = ex.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).takeIf { it > 0 } ?: ex.getAttributeInt(ExifInterface.TAG_PIXEL_X_DIMENSION, 0).takeIf { it > 0 }
             val h = ex.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).takeIf { it > 0 } ?: ex.getAttributeInt(ExifInterface.TAG_PIXEL_Y_DIMENSION, 0).takeIf { it > 0 }
-            Media.MediaMeta(
-                takenAt, ll?.get(0), ll?.get(1),
-                s(ExifInterface.TAG_MAKE), s(ExifInterface.TAG_MODEL), s(ExifInterface.TAG_LENS_MODEL),
-                w, h, data.size, exif.ifEmpty { null },
+            val latRef = s(ExifInterface.TAG_GPS_LATITUDE_REF)
+            val lngRef = s(ExifInterface.TAG_GPS_LONGITUDE_REF)
+            MediaExif.map(
+                MediaExif.Raw(
+                    latitude = ll?.getOrNull(0)?.let { if (latRef == null) it else kotlin.math.abs(it) },
+                    latitudeRef = latRef,
+                    longitude = ll?.getOrNull(1)?.let { if (lngRef == null) it else kotlin.math.abs(it) },
+                    longitudeRef = lngRef,
+                    dateTimeOriginal = s(ExifInterface.TAG_DATETIME_ORIGINAL),
+                    cameraMake = s(ExifInterface.TAG_MAKE),
+                    cameraModel = s(ExifInterface.TAG_MODEL),
+                    lens = s(ExifInterface.TAG_LENS_MODEL),
+                    width = w,
+                    height = h,
+                    fileSize = data.size,
+                    fNumber = ex.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0),
+                    exposureTime = ex.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0),
+                    iso = s(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY),
+                    focalLength = ex.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0),
+                    focalLength35mm = s(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM),
+                    flash = ex.getAttributeInt(ExifInterface.TAG_FLASH, -1),
+                    software = s(ExifInterface.TAG_SOFTWARE),
+                    altitude = ex.getAltitude(Double.NaN).takeIf { !it.isNaN() },
+                    altitudeRef = ex.getAttributeInt(ExifInterface.TAG_GPS_ALTITUDE_REF, -1).takeIf { it >= 0 },
+                ),
+                fallback,
             )
         }.getOrDefault(Media.MediaMeta(fallback, null, null, fileSize = data.size))
     }

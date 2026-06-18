@@ -1,6 +1,6 @@
 id: uc.search.filter
 title: Filter & find
-status: partial
+status: implemented
 documents:
   - type: feature
     ref: docs/wiki/features/search/_index.md
@@ -10,6 +10,10 @@ documents:
     ref: docs/wiki/crosscutting/search.md
   - type: entryPoint
     ref: frontend/src/features/search/search.ts
+  - type: entryPoint
+    ref: android/core/src/main/kotlin/app/veyq/crypto/Search.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/Search.swift
 acceptanceCriteria:
   - id: uc.search.filter.name-match
     statement: "Nodes are filtered locally by a case-insensitive substring of their decrypted name; an empty/whitespace query yields no hits and results are capped."
@@ -28,6 +32,31 @@ acceptanceCriteria:
           - testName: "caps results at 25"
             kind: positive
             ref: frontend/src/features/search/search.test.ts
-    gaps:
-      - reason: "The pure name filter is unit-tested on web; the iOS/Android equivalents live inline in the app UI (e.g. HomeScreen.search), and structural facets / journal-tag full-text are deferred (status: partial)."
-        followUp: "Extract the native name filter into core and mirror search.test.ts; add facets when search.filter graduates from partial."
+      android:
+        unit:
+          - testName: matchesCaseInsensitivelyAsASubstring
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+          - testName: returnsNoHitsForAnEmptyOrWhitespaceQuery
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+          - testName: returnsNoHitsWhenNothingMatches
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+          - testName: capsResultsAt25
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+      apple:
+        unit:
+          - testName: testMatchesCaseInsensitivelyAsASubstring
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+          - testName: testReturnsNoHitsForAnEmptyOrWhitespaceQuery
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+          - testName: testReturnsNoHitsWhenNothingMatches
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+          - testName: testCapsResultsAt25
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift

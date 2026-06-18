@@ -1,6 +1,6 @@
 id: uc.uploads.unified-media
 title: Upload, store and attach media (unified)
-status: partial
+status: implemented
 documents:
   - type: feature
     ref: docs/wiki/features/uploads/_index.md
@@ -182,9 +182,20 @@ acceptanceCriteria:
           - testName: testReturnsFallbackForNonImageBytes
             kind: negative
             ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
-    gaps:
-      - reason: "GPS hemisphere->sign mapping + DateTimeOriginal parsing are now unit-tested on web (hand-rolled byte parser) and iOS (Media.extractMeta over ImageIO, self-contained fixture round-trip). Android still extracts inline in the app UI via androidx ExifInterface — testing it needs an instrumented/Robolectric test, since the Android EXIF reader cannot run in the pure-JVM core module."
-        followUp: "Add a Robolectric/instrumented test for the Android ExifInterface GPS mapping, or extract it behind a thin interface."
+      android:
+        unit:
+          - testName: extractsSignedGpsFromHemisphereRefs
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+          - testName: keepsNorthAndEastPositive
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+          - testName: returnsFallbackForMissingExif
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+          - testName: mapsCameraAndExifFields
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
   - id: uc.uploads.unified-media.update-metadata
     statement: "Media metadata can be updated (e.g. toggling highlight) and is re-sealed under the content key."
     coverage:

@@ -317,10 +317,11 @@ final class HomeStore: ObservableObject {
         if allNodes == nil {
             allNodes = try? await MemoryTree.listNodes(apiBase: apiBase, session: session, scopeId: scope.scopeId)
         }
-        searchHits = (allNodes ?? []).compactMap { node in
+        let entries = (allNodes ?? []).map { node in
             let name = (try? MemoryTree.decodeNode(contentKey: contentKey, node: node).name) ?? ""
-            return name.lowercased().contains(q) ? Entry(node: node, name: name) : nil
+            return Entry(node: node, name: name)
         }
+        searchHits = Search.matchByName(entries, query: searchText, name: { $0.name })
     }
 
     func gotoCrumb(_ crumb: Crumb) async {

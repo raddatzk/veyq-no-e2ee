@@ -62,6 +62,7 @@ import app.veyq.crypto.Media
 import app.veyq.crypto.MemoryTree
 import app.veyq.crypto.RegisterViaInvitation
 import app.veyq.crypto.ScopeContent
+import app.veyq.crypto.Search
 import app.veyq.crypto.SwitchActiveSpace
 import app.veyq.crypto.Tenant
 import kotlinx.coroutines.Dispatchers
@@ -421,10 +422,11 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
         if (allNodes == null) {
             allNodes = withContext(Dispatchers.IO) { runCatching { Browse.listNodes(apiBase, session, s.scopeId) }.getOrDefault(emptyList()) }
         }
-        searchHits = (allNodes ?: emptyList()).mapNotNull { n ->
+        val entries = (allNodes ?: emptyList()).map { n ->
             val name = runCatching { MemoryTree.decodeNodeName(key, n) }.getOrDefault("")
-            if (name.lowercase().contains(q)) Entry(n, name) else null
+            Entry(n, name)
         }
+        searchHits = Search.matchByName(entries, searchText) { it.name }
     }
 
     private suspend fun openLevel() {

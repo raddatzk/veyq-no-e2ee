@@ -11,8 +11,8 @@
 
 ## Current scope
 Search runs **entirely client-side** over already-decrypted node names — a case-insensitive **substring
-match** (`frontend/src/features/search/search.ts` `searchNodes`; Android `HomeScreen.search`). There is
-**no server search endpoint**: by design the server cannot index encrypted names.
+match** shared by the web, Android and Apple clients. There is **no server search endpoint**: by design
+the server cannot index encrypted names.
 
 ## Main flow
 1. The curator types a query in the space.
@@ -30,9 +30,9 @@ match** (`frontend/src/features/search/search.ts` `searchNodes`; Android `HomeSc
 ## Quality notes
 - *Confidentiality (paramount):* **operator-blind by construction** — the query and names never leave the
   device; there is no server-side index of encrypted content.
-- *Known gap (partial):* only node **names** are searched today. Structural **facets**
-  (date/type/scope filter chips), full-text over **journal/tags**, and **semantic/face** search are
-  deferred (see [natural-language](../../search/_index.md) and the Search model below).
+- *Roadmap outside this use-case:* structural facets (date/type/scope filter chips), full-text over
+  **journal/tags**, and **semantic/face** search are deferred (see [natural-language](../../search/_index.md)
+  and the Search model below).
 
 ## Related
 - Feature: [Search](../_index.md) · Actors: [Memory Curator](../../../actors.md)
