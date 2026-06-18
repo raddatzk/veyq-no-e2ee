@@ -20,6 +20,7 @@ class Share {
     @Column(name = "node_id", nullable = false) var nodeId: String = ""
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "wrapped_content_key", nullable = false) var wrappedContentKey: ByteArray = ByteArray(0)
+    @Column(name = "upload_capability_hash") var uploadCapabilityHash: ByteArray? = null
     @Column(nullable = false) var role: String = "VIEWER"
     @Column(name = "password_salt") var passwordSalt: ByteArray? = null
     @Column(name = "expires_at") var expiresAt: Instant? = null

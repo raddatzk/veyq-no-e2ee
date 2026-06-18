@@ -25,7 +25,9 @@ import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.`is`
+import java.security.MessageDigest
 import java.time.Instant
+import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import com.veyq.app.shared.keymgmt.ScopeKind
@@ -47,6 +49,10 @@ class ShareSliceTest {
     private lateinit var ownerToken: String
     private lateinit var outsiderToken: String
     private val scopeId = "shr-scope"
+    private val uploadTokenBytes = "share-upload-token".toByteArray()
+    private val uploadToken = Base64.getUrlEncoder().withoutPadding().encodeToString(uploadTokenBytes)
+    private val uploadCapabilityHash = Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(MessageDigest.getInstance("SHA-256").digest(uploadTokenBytes))
 
     @BeforeTest
     fun seed() {
@@ -85,6 +91,8 @@ class ShareSliceTest {
     }
 
     private val body = """{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"}}"""
+    private fun uploadShareBody(role: String) =
+        """{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"$role","uploadCapabilityHash":{"suiteId":"v1","bytes":"$uploadCapabilityHash"}}"""
 
     @Test
     fun createsAndResolvesAReadOnlyShare() {
@@ -136,23 +144,35 @@ class ShareSliceTest {
 
     @Test
     fun contributorGuestUploadsMediaAndWritesJournal() {
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .post("/api/scopes/$scopeId/nodes/shr-mem2/shares").then().statusCode(400)
+            .body("code", `is`("UPLOAD_CAPABILITY_REQUIRED"))
+
         // a CONTRIBUTOR share lets a guest contribute (on its own memory, isolated from other tests)
         val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .body(uploadShareBody("CONTRIBUTOR"))
             .post("/api/scopes/$scopeId/nodes/shr-mem2/shares").then().statusCode(200)
             .body("role", `is`("CONTRIBUTOR")).extract().path<String>("shareId")
 
+        // shareId alone is no longer a write capability; the guest must also prove possession of the upload token.
+        given().contentType(ContentType.JSON).body("""{"dedupToken":"guest-no-proof","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_UPLOAD_PROOF_INVALID"))
+        given().header("X-Veyq-Share-Upload-Token", "bad-token").contentType(ContentType.JSON)
+            .body("""{"dedupToken":"guest-bad-proof","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_UPLOAD_PROOF_INVALID"))
+
         // the guest uploads a one-frame blob through the shared blob path (no auth)
-        val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"guest-1","totalChunks":1,"byteSize":6}""")
+        val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"guest-1","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareId/blobs").then().statusCode(200).body("status", `is`("UPLOADING"))
             .extract().path<String>("uploadId")
-        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
             .put("/api/public/shares/$shareId/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
-        val blobId = given().post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200)
+        val blobId = given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200)
             .extract().path<String>("blobId")
 
         // and attaches it as media on the shared memory
-        given().contentType(ContentType.JSON)
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
             .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
             .post("/api/public/shares/$shareId/nodes/shr-mem2/contributed-media").then().statusCode(200)
         // the shared gallery now lists the guest's contribution
@@ -162,7 +182,7 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-mem2/journal").then().statusCode(200)
 
         // a guest still cannot contribute outside the subtree
-        given().contentType(ContentType.JSON)
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
             .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
             .post("/api/public/shares/$shareId/nodes/shr-other/contributed-media").then().statusCode(404)
     }
@@ -170,14 +190,14 @@ class ShareSliceTest {
     @Test
     fun guestUploadsAreCappedPerShare() {
         val share = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .body(uploadShareBody("CONTRIBUTOR"))
             .post("/api/scopes/$scopeId/nodes/shr-mem2/shares").then().statusCode(200).extract().path<String>("shareId")
         // open the per-share guest session cap (default 10) with distinct dedup tokens; the 11th is refused 429
         repeat(10) { i ->
-            given().contentType(ContentType.JSON).body("""{"dedupToken":"quota-$i","totalChunks":1,"byteSize":6}""")
+            given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"quota-$i","totalChunks":1,"byteSize":6}""")
                 .post("/api/public/shares/$share/blobs").then().statusCode(200)
         }
-        given().contentType(ContentType.JSON).body("""{"dedupToken":"quota-over","totalChunks":1,"byteSize":6}""")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"quota-over","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$share/blobs").then().statusCode(429).body("code", `is`("TOO_MANY_OPEN_UPLOADS"))
     }
 
@@ -185,25 +205,25 @@ class ShareSliceTest {
     fun guestCannotTouchAnotherSharesInFlightUpload() {
         // two CONTRIBUTOR shares on the SAME scope (different memories) — distinct guests
         fun contributorShareOn(node: String) = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .body(uploadShareBody("CONTRIBUTOR"))
             .post("/api/scopes/$scopeId/nodes/$node/shares").then().statusCode(200).extract().path<String>("shareId")
         val shareA = contributorShareOn("shr-mem2")
         val shareB = contributorShareOn("shr-mem3")
 
         // guest A starts an upload under share A
-        val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"a2-guest","totalChunks":1,"byteSize":6}""")
+        val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"a2-guest","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareA/blobs").then().statusCode(200).extract().path<String>("uploadId")
 
         // guest B (share B, same scope) knows A's uploadId but must NOT read/overwrite/finalize it — 404, not a hit
-        given().get("/api/public/shares/$shareB/blob-uploads/$uploadId").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
-        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).get("/api/public/shares/$shareB/blob-uploads/$uploadId").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
             .put("/api/public/shares/$shareB/blob-uploads/$uploadId/chunks/0").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
-        given().post("/api/public/shares/$shareB/blob-uploads/$uploadId/complete").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareB/blob-uploads/$uploadId/complete").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
 
         // the rightful owner (share A) still operates on it normally
-        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
             .put("/api/public/shares/$shareA/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
-        given().get("/api/public/shares/$shareA/blob-uploads/$uploadId").then().statusCode(200)
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).get("/api/public/shares/$shareA/blob-uploads/$uploadId").then().statusCode(200)
     }
 
     @Test
@@ -236,7 +256,7 @@ class ShareSliceTest {
     fun uploaderGuestUploadsButCannotRead() {
         // an UPLOADER share is a blind drop-off: it may upload but not read the gallery/journal
         val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"UPLOADER"}""")
+            .body(uploadShareBody("UPLOADER"))
             .post("/api/scopes/$scopeId/nodes/shr-mem3/shares").then().statusCode(200)
             .body("role", `is`("UPLOADER")).extract().path<String>("shareId")
 
@@ -248,12 +268,12 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/tracks").then().statusCode(403)
 
         // but uploading a blob + attaching media works
-        val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"up-1","totalChunks":1,"byteSize":6}""")
+        val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"up-1","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareId/blobs").then().statusCode(200).extract().path<String>("uploadId")
-        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
             .put("/api/public/shares/$shareId/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
-        val blobId = given().post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200).extract().path<String>("blobId")
-        given().contentType(ContentType.JSON)
+        val blobId = given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200).extract().path<String>("blobId")
+        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
             .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
             .post("/api/public/shares/$shareId/nodes/shr-mem3/contributed-media").then().statusCode(200)
     }

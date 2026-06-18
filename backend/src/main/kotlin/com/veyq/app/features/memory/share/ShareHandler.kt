@@ -51,11 +51,22 @@ class ShareHandler(
         val userId = requireKeyHolder(scopeId, auth)
         requireShareNode(scopeId, nodeId)
         if (!suites.isKnown(req.wrappedContentKey.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        val role = req.role ?: ShareRole.VIEWER
+        val uploadCapabilityHash = req.uploadCapabilityHash?.let {
+            if (!suites.isKnown(it.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+            dec.decode(it.bytes).also { hash ->
+                if (hash.size != 32) throw ApiException(400, "INVALID_UPLOAD_CAPABILITY", "Upload capability hash must be 32 bytes")
+            }
+        }
+        if (canUpload(role.value) && uploadCapabilityHash == null) {
+            throw ApiException(400, "UPLOAD_CAPABILITY_REQUIRED", "Upload-capable shares require an upload capability hash")
+        }
         val bytes = ByteArray(32).also(rng::nextBytes)
         val share = Share().apply {
             id = enc.encodeToString(bytes); this.scopeId = scopeId; this.nodeId = nodeId
             suiteId = req.wrappedContentKey.suiteId; wrappedContentKey = dec.decode(req.wrappedContentKey.bytes)
-            role = (req.role ?: ShareRole.VIEWER).value
+            this.role = role.value
+            this.uploadCapabilityHash = uploadCapabilityHash
             passwordSalt = req.passwordSalt?.let { dec.decode(it.bytes) }
             expiresAt = req.expiresAt?.toInstant()
             label = (req.label ?: "").take(120)

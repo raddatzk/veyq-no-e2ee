@@ -19,7 +19,8 @@
   [collect-uploads](uc.sharing.collect-uploads.md).
 
 ## Main flow
-1. The curator creates a share with role **CONTRIBUTOR** and distributes the sealed link.
+1. The curator creates a share with role **CONTRIBUTOR**, deriving a blind upload-capability proof from
+   the share unwrap key, and distributes the sealed link.
 2. A Public Contributor opens it, resolves the share and **unwraps** the content key from the fragment
    (as a viewer).
 3. The contributor reads the subtree, then **starts a blob upload** (`POST …/blobs`), uploads encrypted
@@ -38,6 +39,7 @@
 - E3: A guest tries to attach a blob **not uploaded through this share** (e.g. an owner-scope blob) →
   `403` (blob not from share).
 - E4: **Cross-share** upload-id reuse → `404` (owner-tag mismatch isolates shares).
+- E5: A request has only the `shareId` but no valid upload-capability token → `403`.
 
 ## Quality notes
 - *Confidentiality (paramount):* the operator sees the role, sealed metadata and ciphertext blobs —
@@ -51,5 +53,6 @@
   [Public Contributor](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (share keys, share-boundary T&S)
 - Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys),
-  [AD-05](../../../decisions/README.md) (T&S); ADR 0011 (persisted shares)
+  [AD-05](../../../decisions/README.md) (T&S),
+  [AD-30](../../../decisions/0030-public-share-upload-capability.md) (upload capability); ADR 0011 (persisted shares)
 - Related use-cases: `uc.sharing.share-public-viewer`, `uc.sharing.collect-uploads`, `uc.uploads.unified-media`

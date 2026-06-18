@@ -42,12 +42,21 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
     wrapKey = v1.shareWrapKey(shareKey, opts.password, salt)
     passwordSalt = { suiteId: 'v1', bytes: b64url(salt) }
   }
+  const uploadToken = v1.shareUploadToken(wrapKey)
   const nonce = v1.randomBytes(12)
   const wrapped = v1.concat(nonce, v1.aeadSeal(wrapKey, nonce, active.contentKey, EMPTY))
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
-    body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role: opts.role ?? 'VIEWER', passwordSalt, expiresAt: opts.expiresAt, label: opts.label ?? '', noticeMarkdown: opts.noticeMarkdown }),
+    body: JSON.stringify({
+      wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) },
+      uploadCapabilityHash: { suiteId: 'v1', bytes: b64url(v1.sha256Digest(uploadToken)) },
+      role: opts.role ?? 'VIEWER',
+      passwordSalt,
+      expiresAt: opts.expiresAt,
+      label: opts.label ?? '',
+      noticeMarkdown: opts.noticeMarkdown,
+    }),
   })
   if (!res.ok) throw await apiError(res, 'create share')
   const { shareId } = await res.json()
@@ -84,7 +93,7 @@ export async function revokeShare(apiBase: string, session: UnlockedSession, act
 
 // ---- guest side (no auth) -------------------------------------------------------------------------------
 
-export type ShareContext = { apiBase: string; shareId: string; scopeId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole; notices: ShareNotice[] }
+export type ShareContext = { apiBase: string; shareId: string; scopeId: string; contentKey: Uint8Array; uploadToken: string; rootNodeId: string; rootName: string; role: ShareRole; notices: ShareNotice[] }
 
 // ---- tenant Terms of Service (owner) --------------------------------------------------------------------
 
@@ -130,7 +139,7 @@ export async function resolvePublicShare(apiBase: string, shareId: string, share
   }
   // A blind UPLOADER gets no root node (it must not learn metadata); only readers see the album name.
   const rootName = body.root ? decodeNode(contentKey, body.root as MemoryNode).name : ''
-  return { apiBase, shareId, scopeId: body.scopeId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
+  return { apiBase, shareId, scopeId: body.scopeId, contentKey, uploadToken: b64url(v1.shareUploadToken(wrapKey)), rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
 }
 
 /** The shared subtree's nodes (ciphertext). */
@@ -228,29 +237,31 @@ export async function loadShareOriginal(ctx: ShareContext, tile: GalleryTile): P
 // ---- guest contribution (CONTRIBUTOR shares) ------------------------------------------------------------
 
 const sp = (ctx: ShareContext) => `${ctx.apiBase}/api/public/shares/${ctx.shareId}`
+const uploadProofHeaders = (ctx: ShareContext): Record<string, string> => ({ 'x-veyq-share-upload-token': ctx.uploadToken })
+const uploadJsonHeaders = (ctx: ShareContext): Record<string, string> => ({ 'content-type': 'application/json', ...uploadProofHeaders(ctx) })
 
 /** Upload arbitrary content as a deduplicated blob via the share's guest endpoints (dedup + resume). */
 async function uploadShareBlob(ctx: ShareContext, bytes: Uint8Array): Promise<BlobRef> {
   const chunks = chunkBytes(bytes, DEFAULT_CHUNK_SIZE)
   const start = await fetch(`${sp(ctx)}/blobs`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: uploadJsonHeaders(ctx),
     body: JSON.stringify({ dedupToken: dedupTokenFor(ctx.contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length }),
   })
   if (!start.ok) throw await apiError(start, 'share start blob')
   const ticket = await start.json()
   if (ticket.status === 'READY') return { blobId: ticket.blobId, totalChunks: ticket.totalChunks, byteSize: bytes.length }
   const uploadId = ticket.uploadId
-  const have = new Set<number>((await (await fetch(`${sp(ctx)}/blob-uploads/${uploadId}`)).json()).receivedChunks)
+  const have = new Set<number>((await (await fetch(`${sp(ctx)}/blob-uploads/${uploadId}`, { headers: uploadProofHeaders(ctx) })).json()).receivedChunks)
   for (let i = 0; i < chunks.length; i++) {
     if (have.has(i)) continue
     const frame = v1.sealFrame(ctx.contentKey, i, chunks.length, chunks[i], v1.randomBytes(12))
     const put = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/chunks/${i}`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: uploadJsonHeaders(ctx),
       body: JSON.stringify({ frame: { suiteId: 'v1', bytes: b64url(frame) } }),
     })
     if (!put.ok) throw new Error(`share put chunk ${i} failed: ${put.status}`)
   }
-  const done = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/complete`, { method: 'POST' })
+  const done = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/complete`, { method: 'POST', headers: uploadProofHeaders(ctx) })
   if (!done.ok) throw await apiError(done, 'share complete')
   return done.json()
 }
@@ -273,7 +284,7 @@ export async function uploadShareMedia(ctx: ShareContext, m: NewMedia, contribut
     cameraMake: m.cameraMake, cameraModel: m.cameraModel, lens: m.lens, width: m.width, height: m.height, fileSize: m.fileSize, exif: m.exif,
   })
   const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/contributed-media`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: uploadJsonHeaders(ctx),
     body: JSON.stringify({
       originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives,
       ...(contributor ? { contributorId: contributor.id, contributorName: sealShareName(ctx, contributor.name) } : {}),

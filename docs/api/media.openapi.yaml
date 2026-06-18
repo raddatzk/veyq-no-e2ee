@@ -271,9 +271,10 @@ paths:
     post:
       tags: [PublicShareContribute]
       operationId: startShareBlob
-      summary: Begin (or dedup) a guest blob upload (no auth — CONTRIBUTOR shares only).
+      summary: Begin (or dedup) a guest blob upload (no auth — CONTRIBUTOR/UPLOADER shares only).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/StartBlobRequest' } } }
@@ -285,10 +286,11 @@ paths:
     get:
       tags: [PublicShareContribute]
       operationId: getShareUpload
-      summary: A guest blob upload's progress (no auth — CONTRIBUTOR shares only).
+      summary: A guest blob upload's progress (no auth — CONTRIBUTOR/UPLOADER shares only).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: uploadId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       responses:
         '200': { description: Upload progress., content: { application/json: { schema: { $ref: '#/components/schemas/BlobUploadProgress' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
@@ -297,11 +299,12 @@ paths:
     put:
       tags: [PublicShareContribute]
       operationId: putShareChunk
-      summary: Upload one AEAD frame of a guest blob (no auth — CONTRIBUTOR shares only).
+      summary: Upload one AEAD frame of a guest blob (no auth — CONTRIBUTOR/UPLOADER shares only).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: uploadId, in: path, required: true, schema: { type: string } }
         - { name: index, in: path, required: true, schema: { type: integer } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/PutChunkRequest' } } }
@@ -313,10 +316,11 @@ paths:
     post:
       tags: [PublicShareContribute]
       operationId: completeShareBlob
-      summary: Finalize a guest blob upload (no auth — CONTRIBUTOR shares only).
+      summary: Finalize a guest blob upload (no auth — CONTRIBUTOR/UPLOADER shares only).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: uploadId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       responses:
         '200': { description: The finalized blob., content: { application/json: { schema: { $ref: '#/components/schemas/CompleteBlobResponse' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
@@ -325,10 +329,11 @@ paths:
     post:
       tags: [PublicShareContribute]
       operationId: createShareMedia
-      summary: Attach a guest-uploaded blob as media on a shared node (no auth — CONTRIBUTOR shares only).
+      summary: Attach a guest-uploaded blob as media on a shared node (no auth — CONTRIBUTOR/UPLOADER shares only).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/CreateMediaRequest' } } }

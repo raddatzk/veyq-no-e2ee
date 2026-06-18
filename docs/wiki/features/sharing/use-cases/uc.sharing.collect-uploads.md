@@ -40,7 +40,8 @@ S --> C : upload accepted (attributed to uploader bucket)
 
 ## Main flow
 1. The curator creates an **uploader link**; the system wraps the Memory subtree's content key to a
-   per-share key and embeds the share token in the link's URL fragment.
+   per-share key, derives an upload-capability proof from the share unwrap key, and embeds the share
+   token in the link's URL fragment.
 2. The curator shares the link (optionally with a name/notice requirement).
 3. A Public Uploader opens the link and sees only an upload form (no gallery).
 4. The uploader provides a display **name** (which names their **bucket**) and selects files.
@@ -54,8 +55,9 @@ S --> C : upload accepted (attributed to uploader bucket)
 - A1: The curator sets an upload notice/terms → the uploader must accept before uploading.
 - A2: The curator revokes the link → the system rotates the content key; the old token can no longer
   encrypt or decrypt new content.
-- E1: Disallowed file type or limits exceeded → rejected with a clear, rate-limited error.
-- E2: No worker available → the item is marked "processing pending"; if no agent is configured, the
+- E1: A request has only the `shareId` but no valid upload-capability token → `403`.
+- E2: Disallowed file type or limits exceeded → rejected with a clear, rate-limited error.
+- E3: No worker available → the item is marked "processing pending"; if no agent is configured, the
   uploading client transcodes synchronously (fallback — see the diagram).
 
 ## Quality notes
@@ -68,7 +70,7 @@ S --> C : upload accepted (attributed to uploader bucket)
 
 ## Related
 - Feature: [Sharing](../_index.md) · Actors: [Memory Curator](../../../actors.md), [Public Uploader](../../../actors.md)
-- Concepts: [Security Model](../../../crosscutting/security-model.md) (share keys, token-in-fragment,
-  share-boundary T&S), [Agent Mode](../../../crosscutting/agent-mode.md)
-- Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys), [AD-05](../../../decisions/README.md) (T&S), [AD-12](../../../decisions/README.md) (liveness)
+- Concepts: [Security Model](../../../crosscutting/security-model.md) (share keys, upload capability,
+  token-in-fragment, share-boundary T&S), [Agent Mode](../../../crosscutting/agent-mode.md)
+- Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys), [AD-05](../../../decisions/README.md) (T&S), [AD-12](../../../decisions/README.md) (liveness), [AD-30](../../../decisions/0030-public-share-upload-capability.md) (upload capability)
 - Related use-cases: `uc.sharing.share-public-viewer`, `uc.uploads.unified-media`

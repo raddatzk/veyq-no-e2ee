@@ -148,6 +148,8 @@ export function dedupToken(contentKey: Uint8Array, content: Uint8Array): Uint8Ar
   return hmac(sha256, dedupKey, sha256(content))
 }
 
+export const sha256Digest = (content: Uint8Array): Uint8Array => sha256(content)
+
 /**
  * Recovery commitment (AD: password reset). A domain-separated hash of the master key, stored server-side
  * when the RECOVERY wrap is written. Password reset must reproduce it — which needs the master key, i.e. the
@@ -207,6 +209,9 @@ export const kekPasskey = (prfOutput: Uint8Array): Uint8Array =>
 // The link's fragment shareKey alone can't decrypt — you also need the password. The server stays blind.
 export const shareWrapKey = (shareKey: Uint8Array, password: string, salt: Uint8Array): Uint8Array =>
   hkdf(sha256, shareKey, kekRecovery(utf8(password), salt), utf8('veyq/v1/share-pw'), 32)
+
+export const shareUploadToken = (shareUnwrapKey: Uint8Array): Uint8Array =>
+  hkdf(sha256, shareUnwrapKey, new Uint8Array(0), utf8('veyq/v1/share-upload'), 32)
 
 export const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
 

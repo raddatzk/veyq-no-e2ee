@@ -60,7 +60,7 @@ run('share e2e', () => {
     // A3: a contributor may NOT attach a scope blob it didn't upload through this share — referencing the
     // owner's original blob id (which the guest can see via listShareMedia) is rejected.
     const forgery = await fetch(`${apiBase}/api/public/shares/${cCtx.shareId}/nodes/${cCtx.rootNodeId}/contributed-media`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-veyq-share-upload-token': cCtx.uploadToken },
       body: JSON.stringify({ originalBlobId: vMedia[0].original.blobId, sealedMeta: { suiteId: 'v1', bytes: '' }, mimeType: 'image/jpeg', derivatives: [] }),
     })
     expect(forgery.status).toBe(403)

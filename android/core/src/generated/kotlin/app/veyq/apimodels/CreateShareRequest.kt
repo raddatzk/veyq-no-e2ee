@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  *
  * @param wrappedContentKey 
  * @param role 
+ * @param uploadCapabilityHash SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints.
  * @param passwordSalt 
  * @param expiresAt When the link stops working (omit for never).
  * @param label An owner-facing label for the link (not shown to guests).
@@ -50,6 +51,10 @@ data class CreateShareRequest (
 
     @Contextual @SerialName(value = "role")
     val role: ShareRole? = null,
+
+    /* SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints. */
+    @SerialName(value = "uploadCapabilityHash")
+    val uploadCapabilityHash: Blob? = null,
 
     @SerialName(value = "passwordSalt")
     val passwordSalt: Blob? = null,

@@ -15,6 +15,8 @@ public struct CreateShareRequest: Codable {
 
     public private(set) var wrappedContentKey: Blob
     public private(set) var role: ShareRole?
+    /** SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints. */
+    public private(set) var uploadCapabilityHash: Blob?
     public private(set) var passwordSalt: Blob?
     /** When the link stops working (omit for never). */
     public private(set) var expiresAt: Date?
@@ -23,9 +25,10 @@ public struct CreateShareRequest: Codable {
     /** Extra terms a guest must accept for THIS share (markdown). */
     public private(set) var noticeMarkdown: String?
 
-    public init(wrappedContentKey: Blob, role: ShareRole? = nil, passwordSalt: Blob? = nil, expiresAt: Date? = nil, label: String? = nil, noticeMarkdown: String? = nil) {
+    public init(wrappedContentKey: Blob, role: ShareRole? = nil, uploadCapabilityHash: Blob? = nil, passwordSalt: Blob? = nil, expiresAt: Date? = nil, label: String? = nil, noticeMarkdown: String? = nil) {
         self.wrappedContentKey = wrappedContentKey
         self.role = role
+        self.uploadCapabilityHash = uploadCapabilityHash
         self.passwordSalt = passwordSalt
         self.expiresAt = expiresAt
         self.label = label
@@ -35,6 +38,7 @@ public struct CreateShareRequest: Codable {
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case wrappedContentKey
         case role
+        case uploadCapabilityHash
         case passwordSalt
         case expiresAt
         case label
@@ -47,6 +51,7 @@ public struct CreateShareRequest: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(wrappedContentKey, forKey: .wrappedContentKey)
         try container.encodeIfPresent(role, forKey: .role)
+        try container.encodeIfPresent(uploadCapabilityHash, forKey: .uploadCapabilityHash)
         try container.encodeIfPresent(passwordSalt, forKey: .passwordSalt)
         try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
         try container.encodeIfPresent(label, forKey: .label)

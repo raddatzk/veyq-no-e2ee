@@ -40,25 +40,25 @@ class PublicShareTreeResource(private val handler: PublicShareTreeHandler) : Pub
     override fun listSharePlaylists(shareId: String, nodeId: String): Response = Response.ok(handler.listSharePlaylists(shareId, nodeId)).build()
 }
 
-/** Guest-side contribution: blob upload + media create (no auth, CONTRIBUTOR shares only). */
+/** Guest-side contribution: blob upload + media create (no auth, CONTRIBUTOR/UPLOADER shares only). */
 @ApplicationScoped
 class PublicShareContributeResource(private val handler: PublicShareContributeHandler) : PublicShareContributeApi {
-    override fun startShareBlob(shareId: String, startBlobRequest: StartBlobRequest): Response =
-        Response.ok(handler.startShareBlob(shareId, startBlobRequest)).build()
+    override fun startShareBlob(shareId: String, startBlobRequest: StartBlobRequest, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.startShareBlob(shareId, xVeyqShareUploadToken, startBlobRequest)).build()
 
-    override fun getShareUpload(shareId: String, uploadId: String): Response =
-        Response.ok(handler.getShareUpload(shareId, uploadId)).build()
+    override fun getShareUpload(shareId: String, uploadId: String, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.getShareUpload(shareId, uploadId, xVeyqShareUploadToken)).build()
 
-    override fun putShareChunk(shareId: String, uploadId: String, index: Int, putChunkRequest: PutChunkRequest): Response {
-        handler.putShareChunk(shareId, uploadId, index, putChunkRequest)
+    override fun putShareChunk(shareId: String, uploadId: String, index: Int, putChunkRequest: PutChunkRequest, xVeyqShareUploadToken: String?): Response {
+        handler.putShareChunk(shareId, uploadId, index, xVeyqShareUploadToken, putChunkRequest)
         return Response.noContent().build()
     }
 
-    override fun completeShareBlob(shareId: String, uploadId: String): Response =
-        Response.ok(handler.completeShareBlob(shareId, uploadId)).build()
+    override fun completeShareBlob(shareId: String, uploadId: String, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.completeShareBlob(shareId, uploadId, xVeyqShareUploadToken)).build()
 
-    override fun createShareMedia(shareId: String, nodeId: String, createMediaRequest: CreateMediaRequest): Response =
-        Response.ok(handler.createShareMedia(shareId, nodeId, createMediaRequest)).build()
+    override fun createShareMedia(shareId: String, nodeId: String, createMediaRequest: CreateMediaRequest, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.createShareMedia(shareId, nodeId, xVeyqShareUploadToken, createMediaRequest)).build()
 }
 
 /** Guest-side share media + blob frames (no auth). */

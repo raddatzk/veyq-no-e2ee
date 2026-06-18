@@ -333,10 +333,11 @@ password, which never unlocks content (the Secret Key does) — and in a self-ho
 the user, so it is moot. The lever, if the threat model ever tightens, is the Argon2id cost, not a protocol
 change.
 
-> **Deferred hardening (tracked):** public-share *upload* (CONTRIBUTOR/UPLOADER) is authorized by the
-> `shareId` alone — link possession lets a guest append (sealed) junk, a storage/DoS vector but not a
-> confidentiality break. A blind-compatible write-proof (share-key MAC or a separate upload-capability
-> token) is deferred; the interim mitigation is per-share upload rate-limiting + byte quotas.
+> **[Built] Public-share upload proof:** public-share *upload* (CONTRIBUTOR/UPLOADER) requires the
+> `shareId` plus a blind upload-capability token. The client derives the token from the share unwrap key
+> (including the password fold for password-protected shares); the server stores only `SHA-256(token)` and
+> verifies the raw token on guest upload/progress/complete/attach requests. Possessing `shareId` alone can
+> no longer append sealed junk. Per-share upload rate-limiting + byte quotas remain as abuse controls.
 
 ## Deduplication under E2EE
 

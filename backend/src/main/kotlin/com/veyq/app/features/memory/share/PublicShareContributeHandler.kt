@@ -17,15 +17,17 @@ import com.veyq.app.shared.content.Share
 import com.veyq.app.shared.content.ShareRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 
 /**
- * uc.memory.share — guest contribution (unauthenticated, CONTRIBUTOR shares only). A guest holding a
- * CONTRIBUTOR link uploads media through the same deduplicated blob path as a member (gated to the share's
- * scope) and attaches it to a node in the shared subtree. Authorization is the share role, not a session;
- * the guest already holds the content key (from the link fragment), so the bytes stay sealed end-to-end.
+ * uc.memory.share — guest contribution (unauthenticated, CONTRIBUTOR/UPLOADER shares only). A guest holding
+ * a writable link uploads media through the same deduplicated blob path as a member (gated to the share's
+ * scope) and attaches it to a node in the shared subtree. Authorization is the share role plus a blind upload
+ * capability derived client-side from the share unwrap key; the server stores only its SHA-256. The guest
+ * already holds the content key (from the link fragment), so the bytes stay sealed end-to-end.
  */
 @ApplicationScoped
 class PublicShareContributeHandler(
@@ -38,20 +40,20 @@ class PublicShareContributeHandler(
     private val dec = Base64.getUrlDecoder()
     // Every guest upload op is bound to THIS share's owner tag, so a guest who learns another guest's uploadId
     // (a second share on the same scope, or a co-guest of one CONTRIBUTOR link) can't read/overwrite/finalize it.
-    fun startShareBlob(shareId: String, req: StartBlobRequest): BlobTicket =
-        uploader(shareId).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
+    fun startShareBlob(shareId: String, uploadToken: String?, req: StartBlobRequest): BlobTicket =
+        uploader(shareId, uploadToken).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
 
-    fun putShareChunk(shareId: String, uploadId: String, index: Int, req: PutChunkRequest) =
-        uploader(shareId).let { blobUploads.putBlobChunkAs(it.scopeId, uploadId, index, req, "share:${it.id}") }
+    fun putShareChunk(shareId: String, uploadId: String, index: Int, uploadToken: String?, req: PutChunkRequest) =
+        uploader(shareId, uploadToken).let { blobUploads.putBlobChunkAs(it.scopeId, uploadId, index, req, "share:${it.id}") }
 
-    fun getShareUpload(shareId: String, uploadId: String): BlobUploadProgress =
-        uploader(shareId).let { blobUploads.getBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
+    fun getShareUpload(shareId: String, uploadId: String, uploadToken: String?): BlobUploadProgress =
+        uploader(shareId, uploadToken).let { blobUploads.getBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
 
-    fun completeShareBlob(shareId: String, uploadId: String): CompleteBlobResponse =
-        uploader(shareId).let { blobUploads.completeBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
+    fun completeShareBlob(shareId: String, uploadId: String, uploadToken: String?): CompleteBlobResponse =
+        uploader(shareId, uploadToken).let { blobUploads.completeBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
 
-    fun createShareMedia(shareId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
-        val share = uploader(shareId)
+    fun createShareMedia(shareId: String, nodeId: String, uploadToken: String?, req: CreateMediaRequest): MediaItem {
+        val share = uploader(shareId, uploadToken)
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
         // A guest may only attach blobs THEY uploaded via this share — not arbitrary scope blobs whose id they
@@ -86,10 +88,26 @@ class PublicShareContributeHandler(
     }
 
     /** Resolve a non-expired share and require an upload permission (CONTRIBUTOR or the blind-drop UPLOADER). */
-    private fun uploader(shareId: String): Share {
+    private fun uploader(shareId: String, uploadToken: String?): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
         if (ShareHandler.isExpired(share)) throw ApiException(404, "SHARE_EXPIRED", "This share has expired")
         if (!ShareHandler.canUpload(share.role)) throw ApiException(403, "SHARE_READ_ONLY", "This share cannot upload")
+        requireUploadProof(share, uploadToken)
         return share
     }
+
+    private fun requireUploadProof(share: Share, uploadToken: String?) {
+        val expected = share.uploadCapabilityHash
+            ?: throw ApiException(403, "SHARE_UPLOAD_PROOF_REQUIRED", "This share requires a fresh upload capability")
+        val raw = try {
+            dec.decode(uploadToken?.takeIf { it.isNotBlank() } ?: throw IllegalArgumentException("missing"))
+        } catch (_: IllegalArgumentException) {
+            throw ApiException(403, "SHARE_UPLOAD_PROOF_INVALID", "Invalid share upload capability")
+        }
+        if (!MessageDigest.isEqual(sha256(raw), expected)) {
+            throw ApiException(403, "SHARE_UPLOAD_PROOF_INVALID", "Invalid share upload capability")
+        }
+    }
+
+    private fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 }

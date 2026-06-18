@@ -626,6 +626,7 @@ components:
       properties:
         wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         role: { $ref: '#/components/schemas/ShareRole' }
+        uploadCapabilityHash: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints.' }
         passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         expiresAt: { type: string, format: date-time, description: 'When the link stops working (omit for never).' }
         label: { type: string, description: 'An owner-facing label for the link (not shown to guests).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
