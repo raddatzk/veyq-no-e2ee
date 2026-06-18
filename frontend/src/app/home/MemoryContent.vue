@@ -1,11 +1,10 @@
 <script setup lang="ts">
-// The shared, tab-based memory presentation (Legacy UI) used by BOTH the internal member view and the public
-// guest share viewer, so they look identical. It owns the Galerie/Map/Journal tabs, in-memory chapter
-// navigation (breadcrumb + child-node cards), the justified gallery + lightbox (via useGallery), and the
-// embed-aware journal render (JournalBody). Everything data-related comes in as loaders keyed by nodeId, so the
-// member passes scope-authed loaders and the guest passes share-capability loaders. Member-only actions
-// (upload, delete, set-cover, edit/live journal, GPX import, download, share) are supplied via named slots; the
-// guest simply omits them.
+// Shared memory detail orchestrator for BOTH the internal member view and the public guest share viewer, so the
+// Legacy UI stays identical. It owns node/tab state, loader orchestration, filters, object-URL cleanup, and
+// parent-facing refresh hooks; concrete tab surfaces are delegated to small presentational components below.
+// Everything data-related comes in as loaders keyed by nodeId, so the member passes scope-authed loaders and the
+// guest passes share-capability loaders. Member-only actions (upload, delete, set-cover, edit/live journal, GPX
+// import, download, share) are supplied via named slots; the guest simply omits them.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '../../i18n/i18n'
 import { useGallery } from '../../features/gallery/useGallery'
@@ -104,9 +103,9 @@ function toggleTrack(id: string) {
   next.has(id) ? next.delete(id) : next.add(id)
   hiddenTracks.value = next
 }
-const geoPoints = () => tiles.value.filter((tl) => tl.lat != null && tl.lng != null).map((tl) => ({ id: tl.id, lat: tl.lat!, lng: tl.lng! }))
-const tracksById = () => Object.fromEntries(tracks.value.map((tr) => [tr.id, tr]))
-const playlistById = () => Object.fromEntries(playlists.value.map((p) => [p.id, p]))
+const geoPoints = computed(() => tiles.value.filter((tl) => tl.lat != null && tl.lng != null).map((tl) => ({ id: tl.id, lat: tl.lat!, lng: tl.lng! })))
+const tracksById = computed<Record<string, Track>>(() => Object.fromEntries(tracks.value.map((tr) => [tr.id, tr])))
+const playlistById = computed<Record<string, Playlist>>(() => Object.fromEntries(playlists.value.map((p) => [p.id, p])))
 function openMapPin(id: string) { const tile = tileById.value[id]; if (tile) openLightbox(tile) }
 
 // Cover hero = the current node's first photo (by takenAt); lightbox prev/next over the takenAt-ordered tiles.
@@ -117,9 +116,9 @@ function lightboxStep(d: number) {
   if (i < 0 || tiles.value.length < 2) return
   openLightbox(tiles.value[(i + d + tiles.value.length) % tiles.value.length])
 }
-const chapterChildCount = () => childNodes.value.filter((n) => n.type === 'CHAPTER').length
+const chapterCount = computed(() => childNodes.value.filter((n) => n.type === 'CHAPTER').length)
 
-const hasHighlights = () => allTiles.value.some((tl) => tl.highlighted)
+const hasHighlights = computed(() => allTiles.value.some((tl) => tl.highlighted))
 // A tile belongs to a bucket: a sub-bucket matches bucketId; a primary matches the contributor's un-bucketed media.
 function tileInBucket(tl: GalleryTile, b: Bucket): boolean {
   return b.primary ? tl.createdBy === b.ownerKey && (tl.bucketId == null) : tl.bucketId === b.id
@@ -144,6 +143,7 @@ function toggleHighlightFilter() { showHighlights.value = !showHighlights.value;
 function setCameraFilter(value: string | null) { cameraFilter.value = value; applyTileFilter() }
 function bucketCount(b: Bucket): number { return allTiles.value.filter((tl) => tileInBucket(tl, b)).length }
 function isOwnBucket(b: Bucket): boolean { return !!props.ownerKey && b.ownerKey === props.ownerKey }
+const ownBuckets = computed(() => contribBuckets.value.filter(isOwnBucket))
 async function loadContribBuckets() {
   if (!props.loadBuckets) return
   try { contribBuckets.value = await props.loadBuckets(currentNodeId.value); bucketsLoaded.value = true } catch (e) { emit('error', (e as Error).message) }
@@ -350,7 +350,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :media-count="tiles.length"
       :date-range="dateRange"
       :track-count="tracks.length"
-      :chapter-count="chapterChildCount()"
+      :chapter-count="chapterCount"
     />
 
     <MemoryChaptersSection
@@ -362,7 +362,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
 
     <MemoryMapSection
       v-if="tab === 'map'"
-      :points="geoPoints()"
+      :points="geoPoints"
       :tracks="tracks"
       :visible-tracks="visibleTracks"
       :hidden-track-ids="hiddenTracks"
@@ -383,9 +383,9 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :markdown="journalMarkdown"
       :editing="journalEditing"
       :tile-by-id="tileById"
-      :tracks-by-id="tracksById()"
+      :tracks-by-id="tracksById"
       :chapter-by-id="chapterById"
-      :playlist-by-id="playlistById()"
+      :playlist-by-id="playlistById"
       @open-media="openLightbox"
       @open-chapter="(id) => navigate(id)"
     >
@@ -398,13 +398,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
     </MemoryJournalSection>
 
     <MemoryGalleryToolbar
-      v-if="tab === 'gallery' && (dateRange || hasHighlights() || selectedBucket)"
+      v-if="tab === 'gallery' && (dateRange || hasHighlights || selectedBucket)"
       :date-range="dateRange"
       :selected-bucket="selectedBucket"
       :bucket-label="bucketLabel"
       :camera-filter="cameraFilter"
       :camera-options="cameraOptions"
-      :has-highlights="hasHighlights()"
+      :has-highlights="hasHighlights"
       :show-highlights="showHighlights"
       @clear-bucket="clearBucket"
       @camera-filter-change="setCameraFilter"
@@ -429,7 +429,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :tile-count="tiles.length"
       :downloading="downloading"
       :can-move-tile="!!moveMedia && !!lightboxTile && lightboxTile.createdBy === ownerKey"
-      :move-buckets="contribBuckets.filter(isOwnBucket)"
+      :move-buckets="ownBuckets"
       :owner-key="ownerKey"
       :bucket-label="bucketLabel"
       @close="closeLightbox"
