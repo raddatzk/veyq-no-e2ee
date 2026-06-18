@@ -11,7 +11,7 @@ import { t } from '../../i18n/i18n'
 import { useGallery } from '../../features/gallery/useGallery'
 import type { GalleryTile } from '../../features/gallery/gallery'
 import type { Bucket } from '../../features/memory/buckets/buckets'
-import { PROVIDER_LABEL, type Playlist } from '../../features/memory/playlist/playlist'
+import type { Playlist } from '../../features/memory/playlist/playlist'
 import type { Track } from '../../features/memory/track/track'
 import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -19,6 +19,7 @@ import JournalBody from './JournalBody.vue'
 import MemoryMap from './MemoryMap.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
+import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
 
@@ -175,7 +176,6 @@ async function moveToBucket(tile: GalleryTile | null, bucketId: string) {
   try { await props.moveMedia(tile.id, bucketId); await loadContribBuckets(); await reloadTiles() } catch (e) { emit('error', (e as Error).message) }
 }
 
-const PLAYLIST_LABEL = PROVIDER_LABEL
 async function loadPlaylistsTab() {
   if (!props.loadPlaylists) return
   try { playlists.value = await props.loadPlaylists(currentNodeId.value); playlistsLoaded.value = true } catch (e) { emit('error', (e as Error).message) }
@@ -325,18 +325,16 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       @open="openTab"
     />
 
-    <section v-if="tab === 'playlists'" class="memory-playlists">
-      <button v-if="addPlaylist" class="btn btn-primary" type="button" @click="addPlaylist">+ {{ t('playlist.add') }}</button>
-      <ul v-if="playlists.length" class="playlist-list">
-        <li v-for="p in playlists" :key="p.id" class="playlist-row">
-          <span class="playlist-provider">{{ PLAYLIST_LABEL[p.provider] }}</span>
-          <a class="playlist-title" :href="p.url" target="_blank" rel="noopener noreferrer">{{ p.title || p.url }}</a>
-          <button v-if="featurePlaylist" class="btn btn-ghost" type="button" :title="t('playlist.featured')" @click="toggleFeatured(p)">{{ p.featured ? '★' : '☆' }}</button>
-          <button v-if="removePlaylist" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="removePlaylist(p)">{{ t('common.delete') }}</button>
-        </li>
-      </ul>
-      <div v-else class="home-empty">{{ t('playlist.empty') }}</div>
-    </section>
+    <MemoryPlaylistsSection
+      v-if="tab === 'playlists'"
+      :playlists="playlists"
+      :can-add="!!addPlaylist"
+      :can-feature="!!featurePlaylist"
+      :can-remove="!!removePlaylist"
+      @add="addPlaylist"
+      @feature="toggleFeatured"
+      @remove="removePlaylist"
+    />
 
     <section v-if="tab === 'contributions'" class="memory-contributions">
       <ul class="bucket-list">

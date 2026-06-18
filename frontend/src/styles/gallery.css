@@ -193,6 +193,7 @@
 .playlist-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); margin-bottom: 0.4rem; }
 .playlist-provider { font-size: 0.78rem; color: var(--app-muted); background: var(--app-surface); padding: 0.15rem 0.45rem; border-radius: 999px; white-space: nowrap; }
 .playlist-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--app-accent); }
+.playlist-delete { color: var(--app-danger); }
 .track-del { color: var(--app-danger); padding: 0.3rem 0.6rem; }
 .memory-map {
   width: 100%;
