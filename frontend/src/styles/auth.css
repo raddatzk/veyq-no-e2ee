@@ -1,39 +1,50 @@
-/* Auth flow (connect / setup / login) — a centered card on the branded gradient, matching the
-   reference card chrome. Shared by every panel in the onboarding flow. */
+/* Auth flow aligned with legacy public-shell/login-card chrome. */
 .auth-screen {
-  min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 2rem 1rem;
+  width: 100%;
+  min-height: 100vh;
+  padding: 2rem;
   background: var(--app-background-pattern);
 }
 
 .auth-card {
-  width: 100%;
-  max-width: 420px;
-  background: var(--app-surface);
+  width: min(460px, 100%);
+  min-width: 0;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
-  box-shadow: var(--app-shadow-md);
-  padding: 1.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+  padding: 1.6rem;
+}
+
+:root.veyq-dark .auth-card {
+  background: var(--app-surface);
+  color: var(--app-text);
 }
 
 .auth-wordmark {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.25rem;
+  color: var(--app-text);
+  font-size: 1.65rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  margin: 0 0 0.35rem;
 }
 
 .auth-title {
-  font-size: 1.15rem;
+  color: var(--app-text);
+  font-size: 1.65rem;
   font-weight: 700;
-  margin: 0 0 0.35rem;
+  line-height: normal;
+  margin: 0 0 0.5rem;
 }
 
 .auth-sub {
   color: var(--app-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
   margin: 0 0 1.25rem;
 }
 
@@ -51,7 +62,8 @@
 
 .veyq-form input {
   width: 100%;
-  padding: 0.62rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.62rem 0.75rem;
   font: inherit;
   color: var(--app-control-text);
   background: var(--app-control-bg);
@@ -61,8 +73,8 @@
 }
 
 .veyq-form input:focus {
-  border-color: var(--app-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 30%, transparent);
+  border-color: var(--app-focus);
+  box-shadow: 0 0 0 3px var(--app-focus-ring);
 }
 
 .field-hint {
@@ -76,10 +88,11 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  padding: 0.66rem 0.9rem;
+  min-height: 2.35rem;
+  padding: 0 0.8rem;
   font: inherit;
   font-weight: 600;
-  border-radius: var(--app-radius-sm);
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
 }
@@ -90,14 +103,22 @@
 }
 
 .btn-primary {
-  background: var(--app-accent);
+  background: var(--app-success);
   color: var(--app-on-strong);
 }
 
+.btn-primary:hover:not(:disabled) {
+  background: var(--app-success-strong);
+}
+
 .btn-ghost {
-  background: transparent;
-  color: var(--app-muted);
+  background: var(--app-surface);
+  color: var(--app-text);
   border-color: var(--app-line);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--app-hover);
 }
 
 .btn-danger {
@@ -136,9 +157,9 @@
 
 /* Soft, non-blocking warning (e.g. the HIBP breached-password notice). Amber, theme-blended for contrast. */
 .auth-msg-warn {
-  background: color-mix(in srgb, #e0a83d 16%, transparent);
-  border: 1px solid color-mix(in srgb, #e0a83d 45%, transparent);
-  color: color-mix(in srgb, #e0a83d 80%, var(--app-control-text));
+  background: var(--app-warning-soft);
+  border: 1px solid var(--app-warning-line);
+  color: var(--app-warning-text);
 }
 
 .auth-msg-success {

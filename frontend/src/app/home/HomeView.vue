@@ -20,6 +20,8 @@ import GroupMembersModal from './GroupMembersModal.vue'
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import InviteModal from './InviteModal.vue'
 import OpenInApp from '../auth/OpenInApp.vue'
+import logoDarkUrl from '../../assets/brand/logo-dark.svg'
+import logoLightUrl from '../../assets/brand/logo-light.svg'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
@@ -297,12 +299,16 @@ async function cancelDeletion() {
 const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
 const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
 const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
+const brandLogoUrl = computed(() => (session.theme === 'dark' ? logoDarkUrl : logoLightUrl))
 </script>
 
 <template>
   <div class="home">
     <aside class="home-sidebar">
-      <div class="home-brand">veyq</div>
+      <div class="home-brand">
+        <img class="home-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
+        <span>veyq</span>
+      </div>
 
       <div class="home-section">{{ t('home.spaces') }}</div>
       <button v-for="s in personalSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
