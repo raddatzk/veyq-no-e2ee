@@ -18,6 +18,7 @@ import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
+import MemoryGalleryToolbar from './MemoryGalleryToolbar.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryJournalSection from './MemoryJournalSection.vue'
 import MemoryMapSection from './MemoryMapSection.vue'
@@ -149,6 +150,7 @@ function applyTileFilter() {
   tiles.value = v
 }
 function toggleHighlightFilter() { showHighlights.value = !showHighlights.value; applyTileFilter() }
+function setCameraFilter(value: string | null) { cameraFilter.value = value; applyTileFilter() }
 function bucketCount(b: Bucket): number { return allTiles.value.filter((tl) => tileInBucket(tl, b)).length }
 function isOwnBucket(b: Bucket): boolean { return !!props.ownerKey && b.ownerKey === props.ownerKey }
 async function loadContribBuckets() {
@@ -403,19 +405,19 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       </template>
     </MemoryJournalSection>
 
-    <div v-if="tab === 'gallery' && (dateRange || hasHighlights() || selectedBucket)" class="detail-gallery-bar">
-      <span v-if="dateRange" class="detail-daterange">{{ dateRange }}</span>
-      <button v-if="selectedBucket" class="btn btn-ghost gallery-filter active" type="button" @click="clearBucket">
-        {{ bucketLabel?.(selectedBucket) || t('contrib.member') }} ✕
-      </button>
-      <select v-if="selectedBucket && cameraOptions.length" v-model="cameraFilter" class="bucket-camera-filter" @change="applyTileFilter">
-        <option :value="null">{{ t('contrib.allCameras') }}</option>
-        <option v-for="cam in cameraOptions" :key="cam" :value="cam">{{ cam }}</option>
-      </select>
-      <button v-if="hasHighlights()" class="btn btn-ghost gallery-filter" :class="{ active: showHighlights }" type="button" @click="toggleHighlightFilter">
-        ★ {{ t('detail.highlights') }}
-      </button>
-    </div>
+    <MemoryGalleryToolbar
+      v-if="tab === 'gallery' && (dateRange || hasHighlights() || selectedBucket)"
+      :date-range="dateRange"
+      :selected-bucket="selectedBucket"
+      :bucket-label="bucketLabel"
+      :camera-filter="cameraFilter"
+      :camera-options="cameraOptions"
+      :has-highlights="hasHighlights()"
+      :show-highlights="showHighlights"
+      @clear-bucket="clearBucket"
+      @camera-filter-change="setCameraFilter"
+      @toggle-highlights="toggleHighlightFilter"
+    />
 
     <div v-show="tab === 'gallery'" ref="galleryEl" class="gallery-buckets">
       <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
