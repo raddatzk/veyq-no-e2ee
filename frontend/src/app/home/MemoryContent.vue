@@ -19,6 +19,7 @@ import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
 import MemoryGalleryGrid from './MemoryGalleryGrid.vue'
+import MemoryGalleryStatus from './MemoryGalleryStatus.vue'
 import MemoryGalleryToolbar from './MemoryGalleryToolbar.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryJournalSection from './MemoryJournalSection.vue'
@@ -414,10 +415,12 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <MemoryGalleryGrid :buckets="buckets" :tile-by-id="tileById" @open-tile="openLightbox" />
     </div>
 
-    <template v-if="tab === 'gallery'">
-      <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
-      <div v-else-if="!tiles.length && !childNodes.length" class="home-empty">{{ t('detail.noMedia') }}</div>
-    </template>
+    <MemoryGalleryStatus
+      v-if="tab === 'gallery'"
+      :loading="loading"
+      :has-tiles="!!tiles.length"
+      :has-children="!!childNodes.length"
+    />
 
     <MemoryLightbox
       v-if="lightbox"
