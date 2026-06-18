@@ -66,6 +66,24 @@ class Media {
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "mime_type", nullable = false) var mimeType: String = ""
     @Column(nullable = false) var highlighted: Boolean = false // server-visible favourite/star (not content)
+    // Contribution attribution (ADR 0023): who added this medium ("user:<id>" / "share:<shareId>:<contributorId>")
+    // and which bucket it sits in (null = the contributor's primary bucket). The server sees the keys, never names.
+    @Column(name = "created_by", nullable = false) var createdBy: String = ""
+    @Column(name = "bucket_id") var bucketId: String? = null
+    @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
+}
+
+@Entity
+@Table(name = "veyq_media_bucket")
+class MediaBucket {
+    @Id var id: String = ""
+    @Column(name = "scope_id", nullable = false) var scopeId: String = ""
+    @Column(name = "node_id", nullable = false) var nodeId: String = ""
+    @Column(name = "owner_key", nullable = false) var ownerKey: String = ""
+    @Column(name = "parent_bucket_id") var parentBucketId: String? = null
+    @Column(name = "sealed_name", nullable = false) var sealedName: ByteArray = ByteArray(0)
+    @Column(name = "suite_id", nullable = false) var suiteId: String = ""
+    @Column(name = "is_primary", nullable = false) var isPrimary: Boolean = false
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 
@@ -137,6 +155,24 @@ class MediaRepository : PanacheRepositoryBase<Media, String> {
     fun listByNodeIds(nodeIds: Collection<String>): List<Media> = if (nodeIds.isEmpty()) emptyList() else list("nodeId in ?1", nodeIds)
     fun listByScopeId(scopeId: String): List<Media> = list("scopeId", scopeId)
     fun countByOriginalBlobId(blobId: String): Long = count("originalBlobId", blobId)
+    fun countByBucketId(bucketId: String): Long = count("bucketId", bucketId)
+    /** Media a contributor placed in their primary bucket of a node (bucket_id null + created_by match). */
+    fun countPrimaryByOwner(nodeId: String, createdBy: String): Long =
+        count("nodeId = ?1 and createdBy = ?2 and bucketId is null", nodeId, createdBy)
+    fun listByNodeAndCreatedBy(nodeId: String, createdBy: String): List<Media> =
+        list("nodeId = ?1 and createdBy = ?2", nodeId, createdBy)
+    /** Reassign every medium in [bucketId] back to its contributor's primary bucket (null) — on sub-bucket delete. */
+    fun clearBucket(bucketId: String): Int = update("bucketId = null where bucketId = ?1", bucketId)
+    fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
+}
+
+@ApplicationScoped
+class MediaBucketRepository : PanacheRepositoryBase<MediaBucket, String> {
+    fun listByNodeId(nodeId: String): List<MediaBucket> = list("nodeId = ?1 order by createdAt", nodeId)
+    fun findPrimary(nodeId: String, ownerKey: String): MediaBucket? =
+        find("nodeId = ?1 and ownerKey = ?2 and isPrimary = true", nodeId, ownerKey).firstResult()
+    fun listByParent(parentBucketId: String): List<MediaBucket> = list("parentBucketId", parentBucketId)
     fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
     fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }
