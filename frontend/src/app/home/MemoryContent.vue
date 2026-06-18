@@ -14,12 +14,12 @@ import type { Bucket } from '../../features/memory/buckets/buckets'
 import type { Playlist } from '../../features/memory/playlist/playlist'
 import type { Track } from '../../features/memory/track/track'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
-import JournalBody from './JournalBody.vue'
 import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
+import MemoryJournalSection from './MemoryJournalSection.vue'
 import MemoryMapSection from './MemoryMapSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
@@ -383,23 +383,25 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       </template>
     </MemoryMapSection>
 
-    <section v-if="tab === 'journal'" class="journal">
-      <slot v-if="journalEditing" name="journal-edit" :node-id="currentNodeId" :markdown="journalMarkdown" />
-      <template v-else>
-        <slot name="journal-bar" :node-id="currentNodeId" :markdown="journalMarkdown" />
-        <JournalBody
-          v-if="journalMarkdown.trim()"
-          :markdown="journalMarkdown"
-          :tile-by-id="tileById"
-          :tracks-by-id="tracksById()"
-          :chapter-by-id="chapterById"
-          :playlist-by-id="playlistById()"
-          @open-media="openLightbox"
-          @open-chapter="(id) => navigate(id)"
-        />
-        <div v-else class="home-empty">{{ t('journal.empty') }}</div>
+    <MemoryJournalSection
+      v-if="tab === 'journal'"
+      :node-id="currentNodeId"
+      :markdown="journalMarkdown"
+      :editing="journalEditing"
+      :tile-by-id="tileById"
+      :tracks-by-id="tracksById()"
+      :chapter-by-id="chapterById"
+      :playlist-by-id="playlistById()"
+      @open-media="openLightbox"
+      @open-chapter="(id) => navigate(id)"
+    >
+      <template #journal-edit="{ nodeId, markdown }">
+        <slot name="journal-edit" :node-id="nodeId" :markdown="markdown" />
       </template>
-    </section>
+      <template #journal-bar="{ nodeId, markdown }">
+        <slot name="journal-bar" :node-id="nodeId" :markdown="markdown" />
+      </template>
+    </MemoryJournalSection>
 
     <div v-if="tab === 'gallery' && (dateRange || hasHighlights() || selectedBucket)" class="detail-gallery-bar">
       <span v-if="dateRange" class="detail-daterange">{{ dateRange }}</span>
