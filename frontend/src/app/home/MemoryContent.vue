@@ -22,6 +22,7 @@ import MemoryGalleryGrid from './MemoryGalleryGrid.vue'
 import MemoryGalleryToolbar from './MemoryGalleryToolbar.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryJournalSection from './MemoryJournalSection.vue'
+import MemoryLightbox from './MemoryLightbox.vue'
 import MemoryMapSection from './MemoryMapSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
@@ -87,17 +88,10 @@ const cameraFilter = ref<string | null>(null)
 const playlists = ref<Playlist[]>([])
 const playlistsLoaded = ref(false)
 
-const lightboxInfo = ref(false)
-const lightboxImg = ref<HTMLImageElement | null>(null)
-function toggleFullscreen() {
-  if (document.fullscreenElement) void document.exitFullscreen()
-  else void lightboxImg.value?.requestFullscreen?.()
-}
 const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, observe, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
   loadPreview: (tile) => props.loadPreview(tile),
   loadOriginal: (tile) => props.loadOriginal(tile),
   downloadFileName: props.downloadFileName,
-  onLightboxClose: () => { lightboxInfo.value = false },
   onError: (e) => emit('error', e.message),
 })
 
@@ -123,11 +117,6 @@ function lightboxStep(d: number) {
   openLightbox(tiles.value[(i + d + tiles.value.length) % tiles.value.length])
 }
 const chapterChildCount = () => childNodes.value.filter((n) => n.type === 'CHAPTER').length
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
 
 const hasHighlights = () => allTiles.value.some((tl) => tl.highlighted)
 // A tile belongs to a bucket: a sub-bucket matches bucketId; a primary matches the contributor's un-bucketed media.
@@ -180,6 +169,7 @@ async function moveToBucket(tile: GalleryTile | null, bucketId: string) {
   if (!tile || !props.moveMedia) return
   try { await props.moveMedia(tile.id, bucketId); await loadContribBuckets(); await reloadTiles() } catch (e) { emit('error', (e as Error).message) }
 }
+async function moveLightboxTile(bucketId: string) { await moveToBucket(lightboxTile.value, bucketId) }
 
 async function loadPlaylistsTab() {
   if (!props.loadPlaylists) return
@@ -429,34 +419,24 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <div v-else-if="!tiles.length && !childNodes.length" class="home-empty">{{ t('detail.noMedia') }}</div>
     </template>
 
-    <div v-if="lightbox" class="lightbox" @click="closeLightbox">
-      <button v-if="tiles.length > 1" class="lightbox-nav lightbox-prev" type="button" @click.stop="lightboxStep(-1)">‹</button>
-      <img ref="lightboxImg" :src="lightbox" alt="" @click.stop="toggleFullscreen" />
-      <button v-if="tiles.length > 1" class="lightbox-nav lightbox-next" type="button" @click.stop="lightboxStep(1)">›</button>
-      <div v-if="lightboxInfo && lightboxTile" class="lightbox-info" @click.stop>
-        <div><span>{{ t('info.takenAt') }}</span><strong>{{ new Date(lightboxTile.takenAt).toLocaleString() }}</strong></div>
-        <div><span>{{ t('info.type') }}</span><strong>{{ lightboxTile.mimeType }}</strong></div>
-        <div v-if="lightboxTile.lat != null"><span>{{ t('info.location') }}</span><strong>{{ lightboxTile.lat!.toFixed(5) }}, {{ lightboxTile.lng!.toFixed(5) }}</strong></div>
-        <div v-if="lightboxTile.cameraModel"><span>{{ t('info.camera') }}</span><strong>{{ [lightboxTile.cameraMake, lightboxTile.cameraModel].filter(Boolean).join(' ') }}</strong></div>
-        <div v-if="lightboxTile.lens"><span>{{ t('info.lens') }}</span><strong>{{ lightboxTile.lens }}</strong></div>
-        <div v-if="lightboxTile.width && lightboxTile.height"><span>{{ t('info.dimensions') }}</span><strong>{{ lightboxTile.width }}×{{ lightboxTile.height }}</strong></div>
-        <div v-if="lightboxTile.fileSize"><span>{{ t('info.fileSize') }}</span><strong>{{ formatBytes(lightboxTile.fileSize) }}</strong></div>
-        <div v-for="(val, key) in (lightboxTile.exif ?? {})" :key="key"><span>{{ key }}</span><strong>{{ val }}</strong></div>
-      </div>
-      <div class="lightbox-actions" @click.stop>
-        <slot name="lightbox-actions" :tile="lightboxTile" />
-        <select
-          v-if="moveMedia && lightboxTile && lightboxTile.createdBy === ownerKey"
-          class="bucket-move" :value="lightboxTile.bucketId ?? `primary:${ownerKey}`"
-          @change="moveToBucket(lightboxTile, ($event.target as HTMLSelectElement).value)"
-        >
-          <option v-for="b in contribBuckets.filter(isOwnBucket)" :key="b.id" :value="b.id">{{ b.primary ? t('contrib.moveToPrimary') : (bucketLabel?.(b) || '—') }}</option>
-        </select>
-        <button class="btn btn-ghost" type="button" @click="toggleFullscreen">{{ t('detail.fullscreen') }}</button>
-        <button class="btn btn-ghost" type="button" @click="lightboxInfo = !lightboxInfo">{{ t('info.info') }}</button>
-        <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
-        <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>
-      </div>
-    </div>
+    <MemoryLightbox
+      v-if="lightbox"
+      :image-url="lightbox"
+      :tile="lightboxTile"
+      :tile-count="tiles.length"
+      :downloading="downloading"
+      :can-move-tile="!!moveMedia && !!lightboxTile && lightboxTile.createdBy === ownerKey"
+      :move-buckets="contribBuckets.filter(isOwnBucket)"
+      :owner-key="ownerKey"
+      :bucket-label="bucketLabel"
+      @close="closeLightbox"
+      @step="lightboxStep"
+      @move-tile="moveLightboxTile"
+      @download="downloadThisOriginal"
+    >
+      <template #actions="{ tile }">
+        <slot name="lightbox-actions" :tile="tile" />
+      </template>
+    </MemoryLightbox>
   </div>
 </template>
