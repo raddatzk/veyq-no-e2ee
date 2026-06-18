@@ -16,7 +16,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -149,6 +153,11 @@ class GalleryController(
     suspend fun deleteTrack(id: String) {
         runCatching { withContext(Dispatchers.IO) { Track.deleteTrack(apiBase, session, scopeId, nodeId, id) } }
         tracks = tracks.filterNot { it.id == id }
+    }
+
+    suspend fun renameTrack(track: Track.TrackItem, name: String) {
+        runCatching { withContext(Dispatchers.IO) { Track.updateTrack(apiBase, session, scopeId, contentKey, nodeId, track.id, name, track.points) } }
+            .onSuccess { runCatching { withContext(Dispatchers.IO) { Track.getTracks(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { tracks = it } }
     }
 
     suspend fun loadJournal() {
@@ -431,6 +440,8 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var cameraFilter by remember { mutableStateOf<String?>(null) }
     var creatingBucket by remember { mutableStateOf(false) }
     var renamingBucket by remember { mutableStateOf<Buckets.Bucket?>(null) }
+    var hiddenTracks by remember { mutableStateOf(setOf<String>()) }
+    var renamingTrack by remember { mutableStateOf<Track.TrackItem?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load(); controller.loadChildren(); controller.loadBuckets() }
@@ -535,14 +546,30 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             controller.tiles.firstOrNull()?.let { hero ->
                 Image(hero.image, null, modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
+                if (controller.children.isNotEmpty()) TabLabel(L10n.t("detail.chapters"), tab == 5) { tab = 5 }
                 TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
                 TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
                 TabLabel(L10n.t("detail.contributions"), tab == 4) { tab = 4 }
                 TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
             }
-            if (tab == 4) {
+            if (tab == 5) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    controller.children.forEach { child ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).clickable { onOpenChild(child) }.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            val cover = child.cover
+                            if (cover != null) Image(cover, null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                            else Box(Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Bg), contentAlignment = Alignment.Center) { Text(if (child.type == "CHAPTER") "📖" else if (child.type == "FOLDER") "🗂" else "🖼", fontSize = 22.sp) }
+                            Text(child.name, color = Veyq.Text, modifier = Modifier.weight(1f))
+                            Text("›", color = Veyq.Muted, fontSize = 20.sp)
+                        }
+                    }
+                }
+            } else if (tab == 4) {
                 LaunchedEffect(Unit) { controller.loadBuckets() }
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (controller.buckets.isEmpty()) Text(L10n.t("contrib.empty"), color = Veyq.Muted, fontSize = 14.sp)
@@ -579,10 +606,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                     }
                 }
                 if (points.isEmpty() && controller.tracks.isEmpty()) Text(L10n.t("map.empty"), color = Veyq.Muted, fontSize = 14.sp)
-                else MemoryMap(points, controller.tracks) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
+                else MemoryMap(points, controller.tracks.filter { it.id !in hiddenTracks }) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
                 controller.tracks.forEach { tr ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { hiddenTracks = if (tr.id in hiddenTracks) hiddenTracks - tr.id else hiddenTracks + tr.id }) {
+                            Text(if (tr.id in hiddenTracks) "🚫" else "👁", fontSize = 13.sp)
+                        }
                         Box(Modifier.weight(1f)) { TrackStatsRow(tr) }
+                        TextButton(onClick = { renamingTrack = tr }) { Text(L10n.t("common.rename"), color = Veyq.Accent) }
                         TextButton(onClick = { val id = tr.id; scope.launch { controller.deleteTrack(id) } }) { Text(L10n.t("track.delete"), color = Color(0xFFF87171)) }
                     }
                 }
@@ -615,11 +646,6 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                         }
                     }
                 }
-                if (controller.children.isNotEmpty()) {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        controller.children.forEach { child -> ChildCard(child) { onOpenChild(child) } }
-                    }
-                }
                 when {
                     controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
                     controller.loadFailed -> {
@@ -648,7 +674,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(16.dp)) {
                 Box(Modifier.fillMaxWidth()) {
-                    Image(lightboxPreview ?: tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                    var zoom by remember(tile.id) { mutableStateOf(1f) }
+                    Image(
+                        lightboxPreview ?: tile.image, null, contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth()
+                            .graphicsLayer(scaleX = zoom, scaleY = zoom)
+                            .pointerInput(tile.id) { detectTransformGestures { _, _, z, _ -> zoom = (zoom * z).coerceIn(1f, 5f) } }
+                            .pointerInput(tile.id) { detectTapGestures(onDoubleTap = { zoom = if (zoom > 1f) 1f else 2.5f }) },
+                    )
                     if (idx > 0) TextButton(onClick = { goto(idx - 1) }, modifier = Modifier.align(Alignment.CenterStart)) { Text("‹", color = Color.White, fontSize = 34.sp) }
                     if (idx < controller.tiles.size - 1) TextButton(onClick = { goto(idx + 1) }, modifier = Modifier.align(Alignment.CenterEnd)) { Text("›", color = Color.White, fontSize = 34.sp) }
                 }
@@ -700,6 +733,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
 
     if (creatingBucket) BucketNameDialog(L10n.t("contrib.newBucket"), "", onDismiss = { creatingBucket = false }) { name -> creatingBucket = false; scope.launch { controller.createBucket(name) } }
     renamingBucket?.let { b -> BucketNameDialog(L10n.t("common.rename"), controller.bucketLabel(b), onDismiss = { renamingBucket = null }) { name -> renamingBucket = null; scope.launch { controller.renameBucket(b.id, name) } } }
+    renamingTrack?.let { tr -> BucketNameDialog(L10n.t("track.renamePrompt"), tr.name, onDismiss = { renamingTrack = null }) { name -> renamingTrack = null; scope.launch { controller.renameTrack(tr, name) } } }
 
     if (showShareRole) {
         fun share(role: String) {

@@ -124,6 +124,27 @@ object Track {
         if (resp.statusCode() != 200) throw RuntimeException("create track failed: ${resp.statusCode()}")
     }
 
+    /** Rename (re-seal) a track: re-seal {name, points} (new name, same points) and PATCH; the id is preserved. */
+    fun updateTrack(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, trackId: String, name: String, points: List<Point>) {
+        val pointsJson = JSONArray().apply {
+            points.forEach {
+                val o = JSONObject().put("lat", it.lat).put("lng", it.lng)
+                if (it.ele != null) o.put("ele", it.ele)
+                if (it.time != null) o.put("time", it.time)
+                put(o)
+            }
+        }
+        val route = JSONObject().put("name", name).put("points", pointsJson).toString()
+        val nonce = V1.randomBytes(12)
+        val sealed = nonce + V1.aeadSeal(contentKey, nonce, route.toByteArray(Charsets.UTF_8), EMPTY)
+        val payload = JSONObject().put("sealedContent", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(sealed))).toString()
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/tracks/$trackId"))
+            .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(payload)).build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("rename track failed: ${resp.statusCode()}")
+    }
+
     /** Remove a track. */
     fun deleteTrack(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, trackId: String) {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/tracks/$trackId"))
