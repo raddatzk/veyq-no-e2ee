@@ -1,10 +1,10 @@
 package app.veyq.android.ui
 
-// Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`. Mirrors
-// the web `journalEmbed.ts` wire format so journals render identically across platforms. A token ends at a
-// newline, end-of-text, or the next token, so several can sit back-to-back.
+// Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`,
+// `::playlist:id label`. Mirrors the web `journalEmbed.ts` wire format so journals render identically across
+// platforms. A token ends at a newline, end-of-text, or the next token, so several can sit back-to-back.
 
-enum class JournalEmbedKind { MEDIA, TRACK, CHAPTER }
+enum class JournalEmbedKind { MEDIA, TRACK, CHAPTER, PLAYLIST }
 
 data class JournalEmbed(val kind: JournalEmbedKind, val ids: List<String>, val label: String?)
 
@@ -15,7 +15,8 @@ sealed interface JournalContentBlock {
 
 object JournalEmbedParser {
     const val MAX_TRACK_IDS = 20
-    private val regex = Regex("::(media|track|chapter):([^\\s\\n]+)(?:[ \\t]+([^\\n]*?))?(?=\\n|$|::(?:media|track|chapter):)")
+    private val regex = Regex("::(media|track|chapter|playlist):([^\\s\\n]+)(?:[ \\t]+([^\\n]*?))?(?=\\n|$|::(?:media|track|chapter|playlist):)")
+    private val singleIdKinds = setOf(JournalEmbedKind.CHAPTER, JournalEmbedKind.PLAYLIST)
 
     /** Split the journal into an ordered run of Markdown segments and embed tokens for block-based rendering. */
     fun splitBlocks(markdown: String): List<JournalContentBlock> {
@@ -25,9 +26,9 @@ object JournalEmbedParser {
             val range = m.range
             if (range.first > cursor) blocks.add(JournalContentBlock.Markdown(markdown.substring(cursor, range.first)))
             cursor = range.last + 1
-            val kind = when (m.groupValues[1]) { "media" -> JournalEmbedKind.MEDIA; "track" -> JournalEmbedKind.TRACK; else -> JournalEmbedKind.CHAPTER }
+            val kind = when (m.groupValues[1]) { "media" -> JournalEmbedKind.MEDIA; "track" -> JournalEmbedKind.TRACK; "playlist" -> JournalEmbedKind.PLAYLIST; else -> JournalEmbedKind.CHAPTER }
             val raw = m.groupValues[2].split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            val ids = when (kind) { JournalEmbedKind.TRACK -> normalizeTrackIds(raw); JournalEmbedKind.CHAPTER -> raw.take(1); else -> raw }
+            val ids = when { kind == JournalEmbedKind.TRACK -> normalizeTrackIds(raw); kind in singleIdKinds -> raw.take(1); else -> raw }
             if (ids.isEmpty()) continue
             val label = m.groupValues[3].trim().ifEmpty { null }
             blocks.add(JournalContentBlock.Embed(JournalEmbed(kind, ids, label)))
@@ -42,7 +43,7 @@ object JournalEmbedParser {
 
     /** Serialize an embed back to its token form (used by the editor pickers when inserting/editing). */
     fun embedMarkdown(kind: JournalEmbedKind, ids: List<String>, label: String?): String {
-        val norm = when (kind) { JournalEmbedKind.TRACK -> normalizeTrackIds(ids); JournalEmbedKind.CHAPTER -> ids.take(1); else -> ids }
+        val norm = when { kind == JournalEmbedKind.TRACK -> normalizeTrackIds(ids); kind in singleIdKinds -> ids.take(1); else -> ids }
         val suffix = label?.trim()?.takeIf { it.isNotEmpty() }?.let { " $it" } ?: ""
         return "::${kind.name.lowercase()}:${norm.joinToString(",")}$suffix"
     }

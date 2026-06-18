@@ -44,10 +44,10 @@ struct JournalView: View {
         }
         .task {
             await store.loadJournal()
-            // Track embeds in the journal need the tracks loaded to draw their inline map.
-            if JournalEmbedParser.splitBlocks(store.journalMarkdown).contains(where: { if case let .embed(e) = $0 { return e.kind == .track }; return false }) {
-                await store.loadTracks()
-            }
+            // Track embeds need the tracks loaded (inline map); playlist embeds need the playlists (link card).
+            let blocks = JournalEmbedParser.splitBlocks(store.journalMarkdown)
+            if blocks.contains(where: { if case let .embed(e) = $0 { return e.kind == .track }; return false }) { await store.loadTracks() }
+            if blocks.contains(where: { if case let .embed(e) = $0 { return e.kind == .playlist }; return false }) { await store.loadPlaylists() }
         }
     }
 }
@@ -72,6 +72,7 @@ struct JournalBodyView: View {
                     case .media: mediaEmbed(e)
                     case .track: trackEmbed(e)
                     case .chapter: chapterEmbed(e)
+                    case .playlist: playlistEmbed(e)
                     }
                 }
             }
@@ -134,6 +135,24 @@ struct JournalBodyView: View {
         }
         .buttonStyle(.plain)
         .disabled(id.isEmpty)
+    }
+
+    @ViewBuilder private func playlistEmbed(_ e: JournalEmbed) -> some View {
+        if let p = store.playlists.first(where: { $0.id == e.ids.first }), let url = URL(string: p.url) {
+            Link(destination: url) {
+                HStack(spacing: 8) {
+                    Text(p.provider.label).font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.muted)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.surface, in: Capsule())
+                    Text(e.label ?? (p.title?.isEmpty == false ? p.title! : p.url)).foregroundStyle(VeyqStyle.accent).underline().lineLimit(1)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(VeyqStyle.line))
+            }
+            .buttonStyle(.plain)
+        } else {
+            Text(T("journal.embedMissing")).font(.footnote).italic().foregroundStyle(VeyqStyle.muted)
+        }
     }
 }
 

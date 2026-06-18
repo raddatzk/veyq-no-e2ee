@@ -1,10 +1,10 @@
 import Foundation
 
-// Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`. Mirrors
-// the web `journalEmbed.ts` wire format so journals render identically across platforms. A token ends at a
-// newline, end-of-text, or the next token, so several can sit back-to-back.
+// Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`,
+// `::playlist:id label`. Mirrors the web `journalEmbed.ts` wire format so journals render identically across
+// platforms. A token ends at a newline, end-of-text, or the next token, so several can sit back-to-back.
 
-enum JournalEmbedKind: String { case media, track, chapter }
+enum JournalEmbedKind: String { case media, track, chapter, playlist }
 
 struct JournalEmbed: Identifiable {
     let id: Int
@@ -27,7 +27,8 @@ enum JournalBlock: Identifiable {
 enum JournalEmbedParser {
     static let maxTrackIds = 20
     private static let regex = try! NSRegularExpression(
-        pattern: "::(media|track|chapter):([^\\s\\n]+)(?:[ \\t]+([^\\n]*?))?(?=\\n|$|::(?:media|track|chapter):)")
+        pattern: "::(media|track|chapter|playlist):([^\\s\\n]+)(?:[ \\t]+([^\\n]*?))?(?=\\n|$|::(?:media|track|chapter|playlist):)")
+    private static let singleIdKinds: Set<JournalEmbedKind> = [.chapter, .playlist]
 
     /// Split the journal into an ordered run of Markdown segments and embed tokens for block-based rendering.
     static func splitBlocks(_ markdown: String) -> [JournalBlock] {
@@ -44,7 +45,7 @@ enum JournalEmbedParser {
             cursor = full.location + full.length
             guard let kind = JournalEmbedKind(rawValue: ns.substring(with: m.range(at: 1))) else { continue }
             let rawIds = ns.substring(with: m.range(at: 2)).split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            let ids = kind == .track ? normalizeTrackIds(rawIds) : (kind == .chapter ? Array(rawIds.prefix(1)) : rawIds)
+            let ids = kind == .track ? normalizeTrackIds(rawIds) : (singleIdKinds.contains(kind) ? Array(rawIds.prefix(1)) : rawIds)
             if ids.isEmpty { continue }
             let lr = m.range(at: 3)
             let label = lr.location != NSNotFound ? ns.substring(with: lr).trimmingCharacters(in: .whitespaces) : nil
@@ -68,7 +69,7 @@ enum JournalEmbedParser {
 
     /// Serialize an embed back to its token form (used by the editor pickers when inserting/editing).
     static func embedMarkdown(_ kind: JournalEmbedKind, _ ids: [String], label: String?) -> String {
-        let norm = kind == .track ? normalizeTrackIds(ids) : (kind == .chapter ? Array(ids.prefix(1)) : ids)
+        let norm = kind == .track ? normalizeTrackIds(ids) : (singleIdKinds.contains(kind) ? Array(ids.prefix(1)) : ids)
         let trimmed = label?.trimmingCharacters(in: .whitespaces)
         let suffix = (trimmed?.isEmpty ?? true) ? "" : " \(trimmed!)"
         return "::\(kind.rawValue):\(norm.joined(separator: ","))\(suffix)"

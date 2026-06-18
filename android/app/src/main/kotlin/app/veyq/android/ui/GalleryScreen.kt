@@ -1020,9 +1020,11 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
     var live by remember { mutableStateOf(false) }
     val blocks = remember { mutableStateListOf<EditBlock>() }
     LaunchedEffect(Unit) { controller.loadJournal() }
-    // Track embeds in the journal need the tracks loaded to draw their inline map.
+    // Track embeds need the tracks loaded (inline map); playlist embeds need the playlists (link card).
     LaunchedEffect(controller.journalMarkdown) {
-        if (JournalEmbedParser.splitBlocks(controller.journalMarkdown).any { it is JournalContentBlock.Embed && it.embed.kind == JournalEmbedKind.TRACK }) controller.loadTracks()
+        val embedKinds = JournalEmbedParser.splitBlocks(controller.journalMarkdown).filterIsInstance<JournalContentBlock.Embed>().map { it.embed.kind }
+        if (JournalEmbedKind.TRACK in embedKinds) controller.loadTracks()
+        if (JournalEmbedKind.PLAYLIST in embedKinds) controller.loadPlaylists()
     }
 
     if (live) {
@@ -1044,7 +1046,7 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
         if (controller.journalMarkdown.isBlank()) {
             Text(L10n.t("journal.empty"), color = Veyq.Muted, fontSize = 14.sp)
         } else {
-            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, onOpenMedia, onOpenChapter)
+            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, controller.playlists, onOpenMedia, onOpenChapter)
         }
     }
 }
@@ -1052,7 +1054,8 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
 /** Read-only journal renderer with rich embeds (matches web/iOS): Markdown text interleaved with ::media
  *  (thumbnail / horizontal carousel → lightbox) and ::track (inline map). ::chapter renders as a simple chip. */
 @Composable
-private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, tracks: List<Track.TrackItem>, onOpenMedia: (GalleryController.Tile) -> Unit, onOpenChapter: (String) -> Unit = {}) {
+private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, tracks: List<Track.TrackItem>, playlists: List<Playlists.Item>, onOpenMedia: (GalleryController.Tile) -> Unit, onOpenChapter: (String) -> Unit = {}) {
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         JournalEmbedParser.splitBlocks(markdown).forEach { block ->
             when (block) {
@@ -1086,6 +1089,19 @@ private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, t
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) { Text("📖"); Text(e.label ?: cid, color = Veyq.Accent, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline) }
+                        }
+                        JournalEmbedKind.PLAYLIST -> {
+                            val p = playlists.firstOrNull { it.id == e.ids.firstOrNull() }
+                            if (p == null) Text(L10n.t("journal.embedMissing"), color = Veyq.Muted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            else Row(
+                                Modifier.clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).border(1.dp, Veyq.Line, RoundedCornerShape(10.dp))
+                                    .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(p.url))) } }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(e.label ?: (p.title?.ifEmpty { null } ?: p.url), color = Veyq.Accent, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline, maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -1253,6 +1269,7 @@ private fun chipLabel(e: EmbedData, controller: GalleryController): String {
         JournalEmbedKind.MEDIA -> "${e.ids.size} ${L10n.t("detail.media")}"
         JournalEmbedKind.TRACK -> controller.tracks.firstOrNull { it.id == e.ids.firstOrNull() }?.name ?: "${e.ids.size}"
         JournalEmbedKind.CHAPTER -> e.ids.firstOrNull() ?: ""
+        JournalEmbedKind.PLAYLIST -> controller.playlists.firstOrNull { it.id == e.ids.firstOrNull() }?.let { it.title?.ifEmpty { null } ?: it.url } ?: (e.ids.firstOrNull() ?: "")
     }
 }
 
@@ -1263,6 +1280,7 @@ private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotSt
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { picker = PickerState.Insert(JournalEmbedKind.MEDIA) }) { Text("🖼 ${L10n.t("journal.embedKind.media")}", color = Veyq.Accent) }
             TextButton(onClick = { scope.launch { controller.loadTracks() }; picker = PickerState.Insert(JournalEmbedKind.TRACK) }) { Text("🛤 ${L10n.t("journal.embedKind.track")}", color = Veyq.Accent) }
+            TextButton(onClick = { scope.launch { controller.loadPlaylists() }; picker = PickerState.Insert(JournalEmbedKind.PLAYLIST) }) { Text("🎵 ${L10n.t("journal.embedKind.playlist")}", color = Veyq.Accent) }
         }
         blocks.forEachIndexed { idx, block ->
             val e = block.embed
@@ -1271,7 +1289,7 @@ private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotSt
                     Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape).clickable { picker = PickerState.Edit(idx) }.padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (e.kind == JournalEmbedKind.MEDIA) "🖼" else if (e.kind == JournalEmbedKind.TRACK) "🛤" else "🗂")
+                    Text(if (e.kind == JournalEmbedKind.MEDIA) "🖼" else if (e.kind == JournalEmbedKind.TRACK) "🛤" else if (e.kind == JournalEmbedKind.PLAYLIST) "🎵" else "🗂")
                     Text(chipLabel(e, controller), color = Veyq.Text)
                     Text("✎", color = Veyq.Muted, fontSize = 12.sp)
                 }
@@ -1311,12 +1329,15 @@ private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotSt
 private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryController, initial: EmbedData?, onDismiss: () -> Unit, onResult: (PickerResult?) -> Unit) {
     var selected by remember { mutableStateOf(initial?.ids ?: emptyList()) }
     var label by remember { mutableStateOf(initial?.label ?: "") }
-    LaunchedEffect(Unit) { if (kind == JournalEmbedKind.TRACK) controller.loadTracks() }
+    LaunchedEffect(Unit) {
+        if (kind == JournalEmbedKind.TRACK) controller.loadTracks()
+        if (kind == JournalEmbedKind.PLAYLIST) controller.loadPlaylists()
+    }
     fun toggle(id: String) { selected = if (selected.contains(id)) selected - id else selected + id }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Veyq.Surface,
-        title = { Text(if (kind == JournalEmbedKind.MEDIA) L10n.t("journal.mediaPickerTitle") else L10n.t("journal.trackPickerTitle"), color = Veyq.Text) },
+        title = { Text(when (kind) { JournalEmbedKind.MEDIA -> L10n.t("journal.mediaPickerTitle"); JournalEmbedKind.PLAYLIST -> L10n.t("journal.playlistPickerTitle"); else -> L10n.t("journal.trackPickerTitle") }, color = Veyq.Text) },
         text = {
             Column(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -1339,6 +1360,20 @@ private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryControl
                                             .border(3.dp, if (selected.contains(tile.id)) Veyq.Accent else Color.Transparent, RoundedCornerShape(8.dp)),
                                     ) { Image(tile.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
                                 }
+                            }
+                        }
+                    }
+                } else if (kind == JournalEmbedKind.PLAYLIST) {
+                    if (controller.playlists.isEmpty()) Text(L10n.t("journal.pickerEmpty"), color = Veyq.Muted, fontSize = 13.sp)
+                    else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        controller.playlists.forEach { p ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selected = listOf(p.id) }.background(Veyq.Bg).padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(p.title?.ifEmpty { null } ?: p.url, color = Veyq.Text, modifier = Modifier.weight(1f), maxLines = 1)
+                                if (selected.contains(p.id)) Text("✓", color = Veyq.Accent)
                             }
                         }
                     }

@@ -47,6 +47,7 @@ struct JournalBlockEditor: View {
                 Menu {
                     Button("🖼 \(T("journal.embedKind.media"))") { picker = .insert(.media) }
                     Button("🛤 \(T("journal.embedKind.track"))") { Task { await store.loadTracks() }; picker = .insert(.track) }
+                    Button("🎵 \(T("journal.embedKind.playlist"))") { Task { await store.loadPlaylists() }; picker = .insert(.playlist) }
                 } label: { Label(T("journal.embed"), systemImage: "plus.circle") }.tint(VeyqStyle.accent)
             }
             ForEach($blocks) { $block in
@@ -74,7 +75,7 @@ struct JournalBlockEditor: View {
     private func chip(_ e: EmbedData, _ onTap: @escaping () -> Void) -> some View {
         Button(action: onTap) {
             HStack(spacing: 6) {
-                Text(e.kind == .media ? "🖼" : e.kind == .track ? "🛤" : "🗂")
+                Text(e.kind == .media ? "🖼" : e.kind == .track ? "🛤" : e.kind == .playlist ? "🎵" : "🗂")
                 Text(chipText(e)).foregroundStyle(VeyqStyle.text)
                 Image(systemName: "pencil").foregroundStyle(VeyqStyle.muted).font(.caption)
             }
@@ -89,6 +90,7 @@ struct JournalBlockEditor: View {
         case .media: return "\(e.ids.count) \(T("detail.media"))"
         case .track: return store.tracks.first(where: { $0.id == e.ids.first })?.name ?? "\(e.ids.count)"
         case .chapter: return e.ids.first ?? ""
+        case .playlist: return store.playlists.first(where: { $0.id == e.ids.first }).map { $0.title?.isEmpty == false ? $0.title! : $0.url } ?? (e.ids.first ?? "")
         }
     }
 
@@ -138,6 +140,21 @@ struct EmbedPickerSheet: View {
                             }
                         }
                         if store.tiles.isEmpty { Text(T("journal.mediaPickerEmpty")).font(.footnote).foregroundStyle(VeyqStyle.muted) }
+                    } else if kind == .playlist {
+                        VStack(spacing: 4) {
+                            ForEach(store.playlists) { p in
+                                Button { selected = [p.id] } label: {  // single-select
+                                    HStack {
+                                        Text(p.provider.label).font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.muted)
+                                        Text(p.title?.isEmpty == false ? p.title! : p.url).foregroundStyle(VeyqStyle.text).lineLimit(1)
+                                        Spacer()
+                                        if selected.contains(p.id) { Image(systemName: "checkmark").foregroundStyle(VeyqStyle.accent) }
+                                    }
+                                    .padding(10).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+                            if store.playlists.isEmpty { Text(T("journal.pickerEmpty")).font(.footnote).foregroundStyle(VeyqStyle.muted) }
+                        }
                     } else {
                         VStack(spacing: 4) {
                             ForEach(store.tracks) { tr in
@@ -157,7 +174,7 @@ struct EmbedPickerSheet: View {
             }
             .padding(16)
             .background(VeyqStyle.bg)
-            .navigationTitle(kind == .media ? T("journal.mediaPickerTitle") : T("journal.trackPickerTitle"))
+            .navigationTitle(kind == .media ? T("journal.mediaPickerTitle") : kind == .playlist ? T("journal.playlistPickerTitle") : T("journal.trackPickerTitle"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(T("common.cancel")) { onDone(nil); dismiss() } }
@@ -174,6 +191,7 @@ struct EmbedPickerSheet: View {
             selected = initial?.ids ?? []
             label = initial?.label ?? ""
             if kind == .track { Task { await store.loadTracks() } }
+            if kind == .playlist { Task { await store.loadPlaylists() } }
         }
     }
 
