@@ -113,11 +113,12 @@ onBeforeUnmount(teardown)
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  min-height: 240px;
+  min-height: min(60vh, 520px);
   padding: 2rem;
   text-align: center;
-  border: 1px dashed var(--app-border, #3a3a3a);
-  border-radius: 12px;
+  background: var(--app-surface);
+  border: 1px dashed var(--app-line);
+  border-radius: var(--app-radius);
 }
 .map-consent-text { max-width: 32rem; color: var(--app-muted, #999); }
 </style>
