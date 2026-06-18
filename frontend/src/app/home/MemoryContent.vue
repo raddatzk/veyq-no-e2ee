@@ -18,6 +18,7 @@ import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
 import MemoryContributionsSection from './MemoryContributionsSection.vue'
+import MemoryGalleryGrid from './MemoryGalleryGrid.vue'
 import MemoryGalleryToolbar from './MemoryGalleryToolbar.vue'
 import MemoryInfoSection from './MemoryInfoSection.vue'
 import MemoryJournalSection from './MemoryJournalSection.vue'
@@ -420,21 +421,7 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
     />
 
     <div v-show="tab === 'gallery'" ref="galleryEl" class="gallery-buckets">
-      <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
-        <h2 class="bucket-date">{{ b.label }}</h2>
-        <div class="gallery" :style="{ height: b.layout.height + 'px' }">
-          <button
-            v-for="tile in b.layout.tiles"
-            :key="tile.id"
-            class="gallery-tile"
-            :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
-            @click="openLightbox(tileById[tile.id])"
-          >
-            <img :src="tileById[tile.id].url" alt="" />
-            <span v-if="tileById[tile.id].highlighted" class="tile-star">★</span>
-          </button>
-        </div>
-      </section>
+      <MemoryGalleryGrid :buckets="buckets" :tile-by-id="tileById" @open-tile="openLightbox" />
     </div>
 
     <template v-if="tab === 'gallery'">
