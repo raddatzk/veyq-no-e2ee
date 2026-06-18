@@ -47,9 +47,13 @@ function moveTile(event: Event) {
 
 <template>
   <div class="lightbox" @click="emit('close')">
-    <button v-if="tileCount > 1" class="lightbox-nav lightbox-prev" type="button" @click.stop="emit('step', -1)">‹</button>
-    <img ref="imageEl" :src="imageUrl" alt="" @click.stop="toggleFullscreen" />
-    <button v-if="tileCount > 1" class="lightbox-nav lightbox-next" type="button" @click.stop="emit('step', 1)">›</button>
+    <button v-if="tileCount > 1" class="lightbox-nav lightbox-prev" type="button" :aria-label="t('common.previous')" @click.stop="emit('step', -1)">
+      <span aria-hidden="true">‹</span>
+    </button>
+    <img ref="imageEl" class="lightbox-image" :src="imageUrl" alt="" @click.stop="toggleFullscreen" />
+    <button v-if="tileCount > 1" class="lightbox-nav lightbox-next" type="button" :aria-label="t('common.next')" @click.stop="emit('step', 1)">
+      <span aria-hidden="true">›</span>
+    </button>
     <div v-if="showInfo && tile" class="lightbox-info" @click.stop>
       <div><span>{{ t('info.takenAt') }}</span><strong>{{ new Date(tile.takenAt).toLocaleString() }}</strong></div>
       <div><span>{{ t('info.type') }}</span><strong>{{ tile.mimeType }}</strong></div>
@@ -65,6 +69,7 @@ function moveTile(event: Event) {
       <select
         v-if="canMoveTile && tile"
         class="bucket-move"
+        :aria-label="t('move.title')"
         :value="tile.bucketId ?? (ownerKey ? `primary:${ownerKey}` : '')"
         @change="moveTile"
       >

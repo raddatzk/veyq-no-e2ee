@@ -285,17 +285,20 @@ const featurePlaylist = (nodeId: string, playlistId: string, featured: boolean) 
       </template>
 
       <template #lightbox-actions="{ tile }">
-        <button class="btn btn-ghost lightbox-fav" type="button" :title="t('media.favorite')" @click="toggleFavorite(tile)">{{ tile?.highlighted ? '★' : '☆' }}</button>
+        <button class="btn btn-ghost lightbox-fav" :class="{ active: tile?.highlighted }" type="button" :title="t('media.favorite')" :aria-label="t('media.favorite')" @click="toggleFavorite(tile)">
+          <span aria-hidden="true">{{ tile?.highlighted ? '★' : '☆' }}</span>
+        </button>
         <label class="lightbox-date" :title="t('media.editDate')">
           <input
             type="datetime-local"
+            :aria-label="t('media.editDate')"
             :value="tile?.takenAt?.slice(0, 16)"
             @change="onDateChange(tile, ($event.target as HTMLInputElement).value)"
           />
         </label>
-        <button class="btn btn-primary" type="button" @click="setAsCover(tile)">{{ t('cover.setAsCover') }}</button>
-        <button v-if="!mediaDelArm" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="mediaDelArm = true">{{ t('common.delete') }}</button>
-        <button v-else class="btn btn-danger" type="button" @click="deleteThisMedia(tile)">{{ t('delete.confirm') }}</button>
+        <button class="btn btn-primary lightbox-cover" type="button" @click="setAsCover(tile)">{{ t('cover.setAsCover') }}</button>
+        <button v-if="!mediaDelArm" class="btn btn-ghost lightbox-delete" type="button" @click="mediaDelArm = true">{{ t('common.delete') }}</button>
+        <button v-else class="btn btn-danger lightbox-delete-confirm" type="button" @click="deleteThisMedia(tile)">{{ t('delete.confirm') }}</button>
       </template>
     </MemoryContent>
 

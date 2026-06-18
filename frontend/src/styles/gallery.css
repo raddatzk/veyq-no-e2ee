@@ -259,16 +259,43 @@
   overflow-wrap: anywhere;
 }
 .lightbox-nav {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  width: 2.6rem; height: 2.6rem; border: none; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.5);
+  color: #fff;
+  font-size: 1.65rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.lightbox-nav:hover {
+  background: rgba(15, 23, 42, 0.72);
 }
 .lightbox-prev { left: 1rem; }
 .lightbox-next { right: 1rem; }
 .lightbox-info {
-  position: absolute; top: 1rem; left: 1rem; max-width: 70vw;
-  display: flex; flex-direction: column; gap: 0.25rem;
-  background: rgba(0, 0, 0, 0.6); color: #fff; padding: 0.6rem 0.85rem; border-radius: var(--app-radius-sm); font-size: 0.85rem;
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  max-width: min(70vw, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.85rem;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--app-radius-sm);
+  font-size: 0.85rem;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
 }
 .lightbox-info span { color: rgba(255, 255, 255, 0.6); margin-right: 0.5rem; }
 .detail-gallery-bar {
@@ -1079,35 +1106,88 @@
 .lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.86);
   display: grid;
-  place-items: center;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.88);
   z-index: 50;
   cursor: zoom-out;
 }
-.lightbox {
-  flex-direction: column;
-  gap: 1rem;
-}
-.lightbox img {
+.lightbox-image {
   max-width: 92vw;
-  max-height: 80vh;
+  max-height: calc(100vh - 7.75rem);
   border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  cursor: zoom-in;
 }
 .lightbox-actions {
   display: flex;
-  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  max-width: min(100%, 1120px);
+  gap: 0.5rem;
+  padding: 0.55rem;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--app-radius);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  cursor: auto;
+  backdrop-filter: blur(10px);
 }
-.lightbox-actions .btn { padding: 0.5rem 1rem; }
-.lightbox-fav { font-size: 1.1rem; line-height: 1; min-width: 2.4rem; }
+.lightbox-actions .btn,
+.lightbox-actions .bucket-move {
+  min-height: 2.25rem;
+}
+.lightbox-actions .btn {
+  padding: 0.45rem 0.85rem;
+}
+.lightbox-actions .btn-ghost {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.lightbox-actions .btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+.lightbox-actions .bucket-move {
+  max-width: min(100%, 16rem);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.lightbox-fav {
+  width: 2.35rem;
+  min-width: 2.35rem;
+  padding-inline: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.lightbox-fav.active {
+  color: var(--app-warning-text);
+  background: var(--app-warning-soft);
+  border-color: var(--app-warning-line);
+}
 .lightbox-date input {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: var(--app-radius-sm, 6px);
   color: #fff;
-  padding: 0.45rem 0.6rem;
+  min-height: 2.25rem;
+  padding: 0.42rem 0.6rem;
   font: inherit;
   color-scheme: dark;
+}
+.lightbox-delete {
+  color: var(--app-danger-strong);
+  border-color: var(--app-danger-line);
+}
+.lightbox-delete-confirm {
+  border-color: var(--app-danger-line);
 }
 
 /* Live (collaborative) journal editor */
@@ -1154,5 +1234,35 @@
 
   .detail-title {
     font-size: 1.8rem;
+  }
+
+  .lightbox {
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .lightbox-image {
+    max-width: 100%;
+    max-height: calc(100vh - 12rem);
+  }
+
+  .lightbox-info {
+    right: 0.75rem;
+    left: 0.75rem;
+    max-width: none;
+  }
+
+  .lightbox-actions {
+    justify-content: flex-start;
+    width: 100%;
+    max-height: 10rem;
+    overflow-y: auto;
+  }
+
+  .lightbox-actions .btn,
+  .lightbox-date,
+  .lightbox-date input,
+  .lightbox-actions .bucket-move {
+    flex: 1 1 auto;
   }
 }
