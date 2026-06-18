@@ -272,6 +272,34 @@ final class GalleryStore: ObservableObject {
         if let t = try? await Track.getTracks(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { tracks = t }
     }
 
+    @Published var playlists: [Playlists.Item] = []
+    private var playlistsLoaded = false
+
+    func loadPlaylists() async {
+        guard !playlistsLoaded else { return }
+        if let p = try? await Playlists.list(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { playlists = p }
+        playlistsLoaded = true
+    }
+
+    private func reloadPlaylists() async {
+        if let p = try? await Playlists.list(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { playlists = p }
+    }
+
+    func addPlaylist(url: String, title: String) async {
+        guard (try? await Playlists.create(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, url: url, title: title, note: nil, featured: false)) != nil else { return }
+        await reloadPlaylists()
+    }
+
+    func featurePlaylist(_ id: String, _ featured: Bool) async {
+        try? await Playlists.setFeatured(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, playlistId: id, featured: featured)
+        await reloadPlaylists()
+    }
+
+    func deletePlaylist(_ id: String) async {
+        try? await Playlists.delete(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, playlistId: id)
+        playlists.removeAll { $0.id == id }
+    }
+
     /// Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info.
     struct Child: Identifiable, Hashable {
         let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?
@@ -342,6 +370,9 @@ struct MemoryDetailView: View {
     @State private var hiddenTracks: Set<String> = []        // per-track map visibility
     @State private var renamingTrack: Track.TrackItem?
     @State private var trackNameInput = ""
+    @State private var addingPlaylist = false           // playlists: add link flow
+    @State private var playlistUrlInput = ""
+    @State private var playlistTitleInput = ""
     @State private var lightboxZoom: CGFloat = 1              // pinch-zoom in the lightbox
     @State private var lightboxInfo = false          // info panel toggle in the lightbox
     @State private var editingDate = false           // capture-date editor toggle in the lightbox
@@ -388,6 +419,7 @@ struct MemoryDetailView: View {
         .onChange(of: tab) { _, t in
             if t == 2 { Task { await store.loadTracks() } }
             if t == 3 { Task { await store.loadTracks(); await store.loadChildren() } }
+            if t == 6 { Task { await store.loadPlaylists() } }
         }
         .fileImporter(isPresented: $showGpxImporter, allowedContentTypes: [.xml, UTType(filenameExtension: "gpx") ?? .data]) { result in
             guard case let .success(url) = result else { return }
@@ -440,6 +472,16 @@ struct MemoryDetailView: View {
             Button(T("common.cancel"), role: .cancel) { renamingTrack = nil }
             Button(T("journal.save")) { if let tr = renamingTrack { let n = trackNameInput; if !n.isEmpty { Task { await store.renameTrack(tr, n) } } }; renamingTrack = nil }
         }
+        .alert(T("playlist.add"), isPresented: $addingPlaylist) {
+            TextField(T("playlist.urlPrompt"), text: $playlistUrlInput)
+            TextField(T("playlist.titlePrompt"), text: $playlistTitleInput)
+            Button(T("common.cancel"), role: .cancel) { playlistUrlInput = ""; playlistTitleInput = "" }
+            Button(T("playlist.add")) {
+                let url = playlistUrlInput.trimmingCharacters(in: .whitespaces); let title = playlistTitleInput
+                playlistUrlInput = ""; playlistTitleInput = ""
+                if !url.isEmpty { Task { await store.addPlaylist(url: url, title: title) } }
+            }
+        }
     }
 
     @ToolbarContentBuilder private var detailToolbar: some ToolbarContent {
@@ -490,6 +532,7 @@ struct MemoryDetailView: View {
                 if !store.children.isEmpty { Text(T("detail.chapters")).tag(5) }
                 Text(T("detail.map")).tag(2)
                 Text(T("detail.journal")).tag(1)
+                Text(T("detail.playlists")).tag(6)
                 Text(T("detail.contributions")).tag(4)
                 Text(T("detail.info")).tag(3)
             }
@@ -501,6 +544,8 @@ struct MemoryDetailView: View {
                 chaptersTab
             } else if tab == 4 {
                 contributionsTab
+            } else if tab == 6 {
+                playlistsTab
             } else if tab == 1 {
                 JournalView(store: store, onOpenMedia: openLightbox, onOpenChapter: openChapter)
             } else if tab == 2 {
@@ -540,6 +585,34 @@ struct MemoryDetailView: View {
     }
 
     private func toggleTrack(_ id: String) { if hiddenTracks.contains(id) { hiddenTracks.remove(id) } else { hiddenTracks.insert(id) } }
+
+    @ViewBuilder private var playlistsTab: some View {
+        HStack {
+            Spacer()
+            Button(T("playlist.add")) { playlistUrlInput = ""; playlistTitleInput = ""; addingPlaylist = true }.tint(VeyqStyle.accent)
+        }
+        if store.playlists.isEmpty {
+            Text(T("playlist.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+        } else {
+            ForEach(store.playlists) { p in
+                HStack(spacing: 10) {
+                    Text(p.provider.label).font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.muted)
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.surface, in: Capsule())
+                    if let url = URL(string: p.url) {
+                        Link(p.title?.isEmpty == false ? p.title! : p.url, destination: url).foregroundStyle(VeyqStyle.accent).lineLimit(1)
+                    } else {
+                        Text(p.title?.isEmpty == false ? p.title! : p.url).foregroundStyle(VeyqStyle.text).lineLimit(1)
+                    }
+                    Spacer()
+                    Button { let id = p.id; let f = !p.featured; Task { await store.featurePlaylist(id, f) } } label: {
+                        Image(systemName: p.featured ? "star.fill" : "star")
+                    }.tint(p.featured ? VeyqStyle.accent : VeyqStyle.muted)
+                    Button { let id = p.id; Task { await store.deletePlaylist(id) } } label: { Image(systemName: "trash") }.tint(VeyqStyle.danger)
+                }
+                .padding(8).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
 
     @ViewBuilder private func galleryTab(contentWidth: CGFloat) -> some View {
         HStack {

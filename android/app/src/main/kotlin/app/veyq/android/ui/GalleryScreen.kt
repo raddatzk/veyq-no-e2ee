@@ -90,6 +90,7 @@ import app.veyq.crypto.JournalLiveProvider
 import app.veyq.crypto.JournalPersistence
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
+import app.veyq.crypto.Playlists
 import app.veyq.crypto.Share
 import app.veyq.crypto.Track
 import kotlinx.coroutines.Dispatchers
@@ -158,6 +159,34 @@ class GalleryController(
     suspend fun renameTrack(track: Track.TrackItem, name: String) {
         runCatching { withContext(Dispatchers.IO) { Track.updateTrack(apiBase, session, scopeId, contentKey, nodeId, track.id, name, track.points) } }
             .onSuccess { runCatching { withContext(Dispatchers.IO) { Track.getTracks(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { tracks = it } }
+    }
+
+    var playlists by mutableStateOf<List<Playlists.Item>>(emptyList())
+    private var playlistsLoaded = false
+
+    suspend fun loadPlaylists() {
+        if (playlistsLoaded) return
+        runCatching { withContext(Dispatchers.IO) { Playlists.list(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { playlists = it }
+        playlistsLoaded = true
+    }
+
+    private suspend fun reloadPlaylists() {
+        runCatching { withContext(Dispatchers.IO) { Playlists.list(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { playlists = it }
+    }
+
+    suspend fun addPlaylist(url: String, title: String) {
+        runCatching { withContext(Dispatchers.IO) { Playlists.create(apiBase, session, scopeId, contentKey, nodeId, url, title.ifEmpty { null }, null, false) } }
+            .onSuccess { reloadPlaylists() }
+    }
+
+    suspend fun featurePlaylist(id: String, featured: Boolean) {
+        runCatching { withContext(Dispatchers.IO) { Playlists.setFeatured(apiBase, session, scopeId, nodeId, id, featured) } }
+        reloadPlaylists()
+    }
+
+    suspend fun deletePlaylist(id: String) {
+        runCatching { withContext(Dispatchers.IO) { Playlists.delete(apiBase, session, scopeId, nodeId, id) } }
+        playlists = playlists.filterNot { it.id == id }
     }
 
     suspend fun loadJournal() {
@@ -442,6 +471,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var renamingBucket by remember { mutableStateOf<Buckets.Bucket?>(null) }
     var hiddenTracks by remember { mutableStateOf(setOf<String>()) }
     var renamingTrack by remember { mutableStateOf<Track.TrackItem?>(null) }
+    var addingPlaylist by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load(); controller.loadChildren(); controller.loadBuckets() }
@@ -551,6 +581,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 if (controller.children.isNotEmpty()) TabLabel(L10n.t("detail.chapters"), tab == 5) { tab = 5 }
                 TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
                 TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+                TabLabel(L10n.t("detail.playlists"), tab == 6) { tab = 6 }
                 TabLabel(L10n.t("detail.contributions"), tab == 4) { tab = 4 }
                 TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
             }
@@ -589,6 +620,28 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                                     TextButton(onClick = { val id = b.id; scope.launch { controller.deleteBucket(id); if (selectedBucketId == id) selectedBucketId = null } }) { Text("🗑", color = Veyq.Danger) }
                                 }
                             }
+                        }
+                    }
+                }
+            } else if (tab == 6) {
+                LaunchedEffect(Unit) { controller.loadPlaylists() }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { addingPlaylist = true }) { Text(L10n.t("playlist.add"), color = Veyq.Accent) }
+                }
+                if (controller.playlists.isEmpty()) Text(L10n.t("playlist.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    controller.playlists.forEach { p ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                p.title?.ifEmpty { null } ?: p.url, color = Veyq.Accent, fontSize = 14.sp, maxLines = 1,
+                                modifier = Modifier.weight(1f).clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(p.url))) } },
+                            )
+                            TextButton(onClick = { val id = p.id; val f = !p.featured; scope.launch { controller.featurePlaylist(id, f) } }) { Text(if (p.featured) "★" else "☆", color = if (p.featured) Veyq.Accent else Veyq.Muted) }
+                            TextButton(onClick = { val id = p.id; scope.launch { controller.deletePlaylist(id) } }) { Text("🗑", color = Veyq.Danger) }
                         }
                     }
                 }
@@ -734,6 +787,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     if (creatingBucket) BucketNameDialog(L10n.t("contrib.newBucket"), "", onDismiss = { creatingBucket = false }) { name -> creatingBucket = false; scope.launch { controller.createBucket(name) } }
     renamingBucket?.let { b -> BucketNameDialog(L10n.t("common.rename"), controller.bucketLabel(b), onDismiss = { renamingBucket = null }) { name -> renamingBucket = null; scope.launch { controller.renameBucket(b.id, name) } } }
     renamingTrack?.let { tr -> BucketNameDialog(L10n.t("track.renamePrompt"), tr.name, onDismiss = { renamingTrack = null }) { name -> renamingTrack = null; scope.launch { controller.renameTrack(tr, name) } } }
+    if (addingPlaylist) PlaylistDialog(onDismiss = { addingPlaylist = false }) { url, title -> addingPlaylist = false; scope.launch { controller.addPlaylist(url, title) } }
 
     if (showShareRole) {
         fun share(role: String) {
@@ -1366,6 +1420,30 @@ private fun BucketNameDialog(title: String, initial: String, onDismiss: () -> Un
             )
         },
         confirmButton = { TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(L10n.t("journal.save"), color = Veyq.Accent) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+    )
+}
+
+@Composable
+private fun PlaylistDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+    var url by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Veyq.Surface,
+        title = { Text(L10n.t("playlist.add"), color = Veyq.Text) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = url, onValueChange = { url = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(L10n.t("playlist.urlPrompt"), color = Veyq.Muted) }, colors = fieldColors)
+                OutlinedTextField(value = title, onValueChange = { title = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(L10n.t("playlist.titlePrompt"), color = Veyq.Muted) }, colors = fieldColors)
+            }
+        },
+        confirmButton = { TextButton(enabled = url.isNotBlank(), onClick = { onConfirm(url.trim(), title.trim()) }) { Text(L10n.t("playlist.add"), color = Veyq.Accent) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
     )
 }
