@@ -293,6 +293,11 @@
   margin-bottom: 2rem;
 }
 
+.card-grid-memories {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 260px));
+  align-items: stretch;
+}
+
 .memory-card {
   position: relative;
   width: 100%;
@@ -392,6 +397,7 @@
   transform: translateY(-1px);
 }
 .folder-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 42px;
@@ -399,7 +405,31 @@
   border-radius: 10px;
   background: var(--app-info-soft);
   color: var(--app-info-text);
-  font-size: 1.2rem;
+}
+
+.folder-icon::before {
+  position: absolute;
+  top: 12px;
+  left: 9px;
+  width: 24px;
+  height: 17px;
+  border: 1.7px solid currentColor;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  content: "";
+}
+
+.folder-icon::after {
+  position: absolute;
+  top: 9px;
+  left: 10px;
+  width: 11px;
+  height: 5px;
+  border: 1.7px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  content: "";
 }
 .folder-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

@@ -29,7 +29,7 @@ const emit = defineEmits<{
     <span class="content-title">{{ t('home.memories') }}</span>
     <span class="content-count">{{ memories.length }}</span>
   </div>
-  <div class="card-grid">
+  <div class="card-grid card-grid-memories">
     <button
       v-for="m in memories"
       :key="m.node.id"
@@ -45,7 +45,7 @@ const emit = defineEmits<{
       <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
       <span class="card-more" @click.stop="emit('openMenu', m)">...</span>
     </button>
-    <button class="create-card" @click="emit('create', 'MEMORY')"><span class="create-plus">+</span>{{ t('home.createMemory') }}</button>
+    <button class="create-card create-card-memory" @click="emit('create', 'MEMORY')"><span class="create-plus">+</span>{{ t('home.createMemory') }}</button>
   </div>
 
   <div class="content-head">
@@ -63,7 +63,7 @@ const emit = defineEmits<{
       @dragover.prevent
       @drop="emit('reorderDrop', f, 'F')"
     >
-      <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
+      <span class="folder-icon" aria-hidden="true"></span><span class="folder-name">{{ f.name }}</span>
       <span class="card-more" @click.stop="emit('openMenu', f)">...</span>
     </button>
     <button class="create-card create-card-row" @click="emit('create', 'FOLDER')">
