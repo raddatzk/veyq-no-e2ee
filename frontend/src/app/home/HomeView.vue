@@ -20,8 +20,8 @@ import GroupMembersModal from './GroupMembersModal.vue'
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import InviteModal from './InviteModal.vue'
 import OpenInApp from '../auth/OpenInApp.vue'
-import logoDarkUrl from '../../assets/brand/logo-dark.svg'
-import logoLightUrl from '../../assets/brand/logo-light.svg'
+import HomeSidebar from './HomeSidebar.vue'
+import HomeTopbar from './HomeTopbar.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
@@ -281,10 +281,6 @@ const currentPath = computed(() => {
   return buildHomePath(active.value.entry, folderSlugs, selectedMemory.value?.slug)
 })
 
-function spaceSub(s: SpaceEntry): string {
-  return s.kind === 'PERSONAL' ? t('home.personal') : (s.role ?? t('home.group'))
-}
-
 async function cancelDeletion() {
   const entry = active.value?.entry
   if (!entry?.tenantId || !session.unlocked) return
@@ -296,70 +292,26 @@ async function cancelDeletion() {
   }
 }
 
-const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
 const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
-const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
-const brandLogoUrl = computed(() => (session.theme === 'dark' ? logoDarkUrl : logoLightUrl))
 </script>
 
 <template>
   <div class="home">
-    <aside class="home-sidebar">
-      <div class="home-brand">
-        <img class="home-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
-        <span>veyq</span>
-      </div>
-
-      <div class="home-section">{{ t('home.spaces') }}</div>
-      <button v-for="s in personalSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
-        <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
-        <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
-      </button>
-
-      <div class="home-section">{{ t('home.tenants') }}</div>
-      <div v-for="s in tenantSpaces()" :key="s.scopeId" class="space-row-wrap">
-        <button class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
-          <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
-          <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
-        </button>
-        <button v-if="s.role === 'Owner'" class="space-invite" :title="t('groups.invite')" @click.stop="inviteTarget = s">＋</button>
-      </div>
-      <button class="space-row space-create" @click="createGroupOpen = true">
-        <span class="space-avatar space-avatar-ghost">＋</span>
-        <span class="space-meta"><div class="space-name">{{ t('tenants.create') }}</div></span>
-      </button>
-
-      <div class="home-section">{{ t('home.groups') }}</div>
-      <div v-for="s in groupSpaces()" :key="s.scopeId" class="space-row-wrap">
-        <button class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
-          <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
-          <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
-        </button>
-        <button v-if="s.role === 'GroupOwner'" class="space-invite" :title="t('groups.members')" @click.stop="manageGroup = s">⚙</button>
-      </div>
-      <button v-if="tenantSpaces().length" class="space-row space-create" @click="createGroupSpaceOpen = true">
-        <span class="space-avatar space-avatar-ghost">＋</span>
-        <span class="space-meta"><div class="space-name">{{ t('groups.create') }}</div></span>
-      </button>
-
-      <div class="home-spacer" />
-      <button class="space-row" @click="settingsOpen = true">
-        <span class="space-avatar">{{ (session.unlocked?.user.displayName || '?').charAt(0).toUpperCase() }}</span>
-        <span class="space-meta"><div class="space-name">{{ session.unlocked?.user.displayName }}</div><div class="space-sub">{{ t('home.settings') }}</div></span>
-      </button>
-    </aside>
+    <HomeSidebar
+      :spaces="spaces"
+      :active-scope-id="active?.entry.scopeId"
+      :current-user-name="session.unlocked?.user.displayName"
+      @switch-space="switchSpace"
+      @create-tenant="createGroupOpen = true"
+      @create-group-space="createGroupSpaceOpen = true"
+      @invite-tenant="inviteTarget = $event"
+      @manage-group="manageGroup = $event"
+      @open-settings="settingsOpen = true"
+    />
 
     <SettingsOverlay v-if="settingsOpen" @close="settingsOpen = false" />
 
-    <header class="home-topbar">
-      <nav class="crumbs">
-        <template v-for="(c, i) in crumbs" :key="i">
-          <span v-if="i > 0" class="crumb-sep">/</span>
-          <button class="crumb" :class="{ current: i === crumbs.length - 1 }" @click="gotoCrumb(i)">{{ c.name }}</button>
-        </template>
-      </nav>
-      <input class="home-search" type="search" :placeholder="t('home.search')" readonly @focus="active && (searchOpen = true)" @click="active && (searchOpen = true)" />
-    </header>
+    <HomeTopbar :crumbs="crumbs" :search-enabled="!!active" @goto-crumb="gotoCrumb" @open-search="searchOpen = true" />
 
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
