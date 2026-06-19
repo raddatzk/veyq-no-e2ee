@@ -213,6 +213,11 @@ function bucketLabel(b: Bucket): string {
   if (b.ownerKey.startsWith('user:')) return memberNames.value[b.ownerKey.slice(5)] ?? ''
   return ''
 }
+function ownerLabel(key: string): string {
+  if (key === ownerKey) return session.unlocked!.user.displayName
+  if (key.startsWith('user:')) return memberNames.value[key.slice(5)] ?? ''
+  return ''
+}
 const createBucketFn = (nodeId: string, name: string) => createBucket(session.apiBase, s(), props.active, nodeId, name).then(() => undefined)
 const renameBucketFn = (nodeId: string, bucketId: string, name: string) => renameBucket(session.apiBase, s(), props.active, nodeId, bucketId, name).then(() => undefined)
 const deleteBucketFn = (nodeId: string, bucketId: string) => deleteBucket(session.apiBase, s(), props.active, nodeId, bucketId)
@@ -304,6 +309,7 @@ onBeforeUnmount(revokePersonCovers)
       :load-buckets="loadBuckets"
       :bucket-label="bucketLabel"
       :owner-key="ownerKey"
+      :owner-label="ownerLabel"
       :create-bucket="createBucketFn"
       :rename-bucket="renameBucketFn"
       :delete-bucket="deleteBucketFn"

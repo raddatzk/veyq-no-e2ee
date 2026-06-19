@@ -54,6 +54,7 @@ const props = defineProps<{
   loadBuckets?: (nodeId: string) => Promise<Bucket[]>
   bucketLabel?: (bucket: Bucket) => string
   ownerKey?: string
+  ownerLabel?: (ownerKey: string) => string
   createBucket?: (nodeId: string, name: string) => Promise<void>
   renameBucket?: (nodeId: string, bucketId: string, name: string) => Promise<void>
   deleteBucket?: (nodeId: string, bucketId: string) => Promise<void>
@@ -133,6 +134,16 @@ function tileInBucket(tl: GalleryTile, b: Bucket): boolean {
   return b.primary ? tl.createdBy === b.ownerKey && (tl.bucketId == null) : tl.bucketId === b.id
 }
 const selectedBucket = computed(() => contribBuckets.value.find((b) => b.id === selectedBucketId.value) ?? null)
+const lightboxUploaderName = computed(() => {
+  const owner = lightboxTile.value?.createdBy
+  if (!owner) return ''
+  const primary = contribBuckets.value.find((b) => b.primary && b.ownerKey === owner)
+  return (primary ? props.bucketLabel?.(primary) : '') || props.ownerLabel?.(owner) || ''
+})
+const lightboxUploaderUserId = computed(() => {
+  const owner = lightboxTile.value?.createdBy
+  return owner?.startsWith('user:') && lightboxUploaderName.value ? owner.slice(5) : ''
+})
 function cameraOf(tl: GalleryTile): string { return [tl.cameraMake, tl.cameraModel].filter(Boolean).join(' ').trim() }
 // Distinct cameras among the currently-selected bucket's tiles (for the in-bucket camera filter).
 const cameraOptions = computed(() => {
@@ -204,6 +215,14 @@ async function addUserParticipant(userId: string) {
 async function removeParticipantChip(participantId: string) {
   if (!props.removeParticipant) return
   try { await props.removeParticipant(currentNodeId.value, participantId); await loadParticipantList() } catch (e) { emit('error', (e as Error).message) }
+}
+function openLightboxUploader() {
+  if (!lightboxUploaderUserId.value || !lightboxUploaderName.value) return
+  emit('openParticipant', {
+    id: `uploader:${lightboxUploaderUserId.value}`,
+    displayName: lightboxUploaderName.value,
+    linkedUserId: lightboxUploaderUserId.value,
+  })
 }
 async function addPlaylist() {
   if (!props.addPlaylist) return
@@ -471,10 +490,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :move-buckets="ownBuckets"
       :owner-key="ownerKey"
       :bucket-label="bucketLabel"
+      :uploader-name="lightboxUploaderName"
+      :uploader-user-id="canOpenLinkedParticipants ? lightboxUploaderUserId : undefined"
       @close="closeLightbox"
       @step="lightboxStep"
       @move-tile="moveLightboxTile"
       @download="downloadThisOriginal"
+      @open-uploader="openLightboxUploader"
     >
       <template #actions="{ tile }">
         <slot name="lightbox-actions" :tile="tile" />

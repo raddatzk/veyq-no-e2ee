@@ -13,6 +13,8 @@ const props = defineProps<{
   moveBuckets: Bucket[]
   ownerKey?: string
   bucketLabel?: (bucket: Bucket) => string
+  uploaderName?: string
+  uploaderUserId?: string
 }>()
 
 defineSlots<{
@@ -24,6 +26,7 @@ const emit = defineEmits<{
   step: [direction: number]
   moveTile: [bucketId: string]
   download: []
+  openUploader: []
 }>()
 
 const showInfo = ref(false)
@@ -62,9 +65,16 @@ function moveTile(event: Event) {
       <div v-if="tile.lens"><span>{{ t('info.lens') }}</span><strong>{{ tile.lens }}</strong></div>
       <div v-if="tile.width && tile.height"><span>{{ t('info.dimensions') }}</span><strong>{{ tile.width }}×{{ tile.height }}</strong></div>
       <div v-if="tile.fileSize"><span>{{ t('info.fileSize') }}</span><strong>{{ formatBytes(tile.fileSize) }}</strong></div>
+      <div v-if="uploaderName"><span>{{ t('media.uploader') }}</span><strong>{{ uploaderName }}</strong></div>
       <div v-for="(val, key) in (tile.exif ?? {})" :key="key"><span>{{ key }}</span><strong>{{ val }}</strong></div>
     </div>
     <div class="lightbox-actions" @click.stop>
+      <button v-if="uploaderName && uploaderUserId" class="btn btn-ghost lightbox-uploader" type="button" @click="emit('openUploader')">
+        {{ t('media.uploadedBy', { name: uploaderName }) }}
+      </button>
+      <span v-else-if="uploaderName" class="lightbox-uploader lightbox-uploader-static">
+        {{ t('media.uploadedBy', { name: uploaderName }) }}
+      </span>
       <slot name="actions" :tile="tile" />
       <select
         v-if="canMoveTile && tile"

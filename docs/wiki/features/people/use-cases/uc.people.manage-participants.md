@@ -27,6 +27,8 @@
   other accessible Memories whose decrypted participant payload links to the same user.
 - A4: **Public share viewer** -> a public viewer may see participants included in the shared encrypted subtree
   but cannot manage them.
+- A5: **Uploader attribution** -> the Lightbox can show who uploaded a medium. User uploaders may open the
+  same local person view, but upload attribution does not automatically create a participant.
 - E1: **No content key** -> the client cannot decrypt or modify participants and shows no participant controls.
 - E2: **Non-member write** -> the server rejects the write before storing the opaque record.
 
