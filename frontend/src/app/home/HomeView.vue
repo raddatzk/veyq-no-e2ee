@@ -37,6 +37,7 @@ const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
 const searchOpen = ref(false)
 const settingsOpen = ref(false)
+const compactView = ref(false)
 const createType = ref<NodeType | null>(null)
 const renameTarget = ref<LevelEntry | null>(null)
 const menuTarget = ref<LevelEntry | null>(null)
@@ -312,7 +313,15 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
 
     <SettingsOverlay v-if="settingsOpen" @close="settingsOpen = false" />
 
-    <HomeTopbar :crumbs="crumbs" :search-enabled="!!active" @goto-crumb="gotoCrumb" @open-search="searchOpen = true" />
+    <HomeTopbar
+      :crumbs="crumbs"
+      :search-enabled="!!active"
+      :compact-view="compactView"
+      @goto-crumb="gotoCrumb"
+      @open-search="searchOpen = true"
+      @toggle-compact-view="compactView = !compactView"
+      @open-settings="settingsOpen = true"
+    />
 
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
@@ -339,6 +348,7 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
         :memories="memories"
         :folders="folders"
         :covers="covers"
+        :compact="compactView"
         @open-memory="openMemory"
         @open-folder="openFolder"
         @create="createType = $event"

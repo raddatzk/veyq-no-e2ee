@@ -3,13 +3,14 @@ import { onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { moveDestinations, type ActiveSpace, type LevelEntry } from '../../features/home/home'
-import { moveNode } from '../../features/memory/curate/curate'
+import { isNodeNameConflict, moveNode } from '../../features/memory/curate/curate'
 
 const props = defineProps<{ active: ActiveSpace; entry: LevelEntry }>()
 const emit = defineEmits<{ close: []; moved: [] }>()
 
 const dests = ref<{ id: string; name: string }[]>([])
 const busy = ref(false)
+const error = ref('')
 
 onMounted(async () => {
   dests.value = await moveDestinations(session.apiBase, session.unlocked!, props.active, props.entry.node)
@@ -17,9 +18,12 @@ onMounted(async () => {
 
 async function move(destId: string) {
   busy.value = true
+  error.value = ''
   try {
     await moveNode(session.apiBase, session.unlocked!, props.active, props.entry.node, destId)
     emit('moved')
+  } catch (e) {
+    error.value = isNodeNameConflict(e) ? t('home.nameConflict') : (e as Error).message
   } finally {
     busy.value = false
   }
@@ -41,6 +45,7 @@ async function move(destId: string) {
           </button>
         </li>
       </ul>
+      <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
     </div>
   </div>
 </template>

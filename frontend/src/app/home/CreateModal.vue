@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { createChild } from '../../features/memory/curate/curate'
+import { createChild, isNodeNameConflict } from '../../features/memory/curate/curate'
 import type { ActiveSpace } from '../../features/home/home'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 
@@ -21,7 +21,7 @@ async function create() {
     await createChild(session.apiBase, session.unlocked!, props.active, props.type, name.value, props.orderIndex, props.parentId)
     emit('created')
   } catch (e) {
-    error.value = (e as Error).message
+    error.value = isNodeNameConflict(e) ? t('home.nameConflict') : (e as Error).message
   } finally {
     busy.value = false
   }

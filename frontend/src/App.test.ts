@@ -1,6 +1,21 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setUnlocked } from './app/session'
+import { login } from './features/account/login/login'
 import App from './App.vue'
+
+vi.mock('./features/account/login/login', () => ({
+  login: vi.fn(async () => ({
+    sessionToken: 'remembered-token',
+    user: { id: 'u', email: 'kevin@example.com', displayName: 'Kevin', serverRole: 'ServerMember' },
+    identity: {},
+    identityPublicKey: { suiteId: 'v1', kemPublicKey: '', signPublicKey: '' },
+    masterKey: new Uint8Array(32),
+  })),
+}))
+vi.mock('./app/home/HomeView.vue', () => ({
+  default: { name: 'HomeView', template: '<main>Home</main>' },
+}))
 
 // Drives the slice-1 web auth machine: on boot, /api/setup decides setup (first run) vs login.
 // Web is same-origin, so there is no instance-URL step.
@@ -11,8 +26,15 @@ function mockSetup(setupRequired: boolean) {
 }
 const flush = () => new Promise((r) => setTimeout(r))
 
-beforeEach(() => localStorage.clear())
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => {
+  localStorage.clear()
+  setUnlocked(null)
+  vi.mocked(login).mockClear()
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+  setUnlocked(null)
+})
 
 describe('web auth flow (slice 1)', () => {
   it('an already-setup instance boots straight into login (no instance URL)', async () => {
@@ -29,6 +51,19 @@ describe('web auth flow (slice 1)', () => {
     const wrapper = mount(App)
     await flush()
     expect(wrapper.text()).toContain('Server einrichten')
+  })
+
+  it('uses a remembered login on boot after reload', async () => {
+    localStorage.setItem('veyq.rememberedLogin', JSON.stringify({ email: 'kevin@example.com', password: 'pw', secretKey: 'sk' }))
+    vi.stubGlobal('fetch', mockSetup(false))
+
+    const wrapper = mount(App)
+    await flush()
+    await flush()
+
+    expect(login).toHaveBeenCalledWith('', 'kevin@example.com', 'pw', 'sk')
+    expect(wrapper.text()).toContain('Home')
+    expect(wrapper.text()).not.toContain('Anmelden')
   })
 
   it('an unreachable instance shows an error state', async () => {

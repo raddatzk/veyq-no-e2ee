@@ -86,9 +86,6 @@ acceptanceCriteria:
           - testName: recovery code KEK (Argon2id)
             kind: positive
             ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: passkey PRF KEK (HKDF)
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
           - testName: KEM-v1 decap (hybrid X25519 + ML-KEM-768)
             kind: positive
             ref: frontend/src/shared/crypto/v1.conformance.test.ts

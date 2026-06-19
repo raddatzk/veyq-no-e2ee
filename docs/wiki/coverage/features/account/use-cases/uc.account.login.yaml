@@ -17,6 +17,10 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/account/login/login.ts
   - type: entryPoint
+    ref: frontend/src/App.vue
+  - type: entryPoint
+    ref: frontend/src/features/account/rememberedLogin/rememberedLogin.ts
+  - type: entryPoint
     ref: android/core/src/main/kotlin/app/veyq/crypto/Login.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/Login.swift
@@ -60,3 +64,11 @@ acceptanceCriteria:
           - testName: purgeExpiredDropsOnlyExpiredRows
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt
+  - id: uc.account.login.remembered-login-boot
+    statement: A remembered login is used during app boot after reload so the user lands directly in the app.
+    coverage:
+      web:
+        unit:
+          - testName: uses a remembered login on boot after reload
+            kind: positive
+            ref: frontend/src/App.test.ts

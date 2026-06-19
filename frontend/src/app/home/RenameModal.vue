@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { renameNode } from '../../features/memory/curate/curate'
+import { isNodeNameConflict, renameNode } from '../../features/memory/curate/curate'
 import type { ActiveSpace, LevelEntry } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; entry: LevelEntry }>()
@@ -20,7 +20,7 @@ async function submit() {
     await renameNode(session.apiBase, session.unlocked!, props.active, props.entry.node, name.value)
     emit('renamed')
   } catch (e) {
-    error.value = (e as Error).message
+    error.value = isNodeNameConflict(e) ? t('home.nameConflict') : (e as Error).message
   } finally {
     busy.value = false
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
+import MemoryObjectCard from './MemoryObjectCard.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
 
@@ -20,13 +21,19 @@ function nodeTypeClass(type: NodeType): string {
 <template>
   <section class="memory-children">
     <div class="card-grid card-grid-memories">
-      <button v-for="node in nodes" :key="node.id" class="memory-card child-card" @click="emit('navigate', node.id, node.name)">
-        <img v-if="covers[node.id]" class="memory-cover" :src="covers[node.id]" alt="" />
-        <div v-else class="memory-cover placeholder child-cover-placeholder">
+      <MemoryObjectCard
+        v-for="node in nodes"
+        :key="node.id"
+        class="child-card"
+        :name="node.name"
+        :cover="covers[node.id]"
+        placeholder-class="child-cover-placeholder"
+        @open="emit('navigate', node.id, node.name)"
+      >
+        <template #placeholder>
           <span class="child-cover-icon" :class="nodeTypeClass(node.type)" aria-hidden="true"></span>
-        </div>
-        <div class="memory-label"><div class="memory-name">{{ node.name }}</div></div>
-      </button>
+        </template>
+      </MemoryObjectCard>
     </div>
   </section>
 </template>

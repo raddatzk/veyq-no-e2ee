@@ -21,13 +21,18 @@ const emit = defineEmits<{
   openSettings: []
 }>()
 
-const personalSpaces = computed(() => props.spaces.filter((s) => s.kind === 'PERSONAL'))
 const tenantSpaces = computed(() => props.spaces.filter((s) => s.kind === 'TENANT'))
 const groupSpaces = computed(() => props.spaces.filter((s) => s.kind === 'GROUP'))
+const primarySpaces = computed(() => [
+  ...tenantSpaces.value,
+  ...props.spaces.filter((s) => s.kind === 'PERSONAL'),
+])
 const brandLogoUrl = computed(() => (session.theme === 'dark' ? logoDarkUrl : logoLightUrl))
 
 function spaceSub(s: SpaceEntry): string {
-  return s.kind === 'PERSONAL' ? t('home.personal') : (s.role ?? t('home.group'))
+  if (s.kind === 'PERSONAL') return t('home.personal')
+  if (s.domain) return s.domain
+  return s.role ?? t('home.group')
 }
 
 function initial(value?: string): string {
@@ -42,52 +47,55 @@ function initial(value?: string): string {
       <span>veyq</span>
     </div>
 
-    <div class="home-section">{{ t('home.spaces') }}</div>
-    <button
-      v-for="s in personalSpaces"
-      :key="s.scopeId"
-      class="space-row"
-      :class="{ active: activeScopeId === s.scopeId }"
-      @click="emit('switchSpace', s)"
-    >
-      <span class="space-avatar">{{ initial(s.displayName) }}</span>
-      <span class="space-meta">
-        <div class="space-name">{{ s.displayName }}</div>
-        <div class="space-sub">{{ spaceSub(s) }}</div>
-      </span>
-    </button>
-
-    <div class="home-section">{{ t('home.tenants') }}</div>
-    <div v-for="s in tenantSpaces" :key="s.scopeId" class="space-row-wrap">
-      <button class="space-row" :class="{ active: activeScopeId === s.scopeId }" @click="emit('switchSpace', s)">
+    <section class="home-sidebar-section">
+      <div class="home-section-row">
+        <div class="home-section">{{ t('home.spaces') }}</div>
+        <button class="home-section-action" type="button" :title="t('tenants.create')" :aria-label="t('tenants.create')" @click="emit('createTenant')">+</button>
+      </div>
+      <button
+        v-for="s in primarySpaces"
+        :key="s.scopeId"
+        class="space-row"
+        :class="{ active: activeScopeId === s.scopeId }"
+        @click="emit('switchSpace', s)"
+      >
         <span class="space-avatar">{{ initial(s.displayName) }}</span>
         <span class="space-meta">
           <div class="space-name">{{ s.displayName }}</div>
           <div class="space-sub">{{ spaceSub(s) }}</div>
         </span>
       </button>
-      <button v-if="s.role === 'Owner'" class="space-invite" :title="t('groups.invite')" @click.stop="emit('inviteTenant', s)">+</button>
-    </div>
-    <button class="space-row space-create" @click="emit('createTenant')">
-      <span class="space-avatar space-avatar-ghost">+</span>
-      <span class="space-meta"><div class="space-name">{{ t('tenants.create') }}</div></span>
-    </button>
+    </section>
 
-    <div class="home-section">{{ t('home.groups') }}</div>
-    <div v-for="s in groupSpaces" :key="s.scopeId" class="space-row-wrap">
-      <button class="space-row" :class="{ active: activeScopeId === s.scopeId }" @click="emit('switchSpace', s)">
-        <span class="space-avatar">{{ initial(s.displayName) }}</span>
-        <span class="space-meta">
-          <div class="space-name">{{ s.displayName }}</div>
-          <div class="space-sub">{{ spaceSub(s) }}</div>
-        </span>
-      </button>
-      <button v-if="s.role === 'GroupOwner'" class="space-invite" :title="t('groups.members')" @click.stop="emit('manageGroup', s)">⚙</button>
-    </div>
-    <button v-if="tenantSpaces.length" class="space-row space-create" @click="emit('createGroupSpace')">
-      <span class="space-avatar space-avatar-ghost">+</span>
-      <span class="space-meta"><div class="space-name">{{ t('groups.create') }}</div></span>
-    </button>
+    <section class="home-sidebar-section">
+      <div class="home-section-row">
+        <div class="home-section">{{ t('home.favorites') }}</div>
+      </div>
+    </section>
+
+    <section class="home-sidebar-section">
+      <div class="home-section-row">
+        <div class="home-section">{{ t('home.groups') }}</div>
+        <button
+          v-if="tenantSpaces.length"
+          class="home-section-action"
+          type="button"
+          :title="t('groups.create')"
+          :aria-label="t('groups.create')"
+          @click="emit('createGroupSpace')"
+        >+</button>
+      </div>
+      <div v-for="s in groupSpaces" :key="s.scopeId" class="space-row-wrap">
+        <button class="space-row" :class="{ active: activeScopeId === s.scopeId }" @click="emit('switchSpace', s)">
+          <span class="space-avatar">{{ initial(s.displayName) }}</span>
+          <span class="space-meta">
+            <div class="space-name">{{ s.displayName }}</div>
+            <div class="space-sub">{{ spaceSub(s) }}</div>
+          </span>
+        </button>
+        <button v-if="s.role === 'GroupOwner'" class="space-invite" :title="t('groups.members')" @click.stop="emit('manageGroup', s)">⚙</button>
+      </div>
+    </section>
 
     <div class="home-spacer" />
     <button class="space-row" @click="emit('openSettings')">

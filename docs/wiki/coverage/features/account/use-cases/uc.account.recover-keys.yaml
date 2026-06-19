@@ -112,17 +112,23 @@ acceptanceCriteria:
           - testName: recoveryWrapNotInLoginKeyBag
             kind: positive
             ref: android/core/src/test/kotlin/app/veyq/crypto/ResetPasswordE2ETest.kt
-  - id: uc.account.recover-keys.device-unlock
-    statement: "Credentials sealed in the device vault round-trip under the device key and cannot be opened with a different device key (wrong biometric/passkey)."
+  - id: uc.account.recover-keys.remembered-login
+    statement: "When the user chooses to remember the login, email, password and Secret Key are stored locally and can be cleared together with legacy device-unlock state."
     coverage:
       web:
         unit:
-          - testName: "round-trips credentials under a device key"
+          - testName: "stores and reads email, password and Secret Key from localStorage"
             kind: positive
-            ref: frontend/src/features/account/deviceUnlock/deviceVault.test.ts
-          - testName: "cannot be opened with a different device key (wrong biometric/passkey)"
+            ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
+          - testName: "ignores invalid stored data"
             kind: negative
-            ref: frontend/src/features/account/deviceUnlock/deviceVault.test.ts
+            ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
+          - testName: "clears the remembered login and legacy device-unlock state"
+            kind: positive
+            ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
+          - testName: "can clear only the legacy device-unlock state"
+            kind: positive
+            ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
   - id: uc.account.recover-keys.password-strength
     statement: "A new password is checked for breach exposure (HIBP k-anonymity) and against the length policy before it is accepted."
     coverage:

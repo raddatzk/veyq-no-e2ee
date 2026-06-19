@@ -202,9 +202,6 @@ export const kekPasswordSecret = (
 export const kekRecovery = (recoveryCode: Uint8Array, salt: Uint8Array, params: ArgonParams = ARGON): Uint8Array =>
   argon2id(recoveryCode, salt, params)
 
-export const kekPasskey = (prfOutput: Uint8Array): Uint8Array =>
-  hkdf(sha256, prfOutput, new Uint8Array(0), utf8('veyq/v1/passkey-kek'), 32)
-
 // A password-protected share folds the password into the unwrap key: HKDF(shareKey, Argon2id(password,salt)).
 // The link's fragment shareKey alone can't decrypt — you also need the password. The server stays blind.
 export const shareWrapKey = (shareKey: Uint8Array, password: string, salt: Uint8Array): Uint8Array =>

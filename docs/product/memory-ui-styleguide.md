@@ -6,7 +6,7 @@ veyq should feel like a curated private Memory archive. It should not look or be
 
 ## Foundations
 
-Use the shared UI layer in [`frontend/src/styles/ui.css`](../../frontend/src/styles/ui.css) before adding feature-specific styles. New components should start with the generic `.veyq-*` classes and add local classes only for domain-specific layout, media handling or exceptional states. Always look for an existing shared or feature-local CSS class before creating a new one; add a new class only when the existing class set cannot express the required behavior without leaking styles into unrelated UI.
+Use the shared UI layer in [`frontend/src/styles/ui.css`](../../frontend/src/styles/ui.css) and the generic Vue components in [`frontend/src/app/ui/`](../../frontend/src/app/ui/) before adding feature-specific styles. New components should start from the generic `Veyq*` components and `.veyq-*` classes, then add local classes only for domain-specific layout, media handling or exceptional states. Always look for an existing shared or feature-local component/CSS class before creating a new one; add a new class only when the existing class set cannot express the required behavior without leaking styles into unrelated UI.
 
 The shared layer provides:
 
@@ -20,9 +20,15 @@ The shared layer provides:
 
 Memory-specific classes such as `.memory-card`, `.memory-detail-*`, `.memory-upload-action`, `.memory-icon-action` and `.memory-tabs` are the Memory feature layer. Do not use them as generic app primitives outside Memory-oriented surfaces.
 
+When a shared primitive needs domain-specific behavior, wrap it in a dedicated feature component instead
+of copying markup. For example, Memory and Folder grid entries should use concrete components such as
+`MemoryObjectCard`, `FolderCard` and `CreateNodeCard`, which compose generic `Veyq*` primitives. This
+keeps interaction, focus, spacing and future visual changes centralized while allowing Memory-specific
+cover media, folder icons and metadata.
+
 ## Color System
 
-The baseline tokens live in [`frontend/src/styles/base.css`](../../frontend/src/styles/base.css). Use tokens first. Add new raw colors only when the value is local to a concrete visual object and does not represent a reusable semantic role.
+The baseline tokens live in [`frontend/src/styles/tokens.css`](../../frontend/src/styles/tokens.css). Use tokens first. Add new raw colors only when the value is local to a concrete visual object and does not represent a reusable semantic role.
 
 Primary / brand:
 
@@ -67,17 +73,17 @@ Raw colors are allowed only for concrete visual content, for example Lightbox bl
 
 ## Buttons
 
-Prefer PrimeVue buttons for standard application actions, especially where the surrounding UI already uses PrimeVue. Use PrimeIcons for icon actions when a clear icon exists.
+Prefer shared `Veyq*` components and `.veyq-*` button classes for standard application actions. If a product area already uses a component library, use that area's established buttons consistently instead of mixing local one-off button markup.
 
 Button roles:
 
 - Submit, save and confirm actions use the green positive action color. For native buttons in custom forms or dialogs, use `.veyq-dialog-button.veyq-dialog-button-primary`.
 - Cancel and neutral actions use `.veyq-dialog-button-secondary`, `severity="secondary"` or a neutral surface treatment.
-- Destructive confirmations use `.veyq-dialog-button-danger` or PrimeVue danger styling. Labels must be explicit about the destructive action.
+- Destructive confirmations use `.veyq-dialog-button-danger` or the area's established danger styling. Labels must be explicit about the destructive action.
 - Compact toolbars use `.veyq-icon-button` with an accessible `aria-label` or tooltip.
 - Text-like utility actions use `.veyq-text-button`.
 - Voluntary project support links use `.veyq-support-button` so they stay visually distinct from submit or confirm actions.
-- Dialog action buttons use icons consistently: cancel uses `pi pi-times`, generic confirm uses `pi pi-check`, explicit save uses `pi pi-save`, delete uses `pi pi-trash`, and move uses the closest PrimeIcon for that action.
+- Dialog action buttons use icons consistently when the action set uses icons at all: cancel, generic confirm, explicit save, delete and move should use the same icon source and placement within the dialog.
 
 Action layout:
 
@@ -114,7 +120,7 @@ Use `.veyq-empty` and `.veyq-loading` for empty and loading states. Empty states
 
 ## Dialogs and Forms
 
-Use existing PrimeVue dialog wrappers and sizing classes such as `.tenant-dialog`, `.share-dialog` and feature-specific dialog classes. Inside dialogs, use `.veyq-form`, `.veyq-form-grid`, `.veyq-form-copy`, `.veyq-dialog-action-row`, `.veyq-action-row` and `.veyq-action-group`.
+Use existing shared dialog wrappers and sizing classes such as `.tenant-dialog`, `.share-dialog` and feature-specific dialog classes. Inside dialogs, use `.veyq-form`, `.veyq-form-grid`, `.veyq-form-copy`, `.veyq-dialog-action-row`, `.veyq-action-row` and `.veyq-action-group`.
 
 Dialog rules:
 

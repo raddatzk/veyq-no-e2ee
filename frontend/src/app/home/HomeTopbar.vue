@@ -5,11 +5,14 @@ import { t } from '../../i18n/i18n'
 defineProps<{
   crumbs: { id?: string; name: string; slug?: string }[]
   searchEnabled: boolean
+  compactView: boolean
 }>()
 
 const emit = defineEmits<{
   gotoCrumb: [index: number]
   openSearch: []
+  toggleCompactView: []
+  openSettings: []
 }>()
 
 const shortcutLabel = computed(() => (isMacPlatform() ? 'Cmd K' : 'Ctrl K'))
@@ -37,5 +40,21 @@ function isMacPlatform(): boolean {
       <span class="home-search-placeholder">{{ t('home.search') }}</span>
       <kbd>{{ shortcutLabel }}</kbd>
     </button>
+    <div class="home-topbar-actions">
+      <button
+        class="home-topbar-icon"
+        type="button"
+        :class="{ active: compactView }"
+        :title="t('home.viewOptions')"
+        :aria-label="t('home.viewOptions')"
+        :aria-pressed="compactView"
+        @click="emit('toggleCompactView')"
+      >
+        <span class="home-topbar-list-icon" aria-hidden="true"></span>
+      </button>
+      <button class="home-topbar-icon" type="button" :title="t('home.settings')" :aria-label="t('home.settings')" @click="emit('openSettings')">
+        <span class="home-topbar-gear-icon" aria-hidden="true"></span>
+      </button>
+    </div>
   </header>
 </template>

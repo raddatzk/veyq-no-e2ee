@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { login } from '../../features/account/login/login'
 import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
-import { deviceUnlockEnabled, deviceUnlockSupported, enableDeviceUnlock, unlockWithDevice } from '../../features/account/deviceUnlock/deviceUnlock'
+import { clearLegacyDeviceUnlockLogin, rememberedLoginSupported, saveRememberedLogin } from '../../features/account/rememberedLogin/rememberedLogin'
 import { parseKit } from '../../features/account/emergencyKit/emergencyKit'
 import { requestPasswordReset } from '../../features/account/resetPassword/resetPassword'
 import QrScanner from './QrScanner.vue'
@@ -16,8 +16,8 @@ const remember = ref(false)
 const busy = ref(false)
 const error = ref('')
 const host = window.location.host
-const canRemember = deviceUnlockSupported()
-const hasDeviceUnlock = ref(deviceUnlockEnabled())
+const canRemember = rememberedLoginSupported()
+clearLegacyDeviceUnlockLogin()
 const scanning = ref(false)
 const canScan = !!navigator.mediaDevices?.getUserMedia
 const forgot = ref(false)
@@ -54,9 +54,8 @@ async function submit() {
   busy.value = true
   try {
     setUnlocked(await login(session.apiBase, email.value, password.value, secretKey.value))
-    // Set up biometric/passkey unlock for next time (best-effort — a cancelled passkey doesn't block login).
     if (remember.value && canRemember) {
-      try { await enableDeviceUnlock({ email: email.value, password: password.value, secretKey: secretKey.value }) } catch { /* user cancelled */ }
+      saveRememberedLogin({ email: email.value, password: password.value, secretKey: secretKey.value })
     }
   } catch {
     error.value = t('login.failed')
@@ -77,18 +76,6 @@ async function importKit(e: Event) {
   applyKit(text)
 }
 
-async function unlock() {
-  error.value = ''
-  busy.value = true
-  try {
-    const creds = await unlockWithDevice()
-    setUnlocked(await login(session.apiBase, creds.email, creds.password, creds.secretKey))
-  } catch {
-    error.value = t('login.unlockFailed')
-  } finally {
-    busy.value = false
-  }
-}
 </script>
 
 <template>
@@ -115,9 +102,6 @@ async function unlock() {
         <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
       </template>
       <template v-else>
-      <button v-if="hasDeviceUnlock && !props.embedded" class="btn btn-primary auth-unlock" type="button" :disabled="busy" @click="unlock">
-        🔓 {{ t('login.unlock') }}
-      </button>
       <form class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('common.email') }}
@@ -140,15 +124,22 @@ async function unlock() {
           {{ busy ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
-      <button class="btn btn-ghost auth-forgot" type="button" @click="forgot = true; error = ''">{{ t('reset.forgot') }}</button>
-      <label class="kit-import">
-        <span>{{ t('kit.import') }}</span>
-        <input type="file" accept=".pdf,.veyqkit,application/pdf,text/plain" @change="importKit" />
-        <span class="field-hint">{{ t('kit.importHint') }}</span>
-      </label>
-      <button v-if="canScan" class="btn btn-ghost" type="button" style="width: 100%; margin-top: 0.6rem" @click="scanning = true">
-        📷 {{ t('kit.scan') }}
-      </button>
+      <button class="auth-link-button auth-forgot" type="button" @click="forgot = true; error = ''">{{ t('reset.forgot') }}</button>
+      <details class="kit-import">
+        <summary>{{ t('kit.import') }}</summary>
+        <div class="kit-import-body">
+          <span class="field-hint">{{ t('kit.importHint') }}</span>
+          <div class="kit-actions">
+            <label class="btn btn-ghost kit-file-trigger">
+              {{ t('kit.importFile') }}
+              <input class="kit-file-input" type="file" accept=".pdf,.veyqkit,application/pdf,text/plain" @change="importKit" />
+            </label>
+            <button v-if="canScan" class="btn btn-ghost kit-scan" type="button" @click="scanning = true">
+              {{ t('kit.scan') }}
+            </button>
+          </div>
+        </div>
+      </details>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
       </template>
     </div>

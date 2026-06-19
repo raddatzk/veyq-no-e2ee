@@ -3,21 +3,21 @@ import { computed, ref } from 'vue'
 import { applyTheme, session, setUnlocked } from '../session'
 import { logout, updateProfile } from '../../features/account/login/login'
 import { rotateIdentity } from '../../features/keys/rotateIdentity'
-import { deviceUnlockEnabled, disableDeviceUnlock } from '../../features/account/deviceUnlock/deviceUnlock'
+import { clearRememberedLogin, rememberedLoginEnabled } from '../../features/account/rememberedLogin/rememberedLogin'
 import { mapTilesConsent } from '../../features/account/privacy/mapConsent'
 import { i18n, setLocale, t } from '../../i18n/i18n'
 
 const emit = defineEmits<{ close: [] }>()
 const host = window.location.host
-const deviceUnlock = ref(deviceUnlockEnabled())
+const rememberedLogin = ref(rememberedLoginEnabled())
 const displayName = ref(session.unlocked?.user.displayName ?? '')
 const profileSaving = ref(false)
 const profileError = ref('')
 const profileSaved = ref(false)
 const profileDirty = computed(() => displayName.value.trim() !== (session.unlocked?.user.displayName ?? ''))
-function forgetDevice() {
-  disableDeviceUnlock()
-  deviceUnlock.value = false
+function forgetRememberedLogin() {
+  clearRememberedLogin()
+  rememberedLogin.value = false
 }
 
 async function saveProfile() {
@@ -118,9 +118,9 @@ async function signOut() {
         <div v-else-if="profileSaved" class="auth-msg auth-msg-success">{{ t('settings.profileSaved') }}</div>
       </form>
 
-      <template v-if="deviceUnlock">
-        <div class="settings-section">{{ t('settings.deviceUnlock') }}</div>
-        <button class="btn btn-ghost settings-row" type="button" style="width: 100%; justify-content: flex-start" @click="forgetDevice">{{ t('settings.forgetDevice') }}</button>
+      <template v-if="rememberedLogin">
+        <div class="settings-section">{{ t('settings.rememberedLogin') }}</div>
+        <button class="btn btn-ghost settings-row" type="button" style="width: 100%; justify-content: flex-start" @click="forgetRememberedLogin">{{ t('settings.forgetRememberedLogin') }}</button>
       </template>
 
       <div class="settings-section">{{ t('settings.security') }}</div>

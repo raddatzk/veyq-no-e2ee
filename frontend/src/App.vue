@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { applyTheme, session } from './app/session'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { applyTheme, session, setUnlocked } from './app/session'
 import { t } from './i18n/i18n'
 import { getSetupStatus } from './features/account/instance/instance'
+import { login } from './features/account/login/login'
+import { clearRememberedLogin, readRememberedLogin } from './features/account/rememberedLogin/rememberedLogin'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
 import AcceptInvitePanel from './app/auth/AcceptInvitePanel.vue'
@@ -29,18 +31,55 @@ applyTheme(session.theme)
 
 type Phase = 'loading' | 'setup' | 'login' | 'error'
 const phase = ref<Phase>('loading')
+const bootLoadingVisible = ref(false)
 const prefill = ref<{ email?: string; secretKey?: string }>({})
 const invite = ref<ParsedInvite | null>(parseInviteHash(window.location.hash))
 const resetToken = ref<string | null>(parseResetHash(window.location.hash))
+let bootLoadingTimer: number | null = null
+
+function stopDelayedBootLoader() {
+  if (bootLoadingTimer !== null) window.clearTimeout(bootLoadingTimer)
+  bootLoadingTimer = null
+  bootLoadingVisible.value = false
+}
+
+function startDelayedBootLoader() {
+  stopDelayedBootLoader()
+  bootLoadingTimer = window.setTimeout(() => {
+    if (phase.value === 'loading' && !session.unlocked) bootLoadingVisible.value = true
+  }, 220)
+}
+
+async function tryRememberedLogin(): Promise<boolean> {
+  const creds = readRememberedLogin()
+  if (!creds) return false
+  try {
+    setUnlocked(await login(session.apiBase, creds.email, creds.password, creds.secretKey))
+    return true
+  } catch {
+    clearRememberedLogin()
+    return false
+  }
+}
 
 onMounted(async () => {
+  startDelayedBootLoader()
   try {
     const status = await getSetupStatus(session.apiBase)
-    phase.value = status.setupRequired ? 'setup' : 'login'
+    if (status.setupRequired) {
+      phase.value = 'setup'
+      return
+    }
+    if (!share.value && !invite.value && !resetToken.value && await tryRememberedLogin()) return
+    phase.value = 'login'
   } catch {
     phase.value = 'error'
+  } finally {
+    if (phase.value !== 'loading' || session.unlocked) stopDelayedBootLoader()
   }
 })
+
+onBeforeUnmount(stopDelayedBootLoader)
 
 function onSetupDone(email: string, secretKey: string) {
   prefill.value = { email, secretKey }
@@ -63,8 +102,11 @@ function clearReset() {
   <ResetPasswordPanel v-else-if="resetToken && !session.unlocked" :token="resetToken" @done="clearReset" />
   <AcceptInvitePanel v-else-if="invite" :invite="invite" @done="clearInvite" @dismiss="clearInvite" />
   <HomeView v-else-if="session.unlocked" :open-target="homeTarget" />
-  <div v-else-if="phase === 'loading'" class="auth-screen">
-    <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">{{ t('app.loading') }}</p></div>
+  <div v-else-if="phase === 'loading'" class="auth-screen auth-boot-screen" :aria-label="t('app.loading')" aria-live="polite">
+    <div v-if="bootLoadingVisible" class="auth-boot-loader">
+      <p class="auth-wordmark">veyq</p>
+      <span class="auth-boot-dot" aria-hidden="true"></span>
+    </div>
   </div>
   <div v-else-if="phase === 'error'" class="auth-screen">
     <div class="auth-card">

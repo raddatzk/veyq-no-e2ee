@@ -9,9 +9,9 @@ vi.mock('../../features/account/login/login', () => ({
   updateProfile: vi.fn(async () => ({ id: 'u', email: 'k@example.com', displayName: 'New Name', serverRole: 'ServerMember' })),
 }))
 vi.mock('../../features/keys/rotateIdentity', () => ({ rotateIdentity: vi.fn(async () => undefined) }))
-vi.mock('../../features/account/deviceUnlock/deviceUnlock', () => ({
-  deviceUnlockEnabled: vi.fn(() => false),
-  disableDeviceUnlock: vi.fn(),
+vi.mock('../../features/account/rememberedLogin/rememberedLogin', () => ({
+  rememberedLoginEnabled: vi.fn(() => false),
+  clearRememberedLogin: vi.fn(),
 }))
 
 beforeEach(() => {

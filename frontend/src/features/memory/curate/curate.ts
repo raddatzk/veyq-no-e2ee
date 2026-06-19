@@ -1,6 +1,6 @@
 // uc.memory.curate (web) — create a folder/memory in the tree. The name is sealed and a per-parent slug
-// token is derived (the server stays blind); a clean slug is generated from the name, with a numeric suffix
-// on collision. Rename/move/reorder need new backend endpoints (only createNode exists today).
+// token is derived (the server stays blind). Folder, Memory and Chapter children share one per-parent slug
+// namespace, so collisions are surfaced to the user instead of silently creating a numbered permalink.
 import { apiError } from '../../../shared/apiError'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -9,6 +9,16 @@ import { invalidateNodeGraph } from '../../home/nodeGraph'
 import { b64url } from '../../../shared/base64'
 
 const parentSlot = (active: ActiveSpace, parentId: string | null | undefined) => parentId ?? active.scope.scopeId
+const NODE_NAME_CONFLICT = 'NODE_NAME_CONFLICT'
+
+function isSlugConflict(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return msg.includes('SLUG_EXISTS') || /\b409\b/.test(msg) || msg.includes(NODE_NAME_CONFLICT)
+}
+
+export function isNodeNameConflict(e: unknown): boolean {
+  return isSlugConflict(e)
+}
 
 async function patchNode(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, body: Record<string, unknown>): Promise<MemoryNode> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}`, {
@@ -33,7 +43,7 @@ export function slugify(name: string): string {
   )
 }
 
-/** Create a child node under a parent (or the root when parentId is omitted), retrying the slug on collision. */
+/** Create a child node under a parent (or the root when parentId is omitted). */
 export async function createChild(
   apiBase: string,
   session: UnlockedSession,
@@ -43,57 +53,47 @@ export async function createChild(
   orderIndex: number,
   parentId?: string,
 ): Promise<MemoryNode> {
-  const base = slugify(name)
-  for (let attempt = 0; attempt < 25; attempt++) {
-    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
-    try {
-      const created = await createNode(apiBase, session, active.scope.scopeId, active.contentKey, { type, name: name.trim(), slug, orderIndex, parentId })
-      invalidateNodeGraph(active.scope.scopeId) // a new node — drop the per-scope cache so reads see it
-      return created
-    } catch (e) {
-      const msg = String(e)
-      if (!msg.includes('SLUG_EXISTS') && !msg.includes('409')) throw e
-    }
+  const trimmedName = name.trim()
+  try {
+    const created = await createNode(apiBase, session, active.scope.scopeId, active.contentKey, { type, name: trimmedName, slug: slugify(trimmedName), orderIndex, parentId })
+    invalidateNodeGraph(active.scope.scopeId) // a new node — drop the per-scope cache so reads see it
+    return created
+  } catch (e) {
+    if (isSlugConflict(e)) throw new Error(NODE_NAME_CONFLICT)
+    throw e
   }
-  throw new Error('could not create node (slug conflict)')
 }
 
-/** Rename a node: re-seal {name, slug} and recompute the per-parent slug token, retrying on collision. */
+/** Rename a node: re-seal {name, slug} and recompute the per-parent slug token. */
 export async function renameNode(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode, newName: string): Promise<MemoryNode> {
   const slot = parentSlot(active, node.parentId)
-  const base = slugify(newName)
   const name = newName.trim()
-  for (let attempt = 0; attempt < 25; attempt++) {
-    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
-    const sealed = b64url(resealNode(active.contentKey, { name, slug }))
-    try {
-      return await patchNode(apiBase, session, active.scope.scopeId, node.id, {
-        sealedContent: { suiteId: 'v1', bytes: sealed },
-        slugToken: slugTokenFor(active.contentKey, slot, slug),
-      })
-    } catch (e) {
-      if (!String(e).includes('SLUG_EXISTS') && !String(e).includes('409')) throw e
-    }
+  const slug = slugify(name)
+  const sealed = b64url(resealNode(active.contentKey, { name, slug }))
+  try {
+    return await patchNode(apiBase, session, active.scope.scopeId, node.id, {
+      sealedContent: { suiteId: 'v1', bytes: sealed },
+      slugToken: slugTokenFor(active.contentKey, slot, slug),
+    })
+  } catch (e) {
+    if (isSlugConflict(e)) throw new Error(NODE_NAME_CONFLICT)
+    throw e
   }
-  throw new Error('could not rename (slug conflict)')
 }
 
-/** Move a node under a new parent ("root" or a node id), recomputing the slug token (and re-slugging on collision). */
+/** Move a node under a new parent ("root" or a node id), recomputing the slug token. */
 export async function moveNode(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode, newParentId: string): Promise<MemoryNode> {
-  const { name } = decodeNode(active.contentKey, node)
+  const content = decodeNode(active.contentKey, node)
   const newSlot = newParentId === 'root' ? active.scope.scopeId : newParentId
-  const base = slugify(name)
-  for (let attempt = 0; attempt < 25; attempt++) {
-    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
-    const body: Record<string, unknown> = { newParentId, slugToken: slugTokenFor(active.contentKey, newSlot, slug) }
-    if (attempt > 0) body.sealedContent = { suiteId: 'v1', bytes: b64url(resealNode(active.contentKey, { name, slug })) }
-    try {
-      return await patchNode(apiBase, session, active.scope.scopeId, node.id, body)
-    } catch (e) {
-      if (!String(e).includes('SLUG_EXISTS') && !String(e).includes('409')) throw e
-    }
+  const slug = slugify(content.name)
+  const body: Record<string, unknown> = { newParentId, slugToken: slugTokenFor(active.contentKey, newSlot, slug) }
+  if (content.slug !== slug) body.sealedContent = { suiteId: 'v1', bytes: b64url(resealNode(active.contentKey, { name: content.name, slug })) }
+  try {
+    return await patchNode(apiBase, session, active.scope.scopeId, node.id, body)
+  } catch (e) {
+    if (isSlugConflict(e)) throw new Error(NODE_NAME_CONFLICT)
+    throw e
   }
-  throw new Error('could not move (slug conflict)')
 }
 
 /** Pin a media of this memory as its cover (empty string clears it). */

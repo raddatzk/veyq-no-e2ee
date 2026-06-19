@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { t } from '../../i18n/i18n'
 import type { ParticipantNodeHit } from '../../features/people/participants/participants'
+import MemoryObjectCard from './MemoryObjectCard.vue'
+import VeyqEmptyState from '../ui/VeyqEmptyState.vue'
 
 const props = defineProps<{
   name: string
@@ -30,18 +32,22 @@ const initials = computed(() => props.name.split(/\s+/).filter(Boolean).slice(0,
       </div>
     </header>
 
-    <div v-if="loading" class="home-empty">{{ t('app.loading') }}</div>
-    <div v-else-if="error" class="home-empty">{{ error }}</div>
-    <div v-else-if="!hits.length" class="home-empty">{{ t('people.profileEmpty') }}</div>
+    <VeyqEmptyState v-if="loading" loading class="home-empty">{{ t('app.loading') }}</VeyqEmptyState>
+    <VeyqEmptyState v-else-if="error" class="home-empty">{{ error }}</VeyqEmptyState>
+    <VeyqEmptyState v-else-if="!hits.length" class="home-empty">{{ t('people.profileEmpty') }}</VeyqEmptyState>
     <div v-else class="card-grid card-grid-memories person-memory-grid">
-      <button v-for="hit in hits" :key="hit.id" class="memory-card person-memory-card" type="button" @click="emit('openMemory', hit)">
-        <img v-if="covers[hit.id]" class="memory-cover" :src="covers[hit.id]!" alt="" />
-        <div v-else class="memory-cover placeholder">...</div>
-        <div class="memory-label">
-          <div class="memory-name">{{ hit.name }}</div>
+      <MemoryObjectCard
+        v-for="hit in hits"
+        :key="hit.id"
+        class="person-memory-card"
+        :name="hit.name"
+        :cover="covers[hit.id]"
+        @open="emit('openMemory', hit)"
+      >
+        <template #meta>
           <span class="person-memory-type">{{ hit.type === 'CHAPTER' ? t('people.chapter') : t('people.memory') }}</span>
-        </div>
-      </button>
+        </template>
+      </MemoryObjectCard>
     </div>
   </section>
 </template>

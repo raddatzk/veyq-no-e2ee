@@ -58,11 +58,6 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(d.salt)).toBe(k.salt)
   })
 
-  it('passkey PRF KEK (HKDF)', () => {
-    const k = vectors.kek.passkey_prf_hkdf
-    expect(hex(v1.kekPasskey(unhex(k.prf_output)))).toBe(k.kek)
-  })
-
   it('KEM-v1 decap (hybrid X25519 + ML-KEM-768)', () => {
     const d = vectors.kem_v1.decap_kat
     const ss = v1.kemDecap(
