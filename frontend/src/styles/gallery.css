@@ -164,6 +164,30 @@
   text-transform: uppercase;
 }
 
+.participant-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.participant-link:hover .participant-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.participant-link:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
 .participant-remove {
   flex: 0 0 auto;
   display: grid;
@@ -201,6 +225,69 @@
   min-height: 1.9rem;
   padding: 0.2rem 0.65rem;
   font-size: 0.82rem;
+}
+
+.person-profile {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.person-profile-header {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.9rem;
+  padding-bottom: 1.15rem;
+  border-bottom: 1px solid var(--app-line);
+}
+
+.person-avatar {
+  display: grid;
+  place-items: center;
+  width: 3.75rem;
+  height: 3.75rem;
+  border: 1px solid var(--app-success-line);
+  border-radius: 999px;
+  background: var(--app-success-soft);
+  color: var(--app-success-text);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.person-profile-copy {
+  min-width: 0;
+}
+
+.person-profile-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-profile-meta {
+  margin-top: 0.35rem;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+}
+
+.person-memory-grid {
+  align-items: start;
+}
+
+.person-memory-card .memory-label {
+  align-items: flex-start;
+}
+
+.person-memory-type {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .detail-share,
@@ -1321,6 +1408,19 @@
 
   .memory-participants {
     width: 100%;
+  }
+
+  .person-profile-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .person-profile-header .detail-back {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .person-profile-title {
+    font-size: 1.8rem;
   }
 
   .detail-title {

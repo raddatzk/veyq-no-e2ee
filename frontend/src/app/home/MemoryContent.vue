@@ -66,10 +66,11 @@ const props = defineProps<{
   // People participants (ADR 0032). Payloads are sealed by the wrapper; MemoryContent only shows decrypted labels.
   loadParticipants?: (nodeId: string) => Promise<Participant[]>
   participantCandidates?: ParticipantCandidate[]
+  canOpenLinkedParticipants?: boolean
   addParticipant?: (nodeId: string, input: ParticipantInput) => Promise<void>
   removeParticipant?: (nodeId: string, participantId: string) => Promise<void>
 }>()
-const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
+const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string]; openParticipant: [participant: Participant] }>()
 
 const tab = ref<MemoryDetailTab>('gallery')
 const currentNodeId = ref(props.rootNodeId)
@@ -340,11 +341,13 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :participants="participants"
       :participant-candidates="participantCandidates"
       :can-manage-participants="!!addParticipant && !!removeParticipant"
+      :can-open-linked-participants="canOpenLinkedParticipants"
       @back="emit('back')"
       @navigate="navigate"
       @add-anonymous-participant="addAnonymousParticipant"
       @add-user-participant="addUserParticipant"
       @remove-participant="removeParticipantChip"
+      @open-participant="emit('openParticipant', $event)"
     >
       <slot name="head-actions" :node-id="currentNodeId" :tab="tab" />
     </MemoryDetailHeader>

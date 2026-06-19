@@ -5,12 +5,23 @@ import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
+import { listNodesCached } from '../../home/nodeGraph'
+import { decodeNode, type MemoryNode } from '../../memory/createTree/memoryTree'
+import { mapPool } from '../../../shared/pool'
 
 const EMPTY = new Uint8Array(0)
 const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type Participant = { id: string; displayName: string; linkedUserId?: string }
 export type ParticipantInput = { displayName: string; linkedUserId?: string }
+export type ParticipantNodeHit = {
+  id: string
+  name: string
+  slug: string
+  type: MemoryNode['type']
+  node: MemoryNode
+  participant: Participant
+}
 type ParticipantPayload = ParticipantInput & { presentation?: Record<string, unknown> }
 type ApiParticipant = { id: string; sealedPayload: { bytes: string } }
 
@@ -60,4 +71,19 @@ export async function getShareParticipants(ctx: { apiBase: string; shareId: stri
   const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/nodes/${nodeId}/participants`)
   if (!res.ok) throw await apiError(res, 'share participants')
   return (await res.json()).participants.map((p: ApiParticipant) => toParticipant(ctx.contentKey, p))
+}
+
+export async function listParticipantNodeHits(apiBase: string, session: UnlockedSession, active: ActiveSpace, linkedUserId: string): Promise<ParticipantNodeHit[]> {
+  const nodes = (await listNodesCached(apiBase, session, active.scope.scopeId)).filter((n) => n.type !== 'FOLDER')
+  const hits = await mapPool(nodes, 6, async (node): Promise<ParticipantNodeHit | null> => {
+    try {
+      const participant = (await listParticipants(apiBase, session, active, node.id)).find((p) => p.linkedUserId === linkedUserId)
+      if (!participant) return null
+      const decoded = decodeNode(active.contentKey, node)
+      return { id: node.id, name: decoded.name, slug: decoded.slug, type: node.type, node, participant }
+    } catch {
+      return null
+    }
+  })
+  return hits.filter((hit): hit is ParticipantNodeHit => !!hit).sort((a, b) => a.name.localeCompare(b.name))
 }

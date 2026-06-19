@@ -14,6 +14,7 @@ const props = defineProps<{
   participants?: Participant[]
   participantCandidates?: ParticipantCandidate[]
   canManageParticipants?: boolean
+  canOpenLinkedParticipants?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   addAnonymousParticipant: []
   addUserParticipant: [userId: string]
   removeParticipant: [participantId: string]
+  openParticipant: [participant: Participant]
 }>()
 
 const selectedUserId = ref('')
@@ -33,6 +35,10 @@ function addSelectedUser() {
   if (!id) return
   emit('addUserParticipant', id)
   selectedUserId.value = ''
+}
+function openParticipant(participant: Participant) {
+  if (!props.canOpenLinkedParticipants || !participant.linkedUserId) return
+  emit('openParticipant', participant)
 }
 </script>
 
@@ -70,8 +76,19 @@ function addSelectedUser() {
       <div v-if="participantList.length || canManageParticipants" class="memory-participants">
         <span class="memory-participants-label">{{ t('people.participants') }}</span>
         <span v-for="p in participantList" :key="p.id" class="participant-chip" :class="{ linked: !!p.linkedUserId }">
-          <span class="participant-name">{{ p.displayName }}</span>
-          <span v-if="p.linkedUserId" class="participant-kind">{{ t('people.linked') }}</span>
+          <button
+            v-if="p.linkedUserId && canOpenLinkedParticipants"
+            class="participant-link"
+            type="button"
+            @click="openParticipant(p)"
+          >
+            <span class="participant-name">{{ p.displayName }}</span>
+            <span class="participant-kind">{{ t('people.linked') }}</span>
+          </button>
+          <template v-else>
+            <span class="participant-name">{{ p.displayName }}</span>
+            <span v-if="p.linkedUserId" class="participant-kind">{{ t('people.linked') }}</span>
+          </template>
           <button
             v-if="canManageParticipants"
             class="participant-remove"

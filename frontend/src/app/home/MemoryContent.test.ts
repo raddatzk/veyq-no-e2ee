@@ -97,4 +97,18 @@ describe('MemoryContent', () => {
     expect(w.find('.my-editor').exists()).toBe(true)
     expect(w.find('.journal-media-thumb').exists()).toBe(false)
   })
+
+  it('emits linked participant selections for the member profile view', async () => {
+    const props = makeProps({
+      canOpenLinkedParticipants: true,
+      loadParticipants: vi.fn(async () => [
+        { id: 'p1', displayName: 'Mira', linkedUserId: 'u2' },
+        { id: 'p2', displayName: 'Anonymous Guest' },
+      ]),
+    })
+    const w = mount(MemoryContent, { props })
+    await flushPromises()
+    await w.find('.participant-link').trigger('click')
+    expect(w.emitted('openParticipant')?.[0][0]).toEqual({ id: 'p1', displayName: 'Mira', linkedUserId: 'u2' })
+  })
 })

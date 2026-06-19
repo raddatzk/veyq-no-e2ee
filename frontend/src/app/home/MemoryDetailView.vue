@@ -2,7 +2,7 @@
 // Member (internal) memory view — a thin wrapper around the shared, tab-based <MemoryContent> (Legacy UI, same
 // as the guest share viewer). It supplies scope-authed loaders keyed by nodeId and the member-only actions
 // (upload, delete, set-cover, edit/live journal, GPX import, download, share) via named slots.
-import { defineAsyncComponent, onMounted, ref } from 'vue'
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor.vue'))
 import { t } from '../../i18n/i18n'
@@ -13,19 +13,28 @@ import { setCover } from '../../features/memory/curate/curate'
 import { listBuckets, createBucket, renameBucket, deleteBucket, bucketName, type Bucket } from '../../features/memory/buckets/buckets'
 import { listGroupMembers } from '../../features/spaces/groups/groupSpaces'
 import { listPlaylists, createPlaylist, deletePlaylist, setPlaylistFeatured } from '../../features/memory/playlist/playlist'
-import { createParticipant as createMemoryParticipant, deleteParticipant as deleteMemoryParticipant, listParticipants, type ParticipantInput } from '../../features/people/participants/participants'
+import {
+  createParticipant as createMemoryParticipant,
+  deleteParticipant as deleteMemoryParticipant,
+  listParticipantNodeHits,
+  listParticipants,
+  type Participant,
+  type ParticipantInput,
+  type ParticipantNodeHit,
+} from '../../features/people/participants/participants'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
 import { createTrack, deleteTrack, getTracks, updateTrack, type Track } from '../../features/memory/track/track'
 import { parseGpx } from '../../features/memory/track/gpx'
-import { loadCover, loadLevel, loadMemoryById, type ActiveSpace, type MemoryNode } from '../../features/home/home'
+import { loadCover, loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry, type MemoryNode } from '../../features/home/home'
 import DownloadModal from './DownloadModal.vue'
 import ShareModal from './ShareModal.vue'
 import MemoryContent from './MemoryContent.vue'
+import PersonProfileView from './PersonProfileView.vue'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
-const emit = defineEmits<{ back: [] }>()
+const emit = defineEmits<{ back: []; openMemory: [entry: LevelEntry] }>()
 
 const content = ref<InstanceType<typeof MemoryContent> | null>(null)
 const currentNodeId = ref(props.memory.id)
@@ -42,6 +51,11 @@ const journalEditing = ref(false)
 const journalLive = ref(false)
 const journalDraft = ref('')
 const journalSaving = ref(false)
+const selectedPerson = ref<Participant | null>(null)
+const personHits = ref<ParticipantNodeHit[]>([])
+const personCovers = ref<Record<string, string | null>>({})
+const personLoading = ref(false)
+const personError = ref('')
 
 const s = () => session.unlocked!
 
@@ -216,6 +230,46 @@ const featurePlaylist = (nodeId: string, playlistId: string, featured: boolean) 
 const loadParticipantsFn = (nodeId: string) => listParticipants(session.apiBase, s(), props.active, nodeId)
 const addParticipantFn = (nodeId: string, input: ParticipantInput) => createMemoryParticipant(session.apiBase, s(), props.active, nodeId, input)
 const removeParticipantFn = (nodeId: string, participantId: string) => deleteMemoryParticipant(session.apiBase, s(), props.active, nodeId, participantId)
+async function openParticipantProfile(participant: Participant) {
+  if (!participant.linkedUserId) return
+  selectedPerson.value = participant
+  personHits.value = []
+  personCovers.value = {}
+  personError.value = ''
+  personLoading.value = true
+  try {
+    const hits = await listParticipantNodeHits(session.apiBase, s(), props.active, participant.linkedUserId)
+    if (selectedPerson.value?.linkedUserId !== participant.linkedUserId) return
+    personHits.value = hits
+    for (const hit of hits) {
+      loadCover(session.apiBase, s(), props.active, hit.node)
+        .then((url) => {
+          if (selectedPerson.value?.linkedUserId === participant.linkedUserId) personCovers.value = { ...personCovers.value, [hit.id]: url }
+          else if (url) URL.revokeObjectURL(url)
+        })
+        .catch(() => {})
+    }
+  } catch (e) {
+    personError.value = (e as Error).message
+  } finally {
+    personLoading.value = false
+  }
+}
+function revokePersonCovers() {
+  for (const url of Object.values(personCovers.value)) if (url) URL.revokeObjectURL(url)
+  personCovers.value = {}
+}
+function closeParticipantProfile() {
+  revokePersonCovers()
+  selectedPerson.value = null
+  personHits.value = []
+  personError.value = ''
+}
+function openPersonMemory(hit: ParticipantNodeHit) {
+  closeParticipantProfile()
+  emit('openMemory', { node: hit.node, name: hit.name, slug: hit.slug })
+}
+onBeforeUnmount(revokePersonCovers)
 </script>
 
 <template>
@@ -223,7 +277,19 @@ const removeParticipantFn = (nodeId: string, participantId: string) => deleteMem
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
     <ShareModal v-if="shareOpen" :active="active" :memory="memory" :name="name" @close="shareOpen = false" />
 
+    <PersonProfileView
+      v-if="selectedPerson"
+      :name="selectedPerson.displayName"
+      :hits="personHits"
+      :covers="personCovers"
+      :loading="personLoading"
+      :error="personError"
+      @back="closeParticipantProfile"
+      @open-memory="openPersonMemory"
+    />
+
     <MemoryContent
+      v-show="!selectedPerson"
       ref="content"
       :root-node-id="memory.id"
       :root-name="name"
@@ -248,6 +314,7 @@ const removeParticipantFn = (nodeId: string, participantId: string) => deleteMem
       :feature-playlist="featurePlaylist"
       :load-participants="loadParticipantsFn"
       :participant-candidates="participantCandidates"
+      can-open-linked-participants
       :add-participant="addParticipantFn"
       :remove-participant="removeParticipantFn"
       :load-preview="(tile) => loadPreview(session.apiBase, s(), active, tile)"
@@ -256,6 +323,7 @@ const removeParticipantFn = (nodeId: string, participantId: string) => deleteMem
       @back="emit('back')"
       @node-changed="onNodeChanged"
       @error="error = $event"
+      @open-participant="openParticipantProfile"
     >
       <template #head-actions="{ tab }">
         <button class="btn btn-ghost detail-share" type="button" @click="shareOpen = true">{{ t('share.share') }}</button>

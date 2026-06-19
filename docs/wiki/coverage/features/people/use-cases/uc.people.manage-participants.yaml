@@ -20,6 +20,8 @@ documents:
     ref: frontend/src/features/people/participants/participants.ts
   - type: entryPoint
     ref: frontend/src/app/home/MemoryDetailHeader.vue
+  - type: entryPoint
+    ref: frontend/src/app/home/PersonProfileView.vue
 acceptanceCriteria:
   - id: uc.people.manage-participants.sealed-payload
     statement: "Participant display names and optional linked user ids are stored only inside sealed Memory-scoped payloads."
@@ -40,9 +42,17 @@ acceptanceCriteria:
           - testName: addsListsUpdatesAndRemovesParticipants
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/app/features/people/participant/ParticipantSliceTest.kt
+      web:
+        unit:
+          - testName: "emits linked participant selections for the member profile view"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "renders accessible memories for a linked participant and emits selection"
+            kind: positive
+            ref: frontend/src/app/home/PersonProfileView.test.ts
     gaps:
-      - reason: "The web detail header can add linked or anonymous chips, but chip click-through and profile navigation are not implemented yet."
-        followUp: "Add person-profile navigation plus web unit/e2e coverage for linked chips, anonymous chips and remove/rename flows."
+      - reason: "Linked chip click-through has unit coverage, but anonymous participant rename and full browser e2e coverage are still missing."
+        followUp: "Add rename support plus e2e coverage for add linked, add anonymous, open profile and remove flows."
   - id: uc.people.manage-participants.local-search
     statement: "Decrypted participant display names are local search keys for their Memories without using a server search endpoint."
     coverage:

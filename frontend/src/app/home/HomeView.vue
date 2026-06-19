@@ -324,7 +324,15 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
       </div>
       <!-- :key forces a remount when the memory changes (e.g. search-selecting a different one without going
            through openLevel), so the gallery/journal/tracks reload instead of showing the previous memory's. -->
-      <MemoryDetailView v-if="selectedMemory && active" :key="selectedMemory.node.id" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="closeMemory" />
+      <MemoryDetailView
+        v-if="selectedMemory && active"
+        :key="selectedMemory.node.id"
+        :active="active"
+        :memory="selectedMemory.node"
+        :name="selectedMemory.name"
+        @back="closeMemory"
+        @open-memory="openMemory"
+      />
       <MemoryLevelGrid
         v-else
         :error="error"
