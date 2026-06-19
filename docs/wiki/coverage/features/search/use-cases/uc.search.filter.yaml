@@ -60,3 +60,11 @@ acceptanceCriteria:
           - testName: testCapsResultsAt25
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+  - id: uc.search.filter.participant-match
+    statement: "The web client can match decrypted participant names locally while returning the matching Memory as the search hit."
+    coverage:
+      web:
+        unit:
+          - testName: "matches decrypted participant names while returning memory hits"
+            kind: positive
+            ref: frontend/src/features/search/search.test.ts

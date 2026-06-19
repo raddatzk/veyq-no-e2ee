@@ -13,6 +13,7 @@ import { setCover } from '../../features/memory/curate/curate'
 import { listBuckets, createBucket, renameBucket, deleteBucket, bucketName, type Bucket } from '../../features/memory/buckets/buckets'
 import { listGroupMembers } from '../../features/spaces/groups/groupSpaces'
 import { listPlaylists, createPlaylist, deletePlaylist, setPlaylistFeatured } from '../../features/memory/playlist/playlist'
+import { createParticipant as createMemoryParticipant, deleteParticipant as deleteMemoryParticipant, listParticipants, type ParticipantInput } from '../../features/people/participants/participants'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
@@ -176,12 +177,16 @@ const loadBuckets = (nodeId: string) => listBuckets(session.apiBase, s(), props.
 // member-admin list), so resolving OTHER members' synthesized primary buckets client-side stays operator-blind
 // re: content — the server still never learns the (sealed) bucket names. Mirrors what Legacy got server-side.
 const memberNames = ref<Record<string, string>>({})
+const participantCandidates = ref<{ userId: string; displayName: string }[]>([
+  { userId: session.unlocked!.user.id, displayName: session.unlocked!.user.displayName },
+])
 onMounted(async () => {
   const e = props.active.entry
   if ((e.kind === 'GROUP' || e.kind === 'TENANT') && e.tenantId) {
     try {
       const members = await listGroupMembers(session.apiBase, s(), e.tenantId, props.active.scope.scopeId)
       memberNames.value = Object.fromEntries(members.map((m) => [m.userId, m.displayName]))
+      participantCandidates.value = members.map((m) => ({ userId: m.userId, displayName: m.displayName }))
     } catch { /* directory optional — fall back to the generic label */ }
   }
 })
@@ -206,6 +211,11 @@ const loadPlaylists = (nodeId: string) => listPlaylists(session.apiBase, s(), pr
 const addPlaylist = (nodeId: string, url: string, title: string) => createPlaylist(session.apiBase, s(), props.active, nodeId, url, title, '', false)
 const removePlaylist = (nodeId: string, playlistId: string) => deletePlaylist(session.apiBase, s(), props.active, nodeId, playlistId)
 const featurePlaylist = (nodeId: string, playlistId: string, featured: boolean) => setPlaylistFeatured(session.apiBase, s(), props.active, nodeId, playlistId, featured)
+
+// ---- participants (ADR 0032) ----
+const loadParticipantsFn = (nodeId: string) => listParticipants(session.apiBase, s(), props.active, nodeId)
+const addParticipantFn = (nodeId: string, input: ParticipantInput) => createMemoryParticipant(session.apiBase, s(), props.active, nodeId, input)
+const removeParticipantFn = (nodeId: string, participantId: string) => deleteMemoryParticipant(session.apiBase, s(), props.active, nodeId, participantId)
 </script>
 
 <template>
@@ -236,6 +246,10 @@ const featurePlaylist = (nodeId: string, playlistId: string, featured: boolean) 
       :add-playlist="addPlaylist"
       :remove-playlist="removePlaylist"
       :feature-playlist="featurePlaylist"
+      :load-participants="loadParticipantsFn"
+      :participant-candidates="participantCandidates"
+      :add-participant="addParticipantFn"
+      :remove-participant="removeParticipantFn"
       :load-preview="(tile) => loadPreview(session.apiBase, s(), active, tile)"
       :load-original="(tile) => loadOriginal(session.apiBase, s(), active, tile)"
       :download-file-name="(tile, ext) => `${name}-${tile.id.slice(0, 8)}.${ext}`"

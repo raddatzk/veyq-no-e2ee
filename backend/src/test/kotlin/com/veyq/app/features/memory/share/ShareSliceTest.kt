@@ -5,6 +5,8 @@ import com.veyq.app.shared.content.Blob
 import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.Media
 import com.veyq.app.shared.content.MediaRepository
+import com.veyq.app.shared.content.MemoryParticipant
+import com.veyq.app.shared.content.MemoryParticipantRepository
 import com.veyq.app.shared.content.MemoryTrack
 import com.veyq.app.shared.content.MemoryTrackRepository
 import com.veyq.app.shared.content.Node
@@ -44,6 +46,7 @@ class ShareSliceTest {
     @Inject lateinit var blobs: BlobRepository
     @Inject lateinit var medias: MediaRepository
     @Inject lateinit var tracks: MemoryTrackRepository
+    @Inject lateinit var participants: MemoryParticipantRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
@@ -78,6 +81,8 @@ class ShareSliceTest {
             medias.persist(Media().apply { id = "shr-med2"; this.scopeId = this@ShareSliceTest.scopeId; nodeId = "shr-other"; originalBlobId = "shr-b2"; sealedMeta = "m".toByteArray(); suiteId = "v1"; mimeType = "image/png"; createdAt = now })
             // a sealed track on the shared memory (must be readable by a guest) — none on the sibling
             tracks.persist(MemoryTrack().apply { id = "shr-trk1"; nodeId = "shr-mem"; this.scopeId = this@ShareSliceTest.scopeId; suiteId = "v1"; sealedContent = "t".toByteArray(); createdAt = now })
+            // a sealed participant on the shared memory (must be readable by a guest) — none on the sibling
+            participants.persist(MemoryParticipant().apply { id = "shr-part1"; nodeId = "shr-mem"; this.scopeId = this@ShareSliceTest.scopeId; suiteId = "v1"; sealedPayload = "p".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("shr-owner")}"
         outsiderToken = "Bearer ${sessions.issue("shr-out")}"
@@ -136,6 +141,11 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-mem/tracks").then().statusCode(200)
             .body("tracks.size()", `is`(1)).body("tracks[0].id", `is`("shr-trk1"))
         given().get("/api/public/shares/$shareId/nodes/shr-other/tracks").then().statusCode(404)
+
+        // a guest reads the shared memory's sealed participants, gated to the subtree (sibling 404)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/participants").then().statusCode(200)
+            .body("participants.size()", `is`(1)).body("participants[0].id", `is`("shr-part1"))
+        given().get("/api/public/shares/$shareId/nodes/shr-other/participants").then().statusCode(404)
 
         // revoke; the share (and guest access) is gone
         given().header("Authorization", ownerToken).delete("/api/scopes/$scopeId/nodes/shr-mem/shares/$shareId").then().statusCode(204)

@@ -14,6 +14,9 @@ Search runs **entirely client-side** over already-decrypted node names — a cas
 match** shared by the web, Android and Apple clients. There is **no server search endpoint**: by design
 the server cannot index encrypted names.
 
+Planned People integration extends the same local index with decrypted participant display names. The server
+still receives neither the query nor a plaintext person index.
+
 ## Main flow
 1. The curator types a query in the space.
 2. The client matches it (case-insensitive substring) against the **decrypted names** of the loaded
@@ -31,8 +34,8 @@ the server cannot index encrypted names.
 - *Confidentiality (paramount):* **operator-blind by construction** — the query and names never leave the
   device; there is no server-side index of encrypted content.
 - *Roadmap outside this use-case:* structural facets (date/type/scope filter chips), full-text over
-  **journal/tags**, and **semantic/face** search are deferred (see [natural-language](../../search/_index.md)
-  and the Search model below).
+  **participants/journal/tags**, and **semantic/face** search are deferred (see
+  [natural-language](../../search/_index.md) and the Search model below).
 
 ## Related
 - Feature: [Search](../_index.md) · Actors: [Memory Curator](../../../actors.md)

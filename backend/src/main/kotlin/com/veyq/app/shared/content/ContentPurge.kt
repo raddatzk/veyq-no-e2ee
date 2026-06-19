@@ -23,6 +23,7 @@ class ContentPurge(
     private val journalUpdates: MemoryJournalUpdateRepository,
     private val tracks: MemoryTrackRepository,
     private val playlists: MemoryPlaylistRepository,
+    private val participants: MemoryParticipantRepository,
     private val shares: ShareRepository,
     private val contentKeys: ScopeContentKeyRepository,
     private val items: ScopeItemRepository,
@@ -40,6 +41,7 @@ class ContentPurge(
         journalUpdates.deleteByNodeIds(nodeIds)
         tracks.deleteByNodeIds(nodeIds)
         playlists.deleteByNodeIds(nodeIds)
+        participants.deleteByNodeIds(nodeIds)
         shares.deleteByNodeIds(nodeIds)
         nodes.clearCoverByMediaIds(mediaIds) // null any cover ref still pointing at deleted media
         nodes.deleteByIds(nodeIds)
@@ -55,6 +57,7 @@ class ContentPurge(
         journalUpdates.deleteByScopeId(scopeId)
         tracks.deleteByScopeId(scopeId)
         playlists.deleteByScopeId(scopeId)
+        participants.deleteByScopeId(scopeId)
         shares.deleteByScopeId(scopeId)
         nodes.deleteByScopeId(scopeId)
         contentKeys.deleteByScopeId(scopeId)

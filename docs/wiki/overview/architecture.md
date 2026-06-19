@@ -76,7 +76,7 @@ privacy) → its **own context** (People).
 | **Media** | Assets, **encrypted blobs**, derivatives, deduplication, upload sessions, uploader buckets. |
 | **Journal** | Collaborative Markdown (Yjs), the blind relay (op-log + snapshots), embeds. |
 | **Sharing** | Shares, roles (Viewer/Contributor/Manager/Uploader), share keys & tokens, uploader links, tenant terms/notices. |
-| **People** | **Participant** = a name + *optional* User link + (later) a set of face clusters; **tenant-scoped**; **viewer-scoped, non-enumerable** resolution. Owns the privacy-critical person model. Memory references it as participants. Participation is **self-managed** (add/remove yourself) and drives relevance **and processing responsibility** ([Agent Mode](../crosscutting/agent-mode.md)). |
+| **People** | **Participant** = a sealed name + *optional sealed* User link + (later) a set of face clusters; **tenant-scoped**; **viewer-scoped, non-enumerable** resolution. Owns the privacy-critical person model. Memory references it as encrypted participants. Participation is **self-managed** (add/remove yourself) and drives relevance **and processing responsibility** ([Agent Mode](../crosscutting/agent-mode.md)). |
 
 ### Access
 | Context | Owns / language |

@@ -38,6 +38,7 @@
 | AD-29 | **Legacy web UI over the E2EE core**: use the legacy web client as the UX baseline, but bind it to the Greenfield E2EE client/domain core through decrypted view-model adapters; old plaintext API/data assumptions do not return. | Accepted | See [ADR 0029](0029-legacy-web-ui-over-e2ee-core.md). |
 | AD-30 | **Public-share upload capability**: guest upload writes require `shareId` plus a blind upload-capability token derived from the share unwrap key; the server stores only `SHA-256(token)`. | Accepted | Prevents `shareId`-only sealed-junk uploads while preserving the blind server. See [ADR 0030](0030-public-share-upload-capability.md). |
 | AD-31 | **Profile fields are server-visible identity metadata**: profile writes are limited to low-sensitivity account metadata; credential/device changes stay separate key-wrap flows. | Accepted | Enables member rosters/settings without weakening content E2EE. See [ADR 0031](0031-profile-fields-server-visible.md). |
+| AD-32 | **Memory participants are encrypted person metadata**: participants may link to users or be anonymous, but Memory-person relationships and names live only in sealed payloads. | Accepted | Restores Legacy people UX while preserving the blind server. See [ADR 0032](0032-encrypted-memory-participants.md). |
 
 ## ADR template (for new ADR files)
 

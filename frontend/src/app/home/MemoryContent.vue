@@ -13,6 +13,7 @@ import type { Bucket } from '../../features/memory/buckets/buckets'
 import type { Playlist } from '../../features/memory/playlist/playlist'
 import type { Track } from '../../features/memory/track/track'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
+import type { Participant, ParticipantInput } from '../../features/people/participants/participants'
 import MemoryChaptersSection from './MemoryChaptersSection.vue'
 import MemoryDetailHeader from './MemoryDetailHeader.vue'
 import MemoryDetailTabs, { type MemoryDetailTab } from './MemoryDetailTabs.vue'
@@ -27,6 +28,7 @@ import MemoryMapSection from './MemoryMapSection.vue'
 import MemoryPlaylistsSection from './MemoryPlaylistsSection.vue'
 
 type ChildNode = { id: string; type: NodeType; name: string }
+type ParticipantCandidate = { userId: string; displayName: string }
 
 const props = defineProps<{
   rootNodeId: string
@@ -61,6 +63,11 @@ const props = defineProps<{
   addPlaylist?: (nodeId: string, url: string, title: string) => Promise<void>
   removePlaylist?: (nodeId: string, playlistId: string) => Promise<void>
   featurePlaylist?: (nodeId: string, playlistId: string, featured: boolean) => Promise<void>
+  // People participants (ADR 0032). Payloads are sealed by the wrapper; MemoryContent only shows decrypted labels.
+  loadParticipants?: (nodeId: string) => Promise<Participant[]>
+  participantCandidates?: ParticipantCandidate[]
+  addParticipant?: (nodeId: string, input: ParticipantInput) => Promise<void>
+  removeParticipant?: (nodeId: string, participantId: string) => Promise<void>
 }>()
 const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
 
@@ -87,6 +94,7 @@ const selectedBucketId = ref<string | null>(null)
 const cameraFilter = ref<string | null>(null)
 const playlists = ref<Playlist[]>([])
 const playlistsLoaded = ref(false)
+const participants = ref<Participant[]>([])
 
 const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, observe, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
   loadPreview: (tile) => props.loadPreview(tile),
@@ -176,6 +184,26 @@ async function loadPlaylistsTab() {
   if (!props.loadPlaylists) return
   try { playlists.value = await props.loadPlaylists(currentNodeId.value); playlistsLoaded.value = true } catch (e) { emit('error', (e as Error).message) }
 }
+async function loadParticipantList() {
+  if (!props.loadParticipants) return
+  try { participants.value = await props.loadParticipants(currentNodeId.value) } catch (e) { emit('error', (e as Error).message) }
+}
+async function addAnonymousParticipant() {
+  if (!props.addParticipant) return
+  const name = window.prompt(t('people.anonymousNamePrompt'))?.trim()
+  if (!name) return
+  try { await props.addParticipant(currentNodeId.value, { displayName: name }); await loadParticipantList() } catch (e) { emit('error', (e as Error).message) }
+}
+async function addUserParticipant(userId: string) {
+  if (!props.addParticipant) return
+  const candidate = props.participantCandidates?.find((c) => c.userId === userId)
+  if (!candidate) return
+  try { await props.addParticipant(currentNodeId.value, { displayName: candidate.displayName, linkedUserId: candidate.userId }); await loadParticipantList() } catch (e) { emit('error', (e as Error).message) }
+}
+async function removeParticipantChip(participantId: string) {
+  if (!props.removeParticipant) return
+  try { await props.removeParticipant(currentNodeId.value, participantId); await loadParticipantList() } catch (e) { emit('error', (e as Error).message) }
+}
 async function addPlaylist() {
   if (!props.addPlaylist) return
   const url = window.prompt(t('playlist.urlPrompt'))?.trim()
@@ -213,6 +241,7 @@ async function loadCurrent() {
   contribBuckets.value = []
   playlistsLoaded.value = false
   playlists.value = []
+  participants.value = []
   journalMarkdown.value = ''
   tracks.value = []
   revokeAllTiles()
@@ -225,6 +254,7 @@ async function loadCurrent() {
     childNodes.value = kids
     loadChildCovers()
     observe()
+    if (props.loadParticipants) await loadParticipantList()
     if (props.loadBuckets) await loadContribBuckets() // needed for the move-to-bucket control + counts
     if (props.loadPlaylists) await loadPlaylistsTab() // for the tab + ::playlist embeds
     if (tab.value === 'journal') await ensureJournal()
@@ -307,8 +337,14 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       :crumbs="crumbs"
       :current-name="currentName"
       :media-count="tiles.length"
+      :participants="participants"
+      :participant-candidates="participantCandidates"
+      :can-manage-participants="!!addParticipant && !!removeParticipant"
       @back="emit('back')"
       @navigate="navigate"
+      @add-anonymous-participant="addAnonymousParticipant"
+      @add-user-participant="addUserParticipant"
+      @remove-participant="removeParticipantChip"
     >
       <slot name="head-actions" :node-id="currentNodeId" :tab="tab" />
     </MemoryDetailHeader>

@@ -325,6 +325,80 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/participants:
+    get:
+      tags: [MemoryParticipant]
+      operationId: listParticipants
+      summary: A Memory/Chapter's participants — encrypted People metadata (ciphertext only).
+      description: >
+        Returns sealed participant payloads. Each payload contains the display name and optional linked user id
+        sealed client-side under the Memory content key; the server stores ciphertext only and never sees who
+        participates in which Memory.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The participants., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipantList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [MemoryParticipant]
+      operationId: createParticipant
+      summary: Add a sealed participant payload to a Memory/Chapter.
+      description: >
+        Stores one participant as an opaque sealed payload. Linked-vs-anonymous semantics are inside the
+        ciphertext; the server only validates auth, node type and crypto-suite id.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateParticipantRequest' } } }
+      responses:
+        '200': { description: The created participant., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipant' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/participants/{participantId}:
+    patch:
+      tags: [MemoryParticipant]
+      operationId: updateParticipant
+      summary: Replace a participant's sealed payload.
+      description: >
+        The client re-seals the participant payload (for example after rename or linking to a user) and swaps
+        the ciphertext. The participant id stays stable for embeds/local UI references.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: participantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateParticipantRequest' } } }
+      responses:
+        '200': { description: The updated participant., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipant' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    delete:
+      tags: [MemoryParticipant]
+      operationId: deleteParticipant
+      summary: Remove a participant from a Memory/Chapter.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: participantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/shares:
     get:
       tags: [MemoryShare]
@@ -477,6 +551,22 @@ paths:
         '200': { description: The node's playlists., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryPlaylistList' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/participants:
+    get:
+      tags: [PublicShareTree]
+      operationId: listShareParticipants
+      summary: A shared node's participants — READ-ONLY (ciphertext, no auth; gated to the share's subtree).
+      description: >
+        Returns a node's sealed participant payloads for a read-capable share guest (the guest unwraps with
+        the share key). Gated to the shared subtree and to VIEWER/CONTRIBUTOR roles; a blind UPLOADER cannot
+        read People metadata.
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The node's participants., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipantList' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:
@@ -596,6 +686,23 @@ components:
         playlists:
           type: array
           items: { $ref: '#/components/schemas/MemoryPlaylist' }
+    MemoryParticipant:
+      type: object
+      required: [id, nodeId, sealedPayload, createdAt]
+      properties:
+        id: { type: string }
+        nodeId: { type: string }
+        sealedPayload:
+          allOf: [{ $ref: './common.openapi.yaml#/components/schemas/Blob' }]
+          description: 'AEAD payload such as {displayName, linkedUserId?, presentation?}; opaque to the server.'
+        createdAt: { type: string, format: date-time }
+    MemoryParticipantList:
+      type: object
+      required: [participants]
+      properties:
+        participants:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryParticipant' }
     CreatePlaylistRequest:
       type: object
       required: [sealedContent]
@@ -617,6 +724,16 @@ components:
       required: [sealedContent]
       properties:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    CreateParticipantRequest:
+      type: object
+      required: [sealedPayload]
+      properties:
+        sealedPayload: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    UpdateParticipantRequest:
+      type: object
+      required: [sealedPayload]
+      properties:
+        sealedPayload: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ShareRole:
       type: string
       enum: [VIEWER, CONTRIBUTOR, UPLOADER]

@@ -1,7 +1,7 @@
 # Feature: Search
 
-Find memories and media by **structure** (date/type/scope), **text** (titles/journal/tags), and — later
-— **faces and semantics**, all under a blind server.
+Find memories and media by **structure** (date/type/scope), **text** (titles/participant names/journal/tags),
+and — later — **faces and semantics**, all under a blind server.
 
 - **Touched contexts:** spans the content contexts; query orchestration is client-side — see
   [System Architecture](../../overview/architecture.md).
@@ -12,5 +12,5 @@ Find memories and media by **structure** (date/type/scope), **text** (titles/jou
   (ML on-device, deferred).
 
 ## Use-cases
-- ★ [Filter & find](use-cases/uc.search.filter.md) — client-side name search today; structural facets + journal/tag text deferred
+- ★ [Filter & find](use-cases/uc.search.filter.md) — client-side name search today; participant/journal/tag text deferred
 - `uc.search.natural-language` — natural-language / semantic / "ask your memories" (deferred, on-device LLM)

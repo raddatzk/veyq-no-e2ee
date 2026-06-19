@@ -4,6 +4,7 @@ import * as Y from 'yjs'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { getShareJournal, getSharePlaylists, getShareTracks, listShareNodes, loadShareOriginal, loadSharePreview, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
+import { getShareParticipants } from '../../features/people/participants/participants'
 import { loadShareJournalDoc, subscribeShareJournal } from '../../features/memory/journalLive/shareJournalLive'
 import { decodeNode, type MemoryNode } from '../../features/memory/createTree/memoryTree'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
@@ -44,6 +45,7 @@ const loadTiles = (nodeId: string) => loadShareTiles(c(), nodeId)
 const loadJournalMarkdown = (nodeId: string) => getShareJournal(c(), nodeId)
 const loadTracks = (nodeId: string) => getShareTracks(c(), nodeId)
 const loadPlaylists = (nodeId: string) => getSharePlaylists(c(), nodeId)
+const loadParticipants = (nodeId: string) => getShareParticipants(c(), nodeId)
 const loadChildNodes = async (nodeId: string) => childNodesOf(nodeId)
 const resolveChapterNames = async () => chapterMap()
 
@@ -199,6 +201,7 @@ async function onFilesPicked(event: Event) {
         :live-journal="liveJournal"
         :load-tracks="loadTracks"
         :load-playlists="loadPlaylists"
+        :load-participants="loadParticipants"
         :load-child-nodes="loadChildNodes"
         :resolve-chapter-names="resolveChapterNames"
         :load-preview="(tile) => loadSharePreview(c(), tile)"

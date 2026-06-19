@@ -4,11 +4,11 @@ Organizing a library of **folders**, **Memories** and nested **Chapters** with c
 favorites — the product core. Folders organize; Memories hold the content (media, journal, maps,
 playlists). A second, plain file-storage model ("Drive") is planned — see [design notes](../../design-notes.md).
 
-- **Touched contexts:** Memory, Media, Journal — see [System Architecture](../../overview/architecture.md).
+- **Touched contexts:** Memory, Media, Journal, People — see [System Architecture](../../overview/architecture.md).
 - **Cross-cutting:** [Security Model](../../crosscutting/security-model.md) (scope & keys),
   [Space Navigation](../../crosscutting/space-navigation.md) (folders, Memories and chapters),
   [Agent Mode](../../crosscutting/agent-mode.md) (media processing), [Search](../../crosscutting/search.md).
-- **Decisions:** [AD-03/04](../../decisions/README.md) (keys, shared-vs-unshared), [AD-10](../../decisions/README.md) (deletion).
+- **Decisions:** [AD-03/04](../../decisions/README.md) (keys, shared-vs-unshared), [AD-10](../../decisions/README.md) (deletion), [AD-32](../../decisions/README.md) (encrypted participants).
 
 ## Use-cases
 - ★ [Create a Memory tree](use-cases/uc.memory.create-tree.md) — folders, Memories, chapters & permalinks

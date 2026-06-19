@@ -41,7 +41,8 @@ deployment the operator is the user, so this threat is moot.
 The confidentiality boundary, made explicit:
 
 - **Encrypted (server-blind):** media bytes and all derivatives; journal text and embeds; **sensitive
-  metadata** — titles, captions, descriptions, places, people/faces, tags; track/playlist details.
+  metadata** — titles, captions, descriptions, places, people/faces, participant-to-Memory
+  relationships, tags; track/playlist details.
 - **Server-visible (low-sensitivity operational metadata):** existence/IDs of memories, media and
   shares; **scope & membership** (who belongs to which tenant/group); coarse timestamps for ordering
   (`createdAt` / `takenAt`); sizes; MIME type; op-log offsets and update author-ids; presence facts

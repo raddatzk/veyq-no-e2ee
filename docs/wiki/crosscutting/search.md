@@ -3,15 +3,15 @@
 > The server is blind to content ([Security Model](security-model.md)), so **all content search is
 > client-side**. The server only helps with **structural** queries over the metadata it can see.
 
-The searchable **text** surface is **small** — Memory titles, folder names, tags, journal text —
-*not* pixels. Even a user's whole accessible corpus is a few MB to low tens of MB of text.
+The searchable **text** surface is **small** — Memory titles, folder names, participant names, tags,
+journal text — *not* pixels. Even a user's whole accessible corpus is a few MB to low tens of MB of text.
 
 ## Three layers
 
 | Layer | Who | Over what |
 |---|---|---|
 | **Structural / operational** | **Server** | date-range, type, size, scope filter, **sort & paginate** — over the *server-visible operational metadata* (see [encrypted vs. visible](security-model.md)). No content needed. |
-| **Full-text** | **Client** | titles, captions, journal, **tags** — over content it has decrypted locally. |
+| **Full-text** | **Client** | titles, captions, journal, **participants**, **tags** — over content it has decrypted locally. |
 | **ML (later)** | **on-device** | **faces** (People context, viewer-scoped) and semantic / visual search. |
 
 ## The client builds its own index
@@ -42,7 +42,7 @@ SearchQuery {
   // structural → server (visible metadata)
   dateRange?  scope?  mediaType?  inMemory?
   // text → client-local index
-  text?  tags?  place?
+  text?  participants?  tags?  place?
   // ML (deferred) → on-device
   semantic?   // concepts over image AND journal-text embeddings
   people?     // participant names → face clusters

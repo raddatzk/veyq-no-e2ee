@@ -1,18 +1,39 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { t } from '../../i18n/i18n'
+import type { Participant } from '../../features/people/participants/participants'
 
-defineProps<{
+type ParticipantCandidate = { userId: string; displayName: string }
+
+const props = defineProps<{
   heroUrl: string | null
   showBack?: boolean
   crumbs: { id: string; name: string }[]
   currentName: string
   mediaCount: number
+  participants?: Participant[]
+  participantCandidates?: ParticipantCandidate[]
+  canManageParticipants?: boolean
 }>()
 
 const emit = defineEmits<{
   back: []
   navigate: [nodeId: string]
+  addAnonymousParticipant: []
+  addUserParticipant: [userId: string]
+  removeParticipant: [participantId: string]
 }>()
+
+const selectedUserId = ref('')
+const participantList = computed(() => props.participants ?? [])
+const linkedUserIds = computed(() => new Set(participantList.value.map((p) => p.linkedUserId).filter(Boolean) as string[]))
+const availableCandidates = computed(() => (props.participantCandidates ?? []).filter((c) => !linkedUserIds.value.has(c.userId)))
+function addSelectedUser() {
+  const id = selectedUserId.value
+  if (!id) return
+  emit('addUserParticipant', id)
+  selectedUserId.value = ''
+}
 </script>
 
 <template>
@@ -44,6 +65,34 @@ const emit = defineEmits<{
 
       <div class="memory-detail-meta">
         <span>{{ t('detail.mediaCount', { n: mediaCount }) }}</span>
+      </div>
+
+      <div v-if="participantList.length || canManageParticipants" class="memory-participants">
+        <span class="memory-participants-label">{{ t('people.participants') }}</span>
+        <span v-for="p in participantList" :key="p.id" class="participant-chip" :class="{ linked: !!p.linkedUserId }">
+          <span class="participant-name">{{ p.displayName }}</span>
+          <span v-if="p.linkedUserId" class="participant-kind">{{ t('people.linked') }}</span>
+          <button
+            v-if="canManageParticipants"
+            class="participant-remove"
+            type="button"
+            :aria-label="t('people.removeParticipant', { name: p.displayName })"
+            @click="emit('removeParticipant', p.id)"
+          >×</button>
+        </span>
+        <select
+          v-if="canManageParticipants && availableCandidates.length"
+          v-model="selectedUserId"
+          class="participant-select"
+          :aria-label="t('people.addUser')"
+          @change="addSelectedUser"
+        >
+          <option value="">{{ t('people.addUser') }}</option>
+          <option v-for="c in availableCandidates" :key="c.userId" :value="c.userId">{{ c.displayName }}</option>
+        </select>
+        <button v-if="canManageParticipants" class="btn btn-ghost participant-add" type="button" @click="emit('addAnonymousParticipant')">
+          {{ t('people.addAnonymous') }}
+        </button>
       </div>
     </div>
   </header>

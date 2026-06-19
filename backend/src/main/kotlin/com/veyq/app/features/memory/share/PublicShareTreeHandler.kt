@@ -2,6 +2,8 @@ package com.veyq.app.features.memory.share
 
 import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.MemoryJournal
+import com.veyq.app.generated.model.MemoryParticipant as ApiParticipant
+import com.veyq.app.generated.model.MemoryParticipantList
 import com.veyq.app.generated.model.MemoryNodeList
 import com.veyq.app.generated.model.MemoryPlaylist as ApiPlaylist
 import com.veyq.app.generated.model.MemoryPlaylistList
@@ -14,6 +16,8 @@ import com.veyq.app.features.memory.journal.JournalHandler
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.MemoryPlaylist
 import com.veyq.app.shared.content.MemoryPlaylistRepository
+import com.veyq.app.shared.content.MemoryParticipant
+import com.veyq.app.shared.content.MemoryParticipantRepository
 import com.veyq.app.shared.content.MemoryTrack
 import com.veyq.app.shared.content.MemoryTrackRepository
 import com.veyq.app.shared.content.NodeRepository
@@ -38,6 +42,7 @@ class PublicShareTreeHandler(
     private val nodes: NodeRepository,
     private val tracks: MemoryTrackRepository,
     private val playlists: MemoryPlaylistRepository,
+    private val participants: MemoryParticipantRepository,
     private val journals: JournalHandler,
     private val scopes: ScopeRepository,
     private val tenants: TenantRepository,
@@ -134,6 +139,22 @@ class PublicShareTreeHandler(
             )
         })
     }
+
+    // Participants are READ-ONLY over a share. Same gate as tracks/playlists because the payload is People metadata.
+    @Transactional
+    fun listShareParticipants(shareId: String, nodeId: String): MemoryParticipantList {
+        val share = shareOr404(shareId)
+        if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
+        requireSubtree(share, nodeId)
+        return MemoryParticipantList(participants = participants.listByNodeId(nodeId).map(::toParticipantApi))
+    }
+
+    private fun toParticipantApi(p: MemoryParticipant): ApiParticipant =
+        ApiParticipant(
+            id = p.id, nodeId = p.nodeId,
+            sealedPayload = Blob(suiteId = p.suiteId, bytes = enc.encodeToString(p.sealedPayload)),
+            createdAt = OffsetDateTime.ofInstant(p.createdAt, ZoneOffset.UTC),
+        )
 
     private fun shareOr404(shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
