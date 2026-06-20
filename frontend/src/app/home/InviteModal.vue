@@ -7,12 +7,16 @@ import { getTenantTerms, setTenantTerms } from '../../features/memory/share/shar
 import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
 import { changeMemberRole, listTenantMembers, removeMember, rotateScope, type MemberRole, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
 import { deleteTenant, cancelTenantDeletion } from '../../features/spaces/invite/groups'
+import { clearTenantLogo, scaleTenantLogo, uploadTenantLogo, type ScaledTenantLogo } from '../../features/admin/createTenantInviteOwner/tenant'
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import type { SpaceEntry } from '../../features/home/home'
 
 const props = defineProps<{ space: SpaceEntry }>()
-const emit = defineEmits<{ close: []; deleted: [] }>()
+const emit = defineEmits<{ close: []; deleted: []; updated: [] }>()
 const confirmDelete = ref(false)
+const logo = ref<ScaledTenantLogo | null>(null)
+const logoBusy = ref(false)
+const logoSaved = ref(false)
 
 async function doDeleteTenant() {
   if (!session.unlocked || !props.space.tenantId) return
@@ -31,6 +35,52 @@ async function doCancelDeletion() {
     emit('deleted')
   } catch (e) {
     error.value = (e as Error).message
+  }
+}
+
+async function chooseLogo(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  try {
+    if (logo.value?.previewUrl) URL.revokeObjectURL(logo.value.previewUrl)
+    logo.value = await scaleTenantLogo(file)
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
+async function saveLogo() {
+  if (!session.unlocked || !props.space.tenantId) return
+  if (!logo.value) return
+  logoBusy.value = true
+  error.value = ''
+  try {
+    await uploadTenantLogo(session.apiBase, session.unlocked.sessionToken, props.space.tenantId, logo.value)
+    logoSaved.value = true
+    emit('updated')
+    setTimeout(() => (logoSaved.value = false), 1500)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    logoBusy.value = false
+  }
+}
+
+async function clearLogo() {
+  if (!session.unlocked || !props.space.tenantId) return
+  logoBusy.value = true
+  error.value = ''
+  try {
+    await clearTenantLogo(session.apiBase, session.unlocked.sessionToken, props.space.tenantId)
+    if (logo.value?.previewUrl) URL.revokeObjectURL(logo.value.previewUrl)
+    logo.value = null
+    logoSaved.value = true
+    emit('updated')
+    setTimeout(() => (logoSaved.value = false), 1500)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    logoBusy.value = false
   }
 }
 
@@ -180,10 +230,27 @@ async function copy() {
   <div class="settings-backdrop" @click.self="emit('close')">
     <div class="settings-panel">
       <div class="settings-head">
-        <h2 class="settings-title">{{ t('invite.title') }}</h2>
+        <h2 class="settings-title">{{ t('tenants.manageTitle') }}</h2>
         <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.close') }}</button>
       </div>
       <div class="settings-section">{{ space.displayName }}</div>
+      <div class="settings-field">
+        {{ t('tenants.logo') }}
+        <div class="tenant-logo-picker">
+          <div class="tenant-logo-preview-shell">
+            <img v-if="logo?.previewUrl || space.logoUrl" class="tenant-logo-preview" :src="logo?.previewUrl ?? space.logoUrl" alt="" />
+            <span v-else class="tenant-logo-placeholder">+</span>
+          </div>
+          <div class="tenant-logo-actions">
+            <label class="btn btn-ghost tenant-logo-trigger">
+              {{ t('tenants.chooseLogo') }}
+              <input class="tenant-logo-input" type="file" accept="image/png,image/jpeg,image/webp" @change="chooseLogo" />
+            </label>
+            <button class="btn btn-ghost" type="button" :disabled="logoBusy || !logo" @click="saveLogo">{{ logoSaved ? t('common.saved') : t('common.save') }}</button>
+            <button v-if="space.logoUrl || logo" class="btn btn-ghost" type="button" :disabled="logoBusy" @click="clearLogo">{{ t('common.remove') }}</button>
+          </div>
+        </div>
+      </div>
 
       <label class="invite-role">
         {{ t('invite.role') }}
@@ -201,7 +268,7 @@ async function copy() {
         </div>
       </label>
       <template v-if="protection === 'passphrase'">
-        <input class="invite-link" style="margin-bottom: 0.4rem" v-model="passphrase" type="text" :placeholder="t('invite.passphrasePlaceholder')" />
+        <input class="invite-link invite-passphrase" v-model="passphrase" type="text" :placeholder="t('invite.passphrasePlaceholder')" />
         <p class="invite-hint">{{ t('invite.passphraseOob') }}</p>
       </template>
 
@@ -256,7 +323,7 @@ async function copy() {
       </template>
       <template v-else>
         <p class="invite-hint">{{ t('delete.tenantWarning') }}</p>
-        <button class="btn btn-ghost invite-gen" type="button" style="color: var(--app-danger)" @click="confirmDelete = true">{{ t('delete.tenant') }}</button>
+        <button class="btn btn-ghost invite-gen tenant-delete-button" type="button" @click="confirmDelete = true">{{ t('delete.tenant') }}</button>
       </template>
     </div>
     <ConfirmDeleteModal v-if="confirmDelete" :name="space.displayName" @close="confirmDelete = false" @confirm="doDeleteTenant" />

@@ -1,7 +1,7 @@
 import type { PrimeVueConfiguration, PrimeVueLocaleOptions } from 'primevue/config'
-import type { SupportedLocale } from './index'
+import type { Locale } from './i18n'
 
-const primeVueLocales: Record<SupportedLocale, PrimeVueLocaleOptions> = {
+const primeVueLocales: Record<Locale, PrimeVueLocaleOptions> = {
   de: {
     firstDayOfWeek: 1,
     dayNames: ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'],
@@ -92,11 +92,11 @@ const primeVueLocales: Record<SupportedLocale, PrimeVueLocaleOptions> = {
   }
 }
 
-export function primeVueLocale(locale: SupportedLocale) {
+export function primeVueLocale(locale: Locale) {
   return primeVueLocales[locale]
 }
 
-export function applyPrimeVueLocale(config: PrimeVueConfiguration, locale: SupportedLocale) {
+export function applyPrimeVueLocale(config: PrimeVueConfiguration, locale: Locale) {
   config.locale = {
     ...config.locale,
     ...primeVueLocale(locale)

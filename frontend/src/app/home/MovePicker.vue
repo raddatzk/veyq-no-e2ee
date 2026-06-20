@@ -32,15 +32,15 @@ async function move(destId: string) {
 
 <template>
   <div class="settings-backdrop" @click.self="emit('close')">
-    <div class="settings-panel">
+    <div class="settings-panel move-picker-panel">
       <div class="settings-head">
         <h2 class="settings-title">{{ t('move.title') }}</h2>
         <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.close') }}</button>
       </div>
-      <ul class="search-results">
+      <ul class="search-results move-target-list">
         <li v-for="d in dests" :key="d.id">
-          <button class="search-hit" :disabled="busy" @click="move(d.id)">
-            <span class="search-hit-icon">{{ d.id === 'root' ? '🏠' : '📁' }}</span>
+          <button class="search-hit move-target-row" :disabled="busy" @click="move(d.id)">
+            <span class="move-target-icon" :class="{ root: d.id === 'root' }" aria-hidden="true"></span>
             <span class="search-hit-name">{{ d.name }}</span>
           </button>
         </li>

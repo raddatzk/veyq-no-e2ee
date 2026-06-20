@@ -120,17 +120,16 @@ async function signOut() {
 
       <template v-if="rememberedLogin">
         <div class="settings-section">{{ t('settings.rememberedLogin') }}</div>
-        <button class="btn btn-ghost settings-row" type="button" style="width: 100%; justify-content: flex-start" @click="forgetRememberedLogin">{{ t('settings.forgetRememberedLogin') }}</button>
+        <button class="btn btn-ghost settings-row settings-action-row" type="button" @click="forgetRememberedLogin">{{ t('settings.forgetRememberedLogin') }}</button>
       </template>
 
       <div class="settings-section">{{ t('settings.security') }}</div>
       <p class="settings-hint">{{ t('settings.rotateIdentityHint') }}</p>
       <div v-if="rotateError" class="auth-msg auth-msg-error">{{ rotateError }}</div>
       <button
-        class="btn btn-ghost settings-row"
+        class="btn btn-ghost settings-row settings-action-row"
+        :class="{ danger: rotateArmed }"
         type="button"
-        style="width: 100%; justify-content: flex-start"
-        :style="{ color: rotateArmed ? 'var(--app-danger)' : undefined }"
         :disabled="rotating"
         @click="rotateIdentityNow"
       >

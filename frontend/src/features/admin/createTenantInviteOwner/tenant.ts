@@ -4,7 +4,7 @@ import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 
-export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
+export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; logoUrl?: string; status: string }
 export type OwnerInvite = { inviteId: string; bootstrapSecret: string; expiresAt: string }
 export type MyScopeGrant = {
   scopeId: string
@@ -25,6 +25,80 @@ export const createTenant = (apiBase: string, token: string, name: string, displ
 
 export const issueOwnerInvite = (apiBase: string, token: string, tenantId: string) =>
   post<OwnerInvite>(apiBase, `/api/tenants/${tenantId}/owner-invite`, token)
+
+export async function uploadTenantLogo(apiBase: string, token: string, tenantId: string, logo: ScaledTenantLogo): Promise<TenantSummary> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/logo`, {
+    method: 'PUT',
+    headers: json(token),
+    body: JSON.stringify({ contentType: logo.contentType, bytes: logo.bytes }),
+  })
+  if (!res.ok) throw await apiError(res, 'upload tenant logo')
+  return res.json()
+}
+
+export async function clearTenantLogo(apiBase: string, token: string, tenantId: string): Promise<TenantSummary> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/logo`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } })
+  if (!res.ok) throw await apiError(res, 'clear tenant logo')
+  return res.json()
+}
+
+export type ScaledTenantLogo = { contentType: 'image/png' | 'image/jpeg' | 'image/webp'; bytes: string; previewUrl: string }
+
+export async function scaleTenantLogo(file: File, maxSide = 512, maxBytes = 512 * 1024): Promise<ScaledTenantLogo> {
+  if (!file.type.startsWith('image/')) throw new Error('Selected file is not an image')
+  const bitmap = await createImageBitmap(file)
+  try {
+    let side = maxSide
+    const png = await encodeScaledBitmap(bitmap, side, 'image/png')
+    if (png.blob.size <= maxBytes) return toScaledTenantLogo(png.blob, 'image/png')
+
+    for (const quality of [0.9, 0.82, 0.74, 0.66]) {
+      const jpg = await encodeScaledBitmap(bitmap, side, 'image/jpeg', quality)
+      if (jpg.blob.size <= maxBytes) return toScaledTenantLogo(jpg.blob, 'image/jpeg')
+    }
+
+    while (side > 128) {
+      side = Math.max(128, Math.floor(side * 0.75))
+      const jpg = await encodeScaledBitmap(bitmap, side, 'image/jpeg', 0.78)
+      if (jpg.blob.size <= maxBytes) return toScaledTenantLogo(jpg.blob, 'image/jpeg')
+    }
+  } finally {
+    bitmap.close()
+  }
+  throw new Error('Logo image is too large')
+}
+
+async function encodeScaledBitmap(bitmap: ImageBitmap, maxSide: number, contentType: ScaledTenantLogo['contentType'], quality?: number): Promise<{ blob: Blob }> {
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not scale logo')
+  if (contentType === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, width, height)
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode logo'))), contentType, quality))
+  return { blob }
+}
+
+async function toScaledTenantLogo(blob: Blob, contentType: ScaledTenantLogo['contentType']): Promise<ScaledTenantLogo> {
+  const bytes = await blobToBase64(blob)
+  return { contentType, bytes, previewUrl: URL.createObjectURL(blob) }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read logo'))
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.readAsDataURL(blob)
+  })
+}
 
 export async function getMyScopeGrant(apiBase: string, token: string, tenantId: string): Promise<MyScopeGrant> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope`, { headers: { authorization: `Bearer ${token}` } })

@@ -1,45 +1,49 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import HomeView from './HomeView.vue'
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import Message from 'primevue/message'
+import ProgressSpinner from 'primevue/progressspinner'
 import TenantView from './TenantView.vue'
-import SettingsView from './SettingsView.vue'
-import UserProfileView from './UserProfileView.vue'
-import { useAuthState } from '../shared/state/useAuthState'
-import { isSettingsPath, memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/paths'
+import { parseHomePath } from '../features/home/homeRoute'
+import { resolveRoute, type ActiveSpace, type LevelEntry } from '../features/home/home'
+import { ensureActiveSpaceForRoute } from '../app/spaces'
+import { session } from '../app/session'
+import { t } from '../i18n/i18n'
 
 const route = useRoute()
-const router = useRouter()
-const { authState } = useAuthState()
-const tenantName = computed(() => authState.activeTenantName || authState.tenants[0]?.name || '')
-const path = computed(() => routePathToMemoryPath(route.params.pathMatch))
-const firstSegment = computed(() => path.value.split('/').filter(Boolean)[0] || '')
-const ownProfileSegment = computed(() => authState.user?.permalink ? `~${authState.user.permalink}` : '')
-const isSettingsRoute = computed(() => isSettingsPath(path.value))
-const ownProfileRedirectPath = computed(() =>
-  tenantName.value && ownProfileSegment.value && firstSegment.value === ownProfileSegment.value
-    ? memoryPathToTenantRoute(tenantName.value, path.value.replace(/^\/~[^/]+/, '/~me'))
-    : ''
-)
-const isProfileRoute = computed(() =>
-  firstSegment.value.startsWith('~') &&
-  firstSegment.value !== '~me' &&
-  firstSegment.value !== ownProfileSegment.value
-)
+const loading = ref(true)
+const error = ref('')
+const active = ref<ActiveSpace | null>(null)
+const folders = ref<LevelEntry[]>([])
+const memory = ref<LevelEntry | null>(null)
 
-watch(
-  ownProfileRedirectPath,
-  (redirectPath) => {
-    if (!redirectPath) return
-    void router.replace({ path: redirectPath, query: route.query, hash: route.hash })
-  },
-  { immediate: true }
-)
+async function resolve() {
+  loading.value = true
+  error.value = ''
+  try {
+    const parsed = parseHomePath(route.path)
+    const space = await ensureActiveSpaceForRoute(parsed)
+    active.value = space
+    const r = await resolveRoute(session.apiBase, session.unlocked!, space, parsed?.segments ?? [])
+    folders.value = r.folders
+    memory.value = r.memory
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => route.path, resolve, { immediate: true })
 </script>
 
 <template>
-  <HomeView v-if="!tenantName" />
-  <SettingsView v-else-if="isSettingsRoute" />
-  <UserProfileView v-else-if="isProfileRoute" />
-  <TenantView v-else />
+  <div class="veyq-page memory-page">
+    <div v-if="loading" class="veyq-loading">
+      <ProgressSpinner class="small-spinner" />
+      <span>{{ t('app.loading') }}</span>
+    </div>
+    <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
+    <TenantView v-else-if="active" :active="active" :folders="folders" :memory="memory" />
+  </div>
 </template>

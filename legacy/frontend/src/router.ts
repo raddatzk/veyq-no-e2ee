@@ -1,15 +1,16 @@
 import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router'
-import { useAuthState } from './shared/state/useAuthState'
-import { useServerState } from './shared/state/useServerState'
+import { serverState } from './serverState'
+import { isUnlocked } from './app/session'
+import { parseInviteHash } from './features/spaces/invite/inviteLink'
+import { parseConfirmEmailHash } from './features/account/emailChange/emailChange'
 import LoginView from './views/LoginView.vue'
 import InviteView from './views/InviteView.vue'
 import EmailConfirmView from './views/EmailConfirmView.vue'
+import ParticipantProfileView from './views/ParticipantProfileView.vue'
 import PublicShareView from './views/PublicShareView.vue'
 import ResetPasswordView from './views/ResetPasswordView.vue'
-import ResetPasskeyView from './views/ResetPasskeyView.vue'
 import SettingsView from './views/SettingsView.vue'
 import SetupView from './views/SetupView.vue'
-import TenantJoinView from './views/TenantJoinView.vue'
 import TenantRouteView from './views/TenantRouteView.vue'
 
 const router = createRouter({
@@ -17,57 +18,41 @@ const router = createRouter({
   routes: [
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/invite/:userId', name: 'invite', component: InviteView },
-    { path: '/join', name: 'tenant-join', component: TenantJoinView },
-    { path: '/join/:token', name: 'tenant-join-legacy', component: TenantJoinView },
+    // Member-invite acceptance — the inviteId + secrets ride the URL fragment (#invite=…&s=…&k=…).
+    { path: '/invite', name: 'invite', component: InviteView },
     { path: '/s/:shareId/:pathMatch(.*)*', name: 'public-share', component: PublicShareView },
-    { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
-    { path: '/passkey/reset/:userId', name: 'passkey-reset', component: ResetPasskeyView },
-    { path: '/email/confirm', name: 'email-confirm', component: EmailConfirmView },
+    { path: '/password/reset', name: 'password-reset', component: ResetPasswordView },
+    // Email-change confirmation — the one-time token rides the URL fragment (#confirm-email=…); token-only.
+    { path: '/account/confirm-email', name: 'confirm-email', component: EmailConfirmView },
     { path: '/server/settings', name: 'server-settings', component: SettingsView },
     { path: '/~me/settings', name: 'user-settings', component: SettingsView },
+    // A participant's profile within the active space (their shared Memories) — requires an unlocked session.
+    { path: '/~user/:linkedUserId', name: 'participant-profile', component: ParticipantProfileView },
     { path: '/:pathMatch(.*)*', name: 'tenant', component: TenantRouteView }
   ]
 })
 
+// Public routes: reachable while locked (no unlocked session). Everything else requires unlock.
+const publicRouteNames = new Set(['login', 'setup', 'invite', 'public-share', 'password-reset', 'confirm-email'])
+
 router.beforeEach((to) => {
-  const { authState } = useAuthState()
-  if (authState.loading) return true
-
+  // An invite link can land on any path with the invite in the fragment — route it to acceptance first.
+  if (parseInviteHash(to.hash) && to.name !== 'invite') return { name: 'invite', hash: to.hash }
+  // Likewise an email-change confirmation link (#confirm-email=…) routes to the confirm view first.
+  if (parseConfirmEmailHash(to.hash) && to.name !== 'confirm-email') return { name: 'confirm-email', hash: to.hash }
   if (visitingAnyPageWithoutSetup(to)) return { name: 'setup' }
-
-  if (visitingAnyPageWithSetupWithoutLogin(to)) {
+  if (visitingSetupPageWithSetup(to)) return '/'
+  if (!isUnlocked() && !publicRouteNames.has(String(to.name ?? ''))) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-
-  if (visitingSetupPageWithSetup(to)) return '/'
-
   return true
 })
 
 function visitingAnyPageWithoutSetup(to: RouteLocationNormalized) {
-  const { serverState } = useServerState()
   return !serverState.setupCompleted && to.name !== 'setup'
 }
 
-function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
-  const { authState } = useAuthState()
-  return (
-    !authState.isAuthenticated &&
-    to.name !== 'login' &&
-    to.name !== 'setup' &&
-    to.name !== 'invite' &&
-    to.name !== 'tenant-join' &&
-    to.name !== 'tenant-join-legacy' &&
-    to.name !== 'public-share' &&
-    to.name !== 'password-reset' &&
-    to.name !== 'passkey-reset' &&
-    to.name !== 'email-confirm'
-  )
-}
-
 function visitingSetupPageWithSetup(to: RouteLocationNormalized) {
-  const { serverState } = useServerState()
   return serverState.setupCompleted && to.name === 'setup'
 }
 

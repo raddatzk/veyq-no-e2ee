@@ -8,7 +8,7 @@ import { b64url } from '../../../shared/base64'
 // Must match the params used to wrap the master key (see setupServer.ts / login.ts).
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
 
-export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
+export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; logoUrl?: string; status: string }
 export type Blob = { suiteId: string; bytes: string }
 export type KemPublicKey = { suiteId: string; kemPublicKey: string }
 export type InviteMetadata = {

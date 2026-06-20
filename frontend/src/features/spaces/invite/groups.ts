@@ -4,7 +4,7 @@
 import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
-import { claimTenantOwnership, createTenant, issueOwnerInvite, type TenantSummary } from '../../admin/createTenantInviteOwner/tenant'
+import { claimTenantOwnership, createTenant, issueOwnerInvite, uploadTenantLogo, type ScaledTenantLogo, type TenantSummary } from '../../admin/createTenantInviteOwner/tenant'
 import { issueMemberInvite, type MemberRole } from '../../admin/inviteMembersRoles/inviteMembers'
 import { buildInviteLink, buildProtectedInviteLink, type ProtectedInviteParts } from './inviteLink'
 import { b64url, fromB64url } from '../../../shared/base64'
@@ -38,15 +38,22 @@ function slugify(name: string): string {
  * A tenant is domain-scoped (the host resolves it), so a domain is required; tests may omit it (derived
  * from the unique handle) but the UI always supplies one.
  */
-export async function createGroup(apiBase: string, session: UnlockedSession, displayName: string, domain?: string): Promise<TenantSummary> {
+export type CreateGroupResult = TenantSummary & { logoUploadError?: string }
+
+export async function createGroup(apiBase: string, session: UnlockedSession, displayName: string, domain?: string, logo?: ScaledTenantLogo): Promise<CreateGroupResult> {
   const base = slugify(displayName)
   for (let attempt = 0; attempt < 25; attempt++) {
     const handle = attempt === 0 ? base : `${base}-${attempt + 1}`
     try {
       const tenant = await createTenant(apiBase, session.sessionToken, handle, displayName.trim(), domain ?? `${handle}.test`)
       const invite = await issueOwnerInvite(apiBase, session.sessionToken, tenant.id)
-      await claimTenantOwnership(apiBase, session.sessionToken, invite.inviteId, invite.bootstrapSecret, session.identityPublicKey.kemPublicKey)
-      return tenant
+      const claimed = await claimTenantOwnership(apiBase, session.sessionToken, invite.inviteId, invite.bootstrapSecret, session.identityPublicKey.kemPublicKey)
+      if (!logo) return claimed
+      try {
+        return await uploadTenantLogo(apiBase, session.sessionToken, tenant.id, logo)
+      } catch (e) {
+        return { ...claimed, logoUploadError: (e as Error).message }
+      }
     } catch (e) {
       const msg = String(e)
       if (!msg.includes('409') && !msg.toLowerCase().includes('exists')) throw e

@@ -30,14 +30,16 @@ async function create() {
 
 <template>
   <div class="settings-backdrop" @click.self="emit('close')">
-    <div class="settings-panel">
-      <div class="settings-head">
+    <div class="settings-panel create-modal-panel">
+      <div class="settings-head create-modal-head">
         <h2 class="settings-title">{{ type === 'FOLDER' ? t('home.createFolder') : t('home.createMemory') }}</h2>
-        <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
       </div>
-      <form class="veyq-form" @submit.prevent="create">
-        <label>{{ t('common.name') }}<input v-model="name" type="text" autofocus /></label>
-        <button class="btn btn-primary" type="submit" :disabled="busy || !name.trim()">{{ t('common.create') }}</button>
+      <form class="veyq-form create-modal-form" @submit.prevent="create">
+        <label class="settings-field">{{ t('common.name') }}<input v-model="name" type="text" autofocus /></label>
+        <div class="veyq-dialog-action-row create-modal-actions">
+          <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" type="submit" :disabled="busy || !name.trim()">{{ t('common.create') }}</button>
+        </div>
       </form>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
     </div>

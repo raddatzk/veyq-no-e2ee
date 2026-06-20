@@ -11,7 +11,7 @@ const emit = defineEmits<{ confirm: [ids: string[], label: string]; cancel: []; 
 const selected = ref<string[]>([...props.selectedIds])
 const label = ref(props.label)
 const single = computed(() => props.kind === 'chapter' || props.kind === 'playlist')
-const icon = computed(() => props.kind === 'track' ? '🛤' : props.kind === 'playlist' ? '🎵' : '🗂')
+const iconClass = computed(() => props.kind === 'track' ? 'veyq-glyph-track' : props.kind === 'playlist' ? 'veyq-glyph-playlist' : 'veyq-glyph-folder')
 const title = computed(() => props.kind === 'track' ? t('journal.trackPickerTitle') : props.kind === 'playlist' ? t('journal.playlistPickerTitle') : t('journal.chapterPickerTitle'))
 
 function toggle(id: string) {
@@ -36,7 +36,7 @@ function toggle(id: string) {
       <ul v-if="items.length" class="search-results">
         <li v-for="it in items" :key="it.id">
           <button class="search-hit" :class="{ selected: selected.includes(it.id) }" type="button" :aria-pressed="selected.includes(it.id)" @click="toggle(it.id)">
-            <span class="search-hit-icon">{{ icon }}</span>
+            <span class="search-hit-icon veyq-glyph" :class="iconClass" aria-hidden="true"></span>
             <span class="search-hit-name">{{ it.name }}</span>
             <span v-if="selected.includes(it.id)" class="journal-picker-check">✓</span>
           </button>

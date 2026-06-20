@@ -14,12 +14,14 @@ defineProps<{
   memories: LevelEntry[]
   folders: LevelEntry[]
   covers: Record<string, string | null>
+  favoriteIds: Set<string>
   compact?: boolean
 }>()
 
 const emit = defineEmits<{
   openMemory: [entry: LevelEntry]
   openFolder: [entry: LevelEntry]
+  toggleFavorite: [entry: LevelEntry]
   create: [type: NodeType]
   openMenu: [entry: LevelEntry]
   dragStart: [entry: LevelEntry, section: Section]
@@ -40,9 +42,12 @@ const emit = defineEmits<{
       :key="m.node.id"
       :name="m.name"
       :cover="covers[m.node.id]"
+      :favorite="favoriteIds.has(m.node.id)"
+      :favorite-label="favoriteIds.has(m.node.id) ? t('memory.unfavorite') : t('memory.favorite')"
       :menu-label="`${t('common.rename')} / ${t('common.move')} / ${t('common.delete')}`"
       :draggable="true"
       @open="emit('openMemory', m)"
+      @toggle-favorite="emit('toggleFavorite', m)"
       @menu="emit('openMenu', m)"
       @drag-start="emit('dragStart', m, 'M')"
       @reorder-drop="emit('reorderDrop', m, 'M')"

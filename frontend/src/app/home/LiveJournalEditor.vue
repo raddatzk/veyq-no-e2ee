@@ -41,22 +41,22 @@ const picker = ref<{ kind: JournalEmbedKind; range: { from: number; to: number }
 const embedMenuOpen = ref(false)
 
 function chipText(e: JournalEmbed): string {
-  if (e.kind === 'media') return `🖼 ${e.label || t('journal.chipMediaCount', { n: e.ids.length })}`
+  if (e.kind === 'media') return `${t('journal.embedKind.media')} · ${e.label || t('journal.chipMediaCount', { n: e.ids.length })}`
   if (e.kind === 'track') {
     const fallback = e.ids.length > 1 ? t('journal.chipTrackCount', { n: e.ids.length }) : (trackName(e.ids[0]) ?? e.ids[0])
-    return `🛤 ${e.label || fallback}`
+    return `${t('journal.embedKind.track')} · ${e.label || fallback}`
   }
-  if (e.kind === 'playlist') return `🎵 ${e.label || playlistName(e.ids[0]) || e.ids[0]}`
-  return `🗂 ${e.label || chapterName(e.ids[0]) || e.ids[0]}`
+  if (e.kind === 'playlist') return `${t('journal.embedKind.playlist')} · ${e.label || playlistName(e.ids[0]) || e.ids[0]}`
+  return `${t('journal.embedKind.chapter')} · ${e.label || chapterName(e.ids[0]) || e.ids[0]}`
 }
 function typeLabels(): Record<JournalEmbedKind, string> {
   return { media: t('journal.embedKind.media'), track: t('journal.embedKind.track'), chapter: t('journal.embedKind.chapter'), playlist: t('journal.embedKind.playlist') }
 }
-const embedOptions = computed<{ kind: JournalEmbedKind; icon: string; label: string }[]>(() => [
-  { kind: 'media', icon: '🖼', label: t('journal.embedKind.media') },
-  { kind: 'track', icon: '🛤', label: t('journal.embedKind.track') },
-  { kind: 'chapter', icon: '🗂', label: t('journal.embedKind.chapter') },
-  { kind: 'playlist', icon: '🎵', label: t('journal.embedKind.playlist') },
+const embedOptions = computed<{ kind: JournalEmbedKind; iconClass: string; label: string }[]>(() => [
+  { kind: 'media', iconClass: 'veyq-glyph-memory', label: t('journal.embedKind.media') },
+  { kind: 'track', iconClass: 'veyq-glyph-track', label: t('journal.embedKind.track') },
+  { kind: 'chapter', iconClass: 'veyq-glyph-folder', label: t('journal.embedKind.chapter') },
+  { kind: 'playlist', iconClass: 'veyq-glyph-playlist', label: t('journal.embedKind.playlist') },
 ])
 function openInsert(kind: JournalEmbedKind, from: number, to: number) {
   embedMenuOpen.value = false
@@ -223,7 +223,7 @@ function close() {
         </button>
         <div v-if="embedMenuOpen" class="journal-embed-menu-pop" role="menu" @click.self="embedMenuOpen = false">
           <button v-for="option in embedOptions" :key="option.kind" class="btn btn-ghost journal-embed-option" type="button" role="menuitem" @click="insertAtCursor(option.kind)">
-            <span class="journal-embed-option-icon" aria-hidden="true">{{ option.icon }}</span>
+            <span class="journal-embed-option-icon veyq-glyph" :class="option.iconClass" aria-hidden="true"></span>
             <span class="journal-embed-option-label">{{ option.label }}</span>
           </button>
         </div>

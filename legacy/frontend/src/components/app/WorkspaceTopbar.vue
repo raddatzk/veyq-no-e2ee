@@ -1,260 +1,122 @@
 <script setup lang="ts">
+// Global search topbar. Names are sealed (server-blind), so search is a CLIENT operation: load the active
+// space's node graph, decode names, substring-match (searchNodes). A hit navigates by resolving its ancestor
+// slug chain into a home path. The memory breadcrumb now lives in TenantView; old tenant search is gone.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import Button from 'primevue/button'
-import Breadcrumb from 'primevue/breadcrumb'
-import { API_BASE } from '../../shared/api/httpClient'
-import { memoryPathToTenantRoute } from '../../shared/utils/paths'
-import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
-import { workspaceToolbar } from '../../composables/useWorkspaceToolbar'
-import { searchTenant, type SearchResultSummary } from '../../features/memories/api'
-import UploadStatusMenu from '../../features/memories/components/UploadStatusMenu.vue'
-import CapabilityNotice from './CapabilityNotice.vue'
-import { useAuthState } from '../../shared/state/useAuthState'
+import { useRouter } from 'vue-router'
+import { searchNodes, type SearchHit } from '../../features/search/search'
+import { ancestorChain } from '../../features/home/home'
+import { buildHomePath } from '../../features/home/homeRoute'
+import { session } from '../../app/session'
+import { t } from '../../i18n/i18n'
+import UploadStatusMenu from './UploadStatusMenu.vue'
 
-const { t } = useI18n()
-const route = useRoute()
 const router = useRouter()
-const { authState } = useAuthState()
-const { fallbackBreadcrumb } = useBreadcrumbs()
-const fallbackBreadcrumbs = computed(() => [fallbackBreadcrumb.value])
-const items = computed(() =>
-  workspaceToolbar.active ? workspaceToolbar.breadcrumbs : fallbackBreadcrumbs.value
-)
-const actions = computed(() => (workspaceToolbar.active ? workspaceToolbar.actions : []))
-const searchRoot = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
-const searchOpen = ref(false)
-const searchQuery = ref('')
-const searchResults = ref<SearchResultSummary[]>([])
-const searchLoading = ref(false)
-const searchError = ref('')
+const query = ref('')
+const results = ref<SearchHit[]>([])
+const loading = ref(false)
 const selectedIndex = ref(0)
-let searchTimer: number | null = null
-let searchSequence = 0
+let timer: number | null = null
+let sequence = 0
 
-const currentTenantName = computed(() => {
-  if (route.name !== 'tenant') return ''
-  return authState.activeTenantName || authState.tenants[0]?.name || ''
-})
-const searchEnabled = computed(() => currentTenantName.value.length > 0)
-const shortcutLabel = computed(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'))
-const trimmedQuery = computed(() => searchQuery.value.trim())
-const showSearchEmpty = computed(
-  () => trimmedQuery.value.length >= 2 && !searchLoading.value && !searchError.value && searchResults.value.length === 0
-)
+const enabled = computed(() => session.activeSpace !== null)
+const trimmed = computed(() => query.value.trim())
 
-watch(searchQuery, () => {
-  if (searchTimer) window.clearTimeout(searchTimer)
-  searchError.value = ''
-  if (trimmedQuery.value.length < 2 || !searchEnabled.value) {
-    searchResults.value = []
-    searchLoading.value = false
-    selectedIndex.value = 0
+watch(query, () => {
+  if (timer) window.clearTimeout(timer)
+  if (trimmed.value.length < 2 || !enabled.value) {
+    results.value = []
+    loading.value = false
     return
   }
-  searchLoading.value = true
-  searchTimer = window.setTimeout(() => {
-    void runSearch()
-  }, 220)
+  loading.value = true
+  timer = window.setTimeout(() => void run(), 220)
 })
 
-watch(searchResults, () => {
-  selectedIndex.value = searchResults.value.length > 0 ? 0 : -1
-})
-
-onMounted(() => {
-  document.addEventListener('keydown', handleGlobalKeydown)
-  document.addEventListener('pointerdown', handlePointerDown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleGlobalKeydown)
-  document.removeEventListener('pointerdown', handlePointerDown)
-  if (searchTimer) window.clearTimeout(searchTimer)
-})
-
-function openSearch() {
-  if (!searchEnabled.value) return
-  searchOpen.value = true
-  void nextTick(() => searchInput.value?.focus())
-}
-
-function closeSearch() {
-  searchOpen.value = false
-  searchError.value = ''
-}
-
-async function runSearch() {
-  if (!searchEnabled.value || trimmedQuery.value.length < 2) return
-  const sequence = ++searchSequence
-  searchLoading.value = true
-  searchError.value = ''
+async function run() {
+  const active = session.activeSpace
+  if (!active || trimmed.value.length < 2) return
+  const seq = ++sequence
   try {
-    const results = await searchTenant(currentTenantName.value, trimmedQuery.value, 20)
-    if (sequence !== searchSequence) return
-    searchResults.value = results
+    const hits = await searchNodes(session.apiBase, session.unlocked!, active, trimmed.value)
+    if (seq !== sequence) return
+    results.value = hits
+    selectedIndex.value = hits.length ? 0 : -1
   } catch {
-    if (sequence !== searchSequence) return
-    searchResults.value = []
-    searchError.value = t('navigation.searchFailed')
+    if (seq === sequence) results.value = []
   } finally {
-    if (sequence === searchSequence) searchLoading.value = false
+    if (seq === sequence) loading.value = false
   }
 }
 
-function handleGlobalKeydown(event: KeyboardEvent) {
-  const isShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k'
-  if (!isShortcut) return
-  event.preventDefault()
-  openSearch()
+async function openResult(hit: SearchHit) {
+  const active = session.activeSpace
+  if (!active) return
+  const chain = await ancestorChain(session.apiBase, session.unlocked!, active, hit.id)
+  query.value = ''
+  results.value = []
+  void router.push(buildHomePath(active.entry, chain.map((c) => c.slug)))
 }
 
-function handlePointerDown(event: PointerEvent) {
-  if (!searchOpen.value) return
-  const root = searchRoot.value
-  if (root && event.target instanceof Node && !root.contains(event.target)) closeSearch()
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') { query.value = ''; results.value = []; return }
+  if (!results.value.length) return
+  if (event.key === 'ArrowDown') { event.preventDefault(); selectedIndex.value = (selectedIndex.value + 1) % results.value.length }
+  else if (event.key === 'ArrowUp') { event.preventDefault(); selectedIndex.value = (selectedIndex.value - 1 + results.value.length) % results.value.length }
+  else if (event.key === 'Enter' && selectedIndex.value >= 0) { event.preventDefault(); void openResult(results.value[selectedIndex.value]) }
 }
 
-function handleSearchFocusout(event: FocusEvent) {
-  if (!searchOpen.value) return
-  const root = searchRoot.value
-  const nextTarget = event.relatedTarget
-  if (root && nextTarget instanceof Node && root.contains(nextTarget)) return
-  closeSearch()
-}
-
-function handleSearchKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
+function onGlobalKeydown(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    closeSearch()
-    return
-  }
-  if (!searchResults.value.length) return
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    selectedIndex.value = (selectedIndex.value + 1) % searchResults.value.length
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    selectedIndex.value =
-      (selectedIndex.value - 1 + searchResults.value.length) % searchResults.value.length
-  } else if (event.key === 'Enter' && selectedIndex.value >= 0) {
-    event.preventDefault()
-    openResult(searchResults.value[selectedIndex.value])
+    void nextTick(() => searchInput.value?.focus())
   }
 }
 
-function openResult(result: SearchResultSummary) {
-  if (!searchEnabled.value) return
-  closeSearch()
-  searchQuery.value = ''
-  searchResults.value = []
-  void router.push(memoryPathToTenantRoute(currentTenantName.value, result.path))
-}
-
-function resultIcon(result: SearchResultSummary): string {
-  return result.kind === 'MEMORY' ? 'pi pi-images' : 'pi pi-folder'
-}
-
-function resultKindLabel(result: SearchResultSummary): string {
-  return result.kind === 'MEMORY' ? t('memory.title') : t('memory.folders')
-}
-
-function coverUrl(result: SearchResultSummary): string {
-  return result.coverUrl ? `${API_BASE}${result.coverUrl}` : ''
-}
-
-function isMacPlatform(): boolean {
-  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-}
+onMounted(() => document.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKeydown)
+  if (timer) window.clearTimeout(timer)
+})
 </script>
 
 <template>
   <header class="workspace-topbar">
-    <Breadcrumb :model="items" class="app-breadcrumb" />
-    <div
-      ref="searchRoot"
-      class="workspace-search"
-      :class="{ 'workspace-search-open': searchOpen }"
-      @focusout="handleSearchFocusout"
-    >
-      <label
-        class="workspace-topbar-center"
-        :aria-label="t('navigation.globalSearch')"
-        data-testid="workspace-search-trigger"
-        :class="{ 'workspace-topbar-center-disabled': !searchEnabled, 'workspace-topbar-center-open': searchOpen }"
-        @click="openSearch"
-      >
-        <span class="pi pi-search" />
-        <input
-          ref="searchInput"
-          v-model="searchQuery"
-          type="search"
-          :disabled="!searchEnabled"
-          :placeholder="t('navigation.searchPlaceholder')"
-          autocomplete="off"
-          @focus="openSearch"
-          @keydown="handleSearchKeydown"
-        />
-        <kbd>{{ shortcutLabel }}</kbd>
-      </label>
-      <div v-if="searchOpen" class="workspace-search-panel" role="listbox" :aria-label="t('navigation.globalSearch')">
-        <div class="workspace-search-results" role="listbox">
-          <p v-if="trimmedQuery.length < 2" class="workspace-search-state">
-            {{ t('navigation.searchMinLength') }}
-          </p>
-          <p v-else-if="searchLoading" class="workspace-search-state">
-            {{ t('navigation.searchLoading') }}
-          </p>
-          <p v-else-if="searchError" class="workspace-search-state workspace-search-state-error">
-            {{ searchError }}
-          </p>
-          <p v-else-if="showSearchEmpty" class="workspace-search-state">
-            {{ t('navigation.searchEmpty') }}
-          </p>
-          <template v-else>
-            <button
-              v-for="(result, index) in searchResults"
-              :key="`${result.kind}-${result.id}`"
-              class="workspace-search-result"
-              :class="{ 'workspace-search-result-active': index === selectedIndex }"
-              type="button"
-              tabindex="-1"
-              role="option"
-              :aria-selected="index === selectedIndex"
-              @mouseenter="selectedIndex = index"
-              @click="openResult(result)"
-            >
-              <img v-if="coverUrl(result)" :src="coverUrl(result)" alt="" />
-              <span v-else class="workspace-search-result-icon" :class="resultIcon(result)" />
-              <span class="workspace-search-result-text">
-                <strong>{{ result.displayName }}</strong>
-                <small>{{ result.path }}</small>
-                <small v-if="result.journalSnippet">{{ result.journalSnippet }}</small>
-              </span>
-              <span class="workspace-search-result-kind">{{ resultKindLabel(result) }}</span>
-            </button>
-          </template>
-        </div>
-      </div>
+    <div class="workspace-search">
+      <span class="pi pi-search" />
+      <input
+        ref="searchInput"
+        v-model="query"
+        class="workspace-search-input"
+        type="search"
+        :placeholder="t('search.placeholder')"
+        :disabled="!enabled"
+        @keydown="onKeydown"
+      />
+      <ul v-if="results.length" class="search-results">
+        <li v-for="(hit, index) in results" :key="hit.id">
+          <button type="button" class="search-result" :class="{ active: index === selectedIndex }" @click="openResult(hit)">
+            <span :class="hit.type === 'FOLDER' ? 'pi pi-folder' : 'pi pi-images'" />
+            <span class="search-result-name">{{ hit.name }}</span>
+            <small>{{ hit.type === 'FOLDER' ? t('search.folder') : t('search.memory') }}</small>
+          </button>
+        </li>
+      </ul>
+      <p v-else-if="trimmed.length >= 2 && !loading" class="search-empty">{{ t('search.nothing') }}</p>
     </div>
-    <div class="workspace-topbar-actions">
-      <CapabilityNotice />
-      <UploadStatusMenu />
-      <div v-if="actions.length" class="workspace-actions">
-        <Button
-          v-for="action in actions"
-          :key="action.key"
-          class="workspace-action-button"
-          :icon="action.icon"
-          :aria-label="action.label"
-          :severity="action.severity"
-          :outlined="action.outlined"
-          size="small"
-          @click="action.command"
-        />
-      </div>
-    </div>
+    <UploadStatusMenu />
   </header>
 </template>
+
+<style scoped>
+.workspace-topbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; }
+.workspace-search { position: relative; display: flex; align-items: center; gap: 0.5rem; width: min(100%, 520px); border: 1px solid var(--p-content-border-color, rgba(127,127,127,0.25)); border-radius: 10px; padding: 0.35rem 0.6rem; }
+.workspace-search-input { flex: 1; border: none; background: none; color: inherit; outline: none; font: inherit; }
+.search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; list-style: none; margin: 0; padding: 0.25rem; background: var(--p-content-background, #1e1e1e); border: 1px solid var(--p-content-border-color, rgba(127,127,127,0.25)); border-radius: 10px; max-height: 60vh; overflow: auto; }
+.search-result { display: flex; align-items: center; gap: 0.6rem; width: 100%; background: none; border: none; padding: 0.5rem; border-radius: 8px; cursor: pointer; color: inherit; text-align: left; }
+.search-result.active, .search-result:hover { background: var(--p-content-border-color, rgba(127,127,127,0.15)); }
+.search-result-name { flex: 1; }
+.search-result small { opacity: 0.6; }
+.search-empty { position: absolute; top: calc(100% + 4px); left: 0; padding: 0.5rem 0.75rem; opacity: 0.6; }
+</style>

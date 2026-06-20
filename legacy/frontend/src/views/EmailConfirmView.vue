@@ -1,42 +1,37 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+// Email-change confirmation landing. The link in the email (#confirm-email=<token>) is token-only, so this
+// works whether or not the visitor is logged in. On success, if a session is unlocked in THIS tab, refresh
+// its cached user so the new email shows immediately.
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import { tenants } from '../api/tenantClient'
-import { confirmMyEmailChange } from '../features/settings/api'
-import { useAuthState } from '../shared/state/useAuthState'
-import { getErrorMessage } from '../shared/utils/errors'
+import { confirmEmailChange, parseConfirmEmailHash } from '../features/account/emailChange/emailChange'
+import { session, isUnlocked } from '../app/session'
+import { t } from '../i18n/i18n'
 
-const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
-const { authState, setAuthenticated } = useAuthState()
-
+const token = parseConfirmEmailHash(window.location.hash)
 const loading = ref(true)
 const error = ref('')
 const confirmedEmail = ref('')
-const token = computed(() => route.hash.replace(/^#/, ''))
 
-onMounted(confirmEmail)
+onMounted(confirm)
 
-async function confirmEmail() {
-  loading.value = true
-  error.value = ''
-  if (!token.value) {
-    error.value = t('settings.emailConfirmInvalid')
+async function confirm() {
+  if (!token) {
+    error.value = t('emailChange.confirmInvalid')
     loading.value = false
     return
   }
   try {
-    const user = await confirmMyEmailChange(token.value)
-    setAuthenticated(user, await tenants())
+    const user = await confirmEmailChange(session.apiBase, token)
     confirmedEmail.value = user.email
-  } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, t('settings.emailConfirmFailed'))
+    if (session.unlocked) session.unlocked.user = user // refresh the cached user in this tab
+  } catch {
+    error.value = t('emailChange.confirmFailed')
   } finally {
     loading.value = false
   }
@@ -45,25 +40,32 @@ async function confirmEmail() {
 
 <template>
   <Card class="login-card">
-    <template #title>{{ t('settings.emailConfirmTitle') }}</template>
+    <template #title>{{ t('emailChange.confirmTitle') }}</template>
     <template #content>
       <div v-if="loading" class="veyq-loading">
         <ProgressSpinner class="small-spinner" />
-        <span>{{ t('settings.emailConfirmLoading') }}</span>
+        <span>{{ t('emailChange.confirmLoading') }}</span>
       </div>
-      <Message v-else-if="error" severity="error" :closable="false" class="form-message">
-        {{ error }}
-      </Message>
+      <Message v-else-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
       <Message v-else severity="success" :closable="false" class="form-message">
-        {{ t('settings.emailConfirmSuccess', { email: confirmedEmail }) }}
+        {{ t('emailChange.confirmSuccess', { email: confirmedEmail }) }}
       </Message>
       <div class="veyq-button-row">
         <Button
+          v-if="isUnlocked()"
           type="button"
-          :label="t('settings.emailConfirmButton')"
-          icon="pi pi-user"
-          :disabled="loading || !authState.isAuthenticated"
-          @click="router.push('/~me')"
+          :label="t('emailChange.confirmContinue')"
+          icon="pi pi-arrow-right"
+          :disabled="loading"
+          @click="router.push('/')"
+        />
+        <Button
+          v-else
+          type="button"
+          :label="t('auth.login')"
+          icon="pi pi-sign-in"
+          :disabled="loading"
+          @click="router.push({ name: 'login' })"
         />
       </div>
     </template>

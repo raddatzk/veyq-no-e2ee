@@ -87,7 +87,7 @@ async function saveEdit(s: ShareSummary) {
 
 <template>
   <div class="settings-backdrop" @click.self="emit('close')">
-    <div class="settings-panel">
+    <div class="settings-panel share-panel">
       <div class="settings-head">
         <h2 class="settings-title">{{ t('share.share') }} · {{ name }}</h2>
         <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.close') }}</button>
@@ -131,7 +131,10 @@ async function saveEdit(s: ShareSummary) {
         <ul class="track-list">
           <li v-for="s in shares" :key="s.shareId" class="share-li">
             <div class="track-row">
-              <span class="track-name">{{ s.passwordProtected ? '🔒' : '🔗' }} {{ s.label || s.shareId.slice(0, 8) + '…' }}<small v-if="s.expiresAt" class="share-exp"> · {{ t('share.until') }} {{ new Date(s.expiresAt).toLocaleDateString() }}</small></span>
+              <span class="track-name">
+                <span class="share-status-icon" :class="{ locked: s.passwordProtected }" aria-hidden="true"></span>
+                {{ s.label || s.shareId.slice(0, 8) + '…' }}<small v-if="s.expiresAt" class="share-exp"> · {{ t('share.until') }} {{ new Date(s.expiresAt).toLocaleDateString() }}</small>
+              </span>
               <button class="btn btn-ghost track-del" type="button" @click="editId === s.shareId ? (editId = '') : startEdit(s)">{{ t('share.edit') }}</button>
               <button class="btn btn-ghost track-del" type="button" @click="revoke(s.shareId)">{{ t('share.revoke') }}</button>
             </div>

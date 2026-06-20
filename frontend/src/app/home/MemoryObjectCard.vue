@@ -8,6 +8,8 @@ defineProps<{
   name: string
   cover?: string | null
   menuLabel?: string
+  favorite?: boolean
+  favoriteLabel?: string
   draggable?: boolean
   placeholderClass?: string
 }>()
@@ -15,6 +17,7 @@ defineProps<{
 const emit = defineEmits<{
   open: []
   menu: []
+  toggleFavorite: []
   dragStart: [event: DragEvent]
   reorderDrop: [event: DragEvent]
 }>()
@@ -33,13 +36,24 @@ const emit = defineEmits<{
     >
       <img v-if="cover" class="memory-cover" :src="cover" alt="" />
       <div v-else class="memory-cover placeholder" :class="placeholderClass">
-        <slot name="placeholder">...</slot>
+        <slot name="placeholder"></slot>
       </div>
       <div class="memory-label">
         <div class="memory-name">{{ name }}</div>
         <slot name="meta" />
       </div>
     </VeyqCardButton>
+    <VeyqIconButton
+      v-if="favoriteLabel"
+      class="card-favorite"
+      :class="{ active: favorite }"
+      :aria-label="favoriteLabel"
+      :title="favoriteLabel"
+      :aria-pressed="favorite"
+      @click.stop="emit('toggleFavorite')"
+    >
+      {{ favorite ? '★' : '☆' }}
+    </VeyqIconButton>
     <VeyqIconButton
       v-if="menuLabel"
       class="card-more"

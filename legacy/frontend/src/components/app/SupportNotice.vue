@@ -1,66 +1,61 @@
 <script setup lang="ts">
+// A dismissible "support this instance" banner. The operator sets veyq.app.support-url; the server surfaces
+// it on /api/setup as supportUrl. Dismissal is client-side (localStorage) and re-shows after 90 days, keyed
+// by server version so a new release can re-surface it. Low-sensitivity, same-origin config only.
 import { onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import { useI18n } from 'vue-i18n'
-import { getServerSettings, type ServerSettingsResponse } from '../../features/settings/api'
+import { getSetupStatus } from '../../features/account/instance/instance'
+import { session } from '../../app/session'
+import { t } from '../../i18n/i18n'
 
-const SUPPORT_NOTICE_DAYS = 90
-const SUPPORT_NOTICE_MS = SUPPORT_NOTICE_DAYS * 24 * 60 * 60 * 1000
+const SUPPORT_NOTICE_MS = 90 * 24 * 60 * 60 * 1000
 
-const { t } = useI18n()
-const settings = ref<ServerSettingsResponse | null>(null)
+const supportUrl = ref('')
 const visible = ref(false)
 
-onMounted(loadSupportNotice)
+onMounted(load)
 
-async function loadSupportNotice() {
+async function load() {
   try {
-    const response = await getServerSettings()
-    settings.value = response
-    visible.value = Boolean(response.support?.url) && shouldShow(response)
+    const status = await getSetupStatus(session.apiBase)
+    const key = storageKey(status.serverVersion)
+    supportUrl.value = status.supportUrl ?? ''
+    visible.value = Boolean(supportUrl.value) && shouldShow(key)
   } catch {
-    settings.value = null
     visible.value = false
   }
 }
 
 function dismiss() {
-  const current = settings.value
-  if (!current) return
-  window.localStorage.setItem(storageKey(current), String(Date.now()))
+  if (!supportUrl.value) return
+  window.localStorage.setItem(storageKey(currentVersion.value), String(Date.now()))
   visible.value = false
 }
 
-function shouldShow(response: ServerSettingsResponse): boolean {
-  const dismissedAt = Number(window.localStorage.getItem(storageKey(response)) || 0)
-  return !dismissedAt || Date.now() - dismissedAt >= SUPPORT_NOTICE_MS
+const currentVersion = ref('')
+function storageKey(version?: string): string {
+  currentVersion.value = version || 'unversioned'
+  return `veyq:support-notice-dismissed:${currentVersion.value}`
 }
 
-function storageKey(response: ServerSettingsResponse): string {
-  const versionKey = response.license.version || response.license.revision || 'unversioned'
-  return `veyq:support-notice-dismissed:${versionKey}`
+function shouldShow(key: string): boolean {
+  const dismissedAt = Number(window.localStorage.getItem(key) || 0)
+  return !dismissedAt || Date.now() - dismissedAt >= SUPPORT_NOTICE_MS
 }
 </script>
 
 <template>
-  <section v-if="visible && settings?.support" class="support-notice" aria-live="polite">
+  <section v-if="visible" class="support-notice" aria-live="polite">
     <div>
       <strong>{{ t('support.noticeTitle') }}</strong>
       <span>{{ t('support.noticeCopy') }}</span>
     </div>
     <div class="support-notice-actions">
-      <a class="veyq-support-button" :href="settings.support.url" target="_blank" rel="noreferrer">
+      <a class="veyq-support-button" :href="supportUrl" target="_blank" rel="noreferrer">
         <span class="pi pi-heart" />
         <span>{{ t('support.action') }}</span>
       </a>
-      <Button
-        type="button"
-        severity="secondary"
-        text
-        size="small"
-        :label="t('support.dismiss')"
-        @click="dismiss"
-      />
+      <Button type="button" severity="secondary" text size="small" :label="t('support.dismiss')" @click="dismiss" />
     </div>
   </section>
 </template>

@@ -1,379 +1,148 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { toDataURL } from 'qrcode'
+// Accept a member invite. The invite id + bootstrap secret + one-time temp private key ride the URL FRAGMENT
+// (/#invite=…&s=…&k=… or ek/ps for a passphrase-protected link) and never reach the server. A signed-in user
+// joins (re-wraps the scope grant to their identity); a brand-new invitee registers (account + grant) and gets
+// an Emergency Kit. Mirrors the greenfield AcceptInvitePanel.
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
-import PasskeyNameDialog from '../components/auth/PasskeyNameDialog.vue'
-import RegistrationPrivacyOptIns from '../components/auth/RegistrationPrivacyOptIns.vue'
-import { acceptInvitation, acceptInvitationWithPasskey, invitationMetadata } from '../api/invitationClient'
-import { bootstrap } from '../api/entrypointClient'
-import {
-  createTotpEnrollment,
-  enableTotp,
-  listMyPasskeys,
-  updateMyPasskey,
-  type PasskeySummary,
-  type TotpEnrollmentResponse
-} from '../features/settings/api'
-import { useAuthState } from '../shared/state/useAuthState'
-import { getErrorMessage } from '../shared/utils/errors'
+import { getInviteMetadata, type InviteMetadata } from '../features/account/registerViaInvitation/registerViaInvitation'
+import { acceptMemberInvite, registerViaMemberInvite } from '../features/admin/inviteMembersRoles/inviteMembers'
+import { unprotectTempKey } from '../features/spaces/invite/groups'
+import { isProtectedInvite, parseInviteHash, type ParsedInvite } from '../features/spaces/invite/inviteLink'
+import { login } from '../features/account/login/login'
+import { downloadKitPdf } from '../features/account/emergencyKit/emergencyKit'
+import { usePwnedWarning } from '../features/account/passwordWarning'
+import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
+import { isUnlocked, session, setUnlocked } from '../app/session'
+import { t } from '../i18n/i18n'
 
-const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
-const { authState, setAuthenticated } = useAuthState()
-const displayName = ref('')
-const invitedEmail = ref('')
-const inviteRequiresLogin = ref(false)
-const password = ref('')
+const invite = ref<ParsedInvite | null>(parseInviteHash(window.location.hash))
+const needsPassphrase = invite.value ? isProtectedInvite(invite.value) : false
+const passphrase = ref('')
+
+const meta = ref<InviteMetadata | null>(null)
 const error = ref('')
-const loading = ref(false)
-const savingPasskeyName = ref(false)
-const namingPasskey = ref<PasskeySummary | null>(null)
-const pendingRedirect = ref('/')
-const authMethod = ref<'passkey' | 'password'>('passkey')
-const showPrivacyOptIns = ref(false)
-const showTotpSetup = ref(false)
-const totpEnrollment = ref<TotpEnrollmentResponse | null>(null)
-const totpQrCodeUrl = ref('')
-const totpCode = ref('')
-const showTotpManualSetup = ref(false)
-const savingTotp = ref(false)
-const needsPrivacyOptIn = ref(false)
-const userId = computed(() => Number(route.params.userId))
-const token = computed(() => route.hash.replace(/^#/, ''))
-const requiresPassword = computed(() => !authState.isAuthenticated)
-const canSubmitInvite = computed(() => {
-  if (loading.value) return false
-  if (!requiresPassword.value || inviteRequiresLogin.value) return true
-  if (!displayName.value.trim()) return false
-  if (authMethod.value === 'password' && !password.value) return false
-  return true
-})
-const newPasswordInputProps: Record<string, string> = {
-  name: 'password',
-  autocomplete: 'new-password',
-  passwordrules: 'minlength: 10;'
+const busy = ref(false)
+const email = ref('')
+const displayName = ref('')
+const password = ref('')
+const { breachCount } = usePwnedWarning(password)
+const kit = ref<string | null>(null)
+
+/** Resolve the temp private key for accept/register; throws on a wrong passphrase. */
+function tempKey(): string {
+  const inv = invite.value!
+  return isProtectedInvite(inv) ? unprotectTempKey(inv, passphrase.value) : inv.tempPrivateKey
 }
 
-onMounted(() => {
-  void loadInvitationMetadata()
+onMounted(async () => {
+  if (!invite.value) {
+    error.value = t('accept.failed')
+    return
+  }
+  try {
+    meta.value = await getInviteMetadata(session.apiBase, invite.value.inviteId)
+  } catch {
+    error.value = t('accept.failed')
+  }
 })
 
-async function loadInvitationMetadata() {
-  if (!requiresPassword.value) return
-  if (!Number.isInteger(userId.value) || !token.value) return
+const roleLabel = (role?: string) => (role === 'Owner' ? t('invite.owner') : t('invite.member'))
+
+async function join() {
+  if (!isUnlocked() || !invite.value) return
+  busy.value = true
+  error.value = ''
   try {
-    const metadata = await invitationMetadata(userId.value, token.value)
-    invitedEmail.value = metadata.email
-    inviteRequiresLogin.value = Boolean(metadata.requiresLogin)
+    await acceptMemberInvite(session.apiBase, session.unlocked!, invite.value.inviteId, invite.value.bootstrapSecret, tempKey())
+    await router.push('/')
   } catch {
-    invitedEmail.value = ''
-    inviteRequiresLogin.value = false
-  }
-}
-
-async function submit() {
-  error.value = ''
-  if (!Number.isInteger(userId.value) || !token.value) {
-    error.value = t('auth.invalidInviteLink')
-    return
-  }
-  const inviteDisplayName = displayName.value.trim()
-  if (inviteRequiresLogin.value) {
-    await router.push({ name: 'login', query: { redirect: route.fullPath } })
-    return
-  }
-  if (requiresPassword.value && !inviteDisplayName) {
-    error.value = t('auth.displayNameRequired')
-    return
-  }
-  if (requiresPassword.value && authMethod.value === 'password' && !password.value) {
-    error.value = t('auth.passwordRequired')
-    return
-  }
-  const createsAccount = requiresPassword.value
-  const withPasskey = createsAccount && authMethod.value === 'passkey'
-  loading.value = true
-  try {
-    if (!createsAccount) {
-      await acceptInvitation(userId.value, token.value)
-    } else if (withPasskey) {
-      await acceptInvitationWithPasskey(userId.value, token.value, inviteDisplayName)
-    } else {
-      await acceptInvitation(userId.value, token.value, password.value, inviteDisplayName)
-    }
-    const entrypoint = await bootstrap()
-    if (entrypoint.user) {
-      setAuthenticated(entrypoint.user, entrypoint.tenants)
-      pendingRedirect.value = '/'
-      needsPrivacyOptIn.value = createsAccount
-      if (withPasskey) {
-        await showLatestPasskeyNameDialog()
-      } else if (createsAccount) {
-        await showInvitationTotpSetup()
-      } else {
-        await finishInvite()
-      }
-    }
-  } catch (caught) {
-    if (!authState.isAuthenticated && getErrorMessage(caught, '').includes(t('auth.loggedInRequiredMarker'))) {
-      await router.push({ name: 'login', query: { redirect: route.fullPath } })
-      return
-    }
-    error.value = getErrorMessage(caught, t('auth.inviteAcceptFailed'))
+    error.value = needsPassphrase ? t('accept.wrongPassphrase') : t('accept.failed')
   } finally {
-    loading.value = false
+    busy.value = false
   }
 }
 
-async function showInvitationTotpSetup() {
-  showTotpSetup.value = true
-  showTotpManualSetup.value = false
-  totpCode.value = ''
-  try {
-    const enrollment = await createTotpEnrollment()
-    totpEnrollment.value = enrollment
-    totpQrCodeUrl.value = await toDataURL(enrollment.provisioningUri, {
-      errorCorrectionLevel: 'M',
-      margin: 4,
-      width: 240
-    })
-  } catch (caught) {
-    error.value = getErrorMessage(caught, t('auth.inviteTotpSetupFailed'))
-  }
-}
-
-async function submitTotpSetup() {
-  if (!totpEnrollment.value) return
-  savingTotp.value = true
+async function register() {
+  if (password.value.length < MIN_PASSWORD_LENGTH || !invite.value) return
+  busy.value = true
   error.value = ''
   try {
-    const user = await enableTotp(password.value, totpEnrollment.value.secret, totpCode.value)
-    if (authState.user?.userId === user.userId) {
-      authState.user.totpEnabled = user.totpEnabled
-    }
-    password.value = ''
-    await skipTotpSetup()
-  } catch (caught) {
-    error.value = getErrorMessage(caught, t('profile.totpEnableFailed'))
-  } finally {
-    savingTotp.value = false
-  }
-}
-
-async function skipTotpSetup() {
-  showTotpSetup.value = false
-  totpEnrollment.value = null
-  totpQrCodeUrl.value = ''
-  totpCode.value = ''
-  showTotpManualSetup.value = false
-  password.value = ''
-  await continueAfterRegistration()
-}
-
-async function showLatestPasskeyNameDialog() {
-  try {
-    const summary = await listMyPasskeys()
-    namingPasskey.value = summary.passkeys[0] ?? null
+    const res = await registerViaMemberInvite(session.apiBase, invite.value.inviteId, invite.value.bootstrapSecret, tempKey(), email.value, displayName.value, password.value)
+    kit.value = res.emergencyKit.secretKey
   } catch {
-    namingPasskey.value = null
-  }
-  if (!namingPasskey.value) await finishInvite()
-}
-
-async function saveInvitePasskeyName(displayName: string) {
-  if (!namingPasskey.value) return
-  savingPasskeyName.value = true
-  error.value = ''
-  try {
-    await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
-    namingPasskey.value = null
-    await continueAfterRegistration()
-  } catch (caught) {
-    error.value = getErrorMessage(caught, t('profile.passkeyRenameFailed'))
+    error.value = needsPassphrase ? t('accept.wrongPassphrase') : t('accept.registerFailed')
   } finally {
-    savingPasskeyName.value = false
+    busy.value = false
   }
 }
 
-async function skipInvitePasskeyName() {
-  if (!namingPasskey.value) return
-  namingPasskey.value = null
-  await continueAfterRegistration()
-}
-
-async function continueAfterRegistration() {
-  if (needsPrivacyOptIn.value) {
-    showPrivacyOptIns.value = true
-  } else {
-    await finishInvite()
+async function proceed() {
+  if (!kit.value) return
+  busy.value = true
+  try {
+    setUnlocked(await login(session.apiBase, email.value, password.value, kit.value))
+    await router.push('/')
+  } catch {
+    error.value = t('accept.failed')
+  } finally {
+    busy.value = false
   }
-}
-
-async function finishPrivacyOptIns() {
-  showPrivacyOptIns.value = false
-  needsPrivacyOptIn.value = false
-  await finishInvite()
-}
-
-async function finishInvite() {
-  await router.push(pendingRedirect.value)
 }
 </script>
 
 <template>
   <Card class="login-card">
-    <template #title>{{ t('auth.inviteTitle') }}</template>
+    <template #title>{{ t('accept.title') }}</template>
     <template #content>
-      <RegistrationPrivacyOptIns v-if="showPrivacyOptIns" @complete="finishPrivacyOptIns" />
-      <form v-else-if="showTotpSetup" class="veyq-form invite-totp-setup" @submit.prevent="submitTotpSetup">
-        <div>
-          <h2>{{ t('auth.inviteTotpTitle') }}</h2>
-          <p>{{ t('auth.inviteTotpCopy') }}</p>
-        </div>
-        <template v-if="totpEnrollment">
-          <div class="totp-qr-panel">
-            <div class="totp-qr-code">
-              <img :src="totpQrCodeUrl" :alt="t('profile.totpQrAlt')" />
-            </div>
-            <p>{{ t('profile.totpQrCopy') }}</p>
-          </div>
-          <div v-if="!showTotpManualSetup" class="veyq-button-row">
-            <Button
-              type="button"
-              :label="t('profile.totpShowManual')"
-              icon="pi pi-list"
-              severity="secondary"
-              text
-              @click="showTotpManualSetup = true"
-            />
-          </div>
-          <label v-else>
-            {{ t('profile.totpSecret') }}
-            <InputText :model-value="totpEnrollment.secret" readonly autocomplete="off" />
-          </label>
-          <label>
-            {{ t('auth.totpCode') }}
-            <InputText v-model="totpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required />
-          </label>
+      <template v-if="meta">
+        <p class="veyq-form-copy">{{ t('accept.joinAs', { name: meta.tenant.displayName, role: roleLabel(meta.role) }) }}</p>
+
+        <label v-if="needsPassphrase">
+          {{ t('accept.passphrase') }}
+          <Password v-model="passphrase" :input-props="{ autocomplete: 'off' }" :placeholder="t('accept.passphraseHint')" :feedback="false" toggle-mask fluid />
+        </label>
+
+        <!-- already signed in → join -->
+        <template v-if="isUnlocked()">
+          <Button type="button" :label="busy ? t('accept.joining') : t('accept.join')" icon="pi pi-sign-in" :loading="busy" @click="join" />
         </template>
-        <div class="veyq-button-row">
-          <Button
-            type="button"
-            :label="t('auth.inviteTotpSkip')"
-            icon="pi pi-arrow-right"
-            severity="secondary"
-            outlined
-            @click="skipTotpSetup"
-          />
-          <Button
-            type="submit"
-            :label="t('profile.totpEnable')"
-            icon="pi pi-shield"
-            :disabled="!totpEnrollment || !totpCode"
-            :loading="savingTotp"
-          />
-        </div>
-      </form>
-      <form
-        v-else
-        class="veyq-form"
-        method="post"
-        :action="`/api/users/${userId}/invite/accept`"
-        @submit.prevent="submit"
-      >
-        <div
-          v-if="requiresPassword && !inviteRequiresLogin"
-          class="auth-method-switch"
-          role="tablist"
-          :aria-label="t('auth.authMethod')"
-        >
-          <button
-            type="button"
-            :class="{ active: authMethod === 'passkey' }"
-            role="tab"
-            :aria-selected="authMethod === 'passkey'"
-            @click="authMethod = 'passkey'"
-          >
-            {{ t('auth.passkey') }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: authMethod === 'password' }"
-            role="tab"
-            :aria-selected="authMethod === 'password'"
-            @click="authMethod = 'password'"
-          >
-            {{ t('common.password') }}
-          </button>
-        </div>
-        <Message v-if="inviteRequiresLogin" severity="info" :closable="false">
-          {{ t('auth.inviteExistingAccountLogin') }}
-        </Message>
-        <label
-          v-if="requiresPassword && invitedEmail && (inviteRequiresLogin || authMethod === 'password')"
-          for="invite-email"
-        >
-          {{ t('common.email') }}
-          <InputText
-            id="invite-email"
-            :model-value="invitedEmail"
-            type="email"
-            name="email"
-            autocomplete="username"
-            readonly
-            required
-          />
-        </label>
-        <label v-if="requiresPassword && !inviteRequiresLogin">
-          {{ t('auth.displayName') }}
-          <InputText v-model="displayName" name="name" autocomplete="name" required />
-        </label>
-        <label v-if="requiresPassword && !inviteRequiresLogin && authMethod === 'password'" for="invite-new-password">
-          {{ t('common.password') }}
-          <Password
-            v-model="password"
-            input-id="invite-new-password"
-            :input-props="newPasswordInputProps"
-            required
-            minlength="10"
-            toggle-mask
-            fluid
-          />
-        </label>
-        <Button
-          type="submit"
-          :label="
-            inviteRequiresLogin
-              ? t('auth.login')
-              : requiresPassword
-              ? authMethod === 'passkey'
-                ? t('auth.accountCreateWithPasskey')
-                : t('auth.setPassword')
-              : t('auth.acceptInvite')
-          "
-          :icon="requiresPassword && authMethod === 'passkey' ? 'pi pi-key' : 'pi pi-sign-in'"
-          :loading="loading"
-          :disabled="!canSubmitInvite"
-        />
-      </form>
-      <Message v-if="error" severity="error" :closable="false" class="form-message">
-        {{ error }}
-      </Message>
-      <PasskeyNameDialog
-        :visible="Boolean(namingPasskey)"
-        :passkey="namingPasskey"
-        :saving="savingPasskeyName"
-        @update:visible="(visible) => { if (!visible) skipInvitePasskeyName() }"
-        @save="saveInvitePasskeyName"
-        @skip="skipInvitePasskeyName"
-      />
+
+        <!-- just registered → show kit, then proceed -->
+        <template v-else-if="kit">
+          <h3 class="auth-title" style="font-size: 1.1rem">{{ t('setup.kitTitle') }}</h3>
+          <p class="veyq-form-copy">{{ t('setup.kitSub') }}</p>
+          <pre class="kit-secret">{{ kit }}</pre>
+          <Button type="button" :label="t('kit.download')" icon="pi pi-download" severity="secondary" @click="downloadKitPdf({ instance: session.apiBase, email, secretKey: kit! }, displayName)" />
+          <Button type="button" :label="t('setup.kitProceed')" icon="pi pi-arrow-right" :loading="busy" @click="proceed" />
+        </template>
+
+        <!-- not signed in → register -->
+        <template v-else>
+          <form class="veyq-form" @submit.prevent="register">
+            <label>{{ t('setup.displayName') }}<InputText v-model="displayName" type="text" required autofocus /></label>
+            <label>{{ t('common.email') }}<InputText v-model="email" type="email" autocomplete="username" required /></label>
+            <label>{{ t('common.password') }}<Password v-model="password" :input-props="{ autocomplete: 'new-password' }" required :feedback="false" toggle-mask fluid /></label>
+            <Message v-if="breachCount > 0" severity="warn" :closable="false">{{ t('password.pwnedWarning', { count: breachCount }) }}</Message>
+            <small v-if="passwordHintKey(password)" class="field-hint">{{ t(passwordHintKey(password)!) }}</small>
+            <Button type="submit" :label="busy ? t('accept.joining') : t('accept.register')" icon="pi pi-user-plus" :loading="busy" :disabled="password.length < MIN_PASSWORD_LENGTH" />
+          </form>
+          <Button type="button" :label="t('accept.haveAccount')" severity="secondary" text @click="router.push('/login')" />
+        </template>
+      </template>
+
+      <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
+      <p v-else-if="!meta" class="veyq-form-copy">{{ t('app.loading') }}</p>
     </template>
   </Card>
 </template>
+
+<style scoped>
+.kit-secret { white-space: pre-wrap; word-break: break-all; font-family: var(--font-mono, monospace); background: var(--p-content-border-color, rgba(127,127,127,0.15)); padding: 0.75rem; border-radius: 8px; margin: 0 0 0.75rem; }
+</style>

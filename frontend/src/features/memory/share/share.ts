@@ -137,7 +137,7 @@ export async function resolvePublicShare(apiBase: string, shareId: string, share
     if (body.passwordProtected) throw new SharePasswordRequired(true) // AEAD failure = wrong password
     throw new Error('could not open share')
   }
-  // A blind UPLOADER gets no root node (it must not learn metadata); only readers see the album name.
+  // A blind UPLOADER gets no root node (it must not learn metadata); only readers see the Memory name.
   const rootName = body.root ? decodeNode(contentKey, body.root as MemoryNode).name : ''
   return { apiBase, shareId, scopeId: body.scopeId, contentKey, uploadToken: b64url(v1.shareUploadToken(wrapKey)), rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
 }

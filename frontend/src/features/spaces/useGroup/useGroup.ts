@@ -8,6 +8,7 @@ export type GroupSpace = {
   tenantId: string
   name: string
   displayName: string
+  logoUrl?: string
   role: string
   scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }

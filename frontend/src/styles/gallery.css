@@ -512,7 +512,53 @@
   text-align: left;
 }
 .dl-option:hover { background: var(--app-hover); }
-.dl-icon { font-size: 1.3rem; }
+.dl-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--app-info-soft);
+  color: var(--app-info-text);
+}
+.dl-icon-download::before {
+  width: 0.42rem;
+  height: 0.72rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  content: "";
+  transform: rotate(45deg) translate(-0.08rem, -0.1rem);
+}
+.dl-icon-download::after {
+  position: absolute;
+  bottom: 0.46rem;
+  width: 0.9rem;
+  border-bottom: 2px solid currentColor;
+  content: "";
+}
+.dl-icon-folder::before {
+  position: absolute;
+  left: 0.34rem;
+  right: 0.26rem;
+  bottom: 0.48rem;
+  height: 0.78rem;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  content: "";
+}
+.dl-icon-folder::after {
+  position: absolute;
+  left: 0.43rem;
+  top: 0.52rem;
+  width: 0.72rem;
+  height: 0.3rem;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+  content: "";
+}
 .dl-text { display: flex; flex-direction: column; }
 .dl-text small { color: var(--app-muted); }
 
@@ -528,10 +574,13 @@
   gap: 0.4rem;
   min-width: 0;
   margin: 0 0 1.25rem;
+  padding-right: 1rem;
   overflow-x: auto;
   overflow-y: hidden;
   border-bottom: 1px solid var(--app-line);
+  scroll-padding-inline: 0.75rem;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .detail-tab {
@@ -1048,6 +1097,92 @@
   z-index: 0;
 }
 
+.veyq-glyph {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--app-info-text);
+}
+.veyq-glyph-folder::before,
+.veyq-glyph-folder::after,
+.veyq-glyph-memory::before,
+.veyq-glyph-memory::after,
+.veyq-glyph-track::before,
+.veyq-glyph-track::after,
+.veyq-glyph-playlist::before,
+.veyq-glyph-playlist::after {
+  position: absolute;
+  content: "";
+}
+.veyq-glyph-folder::before {
+  left: 0.28em;
+  top: 0.4em;
+  width: 0.56em;
+  height: 0.27em;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 0.16em 0.16em 0 0;
+}
+.veyq-glyph-folder::after {
+  left: 0.18em;
+  right: 0.16em;
+  bottom: 0.28em;
+  height: 0.7em;
+  border: 2px solid currentColor;
+  border-radius: 0.18em;
+}
+.veyq-glyph-memory::before {
+  inset: 0.26em 0.18em;
+  border: 2px solid currentColor;
+  border-radius: 0.18em;
+}
+.veyq-glyph-memory::after {
+  left: 0.33em;
+  right: 0.33em;
+  bottom: 0.42em;
+  height: 0.35em;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: skewX(-28deg);
+}
+.veyq-glyph-track::before {
+  left: 0.3em;
+  top: 0.32em;
+  width: 0.34em;
+  height: 0.34em;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  box-shadow: 0.66em 0.56em 0 -1px var(--app-info-text);
+}
+.veyq-glyph-track::after {
+  left: 0.58em;
+  top: 0.57em;
+  width: 0.58em;
+  height: 0.44em;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  border-radius: 0 999px 0 0;
+  transform: rotate(18deg);
+}
+.veyq-glyph-playlist::before {
+  left: 0.34em;
+  top: 0.34em;
+  width: 0.55em;
+  height: 0.84em;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+.veyq-glyph-playlist::after {
+  left: 0.16em;
+  bottom: 0.24em;
+  width: 0.38em;
+  height: 0.28em;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  box-shadow: 0.44em -0.12em 0 -1px currentColor;
+}
+
 /* Atomic embed chips inside the CodeMirror live editor */
 .journal-chip {
   display: inline-flex;
@@ -1071,6 +1206,12 @@
   border-color: var(--app-danger);
   background: color-mix(in srgb, var(--app-danger) 18%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger) 20%, transparent);
+}
+.journal-inline-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-right: 0.35rem;
+  vertical-align: -0.18rem;
 }
 
 /* "Embed" toolbar menu in the live editor bar */
@@ -1228,7 +1369,8 @@
   background: var(--app-success-soft);
   border-color: var(--app-success-line);
 }
-.journal-picker .search-hit-icon {
+.journal-picker .search-hit-icon,
+.search-hit-icon.veyq-glyph {
   display: grid;
   place-items: center;
   width: 1.7rem;
@@ -1425,6 +1567,15 @@
 
   .detail-title {
     font-size: 1.8rem;
+  }
+
+  .detail-tabs {
+    margin-right: -1rem;
+    padding-right: 2rem;
+  }
+
+  .detail-tab {
+    scroll-snap-align: start;
   }
 
   .lightbox {

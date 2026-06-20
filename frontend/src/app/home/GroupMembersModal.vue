@@ -91,7 +91,7 @@ async function remove(m: GroupMember) {
 
 <template>
   <div class="settings-backdrop" @click.self="emit('close')">
-    <div class="settings-panel">
+    <div class="settings-panel group-members-panel">
       <div class="settings-head">
         <h2 class="settings-title">{{ t('groups.members') }}</h2>
         <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.close') }}</button>
@@ -99,7 +99,7 @@ async function remove(m: GroupMember) {
 
       <div v-for="m in members" :key="m.userId" class="member-row">
         <span class="member-name">{{ m.displayName }}<span v-if="m.userId === myId()"> ({{ t('groups.you') }})</span></span>
-        <select :value="m.role" :disabled="busy" @change="setRole(m, ($event.target as HTMLSelectElement).value as GroupRole)">
+        <select class="member-role-select" :value="m.role" :disabled="busy" @change="setRole(m, ($event.target as HTMLSelectElement).value as GroupRole)">
           <option value="GroupOwner">{{ t('groups.roleOwner') }}</option>
           <option value="GroupMember">{{ t('groups.roleMember') }}</option>
         </select>
@@ -109,7 +109,7 @@ async function remove(m: GroupMember) {
       <form v-if="candidates.length" class="veyq-form member-add" @submit.prevent="add">
         <label>
           {{ t('groups.addMember') }}
-          <select v-model="toAdd">
+          <select v-model="toAdd" class="member-add-select">
             <option v-for="c in candidates" :key="c.userId" :value="c.userId">{{ c.displayName }}</option>
           </select>
         </label>
@@ -118,7 +118,7 @@ async function remove(m: GroupMember) {
 
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
 
-      <button class="btn btn-ghost" type="button" style="color: var(--app-danger); margin-top: 0.5rem" @click="confirmDelete = true">{{ t('delete.group') }}</button>
+      <button class="btn btn-ghost group-delete-button" type="button" @click="confirmDelete = true">{{ t('delete.group') }}</button>
     </div>
     <ConfirmDeleteModal v-if="confirmDelete" :name="space.displayName" @close="confirmDelete = false" @confirm="doDeleteGroup" />
   </div>

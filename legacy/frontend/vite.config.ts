@@ -19,6 +19,12 @@ export default defineConfig({
       '/api': {
         target: proxyTarget,
         changeOrigin: true
+      },
+      // Live-journal relay websocket (/ws/journal/{scope}/{node}) — proxied with ws upgrade to the backend.
+      '/ws': {
+        target: proxyTarget,
+        changeOrigin: true,
+        ws: true
       }
     }
   }

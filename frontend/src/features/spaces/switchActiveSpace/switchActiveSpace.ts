@@ -11,6 +11,8 @@ export type SpaceEntry = {
   name?: string
   // TENANT/GROUP — the tenant's domain (the host that resolves to it); used for routing + cross-host switch.
   domain?: string
+  // TENANT/GROUP — optional tenant branding image URL shown in the space switcher.
+  logoUrl?: string
   displayName: string
   role?: string
   // GROUP only — the group name sealed under its content key (the client decrypts it into displayName).

@@ -5,6 +5,7 @@ import { t } from '../../i18n/i18n'
 import { ancestorChain, enterSpace, loadCover, loadLevel, loadSpaces, resolveRoute, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import { buildHomePath, matchSpace, parseHomePath } from '../../features/home/homeRoute'
 import { deleteNode, reorderNode, slugify } from '../../features/memory/curate/curate'
+import { listFavoriteNodeIds, setMemoryFavorite } from '../../features/memory/favorite/favorite'
 import { cancelTenantDeletion } from '../../features/spaces/invite/groups'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -23,6 +24,7 @@ import OpenInApp from '../auth/OpenInApp.vue'
 import HomeSidebar from './HomeSidebar.vue'
 import HomeTopbar from './HomeTopbar.vue'
 import MemoryLevelGrid from './MemoryLevelGrid.vue'
+import SupportNotice from './SupportNotice.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
@@ -32,6 +34,8 @@ const crumbs = ref<{ id?: string; name: string; slug?: string }[]>([])
 const folders = ref<LevelEntry[]>([])
 const memories = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string | null>>({})
+const favoriteIds = ref<Set<string>>(new Set())
+const favoriteMemories = ref<{ entry: LevelEntry; path: string; cover: string | null }[]>([])
 let loadSeq = 0 // bumped per navigation so superseded async cover/level loads can discard their results
 const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
@@ -85,12 +89,18 @@ async function reloadSpaces(selectTenantId?: string) {
   const target = selectTenantId ? spaces.value.find((s) => s.tenantId === selectTenantId) : undefined
   if (target) await switchSpace(target)
 }
-async function onGroupCreated(tenantId: string) {
+async function onGroupCreated(tenantId: string, warning?: string) {
   createGroupOpen.value = false
   await reloadSpaces(tenantId)
+  if (warning) error.value = warning
 }
 
 const currentParentId = () => (crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined)
+function nextCreateOrderIndex() {
+  if (createType.value === 'FOLDER') return folders.value.length
+  if (createType.value === 'MEMORY') return memories.value.length
+  return folders.value.length + memories.value.length
+}
 async function onCreated() {
   createType.value = null
   await openLevel()
@@ -165,6 +175,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState)
   loadSeq++ // invalidate any in-flight cover loads so they don't touch a torn-down component
   revokeCovers()
+  revokeFavoriteCovers()
 })
 
 const toCrumb = (f: LevelEntry) => ({ id: f.node.id, name: f.name, slug: f.slug })
@@ -233,6 +244,43 @@ function revokeCovers() {
   for (const u of Object.values(covers.value)) if (u) URL.revokeObjectURL(u)
 }
 
+function revokeFavoriteCovers() {
+  for (const f of favoriteMemories.value) if (f.cover) URL.revokeObjectURL(f.cover)
+  favoriteMemories.value = []
+}
+
+async function refreshFavorites(seq = loadSeq) {
+  if (!active.value || !session.unlocked) return
+  const space = active.value
+  const ids = await listFavoriteNodeIds(apiBase, session.unlocked, space.scope.scopeId)
+  if (seq !== loadSeq || active.value?.entry.scopeId !== space.entry.scopeId) return
+  favoriteIds.value = new Set(ids)
+  revokeFavoriteCovers()
+  const entries: { entry: LevelEntry; path: string; cover: string | null }[] = []
+  for (const id of ids) {
+    const chain = await ancestorChain(apiBase, session.unlocked, space, id)
+    const entry = chain[chain.length - 1]
+    if (!entry || entry.node.type !== 'MEMORY' || seq !== loadSeq || active.value?.entry.scopeId !== space.entry.scopeId) continue
+    entries.push({ entry, path: '/' + chain.map((e) => e.slug).filter(Boolean).join('/'), cover: null })
+  }
+  favoriteMemories.value = entries
+  entries.forEach(({ entry }) => {
+    loadCover(apiBase, session.unlocked!, space, entry.node)
+      .then((url) => {
+        if (seq !== loadSeq || active.value?.entry.scopeId !== space.entry.scopeId) { if (url) URL.revokeObjectURL(url); return }
+        let applied = false
+        favoriteMemories.value = favoriteMemories.value.map((f) => {
+          if (f.entry.node.id !== entry.node.id) return f
+          applied = true
+          if (f.cover && f.cover !== url) URL.revokeObjectURL(f.cover)
+          return { ...f, cover: url }
+        })
+        if (!applied && url) URL.revokeObjectURL(url)
+      })
+      .catch(() => {})
+  })
+}
+
 async function openLevel() {
   const seq = ++loadSeq // a generation token: late async results from a superseded navigation are discarded
   selectedMemory.value = null
@@ -243,6 +291,7 @@ async function openLevel() {
   memories.value = entries.filter((e) => e.node.type === 'MEMORY')
   revokeCovers()
   covers.value = {}
+  await refreshFavorites(seq)
   for (const m of memories.value) {
     loadCover(apiBase, session.unlocked!, active.value!, m.node)
       .then((url) => {
@@ -259,6 +308,17 @@ async function openFolder(entry: LevelEntry) {
   syncUrl(true)
 }
 
+async function toggleMemoryFavorite(entry: LevelEntry) {
+  if (!active.value || !session.unlocked) return
+  const next = !favoriteIds.value.has(entry.node.id)
+  try {
+    await setMemoryFavorite(apiBase, session.unlocked, active.value.scope.scopeId, entry.node.id, next)
+    await refreshFavorites()
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
 async function gotoCrumb(i: number) {
   if (i === crumbs.value.length - 1) return
   crumbs.value = crumbs.value.slice(0, i + 1)
@@ -271,6 +331,18 @@ function openMemory(m: LevelEntry) {
   selectedMemory.value = m
   syncUrl(true)
 }
+
+async function openFavorite(nodeId: string) {
+  if (!active.value || !session.unlocked) return
+  const chain = await ancestorChain(apiBase, session.unlocked, active.value, nodeId)
+  const memory = chain[chain.length - 1] ?? null
+  if (!memory) return
+  crumbs.value = [crumbs.value[0], ...chain.slice(0, -1).map(toCrumb)]
+  await openLevel()
+  selectedMemory.value = memory
+  syncUrl(true)
+}
+
 function closeMemory() {
   selectedMemory.value = null
   syncUrl(false)
@@ -301,9 +373,11 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
   <div class="home">
     <HomeSidebar
       :spaces="spaces"
+      :favorite-memories="favoriteMemories.map((f) => ({ id: f.entry.node.id, name: f.entry.name, path: f.path, cover: f.cover }))"
       :active-scope-id="active?.entry.scopeId"
       :current-user-name="session.unlocked?.user.displayName"
       @switch-space="switchSpace"
+      @open-favorite="openFavorite"
       @create-tenant="createGroupOpen = true"
       @create-group-space="createGroupSpaceOpen = true"
       @invite-tenant="inviteTarget = $event"
@@ -327,6 +401,7 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
 
     <main class="home-content">
       <OpenInApp persist-key="home" :path="currentPath" />
+      <SupportNotice v-if="!selectedMemory" />
       <div v-if="active?.entry.scheduledDeletionAt" class="deletion-banner">
         <span class="deletion-banner-text">{{ t('delete.scheduledBanner', { date: new Date(active.entry.scheduledDeletionAt).toLocaleDateString() }) }}</span>
         <button v-if="active.entry.role === 'Owner'" class="btn btn-ghost deletion-banner-cancel" type="button" @click="cancelDeletion">{{ t('delete.cancelDeletion') }}</button>
@@ -348,9 +423,11 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
         :memories="memories"
         :folders="folders"
         :covers="covers"
+        :favorite-ids="favoriteIds"
         :compact="compactView"
         @open-memory="openMemory"
         @open-folder="openFolder"
+        @toggle-favorite="toggleMemoryFavorite"
         @create="createType = $event"
         @open-menu="menuTarget = $event"
         @drag-start="onDragStart"
@@ -363,7 +440,7 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
       :active="active"
       :type="createType"
       :parent-id="currentParentId()"
-      :order-index="folders.length + memories.length"
+      :order-index="nextCreateOrderIndex()"
       @close="createType = null"
       @created="onCreated"
     />
@@ -372,14 +449,14 @@ const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
     <CreateGroupModal v-if="createGroupOpen" @close="createGroupOpen = false" @created="onGroupCreated" />
     <CreateGroupSpaceModal v-if="createGroupSpaceOpen" :tenants="tenantSpaces()" @close="createGroupSpaceOpen = false" @created="onGroupSpaceCreated" />
     <GroupMembersModal v-if="manageGroup" :space="manageGroup" @close="manageGroup = null" @deleted="onGroupDeleted" />
-    <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" @deleted="onTenantDeleted" />
+    <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" @deleted="onTenantDeleted" @updated="reloadSpaces()" />
 
     <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
       <div class="settings-panel action-sheet">
         <div class="settings-head"><h2 class="settings-title">{{ menuTarget.name }}</h2></div>
         <button class="btn btn-ghost action-row" type="button" @click="renameTarget = menuTarget; menuTarget = null">{{ t('common.rename') }}</button>
         <button class="btn btn-ghost action-row" type="button" @click="moveTarget = menuTarget; menuTarget = null">{{ t('common.move') }}</button>
-        <button class="btn btn-ghost action-row" type="button" style="color: var(--app-danger)" @click="deleteNodeTarget = menuTarget; menuTarget = null">{{ t('common.delete') }}</button>
+        <button class="btn btn-ghost action-row action-row-danger" type="button" @click="deleteNodeTarget = menuTarget; menuTarget = null">{{ t('common.delete') }}</button>
       </div>
     </div>
 

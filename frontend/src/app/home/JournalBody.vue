@@ -48,7 +48,7 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
           <MemoryMap :points="[]" :tracks="tracksFor(block.embed.ids)" />
           <ul class="journal-track-stats">
             <li v-for="tr in tracksFor(block.embed.ids)" :key="tr.id">
-              <span class="track-name">🛤 {{ tr.name }}</span>
+              <span class="track-name"><span class="journal-inline-icon veyq-glyph veyq-glyph-track" aria-hidden="true"></span>{{ tr.name }}</span>
               <span class="track-stat">{{ formatDistance(trackStats(tr.points).distanceM) }}</span>
               <span v-if="trackStats(tr.points).durationS" class="track-stat">{{ formatDuration(trackStats(tr.points).durationS!) }}</span>
               <span v-if="formatElevation(trackStats(tr.points))" class="track-stat">{{ formatElevation(trackStats(tr.points)) }}</span>
@@ -69,7 +69,7 @@ const tracksFor = (ids: string[]): Track[] => ids.map((id) => props.tracksById[i
           @click="emit('openChapter', block.embed.ids[0])"
           @keydown.enter="emit('openChapter', block.embed.ids[0])"
         >
-          <span class="journal-chapter-icon">🗂</span>
+          <span class="journal-chapter-icon veyq-glyph veyq-glyph-folder" aria-hidden="true"></span>
           <span>{{ block.embed.label || chapterById[block.embed.ids[0]].name }}</span>
         </a>
         <span v-else class="journal-embed-missing">{{ t('journal.embedMissing') }}</span>

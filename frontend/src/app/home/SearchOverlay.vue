@@ -26,7 +26,7 @@ watch(query, async (q) => {
       <ul v-if="hits.length" class="search-results">
         <li v-for="hit in hits" :key="hit.id">
           <button class="search-hit" @click="emit('select', hit)">
-            <span class="search-hit-icon">{{ hit.type === 'FOLDER' ? '📁' : '🖼️' }}</span>
+            <span class="search-hit-icon veyq-glyph" :class="hit.type === 'FOLDER' ? 'veyq-glyph-folder' : 'veyq-glyph-memory'" aria-hidden="true"></span>
             <span class="search-hit-name">{{ hit.name }}</span>
             <span class="search-hit-type">{{ hit.type === 'FOLDER' ? t('search.folder') : t('search.memory') }}</span>
           </button>

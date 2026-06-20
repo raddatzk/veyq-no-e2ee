@@ -15,7 +15,7 @@ const emit = defineEmits<{
   openSettings: []
 }>()
 
-const shortcutLabel = computed(() => (isMacPlatform() ? 'Cmd K' : 'Ctrl K'))
+const shortcutLabel = computed(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'))
 
 function isMacPlatform(): boolean {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
