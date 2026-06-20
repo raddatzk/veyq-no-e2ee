@@ -13,6 +13,27 @@ documents:
 acceptanceCriteria:
 - id: uc.platform.app-shell.instance-routing
   statement: "On boot the shell discovers the instance state and routes accordingly: a fresh instance to setup, an already-set-up instance to login, and an unreachable instance to a clear error view."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
-    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
+  coverage:
+    web:
+      unit:
+      - testName: "forces setup when the instance is not set up yet"
+        kind: positive
+        ref: frontend/src/router.test.ts
+      - testName: "sends a locked visitor to login on a protected route"
+        kind: positive
+        ref: frontend/src/router.test.ts
+      - testName: "routes a fresh instance to setup (setupCompleted stays false, not unreachable)"
+        kind: positive
+        ref: frontend/src/app/boot.test.ts
+      - testName: "routes an already-set-up instance to login (setupCompleted true, still locked)"
+        kind: positive
+        ref: frontend/src/app/boot.test.ts
+      - testName: "surfaces a clear error state when the instance is unreachable on boot"
+        kind: negative
+        ref: frontend/src/app/boot.test.ts
+      - testName: "renders the app shell when the instance is reachable"
+        kind: positive
+        ref: frontend/src/App.test.ts
+      - testName: "renders a clear error view instead of the shell when the instance is unreachable"
+        kind: negative
+        ref: frontend/src/App.test.ts

@@ -88,6 +88,18 @@ acceptanceCriteria:
         ref: frontend/src/features/gallery/dateBuckets.test.ts
 - id: uc.platform.web-views.memory-views
   statement: "The home view renders the space switcher and memory/folder grids and navigates into folders; the Memory view renders the tabs, root gallery and journal (lazy, embed-aware, live-journal subscription) and navigates into chapters."
+  coverage:
+    web:
+      unit:
+      - testName: "renders the folder and memory grids for the space root"
+        kind: positive
+        ref: frontend/src/views/TenantView.test.ts
+      - testName: "navigates into a folder when its card is clicked"
+        kind: positive
+        ref: frontend/src/views/TenantView.test.ts
+      - testName: "renders the Memory tabs with the gallery active and switches to the journal"
+        kind: positive
+        ref: frontend/src/views/TenantView.test.ts
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
-    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
+  - reason: "The live-journal subscription sub-behavior (Yjs over the encrypted relay websocket replacing the static journal load, and its teardown on leave) needs a live relay socket and is exercised by the journalLive e2e suite, not a unit test. The renderable Memory-view parts (tabs, gallery, embed-aware journal) and folder navigation are unit-covered above."
+    followUp: "Add a web e2e (or a socket-mocked unit test) for the MemoryJournalLive subscribe/teardown lifecycle in the consolidated frontend."

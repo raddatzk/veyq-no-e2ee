@@ -66,6 +66,15 @@ acceptanceCriteria:
         ref: backend/src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt
 - id: uc.account.login.remembered-login-boot
   statement: A remembered login is used during app boot after reload so the user lands directly in the app.
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
-    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
+  coverage:
+    web:
+      unit:
+      - testName: "stores and reads email, password and Secret Key from localStorage"
+        kind: positive
+        ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
+      - testName: "replays a remembered login during boot so the user lands directly in the app"
+        kind: positive
+        ref: frontend/src/app/boot.test.ts
+      - testName: "drops an invalid remembered login on boot and stays locked"
+        kind: negative
+        ref: frontend/src/app/boot.test.ts

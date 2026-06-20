@@ -157,9 +157,33 @@ acceptanceCriteria:
         ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
 - id: uc.journal.embed.render-blocks
   statement: "On read, embeds resolve to their blocks — a single photo or a carousel, a track block with stats, a chapter link — and an unresolved id degrades to a placeholder."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
-    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
+  coverage:
+    web:
+      unit:
+      - testName: "renders surrounding Markdown text around embeds"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "resolves a single ::media embed to one photo and emits openMedia on click"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "resolves a multi-id ::media embed to a carousel with one dot per photo"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "resolves a ::track embed to a track block with distance stats"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "resolves a ::chapter embed to a link and emits openChapter on click"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "falls back to the chapter name when a ::chapter embed has no label"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "resolves a ::playlist embed to a provider link card"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
+      - testName: "degrades an unresolved embed id to a placeholder"
+        kind: negative
+        ref: frontend/src/features/memories/components/JournalBody.test.ts
 - id: uc.journal.embed.atomic-chip
   statement: "In the live editor an embed renders as an atomic chip that deletes with a two-press Backspace gesture and disarms when the cursor moves."
   coverage:
@@ -176,6 +200,18 @@ acceptanceCriteria:
         ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
 - id: uc.journal.embed.picker
   statement: "The embed picker selects media/track/chapter ids with a caption/label, enforces single vs. multi selection, and offers Delete only while editing."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
-    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
+  coverage:
+    web:
+      unit:
+      - testName: "toggles multiple media ids on (multi-select) and confirms them with a caption"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalEmbedPickerDialog.test.ts
+      - testName: "enforces single selection for a chapter embed (a second pick replaces the first)"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalEmbedPickerDialog.test.ts
+      - testName: "disables Insert until at least one id is selected"
+        kind: negative
+        ref: frontend/src/features/memories/components/JournalEmbedPickerDialog.test.ts
+      - testName: "offers Delete only while editing an existing embed"
+        kind: positive
+        ref: frontend/src/features/memories/components/JournalEmbedPickerDialog.test.ts

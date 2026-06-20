@@ -125,6 +125,11 @@ function open(entry: LevelEntry) {
   void router.push(buildHomePath(props.active.entry, [...currentSegments.value, entry.slug]))
 }
 
+// A ::chapter embed in the journal resolves to a child chapter slug; navigate into it under the current memory.
+function openChapterFromJournal(slug: string) {
+  void router.push(buildHomePath(props.active.entry, [...currentSegments.value, slug]))
+}
+
 function openCrumb(index: number) {
   // index -1 = space root; otherwise the folder at that depth.
   const slugs = index < 0 ? [] : props.folders.slice(0, index + 1).map((f) => f.slug)
@@ -303,7 +308,7 @@ onBeforeUnmount(releaseCovers)
         <button type="button" class="memory-tab" :class="{ active: memoryTab === 'share' }" @click="memoryTab = 'share'">{{ t('share.share') }}</button>
       </div>
       <MemoryGallery v-if="memoryTab === 'gallery'" :active="props.active" :node-id="props.memory.node.id" />
-      <MemoryJournal v-else-if="memoryTab === 'journal'" :active="props.active" :node-id="props.memory.node.id" />
+      <MemoryJournal v-else-if="memoryTab === 'journal'" :active="props.active" :node-id="props.memory.node.id" @open-chapter="openChapterFromJournal" />
       <MemoryMap v-else-if="memoryTab === 'map'" :active="props.active" :node-id="props.memory.node.id" />
       <MemoryParticipants v-else-if="memoryTab === 'participants'" :active="props.active" :node-id="props.memory.node.id" />
       <MemoryPlaylists v-else-if="memoryTab === 'playlists'" :active="props.active" :node-id="props.memory.node.id" />
