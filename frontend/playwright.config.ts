@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: [
     {
       // Fresh in-memory backend (no reuse → deterministic setupRequired state at the start of each run).
-      command: `cd ../../backend && DB_KIND=h2 DB_URL='jdbc:h2:mem:veyq;DB_CLOSE_DELAY=-1' DB_USER=sa DB_PASSWORD= ./gradlew quarkusDev --console=plain -Dquarkus.http.port=${BACKEND_PORT}`,
+      command: `cd ../backend && DB_KIND=h2 DB_URL='jdbc:h2:mem:veyq;DB_CLOSE_DELAY=-1' DB_USER=sa DB_PASSWORD= ./gradlew quarkusDev --console=plain -Dquarkus.http.port=${BACKEND_PORT}`,
       url: `http://127.0.0.1:${BACKEND_PORT}/api/setup`,
       reuseExistingServer: false,
       timeout: 300_000

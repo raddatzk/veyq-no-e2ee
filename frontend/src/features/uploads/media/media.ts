@@ -93,127 +93,87 @@ export function dedupTokenFor(contentKey: Uint8Array, content: Uint8Array): stri
   return b64url(v1.dedupToken(contentKey, content))
 }
 
-/** Begin (or dedup) storing a blob. READY → already stored, attach blobId directly; UPLOADING → push frames. */
-export async function startBlob(apiBase: string, session: UnlockedSession, scopeId: string, req: { dedupToken: string; totalChunks: number; byteSize: number; suiteId?: string }): Promise<BlobTicket> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs`, {
+// Direct-to-store only (ADR 0021): every byte travels client↔object-store via short-lived presigned URLs; the
+// backend handles only the control plane (start/finalize/presign), never the frames. The store is blind (AEAD
+// ciphertext), so a presigned URL discloses nothing. There is no proxied fallback — the store MUST be able to
+// presign (an external S3, or the bundled MinIO behind a reverse proxy); a misconfigured store fails loudly.
+
+type BatchBlobStart = { status: 'READY' | 'UPLOADING' | 'ERROR'; blobId?: string; uploadId?: string; totalChunks?: number; receivedChunks?: number[]; presignedPuts?: { index: number; url: string }[]; errorCode?: string }
+type BlobRefInput = { uploadId?: string; blobId?: string }
+type FinalizeItem = { original: BlobRefInput; derivatives?: { kind: DerivativeKind; blob: BlobRefInput }[]; sealedMeta: { suiteId: string; bytes: string }; mimeType: string; bucketId?: string; contributorId?: string; contributorName?: { suiteId: string; bytes: string } }
+type FinalizeResult = { ok: boolean; media?: MediaItem; errorCode?: string }
+type PresignedChunks = { blobId: string; suiteId: string; chunks: { index: number; url: string }[] }
+
+/** ONE round-trip to dedup/open (and presign) many blobs. Each item maps to a READY (dedup hit), an UPLOADING
+ *  result with presigned PUT URLs for the missing chunks, or an ERROR. Pass an item's uploadId to resume. */
+export async function batchStartBlobs(apiBase: string, session: UnlockedSession, scopeId: string, items: { dedupToken: string; totalChunks: number; byteSize: number; suiteId?: string; uploadId?: string }[]): Promise<BatchBlobStart[]> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads-batch`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session) },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ items }),
   })
-  if (!res.ok) throw await apiError(res, 'start blob')
-  return res.json()
+  if (!res.ok) throw await apiError(res, 'batch start blobs')
+  return (await res.json()).results
 }
 
-/** Seal one plaintext chunk into a frame and PUT it (idempotent — re-PUT is the basis of resume). */
-export async function putChunk(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string, index: number, total: number, contentKey: Uint8Array, plain: Uint8Array): Promise<void> {
-  const frame = v1.sealFrame(contentKey, index, total, plain, v1.randomBytes(12))
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}/chunks/${index}`, {
-    method: 'PUT',
+/** ONE round-trip to finalize many items (complete each item's uploads + attach as media). Per-item best-effort. */
+export async function batchFinalizeMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, items: FinalizeItem[]): Promise<FinalizeResult[]> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media-batch`, {
+    method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session) },
-    body: JSON.stringify({ frame: { suiteId: 'v1', bytes: b64url(frame) } }),
+    body: JSON.stringify({ items }),
   })
-  if (!res.ok) throw await apiError(res, `put chunk ${index}`)
+  if (!res.ok) throw await apiError(res, 'batch finalize media')
+  return (await res.json()).results
 }
 
-/** Which chunk indices have landed (drives resume). */
-export async function getProgress(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<UploadProgress> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}`, { headers: auth(session) })
-  if (!res.ok) throw await apiError(res, 'upload progress')
-  return res.json()
+/** ONE round-trip to presign GET URLs for many blobs (a whole gallery page); keyed by blobId. Inaccessible or
+ *  missing blobs are simply absent from the map. */
+export async function batchPresignGet(apiBase: string, session: UnlockedSession, scopeId: string, blobIds: string[]): Promise<Map<string, PresignedChunks>> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-downloads-batch`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth(session) },
+    body: JSON.stringify({ blobIds }),
+  })
+  if (!res.ok) throw await apiError(res, 'batch presign get')
+  return new Map(((await res.json()).results as PresignedChunks[]).map((r) => [r.blobId, r]))
 }
 
-/** Finalize the upload once every chunk has landed; promotes the frames to a content blob. */
-export async function completeBlob(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<BlobRef> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}/complete`, { method: 'POST', headers: auth(session) })
-  if (!res.ok) throw await apiError(res, 'complete blob')
-  return res.json()
-}
-
-/**
- * Upload arbitrary content as a deduplicated blob and return its ref. Dedups first (skips the bytes entirely
- * if the scope already holds them); otherwise opens an upload and pushes only the still-missing frames, so a
- * retried call resumes a half-done upload rather than restarting it.
- */
-export async function uploadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, bytes: Uint8Array, chunkSize: number = DEFAULT_CHUNK_SIZE): Promise<BlobRef> {
-  const chunks = chunkBytes(bytes, chunkSize)
-  // Declare the suite up front so the server can finalize a presigned (direct-to-store) upload, whose raw
-  // frames carry no per-frame suite metadata.
-  const ticket = await startBlob(apiBase, session, scopeId, { dedupToken: dedupTokenFor(contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length, suiteId: 'v1' })
-  if (ticket.status === 'READY') return { blobId: ticket.blobId!, totalChunks: ticket.totalChunks, byteSize: bytes.length }
-  const uploadId = ticket.uploadId!
-  const progress = await getProgress(apiBase, session, scopeId, uploadId)
-  const have = new Set(progress.receivedChunks)
-  // Fast path: when the server offers presigned PUT URLs (S3 backend), seal each frame and PUT it DIRECTLY to
-  // the object store — no backend hop, no base64, no credentials on the client (ADR 0021). Otherwise (or for any
-  // chunk without a URL) fall back to the proxied chunk endpoint, so the in-memory dev backend still works.
-  const presigned = new Map((progress.presignedPuts ?? []).map((p) => [p.index, p.url]))
-  for (let i = 0; i < chunks.length; i++) {
-    if (have.has(i)) continue
-    const url = presigned.get(i)
-    if (url) {
-      const frame = v1.sealFrame(contentKey, i, chunks.length, chunks[i], v1.randomBytes(12))
-      const res = await fetch(url, { method: 'PUT', body: frame as BodyInit })
-      if (!res.ok) throw new Error(`presigned put chunk ${i} failed: ${res.status}`)
-    } else {
-      await putChunk(apiBase, session, scopeId, uploadId, i, chunks.length, contentKey, chunks[i])
-    }
-  }
-  return completeBlob(apiBase, session, scopeId, uploadId)
-}
-
-/** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
-export async function downloadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
+/** Fetch one presigned blob: pull each frame DIRECTLY from the store, open it (AAD checks position), reassemble. */
+async function fetchBlobFrames(contentKey: Uint8Array, ref: BlobRef, presigned: PresignedChunks): Promise<Uint8Array> {
+  if (presigned.chunks.length !== ref.totalChunks) throw new Error(`direct-to-store download unavailable for ${ref.blobId}`)
+  const urls = new Map(presigned.chunks.map((c) => [c.index, c.url]))
   const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
-  // Large (multi-frame) blobs download DIRECTLY from the object store via presigned GET when the S3 backend
-  // offers it (ADR 0021); small single-frame blobs (thumbnails/previews) stay on the cheap proxied path so the
-  // hot gallery download isn't penalised by an extra presign round-trip.
-  if (ref.totalChunks > 1) {
-    const direct = await downloadPresigned(apiBase, session, scopeId, contentKey, ref, indices)
-    if (direct) return direct
-  }
-  // Frames are independent and AAD-position-bound (openFrame checks index+total), so fetch them bound-parallel
-  // and reassemble in order — a multi-chunk download is then bandwidth-bound, not totalChunks × round-trips.
   const parts = await mapPool(indices, 4, async (i) => {
-    const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/chunks/${i}`, { headers: auth(session) })
-    if (!res.ok) throw await apiError(res, `get chunk ${i}`)
-    const frame = fromB64url((await res.json()).frame.bytes)
-    return v1.openFrame(contentKey, i, ref.totalChunks, frame)
+    const url = urls.get(i)
+    if (!url) throw new Error(`missing presigned url for chunk ${i}`)
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`presigned get chunk ${i} failed: ${r.status}`)
+    return v1.openFrame(contentKey, i, ref.totalChunks, new Uint8Array(await r.arrayBuffer()))
   })
   return v1.concat(...parts)
 }
 
-/** Try a direct-from-store download via presigned GET URLs; null if the store can't presign every chunk. */
-async function downloadPresigned(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef, indices: number[]): Promise<Uint8Array | null> {
-  try {
-    const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/presigned-chunks`, { headers: auth(session) })
-    if (!res.ok) return null
-    const urls = new Map<number, string>(((await res.json()).chunks as { index: number; url: string }[]).map((c) => [c.index, c.url]))
-    if (urls.size !== ref.totalChunks) return null
-    const parts = await mapPool(indices, 4, async (i) => {
-      const url = urls.get(i)
-      if (!url) throw new Error('missing presigned url')
-      const r = await fetch(url)
-      if (!r.ok) throw new Error(`presigned get chunk ${i} failed: ${r.status}`)
-      return v1.openFrame(contentKey, i, ref.totalChunks, new Uint8Array(await r.arrayBuffer()))
-    })
-    return v1.concat(...parts)
-  } catch {
-    return null
-  }
+/** Download a finalized blob directly from the store (presign + parallel GET), then open + concatenate frames. */
+export async function downloadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
+  const presigned = (await batchPresignGet(apiBase, session, scopeId, [ref.blobId])).get(ref.blobId)
+  if (!presigned) throw new Error(`blob ${ref.blobId} not available`)
+  return fetchBlobFrames(contentKey, ref, presigned)
+}
+
+/** Download many blobs for a gallery page: ONE batch-presign-get, then every frame fetched direct + parallel. */
+export async function downloadBlobsBatch(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, refs: BlobRef[]): Promise<Map<string, Uint8Array>> {
+  const presigned = await batchPresignGet(apiBase, session, scopeId, refs.map((r) => r.blobId))
+  const out = new Map<string, Uint8Array>()
+  await mapPool(refs, 6, async (ref) => {
+    const p = presigned.get(ref.blobId)
+    if (!p) throw new Error(`blob ${ref.blobId} not available`)
+    out.set(ref.blobId, await fetchBlobFrames(contentKey, ref, p))
+  })
+  return out
 }
 
 // ---- media layer (attach blobs to a Memory) -------------------------------------------------------------
-
-/** Attach a stored blob (+ derivatives) to a Memory/Chapter node. The metadata is pre-sealed by the caller. */
-export async function createMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, req: { originalBlobId: string; sealedMeta: { suiteId: string; bytes: string }; mimeType: string; derivatives?: { kind: DerivativeKind; blobId: string }[] }): Promise<MediaItem> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session) },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw await apiError(res, 'create media')
-  return res.json()
-}
 
 /** Toggle a medium's highlight (favourite) and/or replace its re-sealed metadata (e.g. an edited capture date). */
 export async function updateMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string, req: { highlighted?: boolean; sealedMeta?: { suiteId: string; bytes: string }; bucketId?: string }): Promise<MediaItem> {
@@ -233,27 +193,53 @@ export async function deleteMedia(apiBase: string, session: UnlockedSession, sco
 }
 
 /**
- * The full client flow: upload the original bytes (chunked + deduped transparently) and any client-generated
- * thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a typed derivative —
- * no special API. Returns the created media (original + derivative blob refs).
+ * The full client flow for ONE photo, batched + direct-to-store: the original and any client-generated
+ * thumbnail/preview are all blobs uploaded the SAME way. ONE batch-start dedups/opens every blob and presigns
+ * its missing chunks; the client seals each frame and PUTs it DIRECTLY to the store, bound-parallel across all
+ * three blobs; ONE batch-finalize completes the uploads + attaches the medium. Returns the created media.
  */
 export async function uploadMedia(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, nodeId: string, m: NewMedia, chunkSize: number = DEFAULT_CHUNK_SIZE): Promise<MediaItem> {
-  const original = await uploadBlob(apiBase, session, scopeId, contentKey, m.bytes, chunkSize)
-  const derivatives: { kind: DerivativeKind; blobId: string }[] = []
-  if (m.thumb) {
-    const thumb = await uploadBlob(apiBase, session, scopeId, contentKey, m.thumb, chunkSize)
-    derivatives.push({ kind: 'THUMBNAIL', blobId: thumb.blobId })
-  }
-  if (m.preview) {
-    const preview = await uploadBlob(apiBase, session, scopeId, contentKey, m.preview, chunkSize)
-    derivatives.push({ kind: 'PREVIEW', blobId: preview.blobId })
-  }
+  // The blob plan: original first, then optional derivatives — each split into frames.
+  const plan: { kind: 'original' | DerivativeKind; chunks: Uint8Array[]; bytes: Uint8Array }[] = [{ kind: 'original', chunks: chunkBytes(m.bytes, chunkSize), bytes: m.bytes }]
+  if (m.thumb) plan.push({ kind: 'THUMBNAIL', chunks: chunkBytes(m.thumb, chunkSize), bytes: m.thumb })
+  if (m.preview) plan.push({ kind: 'PREVIEW', chunks: chunkBytes(m.preview, chunkSize), bytes: m.preview })
+
+  // 1. ONE batch-start: dedup or open each blob, presigning every missing chunk (suite declared up front so a
+  //    direct-to-store upload — whose raw frames carry no per-frame suite — can be finalized).
+  const starts = await batchStartBlobs(apiBase, session, scopeId, plan.map((p) => ({ dedupToken: dedupTokenFor(contentKey, p.bytes), totalChunks: p.chunks.length, byteSize: p.bytes.length, suiteId: 'v1' })))
+
+  // 2. Seal + PUT every still-missing frame DIRECTLY to the store, bound-parallel across all blobs.
+  const puts: { url: string; frame: Uint8Array }[] = []
+  starts.forEach((s, bi) => {
+    if (s.status === 'ERROR') throw new Error(`upload start failed (${plan[bi].kind}): ${s.errorCode}`)
+    if (s.status !== 'UPLOADING') return // READY → already stored, nothing to push
+    const have = new Set(s.receivedChunks ?? [])
+    const presigned = new Map((s.presignedPuts ?? []).map((p) => [p.index, p.url]))
+    const chunks = plan[bi].chunks
+    for (let i = 0; i < chunks.length; i++) {
+      if (have.has(i)) continue
+      const url = presigned.get(i)
+      if (!url) throw new Error(`direct-to-store unavailable: the server returned no upload URL for chunk ${i}`)
+      puts.push({ url, frame: v1.sealFrame(contentKey, i, chunks.length, chunks[i], v1.randomBytes(12)) })
+    }
+  })
+  await mapPool(puts, 6, async (p) => {
+    const res = await fetch(p.url, { method: 'PUT', body: p.frame as BodyInit })
+    if (!res.ok) throw new Error(`presigned put failed: ${res.status}`)
+  })
+
+  // 3. ONE batch-finalize: complete each blob's upload + attach the medium with its derivatives.
+  const refFor = (s: BatchBlobStart): BlobRefInput => (s.status === 'READY' ? { blobId: s.blobId! } : { uploadId: s.uploadId! })
+  const derivatives = plan.slice(1).map((p, i) => ({ kind: p.kind as DerivativeKind, blob: refFor(starts[i + 1]) }))
   const sealedMeta = sealMediaMeta(contentKey, {
     takenAt: m.takenAt, lat: m.lat, lng: m.lng,
     cameraMake: m.cameraMake, cameraModel: m.cameraModel, lens: m.lens,
     width: m.width, height: m.height, fileSize: m.fileSize, exif: m.exif,
   })
-  return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives })
+  const results = await batchFinalizeMedia(apiBase, session, scopeId, nodeId, [{ original: refFor(starts[0]), derivatives, sealedMeta, mimeType: m.mimeType }])
+  const r = results[0]
+  if (!r?.ok || !r.media) throw new Error(`media finalize failed: ${r?.errorCode ?? 'unknown'}`)
+  return r.media
 }
 
 /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */

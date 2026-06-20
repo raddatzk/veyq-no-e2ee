@@ -179,17 +179,40 @@ export async function getSharePlaylists(ctx: ShareContext, nodeId: string): Prom
   })
 }
 
-/** Download + open a shared blob through the public share endpoint (frame by frame, AAD checks position). */
-export async function downloadShareBlob(ctx: ShareContext, ref: BlobRef): Promise<Uint8Array> {
-  // Frames are AAD-position-bound, so fetch bound-parallel and reassemble in order (bandwidth- not RTT-bound).
+// Guest transport is direct-to-store too (ADR 0021): the share endpoints only presign; the frames travel
+// guest↔store. The store is blind, so a presigned URL over a share's subtree-gated blob discloses nothing.
+type SharePresignedChunks = { blobId: string; suiteId: string; chunks: { index: number; url: string }[] }
+
+/** ONE round-trip to presign GET URLs for many shared blobs (subtree-gated); keyed by blobId, missing absent. */
+async function shareBatchPresignGet(ctx: ShareContext, blobIds: string[]): Promise<Map<string, SharePresignedChunks>> {
+  const res = await fetch(`${sp(ctx)}/blob-downloads-batch`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ blobIds }),
+  })
+  if (!res.ok) throw await apiError(res, 'share batch presign')
+  return new Map(((await res.json()).results as SharePresignedChunks[]).map((r) => [r.blobId, r]))
+}
+
+/** Fetch one presigned shared blob directly from the store, open each frame (AAD checks position), reassemble. */
+async function fetchShareBlobFrames(ctx: ShareContext, ref: BlobRef, presigned: SharePresignedChunks): Promise<Uint8Array> {
+  if (presigned.chunks.length !== ref.totalChunks) throw new Error(`share download unavailable for ${ref.blobId}`)
+  const urls = new Map(presigned.chunks.map((c) => [c.index, c.url]))
   const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
   const parts = await mapPool(indices, 4, async (i) => {
-    const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/blobs/${ref.blobId}/chunks/${i}`)
-    if (!res.ok) throw await apiError(res, `share chunk ${i}`)
-    const frame = fromB64url((await res.json()).frame.bytes)
-    return v1.openFrame(ctx.contentKey, i, ref.totalChunks, frame)
+    const url = urls.get(i)
+    if (!url) throw new Error(`missing presigned url for chunk ${i}`)
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`share presigned get chunk ${i} failed: ${r.status}`)
+    return v1.openFrame(ctx.contentKey, i, ref.totalChunks, new Uint8Array(await r.arrayBuffer()))
   })
   return v1.concat(...parts)
+}
+
+/** Download + open a shared blob directly from the store (presign + parallel GET). */
+export async function downloadShareBlob(ctx: ShareContext, ref: BlobRef): Promise<Uint8Array> {
+  const p = (await shareBatchPresignGet(ctx, [ref.blobId])).get(ref.blobId)
+  if (!p) throw new Error(`blob ${ref.blobId} not available`)
+  return fetchShareBlobFrames(ctx, ref, p)
 }
 
 function imageAspectRatio(url: string): Promise<number> {
@@ -206,11 +229,19 @@ export async function loadShareTiles(ctx: ShareContext, nodeId: string): Promise
   const media = await listShareMedia(ctx, nodeId)
   const withMeta = media.map((m) => ({ m, meta: decodeMediaMeta(ctx.contentKey, m) }))
   withMeta.sort((a, b) => a.meta.takenAt.localeCompare(b.meta.takenAt))
-  // Download the (small) thumbnails bound-parallel rather than one-by-one; mapPool keeps the takenAt order.
-  return mapPool(withMeta, 6, async ({ m, meta }) => {
-    const ref = m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original
-    const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
-    const bytes = await downloadShareBlob(ctx, ref)
+  // Resolve each tile's thumbnail + preview refs, then presign the whole page's thumbnails in ONE round-trip
+  // and fetch them direct + parallel from the store (no per-thumbnail backend hop / egress).
+  const tiles = withMeta.map(({ m, meta }) => ({
+    m, meta,
+    ref: m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original,
+    preview: m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original,
+  }))
+  const presigned = await shareBatchPresignGet(ctx, tiles.map((t) => t.ref.blobId))
+  // mapPool keeps the takenAt order.
+  return mapPool(tiles, 6, async ({ m, meta, ref, preview }) => {
+    const p = presigned.get(ref.blobId)
+    if (!p) throw new Error(`thumbnail ${ref.blobId} not available`)
+    const bytes = await fetchShareBlobFrames(ctx, ref, p)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
     return {
       id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType,
@@ -240,30 +271,17 @@ const sp = (ctx: ShareContext) => `${ctx.apiBase}/api/public/shares/${ctx.shareI
 const uploadProofHeaders = (ctx: ShareContext): Record<string, string> => ({ 'x-veyq-share-upload-token': ctx.uploadToken })
 const uploadJsonHeaders = (ctx: ShareContext): Record<string, string> => ({ 'content-type': 'application/json', ...uploadProofHeaders(ctx) })
 
-/** Upload arbitrary content as a deduplicated blob via the share's guest endpoints (dedup + resume). */
-async function uploadShareBlob(ctx: ShareContext, bytes: Uint8Array): Promise<BlobRef> {
-  const chunks = chunkBytes(bytes, DEFAULT_CHUNK_SIZE)
-  const start = await fetch(`${sp(ctx)}/blobs`, {
+type ShareBlobStart = { status: 'READY' | 'UPLOADING' | 'ERROR'; blobId?: string; uploadId?: string; receivedChunks?: number[]; presignedPuts?: { index: number; url: string }[]; errorCode?: string }
+type ShareBlobRefInput = { uploadId?: string; blobId?: string }
+
+/** ONE round-trip to dedup/open + presign many guest blobs (proof-gated). */
+async function shareBatchStart(ctx: ShareContext, items: { dedupToken: string; totalChunks: number; byteSize: number; suiteId?: string }[]): Promise<ShareBlobStart[]> {
+  const res = await fetch(`${sp(ctx)}/blob-uploads-batch`, {
     method: 'POST', headers: uploadJsonHeaders(ctx),
-    body: JSON.stringify({ dedupToken: dedupTokenFor(ctx.contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length }),
+    body: JSON.stringify({ items }),
   })
-  if (!start.ok) throw await apiError(start, 'share start blob')
-  const ticket = await start.json()
-  if (ticket.status === 'READY') return { blobId: ticket.blobId, totalChunks: ticket.totalChunks, byteSize: bytes.length }
-  const uploadId = ticket.uploadId
-  const have = new Set<number>((await (await fetch(`${sp(ctx)}/blob-uploads/${uploadId}`, { headers: uploadProofHeaders(ctx) })).json()).receivedChunks)
-  for (let i = 0; i < chunks.length; i++) {
-    if (have.has(i)) continue
-    const frame = v1.sealFrame(ctx.contentKey, i, chunks.length, chunks[i], v1.randomBytes(12))
-    const put = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/chunks/${i}`, {
-      method: 'PUT', headers: uploadJsonHeaders(ctx),
-      body: JSON.stringify({ frame: { suiteId: 'v1', bytes: b64url(frame) } }),
-    })
-    if (!put.ok) throw new Error(`share put chunk ${i} failed: ${put.status}`)
-  }
-  const done = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/complete`, { method: 'POST', headers: uploadProofHeaders(ctx) })
-  if (!done.ok) throw await apiError(done, 'share complete')
-  return done.json()
+  if (!res.ok) throw await apiError(res, 'share batch start')
+  return (await res.json()).results
 }
 
 /** Seal a guest's chosen display name under the share content key (operator-blind), like a bucket name. */
@@ -272,25 +290,54 @@ export function sealShareName(ctx: ShareContext, name: string): { suiteId: strin
   return { suiteId: 'v1', bytes: b64url(v1.concat(nonce, v1.aeadSeal(ctx.contentKey, nonce, v1.utf8(name), EMPTY))) }
 }
 
-/** Contribute a media (original + optional thumbnail) to the shared memory, sealed under the content key. When
- *  the guest has named themselves, the uploads group under their own (named, operator-blind) contribution bucket. */
+/**
+ * Contribute a media (original + optional thumbnail/preview) to the shared memory, batched + direct-to-store:
+ * ONE batch-start presigns every blob, the guest PUTs each sealed frame straight to the store, and ONE
+ * batch-finalize completes the uploads + attaches the medium. When the guest has named themselves, their
+ * uploads group under their own (named, operator-blind) contribution bucket.
+ */
 export async function uploadShareMedia(ctx: ShareContext, m: NewMedia, contributor?: { id: string; name: string }): Promise<void> {
-  const original = await uploadShareBlob(ctx, m.bytes)
-  const derivatives: { kind: DerivativeKind; blobId: string }[] = []
-  if (m.thumb) derivatives.push({ kind: 'THUMBNAIL', blobId: (await uploadShareBlob(ctx, m.thumb)).blobId })
-  if (m.preview) derivatives.push({ kind: 'PREVIEW', blobId: (await uploadShareBlob(ctx, m.preview)).blobId })
+  const plan: { kind: 'original' | DerivativeKind; chunks: Uint8Array[]; bytes: Uint8Array }[] = [{ kind: 'original', chunks: chunkBytes(m.bytes, DEFAULT_CHUNK_SIZE), bytes: m.bytes }]
+  if (m.thumb) plan.push({ kind: 'THUMBNAIL', chunks: chunkBytes(m.thumb, DEFAULT_CHUNK_SIZE), bytes: m.thumb })
+  if (m.preview) plan.push({ kind: 'PREVIEW', chunks: chunkBytes(m.preview, DEFAULT_CHUNK_SIZE), bytes: m.preview })
+
+  const starts = await shareBatchStart(ctx, plan.map((p) => ({ dedupToken: dedupTokenFor(ctx.contentKey, p.bytes), totalChunks: p.chunks.length, byteSize: p.bytes.length, suiteId: 'v1' })))
+
+  const puts: { url: string; frame: Uint8Array }[] = []
+  starts.forEach((s, bi) => {
+    if (s.status === 'ERROR') throw new Error(`share upload start failed (${plan[bi].kind}): ${s.errorCode}`)
+    if (s.status !== 'UPLOADING') return
+    const have = new Set(s.receivedChunks ?? [])
+    const presigned = new Map((s.presignedPuts ?? []).map((p) => [p.index, p.url]))
+    const chunks = plan[bi].chunks
+    for (let i = 0; i < chunks.length; i++) {
+      if (have.has(i)) continue
+      const url = presigned.get(i)
+      if (!url) throw new Error(`direct-to-store unavailable: no upload URL for chunk ${i}`)
+      puts.push({ url, frame: v1.sealFrame(ctx.contentKey, i, chunks.length, chunks[i], v1.randomBytes(12)) })
+    }
+  })
+  await mapPool(puts, 6, async (p) => {
+    const res = await fetch(p.url, { method: 'PUT', body: p.frame as BodyInit })
+    if (!res.ok) throw new Error(`share presigned put failed: ${res.status}`)
+  })
+
+  const refFor = (s: ShareBlobStart): ShareBlobRefInput => (s.status === 'READY' ? { blobId: s.blobId } : { uploadId: s.uploadId })
+  const derivatives = plan.slice(1).map((p, i) => ({ kind: p.kind as DerivativeKind, blob: refFor(starts[i + 1]) }))
   const sealedMeta = sealMediaMeta(ctx.contentKey, {
     takenAt: m.takenAt, lat: m.lat, lng: m.lng,
     cameraMake: m.cameraMake, cameraModel: m.cameraModel, lens: m.lens, width: m.width, height: m.height, fileSize: m.fileSize, exif: m.exif,
   })
-  const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/contributed-media`, {
+  const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/contributed-media-batch`, {
     method: 'POST', headers: uploadJsonHeaders(ctx),
-    body: JSON.stringify({
-      originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives,
+    body: JSON.stringify({ items: [{
+      original: refFor(starts[0]), derivatives, sealedMeta, mimeType: m.mimeType,
       ...(contributor ? { contributorId: contributor.id, contributorName: sealShareName(ctx, contributor.name) } : {}),
-    }),
+    }] }),
   })
-  if (!res.ok) throw await apiError(res, 'contribute media')
+  if (!res.ok) throw await apiError(res, 'share contribute batch')
+  const r = (await res.json()).results[0]
+  if (!r?.ok) throw new Error(`share contribute failed: ${r?.errorCode ?? 'unknown'}`)
 }
 
 /** Read a shared node's journal Markdown ('' when none). Read-only over a share — only the owner edits. */

@@ -3,7 +3,7 @@
 // needs. (The greenfield media model stores no dimensions, so the ratio comes from the bytes we load anyway.)
 import type { UnlockedSession } from '../account/login/login'
 import type { ActiveSpace } from '../home/home'
-import { decodeMediaMeta, downloadBlob, listMedia, type BlobRef } from '../uploads/media/media'
+import { decodeMediaMeta, downloadBlob, downloadBlobsBatch, listMedia, type BlobRef } from '../uploads/media/media'
 import { mapPool } from '../../shared/pool'
 import { galleryDisplayAspectRatio } from './justifiedLayout'
 
@@ -34,11 +34,18 @@ export async function loadGalleryTiles(apiBase: string, session: UnlockedSession
   // Sort by decrypted capture time (the server lists in upload order and is blind to takenAt).
   const withMeta = media.map((m) => ({ m, meta: decodeMediaMeta(active.contentKey, m) }))
   withMeta.sort((a, b) => a.meta.takenAt.localeCompare(b.meta.takenAt))
-  // Download the (small) thumbnails bound-parallel rather than one-by-one; mapPool keeps the takenAt order.
-  return mapPool(withMeta, 6, async ({ m, meta }) => {
-    const ref = m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original
-    const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
-    const bytes = await downloadBlob(apiBase, session, active.scope.scopeId, active.contentKey, ref)
+  // Resolve each tile's thumbnail + preview refs, then download the whole page's thumbnails with ONE
+  // batch-presign-get → direct, parallel GETs from the store (no per-thumbnail backend round-trip / egress).
+  const tiles = withMeta.map(({ m, meta }) => ({
+    m, meta,
+    ref: m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original,
+    preview: m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original,
+  }))
+  const bytesByBlob = await downloadBlobsBatch(apiBase, session, active.scope.scopeId, active.contentKey, tiles.map((t) => t.ref))
+  // mapPool keeps the takenAt order; the bytes are already fetched, so this just builds object URLs + ratios.
+  return mapPool(tiles, 6, async ({ m, meta, ref, preview }) => {
+    const bytes = bytesByBlob.get(ref.blobId)
+    if (!bytes) throw new Error(`thumbnail ${ref.blobId} not available`)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
     return {
       id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType,

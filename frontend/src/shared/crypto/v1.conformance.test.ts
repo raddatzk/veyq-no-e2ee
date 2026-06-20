@@ -8,7 +8,7 @@ const unhex = (s: string) => Uint8Array.from(Buffer.from(s, 'hex'))
 const hex = (u: Uint8Array) => Buffer.from(u).toString('hex')
 
 const here = dirname(fileURLToPath(import.meta.url))
-// repo docs/api/crypto-vectors/v1.json (4 levels up from src/shared/crypto/)
+// repo docs/api/crypto-vectors/v1.json (4 levels up from frontend/src/shared/crypto/)
 const vectors = JSON.parse(
   readFileSync(resolve(here, '../../../../docs/api/crypto-vectors/v1.json'), 'utf8'),
 )
