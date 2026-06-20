@@ -24,20 +24,21 @@ documents:
     ref: apple/Sources/VeyqCrypto/Media.swift
 notes: >
   One upload path / one download path for all bytes. Every file is a deduplicated chunk-set (small = 1 frame,
-  large = many), AEAD-framed (v1.sealFrame, AAD binds index+total) in a BlobStore (filesystem now; S3/MinIO
-  and per-tenant buckets drop in behind the interface); the DB holds only session + manifest. A media attaches
-  a stored blob to a Memory/Chapter with typed derivatives (thumbnail/preview), themselves ordinary blobs.
-  Bytes flow through the app server (no presigned direct-to-store URLs yet); transcode/streaming derivatives
-  are a later slice.
+  large = many), AEAD-framed (v1.sealFrame, AAD binds index+total) in an S3-compatible BlobStore (external S3 or
+  a bundled MinIO; InMemoryBlobStore for dev/test only, which can't presign); the DB holds only session +
+  manifest. A media attaches a stored blob to a Memory/Chapter with typed derivatives (thumbnail/preview),
+  themselves ordinary blobs. Transport is direct-to-store only (ADR 0021): clients PUT/GET frames straight to
+  the store via presigned URLs and the control plane is batched (blob-uploads-batch / media …-batch /
+  blob-downloads-batch); the backend never proxies bytes.
 acceptanceCriteria:
   - id: uc.uploads.unified-media.one-path
-    statement: A small file (one frame) and a large file (many frames) upload and download byte-identical through the SAME blob API; download opens each frame and concatenates.
+    statement: A small file (one frame) and a large file (many frames) upload and download byte-identical through the SAME batched blob API; download opens each frame and concatenates.
     coverage:
       backend:
         integration:
-          - testName: uploadsDeduplicatesAndDownloadsABlob
+          - testName: batchUploadFinalizeDownloadRoundTrip
             kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadSliceTest.kt
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
       web:
         e2e:
           - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
@@ -67,13 +68,13 @@ acceptanceCriteria:
             kind: negative
             ref: frontend/src/features/uploads/media/media.e2e.test.ts
   - id: uc.uploads.unified-media.dedup
-    statement: Identical content within a scope is stored once, keyed by a client-computed per-scope dedup token; startBlob returns READY with the existing blobId and the bytes are never re-sent.
+    statement: Identical content within a scope is stored once, keyed by a client-computed per-scope dedup token; batch-start returns READY with the existing blobId and the bytes are never re-sent.
     coverage:
       backend:
         integration:
-          - testName: uploadsDeduplicatesAndDownloadsABlob
+          - testName: batchStartDedupsAlreadyStoredContentMidBatch
             kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadSliceTest.kt
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
       web:
         unit:
           - testName: "media dedup token (AD-09)"
@@ -88,9 +89,9 @@ acceptanceCriteria:
     coverage:
       backend:
         integration:
-          - testName: uploadsDeduplicatesAndDownloadsABlob
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadSliceTest.kt
+          - testName: resumeSkipsChunksAlreadyInTheStore
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
       web:
         e2e:
           - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"

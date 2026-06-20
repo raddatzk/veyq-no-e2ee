@@ -29,22 +29,22 @@ The architecture target is **E2EE everywhere**. Delivery can still be incrementa
 **shared-scope** key-management + Key Transparency investment can follow. The design assumes all-E2E
 from day one so nothing is painted into a corner.
 
-## Delivery note — legacy web UI port over the E2EE core
+## Delivery note — legacy web UI over the E2EE core
 
 [AD-29](decisions/0029-legacy-web-ui-over-e2ee-core.md) makes the legacy web UI/UX the web product
 baseline, while the Greenfield E2EE client/domain core remains the security and data baseline.
 
-### Porting boundary
+**Status: consolidated.** The two web trees were merged into a single client at **`frontend/`** (the former
+`legacy/frontend`, which already carried the Greenfield E2EE modules under `frontend/src/features/**` and
+`frontend/src/shared/crypto/**`); the earlier separate experimental client was removed and the Dockerfile builds
+`frontend/`. The boundaries below are the governing invariants for that one client.
 
-| Legacy asset | Direction |
-|---|---|
-| `legacy/frontend/src/components/app/AppShell.vue` | Port shell structure into the active web client. |
-| `legacy/frontend/src/components/app/TenantSidebar.vue` | Adapt as the spaces/sidebar surface over decrypted `SpaceEntry` view models. |
-| `legacy/frontend/src/components/app/WorkspaceTopbar.vue` | Port topbar ergonomics; bind search, settings and profile actions to the new session model. |
-| `legacy/frontend/src/components/media/*` | Reuse gallery/lightbox behavior where it fits encrypted blob URLs and client-side decryption. |
-| `legacy/frontend/src/styles/*.css` | Reuse visual system, spacing and responsive behavior; reconcile tokens with active `frontend/src/styles`. |
-| `legacy/frontend/src/api/*` and generated clients | Do not port. Replace with the Greenfield OpenAPI/client and E2EE feature modules. |
-| Legacy auth/tenant/share assumptions | Adapt only through new E2EE registration, scope grants, share-fragment keys and sealed metadata flows. |
+### Porting boundary (historical)
+
+The legacy shell / sidebar / topbar / media / style components were folded into `frontend/`. The legacy
+`src/api/*` generated clients were **not** carried over — they're replaced by the Greenfield OpenAPI client +
+E2EE feature modules. Legacy auth/tenant/share assumptions are honored only through E2EE registration, scope
+grants, share-fragment keys and sealed-metadata flows.
 
 ### Adapter boundary
 

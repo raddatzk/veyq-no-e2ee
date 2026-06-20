@@ -398,9 +398,8 @@ components:
         dedupToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         totalChunks: { type: integer, minimum: 1, maximum: 10000 }
         byteSize: { type: integer, format: int64, minimum: 0, maximum: 10737418240 }
-        # Declared up front for a presigned (direct-to-store) upload: raw frames PUT straight to S3 carry no
-        # per-frame suite metadata, so the client states the frames' crypto suite here. Optional — a proxied
-        # upload still derives it from the frame bodies.
+        # Declared up front for the direct-to-store upload: raw frames PUT straight to the store carry no
+        # per-frame suite metadata, so the client states the frames' crypto suite here.
         suiteId: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 32)'] }
     BlobTicket:
       type: object
@@ -410,11 +409,6 @@ components:
         blobId: { type: string, description: 'Set when READY (dedup hit) — attach this blob directly.' }
         uploadId: { type: string, description: 'Set when UPLOADING — push the frames here, then complete.' }
         totalChunks: { type: integer }
-    PutChunkRequest:
-      type: object
-      required: [frame]
-      properties:
-        frame: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     BlobUploadProgress:
       type: object
       required: [uploadId, totalChunks, receivedChunks, status]
@@ -423,9 +417,9 @@ components:
         totalChunks: { type: integer }
         receivedChunks: { type: array, items: { type: integer } }
         status: { type: string, enum: [OPEN, COMPLETED] }
-        # Direct-to-store fast path (ADR 0021): when the backend can presign, a short-lived PUT URL per still-
-        # missing chunk. The client PUTs the raw sealed frame straight to S3 and skips the proxied chunk endpoint.
-        # Absent/empty when the store can't presign (the in-memory dev backend) → client uses the proxied path.
+        # Direct-to-store (ADR 0021): a short-lived PUT URL per still-missing chunk; the client PUTs the raw
+        # sealed frame straight to the store. Empty only when the store can't presign (dev/test in-memory), where
+        # there is no media-transport path. (Batched callers use blob-uploads-batch, which carries the same URLs.)
         presignedPuts: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
     PresignedPut:
       type: object
@@ -438,9 +432,9 @@ components:
       required: [suiteId, chunks]
       properties:
         suiteId: { type: string }
-        # Direct-from-store download fast path (ADR 0021): a short-lived GET URL per chunk. The client GETs the
-        # raw sealed frame straight from S3 and opens it with openFrame. Empty when the store can't presign (the
-        # in-memory dev backend) → client falls back to the proxied chunk endpoint.
+        # Direct-from-store download (ADR 0021): a short-lived GET URL per chunk; the client GETs the raw sealed
+        # frame straight from the store and opens it with openFrame. Empty only when the store can't presign
+        # (dev/test in-memory). (Batched callers use blob-downloads-batch, which returns the same URLs.)
         chunks: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
     CompleteBlobResponse:
       type: object
@@ -541,11 +535,6 @@ components:
       required: [results]
       properties:
         results: { type: array, items: { $ref: '#/components/schemas/FinalizeMediaResult' } }
-    ChunkResponse:
-      type: object
-      required: [frame]
-      properties:
-        frame: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     BlobRef:
       type: object
       required: [blobId, totalChunks, byteSize]

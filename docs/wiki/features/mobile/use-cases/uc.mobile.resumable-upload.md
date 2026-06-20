@@ -11,27 +11,30 @@
   chunks**; the assembled media attaches to the Memory.
 
 ## Mechanics
-The client seals the media, splits it into fixed-size **encrypted chunks**, and registers the blob
-(`startBlob` → `uploadId` + per-chunk **presigned PUT** URLs). Chunks PUT **directly to object storage**;
-the server tracks which chunks have arrived and finalizes on `completeBlob`
-(`apple/Sources/VeyqCrypto/Media.swift`, `android/core/.../Media.kt`,
-backend `uploads/blob/BlobUploadHandler.kt`).
+The client seals the media, splits it into fixed-size **encrypted chunks**, and opens a photo's blobs
+(original + thumbnail/preview) in ONE **batched** call (`blob-uploads-batch` → per blob: `READY` on a dedup
+hit, or an `uploadId` + per-chunk **presigned PUT** URLs). Chunks PUT **directly to object storage**; the
+server tracks which arrived (by stat-ing the store) and a single batched finalize (media `…-batch`) completes
+the uploads + attaches the media (`apple/Sources/VeyqCrypto/Media.swift`, `android/core/.../Media.kt`,
+backend `uploads/blob/BlobUploadHandler.kt` + `uploads/media/MediaHandler.kt`). Transport is direct-to-store
+only — there is no proxied path (ADR 0021).
 
 ## Main flow
 1. The curator picks media in the app.
 2. The client **seals** it under the content key and splits it into encrypted chunks; it computes a
    **dedup token**.
-3. `startBlob` declares total chunks + size; the server returns an `uploadId` and **presigned PUT** URLs.
-4. The client **PUTs each chunk** to object storage; progress is tracked per chunk.
-5. `completeBlob` finalizes the blob; the client attaches it to the Memory as **media** with sealed
-   metadata.
+3. **Batch-start** declares all of a photo's blobs (chunk counts + sizes); the server returns, per blob,
+   `READY` (dedup hit — never re-sent) or an `uploadId` + **presigned PUT** URLs for the missing chunks.
+4. The client **PUTs each missing chunk** directly to object storage, parallel across blobs; progress per chunk.
+5. **Batch-finalize** completes the uploads and attaches them to the Memory as **media** (with derivatives)
+   under sealed metadata.
 
 ## Alternate / exception flows
-- A1: The **connection drops** mid-upload → the client re-queries progress and re-PUTs only the
-  **missing chunks** (resume, not restart).
-- A2: The **same bytes already exist** (dedup token matches) → the upload short-circuits; no re-transfer.
-- E1: A **presigned URL expires** before a chunk lands → the client requests a fresh URL and retries that
-  chunk.
+- A1: The **connection drops** mid-upload → the client re-calls **batch-start with the `uploadId`**; the
+  server stats the store and re-presigns only the **missing chunks** (resume, not restart).
+- A2: The **same bytes already exist** (dedup token matches) → batch-start returns `READY`; no re-transfer.
+- E1: A **presigned URL expires** before a chunk lands → the client re-requests it via a fresh batch-start
+  and retries that chunk.
 - E2: A chunk fails an **integrity / size** check → rejected; the client retries that chunk.
 - E3: A **disallowed type** or limits exceeded → rejected with a clear, rate-limited error.
 

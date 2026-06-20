@@ -26,8 +26,9 @@
 3. The client builds the link with the share key in the fragment; the curator distributes it.
 4. A Public Viewer opens the link and calls `GET /api/public/shares/{shareId}` (no auth) → role +
    wrapped key + root node.
-5. The viewer **unwraps** the content key from the fragment and reads the subtree (`…/nodes`, `…/media`,
-   `…/blobs/{id}/chunks/{i}`), decrypting everything client-side.
+5. The viewer **unwraps** the content key from the fragment and reads the subtree (`…/nodes`, `…/media`),
+   fetching blob frames **directly from the object store** via subtree-gated presigned GET URLs
+   (`…/blob-downloads-batch`, ADR 0021) and decrypting everything client-side.
 
 ## Alternate / exception flows
 - A1: The curator sets an **expiry** → after it passes, guest requests return `404`.
