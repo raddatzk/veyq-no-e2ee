@@ -200,6 +200,8 @@ test-results/
 
 # Local deployment secrets
 infra/.env
+# Local dev secrets — Quarkus dev-mode auto-loads backend/.env (SMTP creds, real cloud keys); keep it untracked.
+backend/.env
 load/k6/users.local.json
 !load/k6/users.local.example.json
 
