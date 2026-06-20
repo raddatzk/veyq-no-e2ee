@@ -46,6 +46,59 @@ No test should be deleted solely because it was temporarily unmapped. A deletion
 
 None.
 
+## Engineering-Trust Tests (not product acceptance criteria)
+
+These frontend tests protect shared technical infrastructure — routing guards, theming/favicon,
+deep-link/app-banner helpers, date and path utilities. They prove engineering trust rather than a
+Memory-level product, operator, API or platform acceptance criterion, so they are listed here
+(decision `engineering-trust`) instead of being mapped under a use-case coverage YAML.
+
+### App-link / Smart App Banner helpers
+
+The web shell's Safari Smart App Banner and `veyq://` deep-link plumbing — pure helper and component
+behavior driven by runtime bootstrap metadata; no user-facing Memory acceptance criterion of its own.
+
+- `frontend/src/components/app/AppLinkBanner.test.ts::uses runtime bootstrap metadata for the Safari Smart App Banner`: engineering-trust — app-banner component wiring.
+- `frontend/src/components/app/AppLinkBanner.test.ts::does not leave Smart App Banner metadata when the instance has no app id`: engineering-trust — app-banner component wiring.
+- `frontend/src/shared/utils/appLinks.test.ts::detects iOS browser user agents`: engineering-trust — deep-link/user-agent helper.
+- `frontend/src/shared/utils/appLinks.test.ts::builds canonical http app urls from the current location`: engineering-trust — deep-link/user-agent helper.
+- `frontend/src/shared/utils/appLinks.test.ts::rejects non-http locations`: engineering-trust — deep-link/user-agent helper.
+- `frontend/src/shared/utils/appLinks.test.ts::encodes canonical links as veyq open urls`: engineering-trust — deep-link/user-agent helper.
+- `frontend/src/shared/utils/appLinks.test.ts::creates Safari Smart App Banner content only when configured`: engineering-trust — deep-link/user-agent helper.
+- `frontend/src/shared/utils/appLinks.test.ts::upserts and removes Safari Smart App Banner metadata`: engineering-trust — deep-link/user-agent helper.
+
+### Router guard
+
+The Vue router guard's setup/lock/public-route/invite-fragment redirects — navigation infrastructure
+that every feature relies on; the per-feature product behavior is asserted in the feature use-cases.
+
+- `frontend/src/router.test.ts::forces setup when the instance is not set up yet`: engineering-trust — router guard infrastructure.
+- `frontend/src/router.test.ts::sends a locked visitor to login on a protected route`: engineering-trust — router guard infrastructure.
+- `frontend/src/router.test.ts::keeps public routes reachable while locked`: engineering-trust — router guard infrastructure.
+- `frontend/src/router.test.ts::routes an invite-fragment link to the accept view`: engineering-trust — router guard infrastructure.
+
+### Theme / favicon state
+
+Theme preference resolution and active-favicon swapping — cosmetic shell infrastructure with no
+Memory-level acceptance criterion.
+
+- `frontend/src/shared/state/useThemeState.test.ts::sets the light favicon when system preference resolves to light`: engineering-trust — theme/favicon infrastructure.
+- `frontend/src/shared/state/useThemeState.test.ts::replaces the active favicon for an explicit dark theme`: engineering-trust — theme/favicon infrastructure.
+- `frontend/src/shared/state/useThemeState.test.ts::replaces the active favicon when switching back to light`: engineering-trust — theme/favicon infrastructure.
+- `frontend/src/shared/state/useThemeState.test.ts::replaces the active favicon when system preference changes`: engineering-trust — theme/favicon infrastructure.
+
+### Date & path utilities
+
+Low-level ISO-date round-tripping and memory-path/route/API-path conversion helpers — shared utility
+code; behaviors that matter to users are exercised through the feature flows that consume them.
+
+- `frontend/src/shared/utils/isoDate.test.ts::round-trips ISO dates through local Date instances without timezone shifts`: engineering-trust — date utility helper.
+- `frontend/src/shared/utils/isoDate.test.ts::keeps empty or invalid values empty`: engineering-trust — date utility helper.
+- `frontend/src/shared/utils/paths.test.ts::converts route path params to memory paths`: engineering-trust — path utility helper.
+- `frontend/src/shared/utils/paths.test.ts::converts memory paths to frontend routes`: engineering-trust — path utility helper.
+- `frontend/src/shared/utils/paths.test.ts::encodes api paths and path queries`: engineering-trust — path utility helper.
+- `frontend/src/shared/utils/paths.test.ts::detects settings paths by the final segment`: engineering-trust — path utility helper.
+
 ## Pending Native Coverage Mapping
 
 None. Native iOS unit-test mappings now live directly in Feature YAML under `ios.unit`.

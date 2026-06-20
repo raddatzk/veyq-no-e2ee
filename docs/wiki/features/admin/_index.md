@@ -14,6 +14,7 @@ handling of reported shares.
 - ★ [First-run server setup](use-cases/uc.admin.setup-server.md)
 - ★ [Create a tenant and invite its owner](use-cases/uc.admin.create-tenant-invite-owner.md)
 - ★ [Invite members, grant access & assign roles](use-cases/uc.admin.invite-members-roles.md) — incl. remove & deactivate
+- ★ [Manage server users & roles](use-cases/uc.admin.server-users.md) — instance roster & server-role admin
 - ★ [Set tenant branding & legal terms](use-cases/uc.admin.branding-terms.md)
 - `uc.admin.backup-upgrade` — back up and upgrade
 - `uc.admin.takedown-reported-share` — act on a reported public share

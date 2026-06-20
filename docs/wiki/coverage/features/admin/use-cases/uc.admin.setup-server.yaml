@@ -2,146 +2,136 @@ id: uc.admin.setup-server
 title: First-run server setup
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/admin/_index.md
-  - type: useCase
-    ref: docs/wiki/features/admin/use-cases/uc.admin.setup-server.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/account-key-model.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/crypto-spec.md
-  - type: overview
-    ref: docs/wiki/overview/architecture.md
-  - type: api
-    ref: docs/api/setup.openapi.yaml
-  - type: api
-    ref: docs/api/crypto-vectors/v1.json
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/admin/setupServer/setupServer.ts
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/SetupServer.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/SetupServer.swift
+- type: feature
+  ref: docs/wiki/features/admin/_index.md
+- type: useCase
+  ref: docs/wiki/features/admin/use-cases/uc.admin.setup-server.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/account-key-model.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/crypto-spec.md
+- type: overview
+  ref: docs/wiki/overview/architecture.md
+- type: api
+  ref: docs/api/setup.openapi.yaml
+- type: api
+  ref: docs/api/crypto-vectors/v1.json
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/admin/setupServer/setupServer.ts
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/SetupServer.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/SetupServer.swift
 acceptanceCriteria:
-  - id: uc.admin.setup-server.health-and-shell
-    statement: A fresh instance exposes a lightweight health endpoint and a web shell that can render the veyq identity.
-    coverage:
-      backend:
-        integration:
-          - testName: health
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/HealthResourceTest.kt
-      web:
-        unit:
-          - testName: "a fresh instance boots into setup"
-            kind: positive
-            ref: frontend/src/App.test.ts
-  - id: uc.admin.setup-server.first-owner
-    statement: A fresh instance can create its first E2EE Server Owner and then close setup.
-    coverage:
-      backend:
-        integration:
-          - testName: coldRegistrationFlow
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
-          - testName: rejectsBlankDisplayName
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
-          - testName: rejectsMalformedEmail
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
-      web:
-        e2e:
-          - testName: creates the first E2EE user end-to-end
-            kind: positive
-            ref: frontend/src/features/admin/setupServer/setupServer.e2e.test.ts
-      android:
-        e2e:
-          - testName: createsFirstUser
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SetupServerE2ETest.kt
-      apple:
-        e2e:
-          - testName: testCreatesFirstUser
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/SetupServerE2ETests.swift
-  - id: uc.admin.setup-server.crypto-suite
-    statement: Client-side setup key material uses the shared v1 crypto suite and conformance vectors.
-    coverage:
-      web:
-        unit:
-          - testName: targets suite v1
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: AES-256-GCM
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: password + secret key KEK (Argon2id)
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: recovery code KEK (Argon2id)
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: KEM-v1 decap (hybrid X25519 + ML-KEM-768)
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: symmetric master-key wrap
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: asymmetric wrap round-trip (unwrap a recorded blob)
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: "HKDF-SHA256 (RFC 5869 case 1)"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: "kdfParams wire format (encode + decode round-trip)"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-      android:
-        unit:
-          - testName: suiteId
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
-          - testName: mlkem768RoundTrip
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
-          - testName: conformance
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/V1ConformanceTest.kt
-          - testName: asymWrapRoundTrip
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/V1WrapRoundTripTest.kt
-      apple:
-        unit:
-          - testName: testSuiteId
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/SmokeTests.swift
-          - testName: testMLKEM768RoundTrip
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/SmokeTests.swift
-          - testName: testConformance
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/ConformanceTests.swift
-          - testName: testAsymWrapRoundTrip
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/WrapRoundTripTests.swift
-  - id: uc.admin.setup-server.blind-storage
-    statement: Setup stores public material and ciphertext exactly as supplied by the client.
-    coverage:
-      backend:
-        integration:
-          - testName: coldRegistrationFlow
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
-  - id: uc.admin.setup-server.single-use
-    statement: Setup is rejected after the first Server Owner exists.
-    coverage:
-      backend:
-        integration:
-          - testName: coldRegistrationFlow
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+- id: uc.admin.setup-server.health-and-shell
+  statement: A fresh instance exposes a lightweight health endpoint and a web shell that can render the veyq identity.
+  coverage:
+    backend:
+      integration:
+      - testName: health
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/HealthResourceTest.kt
+- id: uc.admin.setup-server.first-owner
+  statement: A fresh instance can create its first E2EE Server Owner and then close setup.
+  coverage:
+    backend:
+      integration:
+      - testName: coldRegistrationFlow
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+      - testName: rejectsBlankDisplayName
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+      - testName: rejectsMalformedEmail
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+    android:
+      e2e:
+      - testName: createsFirstUser
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SetupServerE2ETest.kt
+    apple:
+      e2e:
+      - testName: testCreatesFirstUser
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/SetupServerE2ETests.swift
+- id: uc.admin.setup-server.crypto-suite
+  statement: Client-side setup key material uses the shared v1 crypto suite and conformance vectors.
+  coverage:
+    web:
+      unit:
+      - testName: targets suite v1
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: AES-256-GCM
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: password + secret key KEK (Argon2id)
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: recovery code KEK (Argon2id)
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: KEM-v1 decap (hybrid X25519 + ML-KEM-768)
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: symmetric master-key wrap
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: asymmetric wrap round-trip (unwrap a recorded blob)
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: "HKDF-SHA256 (RFC 5869 case 1)"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: "kdfParams wire format (encode + decode round-trip)"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+    android:
+      unit:
+      - testName: suiteId
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
+      - testName: mlkem768RoundTrip
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
+      - testName: conformance
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/V1ConformanceTest.kt
+      - testName: asymWrapRoundTrip
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/V1WrapRoundTripTest.kt
+    apple:
+      unit:
+      - testName: testSuiteId
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/SmokeTests.swift
+      - testName: testMLKEM768RoundTrip
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/SmokeTests.swift
+      - testName: testConformance
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/ConformanceTests.swift
+      - testName: testAsymWrapRoundTrip
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/WrapRoundTripTests.swift
+- id: uc.admin.setup-server.blind-storage
+  statement: Setup stores public material and ciphertext exactly as supplied by the client.
+  coverage:
+    backend:
+      integration:
+      - testName: coldRegistrationFlow
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+- id: uc.admin.setup-server.single-use
+  statement: Setup is rejected after the first Server Owner exists.
+  coverage:
+    backend:
+      integration:
+      - testName: coldRegistrationFlow
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt

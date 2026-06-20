@@ -2,64 +2,45 @@ id: uc.memory.curate
 title: Curate a Memory
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/memory/_index.md
-  - type: useCase
-    ref: docs/wiki/features/memory/use-cases/uc.memory.curate.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: api
-    ref: docs/api/memory.openapi.yaml
+- type: feature
+  ref: docs/wiki/features/memory/_index.md
+- type: useCase
+  ref: docs/wiki/features/memory/use-cases/uc.memory.curate.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/memory.openapi.yaml
 acceptanceCriteria:
-  - id: uc.memory.curate.structural
-    statement: "Curating nodes (rename, move, reorder, cover) holds the tree invariants — slug uniqueness per parent, no cross-scope moves, no cycles — accepting valid changes and rejecting invalid ones."
-    coverage:
-      backend:
-        integration:
-          - testName: curatesNodesWithStructuralChecks
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
-          - testName: curatesNodesWithStructuralChecks
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
-      web:
-        unit:
-          - testName: "does not create a numbered slug when a sibling already uses the name"
-            kind: negative
-            ref: frontend/src/features/memory/curate/curate.test.ts
-          - testName: "does not rename with a numbered suffix when the target name collides"
-            kind: negative
-            ref: frontend/src/features/memory/curate/curate.test.ts
-          - testName: "does not move with a numbered suffix when the destination already has that name"
-            kind: negative
-            ref: frontend/src/features/memory/curate/curate.test.ts
-          - testName: "still creates a node with the base slug when there is no collision"
-            kind: positive
-            ref: frontend/src/features/memory/curate/curate.test.ts
-  - id: uc.memory.curate.delete
-    statement: "Deleting a node removes its subtree recursively while sparing siblings, and deleting a single medium also removes its derivatives."
-    coverage:
-      backend:
-        integration:
-          - testName: deletesNodeSubtreeRecursivelyButSparesSiblings
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
-          - testName: deletesSingleMediumAndItsDerivatives
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
-  - id: uc.memory.curate.personal-favorite
-    statement: "A member can mark a Memory as a personal favorite per user and remove it again; non-key-holders and non-Memory nodes are rejected."
-    coverage:
-      backend:
-        integration:
-          - testName: storesPersonalMemoryFavoritesPerUser
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt
-          - testName: storesPersonalMemoryFavoritesPerUser
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt
-      web:
-        unit:
-          - testName: "renders favorite memory paths from the decrypted ancestor chain"
-            kind: positive
-            ref: frontend/src/app/home/HomeView.test.ts
+- id: uc.memory.curate.structural
+  statement: "Curating nodes (rename, move, reorder, cover) holds the tree invariants — slug uniqueness per parent, no cross-scope moves, no cycles — accepting valid changes and rejecting invalid ones."
+  coverage:
+    backend:
+      integration:
+      - testName: curatesNodesWithStructuralChecks
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
+      - testName: curatesNodesWithStructuralChecks
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
+- id: uc.memory.curate.delete
+  statement: "Deleting a node removes its subtree recursively while sparing siblings, and deleting a single medium also removes its derivatives."
+  coverage:
+    backend:
+      integration:
+      - testName: deletesNodeSubtreeRecursivelyButSparesSiblings
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
+      - testName: deletesSingleMediumAndItsDerivatives
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
+- id: uc.memory.curate.personal-favorite
+  statement: "A member can mark a Memory as a personal favorite per user and remove it again; non-key-holders and non-Memory nodes are rejected."
+  coverage:
+    backend:
+      integration:
+      - testName: storesPersonalMemoryFavoritesPerUser
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt
+      - testName: storesPersonalMemoryFavoritesPerUser
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt

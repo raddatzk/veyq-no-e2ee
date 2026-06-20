@@ -2,21 +2,15 @@ id: uc.memory.download-zip
 title: Download a Memory as a zip
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/memory/_index.md
-  - type: useCase
-    ref: docs/wiki/features/memory/use-cases/uc.memory.download-zip.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
+- type: feature
+  ref: docs/wiki/features/memory/_index.md
+- type: useCase
+  ref: docs/wiki/features/memory/use-cases/uc.memory.download-zip.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
 acceptanceCriteria:
-  - id: uc.memory.download-zip.archive-roundtrip
-    statement: "The client packs decrypted files into a zip archive byte-for-byte (and produces a valid empty archive), entirely on-device."
-    coverage:
-      web:
-        unit:
-          - testName: "packs files that round-trip byte-for-byte"
-            kind: positive
-            ref: frontend/src/features/download/download.test.ts
-          - testName: "produces a valid empty archive"
-            kind: positive
-            ref: frontend/src/features/download/download.test.ts
+- id: uc.memory.download-zip.archive-roundtrip
+  statement: "The client packs decrypted files into a zip archive byte-for-byte (and produces a valid empty archive), entirely on-device."
+  gaps:
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
+    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).

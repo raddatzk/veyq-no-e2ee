@@ -2,69 +2,64 @@ id: uc.admin.create-tenant-invite-owner
 title: Create tenant and invite owner
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/admin/_index.md
-  - type: feature
-    ref: docs/wiki/features/spaces/_index.md
-  - type: useCase
-    ref: docs/wiki/features/admin/use-cases/uc.admin.create-tenant-invite-owner.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: api
-    ref: docs/api/tenants.openapi.yaml
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/admin/createTenantInviteOwner/tenant.ts
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/Tenant.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/Tenant.swift
+- type: feature
+  ref: docs/wiki/features/admin/_index.md
+- type: feature
+  ref: docs/wiki/features/spaces/_index.md
+- type: useCase
+  ref: docs/wiki/features/admin/use-cases/uc.admin.create-tenant-invite-owner.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/tenants.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/admin/createTenantInviteOwner/tenant.ts
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/Tenant.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/Tenant.swift
 acceptanceCriteria:
-  - id: uc.admin.create-tenant-invite-owner.provision-shell
-    statement: A Server Owner can provision a pending tenant shell and issue an owner invite.
-    coverage:
-      backend:
-        integration:
-          - testName: provisionInviteAndClaim
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
-  - id: uc.admin.create-tenant-invite-owner.authorization
-    statement: Tenant provisioning requires a valid Server Owner session.
-    coverage:
-      backend:
-        integration:
-          - testName: provisionInviteAndClaim
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
-  - id: uc.admin.create-tenant-invite-owner.claim-scope
-    statement: The invited owner claims the tenant by minting the tenant scope and storing only a ciphertext self-grant.
-    coverage:
-      backend:
-        integration:
-          - testName: provisionInviteAndClaim
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
-      web:
-        e2e:
-          - testName: provisions a tenant, claims ownership, and round-trips the scope grant
-            kind: positive
-            ref: frontend/src/features/admin/createTenantInviteOwner/tenant.e2e.test.ts
-      android:
-        e2e:
-          - testName: provisionClaimAndGrant
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/TenantE2ETest.kt
-      apple:
-        e2e:
-          - testName: testProvisionClaimAndGrant
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/TenantE2ETests.swift
-  - id: uc.admin.create-tenant-invite-owner.single-use-secret
-    statement: Wrong bootstrap secrets fail and consumed owner invites cannot be reused.
-    coverage:
-      backend:
-        integration:
-          - testName: provisionInviteAndClaim
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+- id: uc.admin.create-tenant-invite-owner.provision-shell
+  statement: A Server Owner can provision a pending tenant shell and issue an owner invite.
+  coverage:
+    backend:
+      integration:
+      - testName: provisionInviteAndClaim
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+- id: uc.admin.create-tenant-invite-owner.authorization
+  statement: Tenant provisioning requires a valid Server Owner session.
+  coverage:
+    backend:
+      integration:
+      - testName: provisionInviteAndClaim
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+- id: uc.admin.create-tenant-invite-owner.claim-scope
+  statement: The invited owner claims the tenant by minting the tenant scope and storing only a ciphertext self-grant.
+  coverage:
+    backend:
+      integration:
+      - testName: provisionInviteAndClaim
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+    android:
+      e2e:
+      - testName: provisionClaimAndGrant
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/TenantE2ETest.kt
+    apple:
+      e2e:
+      - testName: testProvisionClaimAndGrant
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/TenantE2ETests.swift
+- id: uc.admin.create-tenant-invite-owner.single-use-secret
+  statement: Wrong bootstrap secrets fail and consumed owner invites cannot be reused.
+  coverage:
+    backend:
+      integration:
+      - testName: provisionInviteAndClaim
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt

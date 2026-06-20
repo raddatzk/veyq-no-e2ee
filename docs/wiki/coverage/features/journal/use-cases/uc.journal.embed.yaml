@@ -2,216 +2,124 @@ id: uc.journal.embed
 title: Embed media, tracks, chapters & playlists
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/journal/_index.md
-  - type: useCase
-    ref: docs/wiki/features/journal/use-cases/uc.journal.embed.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: entryPoint
-    ref: frontend/src/features/memory/journal/journalEmbed.ts
+- type: feature
+  ref: docs/wiki/features/journal/_index.md
+- type: useCase
+  ref: docs/wiki/features/journal/use-cases/uc.journal.embed.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: entryPoint
+  ref: frontend/src/features/memory/journal/journalEmbed.ts
 acceptanceCriteria:
-  - id: uc.journal.embed.token-grammar
-    statement: "Embed tokens parse and serialize round-trip with the dedupe/cap, first-id-only and empty-target rules, and text and embeds split in source order."
-    coverage:
-      web:
-        unit:
-          - testName: "parses a single media token with a label"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "parses comma-separated media ids (a carousel) without a label"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "keeps only the first id for a chapter"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "dedupes and caps track ids"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "parses two back-to-back tokens"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "ends a token at a newline"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "ignores an empty target"
-            kind: negative
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "parses a playlist token and keeps only the first id"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "round-trips a labelled media embed"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "omits the suffix when there is no label"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "normalizes track ids on serialize"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "splits text and embeds in source order"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "returns a single markdown block when there are no embeds"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "handles an embed at the very start"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-          - testName: "dedupes, trims, drops empties, and caps at the max"
-            kind: positive
-            ref: frontend/src/features/memory/journal/journalEmbed.test.ts
-      apple:
-        unit:
-          - testName: testParsesSingleMediaTokenWithLabel
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testParsesCommaSeparatedMediaIdsWithoutLabel
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testKeepsOnlyFirstIdForChapter
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testKeepsOnlyFirstIdForPlaylist
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testDedupesAndCapsTrackIds
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testParsesTwoBackToBackTokens
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testEndsTokenAtNewline
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testIgnoresEmptyTarget
-            kind: negative
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testSplitsTextAndEmbedsInSourceOrder
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testReturnsSingleMarkdownBlockWhenNoEmbeds
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testHandlesEmbedAtTheVeryStart
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testRoundTripsLabelledMediaEmbed
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testOmitsSuffixWhenThereIsNoLabel
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testNormalizesTrackIdsOnSerialize
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-          - testName: testDedupesTrimsDropsEmptiesAndCaps
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
-      android:
-        unit:
-          - testName: parsesSingleMediaTokenWithLabel
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: parsesCommaSeparatedMediaIdsWithoutLabel
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: keepsOnlyFirstIdForChapter
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: keepsOnlyFirstIdForPlaylist
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: dedupesAndCapsTrackIds
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: parsesTwoBackToBackTokens
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: endsTokenAtNewline
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: ignoresEmptyTarget
-            kind: negative
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: splitsTextAndEmbedsInSourceOrder
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: returnsSingleMarkdownBlockWhenNoEmbeds
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: handlesEmbedAtTheVeryStart
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: roundTripsLabelledMediaEmbed
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: omitsSuffixWhenThereIsNoLabel
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: normalizesTrackIdsOnSerialize
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-          - testName: dedupesTrimsDropsEmptiesAndCaps
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
-  - id: uc.journal.embed.render-blocks
-    statement: "On read, embeds resolve to their blocks — a single photo or a carousel, a track block with stats, a chapter link — and an unresolved id degrades to a placeholder."
-    coverage:
-      web:
-        unit:
-          - testName: "renders surrounding Markdown text"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "renders a single media photo and emits openMedia on click"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "renders a carousel with one dot per photo for multiple media ids"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "renders a chapter link and emits openChapter on click"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "falls back to the chapter name when no label is given"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "renders a track embed block with distance stats"
-            kind: positive
-            ref: frontend/src/app/home/JournalBody.test.ts
-          - testName: "shows a missing-content note for an unresolved media id"
-            kind: negative
-            ref: frontend/src/app/home/JournalBody.test.ts
-  - id: uc.journal.embed.atomic-chip
-    statement: "In the live editor an embed renders as an atomic chip that deletes with a two-press Backspace gesture and disarms when the cursor moves."
-    coverage:
-      web:
-        unit:
-          - testName: "renders an atomic chip for an embed token"
-            kind: positive
-            ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
-          - testName: "takes two Backspace presses at the token end to delete the whole embed"
-            kind: positive
-            ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
-          - testName: "disarms a pending delete when the cursor moves"
-            kind: positive
-            ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
-  - id: uc.journal.embed.picker
-    statement: "The embed picker selects media/track/chapter ids with a caption/label, enforces single vs. multi selection, and offers Delete only while editing."
-    coverage:
-      web:
-        unit:
-          - testName: "toggles selection and confirms with ids + caption"
-            kind: positive
-            ref: frontend/src/app/home/journalPickers.test.ts
-          - testName: "multi-selects tracks and confirms with ids + label"
-            kind: positive
-            ref: frontend/src/app/home/journalPickers.test.ts
-          - testName: "single-selects a chapter (a second pick replaces the first)"
-            kind: positive
-            ref: frontend/src/app/home/journalPickers.test.ts
-          - testName: "seeds selection + caption and offers Delete in edit mode"
-            kind: positive
-            ref: frontend/src/app/home/journalPickers.test.ts
-          - testName: "disables insert with no selection and hides Delete unless editing"
-            kind: negative
-            ref: frontend/src/app/home/journalPickers.test.ts
+- id: uc.journal.embed.token-grammar
+  statement: "Embed tokens parse and serialize round-trip with the dedupe/cap, first-id-only and empty-target rules, and text and embeds split in source order."
+  coverage:
+    apple:
+      unit:
+      - testName: testParsesSingleMediaTokenWithLabel
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testParsesCommaSeparatedMediaIdsWithoutLabel
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testKeepsOnlyFirstIdForChapter
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testKeepsOnlyFirstIdForPlaylist
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testDedupesAndCapsTrackIds
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testParsesTwoBackToBackTokens
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testEndsTokenAtNewline
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testIgnoresEmptyTarget
+        kind: negative
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testSplitsTextAndEmbedsInSourceOrder
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testReturnsSingleMarkdownBlockWhenNoEmbeds
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testHandlesEmbedAtTheVeryStart
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testRoundTripsLabelledMediaEmbed
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testOmitsSuffixWhenThereIsNoLabel
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testNormalizesTrackIdsOnSerialize
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+      - testName: testDedupesTrimsDropsEmptiesAndCaps
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/JournalEmbedTests.swift
+    android:
+      unit:
+      - testName: parsesSingleMediaTokenWithLabel
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: parsesCommaSeparatedMediaIdsWithoutLabel
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: keepsOnlyFirstIdForChapter
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: keepsOnlyFirstIdForPlaylist
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: dedupesAndCapsTrackIds
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: parsesTwoBackToBackTokens
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: endsTokenAtNewline
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: ignoresEmptyTarget
+        kind: negative
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: splitsTextAndEmbedsInSourceOrder
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: returnsSingleMarkdownBlockWhenNoEmbeds
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: handlesEmbedAtTheVeryStart
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: roundTripsLabelledMediaEmbed
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: omitsSuffixWhenThereIsNoLabel
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: normalizesTrackIdsOnSerialize
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+      - testName: dedupesTrimsDropsEmptiesAndCaps
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/JournalEmbedTest.kt
+- id: uc.journal.embed.render-blocks
+  statement: "On read, embeds resolve to their blocks — a single photo or a carousel, a track block with stats, a chapter link — and an unresolved id degrades to a placeholder."
+  gaps:
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
+    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+- id: uc.journal.embed.atomic-chip
+  statement: "In the live editor an embed renders as an atomic chip that deletes with a two-press Backspace gesture and disarms when the cursor moves."
+  gaps:
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
+    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+- id: uc.journal.embed.picker
+  statement: "The embed picker selects media/track/chapter ids with a caption/label, enforces single vs. multi selection, and offers Delete only while editing."
+  gaps:
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
+    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).

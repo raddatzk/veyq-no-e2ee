@@ -2,55 +2,45 @@ id: uc.sharing.collaborate
 title: Contribute to a shared Memory
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/sharing/_index.md
-  - type: useCase
-    ref: docs/wiki/features/sharing/use-cases/uc.sharing.collaborate.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: decision
-    ref: docs/wiki/decisions/0030-public-share-upload-capability.md
-  - type: api
-    ref: docs/api/memory.openapi.yaml
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/memory/share/ShareHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/memory/share/share.ts
+- type: feature
+  ref: docs/wiki/features/sharing/_index.md
+- type: useCase
+  ref: docs/wiki/features/sharing/use-cases/uc.sharing.collaborate.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: decision
+  ref: docs/wiki/decisions/0030-public-share-upload-capability.md
+- type: api
+  ref: docs/api/memory.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/memory/share/ShareHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/memory/share/share.ts
 acceptanceCriteria:
-  - id: uc.sharing.collaborate.contributor-adds
-    statement: "A CONTRIBUTOR guest, without an account, reads the subtree and adds encrypted media (uploads a blob and attaches it); the new media appears in the gallery."
-    coverage:
-      backend:
-        integration:
-          - testName: contributorGuestUploadsMediaAndWritesJournal
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
-      web:
-        e2e:
-          - testName: "viewer reads + contributor adds, both without an account"
-            kind: positive
-            ref: frontend/src/features/memory/share/share.e2e.test.ts
-  - id: uc.sharing.collaborate.limits-isolation
-    statement: "Guest uploads are capped per share, and a guest cannot touch another share's in-flight upload (per-share isolation)."
-    coverage:
-      backend:
-        integration:
-          - testName: guestUploadsAreCappedPerShare
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
-          - testName: guestCannotTouchAnotherSharesInFlightUpload
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
-  - id: uc.sharing.collaborate.upload-proof
-    statement: "Upload-capable shares must store a blind upload capability hash, and a guest request with only the shareId or a wrong upload token is denied before starting or attaching uploads."
-    coverage:
-      backend:
-        integration:
-          - testName: contributorGuestUploadsMediaAndWritesJournal
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
-      web:
-        e2e:
-          - testName: "viewer reads + contributor adds, both without an account"
-            kind: positive
-            ref: frontend/src/features/memory/share/share.e2e.test.ts
+- id: uc.sharing.collaborate.contributor-adds
+  statement: "A CONTRIBUTOR guest, without an account, reads the subtree and adds encrypted media (uploads a blob and attaches it); the new media appears in the gallery."
+  coverage:
+    backend:
+      integration:
+      - testName: contributorGuestUploadsMediaAndWritesJournal
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+- id: uc.sharing.collaborate.limits-isolation
+  statement: "Guest uploads are capped per share, and a guest cannot touch another share's in-flight upload (per-share isolation)."
+  coverage:
+    backend:
+      integration:
+      - testName: guestUploadsAreCappedPerShare
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+      - testName: guestCannotTouchAnotherSharesInFlightUpload
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+- id: uc.sharing.collaborate.upload-proof
+  statement: "Upload-capable shares must store a blind upload capability hash, and a guest request with only the shareId or a wrong upload token is denied before starting or attaching uploads."
+  coverage:
+    backend:
+      integration:
+      - testName: contributorGuestUploadsMediaAndWritesJournal
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt

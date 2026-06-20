@@ -2,135 +2,117 @@ id: uc.spaces.use-personal
 title: Use the personal space
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/spaces/_index.md
-  - type: useCase
-    ref: docs/wiki/features/spaces/use-cases/uc.spaces.use-personal.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/account-key-model.md
-  - type: api
-    ref: docs/api/auth.openapi.yaml
-  - type: api
-    ref: docs/api/setup.openapi.yaml
-  - type: api
-    ref: docs/api/tenants.openapi.yaml
-  - type: api
-    ref: docs/api/content.openapi.yaml
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentKeyHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeItemsHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/account/login/login.ts
-  - type: entryPoint
-    ref: frontend/src/features/content/scopeContent.ts
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/ScopeContent.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/ScopeContent.swift
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/Login.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/Login.swift
+- type: feature
+  ref: docs/wiki/features/spaces/_index.md
+- type: useCase
+  ref: docs/wiki/features/spaces/use-cases/uc.spaces.use-personal.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/account-key-model.md
+- type: api
+  ref: docs/api/auth.openapi.yaml
+- type: api
+  ref: docs/api/setup.openapi.yaml
+- type: api
+  ref: docs/api/tenants.openapi.yaml
+- type: api
+  ref: docs/api/content.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentKeyHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeItemsHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/account/login/login.ts
+- type: entryPoint
+  ref: frontend/src/features/content/scopeContent.ts
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/ScopeContent.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/ScopeContent.swift
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/Login.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/Login.swift
 acceptanceCriteria:
-  - id: uc.spaces.use-personal.self-owned-scope
-    statement: Account creation creates a self-owned personal scope and stores only the posted wrapped self-grant.
-    coverage:
-      backend:
-        integration:
-          - testName: coldRegistrationFlow
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
-          - testName: registersNewOwnerAndActivatesTenant
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
-      web:
-        e2e:
-          - testName: "seeds a personal space with a memory + varied images"
-            kind: positive
-            ref: frontend/src/seed.e2e.test.ts
-  - id: uc.spaces.use-personal.fetches-owner-grant
-    statement: An authenticated user can fetch and locally open their own personal scope grant.
-    coverage:
-      backend:
-        integration:
-          - testName: loginUnlockAndSession
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
-          - testName: registersNewOwnerAndActivatesTenant
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
-      web:
-        e2e:
-          - testName: registers, logs in, and unlocks the identity key matching the stored public key
-            kind: positive
-            ref: frontend/src/features/account/login/login.e2e.test.ts
-          - testName: registers a new owner from an invite, then logs in and round-trips the scope grant
-            kind: positive
-            ref: frontend/src/features/account/registerViaInvitation/registerViaInvitation.e2e.test.ts
-      android:
-        e2e:
-          - testName: loginAndUnlock
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
-          - testName: registerNewOwnerThenLoginAndGrant
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
-      apple:
-        e2e:
-          - testName: testLoginAndUnlock
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/LoginE2ETests.swift
-          - testName: testRegisterNewOwnerThenLoginAndGrant
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/RegisterViaInvitationE2ETests.swift
-  - id: uc.spaces.use-personal.rejects-invalid-session
-    statement: A missing or invalid session cannot fetch a personal scope grant.
-    coverage:
-      backend:
-        integration:
-          - testName: loginUnlockAndSession
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
-  - id: uc.spaces.use-personal.encrypted-content
-    statement: A personal-scope key-holder can provision the scope content key once, store encrypted items and read ciphertext back for local decryption; non-key-holders are rejected.
-    coverage:
-      backend:
-        integration:
-          - testName: storesAndServesEncryptedContentForKeyHoldersOnly
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
-          - testName: storesAndServesEncryptedContentForKeyHoldersOnly
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
-      web:
-        e2e:
-          - testName: "writes and reads encrypted content under the personal scope; the server stays blind"
-            kind: positive
-            ref: frontend/src/features/content/scopeContent.e2e.test.ts
-      android:
-        e2e:
-          - testName: writeAndReadEncryptedContentUnderPersonalScope
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/ScopeContentE2ETest.kt
-      apple:
-        e2e:
-          - testName: testWriteAndReadEncryptedContentUnderPersonalScope
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/ScopeContentE2ETests.swift
-  - id: uc.spaces.use-personal.content-decode-cap
-    statement: "The server rejects sealed content above the decode cap but accepts content within it."
-    coverage:
-      backend:
-        integration:
-          - testName: rejectsOverlargeSealedContentButAcceptsSmall
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ContentDecodeCapSliceTest.kt
+- id: uc.spaces.use-personal.self-owned-scope
+  statement: Account creation creates a self-owned personal scope and stores only the posted wrapped self-grant.
+  coverage:
+    backend:
+      integration:
+      - testName: coldRegistrationFlow
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+      - testName: registersNewOwnerAndActivatesTenant
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+- id: uc.spaces.use-personal.fetches-owner-grant
+  statement: An authenticated user can fetch and locally open their own personal scope grant.
+  coverage:
+    backend:
+      integration:
+      - testName: loginUnlockAndSession
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+      - testName: registersNewOwnerAndActivatesTenant
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+    android:
+      e2e:
+      - testName: loginAndUnlock
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
+      - testName: registerNewOwnerThenLoginAndGrant
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+    apple:
+      e2e:
+      - testName: testLoginAndUnlock
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/LoginE2ETests.swift
+      - testName: testRegisterNewOwnerThenLoginAndGrant
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/RegisterViaInvitationE2ETests.swift
+- id: uc.spaces.use-personal.rejects-invalid-session
+  statement: A missing or invalid session cannot fetch a personal scope grant.
+  coverage:
+    backend:
+      integration:
+      - testName: loginUnlockAndSession
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+- id: uc.spaces.use-personal.encrypted-content
+  statement: A personal-scope key-holder can provision the scope content key once, store encrypted items and read ciphertext back for local decryption; non-key-holders are rejected.
+  coverage:
+    backend:
+      integration:
+      - testName: storesAndServesEncryptedContentForKeyHoldersOnly
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
+      - testName: storesAndServesEncryptedContentForKeyHoldersOnly
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
+    android:
+      e2e:
+      - testName: writeAndReadEncryptedContentUnderPersonalScope
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/ScopeContentE2ETest.kt
+    apple:
+      e2e:
+      - testName: testWriteAndReadEncryptedContentUnderPersonalScope
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/ScopeContentE2ETests.swift
+- id: uc.spaces.use-personal.content-decode-cap
+  statement: "The server rejects sealed content above the decode cap but accepts content within it."
+  coverage:
+    backend:
+      integration:
+      - testName: rejectsOverlargeSealedContentButAcceptsSmall
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ContentDecodeCapSliceTest.kt

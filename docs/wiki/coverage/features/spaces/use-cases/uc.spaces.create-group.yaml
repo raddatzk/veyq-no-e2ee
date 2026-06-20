@@ -2,122 +2,92 @@ id: uc.spaces.create-group
 title: Create & administer a group
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/spaces/_index.md
-  - type: useCase
-    ref: docs/wiki/features/spaces/use-cases/uc.spaces.create-group.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/space-navigation.md
-  - type: api
-    ref: docs/api/spaces.openapi.yaml
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/spaces/groups/GroupProvisioningHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/spaces/groups/groupSpaces.ts
+- type: feature
+  ref: docs/wiki/features/spaces/_index.md
+- type: useCase
+  ref: docs/wiki/features/spaces/use-cases/uc.spaces.create-group.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/space-navigation.md
+- type: api
+  ref: docs/api/spaces.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/spaces/groups/GroupProvisioningHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/spaces/groups/groupSpaces.ts
 acceptanceCriteria:
-  - id: uc.spaces.create-group.create-and-roster
-    statement: "A tenant member creates a GROUP_ROOT scope with a sealed name and becomes GroupOwner; the group surfaces in the roster and an invited member can open it after the key is re-wrapped."
-    coverage:
-      backend:
-        integration:
-          - testName: createsGroupAsGroupOwnerAndSurfacesItInTheRoster
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
-      web:
-        e2e:
-          - testName: "creates a group, lists it (sealed name), and an invited member opens it after re-wrap"
-            kind: positive
-            ref: frontend/src/features/spaces/groups/groupSpaces.e2e.test.ts
-      apple:
-        e2e:
-          - testName: testGroupLifecycle
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/GroupsE2ETests.swift
-      android:
-        e2e:
-          - testName: groupLifecycle
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/GroupsE2ETest.kt
-  - id: uc.spaces.create-group.invite-and-join
-    statement: "The owner issues an invite whose secrets live only in the link fragment (pragmatic or passphrase-protected); an existing user joins via the link, and a wrong passphrase fails the temp-key unwrap."
-    coverage:
-      web:
-        e2e:
-          - testName: "owner creates a group + link; an existing user joins via the link"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/groups.e2e.test.ts
-        unit:
-          - testName: "round-trips a pragmatic invite through a link fragment"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/inviteLink.test.ts
-          - testName: "round-trips a passphrase-protected invite (ek/ps, no k)"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/inviteLink.test.ts
-          - testName: "keeps the secrets in the fragment (not the query)"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/inviteLink.test.ts
-          - testName: "returns null for non-invite hashes"
-            kind: negative
-            ref: frontend/src/features/spaces/invite/inviteLink.test.ts
-          - testName: "round-trips the temp key under the right passphrase"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/protectTempKey.test.ts
-          - testName: "fails (throws) under a wrong passphrase"
-            kind: negative
-            ref: frontend/src/features/spaces/invite/protectTempKey.test.ts
-          - testName: "uses a fresh salt each time (same key+passphrase → different ciphertext)"
-            kind: positive
-            ref: frontend/src/features/spaces/invite/protectTempKey.test.ts
-          - testName: "recovery KEK at PRODUCTION Argon2 params m=32 MiB (pins the invite-temp-key KEK)"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-          - testName: "symmetric wrap with the invite-temp-key context"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-      apple:
-        unit:
-          - testName: testRoundTripsPragmaticInviteThroughFragment
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
-          - testName: testRoundTripsPassphraseProtectedInvite
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
-          - testName: testKeepsSecretsInFragmentNotQuery
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
-          - testName: testReturnsNilForNonInviteHashes
-            kind: negative
-            ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
-      android:
-        unit:
-          - testName: roundTripsPragmaticInviteThroughFragment
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
-          - testName: roundTripsPassphraseProtectedInvite
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
-          - testName: keepsSecretsInFragmentNotQuery
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
-          - testName: returnsNullForNonInviteHashes
-            kind: negative
-            ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
-  - id: uc.spaces.create-group.manage-members
-    statement: "The GroupOwner adds/removes members and changes roles under a last-owner guard, deletes the group as owner only, and a removed tenant member loses group access and admin power."
-    coverage:
-      backend:
-        integration:
-          - testName: managesMembersAndRolesWithLastOwnerGuard
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
-          - testName: managesMembersAndRolesWithLastOwnerGuard
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
-          - testName: deletesGroupAsGroupOwnerOnly
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
-          - testName: removingTenantMemberStripsGroupAccessAndAdminPower
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
+- id: uc.spaces.create-group.create-and-roster
+  statement: "A tenant member creates a GROUP_ROOT scope with a sealed name and becomes GroupOwner; the group surfaces in the roster and an invited member can open it after the key is re-wrapped."
+  coverage:
+    backend:
+      integration:
+      - testName: createsGroupAsGroupOwnerAndSurfacesItInTheRoster
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
+    apple:
+      e2e:
+      - testName: testGroupLifecycle
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/GroupsE2ETests.swift
+    android:
+      e2e:
+      - testName: groupLifecycle
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/GroupsE2ETest.kt
+- id: uc.spaces.create-group.invite-and-join
+  statement: "The owner issues an invite whose secrets live only in the link fragment (pragmatic or passphrase-protected); an existing user joins via the link, and a wrong passphrase fails the temp-key unwrap."
+  coverage:
+    web:
+      unit:
+      - testName: "recovery KEK at PRODUCTION Argon2 params m=32 MiB (pins the invite-temp-key KEK)"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      - testName: "symmetric wrap with the invite-temp-key context"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+    apple:
+      unit:
+      - testName: testRoundTripsPragmaticInviteThroughFragment
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+      - testName: testRoundTripsPassphraseProtectedInvite
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+      - testName: testKeepsSecretsInFragmentNotQuery
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+      - testName: testReturnsNilForNonInviteHashes
+        kind: negative
+        ref: apple/Tests/VeyqCryptoTests/InviteLinkTests.swift
+    android:
+      unit:
+      - testName: roundTripsPragmaticInviteThroughFragment
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+      - testName: roundTripsPassphraseProtectedInvite
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+      - testName: keepsSecretsInFragmentNotQuery
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+      - testName: returnsNullForNonInviteHashes
+        kind: negative
+        ref: android/core/src/test/kotlin/app/veyq/crypto/InviteLinkTest.kt
+- id: uc.spaces.create-group.manage-members
+  statement: "The GroupOwner adds/removes members and changes roles under a last-owner guard, deletes the group as owner only, and a removed tenant member loses group access and admin power."
+  coverage:
+    backend:
+      integration:
+      - testName: managesMembersAndRolesWithLastOwnerGuard
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
+      - testName: managesMembersAndRolesWithLastOwnerGuard
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
+      - testName: deletesGroupAsGroupOwnerOnly
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt
+      - testName: removingTenantMemberStripsGroupAccessAndAdminPower
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt

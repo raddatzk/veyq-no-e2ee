@@ -1,0 +1,52 @@
+id: uc.admin.server-users
+title: Manage server users & roles
+status: implemented
+documents:
+- type: feature
+  ref: docs/wiki/features/admin/_index.md
+- type: useCase
+  ref: docs/wiki/features/admin/use-cases/uc.admin.server-users.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/admin.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminResource.kt
+acceptanceCriteria:
+- id: uc.admin.server-users.owner-lists-roster
+  statement: A Server Owner can list the instance roster of non-system accounts.
+  coverage:
+    backend:
+      integration:
+      - testName: ownerListsRoster
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt
+- id: uc.admin.server-users.owner-sets-role
+  statement: A Server Owner can promote a member to Server Owner and demote back while more than one owner remains.
+  coverage:
+    backend:
+      integration:
+      - testName: ownerPromotesAndDemotesMember
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt
+- id: uc.admin.server-users.non-owner-forbidden
+  statement: A non-owner caller cannot list the roster or set a server role.
+  coverage:
+    backend:
+      integration:
+      - testName: nonOwnerForbiddenToList
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt
+      - testName: nonOwnerForbiddenToSetRole
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt
+- id: uc.admin.server-users.unknown-user-not-found
+  statement: Setting the server role of an unknown user is rejected as not found.
+  coverage:
+    backend:
+      integration:
+      - testName: setRoleUnknownUserIs404
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt

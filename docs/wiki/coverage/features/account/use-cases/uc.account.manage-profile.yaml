@@ -2,48 +2,41 @@ id: uc.account.manage-profile
 title: Manage profile & credentials
 status: partial
 documents:
-  - type: feature
-    ref: docs/wiki/features/account/_index.md
-  - type: useCase
-    ref: docs/wiki/features/account/use-cases/uc.account.manage-profile.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: api
-    ref: docs/api/auth.openapi.yaml
-  - type: decision
-    ref: docs/wiki/decisions/0031-profile-fields-server-visible.md
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
-  - type: entryPoint
-    ref: frontend/src/features/account/login/login.ts
-  - type: entryPoint
-    ref: frontend/src/app/home/SettingsOverlay.vue
+- type: feature
+  ref: docs/wiki/features/account/_index.md
+- type: useCase
+  ref: docs/wiki/features/account/use-cases/uc.account.manage-profile.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/auth.openapi.yaml
+- type: decision
+  ref: docs/wiki/decisions/0031-profile-fields-server-visible.md
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/account/login/login.ts
 acceptanceCriteria:
-  - id: uc.account.manage-profile.display-name
-    statement: The authenticated user can update their server-visible display name; the response and subsequent /api/me reads return the updated UserSummary.
-    coverage:
-      backend:
-        integration:
-          - testName: updatesCurrentProfileDisplayName
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
-      web:
-        unit:
-          - testName: updates the display name and current session user
-            kind: positive
-            ref: frontend/src/app/home/SettingsOverlay.test.ts
-  - id: uc.account.manage-profile.validation
-    statement: Blank display names and invalid sessions are rejected before any profile update is persisted.
-    coverage:
-      backend:
-        integration:
-          - testName: updatesCurrentProfileDisplayName
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+- id: uc.account.manage-profile.display-name
+  statement: The authenticated user can update their server-visible display name; the response and subsequent /api/me reads return the updated UserSummary.
+  coverage:
+    backend:
+      integration:
+      - testName: updatesCurrentProfileDisplayName
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+- id: uc.account.manage-profile.validation
+  statement: Blank display names and invalid sessions are rejected before any profile update is persisted.
+  coverage:
+    backend:
+      integration:
+      - testName: updatesCurrentProfileDisplayName
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
 gaps:
-  - reason: "Only the display-name profile field is implemented. First/last name, avatar and locale need schema, storage and client controls."
-    followUp: "Extend the profile schema and settings UI once those product fields are finalized."
-  - reason: "Email changes require a verification-token flow and duplicate-email handling; changing it directly would weaken account-control semantics."
-    followUp: "Add a verified email-change use-case and endpoint."
-  - reason: "Password, passkey and trusted-device management are key-wrap changes, not profile-row changes."
-    followUp: "Implement credential/device flows with keep-one-master-key-capable-method checks."
+- reason: "Only the display-name profile field is implemented. First/last name, avatar and locale need schema, storage and client controls."
+  followUp: "Extend the profile schema and settings UI once those product fields are finalized."
+- reason: "Email changes require a verification-token flow and duplicate-email handling; changing it directly would weaken account-control semantics."
+  followUp: "Add a verified email-change use-case and endpoint."
+- reason: "Password, passkey and trusted-device management are key-wrap changes, not profile-row changes."
+  followUp: "Implement credential/device flows with keep-one-master-key-capable-method checks."

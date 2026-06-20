@@ -2,69 +2,52 @@ id: uc.search.filter
 title: Filter & find
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/search/_index.md
-  - type: useCase
-    ref: docs/wiki/features/search/use-cases/uc.search.filter.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/search.md
-  - type: entryPoint
-    ref: frontend/src/features/search/search.ts
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/Search.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/Search.swift
+- type: feature
+  ref: docs/wiki/features/search/_index.md
+- type: useCase
+  ref: docs/wiki/features/search/use-cases/uc.search.filter.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/search.md
+- type: entryPoint
+  ref: frontend/src/features/search/search.ts
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/Search.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/Search.swift
 acceptanceCriteria:
-  - id: uc.search.filter.name-match
-    statement: "Nodes are filtered locally by a case-insensitive substring of their decrypted name; an empty/whitespace query yields no hits and results are capped."
-    coverage:
-      web:
-        unit:
-          - testName: "matches case-insensitively as a substring"
-            kind: positive
-            ref: frontend/src/features/search/search.test.ts
-          - testName: "returns no hits for an empty or whitespace query"
-            kind: negative
-            ref: frontend/src/features/search/search.test.ts
-          - testName: "returns no hits when nothing matches"
-            kind: negative
-            ref: frontend/src/features/search/search.test.ts
-          - testName: "caps results at 25"
-            kind: positive
-            ref: frontend/src/features/search/search.test.ts
-      android:
-        unit:
-          - testName: matchesCaseInsensitivelyAsASubstring
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
-          - testName: returnsNoHitsForAnEmptyOrWhitespaceQuery
-            kind: negative
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
-          - testName: returnsNoHitsWhenNothingMatches
-            kind: negative
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
-          - testName: capsResultsAt25
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
-      apple:
-        unit:
-          - testName: testMatchesCaseInsensitivelyAsASubstring
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
-          - testName: testReturnsNoHitsForAnEmptyOrWhitespaceQuery
-            kind: negative
-            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
-          - testName: testReturnsNoHitsWhenNothingMatches
-            kind: negative
-            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
-          - testName: testCapsResultsAt25
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
-  - id: uc.search.filter.participant-match
-    statement: "The web client can match decrypted participant names locally while returning the matching Memory as the search hit."
-    coverage:
-      web:
-        unit:
-          - testName: "matches decrypted participant names while returning memory hits"
-            kind: positive
-            ref: frontend/src/features/search/search.test.ts
+- id: uc.search.filter.name-match
+  statement: "Nodes are filtered locally by a case-insensitive substring of their decrypted name; an empty/whitespace query yields no hits and results are capped."
+  coverage:
+    android:
+      unit:
+      - testName: matchesCaseInsensitivelyAsASubstring
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+      - testName: returnsNoHitsForAnEmptyOrWhitespaceQuery
+        kind: negative
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+      - testName: returnsNoHitsWhenNothingMatches
+        kind: negative
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+      - testName: capsResultsAt25
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/SearchTest.kt
+    apple:
+      unit:
+      - testName: testMatchesCaseInsensitivelyAsASubstring
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+      - testName: testReturnsNoHitsForAnEmptyOrWhitespaceQuery
+        kind: negative
+        ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+      - testName: testReturnsNoHitsWhenNothingMatches
+        kind: negative
+        ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+      - testName: testCapsResultsAt25
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/SearchTests.swift
+- id: uc.search.filter.participant-match
+  statement: "The web client can match decrypted participant names locally while returning the matching Memory as the search hit."
+  gaps:
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
+    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).

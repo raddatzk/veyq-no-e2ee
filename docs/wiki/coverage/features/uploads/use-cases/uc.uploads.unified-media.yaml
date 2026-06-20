@@ -2,26 +2,26 @@ id: uc.uploads.unified-media
 title: Upload, store and attach media (unified)
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/uploads/_index.md
-  - type: useCase
-    ref: docs/wiki/features/uploads/use-cases/uc.uploads.unified-media.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: api
-    ref: docs/api/media.openapi.yaml
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/uploads/blob/BlobUploadHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/uploads/media/MediaHandler.kt
-  - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/shared/storage/BlobStore.kt
-  - type: entryPoint
-    ref: frontend/src/features/uploads/media/media.ts
-  - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/Media.kt
-  - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/Media.swift
+- type: feature
+  ref: docs/wiki/features/uploads/_index.md
+- type: useCase
+  ref: docs/wiki/features/uploads/use-cases/uc.uploads.unified-media.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/media.openapi.yaml
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/uploads/blob/BlobUploadHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/uploads/media/MediaHandler.kt
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/shared/storage/BlobStore.kt
+- type: entryPoint
+  ref: frontend/src/features/uploads/media/media.ts
+- type: entryPoint
+  ref: android/core/src/main/kotlin/app/veyq/crypto/Media.kt
+- type: entryPoint
+  ref: apple/Sources/VeyqCrypto/Media.swift
 notes: >
   One upload path / one download path for all bytes. Every file is a deduplicated chunk-set (small = 1 frame,
   large = many), AEAD-framed (v1.sealFrame, AAD binds index+total) in an S3-compatible BlobStore (external S3 or
@@ -31,196 +31,160 @@ notes: >
   the store via presigned URLs and the control plane is batched (blob-uploads-batch / media …-batch /
   blob-downloads-batch); the backend never proxies bytes.
 acceptanceCriteria:
-  - id: uc.uploads.unified-media.one-path
-    statement: A small file (one frame) and a large file (many frames) upload and download byte-identical through the SAME batched blob API; download opens each frame and concatenates.
-    coverage:
-      backend:
-        integration:
-          - testName: batchUploadFinalizeDownloadRoundTrip
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
-      web:
-        e2e:
-          - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
-            kind: positive
-            ref: frontend/src/features/uploads/media/media.e2e.test.ts
-      android:
-        e2e:
-          - testName: unifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
-      apple:
-        e2e:
-          - testName: testUnifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
-  - id: uc.uploads.unified-media.frame-conformance
-    statement: All three crypto cores produce byte-identical chunked-AEAD frames; a frame fails to open at the wrong index (AAD binds the position).
-    coverage:
-      backend:
-        integration:
-          - testName: "chunked-AEAD frame (resumable upload / streaming)"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-      web:
-        e2e:
-          - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
-            kind: negative
-            ref: frontend/src/features/uploads/media/media.e2e.test.ts
-  - id: uc.uploads.unified-media.dedup
-    statement: Identical content within a scope is stored once, keyed by a client-computed per-scope dedup token; batch-start returns READY with the existing blobId and the bytes are never re-sent.
-    coverage:
-      backend:
-        integration:
-          - testName: batchStartDedupsAlreadyStoredContentMidBatch
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
-      web:
-        unit:
-          - testName: "media dedup token (AD-09)"
-            kind: positive
-            ref: frontend/src/shared/crypto/v1.conformance.test.ts
-        e2e:
-          - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
-            kind: positive
-            ref: frontend/src/features/uploads/media/media.e2e.test.ts
-  - id: uc.uploads.unified-media.resume
-    statement: A chunked upload survives interruption — the client asks which frames landed, re-sends only the missing ones, finalizes only when complete; completing early is rejected.
-    coverage:
-      backend:
-        integration:
-          - testName: resumeSkipsChunksAlreadyInTheStore
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
-      web:
-        e2e:
-          - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
-            kind: positive
-            ref: frontend/src/features/uploads/media/media.e2e.test.ts
-      android:
-        e2e:
-          - testName: unifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
-      apple:
-        e2e:
-          - testName: testUnifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
-  - id: uc.uploads.unified-media.attach-and-list
-    statement: A stored blob attaches to a Memory/Chapter only (never a Folder), within a scope the caller holds, with typed derivatives (thumbnail/preview); outsiders and missing blobs are rejected; the gallery lists media ordered by takenAt with original + derivative blob refs.
-    coverage:
-      backend:
-        integration:
-          - testName: attachesBlobsAsMediaWithDerivativesAndLists
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaSliceTest.kt
-          - testName: attachesBlobsAsMediaWithDerivativesAndLists
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaSliceTest.kt
-      web:
-        e2e:
-          - testName: "uploads a 1-chunk photo, a multi-chunk video, dedups, resumes, and lists a gallery"
-            kind: positive
-            ref: frontend/src/features/uploads/media/media.e2e.test.ts
-      android:
-        e2e:
-          - testName: unifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
-      apple:
-        e2e:
-          - testName: testUnifiedUploadDownloadDedupResumeAndGallery
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
-  - id: uc.uploads.unified-media.abandoned-gc
-    statement: A scheduled sweep reclaims abandoned OPEN upload sessions older than the TTL (their frames + manifest rows); fresh OPEN and COMPLETED sessions survive.
-    coverage:
-      backend:
-        integration:
-          - testName: purgesOnlyAbandonedOpenUploads
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadGcSliceTest.kt
-  - id: uc.uploads.unified-media.resource-limits
-    statement: The server rejects excessive chunk counts, declared sizes, decoded frame sizes and cumulative frame data before expensive memory or BlobStore work.
-    coverage:
-      backend:
-        integration:
-          - testName: rejectsOversizedDeclarationsBeforeHeavyWork
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt
-  - id: uc.uploads.unified-media.open-session-cap
-    statement: A scope can hold only a bounded number of concurrent OPEN upload sessions; further startBlob calls are refused (anti DB-row exhaustion).
-    coverage:
-      backend:
-        integration:
-          - testName: capsConcurrentOpenSessionsPerScope
-            kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt
-  - id: uc.uploads.unified-media.geo-metadata
-    statement: "GPS location is parsed client-side from EXIF and sealed/round-tripped as media metadata; non-JPEG or EXIF-less bytes yield nothing."
-    coverage:
-      web:
-        unit:
-          - testName: "parses GPS lat/lng with hemisphere refs"
-            kind: positive
-            ref: frontend/src/features/uploads/exifGps.test.ts
-          - testName: "returns nothing for non-JPEG or EXIF-less bytes"
-            kind: negative
-            ref: frontend/src/features/uploads/exifGps.test.ts
-        e2e:
-          - testName: "seals + reads back GPS location"
-            kind: positive
-            ref: frontend/src/features/uploads/media/geo.e2e.test.ts
-      apple:
-        unit:
-          - testName: testExtractsSignedGpsFromHemisphereRefs
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
-          - testName: testKeepsNorthAndEastPositive
-            kind: positive
-            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
-          - testName: testReturnsFallbackForNonImageBytes
-            kind: negative
-            ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
-      android:
-        unit:
-          - testName: extractsSignedGpsFromHemisphereRefs
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
-          - testName: keepsNorthAndEastPositive
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
-          - testName: returnsFallbackForMissingExif
-            kind: negative
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
-          - testName: mapsCameraAndExifFields
-            kind: positive
-            ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
-  - id: uc.uploads.unified-media.update-metadata
-    statement: "Media metadata can be updated (e.g. toggling highlight) and is re-sealed under the content key."
-    coverage:
-      backend:
-        integration:
-          - testName: togglesHighlightAndReSealsMetadata
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaUpdateSliceTest.kt
-  - id: uc.uploads.unified-media.blob-gc
-    statement: "A sweep reclaims only blobs that are unreferenced past the grace period; referenced blobs survive."
-    coverage:
-      backend:
-        integration:
-          - testName: reclaimsOnlyUnreferencedBlobsPastTheGrace
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobGcSliceTest.kt
-  - id: uc.uploads.unified-media.presigned-direct
-    statement: "With presigned URLs the client uploads chunks direct-to-store and a resumed upload skips chunks already present in the store."
-    coverage:
-      backend:
-        integration:
-          - testName: directToStoreRoundTrip
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
-          - testName: resumeSkipsChunksAlreadyInTheStore
-            kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
+- id: uc.uploads.unified-media.one-path
+  statement: A small file (one frame) and a large file (many frames) upload and download byte-identical through the SAME batched blob API; download opens each frame and concatenates.
+  coverage:
+    backend:
+      integration:
+      - testName: batchUploadFinalizeDownloadRoundTrip
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
+    android:
+      e2e:
+      - testName: unifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
+    apple:
+      e2e:
+      - testName: testUnifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
+- id: uc.uploads.unified-media.frame-conformance
+  statement: All three crypto cores produce byte-identical chunked-AEAD frames; a frame fails to open at the wrong index (AAD binds the position).
+  coverage:
+    backend:
+      integration:
+      - testName: "chunked-AEAD frame (resumable upload / streaming)"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+- id: uc.uploads.unified-media.dedup
+  statement: Identical content within a scope is stored once, keyed by a client-computed per-scope dedup token; batch-start returns READY with the existing blobId and the bytes are never re-sent.
+  coverage:
+    backend:
+      integration:
+      - testName: batchStartDedupsAlreadyStoredContentMidBatch
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt
+    web:
+      unit:
+      - testName: "media dedup token (AD-09)"
+        kind: positive
+        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+- id: uc.uploads.unified-media.resume
+  statement: A chunked upload survives interruption — the client asks which frames landed, re-sends only the missing ones, finalizes only when complete; completing early is rejected.
+  coverage:
+    backend:
+      integration:
+      - testName: resumeSkipsChunksAlreadyInTheStore
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
+    android:
+      e2e:
+      - testName: unifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
+    apple:
+      e2e:
+      - testName: testUnifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
+- id: uc.uploads.unified-media.attach-and-list
+  statement: A stored blob attaches to a Memory/Chapter only (never a Folder), within a scope the caller holds, with typed derivatives (thumbnail/preview); outsiders and missing blobs are rejected; the gallery lists media ordered by takenAt with original + derivative blob refs.
+  coverage:
+    backend:
+      integration:
+      - testName: attachesBlobsAsMediaWithDerivativesAndLists
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaSliceTest.kt
+      - testName: attachesBlobsAsMediaWithDerivativesAndLists
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaSliceTest.kt
+    android:
+      e2e:
+      - testName: unifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaE2ETest.kt
+    apple:
+      e2e:
+      - testName: testUnifiedUploadDownloadDedupResumeAndGallery
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/MediaE2ETests.swift
+- id: uc.uploads.unified-media.abandoned-gc
+  statement: A scheduled sweep reclaims abandoned OPEN upload sessions older than the TTL (their frames + manifest rows); fresh OPEN and COMPLETED sessions survive.
+  coverage:
+    backend:
+      integration:
+      - testName: purgesOnlyAbandonedOpenUploads
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadGcSliceTest.kt
+- id: uc.uploads.unified-media.resource-limits
+  statement: The server rejects excessive chunk counts, declared sizes, decoded frame sizes and cumulative frame data before expensive memory or BlobStore work.
+  coverage:
+    backend:
+      integration:
+      - testName: rejectsOversizedDeclarationsBeforeHeavyWork
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt
+- id: uc.uploads.unified-media.open-session-cap
+  statement: A scope can hold only a bounded number of concurrent OPEN upload sessions; further startBlob calls are refused (anti DB-row exhaustion).
+  coverage:
+    backend:
+      integration:
+      - testName: capsConcurrentOpenSessionsPerScope
+        kind: negative
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt
+- id: uc.uploads.unified-media.geo-metadata
+  statement: "GPS location is parsed client-side from EXIF and sealed/round-tripped as media metadata; non-JPEG or EXIF-less bytes yield nothing."
+  coverage:
+    apple:
+      unit:
+      - testName: testExtractsSignedGpsFromHemisphereRefs
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
+      - testName: testKeepsNorthAndEastPositive
+        kind: positive
+        ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
+      - testName: testReturnsFallbackForNonImageBytes
+        kind: negative
+        ref: apple/Tests/VeyqCryptoTests/MediaExifTests.swift
+    android:
+      unit:
+      - testName: extractsSignedGpsFromHemisphereRefs
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+      - testName: keepsNorthAndEastPositive
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+      - testName: returnsFallbackForMissingExif
+        kind: negative
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+      - testName: mapsCameraAndExifFields
+        kind: positive
+        ref: android/core/src/test/kotlin/app/veyq/crypto/MediaExifTest.kt
+- id: uc.uploads.unified-media.update-metadata
+  statement: "Media metadata can be updated (e.g. toggling highlight) and is re-sealed under the content key."
+  coverage:
+    backend:
+      integration:
+      - testName: togglesHighlightAndReSealsMetadata
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaUpdateSliceTest.kt
+- id: uc.uploads.unified-media.blob-gc
+  statement: "A sweep reclaims only blobs that are unreferenced past the grace period; referenced blobs survive."
+  coverage:
+    backend:
+      integration:
+      - testName: reclaimsOnlyUnreferencedBlobsPastTheGrace
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobGcSliceTest.kt
+- id: uc.uploads.unified-media.presigned-direct
+  statement: "With presigned URLs the client uploads chunks direct-to-store and a resumed upload skips chunks already present in the store."
+  coverage:
+    backend:
+      integration:
+      - testName: directToStoreRoundTrip
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
+      - testName: resumeSkipsChunksAlreadyInTheStore
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt

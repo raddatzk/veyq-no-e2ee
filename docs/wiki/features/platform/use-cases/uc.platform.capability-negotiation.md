@@ -1,7 +1,7 @@
 # UC: Negotiate client/server capability compatibility
 
 - **ID:** uc.platform.capability-negotiation
-- **Primary actor:** Memory Curator (via their client/app)
+- **Primary actor:** Memory Curator
 - **Goal:** On connecting to an instance, discover what the server can do and which `major` it is on,
   **enable only the features the server supports**, and — when client and server are on different majors —
   surface a clear, directed "update" path instead of a silent break. Adding abilities must never break older

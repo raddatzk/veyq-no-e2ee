@@ -14,5 +14,6 @@ recovery and account erasure.
 - ★ [Log in and unlock](use-cases/uc.account.login.md) — authenticate + unlock key material
 - ★ [Enable TOTP](use-cases/uc.account.enable-totp.md) — second factor for password login
 - ★ [Manage profile & credentials](use-cases/uc.account.manage-profile.md) — profile fields, passkeys/password, devices
+- ★ [Change account email](use-cases/uc.account.change-email.md) — verified, token-gated email swap
 - ★ [Recover key access](use-cases/uc.account.recover-keys.md) — recovery code / Emergency Kit / another device
 - ★ [Erase account](use-cases/uc.account.erase-account.md) — self-service deletion (crypto-erasure)

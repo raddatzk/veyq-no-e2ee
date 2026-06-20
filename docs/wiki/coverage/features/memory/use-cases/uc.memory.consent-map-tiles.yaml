@@ -2,26 +2,17 @@ id: uc.memory.consent-map-tiles
 title: Consent to external map tiles
 status: implemented
 documents:
-  - type: feature
-    ref: docs/wiki/features/memory/_index.md
-  - type: useCase
-    ref: docs/wiki/features/memory/use-cases/uc.memory.consent-map-tiles.md
-  - type: crosscutting
-    ref: docs/wiki/crosscutting/security-model.md
-  - type: entryPoint
-    ref: frontend/src/features/account/privacy/mapConsent.ts
+- type: feature
+  ref: docs/wiki/features/memory/_index.md
+- type: useCase
+  ref: docs/wiki/features/memory/use-cases/uc.memory.consent-map-tiles.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: entryPoint
+  ref: frontend/src/features/account/privacy/mapConsent.ts
 acceptanceCriteria:
-  - id: uc.memory.consent-map-tiles.local-opt-in
-    statement: "Map tiles load only after an explicit per-device opt-in; consent is persisted locally (per origin), defaults to off when unset, and is never synced to the server."
-    coverage:
-      web:
-        unit:
-          - testName: "defaults to no consent when unset"
-            kind: positive
-            ref: frontend/src/features/account/privacy/mapConsent.test.ts
-          - testName: "persists opt-in and opt-out per origin"
-            kind: positive
-            ref: frontend/src/features/account/privacy/mapConsent.test.ts
-    gaps:
-      - reason: "Native (iOS/Android) map-tile consent is handled via the platform map stack / permissions, not this shared localStorage flag; there is no native unit test of the consent persistence."
-        followUp: "Mirror mapConsent.test.ts if a shared native consent store is introduced."
+- id: uc.memory.consent-map-tiles.local-opt-in
+  statement: "Map tiles load only after an explicit per-device opt-in; consent is persisted locally (per origin), defaults to off when unset, and is never synced to the server."
+  gaps:
+  - reason: "Native (iOS/Android) map-tile consent is handled via the platform map stack / permissions, not this shared localStorage flag; there is no native unit test of the consent persistence."
+    followUp: "Mirror mapConsent.test.ts if a shared native consent store is introduced."
