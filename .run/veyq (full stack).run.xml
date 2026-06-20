@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="veyq (full stack)" type="CompoundRunConfigurationType">
+    <!-- One click: Backend (which first starts + waits for the DB + MinIO) and the Vite frontend. -->
+    <toRun name="Backend (quarkusDev)" type="GradleRunConfiguration" />
+    <toRun name="Frontend (Vite)" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

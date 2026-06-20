@@ -1,0 +1,59 @@
+# Local DEV dependencies only — MariaDB + MinIO — for `quarkusDev` + `vite` (NOT the prod stack; see
+# docker-compose.yml). Host-exposed with dev-friendly defaults so the backend dev profile + browser reach them.
+#
+#   docker compose -f infra/docker-compose.dev.yml up -d --wait
+#
+# The "Dev deps (DB + MinIO)" IntelliJ run config (.run/) does exactly this; the "veyq — full stack" compound
+# starts these, the backend (quarkusDev) and the frontend (vite) together.
+#
+# NOTE: if you already run a MariaDB on :3306 (e.g. a leftover container), the veyq-dev-db host-port bind will
+# clash — stop the other one, or start only MinIO: `… -f infra/docker-compose.dev.yml up -d --wait veyq-dev-minio`.
+name: veyq-dev
+services:
+  veyq-dev-db:
+    image: mariadb:10.11
+    container_name: veyq-dev-db
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      # Match application-dev.properties defaults (db veyq / user veyq / pass change-me).
+      MARIADB_DATABASE: veyq
+      MARIADB_USER: veyq
+      MARIADB_PASSWORD: change-me
+      MARIADB_ROOT_PASSWORD: change-me
+    ports:
+      - "3306:3306"
+    volumes:
+      - veyq-dev-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  veyq-dev-minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: veyq-dev-minio
+    command: server /data --console-address ":9001"
+    environment:
+      # Match the blob-store dev defaults the backend uses (BLOB_STORE_S3_ACCESS_KEY / _SECRET_KEY).
+      MINIO_ROOT_USER: veyqdev
+      MINIO_ROOT_PASSWORD: veyqdevsecret
+      # The web client (vite) is a different origin than MinIO, so the browser needs CORS. `*` is fine for
+      # local dev (native apps aren't subject to CORS).
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    ports:
+      - "9000:9000"  # S3 API (the backend signs presigned URLs for http://localhost:9000)
+      - "9001:9001"  # MinIO console (http://localhost:9001)
+    volumes:
+      - veyq-dev-minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  veyq-dev-db:
+  veyq-dev-minio:

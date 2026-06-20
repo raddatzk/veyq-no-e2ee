@@ -32,13 +32,14 @@ interface BlobStore {
 
     /**
      * A short-lived presigned URL letting a client transfer one object DIRECTLY to/from the store, bypassing
-     * the backend for the bytes — without ever seeing the store credentials (ADR 0021). Returns null when the
-     * backend can't presign (the in-memory dev/test store), so callers fall back to the proxied chunk path.
+     * the backend for the bytes — without ever seeing the store credentials (ADR 0021). This is the ONLY
+     * transport path; returns null only for the in-memory dev/test store, which therefore has no media-transport
+     * path at all (there is no proxied fallback — dev/test that exercises media needs a real S3/MinIO).
      */
     fun presignPut(key: String, ttlSeconds: Int): String? = null
     fun presignGet(key: String, ttlSeconds: Int): String? = null
 
-    /** Whether this store issues presigned URLs — drives the direct-to-store fast path + resume detection. */
+    /** Whether this store issues presigned URLs — drives direct-to-store transport + resume detection. */
     fun supportsPresign(): Boolean = false
 
     /** The stored object's size in bytes, or null if absent — used to verify a directly-uploaded frame. */
