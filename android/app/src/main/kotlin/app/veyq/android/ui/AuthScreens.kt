@@ -2,6 +2,7 @@ package app.veyq.android.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -60,20 +63,38 @@ fun normalizeApiBase(input: String): String {
 
 @Composable
 fun AuthCard(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Box(Modifier.fillMaxSize().background(Veyq.Bg).padding(20.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Veyq.screenBackground()).padding(22.dp), contentAlignment = Alignment.Center) {
         Column(
             Modifier
-                .widthIn(max = 420.dp)
+                .widthIn(max = 520.dp)
                 .fillMaxWidth()
-                .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
-                .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
-                .padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
-            Text("veyq", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Veyq.Text)
-            Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Veyq.Text)
-            if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Veyq.Muted)
-            content()
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Veyq.Accent.copy(alpha = 0.12f), RoundedCornerShape(21.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("v", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Veyq.Accent)
+                }
+                Text("veyq", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Veyq.Text)
+                Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Veyq.Text)
+                if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Veyq.Muted)
+            }
+
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                    .background(Veyq.Surface.copy(alpha = 0.92f), RoundedCornerShape(Veyq.Radius))
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                content()
+            }
         }
     }
 }
@@ -89,7 +110,7 @@ fun VeyqField(label: String, value: String, onValueChange: (String) -> Unit, sec
             visualTransformation = if (secure) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboard),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(Veyq.ControlRadius),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Veyq.SurfaceMuted,
                 unfocusedContainerColor = Veyq.SurfaceMuted,
@@ -109,7 +130,7 @@ fun PrimaryButton(title: String, busy: Boolean = false, enabled: Boolean = true,
         onClick = onClick,
         enabled = enabled && !busy,
         modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Veyq.ControlRadius),
         colors = ButtonDefaults.buttonColors(containerColor = Veyq.Accent, contentColor = Color.White),
     ) {
         Text(if (busy) "…" else title, fontWeight = FontWeight.SemiBold)
@@ -121,7 +142,7 @@ fun GhostButton(title: String, onClick: () -> Unit) {
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(46.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Veyq.ControlRadius),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Veyq.Text),
     ) {
         Text(title, fontWeight = FontWeight.SemiBold)
@@ -136,7 +157,8 @@ fun MessageBox(text: String, error: Boolean = true) {
         color = if (error) Veyq.Danger else Veyq.Muted,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (error) Veyq.Danger.copy(alpha = 0.14f) else Veyq.SurfaceMuted, RoundedCornerShape(10.dp))
+            .border(1.dp, if (error) Veyq.Danger.copy(alpha = 0.36f) else Veyq.Line, RoundedCornerShape(Veyq.ControlRadius))
+            .background(if (error) Veyq.Danger.copy(alpha = 0.14f) else Veyq.SurfaceMuted, RoundedCornerShape(Veyq.ControlRadius))
             .padding(10.dp),
     )
 }

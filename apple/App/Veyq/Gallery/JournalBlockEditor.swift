@@ -58,8 +58,8 @@ struct JournalBlockEditor: View {
                     TextEditor(text: $block.text)
                         .font(.system(size: 15, design: .monospaced)).foregroundStyle(VeyqStyle.text)
                         .scrollContentBackground(.hidden).frame(minHeight: 80).padding(8)
-                        .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-                        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+                        .background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
                 }
             }
         }
@@ -81,7 +81,7 @@ struct JournalBlockEditor: View {
                 Image(systemName: "pencil").foregroundStyle(VeyqStyle.muted).font(.caption)
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(VeyqStyle.surface).clipShape(Capsule()).overlay(Capsule().strokeBorder(VeyqStyle.line))
+            .background(VeyqStyle.elevatedSurface).clipShape(Capsule()).overlay(Capsule().strokeBorder(VeyqStyle.line))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -128,7 +128,10 @@ struct EmbedPickerSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 TextField(kind == .media ? T("journal.caption") : T("journal.label"), text: $label)
-                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(VeyqStyle.elevatedSurface, in: RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
                 ScrollView {
                     if kind == .media {
                         LazyVGrid(columns: cols, spacing: 6) {
@@ -137,6 +140,7 @@ struct EmbedPickerSheet: View {
                                     Image(uiImage: tile.image).resizable().scaledToFill()
                                         .frame(width: 92, height: 92).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                                         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(selected.contains(tile.id) ? VeyqStyle.accent : .clear, lineWidth: 3))
+                                        .background(VeyqStyle.mediaBackdrop)
                                 }
                             }
                         }
@@ -151,7 +155,8 @@ struct EmbedPickerSheet: View {
                                         Spacer()
                                         if selected.contains(p.id) { Image(systemName: "checkmark").foregroundStyle(VeyqStyle.accent) }
                                     }
-                                    .padding(10).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .padding(10).background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
                                 }
                             }
                             if store.playlists.isEmpty { Text(T("journal.pickerEmpty")).font(.footnote).foregroundStyle(VeyqStyle.muted) }
@@ -165,7 +170,8 @@ struct EmbedPickerSheet: View {
                                         Spacer()
                                         if selected.contains(tr.id) { Image(systemName: "checkmark").foregroundStyle(VeyqStyle.accent) }
                                     }
-                                    .padding(10).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .padding(10).background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
                                 }
                             }
                             if store.tracks.isEmpty { Text(T("journal.pickerEmpty")).font(.footnote).foregroundStyle(VeyqStyle.muted) }
@@ -173,8 +179,16 @@ struct EmbedPickerSheet: View {
                     }
                 }
             }
-            .padding(16)
-            .background(VeyqStyle.bg)
+            .padding(18)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                    .stroke(VeyqStyle.line)
+            }
+            .padding(22)
+            .frame(maxWidth: 620)
+            .frame(maxWidth: .infinity)
+            .background(VeyqScreenBackground())
             .navigationTitle(kind == .media ? T("journal.mediaPickerTitle") : kind == .playlist ? T("journal.playlistPickerTitle") : T("journal.trackPickerTitle"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

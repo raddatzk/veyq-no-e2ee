@@ -23,6 +23,9 @@ struct RootView: View {
         }
         .environmentObject(app)
         .onOpenURL { app.handleDeepLink($0) }
+        .alert(T("emailChange.confirmTitle"), isPresented: .constant(app.emailVerifyMessage != nil)) {
+            Button(T("common.close")) { app.emailVerifyMessage = nil }
+        } message: { Text(app.emailVerifyMessage ?? "") }
         .preferredColorScheme(themeScheme(theme))
         .id(locale) // rebuild the tree so every T(...) re-resolves on language change
     }

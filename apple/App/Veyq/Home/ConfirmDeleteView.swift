@@ -11,10 +11,15 @@ struct ConfirmDeleteView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Text(T("delete.warning")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                Label(T("delete.warning"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(VeyqStyle.danger)
                 TextField(String(format: T("delete.confirmPrompt"), name), text: $typed)
                     .autocorrectionDisabled().textInputAutocapitalization(.never)
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(VeyqScreenBackground())
             .navigationTitle(T("delete.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

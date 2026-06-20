@@ -49,9 +49,18 @@ struct ResetPasswordView: View {
 
                     if !error.isEmpty { MessageBox(text: error) }
                 }
-                .padding(16)
+                .padding(18)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                        .stroke(VeyqStyle.line)
+                }
+                .shadow(color: VeyqStyle.cardShadow, radius: 18, y: 10)
+                .frame(maxWidth: 520, alignment: .leading)
+                .padding(22)
+                .frame(maxWidth: .infinity)
             }
-            .background(VeyqStyle.bg)
+            .background(VeyqScreenBackground())
             .navigationTitle(T("reset.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.close")) { dismiss() } } }

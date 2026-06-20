@@ -36,12 +36,19 @@ struct JournalView: View {
                     Button(T("journal.edit")) { blocks = journalEditBlocks(store.journalMarkdown); Task { await store.loadTracks() }; editing = true }.tint(VeyqStyle.accent)
                 }
                 if store.journalMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(T("journal.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                    VeyqEmptyState(symbolName: "text.book.closed", title: T("journal.empty"), message: T("journal.edit"), tint: VeyqStyle.info)
                 } else {
                     JournalBodyView(markdown: store.journalMarkdown, store: store, onOpenMedia: onOpenMedia, onOpenChapter: onOpenChapter)
                 }
             }
         }
+        .padding(18)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                .stroke(VeyqStyle.line)
+        }
+        .shadow(color: VeyqStyle.cardShadow, radius: 18, y: 10)
         .task {
             await store.loadJournal()
             // Track embeds need the tracks loaded (inline map); playlist embeds need the playlists (link card).
@@ -89,18 +96,25 @@ struct JournalBodyView: View {
         VStack(alignment: .leading, spacing: 6) {
             if items.count == 1 {
                 Image(uiImage: items[0].image).resizable().scaledToFit()
-                    .frame(maxHeight: 360).clipShape(RoundedRectangle(cornerRadius: 10))
+                    .frame(maxHeight: 360)
+                    .frame(maxWidth: .infinity)
+                    .background(VeyqStyle.mediaBackdrop)
+                    .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
                     .onTapGesture { onOpenMedia(items[0]) }
             } else if items.count > 1 {
                 TabView {
                     ForEach(items) { tile in
                         Image(uiImage: tile.image).resizable().scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(VeyqStyle.mediaBackdrop)
                             .onTapGesture { onOpenMedia(tile) }
                     }
                 }
                 .tabViewStyle(.page)
                 .frame(height: 320)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
             } else {
                 Text(T("journal.embedMissing")).font(.footnote).italic().foregroundStyle(VeyqStyle.muted)
             }
@@ -130,7 +144,7 @@ struct JournalBodyView: View {
                 Text(e.label ?? id).foregroundStyle(VeyqStyle.accent).underline()
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(VeyqStyle.surface).clipShape(Capsule())
+            .background(VeyqStyle.elevatedSurface).clipShape(Capsule())
             .overlay(Capsule().strokeBorder(VeyqStyle.line))
         }
         .buttonStyle(.plain)
@@ -142,12 +156,12 @@ struct JournalBodyView: View {
             Link(destination: url) {
                 HStack(spacing: 8) {
                     Text(p.provider.label).font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.muted)
-                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.surface, in: Capsule())
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.elevatedSurface, in: Capsule())
                     Text(e.label ?? (p.title?.isEmpty == false ? p.title! : p.url)).foregroundStyle(VeyqStyle.accent).underline().lineLimit(1)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(VeyqStyle.line))
+                .background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
             }
             .buttonStyle(.plain)
         } else {

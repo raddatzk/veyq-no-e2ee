@@ -17,12 +17,18 @@ import androidx.compose.ui.Modifier
 import app.veyq.android.ui.ConnectScreen
 import app.veyq.android.ui.HomeRoute
 import app.veyq.android.ui.HomeScreen
-import app.veyq.android.ui.InviteLink
 import app.veyq.android.ui.L10n
 import app.veyq.android.ui.LoginScreen
 import app.veyq.android.ui.RegisterScreen
 import app.veyq.android.ui.VeyqTheme
+import app.veyq.crypto.EmailChange
+import app.veyq.crypto.InviteLink
 import app.veyq.crypto.Login
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Greenfield Android app entry. Slice 1: connect → login → landed, following iOS in Material 3 on top of
@@ -32,6 +38,8 @@ class MainActivity : FragmentActivity() {
     // Deep links the app was opened with: veyq://invite (→ register) and veyq://open (→ open a member path).
     private val deepLink = mutableStateOf<InviteLink.DeepLink?>(null)
     private val openLink = mutableStateOf<HomeRoute.DeepOpen?>(null)
+    // veyq://email-verify?token=… — confirm an email change (token-only).
+    private val emailVerify = mutableStateOf<String?>(null)
 
     /**
      * On launch, wipe the FileProvider share staging dir (cacheDir/shared). It holds only transient artifacts
@@ -45,6 +53,7 @@ class MainActivity : FragmentActivity() {
 
     private fun captureDeepLink(intent: Intent?) {
         val data = intent?.data?.toString() ?: return
+        EmailChange.parseDeepLink(data)?.let { emailVerify.value = it; return }
         InviteLink.parseDeepLink(data)?.let { deepLink.value = it; return }
         HomeRoute.parseDeepLink(data)?.let { openLink.value = it }
     }
@@ -75,6 +84,8 @@ class MainActivity : FragmentActivity() {
                         onDeepLinkConsumed = { deepLink.value = null },
                         openLink = openLink.value,
                         onOpenLinkConsumed = { openLink.value = null },
+                        emailVerify = emailVerify.value,
+                        onEmailVerifyConsumed = { emailVerify.value = null },
                         onTheme = { theme = it; prefs.edit().putString("veyq.theme", it).apply() },
                         onLocale = { L10n.locale = it; prefs.edit().putString("veyq.locale", it).apply() },
                     )
@@ -93,6 +104,8 @@ private fun AuthFlow(
     onDeepLinkConsumed: () -> Unit,
     openLink: HomeRoute.DeepOpen?,
     onOpenLinkConsumed: () -> Unit,
+    emailVerify: String?,
+    onEmailVerifyConsumed: () -> Unit,
     onTheme: (String) -> Unit,
     onLocale: (String) -> Unit,
 ) {
@@ -102,6 +115,8 @@ private fun AuthFlow(
     var session by remember { mutableStateOf<Login.UnlockedSession?>(null) }
     var invite by remember { mutableStateOf<InviteLink.Parts?>(null) }
     var pendingOpenPath by remember { mutableStateOf<String?>(null) }
+    var pendingEmailVerify by remember { mutableStateOf<String?>(null) }
+    var emailVerifyResult by remember { mutableStateOf<String?>(null) }
 
     // A fresh invite deep link (when not already signed in) jumps straight to registration on that instance.
     androidx.compose.runtime.LaunchedEffect(deepLink) {
@@ -118,11 +133,33 @@ private fun AuthFlow(
             onOpenLinkConsumed()
         }
     }
+    // Email-change confirmation: stash the token, then confirm once an instance is known (token-only). The
+    // server normally emails a web link the browser handles; this native path is for veyq://email-verify links.
+    androidx.compose.runtime.LaunchedEffect(emailVerify) {
+        if (emailVerify != null) { pendingEmailVerify = emailVerify; onEmailVerifyConsumed() }
+    }
+    androidx.compose.runtime.LaunchedEffect(pendingEmailVerify, apiBase) {
+        val tok = pendingEmailVerify
+        if (tok != null && apiBase.isNotEmpty()) {
+            val r = runCatching { withContext(Dispatchers.IO) { EmailChange.confirm(apiBase, tok) } }
+            emailVerifyResult = if (r.isSuccess) L10n.t("emailChange.confirmed") else L10n.t("emailChange.confirmFailed")
+            pendingEmailVerify = null
+        }
+    }
 
     when (phase) {
         Phase.Connect -> ConnectScreen(apiBase) { base, appUrl -> apiBase = base; appBaseUrl = appUrl ?: base; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
         Phase.Register -> RegisterScreen(apiBase, invite!!, onCancel = { phase = Phase.Login }) { session = it; phase = Phase.Landed }
         Phase.Landed -> HomeScreen(apiBase, appBaseUrl, session!!, theme, onTheme, onLocale, pendingOpenPath, { pendingOpenPath = null }) { session = null; phase = Phase.Login }
+    }
+
+    emailVerifyResult?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { emailVerifyResult = null },
+            title = { Text(L10n.t("emailChange.confirmTitle")) },
+            text = { Text(msg) },
+            confirmButton = { TextButton(onClick = { emailVerifyResult = null }) { Text(L10n.t("common.close")) } },
+        )
     }
 }

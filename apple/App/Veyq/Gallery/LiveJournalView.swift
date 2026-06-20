@@ -102,10 +102,14 @@ struct LiveJournalView: View {
             )
             .frame(minHeight: 280)
             .padding(8)
-            .background(VeyqStyle.surface)
-            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+            .background(VeyqStyle.elevatedSurface)
+            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
         }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
+        .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
         .onAppear { model.start(store: store, initial: store.journalMarkdown) }
         // Tear down on ANY dismissal (swipe, tab switch, background), not only the Done button — otherwise the
         // relay leaks and edits in the debounce window are lost. Idempotent with Done via stop()'s guard.

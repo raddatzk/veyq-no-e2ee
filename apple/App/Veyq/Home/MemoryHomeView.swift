@@ -126,6 +126,7 @@ struct MemoryHomeView: View {
     private var scroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                homeHeader
                 if let error = store.error { MessageBox(text: error) }
                 if let entry = store.activeEntry, let deadline = entry.scheduledDeletionAt {
                     deletionBanner(entry: entry, deadline: deadline)
@@ -139,9 +140,25 @@ struct MemoryHomeView: View {
             .padding(16)
             .readableWidth()
         }
-        .background(VeyqStyle.bg)
+        .background(VeyqScreenBackground())
         .navigationTitle(store.crumbs.last?.name ?? "veyq")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var homeHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(store.activeEntry.map { store.displayName(for: $0) } ?? "veyq")
+                .font(.largeTitle.bold())
+                .foregroundStyle(VeyqStyle.text)
+                .accessibilityIdentifier("memory-home-title")
+            if let subtitle = store.crumbs.last?.name, subtitle != store.activeEntry.map({ store.displayName(for: $0) }) {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(VeyqStyle.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, 4)
     }
 
     /// A warning that the active tenant is scheduled for deletion, with an owner-only cancel action.

@@ -8,9 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +55,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import app.veyq.crypto.Browse
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
@@ -525,64 +530,20 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
         return
     }
 
-    Scaffold(
-        containerColor = Veyq.Bg,
-        topBar = {
-            TopAppBar(
-                title = { Text(controller.crumbs.lastOrNull()?.name ?: "veyq", color = Veyq.Text, fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
-                navigationIcon = {
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) { Text("▦", color = Veyq.Text, fontSize = 18.sp) }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            controller.spaces.forEach { s ->
-                                DropdownMenuItem(text = { Text(controller.displayName(s)) }, onClick = {
-                                    menuOpen = false; scope.launch { controller.switchSpace(s) }
-                                })
-                            }
-                            HorizontalDivider()
-                            DropdownMenuItem(text = { Text(L10n.t("tenants.create")) }, onClick = { menuOpen = false; newSpaceName = ""; createTenantOpen = true })
-                            if (controller.spaces.any { it.getString("kind") == "TENANT" }) {
-                                DropdownMenuItem(text = { Text(L10n.t("groups.create")) }, onClick = {
-                                    menuOpen = false; newSpaceName = ""
-                                    newGroupTenant = controller.spaces.firstOrNull { it.getString("kind") == "TENANT" }?.optString("tenantId") ?: ""
-                                    createGroupOpen = true
-                                })
-                            }
-                            DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinPassphrase = ""; joinOpen = true })
-                            // Management actions for the ACTIVE space (owner only)
-                            val activeSpace = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
-                            if (activeSpace != null && activeSpace.getString("kind") == "GROUP" && activeSpace.optString("role") == "GroupOwner") {
-                                HorizontalDivider()
-                                DropdownMenuItem(text = { Text(L10n.t("groups.members")) }, onClick = { menuOpen = false; manageGroupEntry = activeSpace })
-                                DropdownMenuItem(text = { Text(L10n.t("delete.group"), color = Veyq.Danger) }, onClick = {
-                                    menuOpen = false; confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteGroup(activeSpace) }
-                                })
-                            }
-                            if (activeSpace != null && activeSpace.getString("kind") == "TENANT" && activeSpace.optString("role") == "Owner") {
-                                HorizontalDivider()
-                                DropdownMenuItem(text = { Text(L10n.t("invite.title")) }, onClick = { menuOpen = false; inviteTenant = activeSpace })
-                                DropdownMenuItem(text = { Text(L10n.t("delete.tenant"), color = Veyq.Danger) }, onClick = {
-                                    menuOpen = false; confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteTenant(activeSpace) }
-                                })
-                            }
-                        }
-                    }
-                },
-                actions = {
-                    Box {
-                        IconButton(onClick = { createMenuOpen = true }) { Text("＋", color = Veyq.Accent, fontSize = 22.sp) }
-                        DropdownMenu(expanded = createMenuOpen, onDismissRequest = { createMenuOpen = false }) {
-                            DropdownMenuItem(text = { Text(L10n.t("home.createMemory")) }, onClick = { createMenuOpen = false; createType = "MEMORY"; newName = ""; showNameDialog = true })
-                            DropdownMenuItem(text = { Text(L10n.t("home.createFolder")) }, onClick = { createMenuOpen = false; createType = "FOLDER"; newName = ""; showNameDialog = true })
-                        }
-                    }
-                    IconButton(onClick = { settingsOpen = true }) { Text("⚙", color = Veyq.Muted, fontSize = 20.sp) }
-                },
-            )
-        },
-    ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    @Composable
+    fun BrowsePane(modifier: Modifier = Modifier, gridColumns: Int = 2) {
+        Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }?.let { controller.displayName(it) } ?: "veyq",
+                    color = Veyq.Text,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                controller.crumbs.lastOrNull()?.name?.let {
+                    Text(it, color = Veyq.Muted, fontSize = 14.sp)
+                }
+            }
             controller.error?.let { MessageBox(it) }
 
             val active = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
@@ -618,11 +579,113 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 
                 SectionHeader(L10n.t("home.memories"), controller.memories.size)
                 if (controller.memories.isEmpty()) EmptyText(L10n.t("home.noMemories"))
-                else MemoryGrid(controller.memories, controller.covers, onOpen = { detail = it }, onRename = startAction)
+                else MemoryGrid(controller.memories, controller.covers, columns = gridColumns, onOpen = { detail = it }, onRename = startAction)
 
                 SectionHeader(L10n.t("home.folders"), controller.folders.size)
                 if (controller.folders.isEmpty()) EmptyText(L10n.t("home.noFolders"))
                 else controller.folders.forEach { f -> FolderRow(f, onClick = { scope.launch { controller.openFolder(f) } }, onLongClick = { startAction(f) }) }
+            }
+        }
+    }
+
+    @Composable
+    fun SpaceMenuContent(onClose: () -> Unit) {
+        controller.spaces.forEach { s ->
+            DropdownMenuItem(text = { Text(controller.displayName(s)) }, onClick = {
+                onClose(); scope.launch { controller.switchSpace(s) }
+            })
+        }
+        HorizontalDivider()
+        DropdownMenuItem(text = { Text(L10n.t("tenants.create")) }, onClick = { onClose(); newSpaceName = ""; createTenantOpen = true })
+        if (controller.spaces.any { it.getString("kind") == "TENANT" }) {
+            DropdownMenuItem(text = { Text(L10n.t("groups.create")) }, onClick = {
+                onClose(); newSpaceName = ""
+                newGroupTenant = controller.spaces.firstOrNull { it.getString("kind") == "TENANT" }?.optString("tenantId") ?: ""
+                createGroupOpen = true
+            })
+        }
+        DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { onClose(); joinLink = ""; joinInfo = null; joinPassphrase = ""; joinOpen = true })
+        val activeSpace = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
+        if (activeSpace != null && activeSpace.getString("kind") == "GROUP" && activeSpace.optString("role") == "GroupOwner") {
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text(L10n.t("groups.members")) }, onClick = { onClose(); manageGroupEntry = activeSpace })
+            DropdownMenuItem(text = { Text(L10n.t("delete.group"), color = Veyq.Danger) }, onClick = {
+                onClose(); confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteGroup(activeSpace) }
+            })
+        }
+        if (activeSpace != null && activeSpace.getString("kind") == "TENANT" && activeSpace.optString("role") == "Owner") {
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text(L10n.t("invite.title")) }, onClick = { onClose(); inviteTenant = activeSpace })
+            DropdownMenuItem(text = { Text(L10n.t("delete.tenant"), color = Veyq.Danger) }, onClick = {
+                onClose(); confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteTenant(activeSpace) }
+            })
+        }
+    }
+
+    @Composable
+    fun CreateMenuContent(onClose: () -> Unit) {
+        DropdownMenuItem(text = { Text(L10n.t("home.createMemory")) }, onClick = { onClose(); createType = "MEMORY"; newName = ""; showNameDialog = true })
+        DropdownMenuItem(text = { Text(L10n.t("home.createFolder")) }, onClick = { onClose(); createType = "FOLDER"; newName = ""; showNameDialog = true })
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val largeScreen = maxWidth >= 840.dp
+        val gridColumns = when {
+            maxWidth >= 1180.dp -> 4
+            maxWidth >= 700.dp -> 3
+            else -> 2
+        }
+
+        Scaffold(
+            containerColor = Veyq.Bg,
+            topBar = {
+                TopAppBar(
+                    title = { Text(controller.crumbs.lastOrNull()?.name ?: "veyq", color = Veyq.Text, fontWeight = FontWeight.Bold) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
+                    navigationIcon = {
+                        if (!largeScreen) {
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) { Text("▦", color = Veyq.Text, fontSize = 18.sp) }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    SpaceMenuContent { menuOpen = false }
+                                }
+                            }
+                        }
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { createMenuOpen = true }) { Text("+", color = Veyq.Accent, fontSize = 22.sp) }
+                            DropdownMenu(expanded = createMenuOpen, onDismissRequest = { createMenuOpen = false }) {
+                                CreateMenuContent { createMenuOpen = false }
+                            }
+                        }
+                        if (!largeScreen) {
+                            IconButton(onClick = { settingsOpen = true }) { Text("⚙", color = Veyq.Muted, fontSize = 20.sp) }
+                        }
+                    },
+                )
+            },
+        ) { pad ->
+            if (largeScreen) {
+                Row(Modifier.padding(pad).fillMaxSize().background(Veyq.screenBackground())) {
+                    SpaceSidebar(
+                        controller = controller,
+                        onSpace = { scope.launch { controller.switchSpace(it) } },
+                        onCreateTenant = { newSpaceName = ""; createTenantOpen = true },
+                        onCreateGroup = {
+                            newSpaceName = ""
+                            newGroupTenant = controller.spaces.firstOrNull { it.getString("kind") == "TENANT" }?.optString("tenantId") ?: ""
+                            createGroupOpen = true
+                        },
+                        onJoinGroup = { joinLink = ""; joinInfo = null; joinPassphrase = ""; joinOpen = true },
+                        onSettings = { settingsOpen = true },
+                    )
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                        BrowsePane(Modifier.fillMaxWidth().widthIn(max = 1040.dp), gridColumns)
+                    }
+                }
+            } else {
+                BrowsePane(Modifier.padding(pad).fillMaxSize().background(Veyq.screenBackground()), gridColumns)
             }
         }
     }
@@ -710,11 +773,12 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 
     if (joinOpen) {
         AlertDialog(
+            modifier = Modifier.widthIn(max = 560.dp),
             onDismissRequest = { joinOpen = false },
-            containerColor = Veyq.Surface,
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("groups.join"), color = Veyq.Text) },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = joinLink,
                         onValueChange = { v ->
@@ -723,6 +787,8 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
                         },
                         placeholder = { Text(L10n.t("accept.paste"), color = Veyq.Muted) },
                         singleLine = false,
+                        shape = RoundedCornerShape(Veyq.ControlRadius),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                             focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
@@ -731,7 +797,7 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
                     )
                     joinInfo?.let { (name, role) ->
                         val roleLabel = if (role == "Owner") L10n.t("invite.owner") else L10n.t("invite.member")
-                        Text("$name — ${L10n.t("accept.as")} $roleLabel", color = Veyq.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                        Text("$name — ${L10n.t("accept.as")} $roleLabel", color = Veyq.Text, fontSize = 14.sp)
                     }
                     if (InviteLink.parse(joinLink)?.isProtected == true) {
                         OutlinedTextField(
@@ -740,7 +806,8 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
                             placeholder = { Text(L10n.t("accept.passphraseHint"), color = Veyq.Muted) },
-                            modifier = Modifier.padding(top = 8.dp),
+                            shape = RoundedCornerShape(Veyq.ControlRadius),
+                            modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                                 focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
@@ -769,8 +836,9 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 
     renameEntry?.let { entry ->
         AlertDialog(
+            modifier = Modifier.widthIn(max = 520.dp),
             onDismissRequest = { renameEntry = null },
-            containerColor = Veyq.Surface,
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("common.rename"), color = Veyq.Text) },
             text = {
                 OutlinedTextField(
@@ -778,6 +846,8 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
                     onValueChange = { renameName = it },
                     singleLine = true,
                     placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) },
+                    shape = RoundedCornerShape(Veyq.ControlRadius),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                         focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
@@ -792,8 +862,9 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 
     actionEntry?.let { entry ->
         AlertDialog(
+            modifier = Modifier.widthIn(max = 520.dp),
             onDismissRequest = { actionEntry = null },
-            containerColor = Veyq.Surface,
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(entry.name, color = Veyq.Text) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -816,15 +887,18 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
     // Confirm-by-name gate for every destructive delete (node/group/tenant).
     confirmDelName?.let { name ->
         AlertDialog(
+            modifier = Modifier.widthIn(max = 520.dp),
             onDismissRequest = { confirmDelName = null; confirmDelAction = null },
-            containerColor = Veyq.Surface,
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("delete.title"), color = Veyq.Text) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(L10n.t("delete.warning"), color = Veyq.Muted, fontSize = 12.sp)
+                    Text(L10n.t("delete.warning"), color = Veyq.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
                         value = confirmDelText, onValueChange = { confirmDelText = it }, singleLine = true,
                         placeholder = { Text(name, color = Veyq.Muted) },
+                        shape = RoundedCornerShape(Veyq.ControlRadius),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text),
                     )
                 }
@@ -845,8 +919,9 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 
     moveEntry?.let { entry ->
         AlertDialog(
+            modifier = Modifier.widthIn(max = 560.dp),
             onDismissRequest = { moveEntry = null },
-            containerColor = Veyq.Surface,
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("move.title"), color = Veyq.Text) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -868,6 +943,89 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
     }
 }
 
+@Composable
+private fun SpaceSidebar(
+    controller: HomeController,
+    onSpace: (JSONObject) -> Unit,
+    onCreateTenant: () -> Unit,
+    onCreateGroup: () -> Unit,
+    onJoinGroup: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxHeight()
+            .width(284.dp)
+            .background(Veyq.Surface)
+            .border(1.dp, Veyq.Line)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("veyq", color = Veyq.Text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        SidebarSection(L10n.t("home.spaces"))
+        controller.spaces.forEach { space ->
+            val selected = space.getString("scopeId") == controller.activeScopeId
+            SidebarSpaceRow(
+                name = controller.displayName(space),
+                subtitle = when (space.getString("kind")) {
+                    "PERSONAL" -> L10n.t("home.personal")
+                    "TENANT" -> space.optString("role").ifEmpty { L10n.t("home.tenants") }
+                    else -> space.optString("role").ifEmpty { L10n.t("home.groups") }
+                },
+                selected = selected,
+                onClick = { onSpace(space) },
+            )
+        }
+        HorizontalDivider(color = Veyq.Line)
+        TextButton(onClick = onCreateTenant, modifier = Modifier.fillMaxWidth()) {
+            Text(L10n.t("tenants.create"), color = Veyq.Accent, modifier = Modifier.fillMaxWidth())
+        }
+        if (controller.spaces.any { it.getString("kind") == "TENANT" }) {
+            TextButton(onClick = onCreateGroup, modifier = Modifier.fillMaxWidth()) {
+                Text(L10n.t("groups.create"), color = Veyq.Accent, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        TextButton(onClick = onJoinGroup, modifier = Modifier.fillMaxWidth()) {
+            Text(L10n.t("groups.join"), color = Veyq.Accent, modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
+            Text(L10n.t("home.settings"), color = Veyq.Text, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun SidebarSection(title: String) {
+    Text(title, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun SidebarSpaceRow(name: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(if (selected) Veyq.Accent.copy(alpha = 0.14f) else Veyq.Surface, RoundedCornerShape(Veyq.ControlRadius))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .background(Veyq.Accent, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(name.take(1).uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(name, color = Veyq.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(subtitle, color = Veyq.Muted, fontSize = 11.sp, maxLines = 1)
+        }
+    }
+}
+
 /**
  * Owner-side member invite for a tenant: role + protection mode, then email the invite or copy the link.
  * Pragmatic = the temp key rides the link in the clear; passphrase = it's encrypted under an out-of-band
@@ -876,7 +1034,7 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
 @Composable
 private fun InviteMemberDialog(controller: HomeController, tenant: JSONObject, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
     val tenantId = tenant.optString("tenantId")
     var role by remember { mutableStateOf("Member") }
     var passphraseMode by remember { mutableStateOf(false) }
@@ -901,29 +1059,34 @@ private fun InviteMemberDialog(controller: HomeController, tenant: JSONObject, o
     )
 
     AlertDialog(
+        modifier = Modifier.widthIn(max = 560.dp),
         onDismissRequest = onClose,
-        containerColor = Veyq.Surface,
+        containerColor = Veyq.Surface.copy(alpha = 0.96f),
         title = { Text(L10n.t("invite.title"), color = Veyq.Text) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(L10n.t("invite.role"), color = Veyq.Muted, fontSize = 13.sp)
                 Row { toggle(L10n.t("invite.member"), role == "Member") { role = "Member" }; toggle(L10n.t("invite.owner"), role == "Owner") { role = "Owner" } }
-                Text(L10n.t("invite.protection"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(L10n.t("invite.protection"), color = Veyq.Muted, fontSize = 13.sp)
                 Row { toggle(L10n.t("invite.protLink"), !passphraseMode) { passphraseMode = false }; toggle(L10n.t("invite.protPassphrase"), passphraseMode) { passphraseMode = true } }
                 if (passphraseMode) {
                     OutlinedTextField(
                         value = passphrase, onValueChange = { passphrase = it }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         placeholder = { Text(L10n.t("invite.passphrasePlaceholder"), color = Veyq.Muted) },
+                        shape = RoundedCornerShape(Veyq.ControlRadius),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors,
                     )
-                    Text(L10n.t("invite.passphraseOob"), color = Veyq.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text(L10n.t("invite.passphraseOob"), color = Veyq.Muted, fontSize = 12.sp)
                 }
-                Text(L10n.t("invite.emailHint"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(L10n.t("invite.emailHint"), color = Veyq.Muted, fontSize = 13.sp)
                 OutlinedTextField(
                     value = email, onValueChange = { email = it }, singleLine = true,
                     placeholder = { Text(L10n.t("invite.emailPlaceholder"), color = Veyq.Muted) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    shape = RoundedCornerShape(Veyq.ControlRadius),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors,
                 )
                 TextButton(
@@ -931,7 +1094,7 @@ private fun InviteMemberDialog(controller: HomeController, tenant: JSONObject, o
                         busy = true
                         scope.launch {
                             if (!passMissing && controller.buildMemberInviteLink(tenantId, role, passOrNull)?.also { link ->
-                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(link))
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("veyq invite", link)))
                                 } != null) copied = true
                             busy = false
                         }
@@ -1003,12 +1166,12 @@ private fun DeletionBanner(deadlineIso: String, isOwner: Boolean, onCancel: () -
 }
 
 @Composable
-private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, onOpen: (HomeController.Entry) -> Unit, onRename: (HomeController.Entry) -> Unit) {
+private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, columns: Int, onOpen: (HomeController.Entry) -> Unit, onRename: (HomeController.Entry) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        memories.chunked(2).forEach { row ->
+        memories.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { m -> Box(Modifier.weight(1f)) { MemoryCard(m, covers[m.id], onOpen, onRename) } }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -1084,13 +1247,21 @@ fun GroupMembersDialog(controller: HomeController, group: JSONObject, onClose: (
     LaunchedEffect(group) { reload() }
 
     AlertDialog(
+        modifier = Modifier.widthIn(max = 560.dp),
         onDismissRequest = onClose,
-        containerColor = Veyq.Surface,
+        containerColor = Veyq.Surface.copy(alpha = 0.96f),
         title = { Text(L10n.t("groups.members"), color = Veyq.Text) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 members.forEach { m ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                            .background(Veyq.SurfaceMuted, RoundedCornerShape(Veyq.Radius))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(m.getString("displayName"), color = Veyq.Text, modifier = Modifier.weight(1f))
                         TextButton(onClick = {
                             val newRole = if (m.getString("role") == "GroupOwner") "GroupMember" else "GroupOwner"

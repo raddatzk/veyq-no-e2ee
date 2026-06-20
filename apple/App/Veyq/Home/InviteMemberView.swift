@@ -67,6 +67,9 @@ struct InviteMemberView: View {
                 }
                 if let err = store.error { Section { MessageBox(text: err) } }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(VeyqScreenBackground())
             .navigationTitle(T("invite.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.close")) { dismiss() } } }

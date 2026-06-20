@@ -11,13 +11,29 @@ struct QrScannerScreen: View {
         ZStack {
             Color.black.ignoresSafeArea()
             QrScannerView(onDecoded: onDecoded).ignoresSafeArea()
+            VeyqStyle.mediaBackdrop.opacity(0.22).ignoresSafeArea()
+
+            RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                .strokeBorder(VeyqStyle.accent, lineWidth: 2)
+                .frame(width: 260, height: 260)
+                .shadow(color: VeyqStyle.accent.opacity(0.24), radius: 18, y: 8)
+
             VStack {
                 Spacer()
-                Text(T("kit.scanHint"))
-                    .font(.system(size: 13)).foregroundStyle(.white).multilineTextAlignment(.center)
-                    .padding(10).background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: VeyqStyle.radiusSm))
-                Button(T("common.cancel")) { onClose() }
-                    .buttonStyle(.borderedProminent).tint(VeyqStyle.accent).padding(.top, 8).padding(.bottom, 40)
+                VStack(spacing: 12) {
+                    Label(T("kit.scanHint"), systemImage: "qrcode.viewfinder")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VeyqStyle.onStrong)
+                        .multilineTextAlignment(.center)
+                    Button(T("common.cancel")) { onClose() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(VeyqStyle.accent)
+                }
+                .padding(16)
+                .frame(maxWidth: 360)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(.white.opacity(0.24)))
+                .padding(.bottom, 32)
             }
             .padding()
         }

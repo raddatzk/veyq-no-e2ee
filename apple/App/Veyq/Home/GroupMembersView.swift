@@ -48,6 +48,9 @@ struct GroupMembersView: View {
                 }
                 if !error.isEmpty { Text(error).font(.footnote).foregroundStyle(VeyqStyle.danger) }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(VeyqScreenBackground())
             .navigationTitle(store.displayName(for: space))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(T("common.close")) { dismiss() } } }

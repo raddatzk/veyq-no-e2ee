@@ -9,6 +9,10 @@ public enum Instance {
         /// This instance's public app origin — clients assembling invite links build against it. Optional
         /// (older instances omit it); fall back to apiBase when absent.
         public let appBaseUrl: String?
+        /// Optional operator support URL (drives a dismissible support banner). Absent when unset.
+        public let supportUrl: String?
+        /// Advisory deployed server version. Absent on older instances.
+        public let serverVersion: String?
     }
 
     /// Fetch `GET /api/setup` (public, no auth).

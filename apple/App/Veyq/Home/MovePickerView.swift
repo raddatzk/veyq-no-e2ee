@@ -30,9 +30,11 @@ struct MovePickerView: View {
                         }
                         .disabled(busy)
                     }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                 }
             }
-            .background(VeyqStyle.bg)
+            .background(VeyqScreenBackground())
             .navigationTitle(T("move.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

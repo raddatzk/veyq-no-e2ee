@@ -9,21 +9,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 
-/** veyq design tokens (light + dark) — mirrors the web/iOS tokens. */
+/** veyq native design tokens (light + dark) — mirrors the legacy iOS UI reference. */
 data class VeyqColors(
-    val bg: Color, val surface: Color, val surfaceMuted: Color, val text: Color,
-    val muted: Color, val line: Color, val accent: Color, val danger: Color,
+    val bg: Color, val surface: Color, val surfaceMuted: Color, val elevatedSurface: Color,
+    val text: Color, val muted: Color, val line: Color, val accent: Color, val success: Color,
+    val warning: Color, val info: Color, val rose: Color, val danger: Color, val mediaBackdrop: Color,
 )
 
 private val DarkColors = VeyqColors(
-    bg = Color(0xFF101418), surface = Color(0xFF171C22), surfaceMuted = Color(0xFF20262E), text = Color(0xFFEEF3F8),
-    muted = Color(0xFF9AA7B5), line = Color(0xFF333D49), accent = Color(0xFF9B8CFF), danger = Color(0xFFF87171),
+    bg = Color(0xFF101418), surface = Color(0xFF171C22), surfaceMuted = Color(0xFF20262E), elevatedSurface = Color(0xFF20262E),
+    text = Color(0xFFEEF3F8), muted = Color(0xFF9AA7B5), line = Color(0xFF333D49), accent = Color(0xFF9B8CFF),
+    success = Color(0xFF2DD4BF), warning = Color(0xFFFACC15), info = Color(0xFF67E8F9), rose = Color(0xFFFB7185),
+    danger = Color(0xFFF87171), mediaBackdrop = Color(0xFF0B0F14),
 )
 private val LightColors = VeyqColors(
-    bg = Color(0xFFF7F8FB), surface = Color(0xFFFFFFFF), surfaceMuted = Color(0xFFF4F6FB), text = Color(0xFF111827),
-    muted = Color(0xFF667085), line = Color(0xFFDCE2EC), accent = Color(0xFF5B4DF5), danger = Color(0xFFB42318),
+    bg = Color(0xFFF7F8FB), surface = Color(0xFFFFFFFF), surfaceMuted = Color(0xFFF4F6FB), elevatedSurface = Color(0xFFF4F6FB),
+    text = Color(0xFF111827), muted = Color(0xFF667085), line = Color(0xFFDCE2EC), accent = Color(0xFF5B4DF5),
+    success = Color(0xFF0F766E), warning = Color(0xFFFACC15), info = Color(0xFF2563EB), rose = Color(0xFFC8335D),
+    danger = Color(0xFFB42318), mediaBackdrop = Color(0xFF0F172A),
 )
 
 /**
@@ -35,12 +41,28 @@ object Veyq {
     val Bg get() = palette.bg
     val Surface get() = palette.surface
     val SurfaceMuted get() = palette.surfaceMuted
+    val ElevatedSurface get() = palette.elevatedSurface
     val Text get() = palette.text
     val Muted get() = palette.muted
     val Line get() = palette.line
     val Accent get() = palette.accent
+    val Success get() = palette.success
+    val Warning get() = palette.warning
+    val Info get() = palette.info
+    val Rose get() = palette.rose
     val Danger get() = palette.danger
-    val Radius = 12.dp
+    val MediaBackdrop get() = palette.mediaBackdrop
+    val Radius = 10.dp
+    val ControlRadius = 8.dp
+    val FloatingDockContentPadding = 82.dp
+
+    fun screenBackground(): Brush = Brush.linearGradient(
+        listOf(
+            Accent.copy(alpha = 0.12f),
+            Success.copy(alpha = 0.06f),
+            Bg,
+        ),
+    )
 }
 
 @Composable

@@ -19,13 +19,24 @@ struct MemoryMapView: View {
 
     private var consentPlaceholder: some View {
         VStack(spacing: 16) {
+            Image(systemName: "map")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(VeyqStyle.accent)
+                .frame(width: 44, height: 44)
+                .background(VeyqStyle.accent.opacity(0.12), in: Circle())
             Text(T("map.consentText")).foregroundStyle(VeyqStyle.muted).multilineTextAlignment(.center)
-            Button(T("map.consentEnable")) { mapConsent = true }.buttonStyle(.borderedProminent)
+            PrimaryButton(title: T("map.consentEnable")) { mapConsent = true }
+                .frame(maxWidth: 280)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 420)
-        .padding()
-        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line, style: StrokeStyle(lineWidth: 1, dash: [6])))
+        .padding(18)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                .stroke(VeyqStyle.line, style: StrokeStyle(lineWidth: 1, dash: [6]))
+        }
+        .shadow(color: VeyqStyle.cardShadow, radius: 18, y: 10)
     }
 
     // A small palette so multiple tracks are visually distinguishable (mirrors web TRACK_COLORS).
@@ -91,8 +102,10 @@ struct MemoryMapView: View {
             }
         }
         .frame(height: 420)
-        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+        .background(VeyqStyle.mediaBackdrop, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
+        .shadow(color: VeyqStyle.cardShadow, radius: 18, y: 10)
     }
 
     /// Zoom one step deeper, centred on a tapped cluster, so it splits into its members.

@@ -17,6 +17,8 @@ final class AppState: ObservableObject {
     @Published var pendingOpenPath: String?
     /// The instance's public app origin (for assembling invite links); falls back to apiBase if unknown.
     @Published var appBaseUrl: String = ""
+    /// Result of an email-change confirmation deep link, shown as an alert once.
+    @Published var emailVerifyMessage: String?
 
     func connected(apiBase: String, appBaseUrl: String? = nil) {
         self.apiBase = apiBase
@@ -28,6 +30,22 @@ final class AppState: ObservableObject {
     /// A veyq://invite deep link (from the mobile browser banner): point at the named instance and jump a
     /// not-signed-in user straight into registration. Ignored when already signed in.
     func handleDeepLink(_ url: URL) {
+        // Email-change confirmation (token-only — control of the new inbox is the proof; works signed-in or not).
+        // Note: the server normally emails a web link (#confirm-email=…) the browser handles; this native path
+        // is for a veyq://email-verify?token=… link and confirms against the last-connected instance.
+        if let token = EmailChange.parseDeepLink(url.absoluteString) {
+            let base = apiBase
+            Task { @MainActor in
+                guard !base.isEmpty else { emailVerifyMessage = T("emailChange.confirmNeedsInstance"); return }
+                do {
+                    let user = try await EmailChange.confirmEmailChange(apiBase: base, token: token)
+                    emailVerifyMessage = T("emailChange.confirmedMessage", user.email)
+                } catch {
+                    emailVerifyMessage = T("emailChange.confirmFailed")
+                }
+            }
+            return
+        }
         // Invite deep link (only for a not-signed-in user → straight to registration).
         if session == nil, let dl = InviteLink.parseDeepLink(url.absoluteString) {
             apiBase = dl.apiBase

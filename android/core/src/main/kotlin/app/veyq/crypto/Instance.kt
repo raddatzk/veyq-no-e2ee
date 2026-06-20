@@ -12,8 +12,17 @@ import java.net.http.HttpResponse
 object Instance {
     private val client = ApiClient.shared
 
-    /** appBaseUrl = the instance's public app origin (for assembling invite links); null on older instances. */
-    data class SetupStatus(val setupRequired: Boolean, val suites: List<String>, val appBaseUrl: String?)
+    /**
+     * appBaseUrl = the instance's public app origin (for assembling invite links); null on older instances.
+     * supportUrl drives a dismissible support banner (null when unset); serverVersion is advisory.
+     */
+    data class SetupStatus(
+        val setupRequired: Boolean,
+        val suites: List<String>,
+        val appBaseUrl: String?,
+        val supportUrl: String?,
+        val serverVersion: String?,
+    )
 
     /** Fetch `GET /api/setup` (public, no auth). Blocking — call off the main thread. */
     fun getSetupStatus(apiBase: String): SetupStatus {
@@ -24,6 +33,12 @@ object Instance {
         if (resp.statusCode() != 200) throw RuntimeException("setup status failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
         val arr = j.getJSONArray("suites")
-        return SetupStatus(j.getBoolean("setupRequired"), (0 until arr.length()).map { arr.getString(it) }, j.optString("appBaseUrl").ifEmpty { null })
+        return SetupStatus(
+            j.getBoolean("setupRequired"),
+            (0 until arr.length()).map { arr.getString(it) },
+            j.optString("appBaseUrl").ifEmpty { null },
+            j.optString("supportUrl").ifEmpty { null },
+            j.optString("serverVersion").ifEmpty { null },
+        )
     }
 }

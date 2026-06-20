@@ -25,6 +25,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="veyq" android:host="invite" />
                 <data android:scheme="veyq" android:host="open" />
+                <!-- Email-change confirmation (veyq://email-verify?token=…); token-only, works signed-in or not. -->
+                <data android:scheme="veyq" android:host="email-verify" />
             </intent-filter>
         </activity>
 
