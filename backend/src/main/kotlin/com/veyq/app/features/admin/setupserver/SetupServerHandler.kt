@@ -11,6 +11,7 @@ import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.security.ServerSetupRepository
 import com.veyq.app.shared.security.SetupGate
+import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -23,13 +24,25 @@ class SetupServerHandler(
     private val suites: CryptoSuiteRegistry,
     private val setupGate: SetupGate,
     private val serverSetup: ServerSetupRepository,
+    private val store: BlobStore,
     app: AppConfig,
 ) {
     private val appBaseUrl: String = app.baseUrl()
+    private val supportUrl: String? = app.supportUrl().orElse(null)
+    private val serverVersion: String = app.version()
 
     @Transactional
     fun status(): SetupStatus =
-        SetupStatus(setupRequired = !setupGate.isComplete(), suites = suites.supported(), appBaseUrl = appBaseUrl)
+        SetupStatus(
+            setupRequired = !setupGate.isComplete(),
+            suites = suites.supported(),
+            appBaseUrl = appBaseUrl,
+            supportUrl = supportUrl,
+            serverVersion = serverVersion,
+            // Direct-to-store is the only transport (ADR 0021): advertise whether this store can presign, so a
+            // misconfigured store surfaces as an operator hint instead of silently-broken media.
+            directTransport = if (store.supportsPresign()) SetupStatus.DirectTransport.ok else SetupStatus.DirectTransport.unavailable,
+        )
 
     @Transactional
     fun createServerOwner(req: CreateServerOwnerRequest): UserSummary {

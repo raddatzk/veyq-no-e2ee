@@ -19,7 +19,6 @@ import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
-import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import com.veyq.app.shared.keymgmt.ScopeKind
@@ -54,7 +53,6 @@ class BlobUploadLimitsSliceTest {
     // purpose); a personal scope is unique per (owner, kind), so the second needs its own owner.
     private val scopeId = "lim-scope"
     private val capScopeId = "lim-cap-scope"
-    private val enc = Base64.getUrlEncoder().withoutPadding()
 
     @BeforeTest
     fun seed() {
@@ -73,31 +71,21 @@ class BlobUploadLimitsSliceTest {
     }
 
     private fun start(token: String, total: Int = 2, size: Int = 16) = """{"dedupToken":"$token","totalChunks":$total,"byteSize":$size}"""
-    private fun frameBody(n: Int) = """{"frame":{"suiteId":"v1","bytes":"${enc.encodeToString(ByteArray(n))}"}}"""
     private fun startUpload(authz: String, scope: String, token: String, total: Int, size: Int): String =
         given().header("Authorization", authz).contentType(ContentType.JSON).body(start(token, total, size))
             .post("/api/scopes/$scope/blobs").then().statusCode(200).extract().path("uploadId")
 
     @Test
     fun rejectsOversizedDeclarationsBeforeHeavyWork() {
+        // The cheap declare-time bounds (anti-DoS) reject before any store work. Per-frame + cumulative budget
+        // are now enforced on the directly-uploaded objects at complete (stat-based, reconcileDirectUploads) and
+        // exercised by the opt-in MinIO e2e (BlobBatchE2ETest); this slice covers the declare-time gates.
         // too many chunks declared
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(start("t1", total = 5, size = 16))
             .post("/api/scopes/$scopeId/blobs").then().statusCode(400).body("code", `is`("INVALID_CHUNK_COUNT"))
         // declared byteSize over the configured ceiling
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(start("t2", total = 2, size = 2000))
             .post("/api/scopes/$scopeId/blobs").then().statusCode(400).body("code", `is`("INVALID_SIZE"))
-
-        // a single frame larger than max-frame-bytes is rejected before allocation
-        val u = startUpload(ownerToken, scopeId, "t3", total = 2, size = 16)
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(frameBody(80))
-            .put("/api/scopes/$scopeId/blob-uploads/$u/chunks/0").then().statusCode(400).body("code", `is`("FRAME_TOO_LARGE"))
-
-        // cumulative frame data beyond the declared budget (byteSize + totalChunks*28) is rejected
-        val u2 = startUpload(ownerToken, scopeId, "t4", total = 2, size = 16) // budget = 16 + 2*28 = 72 bytes
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(frameBody(40))
-            .put("/api/scopes/$scopeId/blob-uploads/$u2/chunks/0").then().statusCode(204)
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(frameBody(40))
-            .put("/api/scopes/$scopeId/blob-uploads/$u2/chunks/1").then().statusCode(400).body("code", `is`("UPLOAD_TOO_LARGE"))
     }
 
     @Test

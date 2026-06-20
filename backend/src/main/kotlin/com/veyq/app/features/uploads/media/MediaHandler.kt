@@ -1,8 +1,15 @@
 package com.veyq.app.features.uploads.media
 
+import com.veyq.app.features.uploads.blob.BlobUploadHandler
+import com.veyq.app.generated.model.BatchFinalizeMediaRequest
+import com.veyq.app.generated.model.BatchFinalizeMediaResponse
 import com.veyq.app.generated.model.BlobRef
+import com.veyq.app.generated.model.BlobRefInput
 import com.veyq.app.generated.model.NodeType
 import com.veyq.app.generated.model.CreateMediaRequest
+import com.veyq.app.generated.model.FinalizeMediaItem
+import com.veyq.app.generated.model.FinalizeMediaResult
+import com.veyq.app.generated.model.MediaDerivativeInput
 import com.veyq.app.generated.model.MediaDerivativeOut
 import com.veyq.app.generated.model.MediaItem
 import com.veyq.app.generated.model.MediaList
@@ -19,6 +26,7 @@ import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.security.ScopeAccessGuard
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -42,6 +50,7 @@ class MediaHandler(
     private val mapper: MediaApiMapper,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val blobUploads: BlobUploadHandler,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -83,6 +92,51 @@ class MediaHandler(
             })
         }
         return toApi(item)
+    }
+
+    // ---- Batched finalize: complete each item's uploads + attach as media, in one round-trip. ----
+
+    fun batchFinalizeMedia(auth: String?, scopeId: String, nodeId: String, req: BatchFinalizeMediaRequest): BatchFinalizeMediaResponse {
+        val createdBy = QuarkusTransaction.requiringNew().call { "user:" + requireKeyHolder(scopeId, auth) }
+        return finalizeBatch(scopeId, nodeId, req, expectedOwner = null) { createReq -> createMediaAs(scopeId, nodeId, createReq, createdBy) }
+    }
+
+    /**
+     * Drive a batch-finalize: per item, resolve its blob refs (completing pending uploads) and run [attach] in
+     * the SAME transaction, so each item is atomic. Per-item best-effort — a failure yields an ERROR result and
+     * the rest still land. [attach] lets the share path inject its own ACL/bucket logic around createMediaAs.
+     */
+    fun finalizeBatch(scopeId: String, nodeId: String, req: BatchFinalizeMediaRequest, expectedOwner: String?, attach: (CreateMediaRequest) -> MediaItem): BatchFinalizeMediaResponse =
+        BatchFinalizeMediaResponse(
+            results = req.items.map { item ->
+                try {
+                    val m = QuarkusTransaction.requiringNew().call { attach(resolveFinalize(scopeId, item, expectedOwner)) }
+                    FinalizeMediaResult(ok = true, media = m)
+                } catch (e: ApiException) {
+                    FinalizeMediaResult(ok = false, errorCode = e.code)
+                }
+            },
+        )
+
+    /** Resolve a finalize item to a CreateMediaRequest, completing any pending uploads (original + derivatives)
+     *  into blobs first. [expectedOwner] gates completion to a share's own uploads (null for members). */
+    fun resolveFinalize(scopeId: String, item: FinalizeMediaItem, expectedOwner: String?): CreateMediaRequest {
+        val derivatives = item.derivatives.orEmpty().map { d ->
+            MediaDerivativeInput(kind = MediaDerivativeInput.Kind.valueOf(d.kind.value), blobId = resolveRef(scopeId, d.blob, expectedOwner))
+        }
+        return CreateMediaRequest(
+            originalBlobId = resolveRef(scopeId, item.original, expectedOwner),
+            sealedMeta = item.sealedMeta, mimeType = item.mimeType,
+            bucketId = item.bucketId, contributorId = item.contributorId, contributorName = item.contributorName,
+            derivatives = derivatives,
+        )
+    }
+
+    private fun resolveRef(scopeId: String, ref: BlobRefInput, expectedOwner: String?): String {
+        ref.blobId?.takeIf { it.isNotBlank() }?.let { return it } // dedup hit — already a finalized blob
+        val uploadId = ref.uploadId?.takeIf { it.isNotBlank() }
+            ?: throw ApiException(400, "INVALID_BLOB_REF", "Each blob reference needs an uploadId or a blobId")
+        return blobUploads.completeBlobUploadAs(scopeId, uploadId, expectedOwner).blobId
     }
 
     private fun toApi(m: Media): MediaItem =

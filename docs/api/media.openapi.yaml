@@ -58,41 +58,6 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/scopes/{scopeId}/blob-uploads/{uploadId}/chunks/{index}:
-    put:
-      tags: [BlobChunkUpload]
-      operationId: putBlobChunk
-      summary: Upload one AEAD frame (idempotent — re-PUT is the basis of resume).
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-        - { name: uploadId, in: path, required: true, schema: { type: string } }
-        - { name: index, in: path, required: true, schema: { type: integer } }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/PutChunkRequest' } } }
-      responses:
-        '204': { description: The frame was stored (or already present). }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/scopes/{scopeId}/blobs/{blobId}/chunks/{index}:
-    get:
-      tags: [BlobChunkDownload]
-      operationId: getBlobChunk
-      summary: Download one AEAD frame of a finalized blob (the client opens it with openFrame).
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-        - { name: blobId, in: path, required: true, schema: { type: string } }
-        - { name: index, in: path, required: true, schema: { type: integer } }
-      responses:
-        '200': { description: The frame ciphertext., content: { application/json: { schema: { $ref: '#/components/schemas/ChunkResponse' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/blobs/{blobId}/presigned-chunks:
     get:
       tags: [BlobChunkPresign]
@@ -179,6 +144,73 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/blob-uploads-batch:
+    post:
+      tags: [BlobBatchStart]
+      operationId: batchStartBlobs
+      summary: Begin (or dedup/resume) many blob uploads in one round-trip; returns a presigned PUT URL per missing chunk.
+      description: >
+        The batched, direct-to-store upload entry point (ADR 0021): for each descriptor, dedup (READY) or open
+        an upload and return presigned PUT URLs for the still-missing chunks (the client PUTs frames straight to
+        the store). Pass an existing `uploadId` to RESUME (re-presign only the chunks not yet in the store).
+        Per-item best-effort — a failing descriptor yields an ERROR result without sinking the batch.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchStartBlobsRequest' } } }
+      responses:
+        '200': { description: Per-descriptor start results., content: { application/json: { schema: { $ref: '#/components/schemas/BatchStartBlobsResponse' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '429': { $ref: './common.openapi.yaml#/components/responses/TooManyRequests' }
+  /api/scopes/{scopeId}/blob-downloads-batch:
+    post:
+      tags: [BlobBatchDownload]
+      operationId: batchPresignGet
+      summary: Presigned GET URLs for many finalized blobs in one round-trip (direct-from-store download, ADR 0021).
+      description: >
+        The batched download entry point: given many blob ids (e.g. a gallery page's thumbnails), returns a
+        short-lived presigned GET URL per chunk so the client fetches every frame straight from the store. A
+        blob the caller can't access (or absent) is simply omitted from the results.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchPresignGetRequest' } } }
+      responses:
+        '200': { description: Per-blob presigned GET URLs., content: { application/json: { schema: { $ref: '#/components/schemas/BatchPresignGetResponse' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/media-batch:
+    post:
+      tags: [MediaBatch]
+      operationId: batchFinalizeMedia
+      summary: Finalize many uploads and attach them as media in one round-trip (complete + createMedia, batched).
+      description: >
+        The batched finalize: for each item, complete its blob uploads (original + derivatives) and attach the
+        resulting media to the node. A blob reference is either an `uploadId` (completed here) or a `blobId` (a
+        dedup hit). Per-item best-effort — each item is atomic; a failure yields an ERROR result and the rest
+        still land (the client's upload queue retries only the failures).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchFinalizeMediaRequest' } } }
+      responses:
+        '200': { description: Per-item finalize results., content: { application/json: { schema: { $ref: '#/components/schemas/BatchFinalizeMediaResponse' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/buckets:
     get:
       tags: [MemoryBucket]
@@ -255,18 +287,6 @@ paths:
       responses:
         '200': { description: The node's media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaList' } } } }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/public/shares/{shareId}/blobs/{blobId}/chunks/{index}:
-    get:
-      tags: [PublicShareMedia]
-      operationId: getShareChunk
-      summary: One AEAD frame of a shared blob (ciphertext, no auth — gated to the share's subtree).
-      parameters:
-        - { name: shareId, in: path, required: true, schema: { type: string } }
-        - { name: blobId, in: path, required: true, schema: { type: string } }
-        - { name: index, in: path, required: true, schema: { type: integer } }
-      responses:
-        '200': { description: The frame ciphertext., content: { application/json: { schema: { $ref: '#/components/schemas/ChunkResponse' } } } }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/public/shares/{shareId}/blobs:
     post:
       tags: [PublicShareContribute]
@@ -293,23 +313,6 @@ paths:
         - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
       responses:
         '200': { description: Upload progress., content: { application/json: { schema: { $ref: '#/components/schemas/BlobUploadProgress' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/public/shares/{shareId}/blob-uploads/{uploadId}/chunks/{index}:
-    put:
-      tags: [PublicShareContribute]
-      operationId: putShareChunk
-      summary: Upload one AEAD frame of a guest blob (no auth — CONTRIBUTOR/UPLOADER shares only).
-      parameters:
-        - { name: shareId, in: path, required: true, schema: { type: string } }
-        - { name: uploadId, in: path, required: true, schema: { type: string } }
-        - { name: index, in: path, required: true, schema: { type: integer } }
-        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/PutChunkRequest' } } }
-      responses:
-        '204': { description: Stored. }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/public/shares/{shareId}/blob-uploads/{uploadId}/complete:
@@ -339,6 +342,51 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/CreateMediaRequest' } } }
       responses:
         '200': { description: The created media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaItem' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blob-uploads-batch:
+    post:
+      tags: [PublicShareContribute]
+      operationId: batchStartShareBlobs
+      summary: Begin (or dedup/resume) many guest blob uploads in one round-trip (no auth — CONTRIBUTOR/UPLOADER shares).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchStartBlobsRequest' } } }
+      responses:
+        '200': { description: Per-descriptor start results., content: { application/json: { schema: { $ref: '#/components/schemas/BatchStartBlobsResponse' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/contributed-media-batch:
+    post:
+      tags: [PublicShareContribute]
+      operationId: batchFinalizeShareMedia
+      summary: Finalize many guest uploads and attach them as media in one round-trip (no auth — CONTRIBUTOR/UPLOADER shares).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: X-Veyq-Share-Upload-Token, in: header, required: false, schema: { type: string }, description: 'Base64url upload-capability token derived client-side from the share unwrap key; the handler returns 403 when absent or invalid.' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchFinalizeMediaRequest' } } }
+      responses:
+        '200': { description: Per-item finalize results., content: { application/json: { schema: { $ref: '#/components/schemas/BatchFinalizeMediaResponse' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blob-downloads-batch:
+    post:
+      tags: [PublicShareMedia]
+      operationId: batchPresignShareGet
+      summary: Presigned GET URLs for many shared blobs in one round-trip (ciphertext, no auth — gated to the share's subtree).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BatchPresignGetRequest' } } }
+      responses:
+        '200': { description: Per-blob presigned GET URLs., content: { application/json: { schema: { $ref: '#/components/schemas/BatchPresignGetResponse' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
@@ -401,6 +449,98 @@ components:
         blobId: { type: string }
         totalChunks: { type: integer }
         byteSize: { type: integer, format: int64 }
+    # ---- Batched, direct-to-store transport (ADR 0021) ----
+    BatchStartItem:
+      type: object
+      required: [dedupToken, totalChunks, byteSize]
+      properties:
+        dedupToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
+        totalChunks: { type: integer, minimum: 1, maximum: 10000 }
+        byteSize: { type: integer, format: int64, minimum: 0, maximum: 10737418240 }
+        suiteId: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 32)'] }
+        # Resume: re-presign only the still-missing chunks of this existing open upload (the server stats the
+        # store to count chunks already PUT directly). Omit for a fresh start.
+        uploadId: { type: string }
+    BatchStartBlobsRequest:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, maxItems: 64, items: { $ref: '#/components/schemas/BatchStartItem' } }
+    BatchBlobStart:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [READY, UPLOADING, ERROR] }
+        blobId: { type: string, description: 'Set when READY (dedup hit) — reference this blob directly at finalize.' }
+        uploadId: { type: string, description: 'Set when UPLOADING — PUT the frames to presignedPuts, then finalize.' }
+        totalChunks: { type: integer }
+        receivedChunks: { type: array, items: { type: integer }, description: 'Already-stored chunk indices (resume).' }
+        presignedPuts: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
+        errorCode: { type: string, description: 'Set when ERROR — the stable error code for this descriptor.' }
+    BatchStartBlobsResponse:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: '#/components/schemas/BatchBlobStart' } }
+    BatchPresignGetRequest:
+      type: object
+      required: [blobIds]
+      properties:
+        blobIds: { type: array, maxItems: 256, items: { type: string } }
+    BatchPresignGetItem:
+      type: object
+      required: [blobId, suiteId, chunks]
+      properties:
+        blobId: { type: string }
+        suiteId: { type: string }
+        chunks: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
+    BatchPresignGetResponse:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: '#/components/schemas/BatchPresignGetItem' } }
+    BlobRefInput:
+      type: object
+      description: 'A blob to attach: exactly one of uploadId (completed at finalize) or blobId (a dedup hit, already a blob).'
+      properties:
+        uploadId: { type: string }
+        blobId: { type: string }
+    FinalizeDerivativeInput:
+      type: object
+      required: [kind, blob]
+      properties:
+        kind: { type: string, enum: [THUMBNAIL, PREVIEW] }
+        blob: { $ref: '#/components/schemas/BlobRefInput' }
+    FinalizeMediaItem:
+      type: object
+      required: [original, sealedMeta, mimeType]
+      properties:
+        original: { $ref: '#/components/schemas/BlobRefInput' }
+        sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        mimeType: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
+        bucketId: { type: string }
+        contributorId: { type: string }
+        contributorName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        derivatives:
+          type: array
+          items: { $ref: '#/components/schemas/FinalizeDerivativeInput' }
+    BatchFinalizeMediaRequest:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, maxItems: 64, items: { $ref: '#/components/schemas/FinalizeMediaItem' } }
+    FinalizeMediaResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        media: { $ref: '#/components/schemas/MediaItem' }
+        errorCode: { type: string, description: 'Set when ok=false — the stable error code for this item.' }
+    BatchFinalizeMediaResponse:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: '#/components/schemas/FinalizeMediaResult' } }
     ChunkResponse:
       type: object
       required: [frame]

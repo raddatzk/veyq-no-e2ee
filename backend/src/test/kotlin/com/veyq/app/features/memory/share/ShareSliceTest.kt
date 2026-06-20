@@ -125,7 +125,9 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-mem/media").then().statusCode(200)
             .body("media.size()", `is`(1)).body("media[0].id", `is`("shr-med1"))
         given().get("/api/public/shares/$shareId/nodes/shr-other/media").then().statusCode(404)
-        given().get("/api/public/shares/$shareId/blobs/shr-b2/chunks/0").then().statusCode(404)
+        // the sibling memory's blob is NOT presignable through this share (subtree-gated → omitted from results)
+        given().contentType(ContentType.JSON).body("""{"blobIds":["shr-b2"]}""")
+            .post("/api/public/shares/$shareId/blob-downloads-batch").then().statusCode(200).body("results.size()", `is`(0))
 
         // a VIEWER share rejects guest writes (read-only) but may READ the journal
         given().contentType(ContentType.JSON).body("""{"dedupToken":"x","totalChunks":1,"byteSize":6}""")
@@ -172,29 +174,17 @@ class ShareSliceTest {
             .body("""{"dedupToken":"guest-bad-proof","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_UPLOAD_PROOF_INVALID"))
 
-        // the guest uploads a one-frame blob through the shared blob path (no auth)
-        val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"guest-1","totalChunks":1,"byteSize":6}""")
-            .post("/api/public/shares/$shareId/blobs").then().statusCode(200).body("status", `is`("UPLOADING"))
-            .extract().path<String>("uploadId")
-        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
-            .put("/api/public/shares/$shareId/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
-        val blobId = given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200)
-            .extract().path<String>("blobId")
-
-        // and attaches it as media on the shared memory
+        // the guest opens a batched upload through the shared blob path (no auth) — direct-to-store, so the
+        // backend returns the upload session + presigned PUT URLs (empty here on the in-memory dev backend). The
+        // full guest upload→finalize→read byte path is exercised by the opt-in MinIO e2e; this proves the
+        // proof-gated batch-start works for a guest.
         given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
-            .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
-            .post("/api/public/shares/$shareId/nodes/shr-mem2/contributed-media").then().statusCode(200)
-        // the shared gallery now lists the guest's contribution
-        given().get("/api/public/shares/$shareId/nodes/shr-mem2/media").then().statusCode(200).body("media.size()", `is`(1))
+            .body("""{"items":[{"dedupToken":"guest-1","totalChunks":1,"byteSize":6,"suiteId":"v1"}]}""")
+            .post("/api/public/shares/$shareId/blob-uploads-batch").then().statusCode(200)
+            .body("results[0].status", `is`("UPLOADING")).body("results[0].uploadId", org.hamcrest.Matchers.notNullValue())
 
         // a CONTRIBUTOR may READ the journal but not write it (no PUT route — journal is owner-only)
         given().get("/api/public/shares/$shareId/nodes/shr-mem2/journal").then().statusCode(200)
-
-        // a guest still cannot contribute outside the subtree
-        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
-            .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
-            .post("/api/public/shares/$shareId/nodes/shr-other/contributed-media").then().statusCode(404)
     }
 
     @Test
@@ -224,15 +214,11 @@ class ShareSliceTest {
         val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"a2-guest","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareA/blobs").then().statusCode(200).extract().path<String>("uploadId")
 
-        // guest B (share B, same scope) knows A's uploadId but must NOT read/overwrite/finalize it — 404, not a hit
+        // guest B (share B, same scope) knows A's uploadId but must NOT read/finalize it — 404, not a hit
         given().header("X-Veyq-Share-Upload-Token", uploadToken).get("/api/public/shares/$shareB/blob-uploads/$uploadId").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
-        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
-            .put("/api/public/shares/$shareB/blob-uploads/$uploadId/chunks/0").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
         given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareB/blob-uploads/$uploadId/complete").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
 
-        // the rightful owner (share A) still operates on it normally
-        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
-            .put("/api/public/shares/$shareA/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
+        // the rightful owner (share A) still reads it normally
         given().header("X-Veyq-Share-Upload-Token", uploadToken).get("/api/public/shares/$shareA/blob-uploads/$uploadId").then().statusCode(200)
     }
 
@@ -277,14 +263,10 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/journal").then().statusCode(403)
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/tracks").then().statusCode(403)
 
-        // but uploading a blob + attaching media works
-        val uploadId = given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"dedupToken":"up-1","totalChunks":1,"byteSize":6}""")
-            .post("/api/public/shares/$shareId/blobs").then().statusCode(200).extract().path<String>("uploadId")
-        given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
-            .put("/api/public/shares/$shareId/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
-        val blobId = given().header("X-Veyq-Share-Upload-Token", uploadToken).post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200).extract().path<String>("blobId")
+        // but opening an upload works (the blind drop-off may write) — full byte path covered by the MinIO e2e
         given().header("X-Veyq-Share-Upload-Token", uploadToken).contentType(ContentType.JSON)
-            .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
-            .post("/api/public/shares/$shareId/nodes/shr-mem3/contributed-media").then().statusCode(200)
+            .body("""{"items":[{"dedupToken":"up-1","totalChunks":1,"byteSize":6,"suiteId":"v1"}]}""")
+            .post("/api/public/shares/$shareId/blob-uploads-batch").then().statusCode(200)
+            .body("results[0].status", `is`("UPLOADING"))
     }
 }

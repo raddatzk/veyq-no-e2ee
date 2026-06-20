@@ -13,10 +13,13 @@ import java.util.Optional
  * infra/docker-compose.yml. Internal `quarkus.*` keys may still use direct injection.
  */
 
-/** `veyq.app.*` — the public web origin used to build links (invites, password reset). No default: required. */
+/** `veyq.app.*` — the public web origin used to build links (invites, password reset). No default: required.
+ *  `support-url` (optional) drives a dismissible support banner; `version` is an advisory server version string. */
 @ConfigMapping(prefix = "veyq.app")
 interface AppConfig {
     @WithName("base-url") fun baseUrl(): String
+    @WithName("support-url") fun supportUrl(): Optional<String>
+    @WithName("version") @WithDefault("dev") fun version(): String
 }
 
 /** `veyq.uploads.*` — blob upload bounds (anti-abuse) and the resumable-session GC TTL. */
@@ -67,6 +70,12 @@ interface PasswordResetConfig {
     @WithDefault("PT1H") fun ttl(): Duration
 }
 
+/** `veyq.email-change.*` — lifetime of an email-change confirmation token. */
+@ConfigMapping(prefix = "veyq.email-change")
+interface EmailChangeConfig {
+    @WithDefault("P1D") fun ttl(): Duration
+}
+
 /** `veyq.content.*` — the max size of a single sealed-content payload (node name, item, journal, track) the
  *  server will decode into memory. Bounds a DoS via an over-large base64 string; large media goes through the
  *  chunked blob path (bounded separately by veyq.uploads.*), not here. */
@@ -94,6 +103,12 @@ interface DevToolsConfig {
 interface BlobStoreConfig {
     @WithName("backend") @WithDefault("s3") fun backend(): String // s3 (production) | memory (dev/test)
     @WithName("s3-endpoint") fun s3Endpoint(): Optional<String> // e.g. https://s3.amazonaws.com or http://veyq-minio:9000
+    // The endpoint presigned URLs are SIGNED for — the one the CLIENT can reach (direct-to-store, ADR 0021).
+    // The internal `s3-endpoint` may be a private/compose hostname the client can't resolve (e.g. a bundled
+    // MinIO behind a reverse proxy on a path route); set this to the public origin so the signed URL points
+    // there. SigV4 signs host+path, so the public route must serve the bucket path byte-identically (no rewrite).
+    // Absent ⇒ presign against `s3-endpoint` (the single-endpoint case: external S3, or a publicly-reachable store).
+    @WithName("s3-public-endpoint") fun s3PublicEndpoint(): Optional<String>
     @WithName("s3-bucket") @WithDefault("veyq-blobs") fun s3Bucket(): String
     @WithName("s3-region") @WithDefault("us-east-1") fun s3Region(): String
     @WithName("s3-access-key") fun s3AccessKey(): Optional<String>

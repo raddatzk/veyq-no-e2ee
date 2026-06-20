@@ -41,27 +41,27 @@ class MediaE2ETest {
         assertEquals(4, m2.getJSONObject("original").getInt("totalChunks"))
         assertEquals(0, m2.getJSONArray("derivatives").length())
 
-        // both download byte-identical through the SAME frame path
+        // both download byte-identical through the SAME (direct-from-store) frame path
         fun ref(item: org.json.JSONObject) = item.getJSONObject("original").let { Media.BlobRef(it.getString("blobId"), it.getInt("totalChunks"), it.getLong("byteSize")) }
         assertContentEquals(photo, Media.downloadBlob(apiBase, a, scope.scopeId, ck, ref(m1)))
         assertContentEquals(video, Media.downloadBlob(apiBase, a, scope.scopeId, ck, ref(m2)))
 
-        // dedup: re-uploading identical bytes returns the existing blob (READY), no frames sent
-        val ticket = Media.startBlob(apiBase, a, scope.scopeId, Media.dedupTokenFor(ck, photo), 1, photo.size.toLong())
-        assertEquals("READY", ticket.status)
-        assertEquals(origBlobId, ticket.blobId)
+        // dedup: a batch-start for identical bytes returns the existing blob (READY), no frames sent
+        val dedup = Media.batchStartBlobs(apiBase, a, scope.scopeId, listOf(Media.startItem(Media.dedupTokenFor(ck, photo), 1, photo.size.toLong())))[0]
+        assertEquals("READY", dedup.status)
+        assertEquals(origBlobId, dedup.blobId)
 
-        // resume: open a fresh upload, send only chunk 0, then uploadBlob fills the gap and finalizes
+        // resume: open an upload, PUT only chunk 0 direct-to-store, then a resume batch-start sees it received
+        // and re-presigns ONLY the missing chunks (1, 2)
         val partial = ByteArray(25) { ((it * 3 + 9) and 0xff).toByte() }
         val pchunks = Media.chunkBytes(partial, chunkSize)
         assertEquals(3, pchunks.size)
-        val t = Media.startBlob(apiBase, a, scope.scopeId, Media.dedupTokenFor(ck, partial), pchunks.size, partial.size.toLong())
-        val partialUploadId = t.uploadId!!
-        Media.putChunk(apiBase, a, scope.scopeId, partialUploadId, 0, pchunks.size, ck, pchunks[0])
-        val rec = Media.getProgress(apiBase, a, scope.scopeId, partialUploadId).getJSONArray("receivedChunks").let { (0 until it.length()).map { i -> it.getInt(i) }.sorted() }
-        assertEquals(listOf(0), rec)
-        val resumed = Media.uploadBlob(apiBase, a, scope.scopeId, ck, partial, chunkSize)
-        assertContentEquals(partial, Media.downloadBlob(apiBase, a, scope.scopeId, ck, resumed))
+        val open = Media.batchStartBlobs(apiBase, a, scope.scopeId, listOf(Media.startItem(Media.dedupTokenFor(ck, partial), pchunks.size, partial.size.toLong())))[0]
+        val partialUploadId = open.uploadId!!
+        Media.putPresigned(open.presignedPuts[0]!!, V1.sealFrame(ck, 0, pchunks.size, pchunks[0], V1.randomBytes(12)), 0)
+        val resumed = Media.batchStartBlobs(apiBase, a, scope.scopeId, listOf(Media.startItem(Media.dedupTokenFor(ck, partial), pchunks.size, partial.size.toLong(), partialUploadId)))[0]
+        assertEquals(listOf(0), resumed.receivedChunks.sorted())
+        assertEquals(listOf(1, 2), resumed.presignedPuts.keys.sorted())
 
         // the gallery lists both media in upload order (photo then video; the client sorts by decrypted takenAt)
         val gallery = Media.listMedia(apiBase, a, scope.scopeId, memId)

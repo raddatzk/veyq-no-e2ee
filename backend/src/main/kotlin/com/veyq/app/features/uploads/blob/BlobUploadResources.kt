@@ -1,12 +1,13 @@
 package com.veyq.app.features.uploads.blob
 
-import com.veyq.app.generated.api.BlobChunkDownloadApi
+import com.veyq.app.generated.api.BlobBatchDownloadApi
+import com.veyq.app.generated.api.BlobBatchStartApi
 import com.veyq.app.generated.api.BlobChunkPresignApi
-import com.veyq.app.generated.api.BlobChunkUploadApi
 import com.veyq.app.generated.api.BlobCompleteApi
 import com.veyq.app.generated.api.BlobStartApi
 import com.veyq.app.generated.api.BlobUploadStatusApi
-import com.veyq.app.generated.model.PutChunkRequest
+import com.veyq.app.generated.model.BatchPresignGetRequest
+import com.veyq.app.generated.model.BatchStartBlobsRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
@@ -34,21 +35,19 @@ class BlobCompleteResource(private val handler: BlobUploadHandler) : BlobComplet
 }
 
 @ApplicationScoped
-class BlobChunkUploadResource(private val handler: BlobUploadHandler) : BlobChunkUploadApi {
-    override fun putBlobChunk(authorization: String, scopeId: String, uploadId: String, index: Int, putChunkRequest: PutChunkRequest): Response {
-        handler.putBlobChunk(authorization, scopeId, uploadId, index, putChunkRequest)
-        return Response.noContent().build()
-    }
-}
-
-@ApplicationScoped
-class BlobChunkDownloadResource(private val handler: BlobUploadHandler) : BlobChunkDownloadApi {
-    override fun getBlobChunk(authorization: String, scopeId: String, blobId: String, index: Int): Response =
-        Response.ok(handler.getBlobChunk(authorization, scopeId, blobId, index)).build()
-}
-
-@ApplicationScoped
 class BlobChunkPresignResource(private val handler: BlobUploadHandler) : BlobChunkPresignApi {
     override fun getBlobPresignedChunks(authorization: String, scopeId: String, blobId: String): Response =
         Response.ok(handler.getBlobPresignedChunks(authorization, scopeId, blobId)).build()
+}
+
+@ApplicationScoped
+class BlobBatchStartResource(private val handler: BlobUploadHandler) : BlobBatchStartApi {
+    override fun batchStartBlobs(authorization: String, scopeId: String, batchStartBlobsRequest: BatchStartBlobsRequest): Response =
+        Response.ok(handler.batchStartBlobs(authorization, scopeId, batchStartBlobsRequest)).build()
+}
+
+@ApplicationScoped
+class BlobBatchDownloadResource(private val handler: BlobUploadHandler) : BlobBatchDownloadApi {
+    override fun batchPresignGet(authorization: String, scopeId: String, batchPresignGetRequest: BatchPresignGetRequest): Response =
+        Response.ok(handler.batchPresignGet(authorization, scopeId, batchPresignGetRequest)).build()
 }

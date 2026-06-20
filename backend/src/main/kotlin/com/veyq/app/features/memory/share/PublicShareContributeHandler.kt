@@ -2,12 +2,15 @@ package com.veyq.app.features.memory.share
 
 import com.veyq.app.features.uploads.blob.BlobUploadHandler
 import com.veyq.app.features.uploads.media.MediaHandler
+import com.veyq.app.generated.model.BatchFinalizeMediaRequest
+import com.veyq.app.generated.model.BatchFinalizeMediaResponse
+import com.veyq.app.generated.model.BatchStartBlobsRequest
+import com.veyq.app.generated.model.BatchStartBlobsResponse
 import com.veyq.app.generated.model.BlobTicket
 import com.veyq.app.generated.model.BlobUploadProgress
 import com.veyq.app.generated.model.CompleteBlobResponse
 import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.MediaItem
-import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.MediaBucket
@@ -43,14 +46,31 @@ class PublicShareContributeHandler(
     fun startShareBlob(shareId: String, uploadToken: String?, req: StartBlobRequest): BlobTicket =
         uploader(shareId, uploadToken).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
 
-    fun putShareChunk(shareId: String, uploadId: String, index: Int, uploadToken: String?, req: PutChunkRequest) =
-        uploader(shareId, uploadToken).let { blobUploads.putBlobChunkAs(it.scopeId, uploadId, index, req, "share:${it.id}") }
-
     fun getShareUpload(shareId: String, uploadId: String, uploadToken: String?): BlobUploadProgress =
         uploader(shareId, uploadToken).let { blobUploads.getBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
 
     fun completeShareBlob(shareId: String, uploadId: String, uploadToken: String?): CompleteBlobResponse =
         uploader(shareId, uploadToken).let { blobUploads.completeBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
+
+    /** Batched guest start/resume — direct-to-store presigned PUTs for many blobs in one round-trip. */
+    fun batchStartShareBlobs(shareId: String, uploadToken: String?, req: BatchStartBlobsRequest): BatchStartBlobsResponse =
+        uploader(shareId, uploadToken).let { blobUploads.batchStartBlobsAs(it.scopeId, "share:${it.id}", "share:${it.id}", req) }
+
+    /** Batched guest finalize — complete each item's uploads + attach as media, with the same per-guest ACL,
+     *  contributor-bucket and naming logic as [createShareMedia], applied atomically per item. */
+    fun batchFinalizeShareMedia(shareId: String, nodeId: String, uploadToken: String?, req: BatchFinalizeMediaRequest): BatchFinalizeMediaResponse {
+        val share = uploader(shareId, uploadToken)
+        val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
+        if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
+        val owner = "share:${share.id}"
+        return media.finalizeBatch(share.scopeId, nodeId, req, expectedOwner = owner) { createReq ->
+            requireFromThisShare(share.scopeId, createReq.originalBlobId, owner)
+            createReq.derivatives.orEmpty().forEach { requireFromThisShare(share.scopeId, it.blobId, owner) }
+            val contributorKey = createReq.contributorId?.takeIf { it.isNotBlank() }?.let { "share:${share.id}:$it" } ?: owner
+            createReq.contributorName?.let { ensureGuestPrimary(share.scopeId, nodeId, contributorKey, it) }
+            media.createMediaAs(share.scopeId, nodeId, createReq, contributorKey)
+        }
+    }
 
     fun createShareMedia(shareId: String, nodeId: String, uploadToken: String?, req: CreateMediaRequest): MediaItem {
         val share = uploader(shareId, uploadToken)

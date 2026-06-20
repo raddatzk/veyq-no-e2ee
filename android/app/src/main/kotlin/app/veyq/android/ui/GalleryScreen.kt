@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -96,6 +98,7 @@ import app.veyq.crypto.JournalLiveProvider
 import app.veyq.crypto.JournalPersistence
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
+import app.veyq.crypto.Participants
 import app.veyq.crypto.Playlists
 import app.veyq.crypto.Share
 import app.veyq.crypto.Track
@@ -110,6 +113,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.time.Instant
+
+private fun JSONObject.optNullableString(key: String): String? =
+    if (has(key) && !isNull(key)) optString(key).ifEmpty { null } else null
 
 class GalleryController(
     private val apiBase: String,
@@ -195,6 +201,28 @@ class GalleryController(
         playlists = playlists.filterNot { it.id == id }
     }
 
+    var participants by mutableStateOf<List<Participants.Item>>(emptyList())
+    private var participantsLoaded = false
+
+    suspend fun loadParticipants() {
+        if (participantsLoaded) return
+        runCatching { withContext(Dispatchers.IO) { Participants.list(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { participants = it }
+        participantsLoaded = true
+    }
+
+    suspend fun addParticipant(name: String) {
+        runCatching { withContext(Dispatchers.IO) { Participants.create(apiBase, session, scopeId, contentKey, nodeId, name) } }
+            .onSuccess { runCatching { withContext(Dispatchers.IO) { Participants.list(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { participants = it } }
+    }
+
+    suspend fun deleteParticipant(id: String) {
+        runCatching { withContext(Dispatchers.IO) { Participants.delete(apiBase, session, scopeId, nodeId, id) } }
+        participants = participants.filterNot { it.id == id }
+    }
+
+    suspend fun participantNodeHits(linkedUserId: String): List<Participants.NodeHit> =
+        runCatching { withContext(Dispatchers.IO) { Participants.listNodeHits(apiBase, session, scopeId, contentKey, linkedUserId) } }.getOrDefault(emptyList())
+
     suspend fun loadJournal() {
         if (journalLoaded) return
         runCatching { withContext(Dispatchers.IO) { Journal.getJournal(apiBase, session, scopeId, contentKey, nodeId) } }
@@ -264,7 +292,7 @@ class GalleryController(
                     val id = node.getString("id")
                     val type = node.getString("type")
                     val nm = runCatching { MemoryTree.decodeNodeName(contentKey, node) }.getOrDefault("—")
-                    val cover = runCatching { childCover(id, node.optString("coverMediaId", null)) }.getOrNull()
+                    val cover = runCatching { childCover(id, node.optNullableString("coverMediaId")) }.getOrNull()
                     Child(id, type, nm, cover)
                 }
             }
@@ -426,18 +454,23 @@ class GalleryController(
             // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
             val withMeta = media.mapNotNull { m -> runCatching { m to Media.decodeMediaMeta(contentKey, m) }.getOrNull() }
                 .sortedBy { it.second.takenAt }
-            // Download the (small) thumbnails bound-parallel rather than one-by-one; preserves the takenAt order.
+            // ONE batch-presign-get for the page's thumbnails, then fetch each DIRECTLY from the store,
+            // bound-parallel (no per-thumbnail backend hop / egress); mapPool preserves the takenAt order.
             val sem = Semaphore(6)
             tiles = withContext(Dispatchers.IO) {
+                val thumbRefs = withMeta.map { (m, _) -> derivativeRef(m, "THUMBNAIL") }
+                val presigned = runCatching { Media.batchPresignGet(apiBase, session, scopeId, thumbRefs.map { it.blobId }) }.getOrNull() ?: emptyMap()
                 coroutineScope {
                     withMeta.map { (m, meta) ->
                         async {
                             sem.withPermit {
-                                val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, derivativeRef(m, "THUMBNAIL")) }.getOrNull() ?: return@async null
+                                val ref = derivativeRef(m, "THUMBNAIL")
+                                val p = presigned[ref.blobId] ?: return@async null
+                                val bytes = runCatching { Media.fetchBlobFrames(contentKey, ref, p) }.getOrNull() ?: return@async null
                                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@async null
                                 Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()),
                                     meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"), m.optBoolean("highlighted", false),
-                                    m.optString("createdBy", null), m.optString("bucketId", null),
+                                    m.optNullableString("createdBy"), m.optNullableString("bucketId"),
                                     meta.cameraMake, meta.cameraModel, meta.lens, meta.width, meta.height, meta.fileSize, meta.exif)
                             }
                         }
@@ -487,6 +520,8 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var hiddenTracks by remember { mutableStateOf(setOf<String>()) }
     var renamingTrack by remember { mutableStateOf<Track.TrackItem?>(null) }
     var addingPlaylist by remember { mutableStateOf(false) }
+    var addingParticipant by remember { mutableStateOf(false) }
+    var profileNav by remember { mutableStateOf<Pair<String, String>?>(null) }   // (linkedUserId, fallbackName)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load(); controller.loadChildren(); controller.loadBuckets() }
@@ -565,7 +600,71 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         GalleryScreen(apiBase, session, scopeId, contentKey, child.id, child.name, tenantId, onBack = { childNav = null })
         return
     }
+    profileNav?.let { pn ->
+        ParticipantProfile(
+            controller, linkedUserId = pn.first, fallbackName = pn.second,
+            onOpenNode = { hit -> profileNav = null; childNav = GalleryController.Child(hit.nodeId, hit.type, hit.name, null) },
+            onBack = { profileNav = null },
+        )
+        return
+    }
     fun onOpenChild(child: GalleryController.Child) { childNav = child }
+
+    @Composable
+    fun DetailHero() {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(Veyq.Radius))
+                .background(Veyq.SurfaceMuted),
+        ) {
+            val hero = controller.tiles.firstOrNull()
+            if (hero != null) {
+                Image(hero.image, null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Box(Modifier.fillMaxSize().background(Veyq.screenBackground()), contentAlignment = Alignment.Center) {
+                    Text("▧", color = Veyq.Accent, fontSize = 42.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Transparent, Veyq.MediaBackdrop.copy(alpha = 0.74f)),
+                        ),
+                    ),
+            )
+            Column(
+                Modifier.align(Alignment.BottomStart).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(name, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DetailPill("▧", controller.tiles.size)
+                    if (controller.chapterCount > 0) DetailPill("§", controller.chapterCount)
+                    if (controller.tracks.isNotEmpty()) DetailPill("⌁", controller.tracks.size)
+                    val mapped = controller.tiles.count { it.lat != null && it.lng != null }
+                    if (mapped > 0) DetailPill("⌖", mapped)
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun DetailTabs() {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
+            if (controller.children.isNotEmpty()) TabLabel(L10n.t("detail.chapters"), tab == 5) { tab = 5 }
+            TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
+            TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+            TabLabel(L10n.t("detail.playlists"), tab == 6) { tab = 6 }
+            TabLabel(L10n.t("detail.participants"), tab == 7) { tab = 7 }
+            TabLabel(L10n.t("detail.contributions"), tab == 4) { tab = 4 }
+            TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
+        }
+    }
 
     Scaffold(
         containerColor = Veyq.Bg,
@@ -586,77 +685,117 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             )
         },
     ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Cover hero: the first (earliest) photo, like the web detail header.
-            controller.tiles.firstOrNull()?.let { hero ->
-                Image(hero.image, null, modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+        BoxWithConstraints(Modifier.padding(pad).fillMaxSize().background(Veyq.screenBackground())) {
+            val largeScreen = maxWidth >= 840.dp
+            val contentModifier = if (largeScreen) {
+                Modifier.align(Alignment.TopCenter).fillMaxHeight().fillMaxWidth().widthIn(max = 1040.dp)
+            } else {
+                Modifier.fillMaxSize()
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
-                if (controller.children.isNotEmpty()) TabLabel(L10n.t("detail.chapters"), tab == 5) { tab = 5 }
-                TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
-                TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
-                TabLabel(L10n.t("detail.playlists"), tab == 6) { tab = 6 }
-                TabLabel(L10n.t("detail.contributions"), tab == 4) { tab = 4 }
-                TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
-            }
-            if (tab == 5) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    controller.children.forEach { child ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).clickable { onOpenChild(child) }.padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            val cover = child.cover
-                            if (cover != null) Image(cover, null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                            else Box(Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Bg), contentAlignment = Alignment.Center) { Text(if (child.type == "CHAPTER") "📖" else if (child.type == "FOLDER") "🗂" else "🖼", fontSize = 22.sp) }
-                            Text(child.name, color = Veyq.Text, modifier = Modifier.weight(1f))
-                            Text("›", color = Veyq.Muted, fontSize = 20.sp)
+            Column(contentModifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DetailHero()
+                DetailTabs()
+                if (tab == 5) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        controller.children.forEach { child ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(Veyq.Radius))
+                                    .background(Veyq.SurfaceMuted)
+                                    .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                                    .clickable { onOpenChild(child) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                val cover = child.cover
+                                if (cover != null) Image(cover, null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                else Box(Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(if (child.type == "CHAPTER") "📖" else if (child.type == "FOLDER") "🗂" else "🖼", fontSize = 22.sp) }
+                                Text(child.name, color = Veyq.Text, modifier = Modifier.weight(1f))
+                                Text("›", color = Veyq.Muted, fontSize = 20.sp)
+                            }
                         }
                     }
-                }
-            } else if (tab == 4) {
-                LaunchedEffect(Unit) { controller.loadBuckets() }
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (controller.buckets.isEmpty()) Text(L10n.t("contrib.empty"), color = Veyq.Muted, fontSize = 14.sp)
-                    controller.buckets.forEach { b ->
-                        val label = controller.bucketLabel(b).ifEmpty { L10n.t("contrib.member") }
-                        Row(
-                            Modifier.fillMaxWidth().padding(start = if (b.primary) 0.dp else 16.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Surface).padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${if (b.primary) "👤" else "📁"} $label", color = Veyq.Text, modifier = Modifier.weight(1f).clickable { selectedBucketId = b.id; cameraFilter = null; tab = 0 })
-                            Text("${controller.bucketCount(b)}", color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
-                            if (controller.isOwnBucket(b)) {
-                                if (b.primary) {
-                                    TextButton(onClick = { creatingBucket = true }) { Text("+", color = Veyq.Accent) }
-                                } else {
-                                    TextButton(onClick = { renamingBucket = b }) { Text("✎", color = Veyq.Accent) }
-                                    TextButton(onClick = { val id = b.id; scope.launch { controller.deleteBucket(id); if (selectedBucketId == id) selectedBucketId = null } }) { Text("🗑", color = Veyq.Danger) }
+                } else if (tab == 4) {
+                    LaunchedEffect(Unit) { controller.loadBuckets() }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (controller.buckets.isEmpty()) EmptyPanel("§", L10n.t("contrib.empty"))
+                        controller.buckets.forEach { b ->
+                            val label = controller.bucketLabel(b).ifEmpty { L10n.t("contrib.member") }
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = if (b.primary) 0.dp else 16.dp)
+                                    .clip(RoundedCornerShape(Veyq.ControlRadius))
+                                    .background(Veyq.SurfaceMuted)
+                                    .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("${if (b.primary) "👤" else "📁"} $label", color = Veyq.Text, modifier = Modifier.weight(1f).clickable { selectedBucketId = b.id; cameraFilter = null; tab = 0 })
+                                Text("${controller.bucketCount(b)}", color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
+                                if (controller.isOwnBucket(b)) {
+                                    if (b.primary) {
+                                        TextButton(onClick = { creatingBucket = true }) { Text("+", color = Veyq.Accent) }
+                                    } else {
+                                        TextButton(onClick = { renamingBucket = b }) { Text("✎", color = Veyq.Accent) }
+                                        TextButton(onClick = { val id = b.id; scope.launch { controller.deleteBucket(id); if (selectedBucketId == id) selectedBucketId = null } }) { Text("🗑", color = Veyq.Danger) }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            } else if (tab == 6) {
-                LaunchedEffect(Unit) { controller.loadPlaylists() }
+                } else if (tab == 6) {
+                    LaunchedEffect(Unit) { controller.loadPlaylists() }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { addingPlaylist = true }) { Text(L10n.t("playlist.add"), color = Veyq.Accent) }
+                    }
+                    if (controller.playlists.isEmpty()) EmptyPanel("♫", L10n.t("playlist.empty"))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        controller.playlists.forEach { p ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(Veyq.Radius))
+                                    .background(Veyq.SurfaceMuted)
+                                    .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    p.title?.ifEmpty { null } ?: p.url, color = Veyq.Accent, fontSize = 14.sp, maxLines = 1,
+                                    modifier = Modifier.weight(1f).clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(p.url))) } },
+                                )
+                                TextButton(onClick = { val id = p.id; val f = !p.featured; scope.launch { controller.featurePlaylist(id, f) } }) { Text(if (p.featured) "★" else "☆", color = if (p.featured) Veyq.Accent else Veyq.Muted) }
+                                TextButton(onClick = { val id = p.id; scope.launch { controller.deletePlaylist(id) } }) { Text("🗑", color = Veyq.Danger) }
+                            }
+                        }
+                    }
+            } else if (tab == 7) {
+                LaunchedEffect(Unit) { controller.loadParticipants() }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { addingPlaylist = true }) { Text(L10n.t("playlist.add"), color = Veyq.Accent) }
+                    TextButton(onClick = { addingParticipant = true }) { Text(L10n.t("people.addAnonymous"), color = Veyq.Accent) }
                 }
-                if (controller.playlists.isEmpty()) Text(L10n.t("playlist.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                if (controller.participants.isEmpty()) EmptyPanel("👥", L10n.t("people.empty"))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    controller.playlists.forEach { p ->
+                    controller.participants.forEach { p ->
                         Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).padding(horizontal = 10.dp, vertical = 8.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(Veyq.Radius))
+                                .background(Veyq.SurfaceMuted)
+                                .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                p.title?.ifEmpty { null } ?: p.url, color = Veyq.Accent, fontSize = 14.sp, maxLines = 1,
-                                modifier = Modifier.weight(1f).clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(p.url))) } },
-                            )
-                            TextButton(onClick = { val id = p.id; val f = !p.featured; scope.launch { controller.featurePlaylist(id, f) } }) { Text(if (p.featured) "★" else "☆", color = if (p.featured) Veyq.Accent else Veyq.Muted) }
-                            TextButton(onClick = { val id = p.id; scope.launch { controller.deletePlaylist(id) } }) { Text("🗑", color = Veyq.Danger) }
+                            val link = p.linkedUserId
+                            if (link != null) {
+                                Text(p.displayName, color = Veyq.Accent, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f).clickable { profileNav = link to p.displayName })
+                            } else {
+                                Text(p.displayName, color = Veyq.Text, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                            }
+                            TextButton(onClick = { val id = p.id; scope.launch { controller.deleteParticipant(id) } }) { Text("🗑", color = Veyq.Danger) }
                         }
                     }
                 }
@@ -673,7 +812,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                         Text(if (controller.importing) L10n.t("track.importing") else L10n.t("track.import"), color = Veyq.Accent)
                     }
                 }
-                if (points.isEmpty() && controller.tracks.isEmpty()) Text(L10n.t("map.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                if (points.isEmpty() && controller.tracks.isEmpty()) EmptyPanel("⌖", L10n.t("map.empty"))
                 else MemoryMap(points, controller.tracks.filter { it.id !in hiddenTracks }) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
                 controller.tracks.forEach { tr ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -720,7 +859,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                         Text(L10n.t("detail.loadFailed"), color = Veyq.Muted, fontSize = 14.sp)
                         TextButton(onClick = { scope.launch { controller.loading = true; controller.load() } }) { Text(L10n.t("common.retry"), color = Veyq.Accent) }
                     }
-                    displayTiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
+                    displayTiles.isEmpty() -> EmptyPanel("▧", L10n.t("detail.noMedia"))
                     else -> {
                         val range = DateBuckets.dateRange(displayTiles) { it.takenAt }
                         if (range.isNotEmpty()) Text(range, color = Veyq.Muted, fontSize = 13.sp)
@@ -732,6 +871,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 }
             }
         }
+        }
     }
 
     lightboxTile?.let { opened ->
@@ -741,7 +881,13 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         fun goto(i: Int) { if (i in controller.tiles.indices) { lightboxTile = controller.tiles[i]; lightboxInfo = false; editingDate = false; mediaDelArm = false } }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(16.dp)) {
-                Box(Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Veyq.MediaBackdrop, RoundedCornerShape(Veyq.Radius))
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(Veyq.Radius))
+                        .clip(RoundedCornerShape(Veyq.Radius)),
+                ) {
                     var zoom by remember(tile.id) { mutableStateOf(1f) }
                     Image(
                         lightboxPreview ?: tile.image, null, contentScale = ContentScale.Fit,
@@ -754,7 +900,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                     if (idx < controller.tiles.size - 1) TextButton(onClick = { goto(idx + 1) }, modifier = Modifier.align(Alignment.CenterEnd)) { Text("›", color = Color.White, fontSize = 34.sp) }
                 }
                 if (lightboxInfo) {
-                    Column(Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Veyq.Radius))
+                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(Veyq.Radius))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         InfoLine(L10n.t("info.takenAt"), DateBuckets.dayLabel(tile.takenAt.take(10)))
                         InfoLine(L10n.t("info.type"), tile.mimeType)
                         if (tile.lat != null && tile.lng != null) InfoLine(L10n.t("info.location"), String.format(java.util.Locale.US, "%.5f, %.5f", tile.lat, tile.lng))
@@ -765,7 +918,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                         tile.exif?.toSortedMap()?.forEach { (k, v) -> InfoLine(k, v) }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     TextButton(onClick = { scope.launch { controller.toggleHighlight(tile) } }) { Text(if (tile.highlighted) "★" else "☆", color = if (tile.highlighted) Veyq.Accent else Color.White, fontSize = 18.sp) }
                     TextButton(onClick = { lightboxInfo = !lightboxInfo }) { Text("ⓘ", color = Color.White, fontSize = 18.sp) }
                     TextButton(onClick = { editingDate = true }) { Text("📅", fontSize = 16.sp) }
@@ -803,6 +963,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     renamingBucket?.let { b -> BucketNameDialog(L10n.t("common.rename"), controller.bucketLabel(b), onDismiss = { renamingBucket = null }) { name -> renamingBucket = null; scope.launch { controller.renameBucket(b.id, name) } } }
     renamingTrack?.let { tr -> BucketNameDialog(L10n.t("track.renamePrompt"), tr.name, onDismiss = { renamingTrack = null }) { name -> renamingTrack = null; scope.launch { controller.renameTrack(tr, name) } } }
     if (addingPlaylist) PlaylistDialog(onDismiss = { addingPlaylist = false }) { url, title -> addingPlaylist = false; scope.launch { controller.addPlaylist(url, title) } }
+    if (addingParticipant) BucketNameDialog(L10n.t("people.addAnonymous"), "", onDismiss = { addingParticipant = false }) { name -> addingParticipant = false; scope.launch { controller.addParticipant(name) } }
 
     if (showShareRole) {
         fun share(role: String) {
@@ -817,10 +978,11 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         }
         AlertDialog(
             onDismissRequest = { showShareRole = false },
-            containerColor = Veyq.Surface,
+            modifier = Modifier.widthIn(max = 520.dp),
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("share.share"), color = Veyq.Text) },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(L10n.t("share.hint"), color = Veyq.Muted)
                     TextButton(onClick = { share("VIEWER") }, modifier = Modifier.fillMaxWidth()) { Text(L10n.t("share.roleViewer"), color = Veyq.Text, modifier = Modifier.fillMaxWidth()) }
                     TextButton(onClick = { share("CONTRIBUTOR") }, modifier = Modifier.fillMaxWidth()) { Text(L10n.t("share.roleContributor"), color = Veyq.Text, modifier = Modifier.fillMaxWidth()) }
@@ -835,7 +997,8 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     if (showDownload) {
         AlertDialog(
             onDismissRequest = { showDownload = false },
-            containerColor = Veyq.Surface,
+            modifier = Modifier.widthIn(max = 520.dp),
+            containerColor = Veyq.Surface.copy(alpha = 0.96f),
             title = { Text(L10n.t("download.title"), color = Veyq.Text) },
             text = { Text(L10n.t("download.text"), color = Veyq.Muted) },
             confirmButton = { TextButton(onClick = { download(true) }) { Text(L10n.t("download.withChapters"), color = Veyq.Accent) } },
@@ -910,10 +1073,23 @@ private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List
     var consent by remember { mutableStateOf(prefs.getBoolean("veyq.privacy.mapTiles", false)) }
     if (!consent) {
         Column(
-            modifier = Modifier.fillMaxWidth().height(420.dp).padding(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(420.dp)
+                .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                .background(Veyq.Surface.copy(alpha = 0.92f), RoundedCornerShape(Veyq.Radius))
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .background(Veyq.Accent.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("⌖", color = Veyq.Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
             Text(L10n.t("map.consentText"), color = Veyq.Muted, fontSize = 14.sp, textAlign = TextAlign.Center)
             TextButton(onClick = { prefs.edit().putBoolean("veyq.privacy.mapTiles", true).apply(); consent = true }) {
                 Text(L10n.t("map.consentEnable"), color = Veyq.Accent)
@@ -922,7 +1098,12 @@ private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List
         return
     }
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(Veyq.Radius)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(420.dp)
+            .clip(RoundedCornerShape(Veyq.Radius))
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.MediaBackdrop, RoundedCornerShape(Veyq.Radius)),
         factory = { ctx ->
             org.osmdroid.config.Configuration.getInstance().userAgentValue = ctx.packageName
             org.osmdroid.config.Configuration.getInstance().osmdroidBasePath = ctx.cacheDir
@@ -1017,6 +1198,20 @@ private fun clusterIconDrawable(resources: android.content.res.Resources, count:
 }
 
 @Composable
+private fun DetailPill(icon: String, count: Int) {
+    Text(
+        "$icon $count",
+        color = Color.White,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.18f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
 private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
     Text(
         text,
@@ -1027,6 +1222,76 @@ private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(vertical = 4.dp),
     )
+}
+
+/// A participant's profile within the active space: their name + every Memory/Chapter they appear in
+/// (client-side scan, server is blind to participants). Tapping a node opens it.
+@Composable
+private fun ParticipantProfile(
+    controller: GalleryController,
+    linkedUserId: String,
+    fallbackName: String,
+    onOpenNode: (Participants.NodeHit) -> Unit,
+    onBack: () -> Unit,
+) {
+    var hits by remember { mutableStateOf<List<Participants.NodeHit>?>(null) }
+    var name by remember { mutableStateOf(fallbackName) }
+    LaunchedEffect(linkedUserId) {
+        val h = controller.participantNodeHits(linkedUserId)
+        hits = h
+        name = h.firstOrNull()?.displayName ?: fallbackName
+    }
+    Box(Modifier.fillMaxSize().background(Veyq.screenBackground())) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 22.sp) }
+                Text(name, color = Veyq.Text, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            }
+            Text(L10n.t("participant.sharedMemories").uppercase(), color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            val h = hits
+            when {
+                h == null -> Text("…", color = Veyq.Muted)
+                h.isEmpty() -> Text(L10n.t("participant.noMemories"), color = Veyq.Muted, fontSize = 14.sp)
+                else -> h.forEach { hit ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Veyq.Radius))
+                            .background(Veyq.SurfaceMuted)
+                            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                            .clickable { onOpenNode(hit) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(if (hit.type == "CHAPTER") "📖" else if (hit.type == "FOLDER") "🗂" else "🖼")
+                        Text(hit.name, color = Veyq.Text, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                        Text("›", color = Veyq.Muted)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPanel(icon: String, text: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.SurfaceMuted, RoundedCornerShape(Veyq.Radius))
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(42.dp).background(Veyq.Accent.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+            Text(icon, color = Veyq.Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(text, color = Veyq.Muted, fontSize = 14.sp, textAlign = TextAlign.Center)
+    }
 }
 
 @Composable
@@ -1042,26 +1307,35 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
         if (JournalEmbedKind.PLAYLIST in embedKinds) controller.loadPlaylists()
     }
 
-    if (live) {
-        // The live section persists via the CRDT store (compaction on close); just reflect the text + exit.
-        LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false }
-    } else if (editing) {
-        JournalBlockEditor(controller, blocks, scope)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { editing = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) }
-            TextButton(onClick = { val md = journalMarkdownFrom(blocks); scope.launch { controller.saveJournal(md); editing = false } }, enabled = !controller.journalSaving) {
-                Text(if (controller.journalSaving) L10n.t("journal.saving") else L10n.t("journal.save"), color = Veyq.Accent)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.Surface.copy(alpha = 0.92f), RoundedCornerShape(Veyq.Radius))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (live) {
+            // The live section persists via the CRDT store (compaction on close); just reflect the text + exit.
+            LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false }
+        } else if (editing) {
+            JournalBlockEditor(controller, blocks, scope)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { editing = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) }
+                TextButton(onClick = { val md = journalMarkdownFrom(blocks); scope.launch { controller.saveJournal(md); editing = false } }, enabled = !controller.journalSaving) {
+                    Text(if (controller.journalSaving) L10n.t("journal.saving") else L10n.t("journal.save"), color = Veyq.Accent)
+                }
             }
-        }
-    } else {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { live = true }) { Text(L10n.t("journal.live"), color = Veyq.Accent) }
-            TextButton(onClick = { blocks.clear(); blocks.addAll(journalEditBlocks(controller.journalMarkdown)); scope.launch { controller.loadTracks() }; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
-        }
-        if (controller.journalMarkdown.isBlank()) {
-            Text(L10n.t("journal.empty"), color = Veyq.Muted, fontSize = 14.sp)
         } else {
-            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, controller.playlists, onOpenMedia, onOpenChapter)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { live = true }) { Text(L10n.t("journal.live"), color = Veyq.Accent) }
+                TextButton(onClick = { blocks.clear(); blocks.addAll(journalEditBlocks(controller.journalMarkdown)); scope.launch { controller.loadTracks() }; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
+            }
+            if (controller.journalMarkdown.isBlank()) {
+                EmptyPanel("✎", L10n.t("journal.empty"))
+            } else {
+                JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, controller.playlists, onOpenMedia, onOpenChapter)
+            }
         }
     }
 }
@@ -1081,9 +1355,32 @@ private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, t
                         JournalEmbedKind.MEDIA -> {
                             val items = e.ids.mapNotNull { id -> tiles.firstOrNull { it.id == id } }
                             if (items.isEmpty()) Text(L10n.t("journal.embedMissing"), color = Veyq.Muted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
-                            else if (items.size == 1) Image(items[0].image, null, modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(RoundedCornerShape(10.dp)).clickable { onOpenMedia(items[0]) }, contentScale = ContentScale.Fit)
+                            else if (items.size == 1) Image(
+                                items[0].image,
+                                null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 360.dp)
+                                    .clip(RoundedCornerShape(Veyq.Radius))
+                                    .background(Veyq.MediaBackdrop)
+                                    .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+                                    .clickable { onOpenMedia(items[0]) },
+                                contentScale = ContentScale.Fit,
+                            )
                             else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                items.forEach { tile -> Image(tile.image, null, modifier = Modifier.height(180.dp).clip(RoundedCornerShape(8.dp)).clickable { onOpenMedia(tile) }, contentScale = ContentScale.Fit) }
+                                items.forEach { tile ->
+                                    Image(
+                                        tile.image,
+                                        null,
+                                        modifier = Modifier
+                                            .height(180.dp)
+                                            .clip(RoundedCornerShape(Veyq.ControlRadius))
+                                            .background(Veyq.MediaBackdrop)
+                                            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius))
+                                            .clickable { onOpenMedia(tile) },
+                                        contentScale = ContentScale.Fit,
+                                    )
+                                }
                             }
                             e.label?.let { Text(it, color = Veyq.Muted, fontSize = 12.sp) }
                         }
@@ -1099,7 +1396,7 @@ private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, t
                         JournalEmbedKind.CHAPTER -> {
                             val cid = e.ids.firstOrNull() ?: ""
                             Row(
-                                Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape)
+                                Modifier.clip(CircleShape).background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, CircleShape)
                                     .clickable(enabled = cid.isNotEmpty()) { onOpenChapter(cid) }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1109,7 +1406,7 @@ private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, t
                             val p = playlists.firstOrNull { it.id == e.ids.firstOrNull() }
                             if (p == null) Text(L10n.t("journal.embedMissing"), color = Veyq.Muted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                             else Row(
-                                Modifier.clip(RoundedCornerShape(10.dp)).background(Veyq.Surface).border(1.dp, Veyq.Line, RoundedCornerShape(10.dp))
+                                Modifier.clip(RoundedCornerShape(Veyq.ControlRadius)).background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius))
                                     .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(p.url))) } }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1178,7 +1475,7 @@ private fun LiveJournalSection(controller: GalleryController, onClose: (String) 
     }
     val density = LocalDensity.current
     Box(
-        Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(Veyq.Radius)).background(Veyq.Surface)
+        Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(Veyq.Radius)).background(Veyq.SurfaceMuted)
             .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius)).padding(10.dp),
     ) {
         BasicTextField(
@@ -1301,7 +1598,7 @@ private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotSt
             val e = block.embed
             if (e != null) {
                 Row(
-                    Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape).clickable { picker = PickerState.Edit(idx) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    Modifier.clip(CircleShape).background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, CircleShape).clickable { picker = PickerState.Edit(idx) }.padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(if (e.kind == JournalEmbedKind.MEDIA) "🖼" else if (e.kind == JournalEmbedKind.TRACK) "🛤" else if (e.kind == JournalEmbedKind.PLAYLIST) "🎵" else "🗂")
@@ -1313,7 +1610,7 @@ private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotSt
                     value = block.text, onValueChange = { block.text = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp), shape = RoundedCornerShape(Veyq.Radius),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
+                        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                         focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
                         focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
                     ),
@@ -1350,16 +1647,18 @@ private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryControl
     }
     fun toggle(id: String) { selected = if (selected.contains(id)) selected - id else selected + id }
     AlertDialog(
+        modifier = Modifier.widthIn(max = 620.dp),
         onDismissRequest = onDismiss,
-        containerColor = Veyq.Surface,
+        containerColor = Veyq.Surface.copy(alpha = 0.96f),
         title = { Text(when (kind) { JournalEmbedKind.MEDIA -> L10n.t("journal.mediaPickerTitle"); JournalEmbedKind.PLAYLIST -> L10n.t("journal.playlistPickerTitle"); else -> L10n.t("journal.trackPickerTitle") }, color = Veyq.Text) },
         text = {
             Column(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = label, onValueChange = { label = it }, modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(if (kind == JournalEmbedKind.MEDIA) L10n.t("journal.caption") else L10n.t("journal.label"), color = Veyq.Muted) },
+                    shape = RoundedCornerShape(Veyq.ControlRadius),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+                        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                         focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
                         focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
                     ),
@@ -1371,8 +1670,8 @@ private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryControl
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 row.forEach { tile ->
                                     Box(
-                                        Modifier.size(92.dp).clip(RoundedCornerShape(8.dp)).clickable { toggle(tile.id) }
-                                            .border(3.dp, if (selected.contains(tile.id)) Veyq.Accent else Color.Transparent, RoundedCornerShape(8.dp)),
+                                        Modifier.size(92.dp).clip(RoundedCornerShape(Veyq.ControlRadius)).background(Veyq.MediaBackdrop).clickable { toggle(tile.id) }
+                                            .border(3.dp, if (selected.contains(tile.id)) Veyq.Accent else Color.Transparent, RoundedCornerShape(Veyq.ControlRadius)),
                                     ) { Image(tile.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
                                 }
                             }
@@ -1383,7 +1682,7 @@ private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryControl
                     else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         controller.playlists.forEach { p ->
                             Row(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selected = listOf(p.id) }.background(Veyq.Bg).padding(10.dp),
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(Veyq.ControlRadius)).clickable { selected = listOf(p.id) }.background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius)).padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Text(p.provider.label, color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -1397,7 +1696,7 @@ private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryControl
                     else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         controller.tracks.forEach { tr ->
                             Row(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { toggle(tr.id) }.background(Veyq.Bg).padding(10.dp),
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(Veyq.ControlRadius)).clickable { toggle(tr.id) }.background(Veyq.SurfaceMuted).border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius)).padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text("🛤 ${tr.name}", color = Veyq.Text, modifier = Modifier.weight(1f))
@@ -1435,7 +1734,13 @@ private fun TrackStatsRow(route: Track.TrackItem) {
 /** The Info tab: media count, date range, track count, chapter count (matches web/iOS). */
 @Composable
 private fun InfoTab(controller: GalleryController) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Veyq.Radius)).background(Veyq.Surface)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.SurfaceMuted)
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius)),
+    ) {
         InfoTabRow(L10n.t("detail.gallery"), "${controller.tiles.size}")
         val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
         if (range.isNotEmpty()) InfoTabRow(L10n.t("info.dateRange"), range)
@@ -1456,14 +1761,16 @@ private fun InfoTabRow(label: String, value: String) {
 private fun BucketNameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
+        modifier = Modifier.widthIn(max = 520.dp),
         onDismissRequest = onDismiss,
-        containerColor = Veyq.Surface,
+        containerColor = Veyq.Surface.copy(alpha = 0.96f),
         title = { Text(title, color = Veyq.Text) },
         text = {
             OutlinedTextField(
                 value = text, onValueChange = { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Veyq.ControlRadius),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+                    focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
                     focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
                     focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
                 ),
@@ -1479,18 +1786,19 @@ private fun PlaylistDialog(onDismiss: () -> Unit, onConfirm: (String, String) ->
     var url by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
         focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
         focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
     )
     AlertDialog(
+        modifier = Modifier.widthIn(max = 560.dp),
         onDismissRequest = onDismiss,
-        containerColor = Veyq.Surface,
+        containerColor = Veyq.Surface.copy(alpha = 0.96f),
         title = { Text(L10n.t("playlist.add"), color = Veyq.Text) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = url, onValueChange = { url = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(L10n.t("playlist.urlPrompt"), color = Veyq.Muted) }, colors = fieldColors)
-                OutlinedTextField(value = title, onValueChange = { title = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(L10n.t("playlist.titlePrompt"), color = Veyq.Muted) }, colors = fieldColors)
+                OutlinedTextField(value = url, onValueChange = { url = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(Veyq.ControlRadius), label = { Text(L10n.t("playlist.urlPrompt"), color = Veyq.Muted) }, colors = fieldColors)
+                OutlinedTextField(value = title, onValueChange = { title = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(Veyq.ControlRadius), label = { Text(L10n.t("playlist.titlePrompt"), color = Veyq.Muted) }, colors = fieldColors)
             }
         },
         confirmButton = { TextButton(enabled = url.isNotBlank(), onClick = { onConfirm(url.trim(), title.trim()) }) { Text(L10n.t("playlist.add"), color = Veyq.Accent) } },
@@ -1516,7 +1824,14 @@ private fun InfoLine(label: String, value: String) {
 @Composable
 private fun ChildCard(child: GalleryController.Child, onClick: () -> Unit) {
     Column(Modifier.width(132.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.size(132.dp, 92.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Surface), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(132.dp, 92.dp)
+                .clip(RoundedCornerShape(Veyq.ControlRadius))
+                .background(Veyq.SurfaceMuted)
+                .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.ControlRadius)),
+            contentAlignment = Alignment.Center,
+        ) {
             if (child.cover != null) Image(child.cover, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             else Text(if (child.type == "CHAPTER") "📖" else if (child.type == "FOLDER") "🗂" else "🖼", fontSize = 28.sp)
         }

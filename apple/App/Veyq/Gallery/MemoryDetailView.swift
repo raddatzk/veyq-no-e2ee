@@ -127,23 +127,13 @@ final class GalleryStore: ObservableObject {
         await load(); await loadBuckets()
     }
 
-    /// Fetch thumbnail bytes for the given refs, at most 6 in flight, returned keyed by their input index.
+    /// Fetch thumbnail bytes for the given refs, returned keyed by their input index. ONE batch-presign-get,
+    /// then every frame fetched DIRECTLY from the store (parallel) — no per-thumbnail backend hop / egress.
     private func downloadThumbnails(_ refs: [Media.BlobRef]) async -> [Int: Data] {
-        let apiBase = apiBase, session = session, scopeId = scopeId, contentKey = contentKey
-        return await withTaskGroup(of: (Int, Data?).self) { group in
-            var out: [Int: Data] = [:]
-            var next = 0
-            func add(_ i: Int) {
-                let ref = refs[i]
-                group.addTask { (i, try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)) }
-            }
-            while next < min(6, refs.count) { add(next); next += 1 }
-            for await (i, data) in group {
-                if let data { out[i] = data }
-                if next < refs.count { add(next); next += 1 }
-            }
-            return out
-        }
+        guard let byBlob = try? await Media.downloadBlobsBatch(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, refs: refs) else { return [:] }
+        var out: [Int: Data] = [:]
+        for (i, ref) in refs.enumerated() { if let data = byBlob[ref.blobId] { out[i] = data } }
+        return out
     }
 
     /// Decrypt a tile's PREVIEW (≈2048px) for the lightbox.
@@ -257,6 +247,25 @@ final class GalleryStore: ObservableObject {
         playlists.removeAll { $0.id == id }
     }
 
+    @Published var participants: [Participants.Item] = []
+    private var participantsLoaded = false
+
+    func loadParticipants() async {
+        guard !participantsLoaded else { return }
+        if let p = try? await Participants.list(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { participants = p }
+        participantsLoaded = true
+    }
+
+    func addParticipant(_ name: String) async {
+        guard (try? await Participants.create(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, displayName: name)) != nil else { return }
+        if let p = try? await Participants.list(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { participants = p }
+    }
+
+    func deleteParticipant(_ id: String) async {
+        try? await Participants.delete(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, participantId: id)
+        participants.removeAll { $0.id == id }
+    }
+
     /// Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info.
     struct Child: Identifiable, Hashable {
         let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?
@@ -330,6 +339,8 @@ struct MemoryDetailView: View {
     @State private var addingPlaylist = false           // playlists: add link flow
     @State private var playlistUrlInput = ""
     @State private var playlistTitleInput = ""
+    @State private var addingParticipant = false        // participants: add anonymous flow
+    @State private var participantNameInput = ""
     @State private var lightboxZoom: CGFloat = 1              // pinch-zoom in the lightbox
     @State private var lightboxInfo = false          // info panel toggle in the lightbox
     @State private var editingDate = false           // capture-date editor toggle in the lightbox
@@ -377,6 +388,7 @@ struct MemoryDetailView: View {
             if t == 2 { Task { await store.loadTracks() } }
             if t == 3 { Task { await store.loadTracks(); await store.loadChildren() } }
             if t == 6 { Task { await store.loadPlaylists() } }
+            if t == 7 { Task { await store.loadParticipants() } }
         }
         .fileImporter(isPresented: $showGpxImporter, allowedContentTypes: [.xml, UTType(filenameExtension: "gpx") ?? .data]) { result in
             guard case let .success(url) = result else { return }
@@ -404,7 +416,7 @@ struct MemoryDetailView: View {
                     .padding(16)
                     .readableWidth()
             }
-            .background(VeyqStyle.bg)
+            .background(VeyqScreenBackground())
         }
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
@@ -439,6 +451,15 @@ struct MemoryDetailView: View {
                 if !url.isEmpty { Task { await store.addPlaylist(url: url, title: title) } }
             }
         }
+        .alert(T("people.addAnonymous"), isPresented: $addingParticipant) {
+            TextField(T("people.namePrompt"), text: $participantNameInput)
+            Button(T("common.cancel"), role: .cancel) { participantNameInput = "" }
+            Button(T("common.add")) {
+                let name = participantNameInput.trimmingCharacters(in: .whitespaces)
+                participantNameInput = ""
+                if !name.isEmpty { Task { await store.addParticipant(name) } }
+            }
+        }
     }
 
     @ToolbarContentBuilder private var detailToolbar: some ToolbarContent {
@@ -451,8 +472,10 @@ struct MemoryDetailView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
-                Text(store.uploading ? T("detail.uploading") : T("detail.upload")).foregroundStyle(VeyqStyle.accent)
+                Image(systemName: "photo.badge.plus")
+                    .foregroundStyle(VeyqStyle.accent)
             }
+            .accessibilityLabel(store.uploading ? T("detail.uploading") : T("detail.upload"))
             .disabled(store.uploading)
         }
     }
@@ -476,20 +499,14 @@ struct MemoryDetailView: View {
 
     @ViewBuilder private func detailContent(contentWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Cover hero: the first (earliest) photo, like the web detail header.
-            if let hero = store.tiles.first {
-                Image(uiImage: hero.image).resizable().scaledToFill()
-                    .frame(height: 180).frame(maxWidth: .infinity).clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-            }
-            Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
-            metadataPills
+            heroHeader
             Picker("", selection: $tab) {
                 Text(T("detail.gallery")).tag(0)
                 if !store.children.isEmpty { Text(T("detail.chapters")).tag(5) }
                 Text(T("detail.map")).tag(2)
                 Text(T("detail.journal")).tag(1)
                 Text(T("detail.playlists")).tag(6)
+                Text(T("detail.participants")).tag(7)
                 Text(T("detail.contributions")).tag(4)
                 Text(T("detail.info")).tag(3)
             }
@@ -503,6 +520,8 @@ struct MemoryDetailView: View {
                 contributionsTab
             } else if tab == 6 {
                 playlistsTab
+            } else if tab == 7 {
+                participantsTab
             } else if tab == 1 {
                 JournalView(store: store, onOpenMedia: openLightbox, onOpenChapter: openChapter)
             } else if tab == 2 {
@@ -511,6 +530,58 @@ struct MemoryDetailView: View {
                 galleryTab(contentWidth: contentWidth)
             }
         }
+    }
+
+    private var heroHeader: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let hero = store.tiles.first {
+                    Image(uiImage: hero.image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            VeyqStyle.accent.opacity(0.22),
+                            VeyqStyle.rose.opacity(0.12),
+                            VeyqStyle.success.opacity(0.10)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 42, weight: .semibold))
+                        .foregroundStyle(VeyqStyle.accent.opacity(0.72))
+                }
+            }
+            .frame(height: 220)
+            .frame(maxWidth: .infinity)
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    VeyqStyle.mediaBackdrop.opacity(0),
+                    VeyqStyle.mediaBackdrop.opacity(0.72)
+                ],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(name)
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(VeyqStyle.onStrong)
+                    .lineLimit(2)
+                metadataPills
+            }
+            .padding(16)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous)
+                .stroke(VeyqStyle.line.opacity(0.70))
+        }
+        .shadow(color: VeyqStyle.cardShadow, radius: 12, x: 0, y: 8)
     }
 
     @ViewBuilder private var mapTab: some View {
@@ -549,12 +620,12 @@ struct MemoryDetailView: View {
             Button(T("playlist.add")) { playlistUrlInput = ""; playlistTitleInput = ""; addingPlaylist = true }.tint(VeyqStyle.accent)
         }
         if store.playlists.isEmpty {
-            Text(T("playlist.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+            VeyqEmptyState(symbolName: "music.note.list", title: T("playlist.empty"), message: T("playlist.add"), tint: VeyqStyle.rose)
         } else {
             ForEach(store.playlists) { p in
                 HStack(spacing: 10) {
                     Text(p.provider.label).font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.muted)
-                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.surface, in: Capsule())
+                        .padding(.horizontal, 8).padding(.vertical, 3).background(VeyqStyle.elevatedSurface, in: Capsule())
                     if let url = URL(string: p.url) {
                         Link(p.title?.isEmpty == false ? p.title! : p.url, destination: url).foregroundStyle(VeyqStyle.accent).lineLimit(1)
                     } else {
@@ -566,7 +637,43 @@ struct MemoryDetailView: View {
                     }.tint(p.featured ? VeyqStyle.accent : VeyqStyle.muted)
                     Button { let id = p.id; Task { await store.deletePlaylist(id) } } label: { Image(systemName: "trash") }.tint(VeyqStyle.danger)
                 }
-                .padding(8).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(8)
+                .background(VeyqStyle.elevatedSurface)
+                .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
+            }
+        }
+    }
+
+    @ViewBuilder private var participantsTab: some View {
+        HStack {
+            Spacer()
+            Button(T("people.addAnonymous")) { participantNameInput = ""; addingParticipant = true }.tint(VeyqStyle.accent)
+        }
+        if store.participants.isEmpty {
+            VeyqEmptyState(symbolName: "person.2", title: T("people.empty"), message: T("people.addAnonymous"), tint: VeyqStyle.rose)
+        } else {
+            ForEach(store.participants) { p in
+                HStack(spacing: 10) {
+                    Text(String(p.displayName.prefix(1)).uppercased())
+                        .font(.subheadline.weight(.bold)).foregroundStyle(.white)
+                        .frame(width: 30, height: 30).background(VeyqStyle.accent, in: Circle())
+                    if let linked = p.linkedUserId {
+                        NavigationLink {
+                            ParticipantProfileView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, linkedUserId: linked, fallbackName: p.displayName)
+                        } label: {
+                            Text(p.displayName).foregroundStyle(VeyqStyle.accent).lineLimit(1)
+                        }
+                    } else {
+                        Text(p.displayName).foregroundStyle(VeyqStyle.text).lineLimit(1)
+                    }
+                    Spacer()
+                    Button { let id = p.id; Task { await store.deleteParticipant(id) } } label: { Image(systemName: "trash") }.tint(VeyqStyle.danger)
+                }
+                .padding(8)
+                .background(VeyqStyle.elevatedSurface)
+                .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
             }
         }
     }
@@ -600,7 +707,7 @@ struct MemoryDetailView: View {
         if store.loading {
             Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
         } else if displayTiles.isEmpty {
-            Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+            VeyqEmptyState(symbolName: "photo.on.rectangle", title: T("detail.noMedia"), message: T("detail.uploading"), tint: VeyqStyle.info)
         } else {
             let range = DateBuckets.dateRange(displayTiles) { $0.takenAt }
             if !range.isEmpty {
@@ -626,9 +733,9 @@ struct MemoryDetailView: View {
         }
     }
     private func pill(_ icon: String, _ count: Int) -> some View {
-        Text("\(icon) \(count)").font(.caption).foregroundStyle(VeyqStyle.muted)
+        Text("\(icon) \(count)").font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.onStrong)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(VeyqStyle.surface, in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
     }
 
     @ViewBuilder private var chaptersTab: some View {
@@ -641,13 +748,14 @@ struct MemoryDetailView: View {
                         if let cover = child.cover {
                             Image(uiImage: cover).resizable().scaledToFill().frame(width: 56, height: 56).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                         } else {
-                            Text(child.type == "CHAPTER" ? "📖" : child.type == "FOLDER" ? "🗂" : "🖼").font(.title).frame(width: 56, height: 56).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                            Text(child.type == "CHAPTER" ? "📖" : child.type == "FOLDER" ? "🗂" : "🖼").font(.title).frame(width: 56, height: 56).background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         Text(child.name).foregroundStyle(VeyqStyle.text)
                         Spacer()
                         Image(systemName: "chevron.right").foregroundStyle(VeyqStyle.muted)
                     }
-                    .padding(8).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(8).background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
                 }
                 .buttonStyle(.plain)
             }
@@ -662,7 +770,8 @@ struct MemoryDetailView: View {
             infoRow(T("detail.map"), "\(store.tracks.count)")
             infoRow(T("info.chapters"), "\(store.chapterCount)")
         }
-        .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+        .background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(VeyqStyle.line))
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
@@ -678,7 +787,7 @@ struct MemoryDetailView: View {
     @ViewBuilder private var contributionsTab: some View {
         VStack(alignment: .leading, spacing: 6) {
             if store.buckets.isEmpty {
-                Text(T("contrib.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                VeyqEmptyState(symbolName: "person.2", title: T("contrib.empty"), message: T("contrib.member"), tint: VeyqStyle.success)
             }
             ForEach(store.buckets) { b in
                 HStack(spacing: 8) {
@@ -699,7 +808,8 @@ struct MemoryDetailView: View {
                     }
                 }
                 .padding(.vertical, 8).padding(.horizontal, 10).padding(.leading, b.primary ? 0 : 16)
-                .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(VeyqStyle.elevatedSurface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
             }
         }
     }
@@ -710,11 +820,14 @@ struct MemoryDetailView: View {
                 if let cover = child.cover {
                     Image(uiImage: cover).resizable().scaledToFill()
                 } else {
-                    VeyqStyle.surface
+                    VeyqStyle.elevatedSurface
                     Text(child.type == "CHAPTER" ? "📖" : child.type == "FOLDER" ? "🗂" : "🖼").font(.largeTitle)
                 }
             }
-            .frame(width: 132, height: 92).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(width: 132, height: 92)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous).strokeBorder(VeyqStyle.line))
             Text(child.name).font(.caption).foregroundStyle(VeyqStyle.text).lineLimit(1).frame(width: 132, alignment: .leading)
         }
     }
@@ -739,36 +852,40 @@ struct MemoryDetailView: View {
                 }
                 if lightboxInfo { lightboxInfoPanel(tile) }
                 if editingDate { lightboxDateEditor(tile) }
-                HStack(spacing: 12) {
-                    Button { Task { await store.toggleHighlight(tile) } } label: {
-                        Image(systemName: tile.highlighted ? "star.fill" : "star")
-                    }.tint(tile.highlighted ? VeyqStyle.accent : .white)
-                    Button { lightboxInfo.toggle() } label: { Image(systemName: "info.circle") }.tint(.white)
-                    Button { editingDate.toggle() } label: { Image(systemName: "calendar") }.tint(.white)
-                    // Move my own medium between my own buckets.
-                    if tile.createdBy == store.ownerKey, !store.buckets.filter(store.isOwnBucket).isEmpty {
-                        Menu {
-                            ForEach(store.buckets.filter(store.isOwnBucket)) { b in
-                                Button(b.primary ? T("contrib.moveToPrimary") : bucketLabelOrFallback(b)) { Task { await store.moveMedia(tile, toBucket: b.id) } }
-                            }
-                        } label: { Image(systemName: "folder") }.tint(.white)
-                    }
-                    Button(T("cover.setAsCover")) {
-                        Task { await store.setCover(tile.id) }
-                        closeLightbox()
-                    }
-                    .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
-                    Button(savingOriginal ? T("detail.uploading") : T("detail.download")) { saveOriginal(tile) }
-                        .tint(.white).disabled(savingOriginal)
-                    if !mediaDelArm {
-                        Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
-                    } else {
-                        Button(T("delete.confirm")) {
-                            Task { await store.deleteMedia(tile.id) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        Button { Task { await store.toggleHighlight(tile) } } label: {
+                            Image(systemName: tile.highlighted ? "star.fill" : "star")
+                        }.tint(tile.highlighted ? VeyqStyle.accent : .white)
+                        Button { lightboxInfo.toggle() } label: { Image(systemName: "info.circle") }.tint(.white)
+                        Button { editingDate.toggle() } label: { Image(systemName: "calendar") }.tint(.white)
+                        // Move my own medium between my own buckets.
+                        if tile.createdBy == store.ownerKey, !store.buckets.filter(store.isOwnBucket).isEmpty {
+                            Menu {
+                                ForEach(store.buckets.filter(store.isOwnBucket)) { b in
+                                    Button(b.primary ? T("contrib.moveToPrimary") : bucketLabelOrFallback(b)) { Task { await store.moveMedia(tile, toBucket: b.id) } }
+                                }
+                            } label: { Image(systemName: "folder") }.tint(.white)
+                        }
+                        Button(T("cover.setAsCover")) {
+                            Task { await store.setCover(tile.id) }
                             closeLightbox()
-                        }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
+                        }
+                        .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
+                        Button(savingOriginal ? T("detail.uploading") : T("detail.download")) { saveOriginal(tile) }
+                            .tint(.white).disabled(savingOriginal)
+                        if !mediaDelArm {
+                            Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
+                        } else {
+                            Button(T("delete.confirm")) {
+                                Task { await store.deleteMedia(tile.id) }
+                                closeLightbox()
+                            }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
+                        }
+                        Button(T("common.close")) { closeLightbox() }.tint(.white)
                     }
-                    Button(T("common.close")) { closeLightbox() }.tint(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
             }
             .padding()
@@ -791,7 +908,9 @@ struct MemoryDetailView: View {
             ForEach((tile.exif ?? [:]).sorted(by: { $0.key < $1.key }), id: \.key) { k, v in infoLine(k, v) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12).background(Color.white.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(Color.white.opacity(0.16)))
     }
 
     private func formatBytes(_ n: Int) -> String {
@@ -811,7 +930,9 @@ struct MemoryDetailView: View {
         )
         DatePicker(T("media.editDate"), selection: binding, displayedComponents: [.date, .hourAndMinute])
             .datePickerStyle(.compact).tint(VeyqStyle.accent).colorScheme(.dark)
-            .padding(12).background(Color.white.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius, style: .continuous).strokeBorder(Color.white.opacity(0.16)))
     }
 
     private func page(_ delta: Int) {

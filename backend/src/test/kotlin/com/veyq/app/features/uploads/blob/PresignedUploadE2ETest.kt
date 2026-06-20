@@ -15,7 +15,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
-import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -37,6 +37,9 @@ import kotlin.test.assertTrue
  */
 @QuarkusTest
 @TestProfile(PresignedUploadE2ETest.S3Profile::class)
+// Skipped at the JUnit level (BEFORE Quarkus boots the S3 profile) unless opted in, so a normal `gradle test`
+// with no MinIO doesn't even try to start the S3 backend. Run with: VEYQ_S3_E2E=1 + a MinIO on :19000.
+@EnabledIfEnvironmentVariable(named = "VEYQ_S3_E2E", matches = "1")
 class PresignedUploadE2ETest {
 
     class S3Profile : QuarkusTestProfile {
@@ -58,8 +61,7 @@ class PresignedUploadE2ETest {
     private val scopeId = "ps-scope"
 
     @BeforeTest
-    fun guardAndSeed() {
-        assumeTrue(System.getenv("VEYQ_S3_E2E") == "1", "set VEYQ_S3_E2E=1 + run MinIO on :19000")
+    fun seed() {
         QuarkusTransaction.requiringNew().run {
             if (scopes.findById(scopeId) != null) return@run
             val now = Instant.now()

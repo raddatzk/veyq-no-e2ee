@@ -23,7 +23,6 @@ object Media {
     private val EMPTY = ByteArray(0)
 
     data class BlobRef(val blobId: String, val totalChunks: Int, val byteSize: Long)
-    data class BlobTicket(val status: String, val blobId: String?, val uploadId: String?, val totalChunks: Int)
 
     /** Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
      *  best-effort set of EXIF camera details (operator-blind — sealed with everything else). */
@@ -81,145 +80,150 @@ object Media {
     /** The per-scope dedup token for some content (matches what the server keys on — a blind dedup token). */
     fun dedupTokenFor(contentKey: ByteArray, content: ByteArray): String = enc.encodeToString(V1.dedupToken(contentKey, content))
 
-    /** Begin (or dedup) storing a blob. READY → already stored (attach blobId); UPLOADING → push the frames. */
-    fun startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Long, suiteId: String = "v1"): BlobTicket {
-        val body = JSONObject().put("dedupToken", dedupToken).put("totalChunks", totalChunks).put("byteSize", byteSize).put("suiteId", suiteId).toString()
-        val resp = send("$apiBase/api/scopes/$scopeId/blobs", session.sessionToken, "POST", body)
-        if (resp.statusCode() != 200) throw RuntimeException("start blob failed: ${resp.statusCode()}")
-        val j = JSONObject(resp.body())
-        return BlobTicket(j.getString("status"), j.optString("blobId", null), j.optString("uploadId", null), j.getInt("totalChunks"))
-    }
-
-    /** Seal one plaintext chunk into a frame and PUT it (idempotent — re-PUT is the basis of resume). */
-    fun putChunk(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String, index: Int, total: Int, contentKey: ByteArray, plain: ByteArray) {
-        val frame = V1.sealFrame(contentKey, index, total, plain, V1.randomBytes(12))
-        val body = JSONObject().put("frame", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(frame))).toString()
-        val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId/chunks/$index", session.sessionToken, "PUT", body)
-        if (resp.statusCode() != 204) throw RuntimeException("put chunk $index failed: ${resp.statusCode()}")
-    }
-
-    /** Which chunk indices have landed (drives resume). */
-    fun getProgress(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String): JSONObject {
-        val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId", session.sessionToken, "GET")
-        if (resp.statusCode() != 200) throw RuntimeException("upload progress failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
-
-    /** Finalize the upload once every chunk has landed; promotes the frames to a content blob. */
-    fun completeBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String): BlobRef {
-        val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId/complete", session.sessionToken, "POST")
-        if (resp.statusCode() != 200) throw RuntimeException("complete blob failed: ${resp.statusCode()}")
-        val j = JSONObject(resp.body())
-        return BlobRef(j.getString("blobId"), j.getInt("totalChunks"), j.getLong("byteSize"))
-    }
-
-    /**
-     * Upload arbitrary content as a deduplicated blob. Dedups first (skips the bytes entirely if the scope
-     * already holds them); otherwise opens an upload and pushes only the still-missing frames, so a retried
-     * call resumes a half-done upload rather than restarting it.
-     */
-    fun uploadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, bytes: ByteArray, chunkSize: Int = DEFAULT_CHUNK_SIZE): BlobRef {
-        val chunks = chunkBytes(bytes, chunkSize)
-        val ticket = startBlob(apiBase, session, scopeId, dedupTokenFor(contentKey, bytes), chunks.size, bytes.size.toLong())
-        if (ticket.status == "READY") return BlobRef(ticket.blobId!!, ticket.totalChunks, bytes.size.toLong())
-        val uploadId = ticket.uploadId!!
-        val progress = getProgress(apiBase, session, scopeId, uploadId)
-        val arr = progress.getJSONArray("receivedChunks")
-        val have = (0 until arr.length()).map { arr.getInt(it) }.toSet()
-        // Fast path: when the server offers presigned PUT URLs (S3 backend), seal each frame and PUT it DIRECTLY to
-        // the object store — no backend hop, no base64, no credentials on the client (ADR 0021). Any chunk without a
-        // URL (or the in-memory dev backend) falls back to the proxied chunk endpoint.
-        val presigned = HashMap<Int, String>()
-        if (progress.has("presignedPuts")) {
-            val pa = progress.getJSONArray("presignedPuts")
-            for (j in 0 until pa.length()) pa.getJSONObject(j).let { presigned[it.getInt("index")] = it.getString("url") }
-        }
-        for (i in chunks.indices) if (i !in have) {
-            val url = presigned[i]
-            if (url != null) putPresigned(url, V1.sealFrame(contentKey, i, chunks.size, chunks[i], V1.randomBytes(12)), i)
-            else putChunk(apiBase, session, scopeId, uploadId, i, chunks.size, contentKey, chunks[i])
-        }
-        return completeBlob(apiBase, session, scopeId, uploadId)
-    }
-
     private val rawClient = java.net.http.HttpClient.newHttpClient()
 
+    // Direct-to-store only (ADR 0021): every byte travels client↔object-store via short-lived presigned URLs;
+    // the backend handles only the control plane (batch start/finalize/presign). The store is blind (AEAD
+    // ciphertext), so a presigned URL discloses nothing. There is no proxied fallback — the store MUST presign.
+
+    /** One result of a batch-start: a dedup hit (READY), an open upload (UPLOADING) with per-chunk presigned PUT
+     *  URLs for the still-missing chunks, or a per-item ERROR. */
+    data class BatchStart(
+        val status: String, val blobId: String?, val uploadId: String?, val totalChunks: Int?,
+        val receivedChunks: List<Int>, val presignedPuts: Map<Int, String>, val errorCode: String?,
+    )
+
+    /** A blob's presigned GET URLs (direct-from-store download), keyed by chunk index. */
+    data class PresignedBlob(val blobId: String, val suiteId: String, val chunks: Map<Int, String>)
+
+    /** Build one batch-start descriptor; pass [uploadId] to resume an existing open upload. */
+    fun startItem(dedupToken: String, totalChunks: Int, byteSize: Long, uploadId: String? = null, suiteId: String = "v1"): JSONObject =
+        JSONObject().put("dedupToken", dedupToken).put("totalChunks", totalChunks).put("byteSize", byteSize).put("suiteId", suiteId)
+            .also { if (uploadId != null) it.put("uploadId", uploadId) }
+
+    /** ONE round-trip to dedup/open (and presign) many blobs. Per-item best-effort. */
+    fun batchStartBlobs(apiBase: String, session: Login.UnlockedSession, scopeId: String, items: List<JSONObject>): List<BatchStart> {
+        val body = JSONObject().put("items", JSONArray(items)).toString()
+        val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads-batch", session.sessionToken, "POST", body)
+        if (resp.statusCode() != 200) throw RuntimeException("batch start failed: ${resp.statusCode()}")
+        val arr = JSONObject(resp.body()).getJSONArray("results")
+        return (0 until arr.length()).map { parseBatchStart(arr.getJSONObject(it)) }
+    }
+
+    private fun parseBatchStart(j: JSONObject): BatchStart {
+        val received = j.optJSONArray("receivedChunks")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: emptyList()
+        val presigned = HashMap<Int, String>()
+        j.optJSONArray("presignedPuts")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { presigned[it.getInt("index")] = it.getString("url") } }
+        return BatchStart(j.getString("status"), j.optString("blobId", null), j.optString("uploadId", null), if (j.has("totalChunks")) j.getInt("totalChunks") else null, received, presigned, j.optString("errorCode", null))
+    }
+
+    /** ONE round-trip to finalize many items (complete each item's uploads + attach as media). Returns the
+     *  per-item result objects ({ok, media?, errorCode?}). */
+    fun batchFinalizeMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, items: List<JSONObject>): List<JSONObject> {
+        val body = JSONObject().put("items", JSONArray(items)).toString()
+        val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media-batch", session.sessionToken, "POST", body)
+        if (resp.statusCode() != 200) throw RuntimeException("batch finalize failed: ${resp.statusCode()}")
+        val arr = JSONObject(resp.body()).getJSONArray("results")
+        return (0 until arr.length()).map { arr.getJSONObject(it) }
+    }
+
+    /** ONE round-trip to presign GET URLs for many blobs (a whole gallery page); keyed by blobId. */
+    fun batchPresignGet(apiBase: String, session: Login.UnlockedSession, scopeId: String, blobIds: List<String>): Map<String, PresignedBlob> {
+        val body = JSONObject().put("blobIds", JSONArray(blobIds)).toString()
+        val resp = send("$apiBase/api/scopes/$scopeId/blob-downloads-batch", session.sessionToken, "POST", body)
+        if (resp.statusCode() != 200) throw RuntimeException("batch presign failed: ${resp.statusCode()}")
+        val arr = JSONObject(resp.body()).getJSONArray("results")
+        val out = HashMap<String, PresignedBlob>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val chunks = HashMap<Int, String>()
+            val ca = o.getJSONArray("chunks")
+            for (k in 0 until ca.length()) ca.getJSONObject(k).let { chunks[it.getInt("index")] = it.getString("url") }
+            out[o.getString("blobId")] = PresignedBlob(o.getString("blobId"), o.getString("suiteId"), chunks)
+        }
+        return out
+    }
+
     /** PUT a sealed frame's raw bytes straight to a presigned object-store URL (no auth header, no JSON wrapper). */
-    private fun putPresigned(url: String, frame: ByteArray, index: Int) {
+    internal fun putPresigned(url: String, frame: ByteArray, index: Int) {
         val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
             .PUT(java.net.http.HttpRequest.BodyPublishers.ofByteArray(frame)).build()
         val resp = rawClient.send(req, HttpResponse.BodyHandlers.discarding())
         if (resp.statusCode() !in 200..299) throw RuntimeException("presigned put chunk $index failed: ${resp.statusCode()}")
     }
 
-    /**
-     * Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext.
-     * Large (multi-frame) blobs download DIRECTLY from the object store via presigned GET when the S3 backend
-     * offers it (ADR 0021); small single-frame blobs (thumbnails/previews) stay on the cheap proxied path so
-     * the hot gallery download isn't penalised by an extra presign round-trip.
-     */
-    fun downloadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray {
-        if (ref.totalChunks > 1) {
-            downloadPresigned(apiBase, session, scopeId, contentKey, ref)?.let { return it }
-        }
-        val out = java.io.ByteArrayOutputStream() // accumulate into a growable buffer, not `out += frame` (O(n^2) copying)
+    /** Fetch one presigned blob directly from the store, open each frame (AAD checks position), reassemble.
+     *  Public so a gallery can presign a whole page in ONE round-trip then parallel-fetch each blob. */
+    fun fetchBlobFrames(contentKey: ByteArray, ref: BlobRef, presigned: PresignedBlob): ByteArray {
+        if (presigned.chunks.size != ref.totalChunks) throw RuntimeException("direct-to-store download unavailable for ${ref.blobId}")
+        val out = java.io.ByteArrayOutputStream() // growable buffer, not `out += frame` (O(n^2) copying)
         for (i in 0 until ref.totalChunks) {
-            val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/chunks/$i", session.sessionToken, "GET")
-            if (resp.statusCode() != 200) throw RuntimeException("get chunk $i failed: ${resp.statusCode()}")
-            val frame = dec.decode(JSONObject(resp.body()).getJSONObject("frame").getString("bytes"))
-            out.write(V1.openFrame(contentKey, i, ref.totalChunks, frame))
+            val url = presigned.chunks[i] ?: throw RuntimeException("missing presigned url for chunk $i")
+            val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).GET().build()
+            val r = rawClient.send(req, HttpResponse.BodyHandlers.ofByteArray())
+            if (r.statusCode() !in 200..299) throw RuntimeException("presigned get chunk $i failed: ${r.statusCode()}")
+            out.write(V1.openFrame(contentKey, i, ref.totalChunks, r.body()))
         }
         return out.toByteArray()
     }
 
-    /** Try a direct-from-store download via presigned GET URLs; null if the store can't presign every chunk. */
-    private fun downloadPresigned(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray? = runCatching {
-        val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/presigned-chunks", session.sessionToken, "GET")
-        if (resp.statusCode() != 200) return@runCatching null
-        val arr = JSONObject(resp.body()).getJSONArray("chunks")
-        if (arr.length() != ref.totalChunks) return@runCatching null
-        val urls = HashMap<Int, String>()
-        for (j in 0 until arr.length()) arr.getJSONObject(j).let { urls[it.getInt("index")] = it.getString("url") }
-        val out = java.io.ByteArrayOutputStream()
-        for (i in 0 until ref.totalChunks) {
-            val url = urls[i] ?: return@runCatching null
-            val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).GET().build()
-            val r = rawClient.send(req, HttpResponse.BodyHandlers.ofByteArray())
-            if (r.statusCode() !in 200..299) return@runCatching null
-            out.write(V1.openFrame(contentKey, i, ref.totalChunks, r.body()))
+    /** Download a finalized blob directly from the store (presign + sequential GET), open + concatenate frames. */
+    fun downloadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray {
+        val p = batchPresignGet(apiBase, session, scopeId, listOf(ref.blobId))[ref.blobId]
+            ?: throw RuntimeException("blob ${ref.blobId} not available")
+        return fetchBlobFrames(contentKey, ref, p)
+    }
+
+    /** Download many blobs for a gallery page: ONE batch-presign-get, then each blob fetched direct from the store. */
+    fun downloadBlobsBatch(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, refs: List<BlobRef>): Map<String, ByteArray> {
+        val presigned = batchPresignGet(apiBase, session, scopeId, refs.map { it.blobId })
+        val out = HashMap<String, ByteArray>()
+        for (ref in refs) {
+            val p = presigned[ref.blobId] ?: throw RuntimeException("blob ${ref.blobId} not available")
+            out[ref.blobId] = fetchBlobFrames(contentKey, ref, p)
         }
-        out.toByteArray()
-    }.getOrNull()
+        return out
+    }
 
     // ---- media layer (attach blobs to a Memory) ---------------------------------------------------------
 
-    /** Attach a stored blob (+ derivatives) to a Memory/Chapter node. The metadata is pre-sealed by the caller. */
-    fun createMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, originalBlobId: String, sealedMeta: JSONObject, mimeType: String, derivatives: List<Pair<String, String>> = emptyList()): JSONObject {
-        val derivJson = JSONArray().apply { derivatives.forEach { put(JSONObject().put("kind", it.first).put("blobId", it.second)) } }
-        val json = JSONObject().put("originalBlobId", originalBlobId).put("sealedMeta", sealedMeta).put("mimeType", mimeType).put("derivatives", derivJson).toString()
-        val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "POST", json)
-        if (resp.statusCode() != 200) throw RuntimeException("create media failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
-
     /**
-     * The full client flow: upload the original bytes (chunked + deduped transparently) and any
-     * client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
-     * typed derivative — no special API.
+     * The full client flow for ONE photo, batched + direct-to-store: the original and any client-generated
+     * thumbnail/preview are all blobs uploaded the SAME way. ONE batch-start dedups/opens every blob and
+     * presigns its missing chunks; the client seals each frame and PUTs it DIRECTLY to the store; ONE
+     * batch-finalize completes the uploads + attaches the medium. Returns the created media item.
      */
     fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, preview: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, meta: MediaMeta? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
-        val original = uploadBlob(apiBase, session, scopeId, contentKey, bytes, chunkSize)
-        val derivatives = mutableListOf<Pair<String, String>>()
-        if (thumb != null) {
-            val t = uploadBlob(apiBase, session, scopeId, contentKey, thumb, chunkSize)
-            derivatives.add("THUMBNAIL" to t.blobId)
+        data class Plan(val kind: String, val chunks: List<ByteArray>, val bytes: ByteArray)
+        val plan = mutableListOf(Plan("original", chunkBytes(bytes, chunkSize), bytes))
+        if (thumb != null) plan.add(Plan("THUMBNAIL", chunkBytes(thumb, chunkSize), thumb))
+        if (preview != null) plan.add(Plan("PREVIEW", chunkBytes(preview, chunkSize), preview))
+
+        // 1. ONE batch-start: dedup or open each blob, presigning every missing chunk.
+        val starts = batchStartBlobs(apiBase, session, scopeId, plan.map { startItem(dedupTokenFor(contentKey, it.bytes), it.chunks.size, it.bytes.size.toLong()) })
+
+        // 2. Seal + PUT every still-missing frame DIRECTLY to the store.
+        for ((bi, s) in starts.withIndex()) {
+            if (s.status == "ERROR") throw RuntimeException("upload start failed (${plan[bi].kind}): ${s.errorCode}")
+            if (s.status != "UPLOADING") continue
+            val have = s.receivedChunks.toSet()
+            val chunks = plan[bi].chunks
+            for (i in chunks.indices) if (i !in have) {
+                val url = s.presignedPuts[i] ?: throw RuntimeException("direct-to-store unavailable: no upload URL for chunk $i")
+                putPresigned(url, V1.sealFrame(contentKey, i, chunks.size, chunks[i], V1.randomBytes(12)), i)
+            }
         }
-        if (preview != null) {
-            val p = uploadBlob(apiBase, session, scopeId, contentKey, preview, chunkSize)
-            derivatives.add("PREVIEW" to p.blobId)
-        }
+
+        // 3. ONE batch-finalize: complete each blob's upload + attach the medium with its derivatives.
+        fun refFor(s: BatchStart): JSONObject = if (s.status == "READY") JSONObject().put("blobId", s.blobId) else JSONObject().put("uploadId", s.uploadId)
+        val derivJson = JSONArray()
+        for ((i, p) in plan.withIndex()) if (i > 0) derivJson.put(JSONObject().put("kind", p.kind).put("blob", refFor(starts[i])))
         val sealedMeta = sealMediaMeta(contentKey, meta ?: MediaMeta(takenAt, lat, lng))
-        return createMedia(apiBase, session, scopeId, nodeId, original.blobId, sealedMeta, mimeType, derivatives)
+        val item = JSONObject().put("original", refFor(starts[0])).put("derivatives", derivJson).put("sealedMeta", sealedMeta).put("mimeType", mimeType)
+        val results = batchFinalizeMedia(apiBase, session, scopeId, nodeId, listOf(item))
+        val r = results.firstOrNull() ?: throw RuntimeException("media finalize returned no result")
+        if (!r.optBoolean("ok", false)) throw RuntimeException("media finalize failed: ${r.optString("errorCode", "unknown")}")
+        return r.getJSONObject("media")
     }
 
     /**

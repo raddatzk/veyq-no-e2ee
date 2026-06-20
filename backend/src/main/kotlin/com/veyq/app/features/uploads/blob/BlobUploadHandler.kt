@@ -1,13 +1,17 @@
 package com.veyq.app.features.uploads.blob
 
-import com.veyq.app.generated.model.Blob as ApiBlob
+import com.veyq.app.generated.model.BatchBlobStart
+import com.veyq.app.generated.model.BatchPresignGetItem
+import com.veyq.app.generated.model.BatchPresignGetRequest
+import com.veyq.app.generated.model.BatchPresignGetResponse
+import com.veyq.app.generated.model.BatchStartBlobsRequest
+import com.veyq.app.generated.model.BatchStartBlobsResponse
+import com.veyq.app.generated.model.BatchStartItem
 import com.veyq.app.generated.model.BlobTicket
 import com.veyq.app.generated.model.BlobUploadProgress
-import com.veyq.app.generated.model.ChunkResponse
 import com.veyq.app.generated.model.CompleteBlobResponse
 import com.veyq.app.generated.model.PresignedChunks
 import com.veyq.app.generated.model.PresignedPut
-import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.Blob
@@ -29,7 +33,6 @@ import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.transaction.Transactional
 import com.veyq.app.shared.config.UploadsConfig
 import java.time.Instant
-import java.util.Base64
 import java.util.UUID
 
 /**
@@ -60,9 +63,6 @@ class BlobUploadHandler(
     private val maxShareOpenSessions = cfg.maxShareOpenSessions()
     private val maxShareBytes = cfg.maxShareBytes()
     private val presignTtl = cfg.presignTtlSeconds()
-    private val enc = Base64.getUrlEncoder().withoutPadding()
-    private val dec = Base64.getUrlDecoder()
-    private val maxEncodedFrameChars = ((maxFrameBytes + 2) / 3) * 4
 
     @Transactional
     fun startBlob(authz: String?, scopeId: String, req: StartBlobRequest): BlobTicket {
@@ -107,41 +107,6 @@ class BlobUploadHandler(
     }
 
     @Transactional
-    fun putBlobChunk(authz: String?, scopeId: String, uploadId: String, index: Int, req: PutChunkRequest) {
-        requireKeyHolder(scopeId, authz)
-        putBlobChunkAs(scopeId, uploadId, index, req)
-    }
-
-    @Transactional
-    fun putBlobChunkAs(scopeId: String, uploadId: String, index: Int, req: PutChunkRequest, expectedOwner: String? = null) {
-        val u = requireUploadInScope(scopeId, uploadId, lock = true, expectedOwner = expectedOwner)
-        if (u.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
-        if (index < 0 || index >= u.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
-        if (!suites.isKnown(req.frame.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
-        // all frames of one upload seal the same content stream → one suite; reject a mid-upload suite switch.
-        if (u.suiteId != null && u.suiteId != req.frame.suiteId) throw ApiException(400, "SUITE_MISMATCH", "All chunks must share one crypto suite")
-        if (req.frame.bytes.length > maxEncodedFrameChars) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
-        val frame = dec.decode(req.frame.bytes)
-        if (frame.size > maxFrameBytes) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
-        val existing = chunks.findByUpload(uploadId, index)
-        // O(1) budget check off the running counter (re-PUT of a chunk swaps its old size for the new one).
-        val newStaged = u.stagedBytes - (existing?.byteSize ?: 0) + frame.size.toLong()
-        ensureBudget(u, newStaged)
-        val key = "$uploadId/$index"
-        store.put(key, frame) // idempotent overwrite — re-PUT on resume is harmless
-        if (existing == null) {
-            chunks.persist(BlobChunk().apply {
-                id = UUID.randomUUID().toString(); this.uploadId = uploadId; chunkIndex = index
-                objectKey = key; byteSize = frame.size.toLong(); createdAt = Instant.now()
-            })
-        } else {
-            existing.byteSize = frame.size.toLong()
-        }
-        u.stagedBytes = newStaged
-        u.suiteId = req.frame.suiteId
-    }
-
-    @Transactional
     fun getBlobUpload(authz: String?, scopeId: String, uploadId: String): BlobUploadProgress {
         requireKeyHolder(scopeId, authz)
         return getBlobUploadAs(scopeId, uploadId)
@@ -150,27 +115,96 @@ class BlobUploadHandler(
     @Transactional
     fun getBlobUploadAs(scopeId: String, uploadId: String, expectedOwner: String? = null): BlobUploadProgress {
         val u = requireUploadInScope(scopeId, uploadId, expectedOwner = expectedOwner)
-        val have = chunks.listByUploadId(uploadId).map { it.chunkIndex }.toMutableSet()
-        // Presigned (direct-to-store) chunks have NO manifest row until complete — stat the store so resume
-        // counts chunks already PUT directly to S3 as received (and we only presign the truly-missing ones).
-        if (store.supportsPresign() && u.status == UploadStatus.OPEN.name) {
-            for (i in 0 until u.totalChunks) if (i !in have && store.stat("$uploadId/$i") != null) have.add(i)
-        }
-        // Direct-to-store fast path: a presigned PUT URL per still-missing chunk (ADR 0021). Empty when the
-        // store can't presign (in-memory dev backend) → the client falls back to the proxied chunk endpoint.
-        val presigned = if (u.status == UploadStatus.OPEN.name) {
-            (0 until u.totalChunks).filter { it !in have }
-                .mapNotNull { i -> store.presignPut("$uploadId/$i", presignTtl)?.let { PresignedPut(index = i, url = it) } }
-        } else {
-            emptyList()
-        }
+        val (have, presigned) = progressFor(u, probeStore = true)
         return BlobUploadProgress(
             uploadId = u.id, totalChunks = u.totalChunks,
-            receivedChunks = have.toList().sorted(),
+            receivedChunks = have,
             status = BlobUploadProgress.Status.valueOf(u.status),
             presignedPuts = presigned,
         )
     }
+
+    /**
+     * Received-chunk set + a presigned PUT URL per still-missing chunk for an OPEN upload (ADR 0021). When
+     * [probeStore] (resume), the store is stat'd so chunks already PUT directly to it count as received and are
+     * not re-presigned; a fresh start skips that (nothing is there yet). Empty `presigned` when the store can't
+     * presign — direct-to-store is then unavailable (the in-memory dev backend has no upload path at all).
+     */
+    private fun progressFor(u: BlobUpload, probeStore: Boolean): Pair<List<Int>, List<PresignedPut>> {
+        val have = chunks.listByUploadId(u.id).map { it.chunkIndex }.toMutableSet()
+        if (probeStore && store.supportsPresign() && u.status == UploadStatus.OPEN.name) {
+            for (i in 0 until u.totalChunks) if (i !in have && store.stat("${u.id}/$i") != null) have.add(i)
+        }
+        val presigned = if (u.status == UploadStatus.OPEN.name) {
+            (0 until u.totalChunks).filter { it !in have }
+                .mapNotNull { i -> store.presignPut("${u.id}/$i", presignTtl)?.let { PresignedPut(index = i, url = it) } }
+        } else {
+            emptyList()
+        }
+        return have.toList().sorted() to presigned
+    }
+
+    // ---- Batched, direct-to-store transport (ADR 0021): one round-trip to start/resume + presign many blobs. ----
+
+    fun batchStartBlobs(authz: String?, scopeId: String, req: BatchStartBlobsRequest): BatchStartBlobsResponse {
+        val writerId = QuarkusTransaction.requiringNew().call { requireKeyHolder(scopeId, authz) }
+        return batchStartBlobsAs(scopeId, writerId, expectedOwner = null, req)
+    }
+
+    /** Start/resume each descriptor for an already-authorized writer. Per-item best-effort: each runs in its
+     *  own transaction so a failing descriptor yields an ERROR result without rolling back the others. */
+    fun batchStartBlobsAs(scopeId: String, writerId: String, expectedOwner: String?, req: BatchStartBlobsRequest): BatchStartBlobsResponse =
+        BatchStartBlobsResponse(
+            results = req.items.map { item ->
+                try {
+                    QuarkusTransaction.requiringNew().call { startOneInBatch(scopeId, writerId, expectedOwner, item) }
+                } catch (e: ApiException) {
+                    BatchBlobStart(status = BatchBlobStart.Status.ERROR, errorCode = e.code)
+                }
+            },
+        )
+
+    private fun startOneInBatch(scopeId: String, writerId: String, expectedOwner: String?, item: BatchStartItem): BatchBlobStart {
+        item.uploadId?.takeIf { it.isNotBlank() }?.let { resumeId ->
+            val u = requireUploadInScope(scopeId, resumeId, expectedOwner = expectedOwner)
+            if (u.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
+            return uploadingResult(u, probeStore = true)
+        }
+        val ticket = startBlobAs(scopeId, writerId, StartBlobRequest(dedupToken = item.dedupToken, totalChunks = item.totalChunks, byteSize = item.byteSize, suiteId = item.suiteId))
+        return if (ticket.status == BlobTicket.Status.READY) {
+            BatchBlobStart(status = BatchBlobStart.Status.READY, blobId = ticket.blobId, totalChunks = ticket.totalChunks)
+        } else {
+            uploadingResult(uploads.findById(ticket.uploadId!!)!!, probeStore = false)
+        }
+    }
+
+    private fun uploadingResult(u: BlobUpload, probeStore: Boolean): BatchBlobStart {
+        val (have, presigned) = progressFor(u, probeStore)
+        return BatchBlobStart(
+            status = BatchBlobStart.Status.UPLOADING, uploadId = u.id, totalChunks = u.totalChunks,
+            receivedChunks = have, presignedPuts = presigned,
+        )
+    }
+
+    fun batchPresignGet(authz: String?, scopeId: String, req: BatchPresignGetRequest): BatchPresignGetResponse {
+        QuarkusTransaction.requiringNew().call { requireKeyHolder(scopeId, authz) }
+        return batchPresignGetAs(scopeId, req.blobIds)
+    }
+
+    /** Presigned GET URLs for many in-scope blobs. A blob not in this scope (or missing) is simply omitted. */
+    fun batchPresignGetAs(scopeId: String, blobIds: List<String>): BatchPresignGetResponse =
+        BatchPresignGetResponse(
+            results = blobIds.distinct().mapNotNull { blobId ->
+                try {
+                    QuarkusTransaction.requiringNew().call {
+                        val pc = getBlobPresignedChunksAs(scopeId, blobId)
+                        BatchPresignGetItem(blobId = blobId, suiteId = pc.suiteId, chunks = pc.chunks)
+                    }
+                } catch (_: ApiException) {
+                    null
+                }
+            },
+        )
 
     @Transactional
     fun completeBlobUpload(authz: String?, scopeId: String, uploadId: String): CompleteBlobResponse {
@@ -211,26 +245,11 @@ class BlobUploadHandler(
         return CompleteBlobResponse(blobId = blob.id, totalChunks = blob.totalChunks, byteSize = blob.byteSize)
     }
 
-    fun getBlobChunk(authz: String?, scopeId: String, blobId: String, index: Int): ChunkResponse {
-        // Resolve the chunk's metadata (auth + ACL + object key + suite) in a short transaction, then read the
-        // bytes from the store OUTSIDE it — so the DB connection isn't held across blob-store IO (which becomes
-        // a network round-trip once the store is remote). This is the hot download path (every gallery tile).
-        val (objectKey, suiteId) = QuarkusTransaction.requiringNew().call {
-            requireKeyHolder(scopeId, authz)
-            val blob = blobs.findById(blobId) ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found")
-            if (blob.scopeId != scopeId) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found in this scope")
-            val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
-            chunk.objectKey to blob.suiteId
-        }
-        val frame = store.get(objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
-    }
-
     /**
-     * Presigned GET URLs for every frame of a finalized blob — the direct-from-store download fast path (ADR
-     * 0021). The client GETs each raw sealed frame straight from S3 and opens it with openFrame, skipping the
-     * proxied chunk endpoint. Empty `chunks` when the store can't presign (in-memory dev backend) → the client
-     * falls back to the proxied path. Frames are AEAD ciphertext, so a presigned URL discloses no content.
+     * Presigned GET URLs for every frame of a finalized blob — the direct-from-store download path (ADR 0021).
+     * The client GETs each raw sealed frame straight from the store and opens it with openFrame. Empty `chunks`
+     * when the store can't presign (in-memory dev backend). Frames are AEAD ciphertext, so a presigned URL
+     * discloses no content.
      */
     fun getBlobPresignedChunks(authz: String?, scopeId: String, blobId: String): PresignedChunks {
         requireKeyHolder(scopeId, authz)

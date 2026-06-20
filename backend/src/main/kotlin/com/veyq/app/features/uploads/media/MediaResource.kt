@@ -1,6 +1,8 @@
 package com.veyq.app.features.uploads.media
 
 import com.veyq.app.generated.api.MediaApi
+import com.veyq.app.generated.api.MediaBatchApi
+import com.veyq.app.generated.model.BatchFinalizeMediaRequest
 import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.UpdateMediaRequest
 import jakarta.enterprise.context.ApplicationScoped
@@ -23,4 +25,11 @@ class MediaResource(private val handler: MediaHandler) : MediaApi {
         handler.deleteMedia(authorization, scopeId, nodeId, mediaId)
         return Response.noContent().build()
     }
+}
+
+/** Batched finalize (complete uploads + attach media in one round-trip); its own tag/class per the codegen path rule. */
+@ApplicationScoped
+class MediaBatchResource(private val handler: MediaHandler) : MediaBatchApi {
+    override fun batchFinalizeMedia(authorization: String, scopeId: String, nodeId: String, batchFinalizeMediaRequest: BatchFinalizeMediaRequest): Response =
+        Response.ok(handler.batchFinalizeMedia(authorization, scopeId, nodeId, batchFinalizeMediaRequest)).build()
 }

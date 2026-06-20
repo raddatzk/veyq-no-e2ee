@@ -92,6 +92,13 @@ services:
       # secrets manager; they're never persisted to the DB, never logged, and masked in any config dump.
       BLOB_STORE_BACKEND: ${BLOB_STORE_BACKEND:-s3}
       BLOB_STORE_S3_ENDPOINT: ${BLOB_STORE_S3_ENDPOINT:-http://veyq-minio:9000}
+      # Transport is direct-to-store only (ADR 0021): clients PUT/GET frames straight to the object store via
+      # presigned URLs (the backend never proxies bytes). So the store MUST be reachable BY CLIENTS, and
+      # presigned URLs are SIGNED for this PUBLIC endpoint. For the bundled MinIO that's your public origin
+      # routed to MinIO by the Traefik PathPrefix rule below (e.g. https://memories.example.com); the internal
+      # BLOB_STORE_S3_ENDPOINT stays the private compose hostname. For an EXTERNAL S3 leave this empty (the
+      # endpoint is already public) and configure that bucket's CORS for your web origin.
+      BLOB_STORE_S3_PUBLIC_ENDPOINT: ${BLOB_STORE_S3_PUBLIC_ENDPOINT:-}
       BLOB_STORE_S3_BUCKET: ${BLOB_STORE_S3_BUCKET:-veyq-blobs}
       BLOB_STORE_S3_REGION: ${BLOB_STORE_S3_REGION:-us-east-1}
       BLOB_STORE_S3_ACCESS_KEY: ${BLOB_STORE_S3_ACCESS_KEY:?Set BLOB_STORE_S3_ACCESS_KEY}
@@ -230,6 +237,15 @@ services:
   # backend at it with BLOB_STORE_BACKEND=s3 + BLOB_STORE_S3_ENDPOINT=http://veyq-minio:9000 and the same
   # access/secret keys. It stores only AEAD ciphertext. (An external managed S3 needs no container — just set
   # the backend's BLOB_STORE_S3_* env.) The bucket is auto-created by the backend on first use.
+  #
+  # Direct-to-store (ADR 0021): clients transfer bytes straight to MinIO via presigned URLs, so MinIO must be
+  # reachable BY CLIENTS. The Traefik labels below route a PUBLIC PATH (the bucket name, path-style S3) to MinIO
+  # WITHOUT stripping the prefix and preserving the Host header — SigV4 signs host+path+query, so the public
+  # path must arrive at MinIO byte-identical to what was signed. Because the store is served under the SAME
+  # origin as the web app, the browser fetch is same-origin → NO CORS needed. Set:
+  #   MINIO_TRAEFIK_RULE=Host(`memories.example.com`) && PathPrefix(`/veyq-blobs`)   # host = your app host; path = the bucket
+  #   BLOB_STORE_S3_PUBLIC_ENDPOINT=https://memories.example.com                      # what presigned URLs are signed for
+  # (Leave MINIO_TRAEFIK_RULE empty when using an external S3 — no local routing then.)
   veyq-minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: veyq-minio
@@ -242,6 +258,12 @@ services:
     environment:
       MINIO_ROOT_USER: ${BLOB_STORE_S3_ACCESS_KEY:?Set BLOB_STORE_S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${BLOB_STORE_S3_SECRET_KEY:?Set BLOB_STORE_S3_SECRET_KEY}
+      # MinIO's public address (so presigned-URL validation lines up behind the reverse proxy). Same value as
+      # the backend's BLOB_STORE_S3_PUBLIC_ENDPOINT.
+      MINIO_SERVER_URL: ${BLOB_STORE_S3_PUBLIC_ENDPOINT:-}
+      # CORS is only needed when the store is on a DIFFERENT origin than the web app (e.g. a dedicated store
+      # subdomain). With the same-origin path route above it can stay empty. Comma-separated origins, or `*`.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-}
     volumes:
       - veyq-minio:/data
     expose:
@@ -252,6 +274,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    labels:
+      # Path-route the bucket to MinIO ONLY when the operator sets MINIO_TRAEFIK_RULE (empty ⇒ router off, e.g.
+      # external S3). No stripPrefix; preserve the Host header; higher priority than the app router so the bucket
+      # path wins over the app's catch-all Host rule.
+      - traefik.enable=true
+      - traefik.http.routers.veyq-minio.rule=${MINIO_TRAEFIK_RULE:-}
+      - traefik.http.routers.veyq-minio.entrypoints=websecure
+      - traefik.http.routers.veyq-minio.tls.certresolver=letsencrypt
+      - traefik.http.routers.veyq-minio.priority=100
+      - traefik.http.services.veyq-minio.loadbalancer.server.port=9000
+      - traefik.http.services.veyq-minio.loadbalancer.passhostheader=true
 
 volumes:
   veyq-db:

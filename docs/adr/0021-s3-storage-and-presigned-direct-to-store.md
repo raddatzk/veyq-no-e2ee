@@ -102,3 +102,50 @@ operator-blind model.
   store's rightful owner (ADR 0022): self-hosted = the operator's own S3; veyq.cloud = the SaaS provider's
   bucket. End users do not bring their own S3, so there is no per-tenant credential the backend must be blind
   to. Content is E2EE regardless — holding the S3 creds never lets the backend decrypt media (no content key).
+
+## Update — direct-to-store only + batched transport
+
+The presigned fast path described above became the **only** transport: the proxied per-chunk endpoints
+(`putBlobChunk`/`getBlobChunk` and their public-share mirrors) and the client fallbacks were **removed**. The
+backend now handles only the control plane; every byte travels client↔store via presigned URLs. Two reasons it
+is safe to drop the fallback: the store is **blind** (only AEAD ciphertext, per-object short-TTL URLs), so
+exposing it to clients leaks nothing; and this is **greenfield** (no installed base), so the removal breaks no
+deployed client.
+
+**Batched control plane.** To avoid `3N` round-trips for `N` photos (original + preview + thumbnail each), the
+per-blob endpoints were replaced by three batch endpoints (authed + public-share mirrors):
+
+- `…/blob-uploads-batch` — dedup/open + presign **many** blobs in one call (pass an `uploadId` to resume).
+- `…/nodes/{nodeId}/media-batch` — complete many uploads + attach media in one call (per-item best-effort).
+- `…/blob-downloads-batch` — presign GET URLs for a whole gallery page in one call.
+
+A photo upload is then `1 batch-start → parallel direct PUTs → 1 batch-finalize`; a gallery page is
+`1 batch-presign-get → parallel direct GETs`.
+
+**Public endpoint.** Presigned URLs are signed for `veyq.blob-store.s3-public-endpoint` (the endpoint **clients**
+reach), which may differ from the internal `s3-endpoint` (e.g. a bundled MinIO on a private compose hostname).
+`S3BlobStore` keeps a second MinIO client purely for URL signing (presigning is local HMAC; it never connects).
+Empty ⇒ sign against `s3-endpoint` (external S3, or any publicly-reachable store).
+
+**CORS is browser-only.** Native apps PUT/GET presigned URLs directly and are never subject to CORS — it is a
+**web-only** concern, configured **on the store** (veyq cannot inject CORS headers into a direct fetch):
+
+| Store topology | CORS | Where configured |
+|---|---|---|
+| Bundled MinIO via Traefik **path route** (same origin as the web app) | **none needed** (same-origin) | — |
+| Bundled/self MinIO on a **separate** host/subdomain | required | `MINIO_API_CORS_ALLOW_ORIGIN` (server env) |
+| **AWS S3** | required | **bucket** CORS config (`PutBucketCors`) |
+| **Azure Blob** | required | **storage-account** CORS (blob-service properties) |
+
+The CORS rule must allow the web origin with methods `PUT`+`GET` and expose `ETag`. For the bundled MinIO behind
+Traefik, route the **bucket path** to MinIO **without** stripping the prefix and with the Host header preserved —
+SigV4 signs host+path+query, so the public path must arrive at MinIO byte-identical to what was signed.
+
+**Preflight (loud failure).** With no proxied fallback, a misconfigured store would mean silently-broken media.
+`BlobStorePreflight` probes at startup: it presigns a throwaway key and issues a CORS-style `OPTIONS` against the
+**public** endpoint, logging a clear, actionable warning if the public route is unreachable or returns no
+`Access-Control-Allow-Origin` for the web origin. `/api/setup` also advertises `directTransport: ok|unavailable`.
+The probe is advisory (never blocks startup — the backend can't always hairpin to its own public host).
+
+**Dev/test.** The in-memory backend cannot presign, so it no longer has any media-transport path; transport is
+exercised by opt-in e2e tests against a real MinIO (`VEYQ_S3_E2E=1`), and local dev runs the bundled MinIO.

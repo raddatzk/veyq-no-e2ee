@@ -4,9 +4,11 @@ import com.veyq.app.generated.api.MemoryShareApi
 import com.veyq.app.generated.api.PublicShareContributeApi
 import com.veyq.app.generated.api.PublicShareMediaApi
 import com.veyq.app.generated.api.PublicShareTreeApi
+import com.veyq.app.generated.model.BatchFinalizeMediaRequest
+import com.veyq.app.generated.model.BatchPresignGetRequest
+import com.veyq.app.generated.model.BatchStartBlobsRequest
 import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.CreateShareRequest
-import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
@@ -50,21 +52,23 @@ class PublicShareContributeResource(private val handler: PublicShareContributeHa
     override fun getShareUpload(shareId: String, uploadId: String, xVeyqShareUploadToken: String?): Response =
         Response.ok(handler.getShareUpload(shareId, uploadId, xVeyqShareUploadToken)).build()
 
-    override fun putShareChunk(shareId: String, uploadId: String, index: Int, putChunkRequest: PutChunkRequest, xVeyqShareUploadToken: String?): Response {
-        handler.putShareChunk(shareId, uploadId, index, xVeyqShareUploadToken, putChunkRequest)
-        return Response.noContent().build()
-    }
-
     override fun completeShareBlob(shareId: String, uploadId: String, xVeyqShareUploadToken: String?): Response =
         Response.ok(handler.completeShareBlob(shareId, uploadId, xVeyqShareUploadToken)).build()
 
     override fun createShareMedia(shareId: String, nodeId: String, createMediaRequest: CreateMediaRequest, xVeyqShareUploadToken: String?): Response =
         Response.ok(handler.createShareMedia(shareId, nodeId, xVeyqShareUploadToken, createMediaRequest)).build()
+
+    override fun batchStartShareBlobs(shareId: String, batchStartBlobsRequest: BatchStartBlobsRequest, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.batchStartShareBlobs(shareId, xVeyqShareUploadToken, batchStartBlobsRequest)).build()
+
+    override fun batchFinalizeShareMedia(shareId: String, nodeId: String, batchFinalizeMediaRequest: BatchFinalizeMediaRequest, xVeyqShareUploadToken: String?): Response =
+        Response.ok(handler.batchFinalizeShareMedia(shareId, nodeId, xVeyqShareUploadToken, batchFinalizeMediaRequest)).build()
 }
 
 /** Guest-side share media + blob frames (no auth). */
 @ApplicationScoped
 class PublicShareMediaResource(private val handler: PublicShareMediaHandler) : PublicShareMediaApi {
     override fun listShareMedia(shareId: String, nodeId: String): Response = Response.ok(handler.listShareMedia(shareId, nodeId)).build()
-    override fun getShareChunk(shareId: String, blobId: String, index: Int): Response = Response.ok(handler.getShareChunk(shareId, blobId, index)).build()
+    override fun batchPresignShareGet(shareId: String, batchPresignGetRequest: BatchPresignGetRequest): Response =
+        Response.ok(handler.batchPresignShareGet(shareId, batchPresignGetRequest)).build()
 }

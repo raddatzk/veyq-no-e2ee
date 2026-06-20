@@ -1,21 +1,18 @@
 package com.veyq.app.features.memory.share
 
-import com.veyq.app.generated.model.Blob as ApiBlob
-import com.veyq.app.generated.model.ChunkResponse
+import com.veyq.app.features.uploads.blob.BlobUploadHandler
+import com.veyq.app.generated.model.BatchPresignGetItem
+import com.veyq.app.generated.model.BatchPresignGetRequest
+import com.veyq.app.generated.model.BatchPresignGetResponse
 import com.veyq.app.generated.model.MediaList
 import com.veyq.app.platform.error.ApiException
-import com.veyq.app.shared.content.BlobChunkRepository
-import com.veyq.app.shared.content.BlobRepository
-import com.veyq.app.shared.content.Media
 import com.veyq.app.shared.content.MediaDerivativeRepository
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ShareRepository
-import com.veyq.app.shared.storage.BlobStore
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import java.util.Base64
 
 /**
  * uc.memory.share — guest media (unauthenticated). Serves a shared node's media metadata and blob frames
@@ -28,12 +25,9 @@ class PublicShareMediaHandler(
     private val nodes: NodeRepository,
     private val media: MediaRepository,
     private val derivatives: MediaDerivativeRepository,
-    private val blobs: BlobRepository,
-    private val chunks: BlobChunkRepository,
-    private val store: BlobStore,
     private val mapper: com.veyq.app.shared.content.MediaApiMapper,
+    private val blobUploads: BlobUploadHandler,
 ) {
-    private val enc = Base64.getUrlEncoder().withoutPadding()
 
     private fun shareOr404(shareId: String): com.veyq.app.shared.content.Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
@@ -50,20 +44,29 @@ class PublicShareMediaHandler(
         return MediaList(media = mapper.toApiBatch(media.listByNodeId(nodeId)))
     }
 
-    fun getShareChunk(shareId: String, blobId: String, index: Int): ChunkResponse {
-        // Resolve the chunk's metadata (share ACL + object key + suite) in a short transaction, then read the
-        // bytes from the store OUTSIDE it — the DB connection isn't held across blob-store IO (the hot guest
-        // download path).
-        val (objectKey, suiteId) = QuarkusTransaction.requiringNew().call {
-            val share = shareOr404(shareId)
-            if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
-            if (!blobBacksSubtreeMedia(share, blobId)) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
-            val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
-            val suite = blobs.findById(blobId)?.suiteId ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
-            chunk.objectKey to suite
+    /**
+     * Batched presigned GET URLs for many shared blobs (direct-from-store download, ADR 0021) — the guest
+     * gallery's fast path. Each blob is gated to the share's subtree (same ACL as getShareChunk); a blob the
+     * guest may not read (or that can't be presigned) is simply omitted from the results.
+     */
+    fun batchPresignShareGet(shareId: String, req: BatchPresignGetRequest): BatchPresignGetResponse {
+        val share = QuarkusTransaction.requiringNew().call {
+            val s = shareOr404(shareId)
+            if (!ShareHandler.canRead(s.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
+            s
         }
-        val frame = store.get(objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
+        val results = req.blobIds.distinct().mapNotNull { blobId ->
+            try {
+                QuarkusTransaction.requiringNew().call {
+                    if (!blobBacksSubtreeMedia(share, blobId)) return@call null
+                    val pc = blobUploads.getBlobPresignedChunksAs(share.scopeId, blobId)
+                    BatchPresignGetItem(blobId = blobId, suiteId = pc.suiteId, chunks = pc.chunks)
+                }
+            } catch (_: ApiException) {
+                null
+            }
+        }
+        return BatchPresignGetResponse(results = results)
     }
 
     private class AllowedBlobs(val ids: Set<String>, val expiresAtNanos: Long)

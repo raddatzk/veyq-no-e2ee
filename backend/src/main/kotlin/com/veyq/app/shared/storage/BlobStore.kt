@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
  * ephemeral in-process backend for dev/test only (never a deployment). Chosen by veyq.blob-store.backend.
  */
 interface BlobStore {
-    fun put(key: String, bytes: ByteArray)
+    fun put(key: String, bytes: ByteArray, contentType: String? = null)
     fun get(key: String): ByteArray?
     fun delete(key: String)
 
@@ -64,14 +64,22 @@ class BlobStoreProducer(private val config: BlobStoreConfig) {
  */
 class S3BlobStore(config: BlobStoreConfig) : BlobStore {
     private val bucket = config.s3Bucket()
-    private val client: MinioClient = MinioClient.builder()
-        .endpoint(config.s3Endpoint().orElseThrow { IllegalStateException("veyq.blob-store.s3-endpoint is required when backend=s3") })
-        .credentials(
-            config.s3AccessKey().orElseThrow { IllegalStateException("veyq.blob-store.s3-access-key is required when backend=s3") },
-            config.s3SecretKey().orElseThrow { IllegalStateException("veyq.blob-store.s3-secret-key is required when backend=s3") },
-        )
-        .region(config.s3Region())
-        .build()
+    private val endpoint = config.s3Endpoint().orElseThrow { IllegalStateException("veyq.blob-store.s3-endpoint is required when backend=s3") }
+    private val accessKey = config.s3AccessKey().orElseThrow { IllegalStateException("veyq.blob-store.s3-access-key is required when backend=s3") }
+    private val secretKey = config.s3SecretKey().orElseThrow { IllegalStateException("veyq.blob-store.s3-secret-key is required when backend=s3") }
+    private val region = config.s3Region()
+
+    private fun clientFor(ep: String): MinioClient =
+        MinioClient.builder().endpoint(ep).credentials(accessKey, secretKey).region(region).build()
+
+    // Backend ↔ store IO (put/get/stat/delete) uses the internal endpoint (a private/compose hostname is fine).
+    private val client: MinioClient = clientFor(endpoint)
+    // Presigned URLs are SIGNED for the public endpoint the CLIENT can reach (ADR 0021) — which may differ from
+    // the internal one (bundled MinIO behind a reverse proxy). Presigning is local HMAC, so this client never
+    // connects. Defaults to the internal client when no separate public endpoint is configured.
+    private val presignClient: MinioClient =
+        config.s3PublicEndpoint().map { it.trim() }.filter { it.isNotEmpty() && it != endpoint }
+            .map { clientFor(it) }.orElse(client)
 
     init {
         if (!client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build())) {
@@ -79,10 +87,12 @@ class S3BlobStore(config: BlobStoreConfig) : BlobStore {
         }
     }
 
-    override fun put(key: String, bytes: ByteArray) {
+    override fun put(key: String, bytes: ByteArray, contentType: String?) {
         client.putObject(
             PutObjectArgs.builder().bucket(bucket).`object`(key)
-                .stream(ByteArrayInputStream(bytes), bytes.size.toLong(), -1).build(),
+                .stream(ByteArrayInputStream(bytes), bytes.size.toLong(), -1)
+                .contentType(contentType ?: "application/octet-stream")
+                .build(),
         )
     }
 
@@ -98,12 +108,12 @@ class S3BlobStore(config: BlobStoreConfig) : BlobStore {
     }
 
     override fun presignPut(key: String, ttlSeconds: Int): String =
-        client.getPresignedObjectUrl(
+        presignClient.getPresignedObjectUrl(
             GetPresignedObjectUrlArgs.builder().method(Method.PUT).bucket(bucket).`object`(key).expiry(ttlSeconds).build(),
         )
 
     override fun presignGet(key: String, ttlSeconds: Int): String =
-        client.getPresignedObjectUrl(
+        presignClient.getPresignedObjectUrl(
             GetPresignedObjectUrlArgs.builder().method(Method.GET).bucket(bucket).`object`(key).expiry(ttlSeconds).build(),
         )
 
@@ -120,7 +130,7 @@ class S3BlobStore(config: BlobStoreConfig) : BlobStore {
 /** Ephemeral in-process store for dev/test ONLY (no persistence, no deployment). Keeps frames in a map. */
 class InMemoryBlobStore : BlobStore {
     private val objects = ConcurrentHashMap<String, ByteArray>()
-    override fun put(key: String, bytes: ByteArray) { objects[key] = bytes }
+    override fun put(key: String, bytes: ByteArray, contentType: String?) { objects[key] = bytes }
     override fun get(key: String): ByteArray? = objects[key]
     override fun delete(key: String) { objects.remove(key) }
     // No HTTP endpoint to sign against → presign unsupported (callers fall back to the proxied chunk path).
