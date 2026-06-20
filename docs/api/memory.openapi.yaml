@@ -105,6 +105,61 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/favorites:
+    get:
+      # Own tag → the generated MemoryFavoritesApi gets the specific class-@Path /api/scopes/{scopeId}/favorites
+      # instead of the greedy /api/scopes/{scopeId} that the toggle path would otherwise force (which shadows
+      # sibling routes like KeysApi /grants/me). See the password-reset "one tag per op" note.
+      tags: [MemoryFavorites]
+      operationId: listMemoryFavorites
+      summary: List the caller's personal Memory favorites in a scope.
+      description: >
+        Returns node ids the authenticated user has personally marked as favorite in this scope. This is
+        navigation state only: the server sees ids, but not Memory titles, covers or content.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Favorite node ids for this user in this scope.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemoryFavoriteList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/favorite:
+    put:
+      tags: [MemoryFavorite]
+      operationId: favoriteMemory
+      summary: Mark a Memory as a personal favorite.
+      description: >
+        Creates an idempotent per-user favorite relation for a Memory. Folders and Chapters cannot be favorited.
+        The server stores only user id, scope id and node id; encrypted Memory metadata is unchanged.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Favorite status., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryFavoriteStatus' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    delete:
+      tags: [MemoryFavorite]
+      operationId: unfavoriteMemory
+      summary: Remove a Memory from the caller's personal favorites.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Favorite status., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryFavoriteStatus' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/journal:
     get:
       tags: [MemoryJournal]
@@ -613,6 +668,18 @@ components:
         nodes:
           type: array
           items: { $ref: '#/components/schemas/MemoryNode' }
+    MemoryFavoriteList:
+      type: object
+      required: [nodeIds]
+      properties:
+        nodeIds:
+          type: array
+          items: { type: string }
+    MemoryFavoriteStatus:
+      type: object
+      required: [favorite]
+      properties:
+        favorite: { type: boolean }
     MemoryJournal:
       type: object
       required: [nodeId]

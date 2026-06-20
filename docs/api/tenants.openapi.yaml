@@ -55,6 +55,63 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/logo:
+    get:
+      tags: [TenantProvisioning]
+      operationId: getTenantLogo
+      summary: Read the tenant logo bytes. Public branding endpoint; used when the BlobStore cannot presign.
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The tenant logo image.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    put:
+      tags: [TenantProvisioning]
+      operationId: uploadTenantLogo
+      summary: Upload the tenant logo image. Tenant Owner only.
+      description: >
+        Stores public tenant branding bytes in the configured BlobStore/S3 backend. The client scales the
+        selected image before upload; the server still enforces content-type and byte-size bounds. This is
+        branding metadata, not Memory/media content.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UploadTenantLogoRequest' }
+      responses:
+        '200':
+          description: The updated tenant summary.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    delete:
+      tags: [TenantProvisioning]
+      operationId: clearTenantLogo
+      summary: Clear the tenant logo image. Tenant Owner only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The updated tenant summary.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantSummary' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenants/{tenantId}/groups:
     get:
       tags: [Groups]
@@ -534,6 +591,12 @@ components:
         name: { type: string, description: Unique slug-like tenant name., x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         domain: { type: string, description: 'Required + unique: the host that resolves to this tenant (e.g. acme.veyq.app).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+    UploadTenantLogoRequest:
+      type: object
+      required: [contentType, bytes]
+      properties:
+        contentType: { type: string, enum: [image/png, image/jpeg, image/webp] }
+        bytes: { type: string, format: byte, description: 'Base64-encoded scaled image bytes.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 700000)'] }
     TenantSummary:
       type: object
       required: [id, name, displayName, status]
@@ -542,6 +605,7 @@ components:
         name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         domain: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+        logoUrl: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
         status: { type: string, enum: [PENDING, ACTIVE] }
     CreateGroupRequest:
       type: object

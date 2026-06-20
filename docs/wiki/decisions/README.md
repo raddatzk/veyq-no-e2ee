@@ -39,6 +39,7 @@
 | AD-30 | **Public-share upload capability**: guest upload writes require `shareId` plus a blind upload-capability token derived from the share unwrap key; the server stores only `SHA-256(token)`. | Accepted | Prevents `shareId`-only sealed-junk uploads while preserving the blind server. See [ADR 0030](0030-public-share-upload-capability.md). |
 | AD-31 | **Profile fields are server-visible identity metadata**: profile writes are limited to low-sensitivity account metadata; credential/device changes stay separate key-wrap flows. | Accepted | Enables member rosters/settings without weakening content E2EE. See [ADR 0031](0031-profile-fields-server-visible.md). |
 | AD-32 | **Memory participants are encrypted person metadata**: participants may link to users or be anonymous, but Memory-person relationships and names live only in sealed payloads. | Accepted | Restores Legacy people UX while preserving the blind server. See [ADR 0032](0032-encrypted-memory-participants.md). |
+| AD-33 | **Native UI parity from legacy iOS**: legacy iOS is the native UX reference; active Apple and Android move together, with adaptive iPad/Mac and Android tablet/foldable layouts. | Accepted | Keeps native product experience aligned without weakening E2EE. See [ADR 0033](0033-native-ui-parity-from-legacy-ios.md). |
 
 ## ADR template (for new ADR files)
 

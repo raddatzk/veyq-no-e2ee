@@ -1,0 +1,66 @@
+openapi: 3.1.0
+info:
+  title: veyq server admin
+  version: 0.1.0
+paths:
+  /api/admin/users:
+    get:
+      tags: [ServerAdmin]
+      operationId: listServerUsers
+      summary: List all (non-system) accounts on the instance — Server Owner only.
+      description: >
+        The instance roster: id, email, display name and server role. Operator-blind — NO key material,
+        content or memberships are returned, only the low-sensitivity account fields the owner needs to
+        assign the instance-level Server Owner role.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The instance account roster.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServerUserList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+  /api/admin/users/{userId}/server-role:
+    put:
+      tags: [ServerAdmin]
+      operationId: setServerRole
+      summary: Change an account's server role — Server Owner only.
+      description: >
+        Promote a member to Server Owner or demote an owner back to member. The server refuses to demote
+        the last remaining Server Owner (the instance must keep at least one). No crypto — server role gates
+        instance-level authority (e.g. tenant creation), not content access.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetServerRoleRequest' }
+      responses:
+        '200':
+          description: The updated account.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+components:
+  schemas:
+    ServerUserList:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+    SetServerRoleRequest:
+      type: object
+      required: [serverRole]
+      properties:
+        serverRole: { $ref: './common.openapi.yaml#/components/schemas/ServerRole' }

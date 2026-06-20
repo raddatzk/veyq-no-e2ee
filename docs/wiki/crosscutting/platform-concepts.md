@@ -34,9 +34,8 @@ Components negotiate what they can do — **three directions, one concept**. All
 (not content), so it works under E2E.
 
 1. **Server → clients.** The instance advertises which features it supports (collaboration relay,
-   Agent-Mode queue, passkeys, upload-ETA, push, key-transparency …) **plus its version / protocol & E2E
-   levels**. Clients adapt their UI and negotiate compatibility — important for **self-host**, where
-   server versions vary.
+   Agent-Mode queue, upload-ETA, push, key-transparency …) **plus its `major.build` version**. Clients
+   adapt their UI and negotiate compatibility — important for **self-host**, where server versions vary.
 2. **Device self-capabilities** (client-side). A client assesses its own hardware — **NPU, on-device
    LLM, WebCodecs, HW video encoders** — to decide what it can do locally.
 3. **Worker → queue** (Agent Mode). A worker advertises `can-h265`, `has-NPU`, `has-LLM`, … so the
@@ -50,31 +49,74 @@ features ≠ device hardware ≠ worker capabilities), one concept.
 Owned server-side by the **Operations** context (the capability registry); workers declare to
 **Processing**; devices self-assess client-side. (Baseline: legacy `docs/product/capabilities.md`.)
 
+### Capability vs permission (policy)
+
+A capability is **not** a permission — keep the two apart:
+
+- **Capability** — *can this server build do X?* **Instance-wide**, **pre-auth** (`/api/setup`), the
+  compatibility contract. Drives feature-detection + the `major` gate. An operator may disable one
+  **instance-wide** (config / missing backend); clients then degrade.
+- **Permission / policy** — *may **this** user do X **here**?* **Per tenant / scope / role**, **post-auth**,
+  owned by the membership / role / tenant-settings layer (`ScopeAccessGuard`, roles).
+
+Example: on the SaaS instance, tenant `veyq.cloud` should let users create sub-**groups** but **not**
+tenant-wide Memories — while other tenants on the *same* instance may allow both. That is **per-tenant
+authorization**, not a capability: modelling it as a capability would disable tenant-Memories for the
+**whole instance**. So it lives in the policy layer; the client learns its **effective per-scope
+permissions** post-auth and gates the UI on the **intersection** — a feature shows only when *(the
+capability is present)* **and** *(policy permits it here)*. Slice capabilities finer only when a server
+build genuinely *can't* do something — never to express who-may-do-what.
+
 ### Versioning & compatibility
 
-Capabilities are a **versioned contract** — a shared **manifest** with one entry per capability
-(`addedIn`, `deprecatedIn`, `sunsetAt`, `removedIn`, `supersededBy`, + dates). SemVer applies:
+The version is **`major.build`** (no SemVer minor/patch split):
 
-- **Adding** a capability = **minor** (old clients ignore unknown capabilities).
-- **Removing or changing** one = **major** (the server bumps its major version).
-- **Replacing** (`X → Y`): advertise **both** during the overlap; clients prefer `Y`, fall back to `X`.
+- **`build`** — a running number that bumps for *everything additive*: new features (new capabilities) and
+  fixes. Cosmetic / changelog only — **never** a compatibility gate.
+- **`major`** — bumps **only when a capability is removed** (the one breaking event). This is the **hard gate**.
 
-**Server-side deprecation — no abrupt drops.** A capability is never simply removed: it is first
-**marked for removal** (`sunsetAt`, default **~4 months** ahead) and keeps being **advertised and
-working**. Clients see the flag and migrate to `supersededBy` — but the user is **not** nagged
-immediately: for the first ~2 months the client **auto-updates quietly in the background**, and only in
-the **last ~2 months** before the sunset, if still behind, does it **actively warn the user** ("update
-before <date>"). At the sunset it is removed (major). Lifecycle:
-**active → deprecated (silent auto-update → active warning) → removed**.
+**The capability manifest — the soft feature layer.** A single **append-only** `capabilities.json` in the
+repo (codegen → the backend registry + each client's constants) is the source of truth. Each entry:
+`{ id, state }` with `state` ∈ `active` | `deprecated` (+ `sunsetAt`, `supersededBy`). A capability is an
+**immutable token** — only ever **added** or **removed**, never changed in place; a feature "change" is
+**remove old + add new** (`X → Y`). On the wire (`/api/setup`) the server advertises its `active` +
+`deprecated` set **plus `major`** — removed capabilities need not be sent (the `major` already encodes that
+removals happened); the canonical JSON keeps the full history (incl. removed) for humans + a CI monotonicity guard.
 
-**Client lifecycle (auto-updating, no downgrade).** A client keeps a removed capability's code for a
-**grace window — default 12 months from the removal release** — then drops it in a **client major**.
-**CI reads the manifest**, computes each capability's removal age, and **gates/forces** the client drop —
-no human guesswork.
+- *Add* (→ `build`++) → peers that don't know it ignore it; peers that miss it hide the feature. Always safe.
+- *Deprecate* (no version change; `sunsetAt` default **~4 months** ahead, `supersededBy`) → still advertised
+  and working; clients migrate to `Y`. Not nagged immediately: for the first ~2 months the client
+  **auto-updates quietly**, only in the **last ~2 months**, if still behind, does it **actively,
+  non-dismissably warn** ("update before <date>") — and only clients that *still use* it.
+- *Remove* (at sunset → `major`++) → the breaking event: the feature is gone and the `major` moves.
 
-**Enforcement (on connect, via discovery).** The mismatch is detected *before* acting, never a silent
-break: a client that dropped a capability the server still requires → graceful **"server too old —
-please update it"**; the reverse (server needs a newer client) → **"please update the app"**.
+Lifecycle: **active → deprecated (silent auto-update → active warning) → removed (`major`++).**
 
-**Self-host SLA:** keep the server within **~12 months** of current, or current (auto-updated) clients
-will refuse it. SaaS skew is short (you control the server). Decision: [AD-23](../decisions/README.md).
+**The hard gate — `major`, on connect (client-side; the blind server need not know the client).** The client
+compares its built-in `major` to the server's. One integer, direction from the inequality — **no min/range**
+(a `major` gap means a breaking removal sits between the two builds; align rather than risk it):
+- `client.major == server.major` → compatible → features then resolve by **capability presence** (soft),
+- `client.major  < server.major` → **client behind** → "update the app",
+- `client.major  > server.major` → **server behind** → "update the server".
+
+Resolved *before* acting, never a silent break. Because adding never bumps `major`, a **newer** client stays
+compatible with an **older** server (same `major`) and just **degrades** the features the server lacks — the
+whole point for self-host, where servers lag clients.
+
+**Same gate, but scope + remediation differ by platform:**
+- **Web** is same-origin (the server serves the client bundle) → `major` matches **by construction**. A
+  mismatch only means a **stale cached bundle** → remediation is **"reload"**. One instance.
+- **Mobile** is store-distributed and points at **arbitrary / multiple** instances → the gate **and** the
+  capability set are evaluated **per instance**. Remediation is server-specific (`<` → update the app; `>` →
+  update *that* server); the block is **per instance** (an incompatible instance never locks the whole app);
+  capability state is **not** cached across instances.
+
+**Client lifecycle (auto-updating, no downgrade).** A client keeps a removed capability's code for a **grace
+window — default 12 months from the removal release** — then drops it in a later client `build`. **CI reads
+the manifest**, computes each capability's removal age, and **gates/forces** the drop — no human guesswork.
+
+**Self-host SLA:** keep the server within **~12 months** of current, or current (auto-updated) clients will
+refuse it (the `major` gate). SaaS skew is short (you control the server). Decision: [AD-23](../decisions/README.md).
+
+→ Worked walkthroughs of every case (add / deprecate / remove, both gate directions, web vs mobile,
+multi-instance): **[Capability scenarios](capability-scenarios.md)**.

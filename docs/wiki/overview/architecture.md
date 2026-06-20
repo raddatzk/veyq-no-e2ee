@@ -10,7 +10,7 @@
 |---|---|
 | Backend | Quarkus / Kotlin (Java 21), Hibernate Panache, Flyway, MariaDB |
 | Web client | Vue 3 / TypeScript (PrimeVue), generated OpenAPI clients |
-| Native client | Swift / SwiftUI (iOS); Android planned |
+| Native client | Swift / SwiftUI (iPhone, iPad, Mac Catalyst); Android / Jetpack Compose (phone, tablet, foldable) |
 | Collaboration | Yjs (CRDT) over WebSockets; a thin **blind relay** (not a content-aware server) |
 | Processing | clients + trusted agents (see [Agent Mode](../crosscutting/agent-mode.md)) |
 | Infra | Docker Compose (self-host) / Helm (k8s); admin reverse proxy in front |

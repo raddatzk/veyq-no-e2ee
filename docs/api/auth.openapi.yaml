@@ -158,6 +158,50 @@ paths:
       responses:
         '204': { description: The password was reset. }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+  # --- Email change (authenticated request → token emailed to the NEW address → token-gated confirm).
+  # One tag per op (greedy class-@Path gotcha). Email is NOT part of key derivation, so this is a pure
+  # identifier swap — no re-wrap. Confirm is token-only (control of the new inbox is the proof), like reset.
+  /api/account/email-change/request:
+    post:
+      tags: [EmailChangeRequest]
+      operationId: requestEmailChange
+      summary: Request an email change — emails a one-time confirmation token to the NEW address.
+      description: >
+        Authenticated. Starts a change to the caller's account email. The new address must be free. A
+        one-time token is emailed to the NEW address; confirming it (separately) commits the change.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailChangeRequestRequest' }
+      responses:
+        '204': { description: A confirmation email was sent to the new address. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '409': { description: The requested email address is already in use. }
+  /api/account/email-change/confirm:
+    post:
+      tags: [EmailChangeConfirm]
+      operationId: confirmEmailChange
+      summary: Confirm an email change with the token emailed to the new address.
+      description: >
+        Token-gated (no session required): control of the new inbox is the proof, so the link works on any
+        device. Consumes the token and swaps the account email. Returns the updated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailChangeConfirmRequest' }
+      responses:
+        '200':
+          description: The updated current user.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '409': { description: The requested email address is already in use. }
 components:
   schemas:
     LoginRequest:
@@ -222,3 +266,13 @@ components:
         # registration — proves the client recovered the real master key with the Secret Key. Without it,
         # an email-token-only attacker could reset the password verifier and hijack the server account.
         recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
+    EmailChangeRequestRequest:
+      type: object
+      required: [newEmail]
+      properties:
+        newEmail: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+    EmailChangeConfirmRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 512)'] }

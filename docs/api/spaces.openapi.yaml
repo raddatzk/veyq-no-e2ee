@@ -52,6 +52,7 @@ components:
         tenantId: { type: string }
         name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        logoUrl: { type: string, description: 'Optional tenant branding image URL shown in the space switcher.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
         role: { type: string, description: 'The caller''s role in the tenant (membership authority, not content access).' }
         scopeId: { type: string }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
@@ -74,6 +75,7 @@ components:
         tenantId: { type: string, description: 'TENANT/GROUP — the backing tenant.' }
         name: { type: string, description: 'TENANT — the tenant name (slug).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         domain: { type: string, description: 'TENANT/GROUP — the tenant''s domain (the host that resolves to it). The client routes/switches by it.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+        logoUrl: { type: string, description: 'TENANT/GROUP — optional tenant branding image URL shown in the space switcher.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
         displayName: { type: string, description: 'PERSONAL: the user''s display name; TENANT: the tenant display name; GROUP: empty (use sealedName).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string, description: 'TENANT: tenant role; GROUP: group role; absent for PERSONAL.' }
         sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'GROUP only — the group name sealed under its content key.' }

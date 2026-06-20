@@ -97,6 +97,18 @@ acceptanceCriteria:
           - testName: "navigates into a folder (breadcrumb grows)"
             kind: positive
             ref: frontend/src/app/home/HomeView.test.ts
+          - testName: "uses per-section order indices when opening create dialogs"
+            kind: positive
+            ref: frontend/src/app/home/HomeView.test.ts
+          - testName: "shows tenant creation only to server owners"
+            kind: positive
+            ref: frontend/src/app/home/HomeSidebar.test.ts
+          - testName: "shows management gear only for owned tenant and group rows"
+            kind: positive
+            ref: frontend/src/app/home/HomeSidebar.test.ts
+          - testName: "is visible only for server owners and can be dismissed locally"
+            kind: positive
+            ref: frontend/src/app/home/SupportNotice.test.ts
           - testName: "renders the three Legacy tabs, the root title, and loads the root gallery"
             kind: positive
             ref: frontend/src/app/home/MemoryContent.test.ts
