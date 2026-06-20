@@ -14,6 +14,53 @@ acceptanceCriteria:
 - id: uc.journal.embed.token-grammar
   statement: "Embed tokens parse and serialize round-trip with the dedupe/cap, first-id-only and empty-target rules, and text and embeds split in source order."
   coverage:
+    web:
+      unit:
+      - testName: "parses a single media token with a label"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "parses comma-separated media ids (a carousel) without a label"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "keeps only the first id for a chapter"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "dedupes and caps track ids"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "parses two back-to-back tokens"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "ends a token at a newline"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "ignores an empty target"
+        kind: negative
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "parses a playlist token and keeps only the first id"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "round-trips a labelled media embed"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "omits the suffix when there is no label"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "normalizes track ids on serialize"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "splits text and embeds in source order"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "returns a single markdown block when there are no embeds"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "handles an embed at the very start"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
+      - testName: "dedupes, trims, drops empties, and caps at the max"
+        kind: positive
+        ref: frontend/src/features/memory/journal/journalEmbed.test.ts
     apple:
       unit:
       - testName: testParsesSingleMediaTokenWithLabel
@@ -111,15 +158,24 @@ acceptanceCriteria:
 - id: uc.journal.embed.render-blocks
   statement: "On read, embeds resolve to their blocks — a single photo or a carousel, a track block with stats, a chapter link — and an unresolved id degrades to a placeholder."
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
+    followUp: Add coverage once the consolidated frontend ports a test for this use-case.
 - id: uc.journal.embed.atomic-chip
   statement: "In the live editor an embed renders as an atomic chip that deletes with a two-press Backspace gesture and disarms when the cursor moves."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  coverage:
+    web:
+      unit:
+      - testName: "renders an atomic chip for an embed token"
+        kind: positive
+        ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
+      - testName: "takes two Backspace presses at the token end to delete the whole embed"
+        kind: positive
+        ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
+      - testName: "disarms a pending delete when the cursor moves"
+        kind: positive
+        ref: frontend/src/features/memory/journalLive/journalEmbedEditor.test.ts
 - id: uc.journal.embed.picker
   statement: "The embed picker selects media/track/chapter ids with a caption/label, enforces single vs. multi selection, and offers Delete only while editing."
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
+    followUp: Add coverage once the consolidated frontend ports a test for this use-case.

@@ -736,12 +736,15 @@ const en: Dict = {
 const messages: Record<string, Dict> = { de, en }
 export type Locale = 'de' | 'en'
 
-export const i18n = reactive({ locale: ((localStorage.getItem('veyq.locale') as Locale) ?? 'de') as Locale })
+// Guard localStorage so this module is safe to import in a non-browser env (node-env vitest e2e suites).
+const storedLocale = typeof localStorage !== 'undefined' ? (localStorage.getItem('veyq.locale') as Locale | null) : null
+export const i18n = reactive({ locale: (storedLocale ?? 'de') as Locale })
 
 export function setLocale(locale: Locale): void {
   i18n.locale = locale
-  localStorage.setItem('veyq.locale', locale)
-  document.documentElement.lang = locale
+  // Browser-only side effects guarded so setLocale is safe in a non-browser env (node-env vitest suites).
+  if (typeof localStorage !== 'undefined') localStorage.setItem('veyq.locale', locale)
+  if (typeof document !== 'undefined') document.documentElement.lang = locale
 }
 
 export function t(key: string, params?: Record<string, string | number>): string {

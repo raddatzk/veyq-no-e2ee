@@ -14,5 +14,5 @@ acceptanceCriteria:
 - id: uc.platform.app-shell.instance-routing
   statement: "On boot the shell discovers the instance state and routes accordingly: a fresh instance to setup, an already-set-up instance to login, and an unreachable instance to a clear error view."
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
+    followUp: Add coverage once the consolidated frontend ports a test for this use-case.

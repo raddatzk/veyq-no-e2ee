@@ -43,6 +43,12 @@ acceptanceCriteria:
     followUp: "Add rename support plus e2e coverage for add linked, add anonymous, open profile and remove flows."
 - id: uc.people.manage-participants.local-search
   statement: "Decrypted participant display names are local search keys for their Memories without using a server search endpoint."
+  coverage:
+    web:
+      unit:
+      - testName: "matches decrypted participant names while returning memory hits"
+        kind: positive
+        ref: frontend/src/features/search/search.test.ts
   gaps:
   - reason: "Search helper coverage exists, but there is no end-to-end coverage for the full participant UI-to-search flow."
     followUp: "Add an e2e test that adds a participant and finds the Memory by participant name."

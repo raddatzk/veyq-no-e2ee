@@ -2,138 +2,171 @@ id: uc.admin.invite-members-roles
 title: Invite members, grant access and assign roles
 status: implemented
 documents:
-- type: feature
-  ref: docs/wiki/features/admin/_index.md
-- type: useCase
-  ref: docs/wiki/features/admin/use-cases/uc.admin.invite-members-roles.md
-- type: crosscutting
-  ref: docs/wiki/crosscutting/security-model.md
-- type: api
-  ref: docs/api/tenants.openapi.yaml
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteHandler.kt
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberInviteHandler.kt
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/RemoveMemberHandler.kt
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ScopeRotationHandler.kt
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ChangeMemberRoleHandler.kt
-- type: entryPoint
-  ref: frontend/src/features/admin/inviteMembersRoles/inviteMembers.ts
-- type: entryPoint
-  ref: android/core/src/main/kotlin/app/veyq/crypto/InviteMembers.kt
-- type: entryPoint
-  ref: apple/Sources/VeyqCrypto/InviteMembers.swift
+  - type: feature
+    ref: docs/wiki/features/admin/_index.md
+  - type: useCase
+    ref: docs/wiki/features/admin/use-cases/uc.admin.invite-members-roles.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/tenants.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberInviteHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/RemoveMemberHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ScopeRotationHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ChangeMemberRoleHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/admin/inviteMembersRoles/inviteMembers.ts
+  - type: entryPoint
+    ref: android/core/src/main/kotlin/app/veyq/crypto/InviteMembers.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/InviteMembers.swift
 acceptanceCriteria:
-- id: uc.admin.invite-members-roles.member-invite
-  statement: A key-holding Tenant Owner can issue a temp-wrap invite and a new account can register onto the existing scope.
-  coverage:
-    backend:
-      integration:
-      - testName: issuesTempWrapMemberInviteAndRegistersNewUserOnExistingScope
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-      - testName: issuesTempWrapMemberInviteAndRegistersNewUserOnExistingScope
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-    android:
-      e2e:
-      - testName: tempWrapMemberInviteRegistersOnExistingScope
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/MemberInviteE2ETest.kt
-    apple:
-      e2e:
-      - testName: testTempWrapMemberInviteRegistersOnExistingScope
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/MemberInviteE2ETests.swift
-- id: uc.admin.invite-members-roles.accept-existing-account
-  statement: An authenticated existing user can confirm a temp-wrap member invite onto their existing account without creating a new account.
-  coverage:
-    backend:
-      integration:
-      - testName: acceptsMemberInviteOntoExistingAccount
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
-      - testName: acceptsMemberInviteOntoExistingAccount
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
-    android:
-      e2e:
-      - testName: existingUserConfirmsInviteOntoExistingAccount
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/AcceptMemberInviteE2ETest.kt
-    apple:
-      e2e:
-      - testName: testExistingUserConfirmsInviteOntoExistingAccount
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/AcceptMemberInviteE2ETests.swift
-- id: uc.admin.invite-members-roles.member-list
-  statement: Active tenant members can list the tenant roster with identity public keys for rotation, while outsiders are rejected.
-  coverage:
-    backend:
-      integration:
-      - testName: listsTenantMembers
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-      - testName: listsTenantMembers
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-- id: uc.admin.invite-members-roles.email-invite
-  statement: "A Tenant Owner can email the pending invite link to the invitee."
-  coverage:
-    backend:
-      integration:
-      - testName: ownerEmailsThePendingInviteLink
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/EmailInviteSliceTest.kt
-- id: uc.admin.invite-members-roles.remove-member
-  statement: A Tenant Owner can remove a member, deleting their scope grant and invalidating their sessions.
-  coverage:
-    backend:
-      integration:
-      - testName: removesMemberRevokingGrantAndSessions
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-      - testName: removesMemberRevokingGrantAndSessions
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-- id: uc.admin.invite-members-roles.rotate-scope
-  statement: Scope rotation replaces the tenant scope keypair, re-grants exactly the active members and re-wraps an existing content key so encrypted content remains readable.
-  coverage:
-    backend:
-      integration:
-      - testName: rotatesScopeReGrantingExactlyTheActiveMembers
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-      - testName: rotatesScopeReGrantingExactlyTheActiveMembers
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-    android:
-      e2e:
-      - testName: rotateScopeReGrantsEveryActiveMember
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/RotateScopeE2ETest.kt
-      - testName: contentKeyReWrappedOnRotation
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/ContentSurvivesRotationE2ETest.kt
-    apple:
-      e2e:
-      - testName: testRotateScopeReGrantsEveryActiveMember
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/RotateScopeE2ETests.swift
-      - testName: testContentKeyReWrappedOnRotation
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/ContentSurvivesRotationE2ETests.swift
-- id: uc.admin.invite-members-roles.role-change
-  statement: A Tenant Owner can change member roles without changing content grants, and the last owner cannot be demoted.
-  coverage:
-    backend:
-      integration:
-      - testName: changesMemberRoleAndProtectsTheLastOwner
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
-      - testName: changesMemberRoleAndProtectsTheLastOwner
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+  - id: uc.admin.invite-members-roles.member-invite
+    statement: A key-holding Tenant Owner can issue a temp-wrap invite and a new account can register onto the existing scope.
+    coverage:
+      backend:
+        integration:
+          - testName: issuesTempWrapMemberInviteAndRegistersNewUserOnExistingScope
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+          - testName: issuesTempWrapMemberInviteAndRegistersNewUserOnExistingScope
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: issues a temp-wrap member invite, a new user registers onto the existing scope
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/memberInvite.e2e.test.ts
+      android:
+        e2e:
+          - testName: tempWrapMemberInviteRegistersOnExistingScope
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MemberInviteE2ETest.kt
+      apple:
+        e2e:
+          - testName: testTempWrapMemberInviteRegistersOnExistingScope
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/MemberInviteE2ETests.swift
+  - id: uc.admin.invite-members-roles.accept-existing-account
+    statement: An authenticated existing user can confirm a temp-wrap member invite onto their existing account without creating a new account.
+    coverage:
+      backend:
+        integration:
+          - testName: acceptsMemberInviteOntoExistingAccount
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
+          - testName: acceptsMemberInviteOntoExistingAccount
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
+      web:
+        e2e:
+          - testName: an existing user confirms a member invite onto their existing account (no new account)
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/acceptMemberInvite.e2e.test.ts
+      android:
+        e2e:
+          - testName: existingUserConfirmsInviteOntoExistingAccount
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/AcceptMemberInviteE2ETest.kt
+      apple:
+        e2e:
+          - testName: testExistingUserConfirmsInviteOntoExistingAccount
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/AcceptMemberInviteE2ETests.swift
+  - id: uc.admin.invite-members-roles.member-list
+    statement: Active tenant members can list the tenant roster with identity public keys for rotation, while outsiders are rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: listsTenantMembers
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+          - testName: listsTenantMembers
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: "owner lists, re-roles, removes a member, and rotates the scope"
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/memberAdmin.e2e.test.ts
+  - id: uc.admin.invite-members-roles.email-invite
+    statement: "A Tenant Owner can email the pending invite link to the invitee."
+    coverage:
+      backend:
+        integration:
+          - testName: ownerEmailsThePendingInviteLink
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/EmailInviteSliceTest.kt
+  - id: uc.admin.invite-members-roles.remove-member
+    statement: A Tenant Owner can remove a member, deleting their scope grant and invalidating their sessions.
+    coverage:
+      backend:
+        integration:
+          - testName: removesMemberRevokingGrantAndSessions
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+          - testName: removesMemberRevokingGrantAndSessions
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: "removes a member: their grant is revoked and their session stops resolving"
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/removeMember.e2e.test.ts
+  - id: uc.admin.invite-members-roles.rotate-scope
+    statement: Scope rotation replaces the tenant scope keypair, re-grants exactly the active members and re-wraps an existing content key so encrypted content remains readable.
+    coverage:
+      backend:
+        integration:
+          - testName: rotatesScopeReGrantingExactlyTheActiveMembers
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+          - testName: rotatesScopeReGrantingExactlyTheActiveMembers
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: rotates the scope, re-granting a new keypair to every active member
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/rotateScope.e2e.test.ts
+          - testName: re-wraps the content key on rotation; content stays readable and new members can read it
+            kind: positive
+            ref: frontend/src/features/content/contentSurvivesRotation.e2e.test.ts
+      android:
+        e2e:
+          - testName: rotateScopeReGrantsEveryActiveMember
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RotateScopeE2ETest.kt
+          - testName: contentKeyReWrappedOnRotation
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/ContentSurvivesRotationE2ETest.kt
+      apple:
+        e2e:
+          - testName: testRotateScopeReGrantsEveryActiveMember
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/RotateScopeE2ETests.swift
+          - testName: testContentKeyReWrappedOnRotation
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/ContentSurvivesRotationE2ETests.swift
+  - id: uc.admin.invite-members-roles.role-change
+    statement: A Tenant Owner can change member roles without changing content grants, and the last owner cannot be demoted.
+    coverage:
+      backend:
+        integration:
+          - testName: changesMemberRoleAndProtectsTheLastOwner
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+          - testName: changesMemberRoleAndProtectsTheLastOwner
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: promotes a member to Owner without touching their grant
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/changeRole.e2e.test.ts

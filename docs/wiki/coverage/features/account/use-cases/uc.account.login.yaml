@@ -33,6 +33,11 @@ acceptanceCriteria:
       - testName: loginUnlockAndSession
         kind: positive
         ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+    web:
+      e2e:
+      - testName: registers, logs in, and unlocks the identity key matching the stored public key
+        kind: positive
+        ref: frontend/src/features/account/login/login.e2e.test.ts
     android:
       e2e:
       - testName: loginAndUnlock
@@ -62,5 +67,5 @@ acceptanceCriteria:
 - id: uc.account.login.remembered-login-boot
   statement: A remembered login is used during app boot after reload so the user lands directly in the app.
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
+    followUp: Add coverage once the consolidated frontend ports a test for this use-case.

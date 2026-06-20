@@ -49,6 +49,11 @@ acceptanceCriteria:
       - testName: rejectsMalformedEmail
         kind: negative
         ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+    web:
+      e2e:
+      - testName: creates the first E2EE user end-to-end
+        kind: positive
+        ref: frontend/src/features/admin/setupServer/setupServer.e2e.test.ts
     android:
       e2e:
       - testName: createsFirstUser

@@ -2,61 +2,66 @@ id: uc.keys.rotate-identity
 title: Rotate the account identity key
 status: implemented
 documents:
-- type: feature
-  ref: docs/wiki/features/keys/_index.md
-- type: useCase
-  ref: docs/wiki/features/keys/use-cases/uc.keys.rotate-identity.md
-- type: crosscutting
-  ref: docs/wiki/crosscutting/security-model.md
-- type: crosscutting
-  ref: docs/wiki/crosscutting/account-key-model.md
-- type: api
-  ref: docs/api/identity.openapi.yaml
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/keys/rotateidentity/MyGrantsHandler.kt
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentityHandler.kt
-- type: entryPoint
-  ref: frontend/src/features/keys/rotateIdentity.ts
-- type: entryPoint
-  ref: apple/Sources/VeyqCrypto/RotateIdentity.swift
-- type: entryPoint
-  ref: android/core/src/main/kotlin/app/veyq/crypto/RotateIdentity.kt
+  - type: feature
+    ref: docs/wiki/features/keys/_index.md
+  - type: useCase
+    ref: docs/wiki/features/keys/use-cases/uc.keys.rotate-identity.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/account-key-model.md
+  - type: api
+    ref: docs/api/identity.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/keys/rotateidentity/MyGrantsHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentityHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/keys/rotateIdentity.ts
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/RotateIdentity.swift
+  - type: entryPoint
+    ref: android/core/src/main/kotlin/app/veyq/crypto/RotateIdentity.kt
 acceptanceCriteria:
-- id: uc.keys.rotate-identity.rotate
-  statement: A user can rotate their identity keypair, re-wrapping exactly their owned grants, so they keep access to every scope and its content under the new identity while the master key stays unchanged.
-  coverage:
-    backend:
-      integration:
-      - testName: rotatesIdentityAndReWrapsExactlyTheOwnedGrants
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
-      - testName: rotatesIdentityAndReWrapsExactlyTheOwnedGrants
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
-    android:
-      e2e:
-      - testName: rotateIdentityKeepsAccessToScopesAndContent
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/RotateIdentityE2ETest.kt
-    apple:
-      e2e:
-      - testName: testRotateIdentityKeepsAccessToScopesAndContent
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/RotateIdentityE2ETests.swift
-- id: uc.keys.rotate-identity.stale-grant-hidden
-  statement: "After a tenant member is removed, their stale tenant grant is hidden and unreadable."
-  coverage:
-    backend:
-      integration:
-      - testName: removedMembersStaleTenantGrantIsHiddenAndUnreadable
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
-- id: uc.keys.rotate-identity.fingerprint
-  statement: "The identity fingerprint / safety number is derived deterministically from the identity public keys (conformance vector)."
-  coverage:
-    web:
-      unit:
-      - testName: "identity fingerprint / safety number"
-        kind: positive
-        ref: frontend/src/shared/crypto/v1.conformance.test.ts
+  - id: uc.keys.rotate-identity.rotate
+    statement: A user can rotate their identity keypair, re-wrapping exactly their owned grants, so they keep access to every scope and its content under the new identity while the master key stays unchanged.
+    coverage:
+      backend:
+        integration:
+          - testName: rotatesIdentityAndReWrapsExactlyTheOwnedGrants
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
+          - testName: rotatesIdentityAndReWrapsExactlyTheOwnedGrants
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
+      web:
+        e2e:
+          - testName: rotates the identity and keeps access to every scope + content via the new identity
+            kind: positive
+            ref: frontend/src/features/keys/rotateIdentity.e2e.test.ts
+      android:
+        e2e:
+          - testName: rotateIdentityKeepsAccessToScopesAndContent
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RotateIdentityE2ETest.kt
+      apple:
+        e2e:
+          - testName: testRotateIdentityKeepsAccessToScopesAndContent
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/RotateIdentityE2ETests.swift
+  - id: uc.keys.rotate-identity.stale-grant-hidden
+    statement: "After a tenant member is removed, their stale tenant grant is hidden and unreadable."
+    coverage:
+      backend:
+        integration:
+          - testName: removedMembersStaleTenantGrantIsHiddenAndUnreadable
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
+  - id: uc.keys.rotate-identity.fingerprint
+    statement: "The identity fingerprint / safety number is derived deterministically from the identity public keys (conformance vector)."
+    coverage:
+      web:
+        unit:
+          - testName: "identity fingerprint / safety number"
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts

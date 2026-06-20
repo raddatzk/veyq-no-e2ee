@@ -13,21 +13,81 @@ documents:
 acceptanceCriteria:
 - id: uc.platform.web-views.routing
   statement: "Clean space paths build and parse round-trip — tenant (no prefix, host-resolved), personal (~me) and group (@slug) — and each space kind parses back out."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  coverage:
+    web:
+      unit:
+      - testName: "builds tenant paths with no prefix"
+        kind: positive
+        ref: frontend/src/features/home/homeRoute.test.ts
+      - testName: "prefixes personal with ~me and groups with @<name-slug>"
+        kind: positive
+        ref: frontend/src/features/home/homeRoute.test.ts
+      - testName: "parses each space kind back out"
+        kind: positive
+        ref: frontend/src/features/home/homeRoute.test.ts
+      - testName: "round-trips through build → parse → matchSpace"
+        kind: positive
+        ref: frontend/src/features/home/homeRoute.test.ts
+      - testName: "resolves the prefix-less tenant by host (multiple tenants)"
+        kind: positive
+        ref: frontend/src/features/home/homeRoute.test.ts
 - id: uc.platform.web-views.read-cache
   statement: "The node read-cache serves a burst of reads from one fetch and drops cached entries on create/rename/delete and explicit invalidation."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  coverage:
+    web:
+      unit:
+      - testName: "serves a burst of reads from one fetch"
+        kind: positive
+        ref: frontend/src/features/home/nodeGraph.test.ts
+      - testName: "refetches after an explicit invalidate"
+        kind: positive
+        ref: frontend/src/features/home/nodeGraph.test.ts
+      - testName: "createChild drops the cache so the next read sees the new node"
+        kind: positive
+        ref: frontend/src/features/home/nodeGraph.test.ts
+      - testName: "renameNode drops the cache"
+        kind: positive
+        ref: frontend/src/features/home/nodeGraph.test.ts
+      - testName: "deleteNode drops the cache"
+        kind: positive
+        ref: frontend/src/features/home/nodeGraph.test.ts
 - id: uc.platform.web-views.gallery-layout
   statement: "The gallery justifies every full row to the container width, preserves per-tile aspect (clamped), keeps a trailing widow at target height, and groups items into date buckets; empty inputs yield empty results."
-  gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  coverage:
+    web:
+      unit:
+      - testName: "justifies every full row flush to the container width"
+        kind: positive
+        ref: frontend/src/features/gallery/justifiedLayout.test.ts
+      - testName: "keeps the trailing incomplete row as a widow at target height"
+        kind: positive
+        ref: frontend/src/features/gallery/justifiedLayout.test.ts
+      - testName: "preserves per-tile aspect ratio within a justified row (wide tiles get more width)"
+        kind: positive
+        ref: frontend/src/features/gallery/justifiedLayout.test.ts
+      - testName: "returns empty for no items or zero container"
+        kind: negative
+        ref: frontend/src/features/gallery/justifiedLayout.test.ts
+      - testName: "clamps display aspect ratio into [3/4, 4/3] with a 4/3 fallback"
+        kind: positive
+        ref: frontend/src/features/gallery/justifiedLayout.test.ts
+      - testName: "groups consecutive items by local day, preserving order"
+        kind: positive
+        ref: frontend/src/features/gallery/dateBuckets.test.ts
+      - testName: "re-opens a bucket only for consecutive same-day runs"
+        kind: positive
+        ref: frontend/src/features/gallery/dateBuckets.test.ts
+      - testName: "falls back to a placeholder key for invalid timestamps"
+        kind: negative
+        ref: frontend/src/features/gallery/dateBuckets.test.ts
+      - testName: "formats a single date and a range"
+        kind: positive
+        ref: frontend/src/features/gallery/dateBuckets.test.ts
+      - testName: "returns empty range for no items"
+        kind: negative
+        ref: frontend/src/features/gallery/dateBuckets.test.ts
 - id: uc.platform.web-views.memory-views
   statement: "The home view renders the space switcher and memory/folder grids and navigates into folders; the Memory view renders the tabs, root gallery and journal (lazy, embed-aware, live-journal subscription) and navigates into chapters."
   gaps:
-  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not yet port a test for this criterion.
-    followUp: Re-add coverage once the consolidated frontend ports a test for this use-case (test-coverage realignment after the legacy/frontend -> frontend promotion).
+  - reason: Web coverage lived in the retired greenfield frontend; the consolidated client (former legacy/frontend) does not port a component test for this criterion.
+    followUp: Add coverage once the consolidated frontend ports a test for this use-case.

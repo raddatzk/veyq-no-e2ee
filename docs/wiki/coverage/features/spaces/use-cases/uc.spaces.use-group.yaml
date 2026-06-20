@@ -2,46 +2,51 @@ id: uc.spaces.use-group
 title: Use a group space
 status: implemented
 documents:
-- type: feature
-  ref: docs/wiki/features/spaces/_index.md
-- type: useCase
-  ref: docs/wiki/features/spaces/use-cases/uc.spaces.use-group.md
-- type: crosscutting
-  ref: docs/wiki/crosscutting/security-model.md
-- type: api
-  ref: docs/api/spaces.openapi.yaml
-- type: api
-  ref: docs/api/content.openapi.yaml
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsHandler.kt
-- type: entryPoint
-  ref: frontend/src/features/spaces/useGroup/useGroup.ts
-- type: entryPoint
-  ref: android/core/src/main/kotlin/app/veyq/crypto/UseGroup.kt
-- type: entryPoint
-  ref: apple/Sources/VeyqCrypto/UseGroup.swift
+  - type: feature
+    ref: docs/wiki/features/spaces/_index.md
+  - type: useCase
+    ref: docs/wiki/features/spaces/use-cases/uc.spaces.use-group.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/spaces.openapi.yaml
+  - type: api
+    ref: docs/api/content.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/spaces/useGroup/useGroup.ts
+  - type: entryPoint
+    ref: android/core/src/main/kotlin/app/veyq/crypto/UseGroup.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/UseGroup.swift
 acceptanceCriteria:
-- id: uc.spaces.use-group.roster-is-the-wrap
-  statement: The group roster lists exactly the tenants the caller is an active member of AND holds the scope key for (access = the wrap); a member without the grant sees nothing.
-  coverage:
-    backend:
-      integration:
-      - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
-      - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
-        kind: negative
-        ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
-- id: uc.spaces.use-group.shared-collaboration
-  statement: Two members of one group write and read the same shared content under a single scope content key; each sees the other's items.
-  coverage:
-    android:
-      e2e:
-      - testName: twoMembersCollaborateOnOneSharedScope
-        kind: positive
-        ref: android/core/src/test/kotlin/app/veyq/crypto/UseGroupE2ETest.kt
-    apple:
-      e2e:
-      - testName: testTwoMembersCollaborateOnOneSharedScope
-        kind: positive
-        ref: apple/Tests/VeyqCryptoTests/UseGroupE2ETests.swift
+  - id: uc.spaces.use-group.roster-is-the-wrap
+    statement: The group roster lists exactly the tenants the caller is an active member of AND holds the scope key for (access = the wrap); a member without the grant sees nothing.
+    coverage:
+      backend:
+        integration:
+          - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
+          - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
+  - id: uc.spaces.use-group.shared-collaboration
+    statement: Two members of one group write and read the same shared content under a single scope content key; each sees the other's items.
+    coverage:
+      web:
+        e2e:
+          - testName: "lists the group for both members and both read each other's shared items"
+            kind: positive
+            ref: frontend/src/features/spaces/useGroup/useGroup.e2e.test.ts
+      android:
+        e2e:
+          - testName: twoMembersCollaborateOnOneSharedScope
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/UseGroupE2ETest.kt
+      apple:
+        e2e:
+          - testName: testTwoMembersCollaborateOnOneSharedScope
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/UseGroupE2ETests.swift

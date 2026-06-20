@@ -2,32 +2,37 @@ id: uc.sharing.share-public-viewer
 title: Publish a read-only public share
 status: implemented
 documents:
-- type: feature
-  ref: docs/wiki/features/sharing/_index.md
-- type: useCase
-  ref: docs/wiki/features/sharing/use-cases/uc.sharing.share-public-viewer.md
-- type: crosscutting
-  ref: docs/wiki/crosscutting/security-model.md
-- type: api
-  ref: docs/api/memory.openapi.yaml
-- type: entryPoint
-  ref: backend/src/main/kotlin/com/veyq/app/features/memory/share/ShareHandler.kt
-- type: entryPoint
-  ref: frontend/src/features/memory/share/share.ts
+  - type: feature
+    ref: docs/wiki/features/sharing/_index.md
+  - type: useCase
+    ref: docs/wiki/features/sharing/use-cases/uc.sharing.share-public-viewer.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/memory/share/ShareHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/memory/share/share.ts
 acceptanceCriteria:
-- id: uc.sharing.share-public-viewer.sealed-read
-  statement: "A curator creates a VIEWER share whose content key is wrapped under a share key carried in the URL fragment; an unauthenticated viewer resolves it and reads the subtree client-side while the operator stays blind."
-  coverage:
-    backend:
-      integration:
-      - testName: createsAndResolvesAReadOnlyShare
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
-- id: uc.sharing.share-public-viewer.revoke-expire
-  statement: "A share carries an optional label and expiry; once expired (or revoked) guest requests stop resolving."
-  coverage:
-    backend:
-      integration:
-      - testName: passwordExpiryAndLabel
-        kind: positive
-        ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+  - id: uc.sharing.share-public-viewer.sealed-read
+    statement: "A curator creates a VIEWER share whose content key is wrapped under a share key carried in the URL fragment; an unauthenticated viewer resolves it and reads the subtree client-side while the operator stays blind."
+    coverage:
+      backend:
+        integration:
+          - testName: createsAndResolvesAReadOnlyShare
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+      web:
+        e2e:
+          - testName: "viewer reads + contributor adds, both without an account"
+            kind: positive
+            ref: frontend/src/features/memory/share/share.e2e.test.ts
+  - id: uc.sharing.share-public-viewer.revoke-expire
+    statement: "A share carries an optional label and expiry; once expired (or revoked) guest requests stop resolving."
+    coverage:
+      backend:
+        integration:
+          - testName: passwordExpiryAndLabel
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt

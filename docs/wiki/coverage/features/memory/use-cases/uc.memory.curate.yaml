@@ -22,6 +22,20 @@ acceptanceCriteria:
       - testName: curatesNodesWithStructuralChecks
         kind: negative
         ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
+    web:
+      unit:
+      - testName: "does not create a numbered slug when a sibling already uses the name"
+        kind: negative
+        ref: frontend/src/features/memory/curate/curate.test.ts
+      - testName: "does not rename with a numbered suffix when the target name collides"
+        kind: negative
+        ref: frontend/src/features/memory/curate/curate.test.ts
+      - testName: "does not move with a numbered suffix when the destination already has that name"
+        kind: negative
+        ref: frontend/src/features/memory/curate/curate.test.ts
+      - testName: "still creates a node with the base slug when there is no collision"
+        kind: positive
+        ref: frontend/src/features/memory/curate/curate.test.ts
 - id: uc.memory.curate.delete
   statement: "Deleting a node removes its subtree recursively while sparing siblings, and deleting a single medium also removes its derivatives."
   coverage:
