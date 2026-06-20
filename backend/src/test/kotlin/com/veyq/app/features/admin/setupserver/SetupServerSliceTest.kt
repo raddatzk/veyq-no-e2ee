@@ -6,16 +6,29 @@ import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.QuarkusTestProfile
+import io.quarkus.test.junit.TestProfile
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.`is`
+import org.hamcrest.CoreMatchers.notNullValue
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 
 @QuarkusTest
+@TestProfile(SetupServerSliceTest.IsolatedDb::class)
 class SetupServerSliceTest {
+
+    // The cold-setup flow asserts a virgin instance (setupRequired = countServerOwners() == 0). The suite
+    // shares one in-memory H2 (DB_CLOSE_DELAY=-1) and other slices seed a ServerOwner — which would flip
+    // setupRequired to false here depending on class order. An isolated datasource gives this class its own
+    // pristine DB so the cold path is deterministic.
+    class IsolatedDb : QuarkusTestProfile {
+        override fun getConfigOverrides() =
+            mapOf("quarkus.datasource.jdbc.url" to "jdbc:h2:mem:setup-isolated;DB_CLOSE_DELAY=-1")
+    }
 
     @Inject
     lateinit var users: UserRepository
@@ -55,6 +68,7 @@ class SetupServerSliceTest {
             .then().statusCode(200)
             .body("setupRequired", `is`(true))
             .body("suites[0]", `is`("v1"))
+            .body("serverVersion", notNullValue()) // advisory server version (default "dev" in tests)
 
         // 2. create the first Server Owner
         given().contentType(ContentType.JSON).body(request)

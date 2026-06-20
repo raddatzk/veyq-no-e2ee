@@ -10,6 +10,7 @@ import com.veyq.app.generated.model.OwnerInvite
 import com.veyq.app.generated.model.TenantInviteInfo
 import com.veyq.app.generated.model.TenantInviteMaterial
 import com.veyq.app.generated.model.TenantSummary
+import com.veyq.app.generated.model.UploadTenantLogoRequest
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.config.TenantConfig
 import com.veyq.app.shared.content.ContentPurge
@@ -36,6 +37,7 @@ import com.veyq.app.shared.tenancy.TenantInvite
 import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.security.MessageDigest
@@ -67,6 +69,7 @@ class TenantProvisioningHandler(
     private val sessions: SessionService,
     private val guard: TenantAdminGuard,
     private val suites: CryptoSuiteRegistry,
+    private val store: BlobStore,
     tenantCfg: TenantConfig,
 ) {
     private val deletionGrace: Duration = tenantCfg.deletionGrace()
@@ -75,6 +78,8 @@ class TenantProvisioningHandler(
     private val dec = Base64.getUrlDecoder()
     private val rng = SecureRandom()
     private val inviteTtl: Duration = Duration.ofDays(7)
+    private val logoUrlTtlSeconds = 900
+    private val maxLogoBytes = 512 * 1024
 
     @Transactional
     fun createTenant(auth: String?, req: CreateTenantRequest): TenantSummary {
@@ -110,6 +115,40 @@ class TenantProvisioningHandler(
     @Transactional
     fun cancelTenantDeletion(auth: String?, tenantId: String) {
         requireTenantOwner(auth, tenantId).scheduledDeletionAt = null
+    }
+
+    /** Owner uploads scaled public tenant branding bytes into the configured BlobStore/S3 backend. */
+    @Transactional
+    fun uploadTenantLogo(auth: String?, tenantId: String, req: UploadTenantLogoRequest): TenantSummary {
+        val tenant = requireTenantOwner(auth, tenantId)
+        val contentType = req.contentType.value
+        if (req.bytes.isEmpty()) throw ApiException(400, "LOGO_EMPTY", "Logo image is empty")
+        if (req.bytes.size > maxLogoBytes) throw ApiException(400, "LOGO_TOO_LARGE", "Logo image is too large")
+        val oldKey = tenant.logoObjectKey
+        val key = "tenant-logos/${tenant.id}/${newId()}"
+        store.put(key, req.bytes, contentType)
+        tenant.logoObjectKey = key
+        tenant.logoContentType = contentType
+        oldKey?.let { runCatching { store.delete(it) } }
+        return tenant.toSummary()
+    }
+
+    @Transactional
+    fun clearTenantLogo(auth: String?, tenantId: String): TenantSummary {
+        val tenant = requireTenantOwner(auth, tenantId)
+        val oldKey = tenant.logoObjectKey
+        tenant.logoObjectKey = null
+        tenant.logoContentType = null
+        oldKey?.let { runCatching { store.delete(it) } }
+        return tenant.toSummary()
+    }
+
+    @Transactional
+    fun getTenantLogo(tenantId: String): TenantLogoBytes {
+        val tenant = tenants.findById(tenantId) ?: throw notFound("Tenant")
+        val key = tenant.logoObjectKey ?: throw notFound("Tenant logo")
+        val bytes = store.get(key) ?: throw notFound("Tenant logo")
+        return TenantLogoBytes(contentType = tenant.logoContentType ?: "application/octet-stream", bytes = bytes)
     }
 
     /** The tenants whose grace period has passed — a read, so the scheduler can purge them one tx each. */
@@ -248,7 +287,14 @@ class TenantProvisioningHandler(
     }
 
     private fun Tenant.toSummary(): TenantSummary =
-        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain)
+        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain, logoUrl = logoUrl())
+
+    private fun Tenant.logoUrl(): String? {
+        val key = logoObjectKey ?: return null
+        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenants/$id/logo?v=${key.substringAfterLast('/')}"
+    }
+
+    data class TenantLogoBytes(val contentType: String, val bytes: ByteArray)
 
     private fun requireUser(auth: String?): User {
         val userId = sessions.resolve(auth) ?: throw unauthorized()

@@ -38,6 +38,7 @@ class MemoryTreeSliceTest {
     private lateinit var ownerToken: String
     private lateinit var outsiderToken: String
     private val scopeId = "mt-scope"
+    private val favoriteScopeId = "mt-fav-scope"
 
     @BeforeTest
     fun seed() {
@@ -46,11 +47,15 @@ class MemoryTreeSliceTest {
             if (users.findByEmail("mt-owner@example.com") == null) {
                 users.persist(User().apply { id = "mt-owner"; email = "mt-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
                 users.persist(User().apply { id = "mt-outsider"; email = "mt-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
+                users.persist(User().apply { id = "mt-fav-owner"; email = "mt-fav-owner@example.com"; displayName = "Favorite Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
                 // a personal scope (no tenant → no membership gate) the owner holds the key for
                 scopes.persist(Scope().apply { id = scopeId; ownerUserId = "mt-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "mt-grant"; this.scopeId = this@MemoryTreeSliceTest.scopeId; userId = "mt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 // nodes are sealed under the content key, so the scope must have one before any node exists
                 contentKeys.persist(ScopeContentKey().apply { id = "mt-ck"; this.scopeId = this@MemoryTreeSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = favoriteScopeId; ownerUserId = "mt-fav-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "fp".toByteArray(); createdAt = now })
+                grants.persist(ScopeGrant().apply { id = "mt-fav-grant"; scopeId = favoriteScopeId; userId = "mt-owner"; suiteId = "v1"; wrappedPrivateKey = "fg".toByteArray(); createdAt = now })
+                contentKeys.persist(ScopeContentKey().apply { id = "mt-fav-ck"; scopeId = favoriteScopeId; suiteId = "v1"; wrappedKey = "fck".toByteArray(); createdAt = now })
                 // a scope the owner holds the key for but with NO content key — node creation must be refused there
                 users.persist(User().apply { id = "mt-third"; email = "mt-third@example.com"; displayName = "Third"; serverRole = ServerRole.ServerMember; createdAt = now })
                 scopes.persist(Scope().apply { id = "mt-nokey"; ownerUserId = "mt-third"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "nk".toByteArray(); createdAt = now })
@@ -69,9 +74,12 @@ class MemoryTreeSliceTest {
         return """{$parent"type":"$type","slugToken":"$slugToken","orderIndex":$orderIndex,"sealedContent":{"suiteId":"v1","bytes":"c2VhbGVk"}}"""
     }
 
-    private fun create(token: String, type: String, slug: String, order: Int, parentId: String? = null) =
+    private fun createIn(scopeId: String, token: String, type: String, slug: String, order: Int, parentId: String? = null) =
         given().header("Authorization", token).contentType(ContentType.JSON).body(body(type, slug, order, parentId))
             .post("/api/scopes/$scopeId/nodes")
+
+    private fun create(token: String, type: String, slug: String, order: Int, parentId: String? = null) =
+        createIn(scopeId, token, type, slug, order, parentId)
 
     @Test
     fun buildsTreeWithContainmentAndSlugInvariants() {
@@ -116,5 +124,41 @@ class MemoryTreeSliceTest {
             .body("nodes.size()", `is`(2))
         given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes?parentId=$memId").then().statusCode(200)
             .body("nodes.size()", `is`(1)).body("nodes[0].type", `is`("CHAPTER"))
+    }
+
+    @Test
+    fun storesPersonalMemoryFavoritesPerUser() {
+        val folderId = createIn(favoriteScopeId, ownerToken, "FOLDER", "tok-fav-folder", 10).then().statusCode(200).extract().path<String>("id")
+        val memId = createIn(favoriteScopeId, ownerToken, "MEMORY", "tok-fav-memory", 11).then().statusCode(200).extract().path<String>("id")
+        val chapterId = createIn(favoriteScopeId, ownerToken, "CHAPTER", "tok-fav-chapter", 12, memId).then().statusCode(200).extract().path<String>("id")
+
+        given().header("Authorization", outsiderToken)
+            .put("/api/scopes/$favoriteScopeId/nodes/$memId/favorite")
+            .then().statusCode(403).body("code", `is`("NOT_A_KEY_HOLDER"))
+
+        given().header("Authorization", ownerToken)
+            .put("/api/scopes/$favoriteScopeId/nodes/$folderId/favorite")
+            .then().statusCode(400).body("code", `is`("NOT_A_MEMORY"))
+        given().header("Authorization", ownerToken)
+            .put("/api/scopes/$favoriteScopeId/nodes/$chapterId/favorite")
+            .then().statusCode(400).body("code", `is`("NOT_A_MEMORY"))
+
+        given().header("Authorization", ownerToken)
+            .put("/api/scopes/$favoriteScopeId/nodes/$memId/favorite")
+            .then().statusCode(200).body("favorite", `is`(true))
+        given().header("Authorization", ownerToken)
+            .put("/api/scopes/$favoriteScopeId/nodes/$memId/favorite")
+            .then().statusCode(200).body("favorite", `is`(true))
+
+        given().header("Authorization", ownerToken)
+            .get("/api/scopes/$favoriteScopeId/favorites")
+            .then().statusCode(200).body("nodeIds", `is`(listOf(memId)))
+
+        given().header("Authorization", ownerToken)
+            .delete("/api/scopes/$favoriteScopeId/nodes/$memId/favorite")
+            .then().statusCode(200).body("favorite", `is`(false))
+        given().header("Authorization", ownerToken)
+            .get("/api/scopes/$favoriteScopeId/favorites")
+            .then().statusCode(200).body("nodeIds", `is`(emptyList<String>()))
     }
 }

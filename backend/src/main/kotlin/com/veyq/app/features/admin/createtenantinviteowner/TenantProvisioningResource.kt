@@ -4,6 +4,7 @@ import com.veyq.app.generated.api.TenantProvisioningApi
 import com.veyq.app.generated.model.ClaimTenantOwnershipRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.GetInviteMaterialRequest
+import com.veyq.app.generated.model.UploadTenantLogoRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -22,6 +23,17 @@ class TenantProvisioningResource(private val handler: TenantProvisioningHandler)
     override fun cancelTenantDeletion(authorization: String, tenantId: String): Response {
         handler.cancelTenantDeletion(authorization, tenantId)
         return Response.noContent().build()
+    }
+
+    override fun uploadTenantLogo(authorization: String, tenantId: String, uploadTenantLogoRequest: UploadTenantLogoRequest): Response =
+        Response.ok(handler.uploadTenantLogo(authorization, tenantId, uploadTenantLogoRequest)).build()
+
+    override fun clearTenantLogo(authorization: String, tenantId: String): Response =
+        Response.ok(handler.clearTenantLogo(authorization, tenantId)).build()
+
+    override fun getTenantLogo(tenantId: String): Response {
+        val logo = handler.getTenantLogo(tenantId)
+        return Response.ok(logo.bytes, logo.contentType).build()
     }
 
     override fun issueOwnerInvite(authorization: String, tenantId: String): Response =

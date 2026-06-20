@@ -10,6 +10,7 @@ import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.`is`
+import org.hamcrest.CoreMatchers.startsWith
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -85,6 +86,19 @@ class TenantProvisioningSliceTest {
             .body(claimBody(bootstrapSecret))
             .post("/api/tenant-invites/$inviteId/claim").then().statusCode(200)
             .body("status", `is`("ACTIVE"))
+
+        given().header("Authorization", memberToken).contentType(ContentType.JSON)
+            .body("""{"contentType":"image/png","bytes":"bm9wZQ=="}""")
+            .put("/api/tenants/$tenantId/logo").then().statusCode(403)
+
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"contentType":"image/png","bytes":"aW1hZ2U="}""")
+            .put("/api/tenants/$tenantId/logo").then().statusCode(200)
+            .body("logoUrl", startsWith("/api/tenants/$tenantId/logo?v="))
+
+        given().get("/api/tenants/$tenantId/logo").then().statusCode(200)
+            .contentType("image/png")
+            .body(`is`("image"))
 
         // 6. blindness: the stored scope grant is byte-identical to what was posted
         given().header("Authorization", ownerToken)

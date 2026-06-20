@@ -29,6 +29,8 @@ class Tenant {
     @Column(nullable = false, unique = true) var name: String = ""
     @Column(name = "display_name", nullable = false) var displayName: String = ""
     @Column(nullable = false, unique = true) var domain: String = ""
+    @Column(name = "logo_object_key", length = 256) var logoObjectKey: String? = null
+    @Column(name = "logo_content_type", length = 64) var logoContentType: String? = null
     @Enumerated(EnumType.STRING) @Column(nullable = false) var status: TenantStatus = TenantStatus.PENDING
     @Column(name = "terms_markdown", columnDefinition = "text") var termsMarkdown: String? = null
     @Column(name = "terms_version", nullable = false) var termsVersion: Int = 0

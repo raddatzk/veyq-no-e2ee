@@ -47,7 +47,7 @@ class MySpacesSliceTest {
             users.persist(User().apply { id = "sp-multi"; email = "sp-multi@example.com"; displayName = "Multi User"; serverRole = ServerRole.ServerMember; createdAt = now })
             scopes.persist(Scope().apply { id = "sp-personal"; ownerUserId = "sp-multi"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "pp".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "sp-g-personal"; scopeId = "sp-personal"; userId = "sp-multi"; suiteId = "v1"; wrappedPrivateKey = "p".toByteArray(); createdAt = now })
-            tenants.persist(Tenant().apply { id = "sp-tenant"; name = "sp-acme"; domain = "sp-acme.test"; displayName = "Acme Group"; status = TenantStatus.ACTIVE; createdBy = "sp-multi"; createdAt = now })
+            tenants.persist(Tenant().apply { id = "sp-tenant"; name = "sp-acme"; domain = "sp-acme.test"; logoObjectKey = "tenant-logos/sp-tenant/logo"; logoContentType = "image/png"; displayName = "Acme Group"; status = TenantStatus.ACTIVE; createdBy = "sp-multi"; createdAt = now })
             scopes.persist(Scope().apply { id = "sp-scope"; tenantId = "sp-tenant"; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "gp".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "sp-g-group"; scopeId = "sp-scope"; userId = "sp-multi"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             memberships.persist(Membership().apply { id = "sp-m-group"; tenantId = "sp-tenant"; userId = "sp-multi"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
@@ -71,6 +71,7 @@ class MySpacesSliceTest {
             .body("spaces.find { it.kind == 'PERSONAL' }.scopeId", `is`("sp-personal"))
             .body("spaces.find { it.kind == 'TENANT' }.role", `is`("Owner"))
             .body("spaces.find { it.kind == 'TENANT' }.displayName", `is`("Acme Group"))
+            .body("spaces.find { it.kind == 'TENANT' }.logoUrl", `is`("/api/tenants/sp-tenant/logo?v=logo"))
             .body("spaces.find { it.kind == 'TENANT' }.tenantId", `is`("sp-tenant"))
 
         // the solo user sees only their personal space — the group membership without a grant is filtered out

@@ -8,7 +8,9 @@ import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.tenancy.TenantRepository
+import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
@@ -27,8 +29,10 @@ class MyGroupsHandler(
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val sessions: SessionService,
+    private val store: BlobStore,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
+    private val logoUrlTtlSeconds = 900
 
     @Transactional
     fun listMyGroups(auth: String?): MyGroupList {
@@ -48,12 +52,18 @@ class MyGroupsHandler(
                 tenantId = tenant.id,
                 name = tenant.name,
                 displayName = tenant.displayName,
+                logoUrl = tenant.logoUrl(),
                 role = m.role.name,
                 scopeId = scope.id,
                 scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
             )
         }
         return MyGroupList(groups = groups)
+    }
+
+    private fun Tenant.logoUrl(): String? {
+        val key = logoObjectKey ?: return null
+        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenants/$id/logo?v=${key.substringAfterLast('/')}"
     }
 
 }

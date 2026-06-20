@@ -12,7 +12,9 @@ import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.TenantRepository
+import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.OffsetDateTime
@@ -34,8 +36,10 @@ class MySpacesHandler(
     private val grants: ScopeGrantRepository,
     private val groupMembers: GroupMembershipRepository,
     private val sessions: SessionService,
+    private val store: BlobStore,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
+    private val logoUrlTtlSeconds = 900
 
     @Transactional
     fun listMySpaces(auth: String?): MySpaceList {
@@ -78,6 +82,7 @@ class MySpacesHandler(
                 name = tenant.name,
                 displayName = tenant.displayName,
                 domain = tenant.domain,
+                logoUrl = tenant.logoUrl(),
                 role = m.role.name,
                 scheduledDeletionAt = tenant.scheduledDeletionAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
                 scopeId = scope.id,
@@ -95,6 +100,7 @@ class MySpacesHandler(
                 tenantId = scope.tenantId,
                 // the group's tenant domain — so a cross-host tenant switch can navigate to the right host
                 domain = scope.tenantId?.let { tenantsById[it]?.domain },
+                logoUrl = scope.tenantId?.let { tenantsById[it]?.logoUrl() },
                 role = gm.role,
                 sealedName = Blob(suiteId = scope.nameSuiteId ?: scope.suiteId, bytes = enc.encodeToString(scope.sealedName ?: ByteArray(0))),
                 scopeId = scope.id,
@@ -106,5 +112,10 @@ class MySpacesHandler(
     }
 
     private fun Scope.toPublicKey() = KemPublicKey(suiteId = suiteId, kemPublicKey = enc.encodeToString(kemPublicKey))
+
+    private fun Tenant.logoUrl(): String? {
+        val key = logoObjectKey ?: return null
+        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenants/$id/logo?v=${key.substringAfterLast('/')}"
+    }
 
 }

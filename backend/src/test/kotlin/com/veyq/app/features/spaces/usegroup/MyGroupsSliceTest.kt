@@ -49,7 +49,7 @@ class MyGroupsSliceTest {
             // a user who is an active member but holds NO grant (removed-but-not-rotated) — must not see the group
             users.persist(User().apply { id = "grp-ghost"; email = "grp-ghost@example.com"; displayName = "Ghost"; serverRole = ServerRole.ServerMember; createdAt = now })
 
-            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; domain = "grp-acme.test"; displayName = "Acme Group"; status = TenantStatus.ACTIVE; createdBy = "grp-owner"; createdAt = now })
+            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; domain = "grp-acme.test"; logoObjectKey = "tenant-logos/grp-tenant/logo"; logoContentType = "image/png"; displayName = "Acme Group"; status = TenantStatus.ACTIVE; createdBy = "grp-owner"; createdAt = now })
             scopes.persist(Scope().apply { id = "grp-scope"; tenantId = "grp-tenant"; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "grp-pub".toByteArray(); createdAt = now })
             // a second tenant the owner is NOT a member of — must not leak into the owner's roster
             tenants.persist(Tenant().apply { id = "grp-other"; name = "grp-other"; domain = "grp-other.test"; displayName = "Other"; status = TenantStatus.ACTIVE; createdBy = "grp-member"; createdAt = now })
@@ -73,6 +73,7 @@ class MyGroupsSliceTest {
             .body("groups.size()", `is`(1))
             .body("groups[0].tenantId", `is`("grp-tenant"))
             .body("groups[0].displayName", `is`("Acme Group"))
+            .body("groups[0].logoUrl", `is`("/api/tenants/grp-tenant/logo?v=logo"))
             .body("groups[0].role", `is`("Owner"))
             .body("groups[0].scopeId", `is`("grp-scope"))
             .body("groups[0].scopePublicKey.kemPublicKey", `is`("Z3JwLXB1Yg")) // base64url("grp-pub")
