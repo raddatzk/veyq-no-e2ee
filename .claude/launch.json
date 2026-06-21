@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "veyq-legacy-smoke",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/frontend && VITE_PORT=8088 VITE_PROXY_TARGET=http://localhost:8080 npm run dev"],
+      "port": 8088
+    }
+  ]
+}

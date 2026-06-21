@@ -61,8 +61,9 @@ describe('TenantView (home + Memory views)', () => {
     const w = mountView({ folders: [], memory: null })
     await flushPromises()
 
-    const cards = w.findAll('.node-card')
-    expect(cards.length).toBe(3)
+    // The browse grid uses the ported rich cards: a .home-memory-card per memory, a .folder-card per folder.
+    expect(w.findAll('.home-memory-card').length).toBe(2)
+    expect(w.findAll('.folder-card').length).toBe(1)
     expect(w.text()).toContain('Folder f1')
     expect(w.text()).toContain('Memory m1')
     // the space root breadcrumb shows the space display name
@@ -74,7 +75,7 @@ describe('TenantView (home + Memory views)', () => {
     const w = mountView({ folders: [], memory: null })
     await flushPromises()
 
-    await w.find('.node-folder').trigger('click')
+    await w.find('.folder-card').trigger('click')
     expect(push).toHaveBeenCalledWith('/folder-f1')
   })
 

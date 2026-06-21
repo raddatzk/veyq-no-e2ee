@@ -13,6 +13,7 @@ import { buildHomePath } from '../features/home/homeRoute'
 import { listFavoriteNodeIds, setMemoryFavorite } from '../features/memory/favorite/favorite'
 import { downloadMemoryZip } from '../features/download/download'
 import { session } from '../app/session'
+import { useViewState } from '../shared/state/useViewState'
 import { t } from '../i18n/i18n'
 import { decodeNode, type NodeType } from '../features/memory/createTree/memoryTree'
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
@@ -21,6 +22,10 @@ import MemoryParticipants from '../features/memories/components/MemoryParticipan
 import MemoryPlaylists from '../features/memories/components/MemoryPlaylists.vue'
 import MemoryMap from '../features/memories/components/MemoryMap.vue'
 import MemoryShare from '../features/memories/components/MemoryShare.vue'
+import MemoryLevelGrid from '../app/home/MemoryLevelGrid.vue'
+import MemoryObjectCard from '../app/home/MemoryObjectCard.vue'
+import CreateNodeCard from '../app/home/CreateNodeCard.vue'
+import FolderCard from '../app/home/FolderCard.vue'
 
 const props = defineProps<{
   active: ActiveSpace
@@ -29,6 +34,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { compactView } = useViewState()
 const entries = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string>>({})
 const loading = ref(false)
@@ -42,26 +48,32 @@ const creating = ref(false)
 const createTitle = computed(() =>
   createType.value === 'FOLDER' ? t('home.createFolder') : createType.value === 'CHAPTER' ? t('detail.chapters') : t('home.createMemory'),
 )
-const isFavorite = ref(false)
+const favoriteIds = ref<Set<string>>(new Set())
 const favBusy = ref(false)
 const downloading = ref(false)
 let coverUrls: string[] = []
 
-async function loadFavorite() {
-  if (!props.memory) return
+// Favorites are scope-wide: load the id set once per scope so both the grid cards and the open memory's
+// toolbar can reflect/toggle favourite state from the same source.
+const isFavorite = computed(() => (props.memory ? favoriteIds.value.has(props.memory.node.id) : false))
+
+async function loadFavorites() {
   try {
     const ids = await listFavoriteNodeIds(session.apiBase, session.unlocked!, props.active.scope.scopeId)
-    isFavorite.value = ids.includes(props.memory.node.id)
+    favoriteIds.value = new Set(ids)
   } catch {
-    isFavorite.value = false
+    favoriteIds.value = new Set()
   }
 }
 
-async function toggleFavorite() {
-  if (!props.memory) return
+async function toggleFavorite(node: MemoryNode) {
   favBusy.value = true
   try {
-    isFavorite.value = await setMemoryFavorite(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.node.id, !isFavorite.value)
+    const now = await setMemoryFavorite(session.apiBase, session.unlocked!, props.active.scope.scopeId, node.id, !favoriteIds.value.has(node.id))
+    const next = new Set(favoriteIds.value)
+    if (now) next.add(node.id)
+    else next.delete(node.id)
+    favoriteIds.value = next
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -176,6 +188,25 @@ const deleteOpen = ref(false)
 const moveTargets = ref<{ id: string; name: string }[]>([])
 const moveDest = ref('root')
 
+// Card "…" menu: a small action sheet over a single node (rename / move / delete).
+const menuOpen = ref(false)
+const menuEntry = ref<LevelEntry | null>(null)
+function openMenu(entry: LevelEntry) {
+  menuEntry.value = entry
+  menuOpen.value = true
+}
+function menuAction(action: 'rename' | 'move' | 'delete') {
+  const node = menuEntry.value?.node
+  menuOpen.value = false
+  if (!node) return
+  if (action === 'rename') openRename(node)
+  else if (action === 'move') void openMove(node)
+  else openDelete(node)
+}
+function favoriteEntry(entry: LevelEntry) {
+  void toggleFavorite(entry.node)
+}
+
 function nodeName(node: MemoryNode): string {
   if (props.memory?.node.id === node.id) return props.memory.name
   return entries.value.find((e) => e.node.id === node.id)?.name ?? ''
@@ -265,7 +296,7 @@ async function confirmDelete() {
 }
 
 watch(() => [props.active.scope.scopeId, parentId.value], load, { immediate: true })
-watch(() => props.memory?.node.id, loadFavorite, { immediate: true })
+watch(() => props.active.scope.scopeId, loadFavorites, { immediate: true })
 onBeforeUnmount(releaseCovers)
 </script>
 
@@ -283,16 +314,12 @@ onBeforeUnmount(releaseCovers)
       </template>
     </nav>
 
-    <div class="memory-toolbar">
-      <Button type="button" :label="t('home.createFolder')" icon="pi pi-folder" severity="secondary" outlined @click="openCreate('FOLDER')" />
-      <Button type="button" :label="props.memory ? t('detail.chapters') : t('home.createMemory')" icon="pi pi-plus" @click="openCreate(props.memory ? 'CHAPTER' : 'MEMORY')" />
-      <template v-if="props.memory">
-        <Button type="button" :icon="isFavorite ? 'pi pi-star-fill' : 'pi pi-star'" :label="isFavorite ? t('memory.unfavorite') : t('memory.favorite')" severity="secondary" text :loading="favBusy" @click="toggleFavorite" />
-        <Button type="button" icon="pi pi-download" :label="t('detail.download')" severity="secondary" text :loading="downloading" @click="downloadMemory" />
-        <Button type="button" icon="pi pi-pencil" :label="t('common.rename')" severity="secondary" text @click="openRename(props.memory.node)" />
-        <Button type="button" icon="pi pi-arrows-alt" :label="t('common.move')" severity="secondary" text @click="openMove(props.memory.node)" />
-        <Button type="button" icon="pi pi-trash" :label="t('common.delete')" severity="danger" text @click="openDelete(props.memory.node)" />
-      </template>
+    <div v-if="props.memory" class="memory-toolbar">
+      <Button type="button" :icon="isFavorite ? 'pi pi-star-fill' : 'pi pi-star'" :label="isFavorite ? t('memory.unfavorite') : t('memory.favorite')" severity="secondary" text :loading="favBusy" @click="toggleFavorite(props.memory.node)" />
+      <Button type="button" icon="pi pi-download" :label="t('detail.download')" severity="secondary" text :loading="downloading" @click="downloadMemory" />
+      <Button type="button" icon="pi pi-pencil" :label="t('common.rename')" severity="secondary" text @click="openRename(props.memory.node)" />
+      <Button type="button" icon="pi pi-arrows-alt" :label="t('common.move')" severity="secondary" text @click="openMove(props.memory.node)" />
+      <Button type="button" icon="pi pi-trash" :label="t('common.delete')" severity="danger" text @click="openDelete(props.memory.node)" />
     </div>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
@@ -313,43 +340,70 @@ onBeforeUnmount(releaseCovers)
       <MemoryParticipants v-else-if="memoryTab === 'participants'" :active="props.active" :node-id="props.memory.node.id" />
       <MemoryPlaylists v-else-if="memoryTab === 'playlists'" :active="props.active" :node-id="props.memory.node.id" />
       <MemoryShare v-else :active="props.active" :node-id="props.memory.node.id" />
-      <h3 v-if="memoryEntries.length" class="section-title">{{ t('info.chapters') }}</h3>
+
+      <!-- Chapters of this memory, rendered with the same rich cards as the browse grid. -->
+      <div class="veyq-section-header content-head">
+        <span class="content-title">{{ t('info.chapters') }}</span>
+        <span class="content-count">{{ memoryEntries.length }}</span>
+      </div>
+      <div class="card-grid card-grid-memories" :class="{ 'card-grid-compact': compactView }">
+        <MemoryObjectCard
+          v-for="m in memoryEntries"
+          :key="m.node.id"
+          :name="m.name"
+          :cover="covers[m.node.id]"
+          :favorite="favoriteIds.has(m.node.id)"
+          :favorite-label="favoriteIds.has(m.node.id) ? t('memory.unfavorite') : t('memory.favorite')"
+          :menu-label="`${t('common.rename')} / ${t('common.move')} / ${t('common.delete')}`"
+          @open="open(m)"
+          @toggle-favorite="favoriteEntry(m)"
+          @menu="openMenu(m)"
+        />
+        <CreateNodeCard @create="openCreate('CHAPTER')">{{ t('detail.chapters') }}</CreateNodeCard>
+      </div>
+      <template v-if="folderEntries.length">
+        <div class="veyq-section-header content-head">
+          <span class="content-title">{{ t('home.folders') }}</span>
+          <span class="content-count">{{ folderEntries.length }}</span>
+        </div>
+        <div class="card-grid" :class="{ 'card-grid-compact': compactView }">
+          <FolderCard
+            v-for="f in folderEntries"
+            :key="f.node.id"
+            :name="f.name"
+            :menu-label="`${t('common.rename')} / ${t('common.move')} / ${t('common.delete')}`"
+            @open="open(f)"
+            @menu="openMenu(f)"
+          />
+          <CreateNodeCard row @create="openCreate('FOLDER')">{{ t('home.createFolder') }}</CreateNodeCard>
+        </div>
+      </template>
     </template>
 
     <div v-if="loading" class="veyq-loading"><ProgressSpinner class="small-spinner" /></div>
 
-    <section v-if="folderEntries.length" class="node-grid">
-      <div v-for="entry in folderEntries" :key="entry.node.id" class="node-cell">
-        <div class="node-card node-folder" role="button" tabindex="0" @click="open(entry)" @keydown.enter="open(entry)">
-          <span class="pi pi-folder node-folder-icon" />
-          <span class="node-name">{{ entry.name }}</span>
-        </div>
-        <div class="node-actions">
-          <button type="button" class="pi pi-pencil" :title="t('common.rename')" @click.stop="openRename(entry.node)" />
-          <button type="button" class="pi pi-arrows-alt" :title="t('common.move')" @click.stop="openMove(entry.node)" />
-          <button type="button" class="pi pi-trash" :title="t('common.delete')" @click.stop="openDelete(entry.node)" />
-        </div>
-      </div>
-    </section>
+    <!-- Browse level: the rich folder/memory grid with section headers + inline create tiles. -->
+    <MemoryLevelGrid
+      v-else-if="!props.memory"
+      :memories="memoryEntries"
+      :folders="folderEntries"
+      :covers="covers"
+      :favorite-ids="favoriteIds"
+      :compact="compactView"
+      @open-memory="open"
+      @open-folder="open"
+      @toggle-favorite="favoriteEntry"
+      @create="openCreate"
+      @open-menu="openMenu"
+    />
 
-    <section v-if="memoryEntries.length" class="node-grid">
-      <div v-for="entry in memoryEntries" :key="entry.node.id" class="node-cell">
-        <div class="node-card" role="button" tabindex="0" @click="open(entry)" @keydown.enter="open(entry)">
-          <span class="node-cover">
-            <img v-if="covers[entry.node.id]" :src="covers[entry.node.id]" :alt="entry.name" />
-            <span v-else class="pi pi-images node-cover-empty" />
-          </span>
-          <span class="node-name">{{ entry.name }}</span>
-        </div>
-        <div class="node-actions">
-          <button type="button" class="pi pi-pencil" :title="t('common.rename')" @click.stop="openRename(entry.node)" />
-          <button type="button" class="pi pi-arrows-alt" :title="t('common.move')" @click.stop="openMove(entry.node)" />
-          <button type="button" class="pi pi-trash" :title="t('common.delete')" @click.stop="openDelete(entry.node)" />
-        </div>
+    <Dialog v-model:visible="menuOpen" :header="menuEntry?.name" modal class="tenant-dialog" :style="{ width: '20rem' }">
+      <div class="veyq-form">
+        <Button type="button" :label="t('common.rename')" icon="pi pi-pencil" severity="secondary" text @click="menuAction('rename')" />
+        <Button type="button" :label="t('common.move')" icon="pi pi-arrows-alt" severity="secondary" text @click="menuAction('move')" />
+        <Button type="button" :label="t('common.delete')" icon="pi pi-trash" severity="danger" text @click="menuAction('delete')" />
       </div>
-    </section>
-
-    <p v-if="!loading && !entries.length && !props.memory" class="empty-hint">{{ t('home.noMemories') }}</p>
+    </Dialog>
 
     <Dialog v-model:visible="createOpen" :header="createTitle" modal class="tenant-dialog" :style="{ width: '24rem' }">
       <form class="veyq-form" @submit.prevent="confirmCreate">
@@ -404,30 +458,17 @@ onBeforeUnmount(releaseCovers)
 </template>
 
 <style scoped>
+/* The folder/memory grids + section headers come from the ported shell (styles/home.css: .card-grid,
+   .content-head, .home-memory-card, .folder-card, .create-card). Only the breadcrumb, the in-memory
+   toolbar/tabs and the move-select are local to this view. */
 .memory-browser { padding: 1rem; }
 .memory-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.75rem; }
-.crumb { background: none; border: none; color: var(--p-primary-color, #6366f1); cursor: pointer; padding: 0; font: inherit; }
+.crumb { background: none; border: none; color: var(--app-accent, #6366f1); cursor: pointer; padding: 0; font: inherit; }
 .crumb-current { color: inherit; cursor: default; font-weight: 600; }
 .crumb-sep { opacity: 0.5; }
-.memory-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.section-title { margin: 1.25rem 0 0.5rem; }
-.node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-.node-card { display: flex; flex-direction: column; gap: 0.5rem; background: none; border: 1px solid var(--p-content-border-color, rgba(127,127,127,0.2)); border-radius: 12px; padding: 0.75rem; cursor: pointer; text-align: left; color: inherit; }
-.node-card:hover { border-color: var(--p-primary-color, #6366f1); }
-.node-cell { position: relative; }
-.node-actions { position: absolute; top: 0.45rem; right: 0.45rem; display: flex; gap: 0.2rem; opacity: 0; transition: opacity 0.15s; }
-.node-cell:hover .node-actions, .node-cell:focus-within .node-actions { opacity: 1; }
-.node-actions button { width: 1.8rem; height: 1.8rem; border: none; border-radius: 6px; cursor: pointer; color: var(--p-text-color, inherit); background: var(--p-content-background, rgba(20,20,20,0.85)); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-.node-actions button:hover { color: var(--p-primary-color, #6366f1); }
-.move-select { width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--p-content-border-color, rgba(127,127,127,0.3)); background: var(--p-content-background, transparent); color: inherit; }
-.node-folder { flex-direction: row; align-items: center; }
-.node-folder-icon { font-size: 1.4rem; opacity: 0.7; }
-.node-cover { display: block; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: var(--p-content-border-color, rgba(127,127,127,0.12)); display: grid; place-items: center; }
-.node-cover img { width: 100%; height: 100%; object-fit: cover; }
-.node-cover-empty { font-size: 1.6rem; opacity: 0.4; }
-.node-name { font-weight: 600; }
-.empty-hint { opacity: 0.6; }
-.memory-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--p-content-border-color, rgba(127,127,127,0.2)); margin-bottom: 1rem; }
+.memory-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.move-select { width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--app-line, rgba(127,127,127,0.3)); background: var(--app-control-bg, transparent); color: inherit; }
+.memory-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--app-line, rgba(127,127,127,0.2)); margin-bottom: 1rem; }
 .memory-tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 0.5rem 0.85rem; cursor: pointer; color: inherit; opacity: 0.7; }
-.memory-tab.active { opacity: 1; border-bottom-color: var(--p-primary-color, #6366f1); font-weight: 600; }
+.memory-tab.active { opacity: 1; border-bottom-color: var(--app-accent, #6366f1); font-weight: 600; }
 </style>
