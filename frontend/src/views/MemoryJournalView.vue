@@ -14,6 +14,7 @@ import JournalContent from '../features/memories/components/JournalContent.vue'
 import JournalLiveEditor from '../features/memories/components/JournalLiveEditor.vue'
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
+import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
 import { getJournal } from '../features/memory/journal/journal'
@@ -101,6 +102,7 @@ function onSaved(md: string) {
 
 <template>
   <div class="veyq-page veyq-page-narrow">
+    <NodeCover v-if="active && node" :active="active" :node="node" class="detail-cover" icon="pi pi-image" />
     <div class="journal-head">
       <Button type="button" icon="pi pi-arrow-left" text @click="router.push('/')" />
       <h1>{{ title }}</h1>
@@ -156,7 +158,8 @@ function onSaved(md: string) {
         <ul v-if="children.length" class="chapter-list">
           <li v-for="child in children" :key="child.node.id">
             <button type="button" class="chapter-item" @click="router.push(`/m/${child.node.id}`)">
-              <i class="pi pi-book" /><span>{{ child.name }}</span><i class="pi pi-angle-right chapter-go" />
+              <NodeCover v-if="active" :active="active" :node="child.node" class="chapter-cover" />
+              <span>{{ child.name }}</span><i class="pi pi-angle-right chapter-go" />
             </button>
           </li>
         </ul>
@@ -216,4 +219,12 @@ function onSaved(md: string) {
 .chapter-item:hover { border-color: var(--p-primary-color, #5b4df5); }
 .chapter-go { margin-left: auto; opacity: 0.5; }
 .chapter-add { display: flex; gap: 0.5rem; }
+.chapter-cover { width: 2rem; height: 2rem; border-radius: 6px; flex: 0 0 auto; }
+.detail-cover {
+  display: block;
+  width: 100%;
+  height: 200px;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
 </style>

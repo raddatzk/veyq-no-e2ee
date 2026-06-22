@@ -12,6 +12,7 @@ import { ensureSpaces, invalidateSpaces } from '../../app/spaces'
 import { enterSpace, loadMemoryById, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import { listFavoriteNodeIds } from '../../features/memory/favorite/favorite'
 import { requireSession, session, setActiveSpace } from '../../app/session'
+import NodeCover from '../NodeCover.vue'
 import ProfileMenu from './ProfileMenu.vue'
 
 const emit = defineEmits<{ createTenant: []; createGroup: [] }>()
@@ -136,7 +137,7 @@ function initial(name: string): string {
         :to="`/m/${fav.node.id}`"
         class="sidebar-scope-link sidebar-favorite-link"
       >
-        <span class="sidebar-favorite-cover"><span class="pi pi-book" /></span>
+        <NodeCover v-if="session.activeSpace" :active="session.activeSpace" :node="fav.node" class="sidebar-favorite-cover" />
         <span><strong>{{ fav.name }}</strong></span>
       </RouterLink>
       <p v-if="favorites.length === 0" class="sidebar-section-empty">{{ t('navigation.noFavorites') }}</p>

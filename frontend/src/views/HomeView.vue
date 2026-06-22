@@ -2,14 +2,15 @@
 // Minimal personal-space browser for the E2EE backend: enter the personal scope, list its folders/memories
 // (names decrypted client-side), drill into folders, and open a memory's journal. A focused first step of the
 // memories revival — the full rich memory UI (cover grid, media, context panel) is a later increment.
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
+import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
-import { loadLevel, type LevelEntry } from '../features/home/home'
+import { loadLevel, type ActiveSpace, type LevelEntry } from '../features/home/home'
 import { requireSession, session } from '../app/session'
 
 const router = useRouter()
@@ -17,6 +18,7 @@ const { t } = useI18n()
 
 const entries = ref<LevelEntry[]>([])
 const stack = ref<{ id: string; name: string }[]>([])
+const active = shallowRef<ActiveSpace | null>(null)
 const loading = ref(false)
 const error = ref('')
 
@@ -26,8 +28,8 @@ async function open(parentId: string | undefined) {
   loading.value = true
   error.value = ''
   try {
-    const active = await ensureActiveSpaceForRoute(null)
-    entries.value = await loadLevel(session.apiBase, requireSession(), active, parentId)
+    active.value = await ensureActiveSpaceForRoute(null)
+    entries.value = await loadLevel(session.apiBase, requireSession(), active.value, parentId)
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('homeView.loadFailed')
   } finally {
@@ -70,7 +72,8 @@ function back() {
       <ul v-else class="home-list">
         <li v-for="entry in entries" :key="entry.node.id">
           <button type="button" class="home-item" @click="enter(entry)">
-            <i :class="entry.node.type === 'FOLDER' ? 'pi pi-folder' : 'pi pi-book'" />
+            <i v-if="entry.node.type === 'FOLDER'" class="pi pi-folder home-item-icon" />
+            <NodeCover v-else-if="active" :active="active" :node="entry.node" class="home-item-cover" />
             <span>{{ entry.name }}</span>
             <i class="pi pi-angle-right home-item-go" />
           </button>
@@ -115,5 +118,15 @@ function back() {
 .home-item-go {
   margin-left: auto;
   opacity: 0.5;
+}
+.home-item-cover {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.home-item-icon {
+  width: 2.25rem;
+  text-align: center;
 }
 </style>
