@@ -20,6 +20,7 @@ import JournalLiveEditor from '../features/memories/components/JournalLiveEditor
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
 import MemoryPlaylists from '../features/memories/components/MemoryPlaylists.vue'
+import MemoryContributions from '../features/memories/components/MemoryContributions.vue'
 import MemoryPlaylistBar from '../features/memories/components/MemoryPlaylistBar.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
@@ -278,7 +279,7 @@ async function onUpload(event: Event) {
         </TabPanel>
 
         <TabPanel value="contributions">
-          <Message severity="info" :closable="false">{{ t('memoryDetail.comingSoon') }}</Message>
+          <MemoryContributions :key="`c-${nodeId}-${galleryKey}`" :active="active" :node-id="nodeId" />
         </TabPanel>
 
         <TabPanel value="info">
