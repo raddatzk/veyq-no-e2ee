@@ -24,13 +24,15 @@ import MemoryContributions from '../features/memories/components/MemoryContribut
 import MemoryInfo from '../features/memories/components/MemoryInfo.vue'
 import MemoryPlaylistBar from '../features/memories/components/MemoryPlaylistBar.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
+import CoverPickerDialog from '../features/memories/components/CoverPickerDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { ancestorChain, loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
 import { setWorkspaceToolbar, clearWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
 import { getJournal } from '../features/memory/journal/journal'
 import { listPlaylists, type Playlist } from '../features/memory/playlist/playlist'
-import { renameNode, createChild } from '../features/memory/curate/curate'
+import { renameNode, createChild, deleteNode } from '../features/memory/curate/curate'
+import { listFavoriteNodeIds, setMemoryFavorite } from '../features/memory/favorite/favorite'
 import type { MemoryNode } from '../features/memory/createTree/memoryTree'
 import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
 import { uploadMedia } from '../features/uploads/media/media'
@@ -58,6 +60,10 @@ const renameOpen = ref(false)
 const renameValue = ref('')
 const chapterName = ref('')
 const shareOpen = ref(false)
+const coverOpen = ref(false)
+const deleteOpen = ref(false)
+const favorite = ref(false)
+const favBusy = ref(false)
 const busy = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
@@ -84,6 +90,7 @@ async function load() {
     children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId.value)
     await setBreadcrumbs()
     void reloadPlaylists()
+    void reloadFavorite()
     markdown.value = (await getJournal(session.apiBase, requireSession(), active.value, nodeId.value)).markdown
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('journalView.loadFailed')
@@ -100,6 +107,50 @@ async function reloadPlaylists() {
   } catch {
     playlists.value = []
   }
+}
+
+/** Reflect whether this memory is in the active scope's favourites (drives the star toggle). */
+async function reloadFavorite() {
+  if (!active.value) return
+  try {
+    const ids = await listFavoriteNodeIds(session.apiBase, requireSession(), active.value.scope.scopeId)
+    favorite.value = ids.includes(nodeId.value)
+  } catch {
+    favorite.value = false
+  }
+}
+
+async function toggleFavorite() {
+  if (!active.value || favBusy.value) return
+  favBusy.value = true
+  try {
+    favorite.value = await setMemoryFavorite(session.apiBase, requireSession(), active.value.scope.scopeId, nodeId.value, !favorite.value)
+  } catch {
+    /* keep the previous state on failure */
+  } finally {
+    favBusy.value = false
+  }
+}
+
+/** Delete this memory (and its subtree), then navigate to the parent or home. */
+async function doDelete() {
+  if (!active.value || !node.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    const parentId = node.value.parentId
+    await deleteNode(session.apiBase, requireSession(), active.value, nodeId.value)
+    deleteOpen.value = false
+    await router.push(parentId ? `/m/${parentId}` : '/')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('memory.deleteFailed')
+  } finally {
+    busy.value = false
+  }
+}
+
+function onCoverSaved(coverMediaId: string) {
+  if (node.value) node.value = { ...node.value, coverMediaId }
 }
 
 /** Build the breadcrumb trail client-side from the decrypted ancestor chain (root → … → this memory). */
@@ -186,6 +237,16 @@ async function onUpload(event: Event) {
         <Button
           type="button"
           class="veyq-icon-button"
+          :icon="favorite ? 'pi pi-star-fill' : 'pi pi-star'"
+          :aria-label="favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')"
+          :title="favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')"
+          :loading="favBusy"
+          text
+          @click="toggleFavorite"
+        />
+        <Button
+          type="button"
+          class="veyq-icon-button"
           icon="pi pi-upload"
           :aria-label="t('gallery.upload')"
           :title="t('gallery.upload')"
@@ -194,8 +255,10 @@ async function onUpload(event: Event) {
           @click="uploadInput?.click()"
         />
         <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
+        <Button type="button" class="veyq-icon-button" icon="pi pi-image" :aria-label="t('memory.coverChoose')" :title="t('memory.coverChoose')" text @click="coverOpen = true" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" :title="t('memoryDetail.rename')" text @click="openRename" />
+        <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-trash" severity="danger" :aria-label="t('memory.delete')" :title="t('memory.delete')" text @click="deleteOpen = true" />
         <input ref="uploadInput" class="kit-file-input" type="file" accept="image/*,video/*" multiple hidden @change="onUpload" />
       </div>
     </header>
@@ -297,6 +360,23 @@ async function onUpload(event: Event) {
     </Tabs>
 
     <MemoryShareDialog v-if="active" v-model:visible="shareOpen" :active="active" :node-id="nodeId" />
+
+    <CoverPickerDialog
+      v-if="active"
+      v-model:visible="coverOpen"
+      :active="active"
+      :node-id="nodeId"
+      :cover-media-id="node?.coverMediaId"
+      @saved="onCoverSaved"
+    />
+
+    <Dialog v-model:visible="deleteOpen" :header="t('memory.delete')" modal class="tenant-dialog">
+      <p>{{ t('memory.deleteCopy', { name: title }) }}</p>
+      <div class="veyq-dialog-action-row">
+        <Button type="button" :label="t('common.cancel')" severity="secondary" text @click="deleteOpen = false" />
+        <Button type="button" :label="t('memory.delete')" icon="pi pi-trash" severity="danger" :loading="busy" @click="doDelete" />
+      </div>
+    </Dialog>
 
     <Dialog v-model:visible="renameOpen" :header="t('memoryDetail.renameTitle')" modal class="tenant-dialog">
       <form class="veyq-form" @submit.prevent="doRename">
