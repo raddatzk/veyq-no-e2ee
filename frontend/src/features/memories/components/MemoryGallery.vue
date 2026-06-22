@@ -11,6 +11,7 @@ import { useGallery } from '../../gallery/useGallery'
 import { uploadMedia } from '../../uploads/media/media'
 import { fileToNewMedia } from '../../uploads/clientMedia'
 import { enqueueUploads } from '../../uploads/useUploadQueue'
+import { setCover } from '../../memory/curate/curate'
 import { requireSession, session } from '../../../app/session'
 import type { ActiveSpace } from '../../../features/home/home'
 
@@ -18,9 +19,10 @@ const props = defineProps<{ active: ActiveSpace; nodeId: string }>()
 const { t } = useI18n()
 const uploadError = ref('')
 const uploadingCount = ref(0)
+const coverMsg = ref('')
 
 const {
-  tiles, galleryEl, buckets, tileById, lightbox, downloading,
+  tiles, galleryEl, buckets, tileById, lightbox, lightboxTile, downloading,
   observe, revokeTiles, openLightbox, closeLightbox, downloadThisOriginal,
 } = useGallery({
   loadPreview: (tile) => loadPreview(session.apiBase, requireSession(), props.active, tile),
@@ -34,6 +36,18 @@ async function reload() {
 }
 
 onMounted(reload)
+
+async function setAsCover() {
+  if (!lightboxTile.value) return
+  coverMsg.value = ''
+  try {
+    await setCover(session.apiBase, requireSession(), props.active, props.nodeId, lightboxTile.value.id)
+    coverMsg.value = t('memoryDetail.coverSet')
+    closeLightbox()
+  } catch {
+    uploadError.value = t('gallery.uploadFailed')
+  }
+}
 
 async function onUpload(event: Event) {
   const input = event.target as HTMLInputElement
@@ -67,6 +81,7 @@ async function onUpload(event: Event) {
       </label>
     </div>
     <Message v-if="uploadError" severity="error" :closable="false">{{ uploadError }}</Message>
+    <Message v-if="coverMsg" severity="success" :closable="false">{{ coverMsg }}</Message>
 
     <p v-if="tiles.length === 0" class="gallery-empty">{{ t('gallery.empty') }}</p>
 
@@ -91,6 +106,7 @@ async function onUpload(event: Event) {
       <div class="gallery-lightbox-inner">
         <img :src="lightbox" alt="" />
         <div class="gallery-lightbox-actions">
+          <Button type="button" icon="pi pi-image" :label="t('memoryDetail.setCover')" severity="secondary" text @click="setAsCover()" />
           <Button type="button" icon="pi pi-download" :label="t('gallery.download')" :loading="downloading" severity="secondary" @click="downloadThisOriginal()" />
           <Button type="button" icon="pi pi-times" :label="t('common.close')" text @click="closeLightbox()" />
         </div>

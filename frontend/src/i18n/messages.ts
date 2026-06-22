@@ -248,6 +248,17 @@ export const messages = {
       addFailed: 'Route konnte nicht hinzugefügt werden.',
       loadFailed: 'Routen konnten nicht geladen werden.'
     },
+    memoryDetail: {
+      rename: 'Umbenennen',
+      renameTitle: 'Memory umbenennen',
+      renameFailed: 'Memory konnte nicht umbenannt werden.',
+      chapters: 'Kapitel',
+      addChapter: 'Kapitel hinzufügen',
+      addChapterName: 'Name des Kapitels',
+      addChapterFailed: 'Kapitel konnte nicht erstellt werden.',
+      setCover: 'Als Cover festlegen',
+      coverSet: 'Cover wurde festgelegt.'
+    },
     navigation: {
       createTenant: 'Bereich erstellen',
       favorites: 'Favoriten',
@@ -1451,6 +1462,17 @@ export const messages = {
       addGpx: 'Add GPX',
       addFailed: 'Could not add the route.',
       loadFailed: 'Could not load routes.'
+    },
+    memoryDetail: {
+      rename: 'Rename',
+      renameTitle: 'Rename memory',
+      renameFailed: 'Could not rename the memory.',
+      chapters: 'Chapters',
+      addChapter: 'Add chapter',
+      addChapterName: 'Chapter name',
+      addChapterFailed: 'Could not create the chapter.',
+      setCover: 'Set as cover',
+      coverSet: 'Cover set.'
     },
     navigation: {
       createTenant: 'Create space',
