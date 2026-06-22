@@ -20,12 +20,14 @@ import JournalLiveEditor from '../features/memories/components/JournalLiveEditor
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
 import MemoryPlaylists from '../features/memories/components/MemoryPlaylists.vue'
+import MemoryPlaylistBar from '../features/memories/components/MemoryPlaylistBar.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { ancestorChain, loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
 import { setWorkspaceToolbar, clearWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
 import { getJournal } from '../features/memory/journal/journal'
+import { listPlaylists, type Playlist } from '../features/memory/playlist/playlist'
 import { renameNode, createChild } from '../features/memory/curate/curate'
 import type { MemoryNode } from '../features/memory/createTree/memoryTree'
 import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
@@ -48,6 +50,7 @@ const editing = ref(false)
 const active = shallowRef<ActiveSpace | null>(null)
 const node = shallowRef<MemoryNode | null>(null)
 const children = ref<LevelEntry[]>([])
+const playlists = ref<Playlist[]>([])
 
 const renameOpen = ref(false)
 const renameValue = ref('')
@@ -78,11 +81,22 @@ async function load() {
     title.value = memory?.name ?? t('journalView.title')
     children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId.value)
     await setBreadcrumbs()
+    void reloadPlaylists()
     markdown.value = (await getJournal(session.apiBase, requireSession(), active.value, nodeId.value)).markdown
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('journalView.loadFailed')
   } finally {
     loading.value = false
+  }
+}
+
+/** Featured playlist(s) drive the header chip; reload after edits in the Playlists tab. */
+async function reloadPlaylists() {
+  if (!active.value) return
+  try {
+    playlists.value = await listPlaylists(session.apiBase, requireSession(), active.value, nodeId.value)
+  } catch {
+    playlists.value = []
   }
 }
 
@@ -164,6 +178,7 @@ async function onUpload(event: Event) {
 <template>
   <div class="veyq-page veyq-page-narrow">
     <NodeCover v-if="active && node" :active="active" :node="node" class="detail-cover" icon="pi pi-image" />
+    <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
     <header class="memory-detail-header">
       <h1>{{ title }}</h1>
       <div v-if="active" class="memory-detail-actions">
@@ -210,7 +225,7 @@ async function onUpload(event: Event) {
         </TabPanel>
 
         <TabPanel value="playlists">
-          <MemoryPlaylists :key="`p-${nodeId}`" :active="active" :node-id="nodeId" />
+          <MemoryPlaylists :key="`p-${nodeId}`" :active="active" :node-id="nodeId" @changed="reloadPlaylists" />
         </TabPanel>
 
         <TabPanel value="journal">

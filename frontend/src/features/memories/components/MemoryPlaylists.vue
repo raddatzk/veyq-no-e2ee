@@ -15,6 +15,7 @@ import { requireSession, session } from '../../../app/session'
 import type { ActiveSpace } from '../../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; nodeId: string }>()
+const emit = defineEmits<{ changed: [] }>()
 const { t } = useI18n()
 
 const playlists = ref<Playlist[]>([])
@@ -45,6 +46,7 @@ async function add() {
     title.value = ''
     note.value = ''
     await load()
+    emit('changed')
   } catch {
     error.value = t('playlist.saveFailed')
   } finally {
@@ -57,6 +59,7 @@ async function toggleFeatured(p: Playlist) {
   try {
     await setPlaylistFeatured(session.apiBase, requireSession(), props.active, props.nodeId, p.id, !p.featured)
     await load()
+    emit('changed')
   } catch {
     error.value = t('playlist.saveFailed')
   }
@@ -67,6 +70,7 @@ async function remove(p: Playlist) {
   try {
     await deletePlaylist(session.apiBase, requireSession(), props.active, props.nodeId, p.id)
     playlists.value = playlists.value.filter((x) => x.id !== p.id)
+    emit('changed')
   } catch {
     error.value = t('playlist.deleteFailed')
   }
