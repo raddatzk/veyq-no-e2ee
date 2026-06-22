@@ -22,6 +22,9 @@ import { setWorkspaceToolbar, clearWorkspaceToolbar } from '../composables/useWo
 import { getJournal } from '../features/memory/journal/journal'
 import { renameNode, createChild } from '../features/memory/curate/curate'
 import type { MemoryNode } from '../features/memory/createTree/memoryTree'
+import { uploadMedia } from '../features/uploads/media/media'
+import { fileToNewMedia } from '../features/uploads/clientMedia'
+import { enqueueUploads } from '../features/uploads/useUploadQueue'
 import { requireSession, session } from '../app/session'
 
 const route = useRoute()
@@ -44,6 +47,9 @@ const renameValue = ref('')
 const chapterName = ref('')
 const shareOpen = ref(false)
 const busy = ref(false)
+const uploadInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+const galleryKey = ref(0) // bumped after an upload to remount the gallery and reload its tiles
 
 onMounted(load)
 onBeforeUnmount(clearWorkspaceToolbar)
@@ -120,26 +126,50 @@ async function addChapter() {
 function onSaved(md: string) {
   markdown.value = md
 }
+
+async function onUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (files.length === 0 || !active.value) return
+  uploading.value = true
+  error.value = ''
+  try {
+    const space = active.value
+    await enqueueUploads(files, async (file) => {
+      const media = await fileToNewMedia(file)
+      await uploadMedia(session.apiBase, requireSession(), space.scope.scopeId, space.contentKey, nodeId.value, media)
+    })
+    galleryKey.value += 1 // reload the gallery
+  } catch {
+    error.value = t('gallery.uploadFailed')
+  } finally {
+    uploading.value = false
+  }
+}
 </script>
 
 <template>
   <div class="veyq-page veyq-page-narrow">
     <NodeCover v-if="active && node" :active="active" :node="node" class="detail-cover" icon="pi pi-image" />
-    <div class="journal-head">
+    <header class="memory-detail-header">
       <h1>{{ title }}</h1>
-      <Button v-if="active && node" type="button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" text @click="openRename" />
-      <Button v-if="active" type="button" icon="pi pi-share-alt" :aria-label="t('share.title')" text @click="shareOpen = true" />
-      <Button
-        v-if="active"
-        type="button"
-        class="journal-mode-toggle"
-        :icon="editing ? 'pi pi-eye' : 'pi pi-file-edit'"
-        :label="editing ? t('journalView.read') : t('journalView.edit')"
-        severity="secondary"
-        text
-        @click="editing = !editing"
-      />
-    </div>
+      <div v-if="active" class="memory-detail-actions">
+        <Button
+          type="button"
+          class="veyq-icon-button"
+          icon="pi pi-upload"
+          :aria-label="t('gallery.upload')"
+          :title="t('gallery.upload')"
+          :loading="uploading"
+          text
+          @click="uploadInput?.click()"
+        />
+        <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
+        <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" :title="t('memoryDetail.rename')" text @click="openRename" />
+        <input ref="uploadInput" class="kit-file-input" type="file" accept="image/*,video/*" multiple hidden @change="onUpload" />
+      </div>
+    </header>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
@@ -148,33 +178,45 @@ function onSaved(md: string) {
       <span>{{ t('common.loading') }}</span>
     </div>
 
-    <template v-else-if="editing && active">
-      <JournalLiveEditor
-        :key="nodeId"
-        :api-base="session.apiBase"
-        :session="requireSession()"
-        :scope-id="active.scope.scopeId"
-        :node-id="nodeId"
-        :content-key="active.contentKey"
-        @saved="onSaved"
-      />
-    </template>
-
     <template v-else-if="active">
-      <MemoryGallery :key="`g-${nodeId}`" :active="active" :node-id="nodeId" />
+      <MemoryGallery :key="`g-${nodeId}-${galleryKey}`" :active="active" :node-id="nodeId" />
       <MemoryTracks :key="`t-${nodeId}`" :active="active" :node-id="nodeId" />
 
-      <Message v-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
-      <JournalContent
-        v-else
-        :key="`j-${nodeId}`"
-        :api-base="session.apiBase"
-        :session="requireSession()"
-        :scope-id="active.scope.scopeId"
-        :node-id="nodeId"
-        :content-key="active.contentKey"
-        :markdown="markdown"
-      />
+      <!-- Journal (read / live-edit toggle lives in the journal section) -->
+      <section class="memory-journal-section">
+        <div class="settings-section-header journal-section-head">
+          <h2>{{ t('journalView.title') }}</h2>
+          <Button
+            type="button"
+            :icon="editing ? 'pi pi-eye' : 'pi pi-file-edit'"
+            :label="editing ? t('journalView.read') : t('journalView.edit')"
+            severity="secondary"
+            text
+            @click="editing = !editing"
+          />
+        </div>
+        <JournalLiveEditor
+          v-if="editing"
+          :key="nodeId"
+          :api-base="session.apiBase"
+          :session="requireSession()"
+          :scope-id="active.scope.scopeId"
+          :node-id="nodeId"
+          :content-key="active.contentKey"
+          @saved="onSaved"
+        />
+        <Message v-else-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
+        <JournalContent
+          v-else
+          :key="`j-${nodeId}`"
+          :api-base="session.apiBase"
+          :session="requireSession()"
+          :scope-id="active.scope.scopeId"
+          :node-id="nodeId"
+          :content-key="active.contentKey"
+          :markdown="markdown"
+        />
+      </section>
 
       <!-- Child chapters (sub-memories) -->
       <section class="chapters">
@@ -217,6 +259,14 @@ function onSaved(md: string) {
 }
 .journal-mode-toggle {
   margin-left: auto;
+}
+.memory-journal-section {
+  margin-top: 1.5rem;
+}
+.journal-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .chapters {
   margin-top: 1.5rem;

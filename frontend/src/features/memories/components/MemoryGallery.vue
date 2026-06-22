@@ -2,32 +2,38 @@
 // A memory's media as a justified, day-bucketed gallery (E2EE). Thumbnails are decrypted to object URLs by
 // loadGalleryTiles; the lightbox loads the larger PREVIEW on open and the full-res original only on an
 // explicit download. Layout + lifecycle come from the shared useGallery composable.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { loadGalleryTiles, loadPreview, loadOriginal } from '../../gallery/gallery'
 import { useGallery } from '../../gallery/useGallery'
-import { uploadMedia } from '../../uploads/media/media'
-import { fileToNewMedia } from '../../uploads/clientMedia'
-import { enqueueUploads } from '../../uploads/useUploadQueue'
+import { calculateJustifiedLayout } from '../../gallery/justifiedLayout'
 import { setCover } from '../../memory/curate/curate'
 import { requireSession, session } from '../../../app/session'
 import type { ActiveSpace } from '../../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; nodeId: string }>()
 const { t } = useI18n()
-const uploadError = ref('')
-const uploadingCount = ref(0)
 const coverMsg = ref('')
 
 const {
-  tiles, galleryEl, buckets, tileById, lightbox, lightboxTile, downloading,
+  tiles, galleryEl, containerWidth, tileById, lightbox, lightboxTile, downloading,
   observe, revokeTiles, openLightbox, closeLightbox, downloadThisOriginal,
 } = useGallery({
   loadPreview: (tile) => loadPreview(session.apiBase, requireSession(), props.active, tile),
   loadOriginal: (tile) => loadOriginal(session.apiBase, requireSession(), props.active, tile),
 })
+
+// One continuous justified grid (no per-day date headers — the old grid grouped by asset bucket, not day).
+const layout = computed(() =>
+  calculateJustifiedLayout({
+    items: tiles.value.map((tile) => ({ id: tile.id, aspectRatio: tile.aspectRatio })),
+    containerWidth: containerWidth.value,
+    targetHeight: containerWidth.value <= 720 ? 150 : 200,
+    gap: 8,
+  }),
+)
 
 async function reload() {
   revokeTiles()
@@ -45,61 +51,29 @@ async function setAsCover() {
     coverMsg.value = t('memoryDetail.coverSet')
     closeLightbox()
   } catch {
-    uploadError.value = t('gallery.uploadFailed')
-  }
-}
-
-async function onUpload(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
-  if (files.length === 0) return
-  uploadError.value = ''
-  uploadingCount.value = files.length
-  try {
-    await enqueueUploads(files, async (file) => {
-      const media = await fileToNewMedia(file)
-      await uploadMedia(session.apiBase, requireSession(), props.active.scope.scopeId, props.active.contentKey, props.nodeId, media)
-    })
-    await reload()
-  } catch {
-    uploadError.value = t('gallery.uploadFailed')
-  } finally {
-    uploadingCount.value = 0
+    coverMsg.value = ''
   }
 }
 </script>
 
 <template>
   <div ref="galleryEl" class="memory-gallery">
-    <div class="gallery-toolbar">
-      <label class="kit-file-trigger">
-        <span class="p-button p-component p-button-secondary">
-          <i class="pi pi-upload" />&nbsp;{{ uploadingCount > 0 ? t('gallery.uploading', { count: uploadingCount }) : t('gallery.upload') }}
-        </span>
-        <input class="kit-file-input" type="file" accept="image/*,video/*" multiple :disabled="uploadingCount > 0" @change="onUpload" />
-      </label>
-    </div>
-    <Message v-if="uploadError" severity="error" :closable="false">{{ uploadError }}</Message>
     <Message v-if="coverMsg" severity="success" :closable="false">{{ coverMsg }}</Message>
 
     <p v-if="tiles.length === 0" class="gallery-empty">{{ t('gallery.empty') }}</p>
 
-    <section v-for="bucket in buckets" :key="bucket.key" class="gallery-bucket">
-      <h3 class="gallery-day">{{ bucket.label }}</h3>
-      <div class="gallery-rows" :style="{ height: bucket.layout.height + 'px' }">
-        <button
-          v-for="tile in bucket.layout.tiles"
-          :key="tile.id"
-          type="button"
-          class="gallery-tile"
-          :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
-          @click="openLightbox(tileById[tile.id])"
-        >
-          <img :src="tileById[tile.id]?.url" alt="" loading="lazy" />
-        </button>
-      </div>
-    </section>
+    <div v-if="tiles.length" class="gallery-rows" :style="{ height: layout.height + 'px' }">
+      <button
+        v-for="tile in layout.tiles"
+        :key="tile.id"
+        type="button"
+        class="gallery-tile"
+        :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
+        @click="openLightbox(tileById[tile.id])"
+      >
+        <img :src="tileById[tile.id]?.url" alt="" loading="lazy" />
+      </button>
+    </div>
 
     <!-- Lightbox -->
     <div v-if="lightbox" class="gallery-lightbox" @click.self="closeLightbox()">
