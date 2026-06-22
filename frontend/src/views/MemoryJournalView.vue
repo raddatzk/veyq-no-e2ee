@@ -258,8 +258,8 @@ async function onUpload(event: Event) {
         />
         <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-image" :aria-label="t('memory.coverChoose')" :title="t('memory.coverChoose')" text @click="coverOpen = true" />
-        <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-user-plus" :aria-label="t('share.uploaderTitle')" :title="t('share.uploaderTitle')" text @click="uploaderOpen = true" />
+        <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" :title="t('memoryDetail.rename')" text @click="openRename" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-trash" severity="danger" :aria-label="t('memory.delete')" :title="t('memory.delete')" text @click="deleteOpen = true" />
         <input ref="uploadInput" class="kit-file-input" type="file" accept="image/*,video/*" multiple hidden @change="onUpload" />
