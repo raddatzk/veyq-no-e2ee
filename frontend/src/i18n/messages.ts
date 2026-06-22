@@ -622,6 +622,7 @@ export const messages = {
       deleteConfirm:
         'Playlist "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
       deleteFailed: 'Playlist konnte nicht gelöscht werden',
+      loadFailed: 'Playlists konnten nicht geladen werden.',
       deleteNameLabel: 'Playlist-Name zur Bestätigung',
       edit: 'Playlist bearbeiten',
       empty: 'Noch keine Playlists in dieser Memory.',
@@ -1845,6 +1846,7 @@ export const messages = {
       deleteConfirm:
         'Delete playlist "{name}"? Journal references stay in place and render as unavailable.',
       deleteFailed: 'Playlist could not be deleted',
+      loadFailed: 'Could not load playlists.',
       deleteNameLabel: 'Playlist name for confirmation',
       edit: 'Edit playlist',
       empty: 'No playlists in this Memory yet.',

@@ -19,6 +19,7 @@ import JournalContent from '../features/memories/components/JournalContent.vue'
 import JournalLiveEditor from '../features/memories/components/JournalLiveEditor.vue'
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
+import MemoryPlaylists from '../features/memories/components/MemoryPlaylists.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
@@ -209,7 +210,7 @@ async function onUpload(event: Event) {
         </TabPanel>
 
         <TabPanel value="playlists">
-          <Message severity="info" :closable="false">{{ t('memoryDetail.comingSoon') }}</Message>
+          <MemoryPlaylists :key="`p-${nodeId}`" :active="active" :node-id="nodeId" />
         </TabPanel>
 
         <TabPanel value="journal">
