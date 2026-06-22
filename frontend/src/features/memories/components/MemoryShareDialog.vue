@@ -1,548 +1,137 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+// Owner-side public sharing for a memory (operator-blind). createShare wraps the scope content key under a
+// random per-share key; that key rides the returned link FRAGMENT and never reaches the server — so the link
+// is only available at creation time (existing shares show metadata + revoke only). Guests open it via the
+// public /s/<id> route.
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
-import ManagementList from '../../../shared/components/ManagementList.vue'
-import LocaleMarkdownEditor from '../../../shared/components/LocaleMarkdownEditor.vue'
-import { API_BASE } from '../../../shared/api/httpClient'
-import { getErrorMessage } from '../../../shared/utils/errors'
-import {
-  createMemoryShare,
-  listMemoryShares,
-  updateMemoryShare,
-  type Memory,
-  type MemoryShareRole,
-  type MemoryShareSummary
-} from '../api'
-import MemoryCoverImage from './MemoryCoverImage.vue'
+import Password from 'primevue/password'
+import { createShare, listShares, revokeShare, type ShareRole, type ShareSummary } from '../../memory/share/share'
+import { requireSession, session } from '../../../app/session'
+import type { ActiveSpace } from '../../../features/home/home'
 
-type ShareRoleOption = {
-  label: string
-  value: Exclude<MemoryShareRole, 'UPLOADER'>
-  description: string
-}
-
+const props = defineProps<{ active: ActiveSpace; nodeId: string }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const props = defineProps<{
-  tenantName: string
-  memory: Memory
-}>()
-
 const { t } = useI18n()
-const shares = ref<MemoryShareSummary[]>([])
-const name = ref('')
-const role = ref<MemoryShareRole>('VIEWER')
-const passwordEnabled = ref(false)
+
+const shares = ref<ShareSummary[]>([])
+const role = ref<ShareRole>('VIEWER')
 const password = ref('')
-const noticeMarkdownByLocale = ref<Record<string, string>>({})
+const expiresAt = ref('')
+const label = ref('')
+const createdLink = ref('')
+const busy = ref(false)
 const error = ref('')
 const message = ref('')
-const loading = ref(false)
-const createDialogVisible = ref(false)
-const renameDialogVisible = ref(false)
-const passwordDialogVisible = ref(false)
-const noticeDialogVisible = ref(false)
-const selectedShare = ref<MemoryShareSummary | null>(null)
-const editName = ref('')
-const editPasswordEnabled = ref(false)
-const editPassword = ref('')
-const editNoticeMarkdownByLocale = ref<Record<string, string>>({})
 
-const roleOptions = computed<ShareRoleOption[]>(() => [
-  {
-    label: t('share.roles.VIEWER'),
-    value: 'VIEWER',
-    description: t('share.roleDescriptions.VIEWER')
-  },
-  {
-    label: t('share.roles.CONTRIBUTOR'),
-    value: 'CONTRIBUTOR',
-    description: t('share.roleDescriptions.CONTRIBUTOR')
-  },
-  {
-    label: t('share.roles.MANAGER'),
-    value: 'MANAGER',
-    description: t('share.roleDescriptions.MANAGER')
-  }
-])
-const origin = computed(() => window.location.origin)
-const coverUrl = computed(() => props.memory.coverUrl ? `${API_BASE}${props.memory.coverUrl}` : '')
-const visibleShares = computed(() => shares.value.filter((share) => share.role !== 'UPLOADER'))
+watch(visible, (open) => { if (open) void load() })
 
-watch(
-  visible,
-  (isVisible) => {
-    if (!isVisible) return
-    name.value = ''
-    role.value = 'VIEWER'
-    passwordEnabled.value = false
-    password.value = ''
-    noticeMarkdownByLocale.value = {}
-    createDialogVisible.value = false
-    error.value = ''
-    message.value = ''
-    void loadShares()
-  },
-  { immediate: true }
-)
-
-async function loadShares() {
-  loading.value = true
-  try {
-    shares.value = await listMemoryShares(props.tenantName, props.memory.id)
-  } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, t('share.loadFailed'))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function createShare() {
-  if (passwordEnabled.value && !password.value.trim()) return
+async function load() {
   error.value = ''
-  message.value = ''
-  loading.value = true
   try {
-    await createMemoryShare(props.tenantName, props.memory.id, {
-      name: name.value.trim() || null,
-      role: role.value,
-      password: passwordEnabled.value ? password.value.trim() : null,
-      noticeMarkdownByLocale: noticeMarkdownByLocale.value
-    })
-    name.value = ''
-    passwordEnabled.value = false
-    password.value = ''
-    noticeMarkdownByLocale.value = {}
-    createDialogVisible.value = false
-    await loadShares()
-  } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, t('share.createFailed'))
-  } finally {
-    loading.value = false
-  }
-}
-
-function openCreateDialog() {
-  name.value = ''
-  role.value = 'VIEWER'
-  passwordEnabled.value = false
-  password.value = ''
-  noticeMarkdownByLocale.value = {}
-  error.value = ''
-  message.value = ''
-  createDialogVisible.value = true
-}
-
-async function setRole(share: MemoryShareSummary, nextRole: MemoryShareRole) {
-  await updateShare(share, { role: nextRole })
-}
-
-async function toggleShare(share: MemoryShareSummary) {
-  await updateShare(share, { enabled: !share.enabled })
-}
-
-function openRenameDialog(share: MemoryShareSummary) {
-  selectedShare.value = share
-  editName.value = share.name || ''
-  renameDialogVisible.value = true
-}
-
-function openPasswordDialog(share: MemoryShareSummary) {
-  selectedShare.value = share
-  editPasswordEnabled.value = share.hasPassword
-  editPassword.value = ''
-  passwordDialogVisible.value = true
-}
-
-function openNoticeDialog(share: MemoryShareSummary) {
-  selectedShare.value = share
-  editNoticeMarkdownByLocale.value = { ...(share.noticeMarkdownByLocale || {}) }
-  noticeDialogVisible.value = true
-}
-
-async function saveName() {
-  if (!selectedShare.value) return
-  await updateShare(selectedShare.value, { name: editName.value.trim() || null })
-  renameDialogVisible.value = false
-  selectedShare.value = null
-}
-
-async function savePassword() {
-  if (!selectedShare.value || !canSavePassword.value) return
-  await updateShare(selectedShare.value, {
-    password: editPasswordEnabled.value ? editPassword.value.trim() : ''
-  })
-  passwordDialogVisible.value = false
-  selectedShare.value = null
-  editPassword.value = ''
-}
-
-async function saveNotice() {
-  if (!selectedShare.value) return
-  await updateShare(selectedShare.value, { noticeMarkdownByLocale: editNoticeMarkdownByLocale.value })
-  noticeDialogVisible.value = false
-  selectedShare.value = null
-  editNoticeMarkdownByLocale.value = {}
-}
-
-async function updateShare(
-  share: MemoryShareSummary,
-  request: {
-    name?: string | null
-    role?: MemoryShareRole
-    enabled?: boolean
-    password?: string | null
-    noticeMarkdownByLocale?: Record<string, string>
-  }
-) {
-  error.value = ''
-  message.value = ''
-  loading.value = true
-  try {
-    await updateMemoryShare(props.tenantName, share.id, request)
-    await loadShares()
-  } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, t('share.updateFailed'))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function copyShare(share: MemoryShareSummary) {
-  error.value = ''
-  message.value = ''
-  try {
-    await navigator.clipboard.writeText(`${origin.value}${share.shareUrl}`)
-    message.value = t('share.linkCopied')
+    shares.value = await listShares(session.apiBase, requireSession(), props.active, props.nodeId)
   } catch {
-    error.value = t('share.linkCopyFailed')
+    error.value = t('share.loadFailed')
   }
 }
 
-function shareLabel(share: MemoryShareSummary) {
-  return share.name || t(`share.roles.${share.role}`)
+async function create() {
+  busy.value = true
+  error.value = ''
+  message.value = ''
+  createdLink.value = ''
+  try {
+    const res = await createShare(session.apiBase, requireSession(), props.active, props.nodeId, {
+      role: role.value,
+      password: password.value || undefined,
+      expiresAt: expiresAt.value || undefined,
+      label: label.value || undefined,
+      origin: window.location.origin,
+    })
+    await navigator.clipboard?.writeText(res.link).catch(() => {})
+    message.value = t('share.linkCopied')
+    password.value = ''
+    label.value = ''
+    expiresAt.value = ''
+    await load()
+    createdLink.value = res.link // keep the freshly created link visible (the key is client-only)
+  } catch {
+    error.value = t('share.createFailed')
+  } finally {
+    busy.value = false
+  }
 }
 
-function roleOptionByValue(value: unknown): ShareRoleOption | null {
-  const roleValue =
-    typeof value === 'string'
-      ? value
-      : value && typeof value === 'object' && 'value' in value
-        ? String(value.value)
-        : ''
-  return roleOptions.value.find((option) => option.value === roleValue) ?? null
+async function revoke(share: ShareSummary) {
+  error.value = ''
+  try {
+    await revokeShare(session.apiBase, requireSession(), props.active, props.nodeId, share.shareId)
+    shares.value = shares.value.filter((s) => s.shareId !== share.shareId)
+    message.value = t('share.revoked')
+  } catch {
+    error.value = t('share.revokeFailed')
+  }
 }
-
-function roleInfoLabel(option: ShareRoleOption) {
-  return `${option.label}: ${option.description}`
-}
-
-const minSharePasswordLength = 10
-const hasValidSharePassword = (value: string) => value.trim().length >= minSharePasswordLength
-
-const canCreateShare = computed(() => !passwordEnabled.value || hasValidSharePassword(password.value))
-
-const canSavePassword = computed(() => {
-  if (!selectedShare.value) return false
-  if (!editPasswordEnabled.value) return selectedShare.value.hasPassword
-  return hasValidSharePassword(editPassword.value)
-})
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="t('share.title')" modal class="tenant-dialog share-dialog">
-    <div class="veyq-form">
-      <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
-
-      <div class="share-memory-summary">
-        <span class="share-memory-cover">
-          <MemoryCoverImage
-            v-if="coverUrl"
-            :src="coverUrl"
-            :alt="memory.displayName"
-            :crop="memory.coverCrop"
-          />
-          <span v-else class="pi pi-images" />
-        </span>
-        <span class="share-memory-copy">
-          <strong>{{ memory.displayName }}</strong>
-          <small>{{ memory.path }}</small>
-        </span>
-      </div>
-
-      <Button
-        type="button"
-        :label="t('share.createNew')"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-
-      <ManagementList>
-        <div v-for="share in visibleShares" :key="share.id" class="veyq-list-row">
-          <div class="veyq-row-main">
-            <strong class="veyq-row-title">{{ shareLabel(share) }}</strong>
-            <span class="veyq-row-subtitle">{{ origin }}{{ share.shareUrl }}</span>
-            <div class="veyq-row-meta">
-              <span
-                class="veyq-badge"
-                :class="share.hasPassword ? 'success' : 'muted'"
-              >
-                {{ share.hasPassword ? t('share.hasPassword') : t('share.noPassword') }}
-              </span>
-              <span
-                class="veyq-badge"
-                :class="share.enabled ? 'success' : 'warning'"
-              >
-                {{ share.enabled ? t('common.active') : t('common.disabled') }}
-              </span>
-              <span
-                class="veyq-badge"
-                :class="share.noticeMarkdownByLocale ? 'success' : 'muted'"
-              >
-                {{ share.noticeMarkdownByLocale ? t('share.noticeConfigured') : t('share.noticeNotConfigured') }}
-              </span>
-            </div>
-          </div>
-          <Select
-            class="management-control"
-            :model-value="share.role"
-            :options="roleOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            :aria-label="t('share.role')"
-            @update:model-value="setRole(share, $event)"
-          >
-            <template #value="{ value }">
-              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
-                <span>{{ roleOptionByValue(value)?.label }}</span>
-                <span
-                  v-tooltip="roleOptionByValue(value)?.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-            <template #option="{ option }">
-              <span class="share-role-option">
-                <span>{{ option.label }}</span>
-                <span
-                  v-tooltip="option.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(option)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-          </Select>
-          <div class="management-actions">
-            <Button
-              icon="pi pi-copy"
-              severity="secondary"
-              outlined
-              size="small"
-              :aria-label="t('share.linkCopy')"
-              :title="t('share.linkCopy')"
-              @click="copyShare(share)"
-            />
-            <Button
-              icon="pi pi-pencil"
-              severity="secondary"
-              outlined
-              size="small"
-              :aria-label="t('share.rename')"
-              :title="t('share.rename')"
-              @click="openRenameDialog(share)"
-            />
-            <Button
-              :icon="share.enabled ? 'pi pi-lock' : 'pi pi-lock-open'"
-              severity="secondary"
-              outlined
-              size="small"
-              :aria-label="share.enabled ? t('share.toggleDisable') : t('share.toggleEnable')"
-              :title="share.enabled ? t('share.toggleDisable') : t('share.toggleEnable')"
-              @click="toggleShare(share)"
-            />
-            <Button
-              icon="pi pi-key"
-              severity="secondary"
-              outlined
-              size="small"
-              :aria-label="t('share.passwordChange')"
-              :title="t('share.passwordChange')"
-              @click="openPasswordDialog(share)"
-            />
-            <Button
-              icon="pi pi-file-edit"
-              severity="secondary"
-              outlined
-              size="small"
-              :aria-label="t('share.noticeEdit')"
-              :title="t('share.noticeEdit')"
-              @click="openNoticeDialog(share)"
-            />
-          </div>
-        </div>
-      </ManagementList>
-    </div>
-  </Dialog>
-
-  <Dialog v-model:visible="createDialogVisible" :header="t('share.createNew')" modal class="tenant-dialog share-dialog">
-    <form class="veyq-form" @submit.prevent="createShare">
-      <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-
-      <div class="veyq-form-grid">
-        <label>
-          {{ t('common.name') }}
-          <InputText v-model="name" autocomplete="off" :placeholder="t('common.optional')" />
-        </label>
-        <label>
-          {{ t('common.role') }}
-          <Select v-model="role" :options="roleOptions" option-label="label" option-value="value">
-            <template #value="{ value }">
-              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
-                <span>{{ roleOptionByValue(value)?.label }}</span>
-                <span
-                  v-tooltip="roleOptionByValue(value)?.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-            <template #option="{ option }">
-              <span class="share-role-option">
-                <span>{{ option.label }}</span>
-                <span
-                  v-tooltip="option.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(option)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-          </Select>
-        </label>
-      </div>
-      <label class="toggle-row">
-        <span>
-          <strong>{{ t('share.passwordProtection') }}</strong>
-          <small>{{ t('share.passwordProtectionHint') }}</small>
-        </span>
-        <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
-      </label>
-      <label v-if="passwordEnabled">
-        {{ t('common.password') }}
-        <InputText v-model="password" type="password" autocomplete="new-password" required :minlength="minSharePasswordLength" />
-      </label>
-      <LocaleMarkdownEditor
-        v-model="noticeMarkdownByLocale"
-        :label="t('share.noticeTitle')"
-        compact
-      />
-      <Button
-        type="submit"
-        :label="t('share.create')"
-        icon="pi pi-share-alt"
-        :loading="loading"
-        :disabled="!canCreateShare"
-      />
-    </form>
-  </Dialog>
-
-  <Dialog v-model:visible="renameDialogVisible" :header="t('share.rename')" modal class="tenant-dialog">
-    <form class="veyq-form" @submit.prevent="saveName">
+  <Dialog v-model:visible="visible" :header="t('share.title')" modal class="tenant-dialog">
+    <form class="veyq-form" @submit.prevent="create">
       <label>
-        {{ t('common.name') }}
-        <InputText v-model="editName" autocomplete="off" :placeholder="t('common.optional')" />
+        {{ t('share.role') }}
+        <select v-model="role" class="share-select">
+          <option value="VIEWER">{{ t('share.roles.VIEWER') }}</option>
+          <option value="CONTRIBUTOR">{{ t('share.roles.CONTRIBUTOR') }}</option>
+          <option value="UPLOADER">{{ t('share.roles.UPLOADER') }}</option>
+        </select>
       </label>
-      <div class="veyq-dialog-action-row">
-        <Button
-          type="button"
-          :label="t('common.cancel')"
-          icon="pi pi-times"
-          severity="secondary"
-          outlined
-          @click="renameDialogVisible = false"
-        />
-        <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="loading" />
-      </div>
+      <label>
+        {{ t('share.labelPlaceholder') }}
+        <InputText v-model="label" autocomplete="off" />
+      </label>
+      <label>
+        {{ t('share.passwordProtection') }}
+        <Password v-model="password" :input-props="{ autocomplete: 'off' }" :feedback="false" toggle-mask fluid />
+      </label>
+      <label>
+        {{ t('share.expiresLabel') }}
+        <InputText v-model="expiresAt" type="date" />
+      </label>
+      <Button type="submit" :label="t('share.create')" icon="pi pi-link" :loading="busy" />
     </form>
-  </Dialog>
 
-  <Dialog v-model:visible="passwordDialogVisible" :header="t('share.passwordProtection')" modal class="tenant-dialog">
-    <form class="veyq-form" @submit.prevent="savePassword">
-      <label class="toggle-row">
-        <span>
-          <strong>{{ t('share.passwordProtection') }}</strong>
-          <small>{{ t('share.passwordProtectionHint') }}</small>
-        </span>
-        <ToggleSwitch v-model="editPasswordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
-      </label>
-      <label v-if="editPasswordEnabled">
-        {{ t('auth.newPassword') }}
-        <InputText v-model="editPassword" type="password" autocomplete="new-password" required :minlength="minSharePasswordLength" />
-      </label>
-      <div class="veyq-action-row">
-        <div class="veyq-action-group">
-          <Button
-            type="button"
-            :label="t('common.cancel')"
-            severity="secondary"
-            text
-            @click="passwordDialogVisible = false"
-          />
-          <Button
-            type="submit"
-            :label="t('common.save')"
-            icon="pi pi-save"
-            :loading="loading"
-            :disabled="!canSavePassword"
-          />
-        </div>
-      </div>
-    </form>
-  </Dialog>
+    <div v-if="createdLink" class="share-created">
+      <code class="share-link">{{ createdLink }}</code>
+    </div>
 
-  <Dialog v-model:visible="noticeDialogVisible" :header="t('share.noticeEdit')" modal class="tenant-dialog share-notice-dialog">
-    <form class="veyq-form" @submit.prevent="saveNotice">
-      <LocaleMarkdownEditor
-        v-model="editNoticeMarkdownByLocale"
-        :label="t('share.noticeTitle')"
-        compact
-      />
-      <div class="veyq-action-row">
-        <div class="veyq-action-group">
-          <Button
-            type="button"
-            :label="t('common.cancel')"
-            severity="secondary"
-            text
-            @click="noticeDialogVisible = false"
-          />
-          <Button
-            type="submit"
-            :label="t('common.save')"
-            icon="pi pi-save"
-            :loading="loading"
-          />
+    <section class="share-list">
+      <p v-if="shares.length === 0" class="share-empty">{{ t('share.empty') }}</p>
+      <div v-for="s in shares" :key="s.shareId" class="share-row">
+        <div>
+          <strong>{{ s.label || t('share.roles.' + s.role) }}</strong>
+          <small>{{ t('share.roles.' + s.role) }} · {{ s.passwordProtected ? t('share.hasPassword') : t('share.noPassword') }}<template v-if="s.expiresAt"> · {{ new Date(s.expiresAt).toLocaleDateString() }}</template></small>
         </div>
+        <Button type="button" icon="pi pi-trash" severity="danger" text :aria-label="t('share.revoke')" @click="revoke(s)" />
       </div>
-    </form>
+    </section>
+
+    <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
+    <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
   </Dialog>
 </template>
+
+<style scoped>
+.share-select { padding: 0.45rem 0.6rem; border-radius: 8px; border: 1px solid var(--p-content-border-color, rgba(127,127,127,0.25)); background: var(--p-content-background, transparent); color: inherit; }
+.share-created { margin: 0.75rem 0; }
+.share-link { display: block; padding: 0.5rem; border-radius: 8px; background: var(--p-content-border-color, rgba(127,127,127,0.12)); word-break: break-all; font-size: 0.8rem; }
+.share-list { margin-top: 1rem; }
+.share-empty { opacity: 0.55; font-size: 0.9rem; }
+.share-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--p-content-border-color, rgba(127,127,127,0.15)); }
+.share-row div { flex: 1; }
+.share-row strong { display: block; }
+.share-row small { opacity: 0.6; }
+</style>

@@ -696,6 +696,12 @@ export const messages = {
       providedBy: 'Bereitgestellt von veyq',
       rename: 'Freigabe umbenennen',
       role: 'Freigabe-Rolle',
+      revoke: 'Widerrufen',
+      revoked: 'Freigabe wurde widerrufen.',
+      revokeFailed: 'Freigabe konnte nicht widerrufen werden.',
+      empty: 'Noch keine Freigaben.',
+      expiresLabel: 'Gültig bis (optional)',
+      labelPlaceholder: 'Bezeichnung (optional)',
       roleDescriptions: {
         VIEWER: 'Kann die geteilte Memory und ihre Medien ansehen.',
         CONTRIBUTOR:
@@ -1910,6 +1916,12 @@ export const messages = {
       providedBy: 'Provided by veyq',
       rename: 'Rename share',
       role: 'Share role',
+      revoke: 'Revoke',
+      revoked: 'Share revoked.',
+      revokeFailed: 'Could not revoke the share.',
+      empty: 'No shares yet.',
+      expiresLabel: 'Expires (optional)',
+      labelPlaceholder: 'Label (optional)',
       roleDescriptions: {
         VIEWER: 'Can view the shared Memory and its media.',
         CONTRIBUTOR:

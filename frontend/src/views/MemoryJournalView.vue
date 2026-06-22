@@ -14,6 +14,7 @@ import JournalContent from '../features/memories/components/JournalContent.vue'
 import JournalLiveEditor from '../features/memories/components/JournalLiveEditor.vue'
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
+import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
@@ -39,6 +40,7 @@ const children = ref<LevelEntry[]>([])
 const renameOpen = ref(false)
 const renameValue = ref('')
 const chapterName = ref('')
+const shareOpen = ref(false)
 const busy = ref(false)
 
 onMounted(load)
@@ -107,6 +109,7 @@ function onSaved(md: string) {
       <Button type="button" icon="pi pi-arrow-left" text @click="router.push('/')" />
       <h1>{{ title }}</h1>
       <Button v-if="active && node" type="button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" text @click="openRename" />
+      <Button v-if="active" type="button" icon="pi pi-share-alt" :aria-label="t('share.title')" text @click="shareOpen = true" />
       <Button
         v-if="active"
         type="button"
@@ -169,6 +172,8 @@ function onSaved(md: string) {
         </form>
       </section>
     </template>
+
+    <MemoryShareDialog v-if="active" v-model:visible="shareOpen" :active="active" :node-id="nodeId" />
 
     <Dialog v-model:visible="renameOpen" :header="t('memoryDetail.renameTitle')" modal class="tenant-dialog">
       <form class="veyq-form" @submit.prevent="doRename">
