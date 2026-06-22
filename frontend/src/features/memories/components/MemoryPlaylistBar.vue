@@ -56,7 +56,6 @@ function cycle(direction: -1 | 1) {
       >
         <span class="memory-header-playlist-provider-mark">{{ PROVIDER_MARK[active.provider] }}</span>
         <span class="memory-header-playlist-label">{{ active.title || PROVIDER_LABEL[active.provider] }}</span>
-        <i class="pi pi-external-link" />
       </a>
       <Button
         v-if="canCycle"
