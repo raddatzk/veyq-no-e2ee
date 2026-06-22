@@ -178,7 +178,6 @@ async function onUpload(event: Event) {
 <template>
   <div class="veyq-page veyq-page-narrow">
     <NodeCover v-if="active && node" :active="active" :node="node" class="detail-cover" icon="pi pi-image" />
-    <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
     <header class="memory-detail-header">
       <h1>{{ title }}</h1>
       <div v-if="active" class="memory-detail-actions">
@@ -192,6 +191,7 @@ async function onUpload(event: Event) {
           text
           @click="uploadInput?.click()"
         />
+        <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" :title="t('memoryDetail.rename')" text @click="openRename" />
         <input ref="uploadInput" class="kit-file-input" type="file" accept="image/*,video/*" multiple hidden @change="onUpload" />
