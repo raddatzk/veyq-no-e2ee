@@ -1,13 +1,13 @@
+import { config } from '@vue/test-utils'
 import { beforeEach } from 'vitest'
-import { setLocale } from '../i18n/i18n'
+import { i18n, setLocale } from '../i18n'
+
+config.global.plugins = [...(config.global.plugins || []), i18n]
 
 beforeEach(() => {
   setLocale('de')
-  // node-env test files (logic/e2e suites) have no DOM — only stub window.confirm when a DOM exists.
-  if (typeof window !== 'undefined') {
-    Object.defineProperty(window, 'confirm', {
-      configurable: true,
-      value: () => true
-    })
-  }
+  Object.defineProperty(window, 'confirm', {
+    configurable: true,
+    value: () => true
+  })
 })

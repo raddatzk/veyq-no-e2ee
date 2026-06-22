@@ -3,6 +3,24 @@ info:
   title: veyq key management
   version: 0.1.0
 paths:
+  /api/me/key-wraps:
+    get:
+      tags: [Keys]
+      operationId: listMyKeyWraps
+      summary: List the authenticated user's master-key unlock wraps (metadata only).
+      description: >
+        Returns one entry per stored unlock wrap (method, optional credentialRef, optional device name and
+        creation time) WITHOUT any key ciphertext. Drives the "Devices" list in user settings — each DEVICE
+        entry is one enrolled browser/login that can be named and removed.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The caller's unlock wraps.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KeyWrapList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/me/key-wraps/{unlockMethod}:
     put:
       tags: [Keys]
@@ -103,6 +121,21 @@ paths:
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
+    KeyWrapSummary:
+      type: object
+      required: [unlockMethod]
+      properties:
+        unlockMethod: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
+        credentialRef: { type: string }
+        name: { type: string }
+        createdAt: { type: string }
+    KeyWrapList:
+      type: object
+      required: [wraps]
+      properties:
+        wraps:
+          type: array
+          items: { $ref: '#/components/schemas/KeyWrapSummary' }
     UpsertMasterKeyWrapRequest:
       type: object
       required: [masterKeyWrap]

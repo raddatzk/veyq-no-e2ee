@@ -12,6 +12,10 @@ export type UserSummary = {
   displayName: string
   serverRole: string
   permalink: string
+  // Legacy optional fields some shell/settings components still read. They have no E2EE meaning anymore
+  // (avatars/passkeys/TOTP are gone) and stay undefined; kept so deferred components still typecheck.
+  avatarUrl?: string
+  pendingEmail?: string
 }
 export type TenantSummary = {
   id: string

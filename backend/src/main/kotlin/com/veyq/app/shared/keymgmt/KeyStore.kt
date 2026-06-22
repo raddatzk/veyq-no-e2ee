@@ -34,6 +34,8 @@ class KeyBlob {
     @Column(name = "wrapped_key", nullable = false) var wrappedKey: ByteArray = ByteArray(0)
     @Column(name = "kdf_params") var kdfParams: ByteArray? = null
     @Column(name = "credential_ref") var credentialRef: String? = null
+    // Human label for DEVICE wraps (the device/login name shown in user settings). Null for other methods.
+    @Column(name = "name") var name: String? = null
     // RECOVERY rows only: SHA-256("veyq/v1/recovery-auth" || masterKey) — the recovery commitment a password
     // reset must reproduce to prove Secret-Key possession (see PasswordResetHandler.confirm).
     @Column(name = "recovery_auth_tag") var recoveryAuthTag: ByteArray? = null

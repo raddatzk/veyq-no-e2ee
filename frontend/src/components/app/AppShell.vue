@@ -1,29 +1,69 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
-import { isUnlocked } from '../../app/session'
+import Message from 'primevue/message'
+import { useAuthState } from '../../shared/state/useAuthState'
+import CreateGroupFlowDialog from '../../features/settings/components/CreateGroupFlowDialog.vue'
+import CreateTenantDialog from '../tenant/CreateTenantDialog.vue'
+import SupportNotice from './SupportNotice.vue'
 import TenantSidebar from './TenantSidebar.vue'
 import WorkspaceTopbar from './WorkspaceTopbar.vue'
-import SupportNotice from './SupportNotice.vue'
 
+const createTenantOpen = ref(false)
+const createGroupOpen = ref(false)
+const shellMessage = ref('')
+const navigationRefreshKey = ref(0)
+const { authState } = useAuthState()
 const route = useRoute()
-// Locked / public routes render bare; the workspace chrome (sidebar + topbar) shows once unlocked.
-const publicRouteNames = new Set(['setup', 'login', 'invite', 'public-share', 'password-reset', 'confirm-email'])
-const showWorkspaceShell = computed(() => isUnlocked() && !publicRouteNames.has(String(route.name ?? '')))
+const publicRouteNames = new Set([
+  'setup',
+  'login',
+  'invite',
+  'public-share',
+  'password-reset',
+  'passkey-reset',
+  'email-confirm'
+])
+const showWorkspaceShell = computed(() =>
+  authState.isAuthenticated && !publicRouteNames.has(String(route.name ?? ''))
+)
+const activeTenantName = computed(() => authState.activeTenantName || authState.tenants[0]?.name || '')
+
+function refreshNavigation() {
+  navigationRefreshKey.value += 1
+}
+
+function showShellMessage(message: string) {
+  shellMessage.value = message
+}
 </script>
 
 <template>
   <div v-if="showWorkspaceShell" class="app-shell">
     <div class="app-compact-header">
-      <TenantSidebar />
+      <TenantSidebar
+        :navigation-refresh-key="navigationRefreshKey"
+        @create-tenant="createTenantOpen = true"
+        @create-group="createGroupOpen = true"
+      />
       <WorkspaceTopbar />
     </div>
     <div class="app-workspace">
-      <SupportNotice />
       <main class="content">
+        <SupportNotice v-if="authState.user?.serverRole === 'ServerOwner'" />
+        <Message v-if="shellMessage" severity="success" closable @close="shellMessage = ''">
+          {{ shellMessage }}
+        </Message>
         <RouterView />
       </main>
     </div>
+    <CreateTenantDialog v-model:visible="createTenantOpen" @invited="showShellMessage" />
+    <CreateGroupFlowDialog
+      v-if="activeTenantName"
+      v-model:visible="createGroupOpen"
+      :tenant-name="activeTenantName"
+      @saved="refreshNavigation"
+    />
   </div>
   <main v-else class="public-shell">
     <RouterView />

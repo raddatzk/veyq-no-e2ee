@@ -61,6 +61,9 @@ components:
         wrappedKey: { type: string, maxLength: 16384, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 16384)'] }
         kdfParams: { type: string, maxLength: 4096, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 4096)'] }
         credentialRef: { type: string, maxLength: 1024, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)'] }
+        # Human label for DEVICE wraps (the device/login name shown in user settings). Operator-visible, low
+        # sensitivity; never set for PASSWORD/RECOVERY.
+        name: { type: string, maxLength: 255, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
     AuthVerifier:
       type: object
       description: Proves an unlock to the server without revealing the master key.

@@ -2410,12 +2410,6 @@
   padding-right: 0.25rem;
 }
 
-.memory-journal-embed-picker-limit {
-  margin: 0 0 0.65rem;
-  font-size: 0.85rem;
-  color: var(--app-muted);
-}
-
 .memory-journal-embed-option {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 24px;
@@ -2430,15 +2424,10 @@
   cursor: pointer;
 }
 
-.memory-journal-embed-option:not(:disabled):hover,
+.memory-journal-embed-option:hover,
 .memory-journal-embed-option-selected {
   border-color: var(--memory-active-border);
   background: var(--memory-active-surface);
-}
-
-.memory-journal-embed-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .memory-journal-embed-option-icon {

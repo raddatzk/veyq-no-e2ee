@@ -2,9 +2,10 @@
 // Accept a member invite. The invite id + bootstrap secret + one-time temp private key ride the URL FRAGMENT
 // (/#invite=…&s=…&k=… or ek/ps for a passphrase-protected link) and never reach the server. A signed-in user
 // joins (re-wraps the scope grant to their identity); a brand-new invitee registers (account + grant) and gets
-// an Emergency Kit. Mirrors the greenfield AcceptInvitePanel.
+// an Emergency Kit to download.
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -19,9 +20,9 @@ import { downloadKitPdf } from '../features/account/emergencyKit/emergencyKit'
 import { usePwnedWarning } from '../features/account/passwordWarning'
 import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
 import { isUnlocked, session, setUnlocked } from '../app/session'
-import { t } from '../i18n/i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 const invite = ref<ParsedInvite | null>(parseInviteHash(window.location.hash))
 const needsPassphrase = invite.value ? isProtectedInvite(invite.value) : false
 const passphrase = ref('')
@@ -74,7 +75,15 @@ async function register() {
   busy.value = true
   error.value = ''
   try {
-    const res = await registerViaMemberInvite(session.apiBase, invite.value.inviteId, invite.value.bootstrapSecret, tempKey(), email.value, displayName.value, password.value)
+    const res = await registerViaMemberInvite(
+      session.apiBase,
+      invite.value.inviteId,
+      invite.value.bootstrapSecret,
+      tempKey(),
+      email.value,
+      displayName.value,
+      password.value,
+    )
     kit.value = res.emergencyKit.secretKey
   } catch {
     error.value = needsPassphrase ? t('accept.wrongPassphrase') : t('accept.registerFailed')
@@ -138,7 +147,7 @@ async function proceed() {
       </template>
 
       <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
-      <p v-else-if="!meta" class="veyq-form-copy">{{ t('app.loading') }}</p>
+      <p v-else-if="!meta" class="veyq-form-copy">{{ t('common.loading') }}</p>
     </template>
   </Card>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -13,9 +14,9 @@ import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
 import { session } from '../app/session'
 import { setAuthPrefill } from '../app/authPrefill'
 import { useServerState } from '../shared/state/useServerState'
-import { t } from '../i18n/i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 const { setSetupCompleted } = useServerState()
 const displayName = ref('')
 const email = ref('')
@@ -43,6 +44,7 @@ async function submit() {
 }
 
 function proceed() {
+  // Hand the email + Secret Key to the login form so the owner doesn't retype them right after setup.
   setAuthPrefill(kitEmail, secretKey.value!)
   void router.push({ name: 'login' })
 }

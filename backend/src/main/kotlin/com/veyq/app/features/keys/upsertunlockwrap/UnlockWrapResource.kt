@@ -13,6 +13,9 @@ class UnlockWrapResource(
     private val removeUnlockWraps: com.veyq.app.features.keys.removeunlockwrap.RemoveUnlockWrapHandler,
     private val scopeGrants: com.veyq.app.features.keys.rewrapscopegrant.ScopeGrantRewrapHandler,
 ) : KeysApi {
+    override fun listMyKeyWraps(authorization: String): Response =
+        Response.ok(unlockWraps.listMyKeyWraps(authorization)).build()
+
     override fun upsertMyMasterKeyWrap(
         authorization: String,
         unlockMethod: String,

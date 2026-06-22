@@ -2,8 +2,9 @@
 // A lightweight camera overlay that decodes a QR and emits its text. jsqr is imported lazily so the
 // decoder only loads when the user actually opens the scanner. Used to import an Emergency Kit by scanning.
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { t } from '../../i18n/i18n'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const emit = defineEmits<{ decoded: [text: string]; close: [] }>()
 const video = ref<HTMLVideoElement | null>(null)
 const error = ref('')

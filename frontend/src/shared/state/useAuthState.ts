@@ -1,19 +1,32 @@
-import { authState, type TenantSummary } from '../../authState'
+import { authState, type TenantSummary, type UserSummary } from '../../authState'
+import { useServerState } from './useServerState'
 
-// Auth mutations now flow through app/session.ts (setUnlocked). What remains here is the space/tenant
-// selection that legacy navigation reads — populated by the space layer during the port.
 export function useAuthState() {
-  function setActiveTenantName(tenantName: string) {
-    if (!authState.tenants.some((tenant) => tenant.name === tenantName)) return
-    authState.activeTenantName = tenantName
-    storeActiveTenantName(tenantName)
+  function setAuthenticated(user: UserSummary, tenants: TenantSummary[]) {
+    authState.isAuthenticated = true
+    authState.user = user
+    authState.userLabel = user.displayName || user.email
+    authState.tenants = tenants
+    authState.activeTenantName = resolveActiveTenantName(tenants)
+  }
+
+  function setAnonymous() {
+    authState.isAuthenticated = false
+    authState.userLabel = ''
+    authState.user = null
+    authState.tenants = []
+    authState.activeTenantName = ''
   }
 
   function setTenants(tenants: TenantSummary[]) {
     authState.tenants = tenants
-    if (!authState.activeTenantName || !tenants.some((t) => t.name === authState.activeTenantName)) {
-      authState.activeTenantName = resolveActiveTenantName(tenants)
-    }
+    authState.activeTenantName = resolveRefreshedActiveTenantName(tenants)
+  }
+
+  function setActiveTenantName(tenantName: string) {
+    if (!authState.tenants.some((tenant) => tenant.name === tenantName)) return
+    authState.activeTenantName = tenantName
+    storeActiveTenantName(tenantName)
   }
 
   function finishLoading() {
@@ -22,18 +35,27 @@ export function useAuthState() {
 
   return {
     authState,
+    setAuthenticated,
+    setAnonymous,
     setActiveTenantName,
     setTenants,
-    finishLoading,
+    finishLoading
   }
 }
 
 function resolveActiveTenantName(tenants: TenantSummary[]): string {
-  const currentTenant = tenants.find((tenant) => tenant.domain && normalizedHost(tenant.domain) === currentHost())
+  const currentTenant = tenants.find((tenant) => normalizedHost(tenant.domain ?? '') === currentHost())
   if (currentTenant) return currentTenant.name
   const stored = getStoredActiveTenantName()
   if (stored && tenants.some((tenant) => tenant.name === stored)) return stored
   return tenants[0]?.name || ''
+}
+
+function resolveRefreshedActiveTenantName(tenants: TenantSummary[]): string {
+  if (authState.activeTenantName && tenants.some((tenant) => tenant.name === authState.activeTenantName)) {
+    return authState.activeTenantName
+  }
+  return resolveActiveTenantName(tenants)
 }
 
 function currentHost(): string {
@@ -55,6 +77,8 @@ function storeActiveTenantName(tenantName: string) {
 }
 
 function activeTenantStorageKey(): string {
-  const userId = authState.user?.id
-  return userId ? `veyq:${userId}:last-active-tenant` : ''
+  const { serverState } = useServerState()
+  const serverId = serverState.serverId
+  const userId = authState.user?.userId
+  return serverId && userId ? `veyq:${serverId}:${userId}:last-active-tenant` : ''
 }
