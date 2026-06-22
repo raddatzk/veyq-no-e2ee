@@ -11,6 +11,7 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import JournalContent from '../features/memories/components/JournalContent.vue'
 import JournalLiveEditor from '../features/memories/components/JournalLiveEditor.vue'
+import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { loadMemoryById } from '../features/home/home'
 import { getJournal } from '../features/memory/journal/journal'
@@ -87,6 +88,7 @@ function onSaved(md: string) {
     </template>
 
     <template v-else-if="active">
+      <MemoryGallery :active="active" :node-id="nodeId" />
       <Message v-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
       <JournalContent
         v-else

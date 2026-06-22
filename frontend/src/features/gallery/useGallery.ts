@@ -47,8 +47,14 @@ export function useGallery(opts: UseGalleryOptions) {
   const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
   const tileById = computed(() => Object.fromEntries(tiles.value.map((t) => [t.id, t])))
 
-  /** (Re)attach the ResizeObserver to the gallery element — call after the gallery first renders (v-if). */
-  function observe() { if (galleryEl.value && ro) ro.observe(galleryEl.value) }
+  /** (Re)attach the ResizeObserver to the gallery element — call after the gallery first renders (v-if).
+   *  Seed the width immediately from the element too, so the first layout doesn't depend on the
+   *  ResizeObserver's initial callback (which some browsers don't deliver synchronously). */
+  function observe() {
+    if (!galleryEl.value) return
+    containerWidth.value = galleryEl.value.clientWidth
+    ro?.observe(galleryEl.value)
+  }
 
   /** Revoke every tile thumbnail's object URL — call before replacing the tile set (avoids leaks). */
   function revokeTiles() { tiles.value.forEach((t) => URL.revokeObjectURL(t.url)) }

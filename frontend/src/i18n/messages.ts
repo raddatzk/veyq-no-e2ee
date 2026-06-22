@@ -210,6 +210,10 @@ export const messages = {
       playlist: 'Playlist',
       mediaUnavailable: 'Medium nicht verfügbar'
     },
+    gallery: {
+      empty: 'Noch keine Medien.',
+      download: 'Original herunterladen'
+    },
     navigation: {
       createTenant: 'Bereich erstellen',
       favorites: 'Favoriten',
@@ -1373,6 +1377,10 @@ export const messages = {
       track: 'Route',
       playlist: 'Playlist',
       mediaUnavailable: 'Media unavailable'
+    },
+    gallery: {
+      empty: 'No media yet.',
+      download: 'Download original'
     },
     navigation: {
       createTenant: 'Create space',
