@@ -2,7 +2,7 @@
 // Memory detail on the E2EE backend: media gallery (+ upload), GPX tracks/map, and the journal (read or
 // live co-edit). Plus title rename and child chapters (sub-memories). All names/content are sealed under the
 // scope content key; this view threads the active space + node id through the data-layer modules.
-import { onMounted, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -17,7 +17,8 @@ import MemoryTracks from '../features/memories/components/MemoryTracks.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
-import { loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
+import { ancestorChain, loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
+import { setWorkspaceToolbar, clearWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
 import { getJournal } from '../features/memory/journal/journal'
 import { renameNode, createChild } from '../features/memory/curate/curate'
 import type { MemoryNode } from '../features/memory/createTree/memoryTree'
@@ -27,7 +28,8 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-const nodeId = String(route.params.nodeId)
+// Reactive so navigating between memories/chapters (same route name, param change) reloads the view.
+const nodeId = computed(() => String(route.params.nodeId))
 const title = ref('')
 const markdown = ref('')
 const loading = ref(false)
@@ -44,22 +46,40 @@ const shareOpen = ref(false)
 const busy = ref(false)
 
 onMounted(load)
+onBeforeUnmount(clearWorkspaceToolbar)
+// Reload when navigating to another memory/chapter (the component is reused across /m/:nodeId).
+watch(nodeId, () => { editing.value = false; void load() })
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
     active.value = await ensureActiveSpaceForRoute(null)
-    const memory = await loadMemoryById(session.apiBase, requireSession(), active.value, nodeId)
+    const memory = await loadMemoryById(session.apiBase, requireSession(), active.value, nodeId.value)
     node.value = memory?.node ?? null
     title.value = memory?.name ?? t('journalView.title')
-    children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId)
-    markdown.value = (await getJournal(session.apiBase, requireSession(), active.value, nodeId)).markdown
+    children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId.value)
+    await setBreadcrumbs()
+    markdown.value = (await getJournal(session.apiBase, requireSession(), active.value, nodeId.value)).markdown
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('journalView.loadFailed')
   } finally {
     loading.value = false
   }
+}
+
+/** Build the breadcrumb trail client-side from the decrypted ancestor chain (root → … → this memory). */
+async function setBreadcrumbs() {
+  if (!active.value) return
+  const rootLabel = active.value.entry.kind === 'PERSONAL' ? t('homeView.title') : active.value.entry.displayName
+  const chain = await ancestorChain(session.apiBase, requireSession(), active.value, nodeId.value)
+  setWorkspaceToolbar(
+    [
+      { label: rootLabel, command: () => router.push('/') },
+      ...chain.map((entry) => ({ label: entry.name, command: () => router.push(`/m/${entry.node.id}`) })),
+    ],
+    [],
+  )
 }
 
 function openRename() {
@@ -87,9 +107,9 @@ async function addChapter() {
   busy.value = true
   error.value = ''
   try {
-    await createChild(session.apiBase, requireSession(), active.value, 'CHAPTER', chapterName.value.trim(), children.value.length, nodeId)
+    await createChild(session.apiBase, requireSession(), active.value, 'CHAPTER', chapterName.value.trim(), children.value.length, nodeId.value)
     chapterName.value = ''
-    children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId)
+    children.value = await loadLevel(session.apiBase, requireSession(), active.value, nodeId.value)
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('memoryDetail.addChapterFailed')
   } finally {
@@ -106,7 +126,6 @@ function onSaved(md: string) {
   <div class="veyq-page veyq-page-narrow">
     <NodeCover v-if="active && node" :active="active" :node="node" class="detail-cover" icon="pi pi-image" />
     <div class="journal-head">
-      <Button type="button" icon="pi pi-arrow-left" text @click="router.push('/')" />
       <h1>{{ title }}</h1>
       <Button v-if="active && node" type="button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" text @click="openRename" />
       <Button v-if="active" type="button" icon="pi pi-share-alt" :aria-label="t('share.title')" text @click="shareOpen = true" />
@@ -131,6 +150,7 @@ function onSaved(md: string) {
 
     <template v-else-if="editing && active">
       <JournalLiveEditor
+        :key="nodeId"
         :api-base="session.apiBase"
         :session="requireSession()"
         :scope-id="active.scope.scopeId"
@@ -141,12 +161,13 @@ function onSaved(md: string) {
     </template>
 
     <template v-else-if="active">
-      <MemoryGallery :active="active" :node-id="nodeId" />
-      <MemoryTracks :active="active" :node-id="nodeId" />
+      <MemoryGallery :key="`g-${nodeId}`" :active="active" :node-id="nodeId" />
+      <MemoryTracks :key="`t-${nodeId}`" :active="active" :node-id="nodeId" />
 
       <Message v-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
       <JournalContent
         v-else
+        :key="`j-${nodeId}`"
         :api-base="session.apiBase"
         :session="requireSession()"
         :scope-id="active.scope.scopeId"
