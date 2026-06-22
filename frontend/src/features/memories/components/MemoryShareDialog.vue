@@ -86,7 +86,6 @@ async function revoke(share: ShareSummary) {
         <select v-model="role" class="share-select">
           <option value="VIEWER">{{ t('share.roles.VIEWER') }}</option>
           <option value="CONTRIBUTOR">{{ t('share.roles.CONTRIBUTOR') }}</option>
-          <option value="UPLOADER">{{ t('share.roles.UPLOADER') }}</option>
         </select>
       </label>
       <label>

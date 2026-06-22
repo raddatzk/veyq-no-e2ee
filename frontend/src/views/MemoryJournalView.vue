@@ -25,6 +25,7 @@ import MemoryInfo from '../features/memories/components/MemoryInfo.vue'
 import MemoryPlaylistBar from '../features/memories/components/MemoryPlaylistBar.vue'
 import MemoryShareDialog from '../features/memories/components/MemoryShareDialog.vue'
 import CoverPickerDialog from '../features/memories/components/CoverPickerDialog.vue'
+import UploaderShareDialog from '../features/memories/components/UploaderShareDialog.vue'
 import NodeCover from '../components/NodeCover.vue'
 import { ensureActiveSpaceForRoute } from '../app/spaces'
 import { ancestorChain, loadLevel, loadMemoryById, type ActiveSpace, type LevelEntry } from '../features/home/home'
@@ -60,6 +61,7 @@ const renameOpen = ref(false)
 const renameValue = ref('')
 const chapterName = ref('')
 const shareOpen = ref(false)
+const uploaderOpen = ref(false)
 const coverOpen = ref(false)
 const deleteOpen = ref(false)
 const favorite = ref(false)
@@ -257,6 +259,7 @@ async function onUpload(event: Event) {
         <MemoryPlaylistBar v-if="playlists.length" :playlists="playlists" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-image" :aria-label="t('memory.coverChoose')" :title="t('memory.coverChoose')" text @click="coverOpen = true" />
         <Button type="button" class="veyq-icon-button" icon="pi pi-share-alt" :aria-label="t('share.title')" :title="t('share.title')" text @click="shareOpen = true" />
+        <Button type="button" class="veyq-icon-button" icon="pi pi-user-plus" :aria-label="t('share.uploaderTitle')" :title="t('share.uploaderTitle')" text @click="uploaderOpen = true" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-pencil" :aria-label="t('memoryDetail.rename')" :title="t('memoryDetail.rename')" text @click="openRename" />
         <Button v-if="node" type="button" class="veyq-icon-button" icon="pi pi-trash" severity="danger" :aria-label="t('memory.delete')" :title="t('memory.delete')" text @click="deleteOpen = true" />
         <input ref="uploadInput" class="kit-file-input" type="file" accept="image/*,video/*" multiple hidden @change="onUpload" />
@@ -360,6 +363,8 @@ async function onUpload(event: Event) {
     </Tabs>
 
     <MemoryShareDialog v-if="active" v-model:visible="shareOpen" :active="active" :node-id="nodeId" />
+
+    <UploaderShareDialog v-if="active" v-model:visible="uploaderOpen" :active="active" :node-id="nodeId" />
 
     <CoverPickerDialog
       v-if="active"
