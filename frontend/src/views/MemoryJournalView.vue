@@ -10,6 +10,11 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 import JournalContent from '../features/memories/components/JournalContent.vue'
 import JournalLiveEditor from '../features/memories/components/JournalLiveEditor.vue'
 import MemoryGallery from '../features/memories/components/MemoryGallery.vue'
@@ -22,6 +27,7 @@ import { setWorkspaceToolbar, clearWorkspaceToolbar } from '../composables/useWo
 import { getJournal } from '../features/memory/journal/journal'
 import { renameNode, createChild } from '../features/memory/curate/curate'
 import type { MemoryNode } from '../features/memory/createTree/memoryTree'
+import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
 import { uploadMedia } from '../features/uploads/media/media'
 import { fileToNewMedia } from '../features/uploads/clientMedia'
 import { enqueueUploads } from '../features/uploads/useUploadQueue'
@@ -50,6 +56,11 @@ const busy = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const galleryKey = ref(0) // bumped after an upload to remount the gallery and reload its tiles
+
+// Active tab, synced to the URL hash (#journal, #map, …) like the old memory detail.
+const selectedTab = ref<MemoryDetailTab>(memoryTabFromHash(route.hash))
+watch(selectedTab, (tab) => { void router.replace({ params: route.params, hash: memoryTabToHash(tab) }) })
+watch(() => route.hash, (h) => { selectedTab.value = memoryTabFromHash(h) })
 
 onMounted(load)
 onBeforeUnmount(clearWorkspaceToolbar)
@@ -178,63 +189,87 @@ async function onUpload(event: Event) {
       <span>{{ t('common.loading') }}</span>
     </div>
 
-    <template v-else-if="active">
-      <MemoryGallery :key="`g-${nodeId}-${galleryKey}`" :active="active" :node-id="nodeId" />
-      <MemoryTracks :key="`t-${nodeId}`" :active="active" :node-id="nodeId" />
+    <Tabs v-else-if="active" v-model:value="selectedTab" class="memory-tabs">
+      <TabList>
+        <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
+        <Tab value="map">{{ t('memory.context') }}</Tab>
+        <Tab value="playlists">{{ t('memoryDetail.playlists') }}</Tab>
+        <Tab value="journal">{{ t('memory.journal') }}</Tab>
+        <Tab value="children">{{ t('memory.children') }}</Tab>
+        <Tab value="contributions">{{ t('media.contributions') }}</Tab>
+        <Tab value="info">{{ t('memory.info') }}</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="gallery">
+          <MemoryGallery :key="`g-${nodeId}-${galleryKey}`" :active="active" :node-id="nodeId" />
+        </TabPanel>
 
-      <!-- Journal (read / live-edit toggle lives in the journal section) -->
-      <section class="memory-journal-section">
-        <div class="settings-section-header journal-section-head">
-          <h2>{{ t('journalView.title') }}</h2>
-          <Button
-            type="button"
-            :icon="editing ? 'pi pi-eye' : 'pi pi-file-edit'"
-            :label="editing ? t('journalView.read') : t('journalView.edit')"
-            severity="secondary"
-            text
-            @click="editing = !editing"
+        <TabPanel value="map">
+          <MemoryTracks :key="`t-${nodeId}`" :active="active" :node-id="nodeId" />
+        </TabPanel>
+
+        <TabPanel value="playlists">
+          <Message severity="info" :closable="false">{{ t('memoryDetail.comingSoon') }}</Message>
+        </TabPanel>
+
+        <TabPanel value="journal">
+          <div class="journal-section-head">
+            <Button
+              type="button"
+              :icon="editing ? 'pi pi-eye' : 'pi pi-file-edit'"
+              :label="editing ? t('journalView.read') : t('journalView.edit')"
+              severity="secondary"
+              text
+              @click="editing = !editing"
+            />
+          </div>
+          <JournalLiveEditor
+            v-if="editing"
+            :key="nodeId"
+            :api-base="session.apiBase"
+            :session="requireSession()"
+            :scope-id="active.scope.scopeId"
+            :node-id="nodeId"
+            :content-key="active.contentKey"
+            @saved="onSaved"
           />
-        </div>
-        <JournalLiveEditor
-          v-if="editing"
-          :key="nodeId"
-          :api-base="session.apiBase"
-          :session="requireSession()"
-          :scope-id="active.scope.scopeId"
-          :node-id="nodeId"
-          :content-key="active.contentKey"
-          @saved="onSaved"
-        />
-        <Message v-else-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
-        <JournalContent
-          v-else
-          :key="`j-${nodeId}`"
-          :api-base="session.apiBase"
-          :session="requireSession()"
-          :scope-id="active.scope.scopeId"
-          :node-id="nodeId"
-          :content-key="active.contentKey"
-          :markdown="markdown"
-        />
-      </section>
+          <Message v-else-if="!markdown.trim()" severity="info" :closable="false">{{ t('journalView.empty') }}</Message>
+          <JournalContent
+            v-else
+            :key="`j-${nodeId}`"
+            :api-base="session.apiBase"
+            :session="requireSession()"
+            :scope-id="active.scope.scopeId"
+            :node-id="nodeId"
+            :content-key="active.contentKey"
+            :markdown="markdown"
+          />
+        </TabPanel>
 
-      <!-- Child chapters (sub-memories) -->
-      <section class="chapters">
-        <div class="settings-section-header"><h2>{{ t('memoryDetail.chapters') }}</h2></div>
-        <ul v-if="children.length" class="chapter-list">
-          <li v-for="child in children" :key="child.node.id">
-            <button type="button" class="chapter-item" @click="router.push(`/m/${child.node.id}`)">
-              <NodeCover v-if="active" :active="active" :node="child.node" class="chapter-cover" />
-              <span>{{ child.name }}</span><i class="pi pi-angle-right chapter-go" />
-            </button>
-          </li>
-        </ul>
-        <form class="chapter-add" @submit.prevent="addChapter">
-          <InputText v-model="chapterName" :placeholder="t('memoryDetail.addChapterName')" />
-          <Button type="submit" :label="t('memoryDetail.addChapter')" icon="pi pi-plus" :loading="busy" :disabled="!chapterName.trim()" />
-        </form>
-      </section>
-    </template>
+        <TabPanel value="children">
+          <ul v-if="children.length" class="chapter-list">
+            <li v-for="child in children" :key="child.node.id">
+              <button type="button" class="chapter-item" @click="router.push(`/m/${child.node.id}`)">
+                <NodeCover v-if="active" :active="active" :node="child.node" class="chapter-cover" />
+                <span>{{ child.name }}</span><i class="pi pi-angle-right chapter-go" />
+              </button>
+            </li>
+          </ul>
+          <form class="chapter-add" @submit.prevent="addChapter">
+            <InputText v-model="chapterName" :placeholder="t('memoryDetail.addChapterName')" />
+            <Button type="submit" :label="t('memoryDetail.addChapter')" icon="pi pi-plus" :loading="busy" :disabled="!chapterName.trim()" />
+          </form>
+        </TabPanel>
+
+        <TabPanel value="contributions">
+          <Message severity="info" :closable="false">{{ t('memoryDetail.comingSoon') }}</Message>
+        </TabPanel>
+
+        <TabPanel value="info">
+          <Message severity="info" :closable="false">{{ t('memoryDetail.comingSoon') }}</Message>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
 
     <MemoryShareDialog v-if="active" v-model:visible="shareOpen" :active="active" :node-id="nodeId" />
 

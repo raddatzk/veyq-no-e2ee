@@ -257,7 +257,9 @@ export const messages = {
       addChapterName: 'Name des Kapitels',
       addChapterFailed: 'Kapitel konnte nicht erstellt werden.',
       setCover: 'Als Cover festlegen',
-      coverSet: 'Cover wurde festgelegt.'
+      coverSet: 'Cover wurde festgelegt.',
+      playlists: 'Playlists',
+      comingSoon: 'Noch nicht verfügbar.'
     },
     navigation: {
       createTenant: 'Bereich erstellen',
@@ -1478,7 +1480,9 @@ export const messages = {
       addChapterName: 'Chapter name',
       addChapterFailed: 'Could not create the chapter.',
       setCover: 'Set as cover',
-      coverSet: 'Cover set.'
+      coverSet: 'Cover set.',
+      playlists: 'Playlists',
+      comingSoon: 'Not available yet.'
     },
     navigation: {
       createTenant: 'Create space',
