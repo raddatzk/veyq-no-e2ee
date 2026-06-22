@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { useThemeState } from '../../shared/state/useThemeState'
-import { ensureSpaces, invalidateSpaces } from '../../app/spaces'
+import { ensureSpaces, reloadSpaces, spaces } from '../../app/spaces'
 import { enterSpace, loadMemoryById, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import { listFavoriteNodeIds } from '../../features/memory/favorite/favorite'
 import { requireSession, session, setActiveSpace } from '../../app/session'
@@ -21,13 +21,14 @@ const router = useRouter()
 const { t } = useI18n()
 const { resolvedTheme } = useThemeState()
 
-const spaces = ref<SpaceEntry[]>([])
 const favorites = ref<LevelEntry[]>([])
 const sidebarError = ref('')
 
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
 const canCreateGroup = computed(() => Boolean(session.unlocked))
+const canCreateTenant = computed(() => session.unlocked?.user.serverRole === 'ServerOwner')
 const personalSpace = computed(() => spaces.value.find((s) => s.kind === 'PERSONAL'))
+const tenantSpaces = computed(() => spaces.value.filter((s) => s.kind === 'TENANT'))
 const groupSpaces = computed(() => spaces.value.filter((s) => s.kind === 'GROUP'))
 const activeScopeId = computed(() => session.activeSpace?.scope.scopeId ?? null)
 
@@ -37,7 +38,7 @@ watch(activeScopeId, loadFavorites)
 
 async function load() {
   try {
-    spaces.value = await ensureSpaces()
+    await ensureSpaces() // populates the shared `spaces` ref
   } catch (caught) {
     sidebarError.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
   }
@@ -64,7 +65,6 @@ async function open(entry: SpaceEntry) {
   if (isActive(entry)) { void router.push('/'); return }
   try {
     setActiveSpace(await enterSpace(session.apiBase, requireSession(), entry))
-    invalidateSpaces()
     await router.push('/')
   } catch (caught) {
     sidebarError.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
@@ -82,6 +82,37 @@ function initial(name: string): string {
       <img class="sidebar-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
       <span>veyq</span>
     </RouterLink>
+
+    <!-- Tenant switcher (the spaces/areas the user belongs to) -->
+    <section v-if="tenantSpaces.length || canCreateTenant" class="sidebar-section sidebar-tenant-section">
+      <div class="sidebar-section-heading">
+        <p class="sidebar-section-label">{{ t('tenant.title') }}</p>
+        <button
+          v-if="canCreateTenant"
+          class="sidebar-section-action"
+          type="button"
+          :title="t('navigation.createTenant')"
+          :aria-label="t('navigation.createTenant')"
+          @click="emit('createTenant')"
+        >
+          <span class="pi pi-plus" />
+        </button>
+      </div>
+      <button
+        v-for="tenant in tenantSpaces"
+        :key="tenant.scopeId"
+        type="button"
+        class="sidebar-scope-link"
+        :class="{ 'sidebar-tenant-link-active': isActive(tenant) }"
+        @click="open(tenant)"
+      >
+        <span class="sidebar-tenant-avatar">
+          <img v-if="tenant.logoUrl" :src="tenant.logoUrl" alt="" />
+          <span v-else>{{ initial(tenant.displayName) }}</span>
+        </span>
+        <span><strong>{{ tenant.displayName }}</strong></span>
+      </button>
+    </section>
 
     <!-- Personal space -->
     <nav class="sidebar-nav" :aria-label="t('navigation.workspaceNavigation')">

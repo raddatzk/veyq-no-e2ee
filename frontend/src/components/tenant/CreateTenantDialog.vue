@@ -8,7 +8,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { createGroup } from '../../features/spaces/invite/groups'
-import { invalidateSpaces } from '../../app/spaces'
+import { reloadSpaces } from '../../app/spaces'
 import { requireSession, session } from '../../app/session'
 import { getErrorMessage } from '../../shared/utils/errors'
 
@@ -38,7 +38,7 @@ async function submit() {
   loading.value = true
   try {
     await createGroup(session.apiBase, requireSession(), displayName.value.trim())
-    invalidateSpaces()
+    await reloadSpaces()
     message.value = t('setup.tenantInviteSent')
     visible.value = false
     emit('invited', message.value)

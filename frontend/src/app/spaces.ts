@@ -22,6 +22,12 @@ export function invalidateSpaces(): void {
   loaded = false
 }
 
+/** Force a refresh of the shared roster ref (after creating/joining/leaving) so live views update. */
+export async function reloadSpaces(): Promise<SpaceEntry[]> {
+  loaded = false
+  return ensureSpaces()
+}
+
 /** Resolve a parsed route to a space, defaulting to the personal scope, and enter it (open scope + key). */
 export async function ensureActiveSpaceForRoute(route: HomeRoute | null): Promise<ActiveSpace> {
   const all = await ensureSpaces()
