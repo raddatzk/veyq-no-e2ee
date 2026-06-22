@@ -236,7 +236,17 @@ export const messages = {
     },
     gallery: {
       empty: 'Noch keine Medien.',
-      download: 'Original herunterladen'
+      download: 'Original herunterladen',
+      upload: 'Medien hochladen',
+      uploading: '{count} werden hochgeladen …',
+      uploadFailed: 'Upload fehlgeschlagen.'
+    },
+    tracks: {
+      title: 'Routen',
+      empty: 'Noch keine Routen.',
+      addGpx: 'GPX hinzufügen',
+      addFailed: 'Route konnte nicht hinzugefügt werden.',
+      loadFailed: 'Routen konnten nicht geladen werden.'
     },
     navigation: {
       createTenant: 'Bereich erstellen',
@@ -1430,7 +1440,17 @@ export const messages = {
     },
     gallery: {
       empty: 'No media yet.',
-      download: 'Download original'
+      download: 'Download original',
+      upload: 'Upload media',
+      uploading: 'Uploading {count} …',
+      uploadFailed: 'Upload failed.'
+    },
+    tracks: {
+      title: 'Routes',
+      empty: 'No routes yet.',
+      addGpx: 'Add GPX',
+      addFailed: 'Could not add the route.',
+      loadFailed: 'Could not load routes.'
     },
     navigation: {
       createTenant: 'Create space',
