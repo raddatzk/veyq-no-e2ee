@@ -1,36 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+// Per-device map-tile consent (operator-blind, localStorage only). Loading map tiles reveals coarse location
+// to a third party, so it is gated behind this opt-in; the choice never reaches the server.
 import { useI18n } from 'vue-i18n'
-import {
-  disableOsmTiles,
-  enableOsmTiles,
-  hasOsmTileConsent
-} from '../../../shared/privacy/osmTiles'
-import { useAuthState } from '../../../shared/state/useAuthState'
+import { mapTilesConsent } from '../../../features/account/privacy/mapConsent'
 
 const { t } = useI18n()
-const { authState } = useAuthState()
-const userId = authState.user?.userId ?? null
-const osmTilesEnabled = ref(hasOsmTileConsent(userId))
-
-function enableTiles() {
-  enableOsmTiles(userId)
-  osmTilesEnabled.value = true
-}
-
-function disableTiles() {
-  disableOsmTiles(userId)
-  osmTilesEnabled.value = false
-}
-
-function updateTiles(event: Event) {
-  if ((event.target as HTMLInputElement).checked) {
-    enableTiles()
-  } else {
-    disableTiles()
-  }
-}
-
 </script>
 
 <template>
@@ -43,7 +17,7 @@ function updateTiles(event: Event) {
         <p>{{ t('privacy.mapsGroupDescription') }}</p>
       </div>
       <label class="privacy-provider-checkbox">
-        <input type="checkbox" :checked="osmTilesEnabled" @change="updateTiles" />
+        <input v-model="mapTilesConsent" type="checkbox" />
         <span>
           <strong>{{ t('privacy.osmProviderTitle') }}</strong>
           <small>{{ t('privacy.osmDescription') }}</small>

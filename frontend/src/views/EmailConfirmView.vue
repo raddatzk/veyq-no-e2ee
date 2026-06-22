@@ -6,20 +6,20 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import { tenants } from '../api/tenantClient'
-import { confirmMyEmailChange } from '../features/settings/api'
-import { useAuthState } from '../shared/state/useAuthState'
+import { confirmEmailChange, parseConfirmEmailHash } from '../features/account/emailChange/emailChange'
+import { session } from '../app/session'
 import { getErrorMessage } from '../shared/utils/errors'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { authState, setAuthenticated } = useAuthState()
 
 const loading = ref(true)
 const error = ref('')
 const confirmedEmail = ref('')
-const token = computed(() => route.hash.replace(/^#/, ''))
+// The one-time token rides the URL fragment (#confirm-email=… or a bare token); it is email-gated, so this
+// view works whether or not the user is signed in.
+const token = computed(() => parseConfirmEmailHash(route.hash) ?? route.hash.replace(/^#/, ''))
 
 onMounted(confirmEmail)
 
@@ -32,8 +32,7 @@ async function confirmEmail() {
     return
   }
   try {
-    const user = await confirmMyEmailChange(token.value)
-    setAuthenticated(user, await tenants())
+    const user = await confirmEmailChange(session.apiBase, token.value)
     confirmedEmail.value = user.email
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('settings.emailConfirmFailed'))
@@ -62,8 +61,8 @@ async function confirmEmail() {
           type="button"
           :label="t('settings.emailConfirmButton')"
           icon="pi pi-user"
-          :disabled="loading || !authState.isAuthenticated"
-          @click="router.push('/~me')"
+          :disabled="loading"
+          @click="router.push(session.unlocked ? '/~me/settings' : { name: 'login' })"
         />
       </div>
     </template>

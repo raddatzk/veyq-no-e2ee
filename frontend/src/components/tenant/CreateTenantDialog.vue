@@ -1,13 +1,15 @@
 <script setup lang="ts">
+// Create a new shared space (tenant + claim ownership in one E2EE flow). The creator mints the tenant scope
+// keypair and self-grants; all crypto lives in features/spaces/invite/groups.createGroup.
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { createTenant, tenants } from '../../api/tenantClient'
-import { toPermalink } from '../../composables/usePermalink'
-import { useAuthState } from '../../shared/state/useAuthState'
+import { createGroup } from '../../features/spaces/invite/groups'
+import { invalidateSpaces } from '../../app/spaces'
+import { requireSession, session } from '../../app/session'
 import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
@@ -15,49 +17,28 @@ const emit = defineEmits<{
   invited: [message: string]
 }>()
 const { t } = useI18n()
-const { setTenants } = useAuthState()
-const name = ref('')
 const displayName = ref('')
-const domain = ref('')
-const ownerEmail = ref('')
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
-const canSubmit = computed(
-  () =>
-    name.value.trim().length > 0 &&
-    displayName.value.trim().length > 0 &&
-    domain.value.trim().length > 0 &&
-    ownerEmail.value.trim().length > 0
-)
-
-watch(displayName, (value) => {
-  name.value = toPermalink(value)
-})
+const canSubmit = computed(() => displayName.value.trim().length > 0)
 
 watch(visible, (isVisible) => {
   if (isVisible) {
     error.value = ''
     message.value = ''
-    name.value = ''
     displayName.value = ''
-    domain.value = window.location.host
-    ownerEmail.value = ''
   }
 })
 
 async function submit() {
-  const tenantName = name.value.trim()
-  const tenantDisplayName = displayName.value.trim() || tenantName
-  const tenantOwnerEmail = ownerEmail.value.trim()
   if (!canSubmit.value) return
-
   error.value = ''
   message.value = ''
   loading.value = true
   try {
-    await createTenant(tenantName, tenantDisplayName, domain.value, tenantOwnerEmail)
-    setTenants(await tenants())
+    await createGroup(session.apiBase, requireSession(), displayName.value.trim())
+    invalidateSpaces()
     message.value = t('setup.tenantInviteSent')
     visible.value = false
     emit('invited', message.value)
@@ -75,14 +56,6 @@ async function submit() {
       <label>
         {{ t('setup.tenantName') }}
         <InputText v-model="displayName" autocomplete="off" required />
-      </label>
-      <label>
-        {{ t('common.domain') }}
-        <InputText v-model="domain" autocomplete="off" required />
-      </label>
-      <label>
-        {{ t('setup.tenantOwnerEmail') }}
-        <InputText v-model="ownerEmail" type="email" autocomplete="email" required />
       </label>
       <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>

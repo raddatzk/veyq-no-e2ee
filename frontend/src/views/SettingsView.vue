@@ -1,129 +1,48 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+// Settings dispatcher for the E2EE backend. The legacy hierarchical `getSettings(path)` resolution is gone;
+// we render purely by route + the active space:
+//   /~me/settings     → user profile + devices (self-contained)
+//   /server/settings  → server admin (ServerOwner only)
+//   /space/settings   → the active space's admin (TENANT → tenant panel, GROUP → group panel)
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Message from 'primevue/message'
-import ProgressSpinner from 'primevue/progressspinner'
-import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
-import { getSettings, type SettingsResponse } from '../features/settings/api'
 import GroupSettingsPanel from '../features/settings/components/GroupSettingsPanel.vue'
 import ServerSettingsPanel from '../features/settings/components/ServerSettingsPanel.vue'
 import TenantSettingsPanel from '../features/settings/components/TenantSettingsPanel.vue'
 import UserSettingsForm from '../features/settings/components/UserSettingsForm.vue'
-import { useAuthState } from '../shared/state/useAuthState'
+import { session } from '../app/session'
 
 const route = useRoute()
-const router = useRouter()
-const { locale, t } = useI18n()
-const { authState } = useAuthState()
+const { t } = useI18n()
 
-const settingsPath = computed(() => route.path || '/')
-const tenantName = computed(() => authState.activeTenantName || authState.tenants[0]?.name || '')
-const backendSettingsPath = computed(() => {
-  if (route.name === 'server-settings') return '/settings'
-  if (route.name === 'user-settings') return '/~me'
-  if (!tenantName.value) return '/settings'
-  return `/${tenantName.value}${settingsPath.value === '/' ? '/settings' : settingsPath.value}`
-})
-const activeTenant = computed(() => authState.tenants.find((tenant) => tenant.name === tenantName.value))
-const canManageTenant = computed(() => activeTenant.value?.role === 'TenantOwner')
-const isCreatingGroup = computed(() => route.query.createGroup === '1')
-const groupName = computed(() => {
-  const groupSegment = settingsPath.value.trim().split('/').find((segment) => segment.startsWith('@'))
-  return groupSegment ? groupSegment.substring(1) : ''
-})
-const settings = ref<SettingsResponse | null>(null)
-const loading = ref(false)
-const error = ref('')
-let loadSequence = 0
-
-// User settings ("/~me/settings") are self-contained against the E2EE backend (profile + devices) and do not
-// use the legacy hierarchical settings resolution. Server/tenant/group settings remain on the legacy path.
 const isUserSettings = computed(() => route.name === 'user-settings')
+const isServerSettings = computed(() => route.name === 'server-settings')
+const isSpaceSettings = computed(() => route.name === 'space-settings')
 
-watch([backendSettingsPath, locale], () => {
-  if (isUserSettings.value) return
-  void loadSettings()
-}, { immediate: true })
-
-onBeforeUnmount(() => {
-  loadSequence += 1
-  clearWorkspaceToolbar()
-})
-
-async function loadSettings() {
-  const sequence = ++loadSequence
-  loading.value = true
-  error.value = ''
-  clearWorkspaceToolbar()
-  try {
-    const response = await getSettings(backendSettingsPath.value)
-    if (sequence !== loadSequence) return
-    settings.value = response
-    setWorkspaceToolbar(
-      response.breadcrumbs.map((breadcrumb) => ({
-        label: localizeSettingsLabel(breadcrumb.label),
-        command: () => navigateToPath(breadcrumb.path)
-      })),
-      []
-    )
-  } catch (caught) {
-    if (sequence !== loadSequence) return
-    settings.value = null
-    error.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
-    clearWorkspaceToolbar()
-  } finally {
-    if (sequence === loadSequence) loading.value = false
-  }
-}
-
-function navigateToPath(path: string) {
-  void router.push(frontendSettingsPath(path))
-}
-
-function localizeSettingsLabel(label: string): string {
-  if (label === 'Einstellungen' || label === 'Settings') return t('settings.title')
-  if (label === 'Server') return t('settings.serverTitle')
-  return label
-}
-
-function frontendSettingsPath(path: string): string {
-  if (path === '/settings') return '/server/settings'
-  const prefix = `/${tenantName.value}`
-  if (path === prefix || path === `${prefix}/`) return '/'
-  if (path.startsWith(`${prefix}/`)) return path.slice(prefix.length) || '/'
-  return path
-}
+const isServerOwner = computed(() => session.unlocked?.user.serverRole === 'ServerOwner')
+const activeEntry = computed(() => session.activeSpace?.entry ?? null)
+const activeScopeId = computed(() => session.activeSpace?.scope.scopeId ?? '')
+const activeKind = computed(() => activeEntry.value?.kind ?? null)
+const activeTenantId = computed(() => activeEntry.value?.tenantId ?? '')
 </script>
 
 <template>
   <div class="veyq-page veyq-page-narrow settings-page">
     <UserSettingsForm v-if="isUserSettings" />
-    <template v-else>
-    <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-    <div v-if="loading" class="veyq-loading">
-      <ProgressSpinner class="small-spinner" />
-      <span>{{ t('settings.loading') }}</span>
-    </div>
+    <template v-else-if="isServerSettings">
+      <ServerSettingsPanel v-if="isServerOwner" />
+      <Message v-else severity="warn" :closable="false">{{ t('settings.notAuthorized') }}</Message>
+    </template>
 
-    <template v-else-if="settings">
-      <ServerSettingsPanel v-if="settings.subject.type === 'SERVER'" />
-      <UserSettingsForm v-else-if="settings.subject.type === 'USER'" />
-      <template v-else-if="settings.subject.type === 'TENANT'">
-        <TenantSettingsPanel v-if="canManageTenant && !isCreatingGroup" :tenant-name="tenantName" />
-        <GroupSettingsPanel v-else :tenant-name="tenantName" />
-      </template>
-      <GroupSettingsPanel
-        v-else-if="settings.subject.type === 'GROUP'"
-        :tenant-name="tenantName"
-        :group-name="groupName"
-      />
-      <section v-else class="veyq-surface settings-panel">
-        <h1>{{ settings.subject.label }}</h1>
-        <p>{{ t('settings.title') }}</p>
-      </section>
+    <template v-else-if="isSpaceSettings">
+      <TenantSettingsPanel v-if="activeKind === 'TENANT'" :tenant-id="activeTenantId" :scope-id="activeScopeId" />
+      <GroupSettingsPanel v-else-if="activeKind === 'GROUP'" :tenant-id="activeTenantId" :scope-id="activeScopeId" />
+      <Message v-else severity="info" :closable="false">{{ t('settings.noSpaceSettings') }}</Message>
     </template>
-    </template>
+
+    <Message v-else severity="info" :closable="false">{{ t('settings.title') }}</Message>
   </div>
 </template>

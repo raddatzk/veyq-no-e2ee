@@ -2,23 +2,16 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
-import {
-  disableOsmTiles,
-  enableOsmTiles,
-  hasOsmTileConsent
-} from '../../shared/privacy/osmTiles'
-import { useAuthState } from '../../shared/state/useAuthState'
+import { readMapTilesConsent, setMapTilesConsent } from '../../features/account/privacy/mapConsent'
 
 const { t } = useI18n()
-const { authState } = useAuthState()
 const emit = defineEmits<{
   complete: []
 }>()
-const userId = authState.user?.userId ?? null
-const osmTilesEnabled = ref(hasOsmTileConsent(userId))
+const osmTilesEnabled = ref(readMapTilesConsent())
 
 function saveSelection() {
-  applyConsent()
+  setMapTilesConsent(osmTilesEnabled.value)
   emit('complete')
 }
 
@@ -30,14 +23,6 @@ function acceptAll() {
 function acceptNone() {
   osmTilesEnabled.value = false
   saveSelection()
-}
-
-function applyConsent() {
-  if (osmTilesEnabled.value) {
-    enableOsmTiles(userId)
-  } else {
-    disableOsmTiles(userId)
-  }
 }
 </script>
 

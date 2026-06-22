@@ -27,6 +27,7 @@ const router = createRouter({
     { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
     { path: '/email/confirm', name: 'email-confirm', component: EmailConfirmView },
     { path: '/server/settings', name: 'server-settings', component: SettingsView },
+    { path: '/space/settings', name: 'space-settings', component: SettingsView },
     { path: '/~me/settings', name: 'user-settings', component: SettingsView },
     // E2EE home + journal (focused memories slice). The legacy tenant router remains the catch-all.
     { path: '/', name: 'home', component: HomeView },
