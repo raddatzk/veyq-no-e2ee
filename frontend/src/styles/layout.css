@@ -219,7 +219,11 @@
 }
 
 .sidebar-tenant-link-active .sidebar-tenant-avatar {
-  background: linear-gradient(135deg, var(--app-accent), color-mix(in srgb, var(--app-accent) 72%, var(--app-backdrop-strong)));
+  background: linear-gradient(
+    135deg,
+    var(--app-accent),
+    color-mix(in srgb, var(--app-accent) 72%, var(--app-backdrop-strong))
+  );
   color: var(--app-on-strong);
 }
 
@@ -265,6 +269,7 @@
 }
 
 .sidebar-tenant-text,
+.sidebar-nav-link span:last-child,
 .sidebar-memory-link span:last-child,
 .sidebar-scope-link span:last-child {
   display: grid;
@@ -272,13 +277,15 @@
 }
 
 .sidebar-tenant-text strong,
+.sidebar-nav-link span:last-child,
 .sidebar-memory-link strong,
 .sidebar-scope-link strong {
   overflow: hidden;
   color: var(--app-text);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.92rem;
+  font-size: var(--app-font-size-row-title);
+  font-weight: 700;
 }
 
 .sidebar-tenant-text small,
@@ -288,7 +295,7 @@
   color: var(--app-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.78rem;
+  font-size: var(--app-font-size-meta);
 }
 
 .sidebar-profile {
@@ -641,12 +648,12 @@
 }
 
 .workspace-search-result-text strong {
-  font-size: 0.92rem;
+  font-size: var(--app-font-size-row-title);
 }
 
 .workspace-search-result-text small {
   color: var(--app-muted);
-  font-size: 0.78rem;
+  font-size: var(--app-font-size-meta);
 }
 
 .workspace-search-result-kind {

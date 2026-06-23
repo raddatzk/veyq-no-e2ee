@@ -60,7 +60,7 @@ run('group invite e2e', () => {
     expect((await listMySpaces(apiBase, c)).map((s) => s.tenantId)).toContain(g3.id)
 
     // email relay (mailer mock): both modes return 204 when the link targets this instance's app origin.
-    const appOrigin = process.env.VEYQ_APP_BASE ?? 'http://localhost:5173'
+    const appOrigin = process.env.VEYQ_APP_BASE ?? 'http://localhost:8081'
     await emailInviteToGroup(apiBase, a, g3.id, 'Member', 'pragmatic@veyq.app', appOrigin)
     await emailInviteToGroup(apiBase, a, g3.id, 'Member', 'protected@veyq.app', appOrigin, 'another out-of-band secret')
   }, 120000)

@@ -9,13 +9,13 @@ import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
+import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.security.ServerSetupRepository
 import com.veyq.app.shared.security.SetupGate
 import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
-import com.veyq.app.generated.model.ServerRole as ApiServerRole
 
 /** uc.admin.setup-server — cold E2EE registration of the first Server Owner. Server stays blind. */
 @ApplicationScoped
@@ -67,11 +67,6 @@ class SetupServerHandler(
             ),
             Instant.now(),
         )
-        return UserSummary(
-            id = user.id,
-            email = user.email,
-            displayName = user.displayName,
-            serverRole = ApiServerRole.ServerOwner,
-        )
+        return user.toUserSummary()
     }
 }

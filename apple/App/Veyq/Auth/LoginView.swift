@@ -40,8 +40,8 @@ struct LoginView: View {
                 if !error.isEmpty { MessageBox(text: error) }
             }
         }
-        // Import a kit file (PDF / .veyqkit) → prefill. Read as Latin-1 so the ASCII token survives binary PDF bytes.
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf, UTType(filenameExtension: "veyqkit") ?? .data, .data]) { result in
+        // Import a kit PDF → prefill. Read as Latin-1 so the ASCII token survives binary PDF bytes.
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf]) { result in
             guard case let .success(url) = result else { return }
             let ok = url.startAccessingSecurityScopedResource()
             defer { if ok { url.stopAccessingSecurityScopedResource() } }

@@ -28,7 +28,7 @@ cover media, folder icons and metadata.
 
 ## Color System
 
-The baseline tokens live in [`frontend/src/styles/tokens.css`](../../frontend/src/styles/tokens.css). Use tokens first. Add new raw colors only when the value is local to a concrete visual object and does not represent a reusable semantic role.
+The baseline tokens live in [`frontend/src/styles/base.css`](../../frontend/src/styles/base.css). Use tokens first. Add new raw colors only when the value is local to a concrete visual object and does not represent a reusable semantic role.
 
 Primary / brand:
 
@@ -70,6 +70,20 @@ Control and strong contrast:
 Surfaces, text, lines, hover, focus, radius and shadows should come from the existing `--app-*` tokens. Every new semantic color must define both light and dark mode behavior. New frontend work should complete a token pass before merging: repeated raw colors must be converted to role tokens instead of copied into component CSS.
 
 Raw colors are allowed only for concrete visual content, for example Lightbox black overlays, transparent media scrims, map/SVG/canvas drawing values and object-specific gradients where the color is part of the rendered asset rather than an application UI role.
+
+## Typography
+
+Use the shared font-size tokens from `frontend/src/styles/base.css` before adding local component sizes:
+
+- `--app-font-size-page-title` for page or panel titles.
+- `--app-font-size-section-title` for `h2` section headings in settings and management surfaces.
+- `--app-font-size-row-title` for row labels and compact `h3` headings.
+- `--app-font-size-body` for dense body copy where inheriting `1rem` would make the surface feel oversized.
+- `--app-font-size-subtitle` for secondary descriptions, row values and helper text.
+- `--app-font-size-meta` and `--app-font-size-label` for compact metadata, badges and navigation labels.
+- `--app-font-size-control` for text buttons and compact action controls.
+
+Settings, navigation and management screens should feel dense and scannable. Avoid one-off `1rem` row labels or default component-library button text in these surfaces unless the control is intentionally prominent.
 
 ## Buttons
 

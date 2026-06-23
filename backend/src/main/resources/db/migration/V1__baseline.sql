@@ -13,12 +13,17 @@
 
 -- ── Identity & key store ─────────────────────────────────────────────────────────────────────────────
 create table veyq_user (
-    id              varchar(64)  primary key,
-    email           varchar(320) not null unique,
-    display_name    varchar(255) not null,
-    server_role     varchar(32)  not null,
-    system_account  boolean      not null default false,
-    created_at      timestamp    not null
+    id                   varchar(64)  primary key,
+    email                varchar(320) not null unique,
+    display_name         varchar(255) not null,
+    server_role          varchar(32)  not null,
+    system_account       boolean      not null default false,
+    created_at           timestamp    not null,
+    permalink            varchar(80),
+    avatar_object_key    varchar(256),
+    avatar_content_type  varchar(64),
+    deleted_at           timestamp,
+    constraint uq_veyq_user_permalink unique (permalink)
 );
 
 create table veyq_identity_key (
@@ -40,6 +45,7 @@ create table veyq_key_blob (
     wrapped_key        varbinary(8192) not null,
     kdf_params         varbinary(2048),
     credential_ref     varchar(255),
+    name               varchar(255),                         -- user-facing name for DEVICE wraps; null otherwise
     created_at         timestamp       not null,
     recovery_auth_tag  varbinary(64)                        -- SHA-256("veyq/v1/recovery-auth" || masterKey)
 );
@@ -57,13 +63,19 @@ create table veyq_auth_verifier (
 
 -- Opaque server sessions (auth != unlock). Only the SHA-256 of the bearer token is stored, never the raw token.
 create table veyq_session (
-    id          varchar(64)  primary key,
-    token_hash  varchar(128) not null unique,
-    user_id     varchar(64)  not null references veyq_user (id),
-    created_at  timestamp    not null,
-    expires_at  timestamp    not null
+    id                  varchar(64)  primary key,
+    token_hash          varchar(128) not null unique,
+    refresh_token_hash  varchar(128),
+    user_id             varchar(64)  not null references veyq_user (id),
+    device_ref          varchar(255),
+    device_name         text,
+    created_at          timestamp    not null,
+    expires_at          timestamp    not null,
+    refresh_expires_at  timestamp
 );
 create index idx_session_user on veyq_session (user_id);
+create index idx_session_user_device on veyq_session (user_id, device_ref);
+create unique index uq_session_refresh_token_hash on veyq_session (refresh_token_hash);
 
 -- ── Tenancy & scopes ─────────────────────────────────────────────────────────────────────────────────
 create table veyq_tenant (
@@ -76,6 +88,8 @@ create table veyq_tenant (
     created_at             timestamp    not null,
     terms_markdown         text,                             -- tenant-level guest ToS (plaintext policy)
     terms_version          integer      not null default 0,
+    logo_object_key        varchar(256),
+    logo_content_type      varchar(64),
     scheduled_deletion_at  timestamp,                        -- null = not scheduled for grace-period deletion
     constraint uq_tenant_domain unique (domain)
 );
@@ -91,15 +105,16 @@ create table veyq_tenant_invite (
     temp_public_key                 varbinary(2048),
     temp_wrapped_scope_private_key  varbinary(8192),
     temp_wrap_suite_id              varchar(64),
+    target_email                    varchar(255),             -- OWNER: email address that may claim/register
     consumed_by                     varchar(64)    references veyq_user (id),
     created_by                      varchar(64)    not null references veyq_user (id),
     created_at                      timestamp      not null,
     expires_at                      timestamp      not null
 );
 
--- A tenant has one TENANT_ROOT plus many GROUP_ROOT scopes; personal scopes have a null tenant_id. The
--- "one TENANT_ROOT per tenant" rule is enforced in application code (tenant_id is only non-unique-indexed
--- here, which also backs the FK on MariaDB).
+-- A tenant has one TENANT_ROOT plus many GROUP_ROOT scopes. Personal scopes may be unassigned
+-- (tenant_id null) or tenant-bound; both are owner-scoped. The "one TENANT_ROOT per tenant" rule is
+-- enforced in application code (tenant_id is only non-unique-indexed here, which also backs the FK on MariaDB).
 create table veyq_scope (
     id              varchar(64)     primary key,
     tenant_id       varchar(64)     references veyq_tenant (id),
@@ -113,11 +128,11 @@ create table veyq_scope (
     constraint chk_scope_owner check (
         (kind = 'TENANT_ROOT'   and tenant_id is not null and owner_user_id is null)
         or (kind = 'GROUP_ROOT'    and tenant_id is not null and owner_user_id is null)
-        or (kind = 'PERSONAL_ROOT' and tenant_id is null     and owner_user_id is not null)
+        or (kind = 'PERSONAL_ROOT' and owner_user_id is not null)
     )
 );
 create index idx_scope_tenant on veyq_scope (tenant_id);
-create unique index uq_scope_owner_personal on veyq_scope (owner_user_id, kind);
+create unique index uq_scope_owner_personal on veyq_scope (owner_user_id, tenant_id, kind);
 create index idx_scope_owner on veyq_scope (owner_user_id);
 
 create table veyq_scope_grant (
@@ -176,6 +191,28 @@ create table veyq_node (
 );
 create index idx_node_scope on veyq_node (scope_id);
 create index idx_node_parent on veyq_node (parent_id);
+
+create table veyq_memory_participant (
+    id              varchar(64)  primary key,
+    node_id         varchar(64)  not null,
+    scope_id        varchar(64)  not null,
+    suite_id        varchar(64)  not null,
+    sealed_payload  longblob     not null,
+    created_at      timestamp    not null
+);
+create index idx_memory_participant_node on veyq_memory_participant (node_id);
+create index idx_memory_participant_scope on veyq_memory_participant (scope_id);
+
+create table veyq_memory_favorite (
+    id          varchar(64) primary key,
+    user_id     varchar(64) not null references veyq_user (id),
+    scope_id    varchar(64) not null references veyq_scope (id),
+    node_id     varchar(64) not null,
+    created_at  timestamp   not null,
+    constraint uq_memory_favorite_user_node unique (user_id, node_id)
+);
+create index idx_memory_favorite_user_scope on veyq_memory_favorite (user_id, scope_id);
+create index idx_memory_favorite_node on veyq_memory_favorite (node_id);
 
 -- ── Unified media model (blob = deduplicated chunk-set of sealed frames in the BlobStore, not the DB) ──
 create table veyq_blob (
@@ -314,7 +351,8 @@ create table veyq_share (
     password_salt       varbinary(64),                        -- set => password-protected; null => no password
     expires_at          timestamp,                            -- null => never expires
     label               varchar(120)    not null default '',  -- owner-facing link name (not shown to guests)
-    notice_markdown     text                                  -- optional per-share consent terms (plaintext)
+    notice_markdown     text,                                 -- optional per-share consent terms (plaintext)
+    upload_capability_hash varbinary(32)
 );
 create index veyq_share_node_idx on veyq_share (node_id);
 
@@ -349,6 +387,19 @@ create table veyq_password_reset (
     consumed_at  timestamp
 );
 create index idx_password_reset_user on veyq_password_reset (user_id);
+
+-- uc.account.change-email — one-time tokens for confirming an account email change.
+-- Mirrors veyq_password_reset: only the SHA-256 of the token is stored (the raw token rides the email link to
+-- the NEW address). new_email holds the address the change is confirming to. Single-use via confirmed_at.
+create table veyq_email_change_token (
+    id            varchar(64)   not null primary key,
+    user_id       varchar(64)   not null references veyq_user (id),
+    new_email     varchar(320)  not null,                       -- the address the change confirms to
+    token_sha256  varbinary(32) not null unique,                -- only the hash of the one-time email token
+    created_at    timestamp     not null,
+    expires_at    timestamp     not null,
+    confirmed_at  timestamp
+);
 
 -- Seeded singleton row, row-locked (SELECT ... FOR UPDATE) to serialize concurrent first-owner setup.
 create table veyq_server_setup (

@@ -4,6 +4,7 @@ import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.ClaimTenantOwnershipRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.GetInviteMaterialRequest
+import com.veyq.app.generated.model.IssueOwnerInviteRequest
 import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.MyScopeGrant
 import com.veyq.app.generated.model.OwnerInvite
@@ -12,6 +13,7 @@ import com.veyq.app.generated.model.TenantInviteMaterial
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.generated.model.UploadTenantLogoRequest
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.config.AppConfig
 import com.veyq.app.shared.config.TenantConfig
 import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
@@ -38,8 +40,11 @@ import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.tenancy.TenantStatus
 import com.veyq.app.shared.storage.BlobStore
+import io.quarkus.mailer.Mail
+import io.quarkus.mailer.Mailer
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
@@ -70,8 +75,11 @@ class TenantProvisioningHandler(
     private val guard: TenantAdminGuard,
     private val suites: CryptoSuiteRegistry,
     private val store: BlobStore,
+    private val mailer: Mailer,
+    app: AppConfig,
     tenantCfg: TenantConfig,
 ) {
+    private val appBaseUrl: String = app.baseUrl().trimEnd('/')
     private val deletionGrace: Duration = tenantCfg.deletionGrace()
 
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -178,21 +186,29 @@ class TenantProvisioningHandler(
     }
 
     @Transactional
-    fun issueOwnerInvite(auth: String?, tenantId: String): OwnerInvite {
+    fun issueOwnerInvite(auth: String?, tenantId: String, req: IssueOwnerInviteRequest): OwnerInvite {
         val owner = requireServerOwner(auth)
         val tenant = tenants.findById(tenantId) ?: throw notFound("Tenant")
+        val targetEmail = req.email.trim()
         val secret = ByteArray(32).also { rng.nextBytes(it) }
         val now = Instant.now()
         val expires = now.plus(inviteTtl)
         val invite = TenantInvite().apply {
             id = newId(); this.tenantId = tenant.id; role = MemberRole.Owner
             secretHash = sha256(secret); status = InviteStatus.PENDING
+            this.targetEmail = targetEmail
             createdBy = owner.id; createdAt = now; expiresAt = expires
         }
         invites.persist(invite)
+        val link = "${tenantInviteBaseUrl(tenant)}/#invite=${invite.id}&s=${enc.encodeToString(secret)}"
+        val body = buildString {
+            append("Hi,\n\nYou've been invited to become the owner of \"").append(tenant.displayName).append("\" on veyq.\n")
+            append("Open this link to accept:\n\n").append(link).append("\n\n")
+            append("If you didn't expect this, you can ignore this email.\n")
+        }
+        mailer.send(Mail.withText(targetEmail, "You're invited to own ${tenant.displayName} on veyq", body))
         return OwnerInvite(
             inviteId = invite.id,
-            bootstrapSecret = enc.encodeToString(secret),
             expiresAt = OffsetDateTime.ofInstant(expires, ZoneOffset.UTC),
         )
     }
@@ -210,6 +226,7 @@ class TenantProvisioningHandler(
             role = invite.role.name,
             status = TenantInviteInfo.Status.valueOf(invite.status.name),
             kind = TenantInviteInfo.Kind.valueOf(invite.kind.name),
+            existingAccount = invite.targetEmail?.let { users.findByEmail(it) != null } ?: false,
             scopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
         )
     }
@@ -241,9 +258,11 @@ class TenantProvisioningHandler(
         val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
         if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
+        if (invite.kind != InviteKind.OWNER) throw ApiException(400, "NOT_AN_OWNER_INVITE", "Only owner invites can be claimed here")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }
+        requireTargetEmail(invite, user.email)
         suites.require(req.scopePublicKey.suiteId)
         suites.require(req.wrappedScopePrivateKey.suiteId)
 
@@ -262,6 +281,7 @@ class TenantProvisioningHandler(
                 suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
             },
         )
+        scopes.findUnassignedPersonalByOwnerUserId(user.id)?.tenantId = tenant.id
         memberships.persist(
             Membership().apply {
                 id = newId(); tenantId = tenant.id; userId = user.id; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now
@@ -272,6 +292,13 @@ class TenantProvisioningHandler(
         invite.status = InviteStatus.CONSUMED
         invite.consumedBy = user.id
         return tenant.toSummary()
+    }
+
+    fun requireTargetEmail(invite: TenantInvite, email: String) {
+        val target = invite.targetEmail ?: throw ApiException(409, "INVITE_TARGET_REQUIRED", "Owner invite is missing a target email")
+        if (!target.equals(email.trim(), ignoreCase = true)) {
+            throw ApiException(403, "INVITE_EMAIL_MISMATCH", "Invite is bound to a different email address")
+        }
     }
 
     @Transactional
@@ -288,6 +315,18 @@ class TenantProvisioningHandler(
 
     private fun Tenant.toSummary(): TenantSummary =
         TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain, logoUrl = logoUrl())
+
+    private fun tenantInviteBaseUrl(tenant: Tenant): String {
+        val domain = tenant.domain.trim().trimEnd('/')
+        if (domain.isBlank()) return appBaseUrl
+        if (domain.startsWith("http://", ignoreCase = true) || domain.startsWith("https://", ignoreCase = true)) {
+            return domain
+        }
+        val scheme = runCatching { URI(appBaseUrl).scheme?.lowercase() }.getOrNull()
+            ?.takeIf { it == "http" || it == "https" }
+            ?: "https"
+        return "$scheme://$domain"
+    }
 
     private fun Tenant.logoUrl(): String? {
         val key = logoObjectKey ?: return null

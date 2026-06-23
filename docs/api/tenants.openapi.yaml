@@ -241,15 +241,21 @@ paths:
       operationId: issueOwnerInvite
       summary: Issue a single-use owner-claim invitation. Server Owner only.
       description: >
-        Returns a one-time bootstrap secret; the client places it in the invite URL fragment. The server
-        stores only its hash. Claiming the (empty) tenant is an ownership claim — there are no scope keys
-        to temp-wrap; the claimer's client mints the tenant scope keypair.
+        Sends a one-time bootstrap link to the target owner email. The API response does not expose the
+        bootstrap secret to the provisioning client. Claiming the (empty) tenant is an ownership claim —
+        there are no scope keys to temp-wrap; the claimer's client mints the tenant scope keypair. The
+        claim/register email must match the invite target email.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueOwnerInviteRequest' }
       responses:
         '200':
-          description: The owner invitation (bootstrap secret shown once).
+          description: The owner invitation metadata (secret delivered only by email).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OwnerInvite' }
@@ -655,11 +661,16 @@ components:
         members: { type: array, items: { $ref: '#/components/schemas/GroupMember' } }
     OwnerInvite:
       type: object
-      required: [inviteId, bootstrapSecret, expiresAt]
+      required: [inviteId, expiresAt]
       properties:
         inviteId: { type: string }
-        bootstrapSecret: { type: string, description: One-time secret (base64url); goes in the URL fragment., x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        bootstrapSecret: { type: string, description: One-time secret (base64url); member invites return it to the key-holding owner, owner invites deliver it only by email., x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         expiresAt: { type: string, format: date-time }
+    IssueOwnerInviteRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
     MembershipSummary:
       type: object
       required: [tenantId, userId, role, status]
@@ -753,13 +764,16 @@ components:
         memberCount: { type: integer }
     TenantInviteInfo:
       type: object
-      required: [inviteId, tenant, role, status, kind]
+      required: [inviteId, tenant, role, status, kind, existingAccount]
       properties:
         inviteId: { type: string }
         tenant: { $ref: '#/components/schemas/TenantSummary' }
         role: { type: string }
         status: { type: string, enum: [PENDING, CONSUMED, REVOKED] }
         kind: { type: string, enum: [OWNER, MEMBER] }
+        existingAccount:
+          type: boolean
+          description: True when the invite targets an existing account, so the user must sign in and accept instead of registering.
         scopePublicKey:
           $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
           description: MEMBER invites only — the existing scope's public key (a public key, safe to expose).

@@ -11,8 +11,8 @@ import jakarta.enterprise.context.ApplicationScoped
  * The single scope-access gate. Holding a scope grant is necessary but, for a TENANT scope, not
  * sufficient: the caller must ALSO be an ACTIVE member of the tenant. That second layer is defense in
  * depth — a missed grant cleanup (member removed, grant row left behind) must not silently become an
- * IDOR that hands out content or wrapped key material. Personal scopes have no tenant, so the grant alone
- * is authoritative.
+ * IDOR that hands out content or wrapped key material. Tenant-bound personal scopes also require active
+ * membership in their tenant; only legacy/unassigned setup scopes pass by grant alone.
  *
  * New call sites should use this instead of re-deriving the check (which had already drifted: some
  * key-material endpoints and the live-journal relay checked only the grant). See AD-03 / security-model.
@@ -47,7 +47,7 @@ class ScopeAccessGuard(
         return isActiveMember(userId, scope.tenantId)
     }
 
-    /** Membership layer only: personal scopes (no tenant) pass; tenant scopes require ACTIVE membership. */
+    /** Membership layer only: unassigned setup scopes pass; tenant-bound scopes require ACTIVE membership. */
     fun isActiveMember(userId: String, tenantId: String?): Boolean =
         tenantId == null || memberships.find(tenantId, userId)?.status == MembershipStatus.ACTIVE
 }

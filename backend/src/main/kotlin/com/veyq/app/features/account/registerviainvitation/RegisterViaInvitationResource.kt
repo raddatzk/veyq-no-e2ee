@@ -2,6 +2,7 @@ package com.veyq.app.features.account.registerviainvitation
 
 import com.veyq.app.generated.api.RegisterViaInvitationApi
 import com.veyq.app.generated.model.RegisterViaInvitationRequest
+import com.veyq.app.shared.security.refreshSessionCookie
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -9,6 +10,10 @@ import jakarta.ws.rs.core.Response
 @ApplicationScoped
 class RegisterViaInvitationResource(private val handler: RegisterViaInvitationHandler) : RegisterViaInvitationApi {
 
-    override fun registerViaInvitation(inviteId: String, registerViaInvitationRequest: RegisterViaInvitationRequest): Response =
-        Response.ok(handler.registerViaInvitation(inviteId, registerViaInvitationRequest)).build()
+    override fun registerViaInvitation(inviteId: String, registerViaInvitationRequest: RegisterViaInvitationRequest): Response {
+        val result = handler.registerViaInvitation(inviteId, registerViaInvitationRequest)
+        return Response.ok(result.response)
+            .header("Set-Cookie", refreshSessionCookie(result.issuedSession))
+            .build()
+    }
 }

@@ -1,100 +1,168 @@
-// uc.keys.upsert-unlock-wrap (web) — enrol the current browser as a named DEVICE unlock method.
-//
-// After a successful login the master key is unlocked in memory. We wrap a copy of it under a
-// per-browser device key and register it as a DEVICE master-key wrap, tagged with a user-chosen name and
-// a stable per-browser credentialRef. This is what powers the "Devices" list in user settings (replacing
-// the old passkey list): each enrolled browser is one removable DEVICE wrap.
-//
-// The device key is kept in localStorage. That is same-browser-only and good enough for listing/removing
-// devices; hardening it into a non-extractable WebCrypto/IndexedDB key is a future improvement.
 import { apiError } from '../../shared/apiError'
 import * as v1 from '../../shared/crypto/v1'
-import { b64url } from '../../shared/base64'
+import { b64url, fromB64url } from '../../shared/base64'
 import type { UnlockedSession } from '../account/login/login'
 
-const DEVICE_ID_KEY = 'veyq.deviceId'
-const DEVICE_KEY_KEY = 'veyq.deviceKey'
+const LOGIN_DEVICE_ID_PREFIX = 'veyq.loginDevice.'
+const textDecoder = new TextDecoder()
 
-export type KeyWrapSummary = {
-  unlockMethod: 'PASSWORD' | 'PASSKEY' | 'RECOVERY' | 'DEVICE'
-  credentialRef?: string
-  name?: string
-  createdAt?: string
+type NavigatorUserAgentData = {
+  platform?: string
+  model?: string
+  brands?: Array<{ brand: string; version: string }>
+  getHighEntropyValues?: (hints: string[]) => Promise<{ platform?: string; model?: string }>
 }
 
-/** List the caller's unlock wraps (metadata only). Drives the "Devices" list in user settings. */
-export async function listMyKeyWraps(apiBase: string, sessionToken: string): Promise<KeyWrapSummary[]> {
-  const res = await fetch(`${apiBase}/api/me/key-wraps`, { headers: { authorization: `Bearer ${sessionToken}` } })
-  if (!res.ok) throw await apiError(res, 'key wraps')
-  const body: { wraps: KeyWrapSummary[] } = await res.json()
-  return body.wraps
+export type LoginDeviceSummary = {
+  credentialRef?: string
+  name?: string
+  lastLoginAt?: string
 }
 
 function randomId(): string {
   return b64url(v1.randomBytes(16))
 }
 
-/** Stable identifier for this browser; created on first use. Used as the DEVICE wrap's credentialRef. */
-export function deviceId(): string {
-  let id = localStorage.getItem(DEVICE_ID_KEY)
+/** Stable per-user identifier for this browser. It lets Settings invalidate all active sessions for it. */
+export function loginDeviceId(userId: string): string {
+  const key = LOGIN_DEVICE_ID_PREFIX + userId
+  let id = localStorage.getItem(key)
   if (!id) {
     id = randomId()
-    localStorage.setItem(DEVICE_ID_KEY, id)
+    localStorage.setItem(key, id)
   }
   return id
 }
 
-/** Per-browser 32-byte device key (the DEVICE wrap KEK); created on first use. */
-function deviceKey(): Uint8Array {
-  const stored = localStorage.getItem(DEVICE_KEY_KEY)
-  if (stored) return fromStored(stored)
-  const key = v1.randomBytes(32)
-  localStorage.setItem(DEVICE_KEY_KEY, b64url(key))
-  return key
+function userAgentData(): NavigatorUserAgentData | undefined {
+  return (navigator as Navigator & { userAgentData?: NavigatorUserAgentData }).userAgentData
 }
 
-function fromStored(s: string): Uint8Array {
-  // small local decode to avoid importing fromB64url twice; b64url is symmetric with this
-  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
+function isStandaloneApp(): boolean {
+  const standaloneNavigator = navigator as Navigator & { standalone?: boolean }
+  return standaloneNavigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true
 }
 
-function defaultDeviceName(): string {
+function browserName(): string {
+  if (isStandaloneApp()) return 'veyq'
+  const brands = userAgentData()?.brands ?? []
+  const brand = brands.find((candidate) => !/Chromium|Not A Brand/i.test(candidate.brand))?.brand
+  if (brand) return brand.replace('Microsoft Edge', 'Edge').replace('Google Chrome', 'Chrome')
   const ua = navigator.userAgent
-  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS'
-  if (/Android/.test(ua)) return 'Android'
-  if (/Macintosh/.test(ua)) return 'Mac'
-  if (/Windows/.test(ua)) return 'Windows'
-  return 'Browser'
+  return /Firefox/.test(ua)
+    ? 'Firefox'
+    : /Edg\//.test(ua)
+      ? 'Edge'
+      : /Chrome/.test(ua)
+        ? 'Chrome'
+        : /Safari/.test(ua)
+          ? 'Safari'
+          : 'Browser'
 }
 
-/**
- * Register this browser as a named DEVICE unlock wrap. Best-effort: failures never block login (the
- * device list is a convenience, not required to use the app), so callers can fire-and-forget.
- */
-export async function enrollDeviceUnlock(
+function platformLabel(platform?: string, model?: string): string {
+  if (model) return model
+  const source = `${platform ?? ''} ${navigator.platform ?? ''} ${navigator.userAgent}`
+  return /iPhone/.test(source)
+    ? 'iPhone'
+    : /iPad|Macintosh.*Mobile/.test(source)
+      ? 'iPad'
+      : /Android/.test(source)
+        ? 'Android'
+        : /Mac|macOS|Macintosh/.test(source)
+          ? 'Mac'
+          : /Win|Windows/.test(source)
+            ? 'Windows PC'
+            : /Linux/.test(source)
+              ? 'Linux device'
+            : 'Device'
+}
+
+function possessiveName(name?: string): string {
+  const trimmed = name?.trim()
+  if (!trimmed) return ''
+  return trimmed.endsWith('s') ? `${trimmed}'` : `${trimmed}'s`
+}
+
+export async function defaultDeviceName(ownerName?: string): Promise<string> {
+  const client = browserName()
+  let platform = userAgentData()?.platform
+  let model = userAgentData()?.model
+  try {
+    const values = await userAgentData()?.getHighEntropyValues?.(['platform', 'model'])
+    platform = values?.platform ?? platform
+    model = values?.model ?? model
+  } catch {
+    // Client hints are optional; the user agent fallback still gives a readable device class.
+  }
+  const device = platformLabel(platform, model)
+  const owner = possessiveName(ownerName)
+  return owner ? `${client} on ${owner} ${device}` : `${client} on ${device}`
+}
+
+export function fallbackDeviceName(): string {
+  return `${browserName()} on ${platformLabel(userAgentData()?.platform, userAgentData()?.model)}`
+}
+
+function sealDeviceName(masterKey: Uint8Array, name: string): string {
+  return b64url(v1.symWrap(masterKey, v1.utf8(name), 'login-device-name', v1.randomBytes(12)))
+}
+
+function openDeviceName(masterKey: Uint8Array, encryptedName: string): string {
+  try {
+    return textDecoder.decode(v1.symUnwrap(masterKey, fromB64url(encryptedName), 'login-device-name'))
+  } catch {
+    return ''
+  }
+}
+
+export async function registerLoginDevice(
   apiBase: string,
   session: UnlockedSession,
-  name: string,
 ): Promise<void> {
+  const deviceRef = loginDeviceId(session.user.id)
   try {
-    const wrap = v1.symWrap(deviceKey(), session.masterKey, 'master-key', v1.randomBytes(12))
-    const masterKeyWrap = {
-      unlockMethod: 'DEVICE',
-      suiteId: 'v1',
-      wrappedKey: b64url(wrap),
-      credentialRef: deviceId(),
-      name: name || defaultDeviceName(),
-    }
-    const res = await fetch(`${apiBase}/api/me/key-wraps/DEVICE`, {
+    const name = await defaultDeviceName(session.user.displayName)
+    const res = await fetch(`${apiBase}/api/me/devices/current`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
-      body: JSON.stringify({ masterKeyWrap }),
+      body: JSON.stringify({ deviceRef, encryptedName: sealDeviceName(session.masterKey, name) }),
     })
-    if (!res.ok) throw await apiError(res, 'device enrol')
+    if (!res.ok) throw await apiError(res, 'device register')
   } catch {
-    // Non-fatal: the user is logged in regardless of whether the device wrap registered.
+    // Non-fatal: the user is logged in regardless of whether the device registry updated.
   }
+}
+
+export async function listLoginDevices(apiBase: string, session: UnlockedSession): Promise<LoginDeviceSummary[]> {
+  const res = await fetch(`${apiBase}/api/me/devices`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  if (!res.ok) throw await apiError(res, 'login devices')
+  const body: { devices: Array<{ deviceRef: string; encryptedName: string; lastLoginAt: string }> } = await res.json()
+  return body.devices.map((device) => ({
+    credentialRef: device.deviceRef,
+    name: openDeviceName(session.masterKey, device.encryptedName) || fallbackDeviceName(),
+    lastLoginAt: device.lastLoginAt,
+  }))
+}
+
+export async function renameLoginDevice(
+  apiBase: string,
+  session: UnlockedSession,
+  deviceRef: string,
+  name: string,
+): Promise<void> {
+  const res = await fetch(`${apiBase}/api/me/devices/${encodeURIComponent(deviceRef)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify({ encryptedName: sealDeviceName(session.masterKey, name) }),
+  })
+  if (!res.ok) throw await apiError(res, 'login device rename')
+}
+
+export async function removeLoginDevice(apiBase: string, sessionToken: string, deviceRef: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/me/devices/${encodeURIComponent(deviceRef)}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${sessionToken}` },
+  })
+  if (!res.ok) throw await apiError(res, 'login device removal')
 }

@@ -30,7 +30,7 @@ public enum EmergencyKit {
         return prefix + b64url(json)
     }
 
-    /// Extract a kit out of any text — a scanned QR string, a `.veyqkit` file, or the bytes of the kit PDF.
+    /// Extract a kit out of any text — a scanned QR string or the bytes of the kit PDF.
     public static func parse(_ text: String) -> KitData? {
         guard let range = text.range(of: prefix + "[A-Za-z0-9_-]+", options: .regularExpression) else { return nil }
         let token = String(text[range]).dropFirst(prefix.count)

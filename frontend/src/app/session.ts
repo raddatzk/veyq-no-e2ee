@@ -9,6 +9,7 @@
 import { reactive } from 'vue'
 import type { UnlockedSession } from '../features/account/login/login'
 import type { ActiveSpace } from '../features/home/home'
+import { clearSessionUnlock, saveSessionUnlock } from '../features/account/rememberedLogin/rememberedLogin'
 
 export const session = reactive({
   // same-origin: fetch hits `/api/...` on the instance that served this page (vite proxies to the backend)
@@ -25,7 +26,12 @@ export function isUnlocked(): boolean {
 /** Set (or clear) the unlocked session. Clearing also drops the active space (its keys are session-scoped). */
 export function setUnlocked(unlocked: UnlockedSession | null): void {
   session.unlocked = unlocked
-  if (!unlocked) session.activeSpace = null
+  if (unlocked) {
+    saveSessionUnlock(unlocked)
+  } else {
+    session.activeSpace = null
+    clearSessionUnlock()
+  }
 }
 
 /** Set (or clear) the active space (open scope + content key). */

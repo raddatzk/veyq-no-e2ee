@@ -36,19 +36,24 @@
   --app-radius-sm: 10px;
   --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
   --app-shadow-md: 0 14px 40px rgb(15 23 42 / 0.08);
+  --app-font-size-page-title: 1.12rem;
+  --app-font-size-section-title: 0.92rem;
+  --app-font-size-row-title: 0.88rem;
+  --app-font-size-body: 0.88rem;
+  --app-font-size-subtitle: 0.82rem;
+  --app-font-size-meta: 0.78rem;
+  --app-font-size-label: 0.72rem;
+  --app-font-size-control: 0.88rem;
   --app-background-pattern:
     radial-gradient(circle at 18% 12%, rgba(91, 77, 245, 0.13), transparent 28rem),
-    radial-gradient(circle at 82% 24%, rgba(14, 165, 233, 0.1), transparent 30rem),
-    var(--app-bg);
+    radial-gradient(circle at 82% 24%, rgba(14, 165, 233, 0.1), transparent 30rem), var(--app-bg);
   --app-background-pattern-subtle:
     radial-gradient(circle at 20% 8%, rgba(91, 77, 245, 0.055), transparent 38rem),
-    radial-gradient(circle at 84% 22%, rgba(14, 165, 233, 0.052), transparent 42rem),
-    var(--app-bg);
+    radial-gradient(circle at 84% 22%, rgba(14, 165, 233, 0.052), transparent 42rem), var(--app-bg);
   --app-chrome-pattern:
     linear-gradient(rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.84)),
     radial-gradient(circle at 12% 8%, rgba(91, 77, 245, 0.16), transparent 18rem),
-    radial-gradient(circle at 88% 18%, rgba(14, 165, 233, 0.13), transparent 20rem),
-    var(--app-bg);
+    radial-gradient(circle at 88% 18%, rgba(14, 165, 233, 0.13), transparent 20rem), var(--app-bg);
   --app-sidebar-width: 304px;
   --app-topbar-height: 72px;
   color-scheme: light;
@@ -92,17 +97,14 @@
   --app-shadow-md: 0 18px 50px rgb(0 0 0 / 0.34);
   --app-background-pattern:
     radial-gradient(circle at 18% 12%, rgba(155, 140, 255, 0.16), transparent 28rem),
-    radial-gradient(circle at 82% 24%, rgba(45, 212, 191, 0.08), transparent 30rem),
-    var(--app-bg);
+    radial-gradient(circle at 82% 24%, rgba(45, 212, 191, 0.08), transparent 30rem), var(--app-bg);
   --app-background-pattern-subtle:
     radial-gradient(circle at 20% 8%, rgba(155, 140, 255, 0.095), transparent 38rem),
-    radial-gradient(circle at 84% 22%, rgba(45, 212, 191, 0.055), transparent 42rem),
-    var(--app-bg);
+    radial-gradient(circle at 84% 22%, rgba(45, 212, 191, 0.055), transparent 42rem), var(--app-bg);
   --app-chrome-pattern:
     linear-gradient(rgba(23, 28, 34, 0.86), rgba(23, 28, 34, 0.86)),
     radial-gradient(circle at 12% 8%, rgba(155, 140, 255, 0.15), transparent 18rem),
-    radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.08), transparent 20rem),
-    var(--app-bg);
+    radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.08), transparent 20rem), var(--app-bg);
   color-scheme: dark;
 }
 

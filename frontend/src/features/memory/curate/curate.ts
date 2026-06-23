@@ -2,6 +2,7 @@
 // token is derived (the server stays blind). Folder, Memory and Chapter children share one per-parent slug
 // namespace, so collisions are surfaced to the user instead of silently creating a numbered permalink.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { createNode, decodeNode, resealNode, slugTokenFor, type MemoryNode, type NodeType } from '../createTree/memoryTree'
@@ -21,9 +22,9 @@ export function isNodeNameConflict(e: unknown): boolean {
 }
 
 async function patchNode(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, body: Record<string, unknown>): Promise<MemoryNode> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw await apiError(res, 'update node')
@@ -108,10 +109,7 @@ export function reorderNode(apiBase: string, session: UnlockedSession, active: A
 
 /** Delete a node (folder or memory) and everything beneath it — recursive cascade on the server. */
 export async function deleteNode(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}`, {
-    method: 'DELETE',
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete node')
   invalidateNodeGraph(active.scope.scopeId) // the subtree is gone — drop the per-scope cache
 }

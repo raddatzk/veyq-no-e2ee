@@ -9,7 +9,12 @@ import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { useThemeState } from '../../shared/state/useThemeState'
 import { ensureSpaces, reloadSpaces, spaces } from '../../app/spaces'
-import { enterSpace, loadMemoryById, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import {
+  enterSpace,
+  loadMemoryById,
+  type LevelEntry,
+  type SpaceEntry
+} from '../../features/home/home'
 import { listFavoriteNodeIds } from '../../features/memory/favorite/favorite'
 import { requireSession, session, setActiveSpace } from '../../app/session'
 import NodeCover from '../NodeCover.vue'
@@ -25,11 +30,11 @@ const favorites = ref<LevelEntry[]>([])
 const sidebarError = ref('')
 
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
-const canCreateGroup = computed(() => Boolean(session.unlocked))
 const canCreateTenant = computed(() => session.unlocked?.user.serverRole === 'ServerOwner')
 const personalSpace = computed(() => spaces.value.find((s) => s.kind === 'PERSONAL'))
 const tenantSpaces = computed(() => spaces.value.filter((s) => s.kind === 'TENANT'))
 const groupSpaces = computed(() => spaces.value.filter((s) => s.kind === 'GROUP'))
+const canCreateGroup = computed(() => Boolean(session.unlocked && tenantSpaces.value.length > 0))
 const activeScopeId = computed(() => session.activeSpace?.scope.scopeId ?? null)
 
 onMounted(load)
@@ -47,10 +52,15 @@ async function load() {
 
 async function loadFavorites() {
   const active = session.activeSpace
-  if (!active) { favorites.value = []; return }
+  if (!active) {
+    favorites.value = []
+    return
+  }
   try {
     const ids = await listFavoriteNodeIds(session.apiBase, requireSession(), active.scope.scopeId)
-    const entries = await Promise.all(ids.map((id) => loadMemoryById(session.apiBase, requireSession(), active, id)))
+    const entries = await Promise.all(
+      ids.map((id) => loadMemoryById(session.apiBase, requireSession(), active, id))
+    )
     favorites.value = entries.filter((e): e is LevelEntry => e !== null)
   } catch {
     favorites.value = []
@@ -62,7 +72,10 @@ function isActive(entry: SpaceEntry): boolean {
 }
 
 async function open(entry: SpaceEntry) {
-  if (isActive(entry)) { void router.push('/'); return }
+  if (isActive(entry)) {
+    void router.push('/')
+    return
+  }
   try {
     setActiveSpace(await enterSpace(session.apiBase, requireSession(), entry))
     await router.push('/')
@@ -84,7 +97,10 @@ function initial(name: string): string {
     </RouterLink>
 
     <!-- Tenant switcher (the spaces/areas the user belongs to) -->
-    <section v-if="tenantSpaces.length || canCreateTenant" class="sidebar-section sidebar-tenant-section">
+    <section
+      v-if="tenantSpaces.length || canCreateTenant"
+      class="sidebar-section sidebar-tenant-section"
+    >
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('tenant.title') }}</p>
         <button
@@ -110,7 +126,9 @@ function initial(name: string): string {
           <img v-if="tenant.logoUrl" :src="tenant.logoUrl" alt="" />
           <span v-else>{{ initial(tenant.displayName) }}</span>
         </span>
-        <span><strong>{{ tenant.displayName }}</strong></span>
+        <span
+          ><strong>{{ tenant.displayName }}</strong></span
+        >
       </button>
     </section>
 
@@ -151,10 +169,16 @@ function initial(name: string): string {
         :class="{ 'sidebar-tenant-link-active': isActive(group) }"
         @click="open(group)"
       >
-        <span class="sidebar-tenant-avatar"><span>{{ initial(group.displayName) }}</span></span>
-        <span><strong>{{ group.displayName }}</strong></span>
+        <span class="sidebar-tenant-avatar"
+          ><span>{{ initial(group.displayName) }}</span></span
+        >
+        <span
+          ><strong>{{ group.displayName }}</strong></span
+        >
       </button>
-      <p v-if="groupSpaces.length === 0" class="sidebar-section-empty">{{ t('navigation.noGroups') }}</p>
+      <p v-if="groupSpaces.length === 0" class="sidebar-section-empty">
+        {{ t('navigation.noGroups') }}
+      </p>
     </section>
 
     <!-- Favourites of the active space -->
@@ -168,10 +192,19 @@ function initial(name: string): string {
         :to="`/m/${fav.node.id}`"
         class="sidebar-scope-link sidebar-favorite-link"
       >
-        <NodeCover v-if="session.activeSpace" :active="session.activeSpace" :node="fav.node" class="sidebar-favorite-cover" />
-        <span><strong>{{ fav.name }}</strong></span>
+        <NodeCover
+          v-if="session.activeSpace"
+          :active="session.activeSpace"
+          :node="fav.node"
+          class="sidebar-favorite-cover"
+        />
+        <span
+          ><strong>{{ fav.name }}</strong></span
+        >
       </RouterLink>
-      <p v-if="favorites.length === 0" class="sidebar-section-empty">{{ t('navigation.noFavorites') }}</p>
+      <p v-if="favorites.length === 0" class="sidebar-section-empty">
+        {{ t('navigation.noFavorites') }}
+      </p>
     </section>
 
     <section class="sidebar-section sidebar-profile">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildInviteLink, buildProtectedInviteLink, isProtectedInvite, parseInviteHash } from './inviteLink'
+import { buildInviteLink, buildOwnerInviteLink, buildProtectedInviteLink, isProtectedInvite, parseInviteHash } from './inviteLink'
 
 describe('inviteLink', () => {
   const parts = { inviteId: 'inv-1', bootstrapSecret: 'sec-2', tempPrivateKey: 'key-3' }
@@ -22,6 +22,13 @@ describe('inviteLink', () => {
     expect(isProtectedInvite(parsed!)).toBe(true)
   })
 
+  it('round-trips an owner invite without member key material', () => {
+    const owner = { inviteId: 'owner-inv', bootstrapSecret: 'owner-sec' }
+    const link = buildOwnerInviteLink('https://veyq.app', owner)
+    expect(link).toBe('https://veyq.app/#invite=owner-inv&s=owner-sec')
+    expect(parseInviteHash(link.slice(link.indexOf('#')))).toEqual(owner)
+  })
+
   it('keeps the secrets in the fragment (not the query)', () => {
     const link = buildInviteLink('https://veyq.app/', parts)
     expect(link.indexOf('?')).toBe(-1)
@@ -31,7 +38,6 @@ describe('inviteLink', () => {
   it('returns null for non-invite hashes', () => {
     expect(parseInviteHash('')).toBeNull()
     expect(parseInviteHash('#invite=only-id')).toBeNull()
-    expect(parseInviteHash('#invite=id&s=sec')).toBeNull() // no key material at all
     expect(parseInviteHash('#foo=bar')).toBeNull()
   })
 })

@@ -1,6 +1,7 @@
 package com.veyq.app.platform.error
 
 import com.veyq.app.generated.model.ErrorResponse
+import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.ext.ExceptionMapper
 import jakarta.ws.rs.ext.Provider
@@ -13,7 +14,7 @@ class ApiException(val status: Int, val code: String, override val message: Stri
 @Provider
 class ApiExceptionMapper : ExceptionMapper<ApiException> {
     override fun toResponse(ex: ApiException): Response =
-        Response.status(ex.status).entity(ErrorResponse(code = ex.code, message = ex.message)).build()
+        Response.status(ex.status).type(MediaType.APPLICATION_JSON).entity(ErrorResponse(code = ex.code, message = ex.message)).build()
 }
 
 /**
@@ -26,6 +27,7 @@ class ApiExceptionMapper : ExceptionMapper<ApiException> {
 class ConstraintViolationMapper : ExceptionMapper<jakarta.validation.ConstraintViolationException> {
     override fun toResponse(ex: jakarta.validation.ConstraintViolationException): Response =
         Response.status(400)
+            .type(MediaType.APPLICATION_JSON)
             .entity(ErrorResponse(code = "VALIDATION_ERROR", message = ex.constraintViolations.firstOrNull()?.message ?: "Invalid request"))
             .build()
 }
@@ -43,7 +45,22 @@ class MalformedInputMapper : ExceptionMapper<IllegalArgumentException> {
     override fun toResponse(ex: IllegalArgumentException): Response {
         log.warnf(ex, "Rejecting malformed request input: %s", ex.message)
         return Response.status(400)
+            .type(MediaType.APPLICATION_JSON)
             .entity(ErrorResponse(code = "INVALID_BLOB", message = "Malformed request data"))
+            .build()
+    }
+}
+
+/** Last-resort boundary: never expose framework, database or stack details in API error bodies. */
+@Provider
+class UnhandledExceptionMapper : ExceptionMapper<Exception> {
+    private val log = Logger.getLogger(UnhandledExceptionMapper::class.java)
+
+    override fun toResponse(ex: Exception): Response {
+        log.error("Unhandled API exception", ex)
+        return Response.serverError()
+            .type(MediaType.APPLICATION_JSON)
+            .entity(ErrorResponse(code = "INTERNAL_SERVER_ERROR", message = "Request failed"))
             .build()
     }
 }

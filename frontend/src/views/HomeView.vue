@@ -9,7 +9,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import NodeCover from '../components/NodeCover.vue'
-import { ensureActiveSpaceForRoute } from '../app/spaces'
+import { NoSpaceAvailableError, ensureActiveSpaceForRoute } from '../app/spaces'
 import { loadLevel, type ActiveSpace, type LevelEntry } from '../features/home/home'
 import { requireSession, session } from '../app/session'
 
@@ -21,17 +21,26 @@ const stack = ref<{ id: string; name: string }[]>([])
 const active = shallowRef<ActiveSpace | null>(null)
 const loading = ref(false)
 const error = ref('')
+const noSpaces = ref(false)
 
 onMounted(() => open(undefined))
 
 async function open(parentId: string | undefined) {
   loading.value = true
   error.value = ''
+  noSpaces.value = false
   try {
     active.value = await ensureActiveSpaceForRoute(null)
     entries.value = await loadLevel(session.apiBase, requireSession(), active.value, parentId)
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : t('homeView.loadFailed')
+    if (caught instanceof NoSpaceAvailableError) {
+      active.value = null
+      entries.value = []
+      stack.value = []
+      noSpaces.value = true
+    } else {
+      error.value = caught instanceof Error ? caught.message : t('homeView.loadFailed')
+    }
   } finally {
     loading.value = false
   }
@@ -54,9 +63,23 @@ function back() {
 </script>
 
 <template>
-  <div class="veyq-page veyq-page-narrow">
+  <div v-if="noSpaces" class="veyq-page veyq-page-narrow">
+    <div class="home-empty-state">
+      <i class="pi pi-building" aria-hidden="true" />
+      <h1>{{ t('homeView.noTenantTitle') }}</h1>
+      <p>{{ t('homeView.noTenantBody') }}</p>
+    </div>
+  </div>
+  <div v-else class="veyq-page veyq-page-narrow">
     <div class="home-head">
-      <Button v-if="stack.length" type="button" icon="pi pi-arrow-left" :label="t('homeView.back')" text @click="back" />
+      <Button
+        v-if="stack.length"
+        type="button"
+        icon="pi pi-arrow-left"
+        :label="t('homeView.back')"
+        text
+        @click="back"
+      />
       <h1>{{ stack.length ? stack[stack.length - 1].name : t('homeView.title') }}</h1>
     </div>
 
@@ -68,12 +91,19 @@ function back() {
     </div>
 
     <template v-else>
-      <Message v-if="entries.length === 0" severity="info" :closable="false">{{ t('homeView.empty') }}</Message>
+      <Message v-if="entries.length === 0" severity="info" :closable="false">{{
+        t('homeView.empty')
+      }}</Message>
       <ul v-else class="home-list">
         <li v-for="entry in entries" :key="entry.node.id">
           <button type="button" class="home-item" @click="enter(entry)">
             <i v-if="entry.node.type === 'FOLDER'" class="pi pi-folder home-item-icon" />
-            <NodeCover v-else-if="active" :active="active" :node="entry.node" class="home-item-cover" />
+            <NodeCover
+              v-else-if="active"
+              :active="active"
+              :node="entry.node"
+              class="home-item-cover"
+            />
             <span>{{ entry.name }}</span>
             <i class="pi pi-angle-right home-item-go" />
           </button>
@@ -128,5 +158,29 @@ function back() {
 .home-item-icon {
   width: 2.25rem;
   text-align: center;
+}
+.home-empty-state {
+  max-width: 34rem;
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 3rem;
+}
+.home-empty-state > i {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--p-primary-color, #5b4df5);
+  background: color-mix(in srgb, var(--p-primary-color, #5b4df5) 14%, transparent);
+  font-size: 1.25rem;
+}
+.home-empty-state h1,
+.home-empty-state p {
+  margin: 0;
+}
+.home-empty-state p {
+  opacity: 0.72;
+  line-height: 1.5;
 }
 </style>

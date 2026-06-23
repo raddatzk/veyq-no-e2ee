@@ -2,14 +2,15 @@
 
 - **ID:** uc.spaces.switch-active-space
 - **Primary actor:** Memory Curator
-- **Goal:** Switch the active space context quickly (between the personal space and any group space).
-- **Preconditions:** Holds the key for more than one space (the personal scope and/or group memberships).
+- **Goal:** Switch the active space context quickly (between tenant, group and personal spaces).
+- **Preconditions:** Holds the key for at least one tenant context. The personal space is tenant-bound:
+  it exists inside a tenant and is deleted with that tenant; it is not a standalone workspace.
 - **Postconditions (success):** The active space is switched; the UI scopes to it; the client uses that
   space's already-held scope keys.
 
 ## Main flow
-1. The user opens the **space switcher** — one unified list of every space they can enter: their
-   **personal** space plus every **group** they're an active member of and hold the scope key for.
+1. The user opens the **space switcher** — one unified list of every tenant/group space they can enter,
+   plus the **personal** space that belongs to that tenant context.
 2. They pick a space; the client switches the **active scope context** and uses that space's
    already-held scope keys.
 3. Navigation, search and uploads now target the selected space.
@@ -17,10 +18,14 @@
 ## Alternate / exception flows
 - A1: A **just-granted** group appears in the switcher once its grant is held (no user action needed).
 - E1: **Removed** from a group → it disappears from the switcher (no future access).
+- E2: No tenant/group context exists yet → no tenant-bound personal space is shown.
+- E3: A tenant is deleted → its tenant, group and personal scopes are purged together.
 
 ## Quality notes
 - *Roster is the wrap:* a space appears only if the caller actually holds its scope key (access = the
   wrap, ADR 0005) — membership without a grant is not an enterable space.
+- *No standalone personal workspace:* the personal scope is part of a tenant. Tenant deletion purges it
+  through the same tenant scope cleanup as tenant and group scopes.
 - *Switching fetches no secrets:* the client already holds the wrapped scope keys for its spaces;
   switching is pure client-side context, no server roundtrip for keys.
 - *Membership is server-visible:* which groups you belong to is operational metadata; content stays

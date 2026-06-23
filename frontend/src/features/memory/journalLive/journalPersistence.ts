@@ -5,6 +5,7 @@
 // reader projection) which prunes the folded-in updates. Cross-session edits converge without a plaintext
 // server document.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
@@ -18,17 +19,13 @@ export const PERSISTENCE_ORIGIN = 'journal-persistence'
 const seal = v1.journalSeal
 const open = v1.journalOpen
 
-function auth(session: UnlockedSession) {
-  return { authorization: `Bearer ${session.sessionToken}` }
-}
-
 /**
  * Exchange the Bearer session for a short-lived single-use relay ticket, so the live-journal WebSocket can
  * authenticate via `?ticket=` rather than carrying the session token in the URL (which leaks into proxy
  * access logs / browser history).
  */
 export async function fetchJournalLiveTicket(apiBase: string, session: UnlockedSession): Promise<string> {
-  const res = await fetch(`${apiBase}/api/journal-live/ticket`, { method: 'POST', headers: auth(session) })
+  const res = await authFetch(apiBase, session, '/api/journal-live/ticket', { method: 'POST' })
   if (!res.ok) throw await apiError(res, 'journal-live ticket')
   return (await res.json()).ticket
 }
@@ -37,7 +34,7 @@ export async function fetchJournalLiveTicket(apiBase: string, session: UnlockedS
 export async function loadJournalDoc(
   apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, contentKey: Uint8Array, doc: Y.Doc,
 ): Promise<number> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/journal/live`, { headers: auth(session) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/journal/live`)
   if (!res.ok) throw await apiError(res, 'load journal')
   const body = await res.json()
   let maxSeq = Number(body.baseSeq ?? 0)
@@ -55,9 +52,9 @@ export async function loadJournalDoc(
 export async function appendJournalUpdate(
   apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, contentKey: Uint8Array, update: Uint8Array,
 ): Promise<number> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/journal/updates`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/journal/updates`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedUpdate: { suiteId: 'v1', bytes: b64url(seal(contentKey, update)) } }),
   })
   if (!res.ok) throw await apiError(res, 'append journal update')
@@ -90,9 +87,9 @@ export async function compactJournal(
   // plain nonce||AEAD(contentKey) envelope (not the per-message journal sub-key — that's for the CRDT layer).
   const mdNonce = v1.randomBytes(12)
   const md = v1.concat(mdNonce, v1.aeadSeal(contentKey, mdNonce, v1.utf8(markdown), new Uint8Array(0)))
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/journal/snapshot`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/journal/snapshot`, {
     method: 'PUT',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       snapshot: { suiteId: 'v1', bytes: b64url(snapshot) },
       markdown: { suiteId: 'v1', bytes: b64url(md) },

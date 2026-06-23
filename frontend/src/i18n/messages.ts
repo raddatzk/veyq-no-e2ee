@@ -28,6 +28,13 @@ export const messages = {
       disabled: 'Deaktiviert',
       upload: 'Hochladen'
     },
+    emailChange: {
+      section: 'E-Mail-Adresse',
+      newEmail: 'Neue E-Mail-Adresse',
+      request: 'E-Mail ändern',
+      sent: 'Bestätigungslink an {email} gesendet. Öffne ihn, um die Änderung abzuschließen.',
+      failed: 'E-Mail-Änderung fehlgeschlagen.'
+    },
     notifications: {
       title: 'Nachrichten',
       count: '{count} Nachrichten',
@@ -108,17 +115,16 @@ export const messages = {
       tenantJoinTitle: 'Bereich beitreten',
       toLogin: 'Zum Login',
       secretHint: 'Aus deinem Emergency Kit (Secret Key).',
-      loginName: 'Name dieses Geräts',
-      loginNameHint: 'Erscheint in deinen Einstellungen unter „Geräte“.',
       remember: 'Login merken',
       submitting: 'Anmeldung läuft…'
     },
     kit: {
       download: 'Emergency Kit (PDF) herunterladen',
-      downloaded: 'Emergency Kit wurde heruntergeladen.',
+      downloaded: 'Emergency-Kit-Download wurde gestartet.',
+      downloadFailed: 'Emergency Kit konnte nicht heruntergeladen werden.',
       import: 'Emergency Kit importieren',
-      importFile: 'Aus Datei',
-      importScan: 'QR scannen',
+      importFile: 'Emergency Kit hochladen',
+      importScan: 'QR-Code mit Kamera scannen',
       importHint: 'Emergency Kit (PDF/QR) importieren, um E-Mail und Secret Key auszufüllen.',
       importFailed: 'Emergency Kit konnte nicht gelesen werden.',
       scanHint: 'Richte die Kamera auf den QR-Code deines Emergency Kits.',
@@ -127,6 +133,7 @@ export const messages = {
       backupCopy:
         'Lade dein Emergency Kit herunter und bewahre es sicher auf. Mit deinem Secret Key und deinem Passwort kannst du dich jederzeit wieder anmelden.',
       backupConfirm: 'Ich habe mein Emergency Kit gesichert',
+      backupDownloadConfirm: 'Ich habe das Emergency Kit heruntergeladen und sicher gespeichert',
       continue: 'Weiter'
     },
     setup: {
@@ -140,7 +147,12 @@ export const messages = {
       tenantCreate: 'Bereich erstellen',
       tenantCreateFailed: 'Bereich konnte nicht erstellt werden',
       tenantInviteSent: 'Einladung wurde gesendet.',
+      tenantInviteLinkCreated: 'Einladungslink wurde erstellt und kopiert.',
+      tenantInviteLink: 'Einladungslink',
       tenantName: 'Bereichsname',
+      tenantDomain: 'Domain',
+      tenantDomainHint:
+        'Adresse, unter der dieser Bereich erreichbar ist (eindeutig, z. B. familie.veyq.app).',
       tenantOwnerEmail: 'Owner-E-Mail',
       title: 'Server einrichten',
       sub: 'Erstelle den ersten Account (Server-Owner). Alle Schlüssel entstehen hier auf deinem Gerät.',
@@ -150,25 +162,38 @@ export const messages = {
       failed: 'Einrichtung fehlgeschlagen.',
       kitTitle: 'Emergency Kit',
       kitSub:
-        'Das ist dein Secret Key. Lade dein Emergency Kit herunter und bewahre es sicher auf – damit und mit deinem Passwort kannst du dich jederzeit anmelden.',
+        'Lade dein Emergency Kit herunter und bewahre es sicher auf. Damit und mit deinem Passwort kannst du dich jederzeit anmelden.',
       kitProceed: 'Weiter zur Anmeldung'
     },
     password: {
       minLength: 'Mindestens 10 Zeichen.',
       strong: 'Starkes Passwort.',
-      pwnedWarning: 'Dieses Passwort taucht in {count} bekannten Datenlecks auf – wähle besser ein anderes.'
+      pwnedWarning:
+        'Dieses Passwort taucht in {count} bekannten Datenlecks auf – wähle besser ein anderes.'
     },
     accept: {
       title: 'Einladung annehmen',
       failed: 'Einladung konnte nicht geladen werden.',
       joinAs: 'Du trittst „{name}“ als {role} bei.',
-      join: 'Bereich beitreten',
-      joining: 'Beitritt läuft…',
+      join: 'Einladung annehmen',
+      joining: 'Einladung wird angenommen…',
       passphrase: 'Passphrase',
       passphraseHint: 'Aus der separaten Nachricht',
       wrongPassphrase: 'Falsche Passphrase.',
       register: 'Account erstellen',
       registerFailed: 'Account konnte nicht erstellt werden.',
+      existingAccount:
+        'Diese Einladung gehört zu einem bestehenden Account. Melde dich auf dieser Domain an, um sie anzunehmen.',
+      existingOwner:
+        'Du wurdest eingeladen, „{tenant}“ zu leiten. Melde dich mit dem eingeladenen Account an, um die Einladung anzunehmen, oder nutze einen anderen Account.',
+      existingMember:
+        'Du wurdest eingeladen, „{tenant}“ beizutreten. Melde dich mit dem eingeladenen Account an, um die Einladung anzunehmen, oder nutze einen anderen Account.',
+      signIn: 'Einloggen und Einladung annehmen',
+      signedInOwner:
+        'Hallo {user}, du wurdest eingeladen, „{tenant}“ zu leiten. Du kannst die Einladung annehmen oder dich mit einem anderen Account einloggen.',
+      signedInMember:
+        'Hallo {user}, du wurdest eingeladen, „{tenant}“ beizutreten. Du kannst die Einladung annehmen oder dich mit einem anderen Account einloggen.',
+      useOtherAccount: 'Mit anderem Account einloggen',
       haveAccount: 'Ich habe schon einen Account'
     },
     invite: {
@@ -177,9 +202,14 @@ export const messages = {
     },
     device: {
       title: 'Geräte',
-      subtitle: 'Geräte und Logins, mit denen dieser Account entsperrt werden kann. Entferne Geräte, die du nicht mehr nutzt.',
+      subtitle:
+        'Aktive Geräte und Browser-Logins. Entferne einen Eintrag, um die Sessions dieses Geräts auszuloggen.',
       thisDevice: 'Dieses Gerät',
       created: 'Hinzugefügt',
+      lastLogin: 'Letzter Login',
+      edit: 'Gerätename bearbeiten',
+      renamed: 'Gerätename wurde aktualisiert.',
+      renameFailed: 'Gerätename konnte nicht aktualisiert werden.',
       remove: 'Entfernen',
       removed: 'Gerät wurde entfernt.',
       removeFailed: 'Gerät konnte nicht entfernt werden.',
@@ -196,7 +226,8 @@ export const messages = {
       removeFailed: 'Mitglied konnte nicht entfernt werden.',
       roleFailed: 'Rolle konnte nicht geändert werden.',
       rotate: 'Zugriff endgültig entziehen (Scope rotieren)',
-      rotateCopy: 'Erzeugt neue Schlüssel und versiegelt alle Inhalte neu, damit entfernte Mitglieder keinen Zugriff auf neue Inhalte mehr haben.',
+      rotateCopy:
+        'Erzeugt neue Schlüssel und versiegelt alle Inhalte neu, damit entfernte Mitglieder keinen Zugriff auf neue Inhalte mehr haben.',
       rotated: 'Scope wurde rotiert.',
       rotateFailed: 'Scope-Rotation fehlgeschlagen.',
       logo: 'Logo',
@@ -214,6 +245,9 @@ export const messages = {
       title: 'Meine Memories',
       empty: 'Noch keine Memories.',
       loadFailed: 'Memories konnten nicht geladen werden.',
+      noTenantTitle: 'Noch kein Tenant',
+      noTenantBody:
+        'Erstelle oder betrete zuerst einen Tenant, bevor Memories und dein persönlicher Bereich verfügbar sind.',
       back: 'Zurück'
     },
     journalView: {
@@ -353,7 +387,7 @@ export const messages = {
         coverSet: 'Festgelegt',
         coverNone: 'Erstes Medium',
         none: '—',
-        loadFailed: 'Info konnte nicht geladen werden.',
+        loadFailed: 'Info konnte nicht geladen werden.'
       },
       journal: 'Journal',
       journalEmbedUnavailable: 'Embed nicht verfügbar',
@@ -1024,6 +1058,7 @@ export const messages = {
       avatarSaveFailed: 'Profilbild konnte nicht gespeichert werden.',
       avatarSaveSuccess: 'Profilbild wurde gespeichert.',
       createdAt: 'Erstellt',
+      displayNameChange: 'Anzeigename ändern',
       defaultPasskeyName: 'Dieses Gerät',
       deletePasskey: 'Passkey löschen',
       domain: 'Domain',
@@ -1063,6 +1098,7 @@ export const messages = {
       passwordSet: 'Passwort setzen',
       passwordChangeFailed: 'Passwort konnte nicht geändert werden.',
       passwordChangeSuccess: 'Passwort wurde geändert.',
+      passwordRepeat: 'Neues Passwort wiederholen',
       passwordDelete: 'Passwort löschen',
       passwordDeleteConfirm: 'Passwort löschen',
       passwordDeleteCopy:
@@ -1071,14 +1107,27 @@ export const messages = {
       passwordDeleteSuccess: 'Passwort wurde gelöscht.',
       passwordLogin: 'Passwort',
       passwordLoginCopy: 'Verwalte deinen Passwort-Login.',
+      loginSection: 'Anmeldung',
+      loginSectionSubtitle:
+        'Verwalte die E-Mail-Adresse und den Passwort-Login für deinen Account.',
       profile: 'Profil',
       profileAndLogin: 'Profil und Anmeldung',
+      profileLink: 'Profil-Link',
+      profileLinkChange: 'Profil-Link ändern',
+      profileLinkNew: 'Neuer Profil-Link',
+      profileLinkWarning:
+        'Der Profil-Link ist die Adresse, über die andere dich in Memories als Teilnehmer erkennen und dein Profil mit sichtbaren Memories öffnen. Wenn du ihn änderst, funktionieren alte Profil-Links nicht mehr.',
       profileLoadFailed: 'User-Einstellungen konnten nicht geladen werden.',
       profileSaveFailed: 'Profil konnte nicht gespeichert werden.',
       profileSavePendingEmail: 'Profil wurde gespeichert. Bitte bestätige die neue E-Mail-Adresse.',
       profileSaveSuccess: 'Profil wurde gespeichert.',
+      profileSectionSubtitle:
+        'Lege fest, wie andere dich in Memories sehen und über welchen Profil-Link sie dich öffnen.',
       recommended: 'Empfohlen',
       renamePasskey: 'Passkey umbenennen',
+      secretKeyFileImport: 'PDF importieren',
+      secretKeyQrImport: 'QR scannen',
+      signOutCopy: 'Beendet die aktuelle Sitzung in diesem Browser.',
       totpCopy:
         'Sichert Passwort-Logins mit einem sechsstelligen Code aus deiner Authenticator-App ab.',
       totpDisabled: 'TOTP ist für Passwort-Logins noch nicht eingerichtet.',
@@ -1277,6 +1326,13 @@ export const messages = {
       disabled: 'Disabled',
       upload: 'Upload'
     },
+    emailChange: {
+      section: 'Email address',
+      newEmail: 'New email address',
+      request: 'Change email',
+      sent: 'Confirmation link sent to {email}. Open it to complete the change.',
+      failed: 'Email change failed.'
+    },
     notifications: {
       title: 'Messages',
       count: '{count} messages',
@@ -1357,17 +1413,16 @@ export const messages = {
       totpRequired: 'Enter the code from your authenticator app.',
       toLogin: 'Go to login',
       secretHint: 'From your Emergency Kit (Secret Key).',
-      loginName: 'Name of this device',
-      loginNameHint: 'Shown in your settings under “Devices”.',
       remember: 'Remember login',
       submitting: 'Signing in…'
     },
     kit: {
       download: 'Download Emergency Kit (PDF)',
-      downloaded: 'Emergency Kit downloaded.',
+      downloaded: 'Emergency Kit download started.',
+      downloadFailed: 'Could not download the Emergency Kit.',
       import: 'Import Emergency Kit',
-      importFile: 'From file',
-      importScan: 'Scan QR',
+      importFile: 'Upload Emergency Kit',
+      importScan: 'Scan QR code with camera',
       importHint: 'Import your Emergency Kit (PDF/QR) to fill in email and Secret Key.',
       importFailed: 'Could not read the Emergency Kit.',
       scanHint: 'Point the camera at the QR code on your Emergency Kit.',
@@ -1376,6 +1431,7 @@ export const messages = {
       backupCopy:
         'Download your Emergency Kit and keep it safe. With your Secret Key and your password you can always sign in again.',
       backupConfirm: 'I have backed up my Emergency Kit',
+      backupDownloadConfirm: 'I have downloaded and safely stored my Emergency Kit',
       continue: 'Continue'
     },
     setup: {
@@ -1389,7 +1445,11 @@ export const messages = {
       tenantCreate: 'Create space',
       tenantCreateFailed: 'Space could not be created',
       tenantInviteSent: 'Invitation has been sent.',
+      tenantInviteLinkCreated: 'Invitation link has been created and copied.',
+      tenantInviteLink: 'Invitation link',
       tenantName: 'Space name',
+      tenantDomain: 'Domain',
+      tenantDomainHint: 'Address where this space is reachable (unique, e.g. family.veyq.app).',
       tenantOwnerEmail: 'Owner email',
       title: 'Set up server',
       sub: 'Create the first account (server owner). All keys are generated here on your device.',
@@ -1399,7 +1459,7 @@ export const messages = {
       failed: 'Setup failed.',
       kitTitle: 'Emergency Kit',
       kitSub:
-        'This is your Secret Key. Download your Emergency Kit and keep it safe — with it and your password you can always sign in.',
+        'Download your Emergency Kit and keep it safe. With it and your password you can always sign in.',
       kitProceed: 'Continue to sign in'
     },
     password: {
@@ -1411,13 +1471,25 @@ export const messages = {
       title: 'Accept invitation',
       failed: 'The invitation could not be loaded.',
       joinAs: 'You are joining “{name}” as {role}.',
-      join: 'Join space',
-      joining: 'Joining…',
+      join: 'Accept invitation',
+      joining: 'Accepting invitation…',
       passphrase: 'Passphrase',
       passphraseHint: 'From the separate message',
       wrongPassphrase: 'Wrong passphrase.',
       register: 'Create account',
       registerFailed: 'Account could not be created.',
+      existingAccount:
+        'This invitation belongs to an existing account. Sign in on this domain to accept it.',
+      existingOwner:
+        'You were invited to lead “{tenant}”. Sign in with the invited account to accept the invitation, or use another account.',
+      existingMember:
+        'You were invited to join “{tenant}”. Sign in with the invited account to accept the invitation, or use another account.',
+      signIn: 'Sign in and accept invitation',
+      signedInOwner:
+        'Hello {user}, you were invited to lead “{tenant}”. You can accept the invitation or sign in with another account.',
+      signedInMember:
+        'Hello {user}, you were invited to join “{tenant}”. You can accept the invitation or sign in with another account.',
+      useOtherAccount: 'Sign in with another account',
       haveAccount: 'I already have an account'
     },
     invite: {
@@ -1426,9 +1498,14 @@ export const messages = {
     },
     device: {
       title: 'Devices',
-      subtitle: 'Devices and logins that can unlock this account. Remove any you no longer use.',
+      subtitle:
+        'Active devices and browser logins. Remove an entry to sign out that device’s sessions.',
       thisDevice: 'This device',
       created: 'Added',
+      lastLogin: 'Last login',
+      edit: 'Edit device name',
+      renamed: 'Device name updated.',
+      renameFailed: 'Could not update device name.',
       remove: 'Remove',
       removed: 'Device removed.',
       removeFailed: 'Could not remove device.',
@@ -1445,7 +1522,8 @@ export const messages = {
       removeFailed: 'Could not remove member.',
       roleFailed: 'Could not change role.',
       rotate: 'Revoke access for good (rotate scope)',
-      rotateCopy: 'Generates new keys and re-seals all content so removed members can no longer access new content.',
+      rotateCopy:
+        'Generates new keys and re-seals all content so removed members can no longer access new content.',
       rotated: 'Scope rotated.',
       rotateFailed: 'Scope rotation failed.',
       logo: 'Logo',
@@ -1463,6 +1541,9 @@ export const messages = {
       title: 'My memories',
       empty: 'No memories yet.',
       loadFailed: 'Could not load memories.',
+      noTenantTitle: 'No tenant yet',
+      noTenantBody:
+        'Create or join a tenant before Memories and your personal space become available.',
       back: 'Back'
     },
     journalView: {
@@ -1602,7 +1683,7 @@ export const messages = {
         coverSet: 'Set',
         coverNone: 'First medium',
         none: '—',
-        loadFailed: 'Info could not be loaded.',
+        loadFailed: 'Info could not be loaded.'
       },
       journal: 'Journal',
       journalEmbedUnavailable: 'Embed unavailable',
@@ -2270,6 +2351,7 @@ export const messages = {
       avatarSaveFailed: 'Profile picture could not be saved.',
       avatarSaveSuccess: 'Profile picture saved.',
       createdAt: 'Created',
+      displayNameChange: 'Change display name',
       defaultPasskeyName: 'This device',
       deletePasskey: 'Delete passkey',
       domain: 'Domain',
@@ -2309,6 +2391,7 @@ export const messages = {
       passwordSet: 'Set password',
       passwordChangeFailed: 'Password could not be changed.',
       passwordChangeSuccess: 'Password has been changed.',
+      passwordRepeat: 'Repeat new password',
       passwordDelete: 'Delete password',
       passwordDeleteConfirm: 'Delete password',
       passwordDeleteCopy:
@@ -2317,14 +2400,26 @@ export const messages = {
       passwordDeleteSuccess: 'Password has been deleted.',
       passwordLogin: 'Password',
       passwordLoginCopy: 'Manage your password login.',
+      loginSection: 'Login',
+      loginSectionSubtitle: 'Manage the email address and password login for your account.',
       profile: 'Profile',
       profileAndLogin: 'Profile and login',
+      profileLink: 'Profile link',
+      profileLinkChange: 'Change profile link',
+      profileLinkNew: 'New profile link',
+      profileLinkWarning:
+        'The profile link is the address others use to recognize you as a participant in Memories and open your profile with visible Memories. If you change it, old profile links will stop working.',
       profileLoadFailed: 'User settings could not be loaded.',
       profileSaveFailed: 'Profile could not be saved.',
       profileSavePendingEmail: 'Profile saved. Please confirm the new email address.',
       profileSaveSuccess: 'Profile saved.',
+      profileSectionSubtitle:
+        'Choose how others see you in Memories and which profile link opens your profile.',
       recommended: 'Recommended',
       renamePasskey: 'Rename passkey',
+      secretKeyFileImport: 'Import PDF',
+      secretKeyQrImport: 'Scan QR',
+      signOutCopy: 'Ends the current session in this browser.',
       totpCopy: 'Protects password logins with a six-digit code from your authenticator app.',
       totpDisabled: 'TOTP is not set up for password logins yet.',
       totpDisable: 'Disable TOTP',

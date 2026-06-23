@@ -44,9 +44,10 @@ data class NewAccount(
 
 /**
  * The single place a new account's cryptographic core is persisted: identity keypair, master-key unlock
- * wraps, auth verifier, and a self-owned PERSONAL_ROOT scope with its self grant. Both onboarding flows
- * route through here so the "what gets stored for a new account" invariant has one definition. The server
- * stays blind — only public keys, ciphertext and the auth verifier ever land in the DB.
+ * wraps, auth verifier, and a tenant-bound PERSONAL_ROOT scope with its self grant when a tenant is known.
+ * Setup creates the first account before a tenant exists, so its personal scope is attached during the
+ * owner-claim step. The server stays blind — only public keys, ciphertext and the auth verifier ever land
+ * in the DB.
  */
 @ApplicationScoped
 class AccountFactory(
@@ -62,7 +63,7 @@ class AccountFactory(
 
     /** Validate the account material, persist it, and return the new User. Caller supplies the shared timestamp. */
     @Transactional
-    fun createAccount(spec: NewAccount, now: Instant): User {
+    fun createAccount(spec: NewAccount, now: Instant, personalTenantId: String? = null): User {
         if (spec.masterKeyWraps.isEmpty()) {
             throw ApiException(400, "NO_UNLOCK_METHOD", "At least one unlock method is required")
         }
@@ -78,15 +79,17 @@ class AccountFactory(
         suites.require(spec.personalScopePublicKey.suiteId)
         suites.require(spec.wrappedPersonalScopePrivateKey.suiteId)
 
+        val userId = newId()
         val user = User().apply {
-            id = newId(); email = spec.email; displayName = spec.displayName
+            id = userId; email = spec.email; displayName = spec.displayName
+            permalink = uniquePermalink(ProfilePermalinks.fallback(spec.displayName, spec.email, userId), userId)
             serverRole = spec.serverRole; systemAccount = false; createdAt = now
         }
         users.persist(user)
 
         identityKeys.persist(
             IdentityKey().apply {
-                id = newId(); userId = user.id; suiteId = spec.identityPublicKey.suiteId
+                id = newId(); this.userId = user.id; suiteId = spec.identityPublicKey.suiteId
                 kemPublicKey = dec.decode(spec.identityPublicKey.kemPublicKey)
                 signPublicKey = dec.decode(spec.identityPublicKey.signPublicKey)
                 wrappedPrivateKey = dec.decode(spec.wrappedIdentityPrivateKey.bytes)
@@ -97,7 +100,7 @@ class AccountFactory(
         spec.masterKeyWraps.forEach { wrap ->
             keyBlobs.persist(
                 KeyBlob().apply {
-                    id = newId(); userId = user.id; unlockMethod = wrap.unlockMethod.value
+                    id = newId(); this.userId = user.id; unlockMethod = wrap.unlockMethod.value
                     suiteId = wrap.suiteId; wrappedKey = dec.decode(wrap.wrappedKey)
                     kdfParams = wrap.kdfParams?.let { dec.decode(it) }; credentialRef = wrap.credentialRef; createdAt = now
                     if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = spec.recoveryAuthTag?.let { dec.decode(it) }
@@ -107,20 +110,20 @@ class AccountFactory(
 
         authVerifiers.persist(
             AuthVerifier().apply {
-                id = newId(); userId = user.id; kind = spec.authVerifier.kind.value
+                id = newId(); this.userId = user.id; kind = spec.authVerifier.kind.value
                 suiteId = spec.authVerifier.suiteId; verifier = dec.decode(spec.authVerifier.verifier); createdAt = now
             },
         )
 
         val personalScope = Scope().apply {
-            id = newId(); ownerUserId = user.id; kind = ScopeKind.PERSONAL_ROOT
+            id = newId(); tenantId = personalTenantId; ownerUserId = user.id; kind = ScopeKind.PERSONAL_ROOT
             suiteId = spec.personalScopePublicKey.suiteId
             kemPublicKey = dec.decode(spec.personalScopePublicKey.kemPublicKey); createdAt = now
         }
         scopes.persist(personalScope)
         grants.persist(
             ScopeGrant().apply {
-                id = newId(); scopeId = personalScope.id; userId = user.id
+                id = newId(); scopeId = personalScope.id; this.userId = user.id
                 suiteId = spec.wrappedPersonalScopePrivateKey.suiteId
                 wrappedPrivateKey = dec.decode(spec.wrappedPersonalScopePrivateKey.bytes); createdAt = now
             },
@@ -128,6 +131,17 @@ class AccountFactory(
         return user
     }
 
+
+    private fun uniquePermalink(base: String, userId: String): String {
+        val normalized = ProfilePermalinks.normalize(base).ifBlank { "user-${userId.take(8)}" }.take(72).trim('-')
+        var candidate = normalized
+        var suffix = 2
+        while (users.findByPermalink(candidate) != null) {
+            candidate = "${normalized.take(72)}-$suffix"
+            suffix += 1
+        }
+        return candidate
+    }
 
     private fun newId(): String = UUID.randomUUID().toString()
 }

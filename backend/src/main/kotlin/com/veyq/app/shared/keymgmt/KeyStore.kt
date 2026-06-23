@@ -56,6 +56,7 @@ class AuthVerifier {
 @ApplicationScoped
 class IdentityKeyRepository : PanacheRepositoryBase<IdentityKey, String> {
     fun findByUserId(userId: String): IdentityKey? = find("userId", userId).firstResult()
+    fun deleteByUserId(userId: String): Long = delete("userId", userId)
 
     /** Batch lookup by user id (one IN-query) — used by the member roster to avoid an N+1 per member. */
     fun listByUserIds(userIds: Collection<String>): List<IdentityKey> =
@@ -68,6 +69,7 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
     fun findByUserIdAndUnlockMethod(userId: String, unlockMethod: String): List<KeyBlob> =
         list("userId = ?1 and unlockMethod = ?2", userId, unlockMethod)
     fun countByUserId(userId: String): Long = count("userId", userId)
+    fun deleteByUserId(userId: String): Long = delete("userId", userId)
 
     /** Row-locked snapshot of a user's wraps: serializes concurrent removals so the lockout floor holds. */
     fun listByUserIdForUpdate(userId: String): List<KeyBlob> =
@@ -77,4 +79,5 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
 @ApplicationScoped
 class AuthVerifierRepository : PanacheRepositoryBase<AuthVerifier, String> {
     fun findByUserId(userId: String): AuthVerifier? = find("userId", userId).firstResult()
+    fun deleteByUserId(userId: String): Long = delete("userId", userId)
 }

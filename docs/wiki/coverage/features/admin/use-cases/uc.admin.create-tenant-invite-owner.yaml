@@ -68,3 +68,14 @@ acceptanceCriteria:
           - testName: provisionInviteAndClaim
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+  - id: uc.admin.create-tenant-invite-owner.email-bound-claim
+    statement: Owner invites are bound to the target email and the bootstrap secret is not returned to the provisioning client.
+    coverage:
+      backend:
+        integration:
+          - testName: provisionInviteAndClaim
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt
+          - testName: registersNewOwnerAndActivatesTenant
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt

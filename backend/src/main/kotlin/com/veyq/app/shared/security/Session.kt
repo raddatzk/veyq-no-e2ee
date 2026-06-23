@@ -26,59 +26,134 @@ import java.util.UUID
 class Session {
     @Id var id: String = ""
     @Column(name = "token_hash", nullable = false, unique = true) var tokenHash: String = ""
+    @Column(name = "refresh_token_hash", unique = true) var refreshTokenHash: String? = null
     @Column(name = "user_id", nullable = false) var userId: String = ""
+    @Column(name = "device_ref") var deviceRef: String? = null
+    @Column(name = "device_name", columnDefinition = "TEXT") var deviceName: String? = null
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
     @Column(name = "expires_at", nullable = false) var expiresAt: Instant = Instant.EPOCH
+    @Column(name = "refresh_expires_at") var refreshExpiresAt: Instant? = null
 }
 
 @ApplicationScoped
 class SessionRepository : PanacheRepositoryBase<Session, String> {
     fun findByTokenHash(tokenHash: String): Session? = find("tokenHash", tokenHash).firstResult()
+    fun findByRefreshTokenHash(refreshTokenHash: String): Session? = find("refreshTokenHash", refreshTokenHash).firstResult()
+    fun listDevicesByUserId(userId: String, now: Instant): List<Session> =
+        list("userId = ?1 and deviceRef is not null and (expiresAt >= ?2 or refreshExpiresAt >= ?2)", userId, now)
     fun deleteByUserId(userId: String): Long = delete("userId", userId)
+    fun updateDeviceName(userId: String, deviceRef: String, encryptedDeviceName: String): Int =
+        update("deviceName = ?1 where userId = ?2 and deviceRef = ?3", encryptedDeviceName, userId, deviceRef)
+    fun deleteByUserIdAndDeviceRef(userId: String, deviceRef: String): Long =
+        delete("userId = ?1 and deviceRef = ?2", userId, deviceRef)
     fun deleteByTokenHash(tokenHash: String): Long = delete("tokenHash", tokenHash)
-    fun deleteExpired(now: Instant): Long = delete("expiresAt < ?1", now)
+    fun deleteByRefreshTokenHash(refreshTokenHash: String): Long = delete("refreshTokenHash", refreshTokenHash)
+    fun deleteExpired(now: Instant): Long = delete("expiresAt < ?1 and (refreshExpiresAt is null or refreshExpiresAt < ?1)", now)
 }
+
+data class IssuedSession(
+    val accessToken: String,
+    val refreshToken: String,
+    val refreshExpiresAt: Instant,
+    val refreshMaxAgeSeconds: Long,
+)
 
 @ApplicationScoped
 class SessionService(private val sessions: SessionRepository, config: com.veyq.app.shared.config.SessionConfig) {
     private val rng = SecureRandom()
     private val b64 = Base64.getUrlEncoder().withoutPadding()
-    private val ttl: Duration = config.ttl()
+    private val accessTtl: Duration = config.accessTtl()
+    private val refreshTtl: Duration = config.refreshTtl()
 
     /** SHA-256(token), base64url — what we persist and look up by. The raw token never touches the DB. */
     private fun hash(token: String): String =
         b64.encodeToString(MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.UTF_8)))
 
-    @Transactional
-    fun issue(userId: String): String {
+    private fun randomToken(): String {
         val raw = ByteArray(32).also { rng.nextBytes(it) }
-        val token = b64.encodeToString(raw)
+        return b64.encodeToString(raw)
+    }
+
+    @Transactional
+    fun issuePair(userId: String): IssuedSession {
+        val accessToken = randomToken()
+        val refreshToken = randomToken()
         val now = Instant.now()
+        val refreshExpiresAt = now.plus(refreshTtl)
         sessions.persist(
             Session().apply {
                 id = UUID.randomUUID().toString()
-                this.tokenHash = hash(token)
+                this.tokenHash = hash(accessToken)
+                this.refreshTokenHash = hash(refreshToken)
                 this.userId = userId
                 createdAt = now
-                expiresAt = now.plus(ttl)
+                expiresAt = now.plus(accessTtl)
+                this.refreshExpiresAt = refreshExpiresAt
             },
         )
-        return token
+        return IssuedSession(accessToken, refreshToken, refreshExpiresAt, refreshTtl.seconds)
+    }
+
+    @Transactional
+    fun issue(userId: String): String = issuePair(userId).accessToken
+
+    @Transactional
+    fun refresh(refreshToken: String?): IssuedSession? {
+        val token = refreshToken?.takeIf { it.isNotBlank() } ?: return null
+        val session = sessions.findByRefreshTokenHash(hash(token)) ?: return null
+        val now = Instant.now()
+        if ((session.refreshExpiresAt ?: Instant.EPOCH).isBefore(now)) {
+            sessions.delete(session)
+            return null
+        }
+        val nextAccessToken = randomToken()
+        val nextRefreshToken = randomToken()
+        val nextRefreshExpiresAt = now.plus(refreshTtl)
+        session.tokenHash = hash(nextAccessToken)
+        session.refreshTokenHash = hash(nextRefreshToken)
+        session.expiresAt = now.plus(accessTtl)
+        session.refreshExpiresAt = nextRefreshExpiresAt
+        return IssuedSession(nextAccessToken, nextRefreshToken, nextRefreshExpiresAt, refreshTtl.seconds)
     }
 
     /** Invalidates every session for a user (instant token revocation). Returns how many were dropped. */
     @Transactional
     fun invalidateAll(userId: String): Long = sessions.deleteByUserId(userId)
 
+    @Transactional
+    fun registerDevice(authorizationHeader: String?, deviceRef: String, encryptedDeviceName: String) {
+        val token = bearer(authorizationHeader) ?: throw IllegalArgumentException("missing bearer token")
+        val session = sessions.findByTokenHash(hash(token)) ?: return
+        if (session.expiresAt.isBefore(Instant.now())) {
+            sessions.deleteByTokenHash(session.tokenHash)
+            return
+        }
+        session.deviceRef = deviceRef
+        session.deviceName = encryptedDeviceName
+    }
+
+    @Transactional
+    fun listDevices(userId: String): List<Session> = sessions.listDevicesByUserId(userId, Instant.now())
+
+    @Transactional
+    fun renameDevice(userId: String, deviceRef: String, encryptedDeviceName: String): Int =
+        sessions.updateDeviceName(userId, deviceRef, encryptedDeviceName)
+
+    @Transactional
+    fun invalidateDevice(userId: String, deviceRef: String): Long = sessions.deleteByUserIdAndDeviceRef(userId, deviceRef)
+
     /** Drop every expired session row (the scheduled GC sweep). Returns how many were purged. */
     @Transactional
     fun purgeExpired(): Long = sessions.deleteExpired(Instant.now())
 
-    /** Logout: drop the session row for a `Bearer <token>` header. Idempotent (unknown token is a no-op). */
+    /** Logout: drop the whole access/refresh family for either the bearer token or its refresh cookie. */
     @Transactional
-    fun invalidate(authorizationHeader: String?) {
-        val token = bearer(authorizationHeader) ?: return
-        sessions.deleteByTokenHash(hash(token))
+    fun invalidate(authorizationHeader: String?, refreshToken: String? = null): Boolean {
+        val accessToken = bearer(authorizationHeader)
+        if (accessToken != null && sessions.deleteByTokenHash(hash(accessToken)) > 0) return true
+        val refresh = refreshToken?.takeIf { it.isNotBlank() }
+        if (refresh != null && sessions.deleteByRefreshTokenHash(hash(refresh)) > 0) return true
+        return false
     }
 
     /** Resolves a `Bearer <token>` header to a user id, or null if missing/unknown/expired. */
@@ -88,7 +163,6 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
         val tokenHash = hash(token)
         val session = sessions.findByTokenHash(tokenHash) ?: return null
         if (session.expiresAt.isBefore(Instant.now())) {
-            sessions.deleteByTokenHash(tokenHash) // lazy GC: an expired token purges itself on next use
             return null
         }
         return session.userId

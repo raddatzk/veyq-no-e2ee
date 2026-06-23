@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// Create a new shared space (tenant + claim ownership in one E2EE flow). The creator mints the tenant scope
-// keypair and self-grants; all crypto lives in features/spaces/invite/groups.createGroup.
+// Create a tenant shell and owner invite. Ownership is claimed only when the invite is opened, so creating
+// the shell never makes the current Server Owner a tenant member or key-holder.
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { createGroup } from '../../features/spaces/invite/groups'
+import { createTenantOwnerInvite } from '../../features/admin/createTenantInviteOwner/tenant'
 import { reloadSpaces } from '../../app/spaces'
 import { requireSession, session } from '../../app/session'
 import { getErrorMessage } from '../../shared/utils/errors'
@@ -18,16 +18,20 @@ const emit = defineEmits<{
 }>()
 const { t } = useI18n()
 const displayName = ref('')
+const domain = ref('')
+const ownerEmail = ref('')
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
-const canSubmit = computed(() => displayName.value.trim().length > 0)
+const canSubmit = computed(() => displayName.value.trim().length > 0 && domain.value.trim().length > 0 && ownerEmail.value.trim().length > 0)
 
 watch(visible, (isVisible) => {
   if (isVisible) {
     error.value = ''
     message.value = ''
     displayName.value = ''
+    domain.value = ''
+    ownerEmail.value = ''
   }
 })
 
@@ -37,7 +41,7 @@ async function submit() {
   message.value = ''
   loading.value = true
   try {
-    await createGroup(session.apiBase, requireSession(), displayName.value.trim())
+    await createTenantOwnerInvite(session.apiBase, requireSession().sessionToken, displayName.value.trim(), domain.value.trim(), ownerEmail.value.trim())
     await reloadSpaces()
     message.value = t('setup.tenantInviteSent')
     visible.value = false
@@ -48,6 +52,7 @@ async function submit() {
     loading.value = false
   }
 }
+
 </script>
 
 <template>
@@ -56,6 +61,15 @@ async function submit() {
       <label>
         {{ t('setup.tenantName') }}
         <InputText v-model="displayName" autocomplete="off" required />
+      </label>
+      <label>
+        {{ t('setup.tenantDomain') }}
+        <InputText v-model="domain" autocomplete="off" required />
+        <span class="veyq-form-hint">{{ t('setup.tenantDomainHint') }}</span>
+      </label>
+      <label>
+        {{ t('setup.tenantOwnerEmail') }}
+        <InputText v-model="ownerEmail" type="email" autocomplete="email" required />
       </label>
       <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>

@@ -46,7 +46,7 @@ watchEffect(() => {
       email: u.user.email,
       displayName: u.user.displayName,
       serverRole: u.user.serverRole,
-      permalink: '',
+      permalink: u.user.permalink,
     }
     authState.userLabel = u.user.displayName || u.user.email
   } else {

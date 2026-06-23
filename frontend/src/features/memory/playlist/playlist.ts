@@ -2,13 +2,13 @@
 // {provider, url, title?, note?} is sealed under the scope content key (the server is blind to it); only the
 // benign `featured` flag is server-visible. Provider is detected client-side from the URL host.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 
 const EMPTY = new Uint8Array(0)
-const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type PlaylistProvider = 'SPOTIFY' | 'APPLE_MUSIC' | 'YOUTUBE' | 'SOUNDCLOUD' | 'DEEZER' | 'OTHER'
 export type Playlist = { id: string; featured: boolean; provider: PlaylistProvider; url: string; title?: string; note?: string }
@@ -45,15 +45,15 @@ function toPlaylist(contentKey: Uint8Array, p: { id: string; featured: boolean; 
 }
 
 export async function listPlaylists(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Playlist[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists`, { headers: auth(session.sessionToken) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists`)
   if (!res.ok) throw await apiError(res, 'list playlists')
   return (await res.json()).playlists.map((p: never) => toPlaylist(active.contentKey, p))
 }
 
 export async function createPlaylist(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, url: string, title: string, note: string, featured: boolean): Promise<void> {
   const sealedContent = seal(active.contentKey, { provider: detectProvider(url), url, title: title || undefined, note: note || undefined })
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists`, {
-    method: 'POST', headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedContent, featured }),
   })
   if (!res.ok) throw await apiError(res, 'create playlist')
@@ -61,24 +61,22 @@ export async function createPlaylist(apiBase: string, session: UnlockedSession, 
 
 export async function updatePlaylist(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, p: Playlist): Promise<void> {
   const sealedContent = seal(active.contentKey, { provider: detectProvider(p.url), url: p.url, title: p.title || undefined, note: p.note || undefined })
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${p.id}`, {
-    method: 'PATCH', headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${p.id}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedContent, featured: p.featured }),
   })
   if (!res.ok) throw await apiError(res, 'update playlist')
 }
 
 export async function setPlaylistFeatured(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, playlistId: string, featured: boolean): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${playlistId}`, {
-    method: 'PATCH', headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${playlistId}`, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ featured }),
   })
   if (!res.ok) throw await apiError(res, 'feature playlist')
 }
 
 export async function deletePlaylist(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, playlistId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${playlistId}`, {
-    method: 'DELETE', headers: auth(session.sessionToken),
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/playlists/${playlistId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete playlist')
 }

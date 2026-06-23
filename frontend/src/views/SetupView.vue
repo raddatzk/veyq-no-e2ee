@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -25,6 +25,9 @@ const { breachCount } = usePwnedWarning(password)
 const busy = ref(false)
 const error = ref('')
 const secretKey = ref<string | null>(null)
+const kitDownloadTriggered = ref(false)
+const kitBackupConfirmed = ref(false)
+const canProceed = computed(() => kitDownloadTriggered.value && kitBackupConfirmed.value)
 let kitEmail = ''
 
 async function submit() {
@@ -35,6 +38,8 @@ async function submit() {
     const { emergencyKit } = await registerServerOwner(session.apiBase, email.value, displayName.value, password.value)
     kitEmail = email.value
     secretKey.value = emergencyKit.secretKey
+    kitDownloadTriggered.value = false
+    kitBackupConfirmed.value = false
     setSetupCompleted(true)
   } catch {
     error.value = t('setup.failed')
@@ -44,9 +49,24 @@ async function submit() {
 }
 
 function proceed() {
+  if (!canProceed.value) return
   // Hand the email + Secret Key to the login form so the owner doesn't retype them right after setup.
   setAuthPrefill(kitEmail, secretKey.value!)
   void router.push({ name: 'login' })
+}
+
+async function downloadKit() {
+  if (!secretKey.value) return
+  error.value = ''
+  try {
+    await downloadKitPdf(
+      { instance: session.apiBase, email: kitEmail, secretKey: secretKey.value },
+      displayName.value
+    )
+    kitDownloadTriggered.value = true
+  } catch {
+    error.value = t('kit.downloadFailed')
+  }
 }
 </script>
 
@@ -91,15 +111,28 @@ function proceed() {
 
       <template v-else>
         <p class="veyq-form-copy">{{ t('setup.kitSub') }}</p>
-        <pre class="kit-secret">{{ secretKey }}</pre>
         <Button
           type="button"
           :label="t('kit.download')"
           icon="pi pi-download"
           severity="secondary"
-          @click="downloadKitPdf({ instance: session.apiBase, email: kitEmail, secretKey: secretKey! }, displayName)"
+          @click="downloadKit"
         />
-        <Button type="button" :label="t('setup.kitProceed')" icon="pi pi-arrow-right" @click="proceed" />
+        <p v-if="kitDownloadTriggered" class="kit-status">
+          <span class="pi pi-check" aria-hidden="true" />
+          {{ t('kit.downloaded') }}
+        </p>
+        <label class="checkbox-row kit-confirm">
+          <input v-model="kitBackupConfirmed" type="checkbox" :disabled="!kitDownloadTriggered" />
+          <span>{{ t('kit.backupDownloadConfirm') }}</span>
+        </label>
+        <Button
+          type="button"
+          :label="t('setup.kitProceed')"
+          icon="pi pi-arrow-right"
+          :disabled="!canProceed"
+          @click="proceed"
+        />
       </template>
 
       <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
@@ -108,13 +141,15 @@ function proceed() {
 </template>
 
 <style scoped>
-.kit-secret {
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: var(--font-mono, monospace);
-  background: var(--p-content-border-color, rgba(127, 127, 127, 0.15));
-  padding: 0.75rem;
-  border-radius: 8px;
-  margin: 0 0 0.75rem;
+.kit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  color: var(--app-success, var(--p-green-400, #22c55e));
+}
+
+.kit-confirm {
+  margin: 0.75rem 0;
 }
 </style>

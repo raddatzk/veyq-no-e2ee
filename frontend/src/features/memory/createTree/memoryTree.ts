@@ -3,6 +3,7 @@
 // (AD-26) so the server enforces per-parent uniqueness without ever seeing the name. The server holds only
 // the ID graph, types, tokens, order and ciphertext; the client reconstructs and decrypts locally.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
@@ -40,9 +41,9 @@ export async function createNode(
   const sealed = v1.concat(nonce, v1.aeadSeal(contentKey, nonce, payload, EMPTY))
   // the slug token's parent slot is the parent node id, or the scope id at the root (the server's sentinel)
   const parentSlot = node.parentId ?? scopeId
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       ...(node.parentId ? { parentId: node.parentId } : {}),
       type: node.type,
@@ -57,7 +58,7 @@ export async function createNode(
 
 /** List the scope's node graph (flat). The client reconstructs the tree + decrypts names locally. */
 export async function listNodes(apiBase: string, session: UnlockedSession, scopeId: string): Promise<MemoryNode[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes`)
   if (!res.ok) throw await apiError(res, 'list nodes')
   return (await res.json()).nodes
 }

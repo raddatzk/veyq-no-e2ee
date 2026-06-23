@@ -1,7 +1,8 @@
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { authState } from '../../authState'
-import { logout } from '../../api/authClient'
+import { session, setUnlocked } from '../../app/session'
+import { logout } from '../../features/account/login/login'
 import { i18n } from '../../i18n'
 import { useThemeState } from '../../shared/state/useThemeState'
 import ProfileMenu from './ProfileMenu.vue'
@@ -12,7 +13,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push })
 }))
 
-vi.mock('../../api/authClient', () => ({
+vi.mock('../../features/account/login/login', () => ({
   logout: vi.fn()
 }))
 
@@ -24,19 +25,19 @@ describe('ProfileMenu', () => {
     authState.user = null
     authState.userLabel = ''
     authState.tenants = []
+    setUnlocked(null)
   })
 
   it('shows user settings for authenticated users', () => {
     authState.isAuthenticated = true
     authState.userLabel = 'Member'
     authState.user = {
-      userId: 1,
+      id: '1',
+      userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
       permalink: 'member',
-      serverRole: 'ServerMember',
-      passkeyCount: 0,
-      hasPassword: true
+      serverRole: 'ServerMember'
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -57,13 +58,12 @@ describe('ProfileMenu', () => {
     authState.isAuthenticated = true
     authState.userLabel = 'Owner'
     authState.user = {
-      userId: 1,
+      id: '1',
+      userId: '1',
       email: 'owner@example.com',
       displayName: 'Owner',
       permalink: 'owner',
-      serverRole: 'ServerOwner',
-      passkeyCount: 0,
-      hasPassword: true
+      serverRole: 'ServerOwner'
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -79,13 +79,12 @@ describe('ProfileMenu', () => {
     authState.isAuthenticated = true
     authState.userLabel = 'Member'
     authState.user = {
-      userId: 1,
+      id: '1',
+      userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
       permalink: 'member',
-      serverRole: 'ServerMember',
-      passkeyCount: 0,
-      hasPassword: true
+      serverRole: 'ServerMember'
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -104,13 +103,12 @@ describe('ProfileMenu', () => {
     authState.isAuthenticated = true
     authState.userLabel = 'Member'
     authState.user = {
-      userId: 1,
+      id: '1',
+      userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
       permalink: 'member',
-      serverRole: 'ServerMember',
-      passkeyCount: 0,
-      hasPassword: true
+      serverRole: 'ServerMember'
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -131,15 +129,31 @@ describe('ProfileMenu', () => {
     authState.isAuthenticated = true
     authState.userLabel = 'Member'
     authState.user = {
-      userId: 1,
+      id: '1',
+      userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
       permalink: 'member',
-      serverRole: 'ServerMember',
-      passkeyCount: 0,
-      hasPassword: true
+      serverRole: 'ServerMember'
     }
     authState.tenants = []
+    setUnlocked({
+      sessionToken: 'session-token',
+      user: {
+        id: '1',
+        email: 'member@example.com',
+        displayName: 'Member',
+        serverRole: 'ServerMember',
+        permalink: 'member'
+      },
+      identity: {} as never,
+      identityPublicKey: {
+        suiteId: 'suite',
+        kemPublicKey: 'kem',
+        signPublicKey: 'sign'
+      },
+      masterKey: new Uint8Array([1])
+    })
 
     const wrapper = shallowMount(ProfileMenu, {
       global: { stubs: primeVueStubs() }
@@ -148,7 +162,7 @@ describe('ProfileMenu', () => {
     menuItem(wrapper, 'Logout').command?.()
     await flushPromises()
 
-    expect(logout).toHaveBeenCalled()
+    expect(logout).toHaveBeenCalledWith(session.apiBase, 'session-token')
     expect(authState.isAuthenticated).toBe(false)
     expect(push).toHaveBeenCalledWith('/login')
   })

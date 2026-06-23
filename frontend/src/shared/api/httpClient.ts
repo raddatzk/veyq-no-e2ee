@@ -319,7 +319,11 @@ async function refreshLogin(): Promise<void> {
       }
       if (response.status !== 204) {
         const session = await response.json()
-        rememberAccessSession(session)
+        if (typeof session?.accessTokenExpiresAt === 'string') {
+          rememberAccessSession(session)
+        } else {
+          clearAccessSession()
+        }
       }
     })
     .catch((error) => {

@@ -23,6 +23,7 @@ import org.bouncycastle.crypto.params.Argon2Parameters
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.not
 import org.hamcrest.Matchers.emptyString
+import org.hamcrest.Matchers.notNullValue
 import org.junit.jupiter.api.BeforeEach
 import java.text.Normalizer
 import java.time.Instant
@@ -164,6 +165,89 @@ class LoginSliceTest {
     }
 
     @Test
+    fun refreshRotatesTheRefreshCookieAndAccessSession() {
+        val loginResponse = given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","password":"$password"}""")
+            .post("/api/login")
+            .then().statusCode(200)
+            .cookie("VEYQ_REFRESH_TOKEN", notNullValue())
+            .extract()
+
+        val firstAccessToken = loginResponse.path<String>("sessionToken")
+        val firstRefreshToken = loginResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        val refreshResponse = given()
+            .cookie("VEYQ_REFRESH_TOKEN", firstRefreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(200)
+            .cookie("VEYQ_REFRESH_TOKEN", notNullValue())
+            .body("sessionToken", `is`(not(firstAccessToken)))
+            .extract()
+
+        val secondAccessToken = refreshResponse.path<String>("sessionToken")
+        val secondRefreshToken = refreshResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        given().header("Authorization", "Bearer $firstAccessToken")
+            .get("/api/me")
+            .then().statusCode(401)
+
+        given().header("Authorization", "Bearer $secondAccessToken")
+            .get("/api/me")
+            .then().statusCode(200)
+            .body("email", `is`(email))
+
+        given()
+            .cookie("VEYQ_REFRESH_TOKEN", firstRefreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(401)
+
+        given()
+            .cookie("VEYQ_REFRESH_TOKEN", secondRefreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(200)
+            .body("sessionToken", `is`(not(secondAccessToken)))
+    }
+
+    @Test
+    fun logoutInvalidatesTheAssociatedAccessAndRefreshTokenFamily() {
+        val loginResponse = given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","password":"$password"}""")
+            .post("/api/login")
+            .then().statusCode(200)
+            .cookie("VEYQ_REFRESH_TOKEN", notNullValue())
+            .extract()
+
+        val firstAccessToken = loginResponse.path<String>("sessionToken")
+        val firstRefreshToken = loginResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        val refreshResponse = given()
+            .cookie("VEYQ_REFRESH_TOKEN", firstRefreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(200)
+            .cookie("VEYQ_REFRESH_TOKEN", notNullValue())
+            .extract()
+
+        val currentAccessToken = refreshResponse.path<String>("sessionToken")
+        val currentRefreshToken = refreshResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        given()
+            .header("Authorization", "Bearer $firstAccessToken")
+            .cookie("VEYQ_REFRESH_TOKEN", currentRefreshToken)
+            .delete("/api/me/session")
+            .then().statusCode(204)
+            .cookie("VEYQ_REFRESH_TOKEN", emptyString())
+
+        given().header("Authorization", "Bearer $currentAccessToken")
+            .get("/api/me")
+            .then().statusCode(401)
+
+        given()
+            .cookie("VEYQ_REFRESH_TOKEN", currentRefreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(401)
+    }
+
+    @Test
     fun updatesCurrentProfileDisplayName() {
         val sessionToken = given().contentType(ContentType.JSON)
             .body("""{"email":"$email","password":"$password"}""")
@@ -173,26 +257,28 @@ class LoginSliceTest {
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer $sessionToken")
-            .body("""{"displayName":"  Curator Name  "}""")
+            .body("""{"displayName":"  Curator Name  ","permalink":"curator-name"}""")
             .patch("/api/me/profile")
             .then().statusCode(200)
             .body("email", `is`(email))
             .body("displayName", `is`("Curator Name"))
+            .body("permalink", `is`("curator-name"))
 
         given().header("Authorization", "Bearer $sessionToken")
             .get("/api/me")
             .then().statusCode(200)
             .body("displayName", `is`("Curator Name"))
+            .body("permalink", `is`("curator-name"))
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer $sessionToken")
-            .body("""{"displayName":""}""")
+            .body("""{"displayName":"","permalink":"curator-name"}""")
             .patch("/api/me/profile")
             .then().statusCode(400)
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer nope")
-            .body("""{"displayName":"Nobody"}""")
+            .body("""{"displayName":"Nobody","permalink":"nobody"}""")
             .patch("/api/me/profile")
             .then().statusCode(401)
     }

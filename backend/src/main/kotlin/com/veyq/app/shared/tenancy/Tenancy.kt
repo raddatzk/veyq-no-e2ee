@@ -53,6 +53,7 @@ class TenantInvite {
     @Column(name = "temp_public_key") var tempPublicKey: ByteArray? = null
     @Column(name = "temp_wrapped_scope_private_key") var tempWrappedScopePrivateKey: ByteArray? = null
     @Column(name = "temp_wrap_suite_id") var tempWrapSuiteId: String? = null
+    @Column(name = "target_email") var targetEmail: String? = null
     @Column(name = "consumed_by") var consumedBy: String? = null
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH

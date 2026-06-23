@@ -52,10 +52,11 @@ interface RateLimitConfig {
     @WithName("share-chunk-per-min") @WithDefault("600") fun shareChunkPerMin(): Int
 }
 
-/** `veyq.session.*` — opaque Bearer-session lifetime. */
+/** `veyq.session.*` — opaque Bearer access-session + HttpOnly refresh-session lifetimes. */
 @ConfigMapping(prefix = "veyq.session")
 interface SessionConfig {
-    @WithDefault("P30D") fun ttl(): Duration
+    @WithName("access-ttl") @WithDefault("PT15M") fun accessTtl(): Duration
+    @WithName("refresh-ttl") @WithDefault("P30D") fun refreshTtl(): Duration
 }
 
 /** `veyq.tenant.*` — grace window before a soft-deleted tenant is hard-purged. */

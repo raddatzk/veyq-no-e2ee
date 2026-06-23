@@ -5,7 +5,6 @@ import Message from 'primevue/message'
 import { useAuthState } from '../../shared/state/useAuthState'
 import CreateGroupFlowDialog from '../../features/settings/components/CreateGroupFlowDialog.vue'
 import CreateTenantDialog from '../tenant/CreateTenantDialog.vue'
-import SupportNotice from './SupportNotice.vue'
 import TenantSidebar from './TenantSidebar.vue'
 import WorkspaceTopbar from './WorkspaceTopbar.vue'
 
@@ -50,7 +49,6 @@ function showShellMessage(message: string) {
     </div>
     <div class="app-workspace">
       <main class="content">
-        <SupportNotice v-if="authState.user?.serverRole === 'ServerOwner'" />
         <Message v-if="shellMessage" severity="success" closable @close="shellMessage = ''">
           {{ shellMessage }}
         </Message>

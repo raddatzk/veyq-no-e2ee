@@ -4,6 +4,7 @@ import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.security.SessionService
+import io.quarkus.mailer.MockMailbox
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
@@ -20,12 +21,14 @@ class TenantProvisioningSliceTest {
 
     @Inject lateinit var users: UserRepository
     @Inject lateinit var sessions: SessionService
+    @Inject lateinit var mailbox: MockMailbox
 
     private lateinit var ownerToken: String
     private lateinit var memberToken: String
 
     @BeforeTest
     fun seed() {
+        mailbox.clear()
         QuarkusTransaction.requiringNew().run {
             if (users.findByEmail("srvowner@example.com") == null) {
                 // systemAccount = true keeps these seeds from tripping the global setup gate
@@ -63,23 +66,33 @@ class TenantProvisioningSliceTest {
             .body("""{"name":"acme2","displayName":"Acme2","domain":"acme.example"}""")
             .post("/api/tenants").then().statusCode(409).body("code", `is`("DOMAIN_TAKEN"))
 
-        // 2. issue an owner invite (bootstrap secret shown once)
-        val invite = given().header("Authorization", ownerToken)
+        // 2. issue an owner invite. The bootstrap secret is delivered by email, not returned to the caller.
+        val invite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"email":"srvowner@example.com"}""")
             .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()
         val inviteId = invite.path<String>("inviteId")
-        val bootstrapSecret = invite.path<String>("bootstrapSecret")
+        invite.path<String?>("bootstrapSecret")?.let { throw AssertionError("owner invite response must not expose bootstrapSecret") }
+        val ownerMail = mailbox.getMessagesSentTo("srvowner@example.com").last().text
+        org.junit.jupiter.api.Assertions.assertTrue(ownerMail.contains("http://acme.example/#invite=$inviteId&s="))
+        val bootstrapSecret = ownerInviteSecret("srvowner@example.com", inviteId)
 
         // 3. public metadata exposes the tenant but not the secret
         given().get("/api/tenant-invites/$inviteId").then().statusCode(200)
             .body("tenant.name", `is`("acme"))
             .body("role", `is`("Owner"))
             .body("status", `is`("PENDING"))
+            .body("existingAccount", `is`(true))
 
         // 4. a wrong bootstrap secret is rejected
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
             .body(claimBody("AAAA"))
             .post("/api/tenant-invites/$inviteId/claim").then().statusCode(400)
             .body("code", `is`("BAD_BOOTSTRAP_SECRET"))
+
+        given().header("Authorization", memberToken).contentType(ContentType.JSON)
+            .body(claimBody(bootstrapSecret))
+            .post("/api/tenant-invites/$inviteId/claim").then().statusCode(403)
+            .body("code", `is`("INVITE_EMAIL_MISMATCH"))
 
         // 5. claim ownership: scope public key + scope private key wrapped to the claimer
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
@@ -113,11 +126,13 @@ class TenantProvisioningSliceTest {
             .body("code", `is`("INVITE_NOT_PENDING"))
 
         // 7b. a fresh owner invite on the already-claimed tenant cannot mint a second scope
-        val invite2 = given().header("Authorization", ownerToken)
+        val invite2 = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"email":"srvowner@example.com"}""")
             .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()
+        val invite2Id = invite2.path<String>("inviteId")
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body(claimBody(invite2.path<String>("bootstrapSecret")))
-            .post("/api/tenant-invites/${invite2.path<String>("inviteId")}/claim").then().statusCode(409)
+            .body(claimBody(ownerInviteSecret("srvowner@example.com", invite2Id)))
+            .post("/api/tenant-invites/$invite2Id/claim").then().statusCode(409)
             .body("code", `is`("TENANT_ALREADY_CLAIMED"))
 
         // 8. a bogus session does not resolve (valid body so it reaches the auth check)
@@ -133,4 +148,10 @@ class TenantProvisioningSliceTest {
           "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
         }
     """.trimIndent()
+
+    private fun ownerInviteSecret(email: String, inviteId: String): String {
+        val text = mailbox.getMessagesSentTo(email).last().text
+        val marker = "#invite=$inviteId&s="
+        return text.substringAfter(marker).substringBefore("\n").substringBefore("&").trim()
+    }
 }

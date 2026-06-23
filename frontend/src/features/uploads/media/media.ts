@@ -6,14 +6,13 @@
 // it sees ciphertext frames, a per-scope dedup token, blob sizes and the mime type — but NOT capture time
 // or GPS location, which are sealed per-media (sealedMeta) under the scope content key.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
 import { mapPool } from '../../../shared/pool'
 
 const EMPTY = new Uint8Array(0)
-
-const auth = (s: UnlockedSession) => ({ authorization: `Bearer ${s.sessionToken}` })
 
 // 4 MiB plaintext frames: small files stay one frame, large ones chunk transparently.
 export const DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024
@@ -107,9 +106,9 @@ type PresignedChunks = { blobId: string; suiteId: string; chunks: { index: numbe
 /** ONE round-trip to dedup/open (and presign) many blobs. Each item maps to a READY (dedup hit), an UPLOADING
  *  result with presigned PUT URLs for the missing chunks, or an ERROR. Pass an item's uploadId to resume. */
 export async function batchStartBlobs(apiBase: string, session: UnlockedSession, scopeId: string, items: { dedupToken: string; totalChunks: number; byteSize: number; suiteId?: string; uploadId?: string }[]): Promise<BatchBlobStart[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads-batch`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/blob-uploads-batch`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ items }),
   })
   if (!res.ok) throw await apiError(res, 'batch start blobs')
@@ -118,9 +117,9 @@ export async function batchStartBlobs(apiBase: string, session: UnlockedSession,
 
 /** ONE round-trip to finalize many items (complete each item's uploads + attach as media). Per-item best-effort. */
 export async function batchFinalizeMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, items: FinalizeItem[]): Promise<FinalizeResult[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media-batch`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/media-batch`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ items }),
   })
   if (!res.ok) throw await apiError(res, 'batch finalize media')
@@ -130,9 +129,9 @@ export async function batchFinalizeMedia(apiBase: string, session: UnlockedSessi
 /** ONE round-trip to presign GET URLs for many blobs (a whole gallery page); keyed by blobId. Inaccessible or
  *  missing blobs are simply absent from the map. */
 export async function batchPresignGet(apiBase: string, session: UnlockedSession, scopeId: string, blobIds: string[]): Promise<Map<string, PresignedChunks>> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-downloads-batch`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/blob-downloads-batch`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ blobIds }),
   })
   if (!res.ok) throw await apiError(res, 'batch presign get')
@@ -177,9 +176,9 @@ export async function downloadBlobsBatch(apiBase: string, session: UnlockedSessi
 
 /** Toggle a medium's highlight (favourite) and/or replace its re-sealed metadata (e.g. an edited capture date). */
 export async function updateMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string, req: { highlighted?: boolean; sealedMeta?: { suiteId: string; bytes: string }; bucketId?: string }): Promise<MediaItem> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', ...auth(session) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),
   })
   if (!res.ok) throw await apiError(res, 'update media')
@@ -188,7 +187,7 @@ export async function updateMedia(apiBase: string, session: UnlockedSession, sco
 
 /** Delete a single medium (and its derivatives) from a memory. */
 export async function deleteMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, { method: 'DELETE', headers: auth(session) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete media')
 }
 
@@ -244,7 +243,7 @@ export async function uploadMedia(apiBase: string, session: UnlockedSession, sco
 
 /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
 export async function listMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string): Promise<MediaItem[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, { headers: auth(session) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes/${nodeId}/media`)
   if (!res.ok) throw await apiError(res, 'list media')
   return (await res.json()).media
 }

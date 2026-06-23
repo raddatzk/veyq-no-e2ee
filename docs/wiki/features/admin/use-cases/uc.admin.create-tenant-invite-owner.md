@@ -12,23 +12,30 @@
 ## Main flow
 1. The Server Owner creates a **tenant shell** — name, display name, domain, branding placeholder —
    **metadata only, no content keys**.
-2. They issue an **owner invitation** (single-use bootstrap link, token in the URL fragment). The tenant
-   is empty, so there are **no scope keys to temp-wrap** — this is an **ownership claim**.
+2. They issue an **owner invitation** to a target email address. The backend sends the single-use
+   bootstrap link to that address and does **not** return the bootstrap secret to the provisioning
+   client. The tenant is empty, so there are **no scope keys to temp-wrap** — this is an
+   **ownership claim**.
 3. The invitee accepts (→ [register-via-invitation](../../account/use-cases/uc.account.register-via-invitation.md)
-   if new, or claims as an existing user); their client **generates the tenant scope keypair** and they
-   become its **first key-holder**.
+   if new, or claims as an existing user). The backend requires the registering/claiming account email
+   to match the invitation target email; their client **generates the tenant scope keypair** and they become
+   its **first key-holder**.
 4. The tenant is **activated** with a Tenant Owner.
 
 ## Alternate / exception flows
 - A1: The owner is an **existing user** → they claim ownership and generate the tenant scope keypair
   under their existing account (no new account).
 - E1: The invite is expired/revoked → rejected.
+- E2: A different account email tries to claim/register with the owner invite → rejected.
 
 ## Quality notes
 - *Operator never holds tenant keys:* the Server Owner provisions only the **shell**; the Tenant Owner
   is the first key-holder — the paramount invariant holds even for tenant content vs. the operator.
 - *Empty-tenant invite = ownership claim:* no temp-wrap of content; the tenant's content keys are born
   when the owner claims.
+- *No immediate self-claim by the provisioning client:* the Server Owner can create the shell and trigger
+  delivery, but cannot activate the tenant unless they control the target inbox and accept that invite as
+  the target account.
 
 ## Related
 - Feature: [Administration & Operations](../_index.md) · Actors: [Server Owner](../../../actors.md), [Tenant Owner](../../../actors.md)

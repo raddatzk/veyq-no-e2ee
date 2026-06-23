@@ -6,13 +6,13 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.security.SessionService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
-import com.veyq.app.generated.model.ServerRole as ApiServerRole
 import com.veyq.app.platform.error.unauthorized
 
 /**
@@ -63,11 +63,6 @@ class RotateIdentityHandler(
             grant.wrappedPrivateKey = dec.decode(rewrap.wrappedScopePrivateKey.bytes)
         }
 
-        return user.toSummary()
+        return user.toUserSummary()
     }
-
-    private fun User.toSummary(): UserSummary =
-        UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
-
-
 }

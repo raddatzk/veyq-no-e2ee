@@ -117,7 +117,7 @@ acceptanceCriteria:
     coverage:
       web:
         unit:
-          - testName: "stores and reads email, password and Secret Key from localStorage"
+          - testName: "stores and reads email and Secret Key from localStorage"
             kind: positive
             ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
           - testName: "ignores invalid stored data"

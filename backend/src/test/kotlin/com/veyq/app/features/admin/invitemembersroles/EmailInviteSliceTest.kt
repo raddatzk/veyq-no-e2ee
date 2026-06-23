@@ -42,7 +42,8 @@ class EmailInviteSliceTest {
     private lateinit var outsiderToken: String
     private val tenantId = "eml-tenant"
     private val inviteId = "eml-invite"
-    private val link = "http://localhost:5173/#invite=eml-invite&s=AAAA&k=BBBB"
+    private val link = "http://localhost:8081/#invite=eml-invite&s=AAAA&k=BBBB"
+    private val tenantLink = "http://eml-t.test/#invite=eml-invite&s=AAAA&k=BBBB"
 
     @BeforeTest
     fun seed() {
@@ -75,15 +76,19 @@ class EmailInviteSliceTest {
         emailReq(ownerToken, "bob@example.com", "https://evil.example/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
         emailReq(ownerToken, "not-an-email", link).statusCode(400).body("code", `is`("VALIDATION_ERROR")) // @Email rejects at the @Valid boundary now
         // origin (not prefix) check: these all `startsWith(appBaseUrl)` but resolve to a different origin → rejected
-        emailReq(ownerToken, "bob@example.com", "http://localhost:5173@evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
-        emailReq(ownerToken, "bob@example.com", "http://localhost:5173.evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
-        emailReq(ownerToken, "bob@example.com", "http://localhost:51730/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
+        emailReq(ownerToken, "bob@example.com", "http://localhost:8081@evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
+        emailReq(ownerToken, "bob@example.com", "http://localhost:8081.evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
+        emailReq(ownerToken, "bob@example.com", "http://localhost:80810/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
 
         emailReq(ownerToken, "bob@example.com", link).statusCode(204)
+        emailReq(ownerToken, "tenant-bob@example.com", tenantLink).statusCode(204)
 
         val sent = mailbox.getMessagesSentTo("bob@example.com")
         assertEquals(1, sent.size)
         assertTrue(sent[0].text.contains(link))
         assertTrue(sent[0].subject.contains("Acme"))
+        val tenantSent = mailbox.getMessagesSentTo("tenant-bob@example.com")
+        assertEquals(1, tenantSent.size)
+        assertTrue(tenantSent[0].text.contains(tenantLink))
     }
 }

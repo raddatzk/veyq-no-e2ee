@@ -49,7 +49,7 @@ class ScopeRepository : PanacheRepositoryBase<Scope, String> {
     /** The tenant-wide space. A tenant has exactly one TENANT_ROOT (groups also carry the tenant id). */
     fun findByTenantId(tenantId: String): Scope? = find("tenantId = ?1 and kind = ?2", tenantId, ScopeKind.TENANT_ROOT).firstResult()
 
-    /** Every scope under a tenant — its TENANT_ROOT plus all GROUP_ROOT scopes (used by tenant delete). */
+    /** Every scope under a tenant — TENANT_ROOT, GROUP_ROOT and tenant-bound PERSONAL_ROOT scopes. */
     fun listByTenantId(tenantId: String): List<Scope> = list("tenantId", tenantId)
 
     fun listByIds(ids: Collection<String>): List<Scope> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
@@ -62,6 +62,17 @@ class ScopeRepository : PanacheRepositoryBase<Scope, String> {
         list("tenantId = ?1 and kind = ?2", tenantId, ScopeKind.GROUP_ROOT)
     fun findPersonalByOwnerUserId(userId: String): Scope? =
         find("ownerUserId = ?1 and kind = ?2", userId, ScopeKind.PERSONAL_ROOT).firstResult()
+    fun listPersonalByOwnerUserId(userId: String): List<Scope> =
+        list("ownerUserId = ?1 and kind = ?2", userId, ScopeKind.PERSONAL_ROOT)
+    fun findUnassignedPersonalByOwnerUserId(userId: String): Scope? =
+        find("ownerUserId = ?1 and kind = ?2 and tenantId is null", userId, ScopeKind.PERSONAL_ROOT).firstResult()
+    fun listPersonalRootsByOwnerAndTenantIds(userId: String, tenantIds: Collection<String>): List<Scope> =
+        if (tenantIds.isEmpty()) emptyList() else list(
+            "ownerUserId = ?1 and kind = ?2 and tenantId in ?3",
+            userId,
+            ScopeKind.PERSONAL_ROOT,
+            tenantIds,
+        )
 
     /** Row-locked scope read — serialize per-scope insert-if-absent paths (e.g. dedup blob first upload). */
     fun lockById(id: String): Scope? = find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()

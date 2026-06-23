@@ -4,8 +4,10 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Avatar from 'primevue/avatar'
 import TieredMenu from 'primevue/tieredmenu'
-import { logout } from '../../api/authClient'
+import { logout } from '../../features/account/login/login'
 import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n'
+import { clearRememberedLogin } from '../../features/account/rememberedLogin/rememberedLogin'
+import { session, setUnlocked } from '../../app/session'
 import { useAuthState } from '../../shared/state/useAuthState'
 import { useThemeState, type ThemePreference } from '../../shared/state/useThemeState'
 
@@ -96,7 +98,13 @@ const menuItems = computed(() => {
 })
 
 async function doLogout() {
-  await logout()
+  try {
+    if (session.unlocked) await logout(session.apiBase, session.unlocked.sessionToken)
+  } catch {
+    /* best-effort: drop local session regardless */
+  }
+  clearRememberedLogin()
+  setUnlocked(null)
   setAnonymous()
   await router.push('/login')
 }

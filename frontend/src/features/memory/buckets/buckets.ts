@@ -3,13 +3,13 @@
 // sealed name — the client labels it with the member's own display name); sub-buckets + guest primaries are
 // persisted with sealed names. Create/rename/delete + media moves are own-bucket only (enforced server-side).
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 
 const EMPTY = new Uint8Array(0)
-const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type Bucket = {
   id: string
@@ -37,16 +37,16 @@ export function bucketName(contentKey: Uint8Array, bucket: Bucket): string {
 }
 
 export async function listBuckets(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Bucket[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets`, { headers: auth(session.sessionToken) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets`)
   if (!res.ok) throw await apiError(res, 'list buckets')
   return (await res.json()).buckets
 }
 
 /** Create a sub-bucket under the caller's own primary (sealed name). */
 export async function createBucket(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, name: string): Promise<Bucket> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedName: sealName(active.contentKey, name) }),
   })
   if (!res.ok) throw await apiError(res, 'create bucket')
@@ -54,9 +54,9 @@ export async function createBucket(apiBase: string, session: UnlockedSession, ac
 }
 
 export async function renameBucket(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, bucketId: string, name: string): Promise<Bucket> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets/${bucketId}`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets/${bucketId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedName: sealName(active.contentKey, name) }),
   })
   if (!res.ok) throw await apiError(res, 'rename bucket')
@@ -64,9 +64,6 @@ export async function renameBucket(apiBase: string, session: UnlockedSession, ac
 }
 
 export async function deleteBucket(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, bucketId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets/${bucketId}`, {
-    method: 'DELETE',
-    headers: auth(session.sessionToken),
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/buckets/${bucketId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete bucket')
 }

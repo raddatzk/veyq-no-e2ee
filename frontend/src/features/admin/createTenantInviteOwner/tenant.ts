@@ -6,6 +6,7 @@ import { b64url, fromB64url } from '../../../shared/base64'
 
 export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; logoUrl?: string; status: string }
 export type OwnerInvite = { inviteId: string; bootstrapSecret: string; expiresAt: string }
+export type TenantOwnerInvite = { tenant: TenantSummary; invite: OwnerInvite }
 export type MyScopeGrant = {
   scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
@@ -23,8 +24,33 @@ async function post<T>(apiBase: string, path: string, token: string, body?: unkn
 export const createTenant = (apiBase: string, token: string, name: string, displayName: string, domain?: string) =>
   post<TenantSummary>(apiBase, '/api/tenants', token, { name, displayName, domain })
 
-export const issueOwnerInvite = (apiBase: string, token: string, tenantId: string) =>
-  post<OwnerInvite>(apiBase, `/api/tenants/${tenantId}/owner-invite`, token)
+export const issueOwnerInvite = (apiBase: string, token: string, tenantId: string, email = '') =>
+  post<OwnerInvite>(apiBase, `/api/tenants/${tenantId}/owner-invite`, token, { email })
+
+/** A URL-safe tenant handle from a display name (the server keys tenants by it). */
+function slugify(name: string): string {
+  return name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'space'
+}
+
+/**
+ * Provision only the tenant shell and owner invite. This deliberately does not claim ownership: the invited
+ * owner becomes a member and key-holder only after opening the invite link and confirming it.
+ */
+export async function createTenantOwnerInvite(apiBase: string, token: string, displayName: string, domain: string, ownerEmail: string): Promise<TenantOwnerInvite> {
+  const base = slugify(displayName)
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const handle = attempt === 0 ? base : `${base}-${attempt + 1}`
+    try {
+      const tenant = await createTenant(apiBase, token, handle, displayName.trim(), domain.trim())
+      const invite = await issueOwnerInvite(apiBase, token, tenant.id, ownerEmail.trim())
+      return { tenant, invite }
+    } catch (e) {
+      const msg = String(e)
+      if (!msg.includes('409') && !msg.toLowerCase().includes('exists')) throw e
+    }
+  }
+  throw new Error('could not create tenant (handle conflict)')
+}
 
 export async function uploadTenantLogo(apiBase: string, token: string, tenantId: string, logo: ScaledTenantLogo): Promise<TenantSummary> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/logo`, {

@@ -3,12 +3,12 @@ package com.veyq.app.features.account.emailchange
 import com.veyq.app.generated.model.EmailChangeConfirmRequest
 import com.veyq.app.generated.model.EmailChangeRequestRequest
 import com.veyq.app.generated.model.UserSummary
-import com.veyq.app.generated.model.ServerRole as ApiServerRole
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.config.AppConfig
 import com.veyq.app.shared.config.EmailChangeConfig
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
@@ -81,7 +81,7 @@ class EmailChangeHandler(
         if (holder != null && holder.id != user.id) throw emailTaken()
         user.email = token.newEmail
         token.confirmedAt = Instant.now()
-        return user.toSummary()
+        return user.toUserSummary()
     }
 
     private fun requireUser(auth: String?): User {
@@ -94,9 +94,6 @@ class EmailChangeHandler(
         if (t.confirmedAt != null || t.expiresAt.isBefore(Instant.now())) throw invalidToken()
         return t
     }
-
-    private fun User.toSummary(): UserSummary =
-        UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 
     private fun emailTaken() = ApiException(409, "EMAIL_TAKEN", "That email address is already in use")
     private fun invalidToken() = ApiException(400, "INVALID_TOKEN", "Invalid or expired email-change token")

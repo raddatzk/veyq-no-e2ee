@@ -3,11 +3,11 @@ package com.veyq.app.features.admin.serverusers
 import com.veyq.app.generated.model.ServerUserList
 import com.veyq.app.generated.model.SetServerRoleRequest
 import com.veyq.app.generated.model.UserSummary
-import com.veyq.app.generated.model.ServerRole as ApiServerRole
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.security.SessionService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -26,7 +26,7 @@ class ServerAdminHandler(
     fun listUsers(auth: String?): ServerUserList {
         requireServerOwner(auth)
         val roster = users.listAll().filter { !it.systemAccount }.sortedBy { it.displayName.lowercase() }
-        return ServerUserList(users = roster.map { it.toSummary() })
+        return ServerUserList(users = roster.map { it.toUserSummary() })
     }
 
     @Transactional
@@ -40,7 +40,7 @@ class ServerAdminHandler(
             throw ApiException(409, "LAST_SERVER_OWNER", "Cannot demote the last Server Owner")
         }
         target.serverRole = newRole
-        return target.toSummary()
+        return target.toUserSummary()
     }
 
     private fun requireUser(auth: String?): User {
@@ -54,6 +54,4 @@ class ServerAdminHandler(
         return user
     }
 
-    private fun User.toSummary(): UserSummary =
-        UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 }

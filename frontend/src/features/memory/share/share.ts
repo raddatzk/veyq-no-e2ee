@@ -3,6 +3,7 @@
 // and never reaches the server. A guest resolves the share, unwraps the content key client-side, and reads
 // the shared subtree's ciphertext (gated server-side to the subtree). The server stays blind throughout.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -45,9 +46,9 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
   const uploadToken = v1.shareUploadToken(wrapKey)
   const nonce = v1.randomBytes(12)
   const wrapped = v1.concat(nonce, v1.aeadSeal(wrapKey, nonce, active.contentKey, EMPTY))
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) },
       uploadCapabilityHash: { suiteId: 'v1', bytes: b64url(v1.sha256Digest(uploadToken)) },
@@ -66,16 +67,16 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
 
 /** List a memory's shares. */
 export async function listShares(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<ShareSummary[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`)
   if (!res.ok) throw await apiError(res, 'list shares')
   return (await res.json()).shares
 }
 
 /** Edit a link's editable fields (expiry/label/notice). Omit expiresAt to deactivate the expiry. */
 export async function updateShare(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, shareId: string, edit: ShareEdit): Promise<ShareSummary> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares/${shareId}`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares/${shareId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(edit),
   })
   if (!res.ok) throw await apiError(res, 'update share')
@@ -84,10 +85,7 @@ export async function updateShare(apiBase: string, session: UnlockedSession, act
 
 /** Revoke a share. */
 export async function revokeShare(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, shareId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares/${shareId}`, {
-    method: 'DELETE',
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares/${shareId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'revoke share')
 }
 
@@ -101,16 +99,16 @@ export type TenantTerms = { tenantId: string; termsMarkdown?: string; version: n
 
 /** Read a tenant's ToS (Owner only). */
 export async function getTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string): Promise<TenantTerms> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/terms`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  const res = await authFetch(apiBase, session, `/api/tenants/${tenantId}/terms`)
   if (!res.ok) throw await apiError(res, 'get terms')
   return res.json()
 }
 
 /** Set a tenant's ToS (Owner only); bumps the version so guests re-accept. */
 export async function setTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string, termsMarkdown: string): Promise<TenantTerms> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/terms`, {
+  const res = await authFetch(apiBase, session, `/api/tenants/${tenantId}/terms`, {
     method: 'PUT',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ termsMarkdown }),
   })
   if (!res.ok) throw await apiError(res, 'set terms')

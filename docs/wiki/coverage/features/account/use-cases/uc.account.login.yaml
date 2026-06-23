@@ -64,17 +64,19 @@ acceptanceCriteria:
       - testName: purgeExpiredDropsOnlyExpiredRows
         kind: positive
         ref: backend/src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt
-- id: uc.account.login.remembered-login-boot
-  statement: A remembered login is used during app boot after reload so the user lands directly in the app.
+- id: uc.account.login.remembered-secret-key
+  statement: A remembered login stores email, Secret Key, and local unlock material without persisting the password; boot restores only after rotating a valid refresh session.
   coverage:
     web:
       unit:
-      - testName: "stores and reads email, password and Secret Key from localStorage"
+      - testName: "stores and restores the local unlock state with a fresh session token"
         kind: positive
         ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
-      - testName: "replays a remembered login during boot so the user lands directly in the app"
+- id: uc.account.login.refresh-rotation
+  statement: Refresh rotates the HttpOnly refresh cookie, issues a new access session token, and invalidates the old access and refresh tokens.
+  coverage:
+    backend:
+      integration:
+      - testName: refreshRotatesTheRefreshCookieAndAccessSession
         kind: positive
-        ref: frontend/src/app/boot.test.ts
-      - testName: "drops an invalid remembered login on boot and stays locked"
-        kind: negative
-        ref: frontend/src/app/boot.test.ts
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt

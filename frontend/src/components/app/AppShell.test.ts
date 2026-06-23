@@ -49,22 +49,12 @@ describe('AppShell', () => {
     expect(wrapper.findComponent({ name: 'SupportNotice' }).exists()).toBe(false)
   })
 
-  it('shows support notice only for server owners', () => {
-    routeState.name = 'tenant'
-    authState.isAuthenticated = true
-    authState.user = user('ServerOwner')
-
-    const wrapper = shallowMount(AppShell, {
-      global: { stubs: shellStubs() }
-    })
-
-    expect(wrapper.findComponent({ name: 'SupportNotice' }).exists()).toBe(true)
-  })
 })
 
 function user(serverRole: 'ServerOwner' | 'ServerMember') {
   return {
-    userId: 1,
+    id: '1',
+    userId: '1',
     email: 'owner@example.test',
     displayName: 'Owner',
     permalink: 'owner',
@@ -79,7 +69,6 @@ function shellStubs() {
     CreateGroupFlowDialog: { name: 'CreateGroupFlowDialog', template: '<div />' },
     CreateTenantDialog: { name: 'CreateTenantDialog', template: '<div />' },
     Message: { name: 'Message', template: '<div><slot /></div>' },
-    SupportNotice: { name: 'SupportNotice', template: '<section />' },
     TenantSidebar: { name: 'TenantSidebar', template: '<aside />' },
     WorkspaceTopbar: { name: 'WorkspaceTopbar', template: '<header />' }
   }

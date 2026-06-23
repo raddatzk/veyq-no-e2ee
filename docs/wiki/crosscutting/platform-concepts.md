@@ -5,7 +5,10 @@
 
 ## Authentication & sessions
 
-- Web: `HttpOnly` access/refresh token cookies; refresh **rotates** tokens; logout invalidates.
+- Web: short-lived opaque bearer access sessions plus an `HttpOnly` refresh-token cookie. Refresh
+  **rotates** the cookie and returns a fresh access `sessionToken`; key unlock remains local.
+  Logout invalidates the whole associated access/refresh token family, using either the current bearer
+  token or the still-valid refresh cookie as proof of possession.
 - Native: single-use **bearer** sessions.
 - Rate limiting per scope (login, password reset, public endpoints, share login).
 - `VeyqHttpSecurityPolicy` allows only explicitly public API paths without login; tenant/group routes

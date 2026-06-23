@@ -215,7 +215,7 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
         if (kit == null) { error = L10n.t("kit.importFailed"); return }
         email = kit.email; secretKey = kit.secretKey; error = ""
     }
-    // Import a kit file (PDF / .veyqkit) → prefill. Read as Latin-1 so the ASCII token survives binary PDF bytes.
+    // Import a kit PDF → prefill. Read as Latin-1 so the ASCII token survives binary PDF bytes.
     val pickKit = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) applyKit(ctx.contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.ISO_8859_1) })
     }
@@ -263,7 +263,7 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
                 }
             }
         }
-        GhostButton("📄 ${L10n.t("kit.import")}") { pickKit.launch("*/*") }
+        GhostButton("📄 ${L10n.t("kit.import")}") { pickKit.launch("application/pdf") }
         GhostButton("📷 ${L10n.t("kit.scan")}") {
             scanKit.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt(L10n.t("kit.scan")))
         }

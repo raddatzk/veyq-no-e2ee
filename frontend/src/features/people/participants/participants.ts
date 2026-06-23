@@ -1,6 +1,7 @@
 // uc.people.manage-participants (web, ADR 0032) — Memory participants are sealed People metadata. The
 // server stores an opaque payload; linked-user vs anonymous semantics are decrypted locally.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 import type { UnlockedSession } from '../../account/login/login'
@@ -10,7 +11,6 @@ import { decodeNode, type MemoryNode } from '../../memory/createTree/memoryTree'
 import { mapPool } from '../../../shared/pool'
 
 const EMPTY = new Uint8Array(0)
-const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type Participant = { id: string; displayName: string; linkedUserId?: string }
 export type ParticipantInput = { displayName: string; linkedUserId?: string }
@@ -45,25 +45,22 @@ export function participantSearchText(participants: Participant[]): string {
 }
 
 export async function listParticipants(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Participant[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants`, { headers: auth(session.sessionToken) })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants`)
   if (!res.ok) throw await apiError(res, 'list participants')
   return (await res.json()).participants.map((p: ApiParticipant) => toParticipant(active.contentKey, p))
 }
 
 export async function createParticipant(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, input: ParticipantInput): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedPayload: seal(active.contentKey, { displayName: input.displayName, linkedUserId: input.linkedUserId }) }),
   })
   if (!res.ok) throw await apiError(res, 'create participant')
 }
 
 export async function deleteParticipant(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, participantId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants/${participantId}`, {
-    method: 'DELETE',
-    headers: auth(session.sessionToken),
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/participants/${participantId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete participant')
 }
 

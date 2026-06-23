@@ -17,6 +17,7 @@ export type InviteMetadata = {
   role: string
   status: string
   kind: string
+  existingAccount: boolean
   scopePublicKey?: KemPublicKey
 }
 /** Temp-wrapped onboarding material, released only on proof of the bootstrap secret (defense in depth). */
@@ -31,7 +32,7 @@ export type TenantScopeProvider = (idPub: { x: Uint8Array; m: Uint8Array }) => {
 }
 export type RegisterResult = {
   sessionToken: string
-  user: { id: string; email: string; displayName: string; serverRole: string }
+  user: { id: string; email: string; displayName: string; serverRole: string; permalink: string; avatarUrl?: string }
   tenant: TenantSummary
   emergencyKit: EmergencyKit
 }
@@ -130,6 +131,7 @@ export async function registerWithScope(
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(request),
   })
   if (!res.ok) throw await apiError(res, 'register')

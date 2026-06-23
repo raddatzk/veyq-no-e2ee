@@ -5,9 +5,9 @@
 - **Goal:** Authenticate to obtain a session **and** unlock the local key material for content access.
 - **Preconditions:** Has an account (public key in the directory, wrapped key bag on the server). On a
   new device: holds the Emergency Kit (Secret Key) for the password path, **or** a PRF-capable passkey.
-- **Postconditions (success):** A session (access/refresh) exists; the **Master Key** is unlocked on the
-  device (private identity key available); a new device is **enrolled** with a device wrap; content is
-  decryptable.
+- **Postconditions (success):** A session exists; the **Master Key** is unlocked on the device (private
+  identity key available); the login is associated with a named device identifier so the user can later
+  invalidate that device's sessions; content is decryptable.
 
 ## Diagram
 
@@ -32,17 +32,20 @@ else password
   C -> C : Argon2id(password + Secret Key) -> KEK -> unlock Master Key
 end
 C -> C : private identity key available; content decrypts
-C -> S : enroll device (add device wrap, ciphertext only)
+C -> S : register login device (identifier + encrypted name)
 @enduml
 ```
 
-## Main flow (trusted device)
-1. The user opens the app on a **trusted (enrolled)** device.
-2. The user authenticates — passkey assertion, or password (+TOTP if enabled) — and the server issues a
-   **session**.
-3. The client unlocks the Master Key locally via the **device wrap** (OS keystore, gated by
-   biometric/device unlock) — no Secret Key needed.
-4. The private identity key is available; content decrypts.
+## Main flow
+1. The user opens the app and enters email, password and the **Secret Key** from the Emergency Kit.
+2. If the browser has a remembered Secret Key, the client pre-fills email + Secret Key; the password is
+   still entered by the user.
+3. The server verifies the password and issues a **short-lived access session** plus a rotatable
+   HttpOnly refresh session.
+4. The client unlocks the Master Key locally with `Argon2id(password + Secret Key)`.
+5. The client derives a best-effort browser/device name locally, registers it with a stable
+   browser/device identifier as client-encrypted metadata for this session, then decrypts content with
+   the private identity key.
 
 ## Alternate / exception flows
 - A1 — **New device, passkey:** after auth, WebAuthn **PRF** derives the KEK → unlocks the Master Key
@@ -52,11 +55,16 @@ C -> S : enroll device (add device wrap, ciphertext only)
   **enrolled**.
 - A3 — **New device, device-to-device:** an existing trusted device approves the new one and wraps the
   Master Key to it (like linking a messenger app) — **no Secret Key or password-unlock needed**.
-- A4 — **Logout:** the session is dropped; the device **stays trusted** (the device wrap is retained).
-- A4b — **Expired session cleanup:** expired session rows are swept opportunistically or by the
+- A4 — **Logout:** the current access/refresh token family is dropped; remembered email + Secret Key
+  stay local only if the user chose that option.
+- A4b — **Access refresh:** when the access session expires but the refresh session is still valid, the
+  client rotates the refresh cookie and receives a new access `sessionToken`; local key material is not
+  sent back to the server.
+- A4c — **Expired session cleanup:** expired session rows are swept opportunistically or by the
   scheduled job; still-valid sessions remain usable.
-- A5 — **Deauthorize device** (e.g. lost device): the device wrap is removed → the device forgets the
-  keys; ties into two-layer revocation ([AD-24](../../../decisions/README.md)).
+- A5 — **Deauthorize device** (e.g. lost device): all server sessions with that device identifier are
+  invalidated. If that browser also stored email + Secret Key locally, it still cannot silently
+  re-authenticate without the password.
 - E1 — **Authenticated but locked:** auth succeeds but unlock fails (wrong Secret Key, no PRF) → the UI
   shows a **locked** state and routes to unlock retry or **recovery** (`uc.account.recover-keys`); the
   session alone grants **no** content access.
@@ -67,8 +75,9 @@ C -> S : enroll device (add device wrap, ciphertext only)
   client-side. The server can authenticate a user it can never grant content access to — it holds no keys.
 - *New-device requirements:* password ⇒ **password + Secret Key**; passkey ⇒ **PRF**. TOTP is a
   password-auth second factor only ([AD-18](../../../decisions/README.md)), independent of the keys.
-- *Trusted device:* the device wrap (OS keystore + biometric) makes repeat logins seamless without
-  re-entering the Secret Key.
+- *Remembered login:* remembering login stores email + Secret Key and local unlock material, but never
+  the password. Repeat visits can restore the unlocked client state only while the server-side refresh
+  session is still valid.
 - *Revocation:* deauthorizing a device removes its wrap — instant server-side token invalidation +
   eventual key rotation ([AD-24](../../../decisions/README.md)).
 - *Operator-blind:* the server stores the auth verifier, the session and the wrapped key bag — never the

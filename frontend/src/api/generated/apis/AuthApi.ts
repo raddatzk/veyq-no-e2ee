@@ -33,6 +33,7 @@ import type {
   PasskeyLinkResponse,
   PasskeyLoginDomainsResponse,
   PasskeyLoginRequest,
+  RefreshSessionResponse,
   TotpEnrollmentResponse,
   UserSummary,
 } from '../models/index';
@@ -73,6 +74,8 @@ import {
     PasskeyLoginDomainsResponseToJSON,
     PasskeyLoginRequestFromJSON,
     PasskeyLoginRequestToJSON,
+    RefreshSessionResponseFromJSON,
+    RefreshSessionResponseToJSON,
     TotpEnrollmentResponseFromJSON,
     TotpEnrollmentResponseToJSON,
     UserSummaryFromJSON,
@@ -494,13 +497,13 @@ export interface AuthApiInterface {
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSession>>;
+    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RefreshSessionResponse>>;
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSession>;
+    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RefreshSessionResponse>;
 
     /**
      * Creates request options for refreshMobileSession without sending the request
@@ -1247,18 +1250,18 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSession>> {
+    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RefreshSessionResponse>> {
         const requestOptions = await this.refreshRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginSessionFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => RefreshSessionResponseFromJSON(jsonValue));
     }
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSession> {
+    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RefreshSessionResponse> {
         const response = await this.refreshRaw(initOverrides);
         return await response.value();
     }

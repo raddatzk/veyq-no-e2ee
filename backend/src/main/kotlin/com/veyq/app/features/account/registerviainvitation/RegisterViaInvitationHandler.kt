@@ -11,11 +11,13 @@ import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeKind
 import com.veyq.app.shared.keymgmt.ScopeRepository
+import com.veyq.app.shared.security.IssuedSession
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
@@ -32,8 +34,12 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
-import com.veyq.app.generated.model.ServerRole as ApiServerRole
 import com.veyq.app.platform.error.notFound
+
+data class RegisterViaInvitationResult(
+    val response: RegisterViaInvitationResponse,
+    val issuedSession: IssuedSession,
+)
 
 /**
  * uc.account.register-via-invitation — a brand-new invitee accepts an owner invite. Their client
@@ -61,12 +67,18 @@ class RegisterViaInvitationHandler(
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
     @Transactional
-    fun registerViaInvitation(inviteId: String, req: RegisterViaInvitationRequest): RegisterViaInvitationResponse {
+    fun registerViaInvitation(inviteId: String, req: RegisterViaInvitationRequest): RegisterViaInvitationResult {
         val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
         if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
+        }
+        if (invite.kind == InviteKind.OWNER) {
+            val target = invite.targetEmail ?: throw ApiException(409, "INVITE_TARGET_REQUIRED", "Owner invite is missing a target email")
+            if (!target.equals(req.email.trim(), ignoreCase = true)) {
+                throw ApiException(403, "INVITE_EMAIL_MISMATCH", "Invite is bound to a different email address")
+            }
         }
         // tenant-scope suites are validated here; the account material (identity/wraps/verifier/personal
         // scope) is validated by the AccountFactory below.
@@ -79,7 +91,7 @@ class RegisterViaInvitationHandler(
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
         val now = Instant.now()
 
-        // 1+2. the cryptographic account + self-owned personal scope (mirrors uc.admin.setup-server)
+        // 1+2. the cryptographic account + tenant-bound personal scope.
         val user = accounts.createAccount(
             NewAccount(
                 email = req.email,
@@ -94,6 +106,7 @@ class RegisterViaInvitationHandler(
                 wrappedPersonalScopePrivateKey = req.wrappedPersonalScopePrivateKey,
             ),
             now,
+            personalTenantId = tenant.id,
         )
 
         // 3. the tenant scope grant — born here for an owner claim, or re-wrapped from a temp invite
@@ -138,15 +151,16 @@ class RegisterViaInvitationHandler(
         invite.status = InviteStatus.CONSUMED
         invite.consumedBy = user.id
 
-        return RegisterViaInvitationResponse(
-            sessionToken = sessions.issue(user.id),
-            user = user.toSummary(),
-            tenant = tenant.toSummary(),
+        val issued = sessions.issuePair(user.id)
+        return RegisterViaInvitationResult(
+            response = RegisterViaInvitationResponse(
+                sessionToken = issued.accessToken,
+                user = user.toUserSummary(),
+                tenant = tenant.toSummary(),
+            ),
+            issuedSession = issued,
         )
     }
-
-    private fun User.toSummary(): UserSummary =
-        UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 
     private fun Tenant.toSummary(): TenantSummary =
         TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain)

@@ -2,6 +2,7 @@
 // (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only; we
 // seal before POST and open after GET. Route location data is sensitive, so it never leaves the client clear.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -14,9 +15,7 @@ export type Track = { id: string; name: string; points: { lat: number; lng: numb
 
 /** List + decrypt a memory's tracks. */
 export async function getTracks(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Track[]> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`)
   if (!res.ok) throw await apiError(res, 'list tracks')
   const { tracks } = await res.json()
   return tracks.map((t: { id: string; sealedContent: { bytes: string } }) => {
@@ -30,9 +29,9 @@ export async function getTracks(apiBase: string, session: UnlockedSession, activ
 export async function createTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, route: GpxTrack): Promise<void> {
   const nonce = v1.randomBytes(12)
   const sealed = v1.concat(nonce, v1.aeadSeal(active.contentKey, nonce, v1.utf8(JSON.stringify(route)), EMPTY))
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
   })
   if (!res.ok) throw await apiError(res, 'create track')
@@ -43,18 +42,15 @@ export async function createTrack(apiBase: string, session: UnlockedSession, act
 export async function updateTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, trackId: string, route: { name: string; points: Track['points'] }): Promise<void> {
   const nonce = v1.randomBytes(12)
   const sealed = v1.concat(nonce, v1.aeadSeal(active.contentKey, nonce, v1.utf8(JSON.stringify(route)), EMPTY))
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
   })
   if (!res.ok) throw await apiError(res, 'rename track')
 }
 
 export async function deleteTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, trackId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
-    method: 'DELETE',
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, { method: 'DELETE' })
   if (!res.ok) throw await apiError(res, 'delete track')
 }

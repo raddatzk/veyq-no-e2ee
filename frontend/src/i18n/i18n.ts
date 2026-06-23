@@ -17,7 +17,8 @@ const de: Dict = {
   'profile.mySettings': 'Meine Einstellungen',
   'auth.login': 'Anmelden',
   'auth.logout': 'Abmelden',
-  'password.pwnedWarning': 'Dieses Passwort taucht in {count} bekannten Datenlecks auf — wähle besser ein anderes.',
+  'password.pwnedWarning':
+    'Dieses Passwort taucht in {count} bekannten Datenlecks auf — wähle besser ein anderes.',
   'password.minLength': 'Mindestens 10 Zeichen.',
   'password.strong': 'Starkes Passwort.',
   'common.secretKey': 'Secret Key',
@@ -38,7 +39,8 @@ const de: Dict = {
   'move.toRoot': 'Hauptebene',
   'home.createMemory': 'Memory erstellen',
   'home.createFolder': 'Ordner erstellen',
-  'home.nameConflict': 'An dieser Stelle gibt es bereits eine Memory, ein Kapitel oder einen Ordner mit diesem Namen.',
+  'home.nameConflict':
+    'An dieser Stelle gibt es bereits eine Memory, ein Kapitel oder einen Ordner mit diesem Namen.',
   'cover.setAsCover': 'Als Cover',
   'app.loading': 'Lädt…',
   'app.openInApp': 'veyq als App öffnen — flüssiger und näher am System.',
@@ -61,7 +63,8 @@ const de: Dict = {
   'delete.confirm': 'Endgültig löschen',
   'delete.group': 'Gruppe löschen',
   'delete.tenant': 'Tenant löschen',
-  'delete.tenantWarning': 'Der Tenant wird nach einer Frist endgültig gelöscht. Alle Mitglieder sollten bis dahin ihre Daten sichern.',
+  'delete.tenantWarning':
+    'Der Tenant wird nach einer Frist endgültig gelöscht. Alle Mitglieder sollten bis dahin ihre Daten sichern.',
   'delete.scheduledBanner': 'Dieser Tenant wird am {date} gelöscht. Sichere bis dahin deine Daten.',
   'delete.cancelDeletion': 'Löschung abbrechen',
   'tenants.create': 'Neuer Tenant',
@@ -69,24 +72,28 @@ const de: Dict = {
   'tenants.manageTitle': 'Tenant verwalten',
   'tenants.name': 'Tenant-Name',
   'tenants.domain': 'Domain',
-  'tenants.domainHint': 'Die Adresse, unter der dieser Tenant erreichbar ist (eindeutig, z. B. acme.veyq.app).',
+  'tenants.domainHint':
+    'Die Adresse, unter der dieser Tenant erreichbar ist (eindeutig, z. B. acme.veyq.app).',
   'tenants.logo': 'Logo',
   'tenants.chooseLogo': 'Bild wählen',
-  'tenants.logoUploadFailed': 'Der Tenant wurde erstellt, aber das Logo konnte nicht gespeichert werden.',
+  'tenants.logoUploadFailed':
+    'Der Tenant wurde erstellt, aber das Logo konnte nicht gespeichert werden.',
   'invite.role': 'Rolle',
   'invite.member': 'Mitglied',
   'invite.owner': 'Eigentümer',
   'invite.openInApp': 'In der veyq-App öffnen für ein reibungsloseres Erlebnis.',
   'invite.openApp': 'In App öffnen',
   'invite.generate': 'Einladungslink erstellen',
-  'invite.link': 'Teile diesen Link. Er enthält den Schlüssel — gib ihn nur an die eingeladene Person.',
+  'invite.link':
+    'Teile diesen Link. Er enthält den Schlüssel — gib ihn nur an die eingeladene Person.',
   'invite.copy': 'Kopieren',
   'invite.copied': 'Kopiert!',
   'invite.protection': 'Schutz',
   'invite.protLink': 'Im Link',
   'invite.protPassphrase': 'Passwort',
   'invite.passphrasePlaceholder': 'Passwort für die Einladung',
-  'invite.passphraseOob': 'Der Schlüssel wird mit diesem Passwort verschlüsselt. Teile das Passwort auf einem anderen Weg (nicht per E-Mail) mit der eingeladenen Person.',
+  'invite.passphraseOob':
+    'Der Schlüssel wird mit diesem Passwort verschlüsselt. Teile das Passwort auf einem anderen Weg (nicht per E-Mail) mit der eingeladenen Person.',
   'invite.passphraseRequired': 'Bitte ein Passwort eingeben.',
   'invite.emailHint': 'Oder direkt per E-Mail einladen:',
   'invite.emailPlaceholder': 'name@example.com',
@@ -140,11 +147,13 @@ const de: Dict = {
   'share.passwordTitle': 'Passwort erforderlich',
   'share.passwordWrong': 'Falsches Passwort.',
   'share.passwordSubmit': 'Öffnen',
-  'share.noticePlaceholder': 'Zusätzliche Hinweise/Bedingungen für diesen Link (Markdown, optional)',
+  'share.noticePlaceholder':
+    'Zusätzliche Hinweise/Bedingungen für diesen Link (Markdown, optional)',
   'share.termsTitle': 'Nutzungsbedingungen',
   'share.accept': 'Akzeptieren und ansehen',
   'terms.title': 'Nutzungsbedingungen',
-  'terms.hint': 'Gäste müssen diese bei jedem Share dieses Tenants akzeptieren. Klicke Bausteine an oder schreibe frei.',
+  'terms.hint':
+    'Gäste müssen diese bei jedem Share dieses Tenants akzeptieren. Klicke Bausteine an oder schreibe frei.',
   'terms.placeholder': 'Nutzungsbedingungen in Markdown…',
   'terms.edit': 'Nutzungsbedingungen bearbeiten',
   'terms.save': 'Speichern',
@@ -155,7 +164,8 @@ const de: Dict = {
   'members.you': 'du',
   'members.rotate': 'Schlüssel rotieren',
   'members.rotated': 'Rotiert!',
-  'members.rotateHint': 'Nach dem Entfernen: rotiere die Schlüssel, damit entfernte Mitglieder keinen Zugriff mehr auf künftige Inhalte haben.',
+  'members.rotateHint':
+    'Nach dem Entfernen: rotiere die Schlüssel, damit entfernte Mitglieder keinen Zugriff mehr auf künftige Inhalte haben.',
   'app.unreachableTitle': 'Instanz nicht erreichbar',
   'app.unreachableSub': 'Der veyq-Server antwortet nicht. Lade die Seite neu.',
   'setup.title': 'Server einrichten',
@@ -165,12 +175,13 @@ const de: Dict = {
   'setup.submitting': 'Richte ein…',
   'setup.failed': 'Einrichtung fehlgeschlagen. Möglicherweise ist die Instanz schon eingerichtet.',
   'setup.kitTitle': 'Emergency Kit sichern',
-  'setup.kitSub': 'Dein Secret Key. Ohne ihn ist keine Anmeldung möglich — sicher speichern, er wird nicht erneut angezeigt.',
+  'setup.kitSub':
+    'Dein Secret Key. Ohne ihn ist keine Anmeldung möglich — sicher speichern, er wird nicht erneut angezeigt.',
   'setup.kitProceed': 'Gespeichert — weiter zur Anmeldung',
   'kit.download': 'Emergency Kit als PDF herunterladen',
   'kit.import': 'Emergency Kit importieren',
   'kit.importFile': 'Datei wählen',
-  'kit.importHint': 'PDF oder .veyqkit wählen — füllt E-Mail und Secret Key aus.',
+  'kit.importHint': 'PDF wählen oder QR-Code scannen — füllt E-Mail und Secret Key aus.',
   'kit.importFailed': 'Datei nicht erkannt. Bitte ein gültiges Emergency Kit wählen.',
   'kit.scan': 'QR-Code scannen',
   'kit.scanHint': 'Halte den QR-Code aus deinem Emergency Kit vor die Kamera.',
@@ -183,7 +194,8 @@ const de: Dict = {
   'login.remember': 'Login merken',
   'reset.forgot': 'Passwort vergessen?',
   'reset.title': 'Passwort zurücksetzen',
-  'reset.requestHint': 'Wir senden dir einen Link per E-Mail. Zum Zurücksetzen brauchst du außerdem deinen Secret Key.',
+  'reset.requestHint':
+    'Wir senden dir einen Link per E-Mail. Zum Zurücksetzen brauchst du außerdem deinen Secret Key.',
   'reset.sendLink': 'Reset-Link senden',
   'reset.sent': 'Falls ein Konto existiert, ist eine E-Mail unterwegs. Öffne den Link darin.',
   'reset.backToLogin': 'Zurück zur Anmeldung',
@@ -197,18 +209,21 @@ const de: Dict = {
   'settings.forgetRememberedLogin': 'Gemerkten Login löschen',
   'settings.security': 'Sicherheit',
   'settings.rotateIdentity': 'Identitätsschlüssel rotieren',
-  'settings.rotateIdentityHint': 'Erzeugt ein neues Identitäts-Schlüsselpaar und versiegelt alle Zugriffe neu. Login bleibt gleich. Du wirst danach neu angemeldet.',
+  'settings.rotateIdentityHint':
+    'Erzeugt ein neues Identitäts-Schlüsselpaar und versiegelt alle Zugriffe neu. Login bleibt gleich. Du wirst danach neu angemeldet.',
   'settings.rotateConfirm': 'Wirklich rotieren? Du wirst neu angemeldet',
   'settings.rotating': 'Rotiere…',
   'support.noticeTitle': 'veyq ist freie Software',
-  'support.noticeCopy': 'Wenn dir das Projekt hilft, kannst du die Entwicklung freiwillig unterstützen.',
+  'support.noticeCopy':
+    'Wenn dir das Projekt hilft, kannst du die Entwicklung freiwillig unterstützen.',
   'support.action': 'Unterstützen',
   'support.dismiss': 'Nicht mehr anzeigen',
   'emailChange.section': 'E-Mail-Adresse',
   'emailChange.newEmail': 'Neue E-Mail-Adresse',
   'emailChange.request': 'E-Mail ändern',
   'emailChange.sending': 'Sende…',
-  'emailChange.sent': 'Bestätigungslink an {email} gesendet. Öffne ihn, um die Änderung abzuschließen.',
+  'emailChange.sent':
+    'Bestätigungslink an {email} gesendet. Öffne ihn, um die Änderung abzuschließen.',
   'emailChange.taken': 'Diese E-Mail-Adresse wird bereits verwendet.',
   'emailChange.failed': 'E-Mail-Änderung fehlgeschlagen.',
   'emailChange.confirmTitle': 'E-Mail-Adresse bestätigen',
@@ -293,7 +308,8 @@ const de: Dict = {
   'contrib.newBucket': 'Ordner',
   'contrib.newBucketPrompt': 'Name des Unterordners',
   'contrib.renamePrompt': 'Neuer Name',
-  'contrib.deleteConfirm': 'Diesen Ordner löschen? Die Medien wandern zurück in deinen Haupt-Bereich.',
+  'contrib.deleteConfirm':
+    'Diesen Ordner löschen? Die Medien wandern zurück in deinen Haupt-Bereich.',
   'contrib.allCameras': 'Alle Kameras',
   'contrib.moveToPrimary': 'Mein Bereich',
   'media.favorite': 'Favorit',
@@ -301,7 +317,8 @@ const de: Dict = {
   'media.uploader': 'Hochgeladen von',
   'media.uploadedBy': 'Von {name}',
   'map.empty': 'Keine Medien mit Standort. Fotos mit GPS erscheinen hier auf der Karte.',
-  'map.consentText': 'Die Karte lädt Kartenmaterial von OpenStreetMap. Dabei erfährt dieser externe Dienst die ungefähren Aufnahmeorte deiner Medien. Aktivieren?',
+  'map.consentText':
+    'Die Karte lädt Kartenmaterial von OpenStreetMap. Dabei erfährt dieser externe Dienst die ungefähren Aufnahmeorte deiner Medien. Aktivieren?',
   'map.consentEnable': 'Karte aktivieren',
   'track.import': 'GPX importieren',
   'track.importing': 'Importiert…',
@@ -352,7 +369,8 @@ const de: Dict = {
   'settings.language': 'Sprache',
   'settings.privacy': 'Datenschutz',
   'settings.mapTiles': 'Externe Kartenkacheln',
-  'settings.mapTilesHint': 'Erlaubt der Karte, Material von OpenStreetMap zu laden (verrät die ungefähren Aufnahmeorte).',
+  'settings.mapTilesHint':
+    'Erlaubt der Karte, Material von OpenStreetMap zu laden (verrät die ungefähren Aufnahmeorte).',
   'settings.on': 'Ein',
   'settings.off': 'Aus',
   'settings.account': 'Account',
@@ -366,7 +384,7 @@ const de: Dict = {
   'download.onlyThisSub': '{n} Originale aus dieser Memory',
   'download.withChapters': 'Mit Kapiteln',
   'download.withChaptersSub': '{n} Originale aus dieser Memory und ihren Kapiteln',
-  'download.building': 'Pakete werden erstellt…',
+  'download.building': 'Pakete werden erstellt…'
 }
 
 const en: Dict = {
@@ -382,7 +400,8 @@ const en: Dict = {
   'profile.mySettings': 'My settings',
   'auth.login': 'Sign in',
   'auth.logout': 'Sign out',
-  'password.pwnedWarning': 'This password appeared in {count} known data breaches — consider a different one.',
+  'password.pwnedWarning':
+    'This password appeared in {count} known data breaches — consider a different one.',
   'password.minLength': 'At least 10 characters.',
   'password.strong': 'Strong password.',
   'common.secretKey': 'Secret Key',
@@ -426,7 +445,8 @@ const en: Dict = {
   'delete.confirm': 'Delete permanently',
   'delete.group': 'Delete group',
   'delete.tenant': 'Delete tenant',
-  'delete.tenantWarning': 'The tenant will be permanently deleted after a grace period. All members should secure their data before then.',
+  'delete.tenantWarning':
+    'The tenant will be permanently deleted after a grace period. All members should secure their data before then.',
   'delete.scheduledBanner': 'This tenant will be deleted on {date}. Secure your data before then.',
   'delete.cancelDeletion': 'Cancel deletion',
   'tenants.create': 'New tenant',
@@ -451,7 +471,8 @@ const en: Dict = {
   'invite.protLink': 'In link',
   'invite.protPassphrase': 'Password',
   'invite.passphrasePlaceholder': 'Password for the invite',
-  'invite.passphraseOob': 'The key is encrypted with this password. Share the password through another channel (not email) with the person you invite.',
+  'invite.passphraseOob':
+    'The key is encrypted with this password. Share the password through another channel (not email) with the person you invite.',
   'invite.passphraseRequired': 'Please enter a password.',
   'invite.emailHint': 'Or invite directly by email:',
   'invite.emailPlaceholder': 'name@example.com',
@@ -509,7 +530,8 @@ const en: Dict = {
   'share.termsTitle': 'Terms of use',
   'share.accept': 'Accept and view',
   'terms.title': 'Terms of service',
-  'terms.hint': 'Guests must accept these on every share for this tenant. Click building blocks or write freely.',
+  'terms.hint':
+    'Guests must accept these on every share for this tenant. Click building blocks or write freely.',
   'terms.placeholder': 'Terms of service in Markdown…',
   'terms.edit': 'Edit terms of service',
   'terms.save': 'Save',
@@ -520,7 +542,8 @@ const en: Dict = {
   'members.you': 'you',
   'members.rotate': 'Rotate keys',
   'members.rotated': 'Rotated!',
-  'members.rotateHint': 'After removing someone, rotate the keys so removed members lose access to future content.',
+  'members.rotateHint':
+    'After removing someone, rotate the keys so removed members lose access to future content.',
   'app.unreachableTitle': 'Instance unreachable',
   'app.unreachableSub': 'The veyq server is not responding. Reload the page.',
   'setup.title': 'Set up server',
@@ -530,12 +553,13 @@ const en: Dict = {
   'setup.submitting': 'Setting up…',
   'setup.failed': 'Setup failed. The instance may already be set up.',
   'setup.kitTitle': 'Save your Emergency Kit',
-  'setup.kitSub': 'Your Secret Key. Without it you cannot sign in — save it safely, it is not shown again.',
+  'setup.kitSub':
+    'Your Secret Key. Without it you cannot sign in — save it safely, it is not shown again.',
   'setup.kitProceed': 'Saved — continue to sign in',
   'kit.download': 'Download Emergency Kit (PDF)',
   'kit.import': 'Import Emergency Kit',
   'kit.importFile': 'Choose file',
-  'kit.importHint': 'Choose a PDF or .veyqkit file — fills in email and Secret Key.',
+  'kit.importHint': 'Choose a PDF or scan the QR code — fills in email and Secret Key.',
   'kit.importFailed': 'File not recognised. Please choose a valid Emergency Kit.',
   'kit.scan': 'Scan QR code',
   'kit.scanHint': 'Hold the QR code from your Emergency Kit up to the camera.',
@@ -562,7 +586,8 @@ const en: Dict = {
   'settings.forgetRememberedLogin': 'Delete remembered login',
   'settings.security': 'Security',
   'settings.rotateIdentity': 'Rotate identity key',
-  'settings.rotateIdentityHint': 'Generates a new identity key pair and re-seals all access. Your login stays the same. You will be signed in again afterwards.',
+  'settings.rotateIdentityHint':
+    'Generates a new identity key pair and re-seals all access. Your login stays the same. You will be signed in again afterwards.',
   'settings.rotateConfirm': 'Really rotate? You will be signed in again',
   'settings.rotating': 'Rotating…',
   'support.noticeTitle': 'veyq is free software',
@@ -665,7 +690,8 @@ const en: Dict = {
   'media.uploader': 'Uploaded by',
   'media.uploadedBy': 'By {name}',
   'map.empty': 'No media with a location. Photos with GPS show up here on the map.',
-  'map.consentText': 'The map loads imagery from OpenStreetMap. That external service learns the approximate locations where your media were taken. Enable it?',
+  'map.consentText':
+    'The map loads imagery from OpenStreetMap. That external service learns the approximate locations where your media were taken. Enable it?',
   'map.consentEnable': 'Enable map',
   'track.import': 'Import GPX',
   'track.importing': 'Importing…',
@@ -716,7 +742,8 @@ const en: Dict = {
   'settings.language': 'Language',
   'settings.privacy': 'Privacy',
   'settings.mapTiles': 'External map tiles',
-  'settings.mapTilesHint': 'Lets the map load imagery from OpenStreetMap (reveals the approximate locations where media were taken).',
+  'settings.mapTilesHint':
+    'Lets the map load imagery from OpenStreetMap (reveals the approximate locations where media were taken).',
   'settings.on': 'On',
   'settings.off': 'Off',
   'settings.account': 'Account',
@@ -730,14 +757,17 @@ const en: Dict = {
   'download.onlyThisSub': '{n} originals from this memory',
   'download.withChapters': 'With chapters',
   'download.withChaptersSub': '{n} originals from this memory and its chapters',
-  'download.building': 'Building archive…',
+  'download.building': 'Building archive…'
 }
 
 const messages: Record<string, Dict> = { de, en }
 export type Locale = 'de' | 'en'
 
 // Guard localStorage so this module is safe to import in a non-browser env (node-env vitest e2e suites).
-const storedLocale = typeof localStorage !== 'undefined' ? (localStorage.getItem('veyq.locale') as Locale | null) : null
+const storedLocale =
+  typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('veyq.locale') as Locale | null)
+    : null
 export const i18n = reactive({ locale: (storedLocale ?? 'de') as Locale })
 
 export function setLocale(locale: Locale): void {

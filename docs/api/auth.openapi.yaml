@@ -25,6 +25,22 @@ paths:
               schema: { $ref: '#/components/schemas/LoginResponse' }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/auth/refresh:
+    post:
+      tags: [Login]
+      operationId: refreshSession
+      summary: Rotate the HttpOnly refresh cookie and receive a fresh access session token.
+      description: >
+        Refresh restores server authentication only. It never returns key material; a client that wants to
+        continue decrypting after reload must also have a local device-unlock state for the E2EE keys.
+        The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash.
+      responses:
+        '200':
+          description: Fresh access session token; the refresh cookie is rotated in Set-Cookie.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RefreshSessionResponse' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/me:
     get:
       tags: [Login]
@@ -66,6 +82,90 @@ paths:
               schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/avatar:
+    get:
+      tags: [Login]
+      operationId: getCurrentAvatar
+      summary: Read the authenticated user's profile image bytes.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: Profile image bytes.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    put:
+      tags: [Login]
+      operationId: updateCurrentAvatar
+      summary: Upload profile image bytes for the authenticated user.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAvatarRequest' }
+      responses:
+        '200':
+          description: The updated current user.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+    delete:
+      tags: [Login]
+      operationId: deleteCurrentAvatar
+      summary: Remove the authenticated user's profile image.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The updated current user.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/password:
+    post:
+      tags: [Login]
+      operationId: changeCurrentPassword
+      summary: Change the password and replace the PASSWORD master-key wrap.
+      description: >
+        Authenticated and re-authenticated with the current password. The client keeps the Master Key
+        unchanged, submits a new PASSWORD wrap and auth verifier, and the server invalidates all sessions.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: Password changed; sessions invalidated. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/account:
+    delete:
+      tags: [Login]
+      operationId: deleteCurrentAccount
+      summary: Delete the current account by credential and key erasure.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeleteAccountRequest' }
+      responses:
+        '204': { description: Account credentials/key material were erased and the profile anonymized. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/me/session:
     delete:
       tags: [Login]
@@ -78,6 +178,73 @@ paths:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
       responses:
         '204': { description: The session was invalidated (or did not exist). }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/devices:
+    get:
+      tags: [LoginDevices]
+      operationId: listLoginDevices
+      summary: List active login devices for the authenticated user.
+      description: >
+        Groups active server sessions by the client-generated device identifier. The human-readable device
+        name is stored as client-encrypted opaque text; the server can invalidate sessions for a device
+        without learning the name or any key material.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: Active login devices.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginDeviceList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/devices/current:
+    put:
+      tags: [LoginDevices]
+      operationId: registerCurrentLoginDevice
+      summary: Attach a client device identifier and encrypted name to the current session.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterLoginDeviceRequest' }
+      responses:
+        '204': { description: The current session was associated with the login device. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/devices/{deviceRef}:
+    put:
+      tags: [LoginDevices]
+      operationId: renameLoginDevice
+      summary: Update the encrypted display name for one login device.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - name: deviceRef
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenameLoginDeviceRequest' }
+      responses:
+        '204': { description: The encrypted device name was updated. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+    delete:
+      tags: [LoginDevices]
+      operationId: removeLoginDevice
+      summary: Sign out all active sessions for one login device.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - name: deviceRef
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: All sessions for that device identifier were invalidated. }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/me/personal-scope:
     get:
@@ -100,6 +267,47 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PersonalScopeGrant' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/{tenantName}/profiles/{userPermalink}:
+    get:
+      tags: [Profiles]
+      operationId: getUserProfile
+      summary: Read a tenant-visible user profile by profile address.
+      description: >
+        Returns server-visible identity metadata for a user visible in the tenant. It deliberately does not
+        expose a server-side participant-to-Memory graph; clients aggregate person-centric memories from
+        decrypted participant payloads they already can access.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantName, in: path, required: true, schema: { type: string } }
+        - { name: userPermalink, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Tenant-visible profile metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfileSummary' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/{tenantName}/profiles/{userPermalink}/avatar:
+    get:
+      tags: [Profiles]
+      operationId: getUserProfileAvatar
+      summary: Read a tenant-visible profile image.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantName, in: path, required: true, schema: { type: string } }
+        - { name: userPermalink, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Profile image bytes.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   # --- Password reset (Secret Key + email). One tag per op so the jaxrs-spec greedy class-@Path on the
   # shared /api/account/password-reset prefix can't shadow sibling routes (see the codegen gotcha doc).
@@ -217,11 +425,82 @@ components:
         sessionToken: { type: string }
         user: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         keyBag: { $ref: '#/components/schemas/KeyBag' }
+    RefreshSessionResponse:
+      type: object
+      required: [sessionToken]
+      properties:
+        sessionToken: { type: string, description: Fresh opaque bearer access token. }
+    RegisterLoginDeviceRequest:
+      type: object
+      required: [deviceRef, encryptedName]
+      properties:
+        deviceRef: { type: string, maxLength: 255, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
+        encryptedName: { type: string, maxLength: 16384, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 16384)'] }
+    RenameLoginDeviceRequest:
+      type: object
+      required: [encryptedName]
+      properties:
+        encryptedName: { type: string, maxLength: 16384, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 16384)'] }
+    LoginDeviceSummary:
+      type: object
+      required: [deviceRef, encryptedName, lastLoginAt]
+      properties:
+        deviceRef: { type: string }
+        encryptedName: { type: string, description: Client-encrypted human-readable device/login name. }
+        lastLoginAt: { type: string, format: date-time }
+    LoginDeviceList:
+      type: object
+      required: [devices]
+      properties:
+        devices:
+          type: array
+          items: { $ref: '#/components/schemas/LoginDeviceSummary' }
     UpdateProfileRequest:
       type: object
-      required: [displayName]
+      required: [displayName, permalink]
       properties:
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        permalink:
+          type: string
+          maxLength: 80
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$'
+          x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 80)']
+    UpdateAvatarRequest:
+      type: object
+      required: [contentType, bytes]
+      properties:
+        contentType: { type: string, enum: [image/png, image/jpeg, image/webp] }
+        bytes:
+          type: string
+          format: byte
+          maxLength: 700000
+          x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 700000)']
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, masterKeyWrap, authVerifier]
+      properties:
+        currentPassword: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)'] }
+        masterKeyWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
+        authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)'] }
+    UserProfileSummary:
+      type: object
+      required: [id, displayName, permalink, initials, memories]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        permalink: { type: string }
+        initials: { type: string }
+        avatarUrl: { type: string }
+        memories:
+          type: array
+          # Person-centric memory aggregation is client-side from decrypted participant payloads. The backend
+          # returns an empty list for now to avoid exposing a plaintext Memory-person graph.
+          items: { type: object }
     KeyBag:
       type: object
       description: The wrapped key material needed to unlock the master key client-side.

@@ -10,7 +10,6 @@ import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
 import { workspaceToolbar } from '../../composables/useWorkspaceToolbar'
 import { searchTenant, type SearchResultSummary } from '../../features/memories/api'
 import UploadStatusMenu from '../../features/memories/components/UploadStatusMenu.vue'
-import CapabilityNotice from './CapabilityNotice.vue'
 import { useAuthState } from '../../shared/state/useAuthState'
 
 const { t } = useI18n()
@@ -240,7 +239,6 @@ function isMacPlatform(): boolean {
       </div>
     </div>
     <div class="workspace-topbar-actions">
-      <CapabilityNotice />
       <UploadStatusMenu />
       <div v-if="actions.length" class="workspace-actions">
         <Button

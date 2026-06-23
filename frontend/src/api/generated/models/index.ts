@@ -49,6 +49,7 @@ export * from './JoinTenantRegistrationInviteRequest';
 export * from './JoinTenantRegistrationInviteWithPasskeyRequest';
 export * from './LoginRequest';
 export * from './LoginSession';
+export * from './RefreshSessionResponse';
 export * from './ManagedUserSummary';
 export * from './ManagedUserTenantSummary';
 export * from './ManagedUsersSummary';

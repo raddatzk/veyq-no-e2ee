@@ -25,7 +25,7 @@ object EmergencyKit {
         return PREFIX + enc.encodeToString(json.toString().toByteArray(Charsets.UTF_8))
     }
 
-    /** Extract a kit out of any text — a scanned QR string, a `.veyqkit` file, or the bytes of the kit PDF. */
+    /** Extract a kit out of any text — a scanned QR string or the bytes of the kit PDF. */
     fun parse(text: String): KitData? {
         val m = tokenRe.find(text) ?: return null
         return try {

@@ -9,8 +9,10 @@ import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
 import com.veyq.app.shared.config.AppConfig
+import com.veyq.app.shared.tenancy.Tenant
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import java.net.URI
 
 /**
  * uc.admin.email-invite — relay an already-issued member-invite link to an email address. The link is
@@ -39,10 +41,11 @@ class EmailInviteHandler(
         }
         val to = req.email.trim()
         if (!to.contains("@") || to.contains(" ")) throw ApiException(400, "INVALID_EMAIL", "Invalid email address")
-        // Anti-abuse: only relay links whose ORIGIN exactly matches this instance — a prefix check (startsWith)
-        // is bypassable (`https://veyq.example.com.evil.com/…`, `https://veyq.example.com@evil.com/…`), which
-        // would turn this Owner-gated endpoint into a phishing/spam relay sending attacker links from our domain.
-        if (!sameOrigin(req.link, appBaseUrl)) throw ApiException(400, "BAD_LINK", "Invite link must point at this instance")
+        // Anti-abuse: only relay links whose ORIGIN exactly matches this instance or this tenant's domain —
+        // a prefix check (`startsWith`) is bypassable via attacker-controlled hosts.
+        if (!sameOrigin(req.link, appBaseUrl) && !sameOrigin(req.link, tenantInviteBaseUrl(tenant))) {
+            throw ApiException(400, "BAD_LINK", "Invite link must point at this instance")
+        }
 
         val subject = "You've been invited to ${tenant.displayName} on veyq"
         val body = buildString {
@@ -55,8 +58,8 @@ class EmailInviteHandler(
 
     /** True iff [link] and [base] share an exact origin (scheme + host + effective port). Any parse failure = false. */
     private fun sameOrigin(link: String, base: String): Boolean = try {
-        val l = java.net.URI(link)
-        val b = java.net.URI(base)
+        val l = URI(link)
+        val b = URI(base)
         val scheme = l.scheme?.lowercase()
         scheme != null && scheme in setOf("http", "https") && scheme == b.scheme?.lowercase() &&
             l.host != null && l.host.equals(b.host, ignoreCase = true) && port(l) == port(b)
@@ -64,6 +67,18 @@ class EmailInviteHandler(
         false
     }
 
-    private fun port(u: java.net.URI): Int =
+    private fun tenantInviteBaseUrl(tenant: Tenant): String {
+        val domain = tenant.domain.trim().trimEnd('/')
+        if (domain.isBlank()) return appBaseUrl
+        if (domain.startsWith("http://", ignoreCase = true) || domain.startsWith("https://", ignoreCase = true)) {
+            return domain
+        }
+        val scheme = runCatching { URI(appBaseUrl).scheme?.lowercase() }.getOrNull()
+            ?.takeIf { it == "http" || it == "https" }
+            ?: "https"
+        return "$scheme://$domain"
+    }
+
+    private fun port(u: URI): Int =
         if (u.port != -1) u.port else when (u.scheme?.lowercase()) { "https" -> 443; "http" -> 80; else -> -1 }
 }

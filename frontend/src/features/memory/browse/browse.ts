@@ -4,6 +4,7 @@
 // the node itself (server-visible structure), NOT from the URL — so /urlaube/italien-2026 stays clean and
 // the client learns at each step whether it's a Folder, Memory or Chapter.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import type { UnlockedSession } from '../../account/login/login'
 import { slugTokenFor, type MemoryNode } from '../createTree/memoryTree'
 
@@ -18,9 +19,7 @@ export async function listChildren(
   parentId?: string,
 ): Promise<MemoryNode[]> {
   const slot = parentId ?? 'root'
-  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes?parentId=${encodeURIComponent(slot)}`, {
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${scopeId}/nodes?parentId=${encodeURIComponent(slot)}`)
   if (!res.ok) throw await apiError(res, 'list children')
   return (await res.json()).nodes
 }

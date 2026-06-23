@@ -3,6 +3,7 @@
 // only. Editing goes through the operator-blind CRDT store (journalLive/journalPersistence); this module is
 // the read path (detail view) that opens the compacted Markdown projection.
 import { apiError } from '../../../shared/apiError'
+import { authFetch } from '../../../shared/api/sessionFetch'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -14,9 +15,7 @@ export type Journal = { markdown: string; updatedAt: string | null }
 
 /** Load and decrypt a memory's journal Markdown ('' when none has been written yet). */
 export async function getJournal(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Journal> {
-  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/journal`, {
-    headers: { authorization: `Bearer ${session.sessionToken}` },
-  })
+  const res = await authFetch(apiBase, session, `/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/journal`)
   if (!res.ok) throw await apiError(res, 'get journal')
   const body = await res.json()
   if (!body.sealedContent) return { markdown: '', updatedAt: null }

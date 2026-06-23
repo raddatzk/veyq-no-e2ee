@@ -4,6 +4,7 @@ import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.security.SessionService
+import io.quarkus.mailer.MockMailbox
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
@@ -20,11 +21,13 @@ class RegisterViaInvitationSliceTest {
 
     @Inject lateinit var users: UserRepository
     @Inject lateinit var sessions: SessionService
+    @Inject lateinit var mailbox: MockMailbox
 
     private lateinit var ownerToken: String
 
     @BeforeTest
     fun seed() {
+        mailbox.clear()
         // A seed identity scoped to this class — sharing ids/emails across slice tests is unsafe because
         // the H2 instance is shared across the run (a sibling test's guarded seed would be skipped).
         QuarkusTransaction.requiringNew().run {
@@ -46,15 +49,20 @@ class RegisterViaInvitationSliceTest {
             .body("""{"name":"reg-acme","displayName":"Acme","domain":"reg-acme.test"}""")
             .post("/api/tenants").then().statusCode(200)
             .extract().path<String>("id")
-        val invite = given().header("Authorization", ownerToken)
+        val invite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"email":"invitee@example.com"}""")
             .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()
         val inviteId = invite.path<String>("inviteId")
-        val bootstrapSecret = invite.path<String>("bootstrapSecret")
+        val bootstrapSecret = ownerInviteSecret("invitee@example.com", inviteId)
 
         // a wrong bootstrap secret is rejected before any account is created
         given().contentType(ContentType.JSON).body(registerBody("AAAA", "nope@example.com"))
             .post("/api/tenant-invites/$inviteId/register").then().statusCode(400)
             .body("code", `is`("BAD_BOOTSTRAP_SECRET"))
+
+        given().contentType(ContentType.JSON).body(registerBody(bootstrapSecret, "wrong@example.com"))
+            .post("/api/tenant-invites/$inviteId/register").then().statusCode(403)
+            .body("code", `is`("INVITE_EMAIL_MISMATCH"))
 
         // the invitee (unauthenticated) registers an account and claims the tenant in one step
         val session = given().contentType(ContentType.JSON)
@@ -94,10 +102,11 @@ class RegisterViaInvitationSliceTest {
         val tenantId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
             .body("""{"name":"reg-globex","displayName":"Globex","domain":"reg-globex.test"}""")
             .post("/api/tenants").then().statusCode(200).extract().path<String>("id")
-        val invite = given().header("Authorization", ownerToken)
+        val invite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"email":"reg-srvowner@example.com"}""")
             .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()
         val inviteId = invite.path<String>("inviteId")
-        val bootstrapSecret = invite.path<String>("bootstrapSecret")
+        val bootstrapSecret = ownerInviteSecret("reg-srvowner@example.com", inviteId)
 
         // the seeded Server Owner's email is already taken — the invite stays claimable
         given().contentType(ContentType.JSON).body(registerBody(bootstrapSecret, "reg-srvowner@example.com"))
@@ -124,4 +133,10 @@ class RegisterViaInvitationSliceTest {
           "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
         }
     """.trimIndent()
+
+    private fun ownerInviteSecret(email: String, inviteId: String): String {
+        val text = mailbox.getMessagesSentTo(email).last().text
+        val marker = "#invite=$inviteId&s="
+        return text.substringAfter(marker).substringBefore("\n").substringBefore("&").trim()
+    }
 }

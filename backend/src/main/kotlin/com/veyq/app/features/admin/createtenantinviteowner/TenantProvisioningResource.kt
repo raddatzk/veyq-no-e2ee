@@ -4,6 +4,7 @@ import com.veyq.app.generated.api.TenantProvisioningApi
 import com.veyq.app.generated.model.ClaimTenantOwnershipRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.GetInviteMaterialRequest
+import com.veyq.app.generated.model.IssueOwnerInviteRequest
 import com.veyq.app.generated.model.UploadTenantLogoRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
@@ -36,8 +37,8 @@ class TenantProvisioningResource(private val handler: TenantProvisioningHandler)
         return Response.ok(logo.bytes, logo.contentType).build()
     }
 
-    override fun issueOwnerInvite(authorization: String, tenantId: String): Response =
-        Response.ok(handler.issueOwnerInvite(authorization, tenantId)).build()
+    override fun issueOwnerInvite(authorization: String, tenantId: String, issueOwnerInviteRequest: IssueOwnerInviteRequest): Response =
+        Response.ok(handler.issueOwnerInvite(authorization, tenantId, issueOwnerInviteRequest)).build()
 
     override fun getTenantInvite(inviteId: String): Response =
         Response.ok(handler.getTenantInvite(inviteId)).build()
