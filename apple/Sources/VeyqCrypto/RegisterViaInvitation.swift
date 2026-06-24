@@ -112,7 +112,7 @@ public enum RegisterViaInvitation {
                 MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(masterWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: salt))),
                 MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: SetupServer.b64url(recWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: recSalt))),
             ],
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
+            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.authVerifierPhc(salt: authSalt, verifier: verifier)),
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
             recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(personalPublic)),

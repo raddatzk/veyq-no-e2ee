@@ -79,7 +79,7 @@ object RegisterViaInvitation {
             .put("identityPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(id.pubKemX + id.pubKemM)).put("signPublicKey", b64url(id.pubSign)))
             .put("wrappedIdentityPrivateKey", blob(wrappedPriv))
             .put("masterKeyWraps", masterKeyWraps)
-            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", b64url(authSalt + verifier)))
+            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", SetupServer.authVerifierPhc(authSalt, verifier)))
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
             .put("recoveryAuthTag", b64url(V1.recoveryAuthTag(masterKey)))
             .put("personalScopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(personalPublic)))

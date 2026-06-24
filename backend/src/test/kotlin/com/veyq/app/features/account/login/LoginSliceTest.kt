@@ -1,10 +1,9 @@
 package com.veyq.app.features.account.login
 
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.keymgmt.AuthVerifier
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.IdentityKey
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
@@ -25,7 +24,6 @@ import org.hamcrest.CoreMatchers.not
 import org.hamcrest.Matchers.emptyString
 import org.hamcrest.Matchers.notNullValue
 import org.junit.jupiter.api.BeforeEach
-import java.text.Normalizer
 import java.time.Instant
 import kotlin.test.Test
 import com.veyq.app.shared.keymgmt.ScopeKind
@@ -36,26 +34,12 @@ class LoginSliceTest {
     @Inject lateinit var users: UserRepository
     @Inject lateinit var identityKeys: IdentityKeyRepository
     @Inject lateinit var keyBlobs: KeyBlobRepository
-    @Inject lateinit var authVerifiers: AuthVerifierRepository
     @Inject lateinit var scopes: ScopeRepository
     @Inject lateinit var grants: ScopeGrantRepository
+    @Inject lateinit var argon2: Argon2Verifier
 
     private val email = "login@example.com"
     private val password = "correct horse battery staple"
-
-    /** Mirrors the clients' v1 ARGON2_PROOF verifier: salt(16) || Argon2id(nfc(password), salt). */
-    private fun verifierBytes(): ByteArray {
-        val salt = ByteArray(16) { it.toByte() }
-        val nfc = Normalizer.normalize(password, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
-        val gen = Argon2BytesGenerator()
-        gen.init(
-            Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
-                .withVersion(Argon2Parameters.ARGON2_VERSION_13)
-                .withIterations(3).withMemoryAsKB(32768).withParallelism(1).withSalt(salt).build(),
-        )
-        val proof = ByteArray(32).also { gen.generateBytes(nfc, it) }
-        return salt + proof
-    }
 
     /** Seed an enrolled user directly (bypassing the one-shot setup gate) so the slice is independent. */
     @BeforeEach
@@ -69,6 +53,8 @@ class LoginSliceTest {
             val user = User().apply {
                 id = "login-user"; this.email = this@LoginSliceTest.email
                 displayName = "Login User"; serverRole = ServerRole.ServerMember; createdAt = now
+                authVerifierKind = "ARGON2_PROOF"; authVerifierSuiteId = "v1"
+                authVerifier = argon2.createPasswordVerifier(password); authVerifierCreatedAt = now
             }
             users.persist(user)
             identityKeys.persist(
@@ -82,12 +68,6 @@ class LoginSliceTest {
                 KeyBlob().apply {
                     id = "login-blob"; userId = user.id; unlockMethod = "PASSWORD"; suiteId = "v1"
                     wrappedKey = byteArrayOf(1, 2, 3, 4); kdfParams = byteArrayOf(5, 6, 7, 8); createdAt = now
-                },
-            )
-            authVerifiers.persist(
-                AuthVerifier().apply {
-                    id = "login-ver"; userId = user.id; kind = "ARGON2_PROOF"; suiteId = "v1"
-                    verifier = verifierBytes(); createdAt = now
                 },
             )
             scopes.persist(

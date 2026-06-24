@@ -18,6 +18,10 @@ create table veyq_user (
     display_name         varchar(255) not null,
     server_role          varchar(32)  not null,
     system_account       boolean      not null default false,
+    auth_verifier_kind   varchar(32),
+    auth_verifier_suite_id varchar(64),
+    auth_verifier        text,
+    auth_verifier_created_at timestamp,
     created_at           timestamp    not null,
     username             varchar(80),
     avatar_object_key    varchar(256),
@@ -50,15 +54,6 @@ create table veyq_key_blob (
 );
 create index idx_key_blob_user on veyq_key_blob (user_id);
 create index idx_key_blob_user_method on veyq_key_blob (user_id, unlock_method);
-
-create table veyq_auth_verifier (
-    id          varchar(64)     primary key,
-    user_id     varchar(64)     not null references veyq_user (id),
-    kind        varchar(32)     not null,
-    suite_id    varchar(64)     not null,
-    verifier    varbinary(8192) not null,
-    created_at  timestamp       not null
-);
 
 -- Opaque server sessions (auth != unlock). Only the SHA-256 of the bearer token is stored, never the raw token.
 create table veyq_session (

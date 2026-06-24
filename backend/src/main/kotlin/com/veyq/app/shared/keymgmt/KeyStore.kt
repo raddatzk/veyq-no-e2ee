@@ -42,17 +42,6 @@ class KeyBlob {
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 
-@Entity
-@Table(name = "veyq_auth_verifier")
-class AuthVerifier {
-    @Id var id: String = ""
-    @Column(name = "user_id", nullable = false) var userId: String = ""
-    @Column(nullable = false) var kind: String = ""
-    @Column(name = "suite_id", nullable = false) var suiteId: String = ""
-    @Column(nullable = false) var verifier: ByteArray = ByteArray(0)
-    @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
-}
-
 @ApplicationScoped
 class IdentityKeyRepository : PanacheRepositoryBase<IdentityKey, String> {
     fun findByUserId(userId: String): IdentityKey? = find("userId", userId).firstResult()
@@ -74,10 +63,4 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
     /** Row-locked snapshot of a user's wraps: serializes concurrent removals so the lockout floor holds. */
     fun listByUserIdForUpdate(userId: String): List<KeyBlob> =
         find("userId", userId).withLock(LockModeType.PESSIMISTIC_WRITE).list()
-}
-
-@ApplicationScoped
-class AuthVerifierRepository : PanacheRepositoryBase<AuthVerifier, String> {
-    fun findByUserId(userId: String): AuthVerifier? = find("userId", userId).firstResult()
-    fun deleteByUserId(userId: String): Long = delete("userId", userId)
 }

@@ -3,7 +3,7 @@
 // returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
 import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
-import { b64url } from '../../../shared/base64'
+import { b64url, phcB64 } from '../../../shared/base64'
 
 // Must match the params used to wrap the master key (see setupServer.ts / login.ts).
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
@@ -88,9 +88,10 @@ export async function registerWithScope(
   const recSalt = v1.randomBytes(16)
   const recWrap = v1.symWrap(v1.kekRecovery(secretKey, recSalt, ARGON), masterKey, 'master-key', v1.randomBytes(12))
 
-  // server-side auth verifier: argon2id(password, authSalt); store authSalt || output
+  // server-side auth verifier: Argon2id(password, authSalt) stored as a PHC string
   const authSalt = v1.randomBytes(16)
   const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
+  const authPhc = `$argon2id$v=19$m=${ARGON.m},t=${ARGON.t},p=${ARGON.p}$${phcB64(authSalt)}$${phcB64(verifier)}`
 
   // create the unshared personal scope; only this user receives a grant
   const personal = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
@@ -119,7 +120,7 @@ export async function registerWithScope(
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, salt)) },
       { unlockMethod: 'RECOVERY', suiteId: 'v1', wrappedKey: b64url(recWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, recSalt)) },
     ],
-    authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
+    authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: authPhc },
     // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
     recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },

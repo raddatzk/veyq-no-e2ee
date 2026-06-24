@@ -9,7 +9,6 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.security.SessionService
@@ -36,7 +35,6 @@ import java.util.UUID
 class PasswordResetHandler(
     private val users: UserRepository,
     private val keyBlobs: KeyBlobRepository,
-    private val authVerifiers: AuthVerifierRepository,
     private val tokens: PasswordResetRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
@@ -125,11 +123,12 @@ class PasswordResetHandler(
         passwordBlob.wrappedKey = dec.decode(wrap.wrappedKey)
         passwordBlob.kdfParams = wrap.kdfParams?.let { dec.decode(it) }
 
-        authVerifiers.findByUserId(userId)?.apply {
-            kind = "ARGON2_PROOF"
-            suiteId = "v1"
-            verifier = argon2.createPasswordVerifier(req.newPassword)
-        } ?: throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
+        val user = users.findById(userId) ?: throw invalidToken()
+        if (user.authVerifier == null) throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
+        user.authVerifierKind = "ARGON2_PROOF"
+        user.authVerifierSuiteId = "v1"
+        user.authVerifier = argon2.createPasswordVerifier(req.newPassword)
+        user.authVerifierCreatedAt = Instant.now()
 
         token.consumedAt = Instant.now()
         sessions.invalidateAll(userId) // every old session dies; the user re-logs in with the new password

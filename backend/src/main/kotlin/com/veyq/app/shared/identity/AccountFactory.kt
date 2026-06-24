@@ -6,9 +6,8 @@ import com.veyq.app.generated.model.IdentityPublicKey
 import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.MasterKeyWrap
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
-import com.veyq.app.shared.keymgmt.AuthVerifier
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.IdentityKey
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
@@ -54,10 +53,10 @@ class AccountFactory(
     private val users: UserRepository,
     private val identityKeys: IdentityKeyRepository,
     private val keyBlobs: KeyBlobRepository,
-    private val authVerifiers: AuthVerifierRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val suites: CryptoSuiteRegistry,
+    private val argon2: Argon2Verifier,
 ) {
     private val dec = Base64.getUrlDecoder()
 
@@ -78,12 +77,21 @@ class AccountFactory(
         spec.masterKeyWraps.forEach { suites.require(it.suiteId) }
         suites.require(spec.personalScopePublicKey.suiteId)
         suites.require(spec.wrappedPersonalScopePrivateKey.suiteId)
+        if (spec.authVerifier.kind.value != "ARGON2_PROOF") {
+            throw ApiException(400, "UNSUPPORTED_AUTH_VERIFIER", "Only ARGON2_PROOF auth verifiers are supported")
+        }
+        runCatching { argon2.requirePasswordVerifier(spec.authVerifier.verifier) }
+            .getOrElse { throw ApiException(400, "BAD_AUTH_VERIFIER", "Auth verifier must be a supported Argon2id PHC string") }
 
         val userId = newId()
         val user = User().apply {
             id = userId; email = spec.email; displayName = spec.displayName
             username = uniqueUsername(Usernames.fallback(spec.displayName, spec.email, userId), userId)
             serverRole = spec.serverRole; systemAccount = false; createdAt = now
+            authVerifierKind = spec.authVerifier.kind.value
+            authVerifierSuiteId = spec.authVerifier.suiteId
+            authVerifier = spec.authVerifier.verifier
+            authVerifierCreatedAt = now
         }
         users.persist(user)
 
@@ -107,13 +115,6 @@ class AccountFactory(
                 },
             )
         }
-
-        authVerifiers.persist(
-            AuthVerifier().apply {
-                id = newId(); this.userId = user.id; kind = spec.authVerifier.kind.value
-                suiteId = spec.authVerifier.suiteId; verifier = dec.decode(spec.authVerifier.verifier); createdAt = now
-            },
-        )
 
         val personalScope = Scope().apply {
             id = newId(); tenantId = personalTenantId; ownerUserId = user.id; kind = ScopeKind.PERSONAL_ROOT

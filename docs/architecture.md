@@ -24,7 +24,7 @@ All client crypto is pinned to suite **"v1"**, implemented byte-identically on w
 The schema (migrations V1–V27) is built around users, opaque scopes, a sealed node tree, sealed blobs and grants. Key tables:
 
 - `veyq_user` — global users: `email`, `display_name`, `server_role`, `system_account`, `created_at`. There is **no password hash here**; password material is an Argon2 verifier (below).
-- `veyq_auth_verifier` — the Argon2id auth verifier (salt + proof) used to check a login proof. `veyq_password_reset` carries reset material.
+- `veyq_user.auth_verifier*` — the Argon2id PHC auth verifier used to check a login proof. `veyq_password_reset` carries reset material.
 - `veyq_identity_key` / `veyq_key_blob` — the user's identity public key and the wrapped private key + master-key wraps ("key bag"). The server stores these but cannot unwrap them.
 - `veyq_session` — opaque Bearer sessions, stored only as `token_hash`. Issued at login, invalidated at logout; there is **no refresh/rotation model**.
 - `veyq_tenant` — a tenant with a unique `domain`. `veyq_tenant_invite` holds sealed invite secrets + temp-key wraps.
@@ -42,7 +42,7 @@ The server sees none of the following in cleartext: names, titles, journal/track
 
 Authentication is operator-blind: the server verifies an Argon2id password *proof* and returns ciphertext (the wrapped key bag); the actual unlock happens on the client.
 
-1. `POST /api/login` — verifies the Argon2 auth proof against `veyq_auth_verifier` and returns a JSON `LoginResponse` with an opaque `sessionToken` (Bearer), the `user`, and the wrapped `keyBag`. No cookies are set.
+1. `POST /api/login` — verifies the Argon2 PHC auth proof on `veyq_user` and returns a JSON `LoginResponse` with an opaque `sessionToken` (Bearer), the `user`, and the wrapped `keyBag`. No cookies are set.
 2. Protected calls send `Authorization: Bearer <token>`. Each handler resolves it imperatively via `SessionService.resolve(...)`; there is no Quarkus `SecurityIdentity`/`HttpSecurityPolicy` mechanism. Access control is enforced by guards — `ScopeAccessGuard` (a valid grant + ACTIVE membership), `TenantAdminGuard` — operating on scope/tenant IDs.
 3. There is **no token refresh or rotation**. Sessions have a long TTL and are simply revoked on logout.
 4. `DELETE /api/me/session` — invalidates the current Bearer session server-side (`SessionService.invalidate`).

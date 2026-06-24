@@ -76,7 +76,7 @@ components:
         name: { type: string, maxLength: 255, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
     AuthVerifier:
       type: object
-      description: Proves an unlock to the server without revealing the master key.
+      description: Proves account authentication to the server without revealing the master key. For ARGON2_PROOF, `verifier` is an Argon2id PHC string (`$argon2id$v=19$m=32768,t=3,p=1$...$...`).
       required: [kind, suiteId, verifier]
       properties:
         kind: { type: string, enum: [ARGON2_PROOF, WEBAUTHN] }

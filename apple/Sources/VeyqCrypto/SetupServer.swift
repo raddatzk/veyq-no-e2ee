@@ -12,6 +12,12 @@ public enum SetupServer {
             .replacingOccurrences(of: "=", with: "")
     }
 
+    static func authVerifierPhc(salt: Data, verifier: Data) -> String {
+        let s = salt.base64EncodedString().replacingOccurrences(of: "=", with: "")
+        let v = verifier.base64EncodedString().replacingOccurrences(of: "=", with: "")
+        return "$argon2id$v=19$m=\(argon.m),t=\(argon.t),p=\(argon.p)$\(s)$\(v)"
+    }
+
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
@@ -64,7 +70,7 @@ public enum SetupServer {
                 MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: salt))),
                 MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: b64url(recWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: recSalt))),
             ],
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: b64url(authSalt + verifier)),
+            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: authVerifierPhc(salt: authSalt, verifier: verifier)),
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
             recoveryAuthTag: b64url(V1.recoveryAuthTag(masterKey: masterKey)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(personalPublic)),

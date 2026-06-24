@@ -419,7 +419,7 @@ class InviteMembersRolesSliceTest {
           "identityPublicKey": { "suiteId": "v1", "kemPublicKey": "a2VtcHVi", "signPublicKey": "c2lnbg" },
           "wrappedIdentityPrivateKey": { "suiteId": "v1", "bytes": "d3JhcHBlZA" },
           "masterKeyWraps": [ { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "bWs", "kdfParams": "c2FsdA" } ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "dmVyaWZpZXI" },
+          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "${'$'}argon2id${'$'}v=19${'$'}m=32768,t=3,p=1${'$'}AAAAAAAAAAAAAAAAAAAAAA${'$'}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
           "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "cGVyc29uYWw" },
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWwtZ3JhbnQ" },
           "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "$scopePub" },

@@ -41,6 +41,18 @@ class User {
     @Column(name = "system_account", nullable = false)
     var systemAccount: Boolean = false
 
+    @Column(name = "auth_verifier_kind")
+    var authVerifierKind: String? = null
+
+    @Column(name = "auth_verifier_suite_id")
+    var authVerifierSuiteId: String? = null
+
+    @Column(name = "auth_verifier")
+    var authVerifier: String? = null
+
+    @Column(name = "auth_verifier_created_at")
+    var authVerifierCreatedAt: Instant? = null
+
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null
 

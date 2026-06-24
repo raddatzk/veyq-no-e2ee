@@ -126,7 +126,7 @@ class RegisterViaInvitationSliceTest {
           "masterKeyWraps": [
             { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "bWs", "kdfParams": "c2FsdA" }
           ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "dmVyaWZpZXI" },
+          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "${'$'}argon2id${'$'}v=19${'$'}m=32768,t=3,p=1${'$'}AAAAAAAAAAAAAAAAAAAAAA${'$'}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
           "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "cGVyc29uYWw" },
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWxncmFudA" },
           "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },

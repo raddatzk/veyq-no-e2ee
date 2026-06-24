@@ -23,7 +23,6 @@ import com.veyq.app.shared.identity.AvatarUrls
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.identity.Usernames
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
@@ -55,7 +54,6 @@ class LoginHandler(
     private val users: UserRepository,
     private val identityKeys: IdentityKeyRepository,
     private val keyBlobs: KeyBlobRepository,
-    private val authVerifiers: AuthVerifierRepository,
     private val scopes: ScopeRepository,
     private val argon2: Argon2Verifier,
     private val sessions: SessionService,
@@ -69,18 +67,18 @@ class LoginHandler(
 ) {
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    // a fixed dummy verifier (salt||proof) so an unknown email still runs Argon2 — no enumeration oracle
-    private val dummyVerifier = ByteArray(48)
+    // A fixed PHC verifier so an unknown email still runs Argon2 — no enumeration oracle.
+    private val dummyVerifier = argon2.dummyVerifier
 
     @Transactional
     fun login(req: LoginRequest): LoginResult {
         val user = users.findByEmail(req.email)
-        val verifier = user?.let { authVerifiers.findByUserId(it.id) }
-        if (user == null || verifier == null || verifier.kind != "ARGON2_PROOF") {
+        val verifier = user?.authVerifier
+        if (user == null || verifier == null || user.authVerifierKind != "ARGON2_PROOF" || user.authVerifierSuiteId != "v1") {
             argon2.verifyPassword(req.password, dummyVerifier) // equalize timing vs the real path
             throw invalidCredentials()
         }
-        if (!argon2.verifyPassword(req.password, verifier.verifier)) {
+        if (!argon2.verifyPassword(req.password, verifier)) {
             throw invalidCredentials()
         }
 
@@ -217,11 +215,11 @@ class LoginHandler(
         passwordBlob.wrappedKey = dec.decode(wrap.wrappedKey)
         passwordBlob.kdfParams = wrap.kdfParams?.let { dec.decode(it) }
 
-        authVerifiers.findByUserId(user.id)?.apply {
-            kind = "ARGON2_PROOF"
-            suiteId = "v1"
-            verifier = argon2.createPasswordVerifier(req.newPassword)
-        } ?: throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
+        if (user.authVerifier == null) throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
+        user.authVerifierKind = "ARGON2_PROOF"
+        user.authVerifierSuiteId = "v1"
+        user.authVerifier = argon2.createPasswordVerifier(req.newPassword)
+        user.authVerifierCreatedAt = Instant.now()
         sessions.invalidateAll(user.id)
     }
 
@@ -239,7 +237,6 @@ class LoginHandler(
         emailChangeTokens.deleteByUserId(user.id)
         sessions.invalidateAll(user.id)
         keyBlobs.deleteByUserId(user.id)
-        authVerifiers.deleteByUserId(user.id)
         identityKeys.deleteByUserId(user.id)
         user.avatarObjectKey?.let { runCatching { store.delete(it) } }
         user.email = "deleted-${user.id}@deleted.veyq.local"
@@ -267,8 +264,8 @@ class LoginHandler(
         )
 
     private fun verifyPassword(user: User, password: String) {
-        val verifier = authVerifiers.findByUserId(user.id) ?: throw invalidCredentials()
-        if (verifier.kind != "ARGON2_PROOF" || !argon2.verifyPassword(password, verifier.verifier)) {
+        val verifier = user.authVerifier ?: throw invalidCredentials()
+        if (user.authVerifierKind != "ARGON2_PROOF" || user.authVerifierSuiteId != "v1" || !argon2.verifyPassword(password, verifier)) {
             throw invalidCredentials()
         }
     }

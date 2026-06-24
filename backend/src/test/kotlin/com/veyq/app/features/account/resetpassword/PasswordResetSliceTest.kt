@@ -4,8 +4,6 @@ import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.keymgmt.AuthVerifier
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.security.SessionService
@@ -34,7 +32,6 @@ import kotlin.test.assertTrue
 class PasswordResetSliceTest {
     @Inject lateinit var users: UserRepository
     @Inject lateinit var keyBlobs: KeyBlobRepository
-    @Inject lateinit var authVerifiers: AuthVerifierRepository
     @Inject lateinit var sessions: SessionService
     @Inject lateinit var mailbox: MockMailbox
     @Inject lateinit var argon2: Argon2Verifier
@@ -50,10 +47,14 @@ class PasswordResetSliceTest {
             if (users.findByEmail(email) != null) return@run
             val now = Instant.now()
             // a recoverable account: PASSWORD + RECOVERY wraps + an auth verifier
-            users.persist(User().apply { id = "pr-user"; this.email = this@PasswordResetSliceTest.email; displayName = "U"; serverRole = ServerRole.ServerMember; createdAt = now })
+            users.persist(User().apply {
+                id = "pr-user"; this.email = this@PasswordResetSliceTest.email
+                displayName = "U"; serverRole = ServerRole.ServerMember; createdAt = now
+                authVerifierKind = "ARGON2_PROOF"; authVerifierSuiteId = "v1"
+                authVerifier = argon2.createPasswordVerifier("old-password"); authVerifierCreatedAt = now
+            })
             keyBlobs.persist(KeyBlob().apply { id = "pr-pw"; userId = "pr-user"; unlockMethod = "PASSWORD"; suiteId = "v1"; wrappedKey = "old-pw".toByteArray(); kdfParams = "kp".toByteArray() })
             keyBlobs.persist(KeyBlob().apply { id = "pr-rec"; userId = "pr-user"; unlockMethod = "RECOVERY"; suiteId = "v1"; wrappedKey = "rec-wrap".toByteArray(); kdfParams = "rk".toByteArray(); recoveryAuthTag = "rec-tag".toByteArray() })
-            authVerifiers.persist(AuthVerifier().apply { id = "pr-av"; userId = "pr-user"; kind = "ARGON2_PROOF"; suiteId = "v1"; verifier = "old-v".toByteArray(); createdAt = now })
             // a non-recoverable account: PASSWORD only, no RECOVERY wrap
             users.persist(User().apply { id = "pr-norec"; this.email = noRecEmail; displayName = "N"; serverRole = ServerRole.ServerMember; createdAt = now })
             keyBlobs.persist(KeyBlob().apply { id = "pr-norec-pw"; userId = "pr-norec"; unlockMethod = "PASSWORD"; suiteId = "v1"; wrappedKey = "x".toByteArray() })
@@ -95,11 +96,12 @@ class PasswordResetSliceTest {
         QuarkusTransaction.requiringNew().run {
             val pw = keyBlobs.findByUserIdAndUnlockMethod("pr-user", "PASSWORD").first()
             assertEquals("new-pw", String(pw.wrappedKey))
-            val verifier = authVerifiers.findByUserId("pr-user")!!
-            assertEquals("ARGON2_PROOF", verifier.kind)
-            assertEquals("v1", verifier.suiteId)
-            assertTrue(argon2.verifyPassword(newPassword, verifier.verifier))
-            assertTrue(!argon2.verifyPassword("old-password", verifier.verifier))
+            val user = users.findById("pr-user")!!
+            assertEquals("ARGON2_PROOF", user.authVerifierKind)
+            assertEquals("v1", user.authVerifierSuiteId)
+            val verifier = user.authVerifier!!
+            assertTrue(argon2.verifyPassword(newPassword, verifier))
+            assertTrue(!argon2.verifyPassword("old-password", verifier))
         }
         // the old session was invalidated
         given().header("Authorization", session).get("/api/me").then().statusCode(401)
@@ -132,7 +134,7 @@ class PasswordResetSliceTest {
         // the attacker's password + PASSWORD wrap were NOT applied — the takeover is blocked. (Assert "not the
         // attacker's value" rather than an absolute, since the shared H2 may carry the happy-path's swap.)
         QuarkusTransaction.requiringNew().run {
-            assertTrue(!argon2.verifyPassword(newPassword, authVerifiers.findByUserId("pr-user")!!.verifier))
+            assertTrue(!argon2.verifyPassword(newPassword, users.findById("pr-user")!!.authVerifier!!))
             assertTrue(String(keyBlobs.findByUserIdAndUnlockMethod("pr-user", "PASSWORD").first().wrappedKey) != "attacker-pw")
         }
     }

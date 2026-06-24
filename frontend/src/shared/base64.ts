@@ -9,6 +9,13 @@ export function b64url(b: Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+/** Bytes -> unpadded standard base64, as required by PHC string fields. */
+export function phcB64(b: Uint8Array): string {
+  let s = ''
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
+  return btoa(s).replace(/=+$/, '')
+}
+
 /** base64url string (padded or not) → bytes. */
 export function fromB64url(s: string): Uint8Array {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/')

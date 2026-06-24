@@ -153,7 +153,9 @@ This spec governs **unlock** (client-side key crypto). **Auth** (proving identit
 session) is separate ([Security Model → key recovery / Secret Key](security-model.md)):
 - **password auth:** the server stores `Argon2id(NFC(password), authSalt)` (a *different* salt than the
   unlock KEK, and **without** the secret key — the server must verify from the password alone) and checks
-  it on login. The secret key never reaches the server, so this verifier does not yield the master key.
+  it on login. The stored verifier is a PHC string
+  (`$argon2id$v=19$m=32768,t=3,p=1$<salt>$<proof>`) on the user row, not an encrypted blob. The secret key
+  never reaches the server, so this verifier does not yield the master key.
 - **passkey auth:** the stored WebAuthn credential public key verifies assertions.
 
 The auth verifier and the unlock KEK are **independent derivations** from the password; holding one never
@@ -162,7 +164,7 @@ yields the other.
 ## 8. What the server stores (all opaque)
 
 Per user, in the blind key store: the **identity public bundle** (directory), the **wrapped identity
-private bundle**, **N `KeyBlob`s** (master-key wraps), and the **auth verifier(s)**. Never the master key,
+private bundle**, **N `KeyBlob`s** (master-key wraps), and the **auth verifier**. Never the master key,
 a KEK, the secret key, the recovery code, or any private key. Store-bytes === posted-bytes is asserted by
 the backend echo test.
 
