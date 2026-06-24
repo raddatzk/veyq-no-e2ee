@@ -1,0 +1,7 @@
+# Feature: account
+# Use-case: uc.account.delete-avatar
+# Use-case doc: ../../../../docs/wiki/features/account/use-cases/uc.account.delete-avatar.md
+
+### Delete current avatar
+DELETE {{baseUrl}}/api/me/avatar
+Authorization: Bearer {{sessionToken}}

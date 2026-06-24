@@ -35,5 +35,6 @@
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy — email is outside it),
   [Platform Concepts](../../../crosscutting/platform-concepts.md) (auth & sessions)
 - Decisions: [AD-08](../../../decisions/README.md) (Secret Key), [AD-31](../../../decisions/0031-profile-fields-server-visible.md) (profile fields server-visible)
+- HTTP client: [uc.account.change-email.http](../../../../../http/features/account/use-cases/uc.account.change-email.http)
 - Related use-cases: `uc.account.update-profile`, `uc.account.change-password`, `uc.account.login`,
   `uc.account.recover-keys`

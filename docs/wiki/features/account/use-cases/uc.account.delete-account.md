@@ -35,4 +35,5 @@
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (deletion & erasure, key hierarchy)
 - Decisions: [AD-10](../../../decisions/README.md) (deletion & erasure), [AD-02](../../../decisions/README.md) (E2EE)
+- HTTP client: [uc.account.delete-account.http](../../../../../http/features/account/use-cases/uc.account.delete-account.http)
 - Related use-cases: `uc.account.login`, `uc.account.recover-keys`

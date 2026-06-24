@@ -28,4 +28,5 @@
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (server-visible account metadata)
 - Decisions: [AD-31](../../../decisions/0031-profile-fields-server-visible.md)
+- HTTP client: [uc.account.delete-avatar.http](../../../../../http/features/account/use-cases/uc.account.delete-avatar.http)
 - Related use-cases: `uc.account.set-avatar`, `uc.account.update-profile`

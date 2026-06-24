@@ -34,4 +34,5 @@
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy, Secret Key, unlock wraps)
 - Decisions: [AD-08](../../../decisions/README.md) (Secret Key)
+- HTTP client: [uc.account.change-password.http](../../../../../http/features/account/use-cases/uc.account.change-password.http)
 - Related use-cases: `uc.account.login`, `uc.account.reset-password`, `uc.keys.upsert-unlock-wrap`

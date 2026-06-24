@@ -40,4 +40,5 @@
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key recovery, Secret Key, key hierarchy)
 - Decisions: [AD-06](../../../decisions/README.md) (recovery), [AD-08](../../../decisions/README.md) (Secret Key)
+- HTTP client: [uc.account.reset-password.http](../../../../../http/features/account/use-cases/uc.account.reset-password.http)
 - Related use-cases: `uc.account.login`, `uc.account.change-password`, `uc.account.recover-keys`

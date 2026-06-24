@@ -1,0 +1,20 @@
+# Feature: account
+# Use-case: uc.account.change-email
+# Use-case doc: ../../../../docs/wiki/features/account/use-cases/uc.account.change-email.md
+
+### Request email change
+POST {{baseUrl}}/api/me/email-change/request
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "newEmail": "{{accountNewEmail}}"
+}
+
+### Confirm email change
+POST {{baseUrl}}/api/me/email-change/confirm
+Content-Type: application/json
+
+{
+  "token": "{{emailChangeToken}}"
+}

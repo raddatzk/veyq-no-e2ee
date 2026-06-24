@@ -31,4 +31,5 @@
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (server-visible operational metadata)
 - Decisions: [AD-31](../../../decisions/0031-profile-fields-server-visible.md)
+- HTTP client: [uc.account.update-profile.http](../../../../../http/features/account/use-cases/uc.account.update-profile.http)
 - Related use-cases: `uc.account.change-email`, `uc.account.set-avatar`, `uc.account.change-password`
