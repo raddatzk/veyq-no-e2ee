@@ -39,23 +39,23 @@ public enum Login {
         public let scopePublicKey: KemPublicKeyDTO
         public let wrappedScopePrivateKey: BlobDTO
     }
-    struct LoginRequestDTO: Codable { let email: String; let password: String; let deviceRef: String? }
-    struct LoginResponseDTO: Codable { let sessionToken: String; let deviceRef: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
+    struct LoginRequestDTO: Codable { let email: String; let password: String }
+    struct LoginResponseDTO: Codable { let sessionToken: String; let rootSessionId: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
 
     public struct UnlockedSession: Sendable {
         public let sessionToken: String
-        public let deviceRef: String
+        public let rootSessionId: String
         public let user: UserSummaryDTO
         public let identity: V1.IdentityPrivate
         public let kemPublicKey: Data
         public let masterKey: Data
     }
 
-    public static func login(apiBase: String, email: String, password: String, secretKeyB64: String, deviceRef: String? = nil) async throws -> UnlockedSession {
+    public static func login(apiBase: String, email: String, password: String, secretKeyB64: String) async throws -> UnlockedSession {
         var request = URLRequest(url: URL(string: "\(apiBase)/api/login")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(LoginRequestDTO(email: email, password: password, deviceRef: deviceRef))
+        request.httpBody = try JSONEncoder().encode(LoginRequestDTO(email: email, password: password))
         let (data, resp) = try await URLSession.shared.data(for: request)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
             throw NSError(domain: "veyq.login", code: 1,
@@ -75,7 +75,7 @@ public enum Login {
         let identity = V1.deserializeIdentityPrivate(privBytes)
 
         return UnlockedSession(
-            sessionToken: body.sessionToken, deviceRef: body.deviceRef, user: body.user, identity: identity,
+            sessionToken: body.sessionToken, rootSessionId: body.rootSessionId, user: body.user, identity: identity,
             kemPublicKey: b64urlDecode(body.keyBag.identityPublicKey.kemPublicKey), masterKey: masterKey)
     }
 

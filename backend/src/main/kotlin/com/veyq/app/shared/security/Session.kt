@@ -1,5 +1,6 @@
 package com.veyq.app.shared.security
 
+import com.veyq.app.shared.config.SessionConfig
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
@@ -14,41 +15,36 @@ import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 
+const val LOGIN_METHOD_PASSWORD = "PASSWORD"
+const val SESSION_REVOKED_LOGOUT = "LOGOUT"
+const val SESSION_REVOKED_ROTATED = "ROTATED"
+const val SESSION_REVOKED_REUSE_DETECTED = "REUSE_DETECTED"
+const val SESSION_REVOKED_REMOTE = "REMOTE_LOGOUT"
+const val SESSION_REVOKED_ALL = "REVOKE_ALL"
+
 /**
- * An opaque bearer session. The token proves identity to the server; it unlocks no content.
+ * An opaque bearer session version. One login creates a session family (`root_session_id`); each refresh
+ * appends a new version and marks the previous one rotated so reuse can be detected.
  *
- * Only the SHA-256 of the bearer token is stored (`token_hash`), never the raw token: a DB dump then
- * yields no usable bearer credential (the raw token is high-entropy random, so the hash is not reversible).
- * The client holds the raw token; the server hashes every presented token and looks it up by hash.
+ * Only SHA-256 token hashes are stored, never raw tokens. The session proves server identity only; it
+ * unlocks no content and carries no key material.
  */
 @Entity
 @Table(name = "veyq_session")
 class Session {
     @Id var id: String = ""
+    @Column(name = "root_session_id") var rootSessionId: String = ""
+    @Column(name = "parent_session_id") var parentSessionId: String? = null
     @Column(name = "token_hash", nullable = false, unique = true) var tokenHash: String = ""
     @Column(name = "refresh_token_hash", unique = true) var refreshTokenHash: String? = null
     @Column(name = "user_id", nullable = false) var userId: String = ""
-    @Column(name = "device_ref") var deviceRef: String? = null
-    @Column(name = "device_name", columnDefinition = "TEXT") var deviceName: String? = null
+    @Column(name = "encrypted_label", columnDefinition = "TEXT") var encryptedLabel: String? = null
+    @Column(name = "login_method") var loginMethod: String = LOGIN_METHOD_PASSWORD
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
     @Column(name = "expires_at", nullable = false) var expiresAt: Instant = Instant.EPOCH
     @Column(name = "refresh_expires_at") var refreshExpiresAt: Instant? = null
-}
-
-@ApplicationScoped
-class SessionRepository : PanacheRepositoryBase<Session, String> {
-    fun findByTokenHash(tokenHash: String): Session? = find("tokenHash", tokenHash).firstResult()
-    fun findByRefreshTokenHash(refreshTokenHash: String): Session? = find("refreshTokenHash", refreshTokenHash).firstResult()
-    fun listDevicesByUserId(userId: String, now: Instant): List<Session> =
-        list("userId = ?1 and deviceRef is not null and (expiresAt >= ?2 or refreshExpiresAt >= ?2)", userId, now)
-    fun deleteByUserId(userId: String): Long = delete("userId", userId)
-    fun updateDeviceName(userId: String, deviceRef: String, encryptedDeviceName: String): Int =
-        update("deviceName = ?1 where userId = ?2 and deviceRef = ?3", encryptedDeviceName, userId, deviceRef)
-    fun deleteByUserIdAndDeviceRef(userId: String, deviceRef: String): Long =
-        delete("userId = ?1 and deviceRef = ?2", userId, deviceRef)
-    fun deleteByTokenHash(tokenHash: String): Long = delete("tokenHash", tokenHash)
-    fun deleteByRefreshTokenHash(refreshTokenHash: String): Long = delete("refreshTokenHash", refreshTokenHash)
-    fun deleteExpired(now: Instant): Long = delete("expiresAt < ?1 and (refreshExpiresAt is null or refreshExpiresAt < ?1)", now)
+    @Column(name = "revoked_at") var revokedAt: Instant? = null
+    @Column(name = "revoked_reason") var revokedReason: String? = null
 }
 
 data class IssuedSession(
@@ -56,15 +52,58 @@ data class IssuedSession(
     val refreshToken: String,
     val refreshExpiresAt: Instant,
     val refreshMaxAgeSeconds: Long,
-    val deviceRef: String,
+    val rootSessionId: String,
+)
+
+data class LoginSessionFamily(
+    val rootSessionId: String,
+    val encryptedLabel: String,
+    val loginMethod: String,
+    val createdAt: Instant,
+    val lastUsedAt: Instant,
 )
 
 @ApplicationScoped
-class SessionService(private val sessions: SessionRepository, config: com.veyq.app.shared.config.SessionConfig) {
+class SessionRepository : PanacheRepositoryBase<Session, String> {
+    fun findByTokenHash(tokenHash: String): Session? = find("tokenHash", tokenHash).firstResult()
+    fun findByRefreshTokenHash(refreshTokenHash: String): Session? = find("refreshTokenHash", refreshTokenHash).firstResult()
+    fun listByUserId(userId: String): List<Session> = list("userId", userId)
+    fun updateFamilyLabel(userId: String, rootSessionId: String, encryptedLabel: String): Int =
+        update("encryptedLabel = ?1 where userId = ?2 and rootSessionId = ?3", encryptedLabel, userId, rootSessionId)
+    fun revokeByUserId(userId: String, revokedAt: Instant, reason: String): Long =
+        update("revokedAt = ?1, revokedReason = ?2 where userId = ?3 and revokedAt is null", revokedAt, reason, userId).toLong()
+    fun revokeFamily(userId: String, rootSessionId: String, revokedAt: Instant, reason: String): Long =
+        update(
+            "revokedAt = ?1, revokedReason = ?2 where userId = ?3 and rootSessionId = ?4 and revokedAt is null",
+            revokedAt,
+            reason,
+            userId,
+            rootSessionId,
+        ).toLong()
+    fun flagFamilyReuseDetected(userId: String, rootSessionId: String, revokedAt: Instant): Long =
+        update(
+            "revokedAt = ?1, revokedReason = ?2 where userId = ?3 and rootSessionId = ?4",
+            revokedAt,
+            SESSION_REVOKED_REUSE_DETECTED,
+            userId,
+            rootSessionId,
+        ).toLong()
+    fun deleteExpired(cutoff: Instant): Long =
+        delete(
+            "(revokedAt is not null and revokedAt < ?1) or " +
+                "(revokedAt is null and refreshExpiresAt is not null and refreshExpiresAt < ?1) or " +
+                "(revokedAt is null and refreshExpiresAt is null and expiresAt < ?1)",
+            cutoff,
+        )
+}
+
+@ApplicationScoped
+class SessionService(private val sessions: SessionRepository, config: SessionConfig) {
     private val rng = SecureRandom()
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private val accessTtl: Duration = config.accessTtl()
     private val refreshTtl: Duration = config.refreshTtl()
+    private val auditRetention: Duration = config.auditRetention()
 
     /** SHA-256(token), base64url — what we persist and look up by. The raw token never touches the DB. */
     private fun hash(token: String): String =
@@ -76,25 +115,26 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
     }
 
     @Transactional
-    fun issuePair(userId: String, deviceRef: String? = null): IssuedSession {
+    fun issuePair(userId: String, loginMethod: String = LOGIN_METHOD_PASSWORD): IssuedSession {
         val accessToken = randomToken()
         val refreshToken = randomToken()
-        val resolvedDeviceRef = deviceRef?.trim()?.takeIf { it.isNotBlank() } ?: randomToken()
+        val rootSessionId = UUID.randomUUID().toString()
         val now = Instant.now()
         val refreshExpiresAt = now.plus(refreshTtl)
         sessions.persist(
             Session().apply {
-                id = UUID.randomUUID().toString()
+                id = rootSessionId
+                this.rootSessionId = rootSessionId
                 this.tokenHash = hash(accessToken)
                 this.refreshTokenHash = hash(refreshToken)
                 this.userId = userId
-                this.deviceRef = resolvedDeviceRef
+                this.loginMethod = loginMethod
                 createdAt = now
                 expiresAt = now.plus(accessTtl)
                 this.refreshExpiresAt = refreshExpiresAt
             },
         )
-        return IssuedSession(accessToken, refreshToken, refreshExpiresAt, refreshTtl.seconds, resolvedDeviceRef)
+        return IssuedSession(accessToken, refreshToken, refreshExpiresAt, refreshTtl.seconds, rootSessionId)
     }
 
     @Transactional
@@ -103,57 +143,104 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
     @Transactional
     fun refresh(refreshToken: String?): IssuedSession? {
         val token = refreshToken?.takeIf { it.isNotBlank() } ?: return null
-        val session = sessions.findByRefreshTokenHash(hash(token)) ?: return null
+        val previous = sessions.findByRefreshTokenHash(hash(token)) ?: return null
         val now = Instant.now()
-        if ((session.refreshExpiresAt ?: Instant.EPOCH).isBefore(now)) {
-            sessions.delete(session)
+        val rootSessionId = previous.rootSessionId.ifBlank { previous.id }
+        if (previous.revokedAt != null) {
+            if (previous.revokedReason == SESSION_REVOKED_ROTATED) {
+                sessions.flagFamilyReuseDetected(previous.userId, rootSessionId, now)
+            }
             return null
         }
+        if ((previous.refreshExpiresAt ?: Instant.EPOCH).isBefore(now)) {
+            return null
+        }
+
         val nextAccessToken = randomToken()
         val nextRefreshToken = randomToken()
         val nextRefreshExpiresAt = now.plus(refreshTtl)
-        session.tokenHash = hash(nextAccessToken)
-        session.refreshTokenHash = hash(nextRefreshToken)
-        session.expiresAt = now.plus(accessTtl)
-        session.refreshExpiresAt = nextRefreshExpiresAt
-        return IssuedSession(nextAccessToken, nextRefreshToken, nextRefreshExpiresAt, refreshTtl.seconds, session.deviceRef ?: randomToken())
+        previous.revokedAt = now
+        previous.revokedReason = SESSION_REVOKED_ROTATED
+        sessions.persist(
+            Session().apply {
+                id = UUID.randomUUID().toString()
+                this.rootSessionId = rootSessionId
+                parentSessionId = previous.id
+                tokenHash = hash(nextAccessToken)
+                refreshTokenHash = hash(nextRefreshToken)
+                userId = previous.userId
+                encryptedLabel = previous.encryptedLabel
+                loginMethod = previous.loginMethod
+                createdAt = now
+                expiresAt = now.plus(accessTtl)
+                refreshExpiresAt = nextRefreshExpiresAt
+            },
+        )
+        return IssuedSession(nextAccessToken, nextRefreshToken, nextRefreshExpiresAt, refreshTtl.seconds, rootSessionId)
     }
 
-    /** Invalidates every session for a user (instant token revocation). Returns how many were dropped. */
+    /** Revokes every active session for a user. Returns how many rows were newly revoked. */
     @Transactional
-    fun invalidateAll(userId: String): Long = sessions.deleteByUserId(userId)
+    fun invalidateAll(userId: String, reason: String = SESSION_REVOKED_ALL): Long =
+        sessions.revokeByUserId(userId, Instant.now(), reason)
 
     @Transactional
-    fun listDevices(userId: String): List<Session> = sessions.listDevicesByUserId(userId, Instant.now())
+    fun listLoginSessions(userId: String): List<LoginSessionFamily> {
+        val now = Instant.now()
+        return sessions.listByUserId(userId)
+            .groupBy { it.rootSessionId.ifBlank { it.id } }
+            .values
+            .mapNotNull { family ->
+                val active = family.filter { it.revokedAt == null && ((it.refreshExpiresAt ?: it.expiresAt).isAfter(now)) }
+                if (active.isEmpty()) return@mapNotNull null
+                val root = family.minBy { it.createdAt }
+                val latest = active.maxBy { it.createdAt }
+                LoginSessionFamily(
+                    rootSessionId = root.rootSessionId.ifBlank { root.id },
+                    encryptedLabel = latest.encryptedLabel ?: "",
+                    loginMethod = root.loginMethod,
+                    createdAt = root.createdAt,
+                    lastUsedAt = latest.createdAt,
+                )
+            }
+            .sortedByDescending { it.lastUsedAt }
+    }
 
     @Transactional
-    fun renameDevice(userId: String, deviceRef: String, encryptedDeviceName: String): Int =
-        sessions.updateDeviceName(userId, deviceRef, encryptedDeviceName)
+    fun renameLoginSession(userId: String, rootSessionId: String, encryptedLabel: String): Int =
+        sessions.updateFamilyLabel(userId, rootSessionId, encryptedLabel)
 
     @Transactional
-    fun invalidateDevice(userId: String, deviceRef: String): Long = sessions.deleteByUserIdAndDeviceRef(userId, deviceRef)
+    fun invalidateLoginSession(userId: String, rootSessionId: String, reason: String = SESSION_REVOKED_REMOTE): Long =
+        sessions.revokeFamily(userId, rootSessionId, Instant.now(), reason)
 
-    /** Drop every expired session row (the scheduled GC sweep). Returns how many were purged. */
+    /** Drop audit-retained rows after the retention window. Returns how many were purged. */
     @Transactional
-    fun purgeExpired(): Long = sessions.deleteExpired(Instant.now())
+    fun purgeExpired(): Long = sessions.deleteExpired(Instant.now().minus(auditRetention))
 
-    /** Logout: drop the whole access/refresh family for either the bearer token or its refresh cookie. */
+    /** Logout: revoke the whole access/refresh family for either the bearer token or its refresh cookie. */
     @Transactional
     fun invalidate(authorizationHeader: String?, refreshToken: String? = null): Boolean {
-        val accessToken = bearer(authorizationHeader)
-        if (accessToken != null && sessions.deleteByTokenHash(hash(accessToken)) > 0) return true
-        val refresh = refreshToken?.takeIf { it.isNotBlank() }
-        if (refresh != null && sessions.deleteByRefreshTokenHash(hash(refresh)) > 0) return true
+        val now = Instant.now()
+        val accessSession = bearer(authorizationHeader)?.let { sessions.findByTokenHash(hash(it)) }
+        if (accessSession != null) {
+            sessions.revokeFamily(accessSession.userId, accessSession.rootSessionId.ifBlank { accessSession.id }, now, SESSION_REVOKED_LOGOUT)
+            return true
+        }
+        val refreshSession = refreshToken?.takeIf { it.isNotBlank() }?.let { sessions.findByRefreshTokenHash(hash(it)) }
+        if (refreshSession != null) {
+            sessions.revokeFamily(refreshSession.userId, refreshSession.rootSessionId.ifBlank { refreshSession.id }, now, SESSION_REVOKED_LOGOUT)
+            return true
+        }
         return false
     }
 
-    /** Resolves a `Bearer <token>` header to a user id, or null if missing/unknown/expired. */
+    /** Resolves a `Bearer <token>` header to a user id, or null if missing/unknown/expired/revoked. */
     @Transactional
     fun resolve(authorizationHeader: String?): String? {
         val token = bearer(authorizationHeader) ?: return null
-        val tokenHash = hash(token)
-        val session = sessions.findByTokenHash(tokenHash) ?: return null
-        if (session.expiresAt.isBefore(Instant.now())) {
+        val session = sessions.findByTokenHash(hash(token)) ?: return null
+        if (session.revokedAt != null || session.expiresAt.isBefore(Instant.now())) {
             return null
         }
         return session.userId

@@ -34,7 +34,7 @@ import kotlin.coroutines.resume
  * `setInvalidatedByBiometricEnrollment` drops the key if a new fingerprint is enrolled (the user re-logs in).
  */
 object DeviceUnlock {
-    data class Creds(val apiBase: String, val email: String, val password: String, val secretKey: String, val deviceRef: String? = null)
+    data class Creds(val apiBase: String, val email: String, val password: String, val secretKey: String)
 
     private const val PREFS = "veyq_device_unlock"
     private const val KEY_ALIAS = "veyq_device_unlock_rsa"
@@ -74,7 +74,6 @@ object DeviceUnlock {
         ensureKey()
         val json = JSONObject().put("apiBase", creds.apiBase).put("email", creds.email)
             .put("password", creds.password).put("secretKey", creds.secretKey)
-        if (!creds.deviceRef.isNullOrBlank()) json.put("deviceRef", creds.deviceRef)
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         val aesKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
@@ -115,7 +114,7 @@ object DeviceUnlock {
                 init(Cipher.DECRYPT_MODE, SecretKeySpec(aesKey, "AES"), GCMParameterSpec(128, iv)); doFinal(ct)
             }
             val o = JSONObject(String(json, Charsets.UTF_8))
-            Creds(o.getString("apiBase"), o.getString("email"), o.getString("password"), o.getString("secretKey"), o.optString("deviceRef").ifBlank { null })
+            Creds(o.getString("apiBase"), o.getString("email"), o.getString("password"), o.getString("secretKey"))
         }.getOrNull()
     }
 

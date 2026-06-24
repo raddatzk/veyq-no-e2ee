@@ -14,7 +14,6 @@ export * from './GroupLifecycleApi';
 export * from './GroupMembersApi';
 export * from './IdentityGrantsApi';
 export * from './IdentityRotationApi';
-export * from './LoginDevicesApi';
 export * from './MasterKeyWrapsApi';
 export * from './MediaApi';
 export * from './MediaBatchApi';

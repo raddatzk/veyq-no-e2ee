@@ -12,6 +12,9 @@ import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
+import com.veyq.app.shared.security.SESSION_REVOKED_REUSE_DETECTED
+import com.veyq.app.shared.security.SESSION_REVOKED_ROTATED
+import com.veyq.app.shared.security.SessionRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
@@ -26,6 +29,8 @@ import org.hamcrest.Matchers.notNullValue
 import org.junit.jupiter.api.BeforeEach
 import java.time.Instant
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
@@ -37,6 +42,7 @@ class LoginSliceTest {
     @Inject lateinit var scopes: ScopeRepository
     @Inject lateinit var grants: ScopeGrantRepository
     @Inject lateinit var argon2: Argon2Verifier
+    @Inject lateinit var sessionRows: SessionRepository
 
     private val email = "login@example.com"
     private val password = "correct horse battery staple"
@@ -45,6 +51,7 @@ class LoginSliceTest {
     @BeforeEach
     fun seed() {
         QuarkusTransaction.requiringNew().run {
+            sessionRows.delete("userId", "login-user")
             users.findByEmail(email)?.let {
                 it.displayName = "Login User"
                 return@run
@@ -88,7 +95,7 @@ class LoginSliceTest {
     @Test
     fun loginUnlockAndSession() {
         // 1. login returns a session token + the wrapped key bag (ciphertext only)
-        val sessionToken = given().contentType(ContentType.JSON)
+        val loginResponse = given().contentType(ContentType.JSON)
             .body("""{"email":"$email","password":"$password"}""")
             .post("/api/login")
             .then().statusCode(200)
@@ -100,7 +107,18 @@ class LoginSliceTest {
             .body("keyBag.masterKeyWraps[0].unlockMethod", `is`("PASSWORD"))
             .body("keyBag.masterKeyWraps[0].wrappedKey", `is`("AQIDBA")) // base64url(01020304)
             .body("keyBag.masterKeyWraps[0].kdfParams", `is`("BQYHCA")) // base64url(05060708)
-            .extract().path<String>("sessionToken")
+            .body("rootSessionId", `is`(not(emptyString())))
+            .extract()
+        val sessionToken = loginResponse.path<String>("sessionToken")
+        val rootSessionId = loginResponse.path<String>("rootSessionId")
+
+        QuarkusTransaction.requiringNew().run {
+            val root = sessionRows.findById(rootSessionId)
+            assertNotNull(root)
+            assertEquals(rootSessionId, root.rootSessionId)
+            assertEquals(null, root.parentSessionId)
+            assertEquals("PASSWORD", root.loginMethod)
+        }
 
         // 2. the session resolves
         given().header("Authorization", "Bearer $sessionToken")
@@ -154,6 +172,7 @@ class LoginSliceTest {
             .extract()
 
         val firstAccessToken = loginResponse.path<String>("sessionToken")
+        val rootSessionId = loginResponse.path<String>("rootSessionId")
         val firstRefreshToken = loginResponse.cookie("VEYQ_REFRESH_TOKEN")
 
         val refreshResponse = given()
@@ -166,6 +185,16 @@ class LoginSliceTest {
 
         val secondAccessToken = refreshResponse.path<String>("sessionToken")
         val secondRefreshToken = refreshResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        QuarkusTransaction.requiringNew().run {
+            val family = sessionRows.listByUserId("login-user").filter { it.rootSessionId == rootSessionId }
+            assertEquals(2, family.size)
+            val root = family.single { it.id == rootSessionId }
+            val child = family.single { it.parentSessionId == rootSessionId }
+            assertEquals(SESSION_REVOKED_ROTATED, root.revokedReason)
+            assertNotNull(root.revokedAt)
+            assertEquals(null, child.revokedAt)
+        }
 
         given().header("Authorization", "Bearer $firstAccessToken")
             .get("/api/me")
@@ -181,11 +210,21 @@ class LoginSliceTest {
             .post("/api/auth/refresh")
             .then().statusCode(401)
 
+        QuarkusTransaction.requiringNew().run {
+            sessionRows.listByUserId("login-user").filter { it.rootSessionId == rootSessionId }.forEach {
+                assertEquals(SESSION_REVOKED_REUSE_DETECTED, it.revokedReason)
+                assertNotNull(it.revokedAt)
+            }
+        }
+
+        given().header("Authorization", "Bearer $secondAccessToken")
+            .get("/api/me")
+            .then().statusCode(401)
+
         given()
             .cookie("VEYQ_REFRESH_TOKEN", secondRefreshToken)
             .post("/api/auth/refresh")
-            .then().statusCode(200)
-            .body("sessionToken", `is`(not(secondAccessToken)))
+            .then().statusCode(401)
     }
 
     @Test
@@ -224,6 +263,58 @@ class LoginSliceTest {
         given()
             .cookie("VEYQ_REFRESH_TOKEN", currentRefreshToken)
             .post("/api/auth/refresh")
+            .then().statusCode(401)
+    }
+
+    @Test
+    fun managesLoginSessionFamilies() {
+        val loginResponse = given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","password":"$password"}""")
+            .post("/api/login")
+            .then().statusCode(200)
+            .extract()
+
+        val token = loginResponse.path<String>("sessionToken")
+        val rootSessionId = loginResponse.path<String>("rootSessionId")
+        val refreshToken = loginResponse.cookie("VEYQ_REFRESH_TOKEN")
+
+        given().header("Authorization", "Bearer $token")
+            .get("/api/me/login-sessions")
+            .then().statusCode(200)
+            .body("sessions.size()", `is`(1))
+            .body("sessions[0].rootSessionId", `is`(rootSessionId))
+            .body("sessions[0].loginMethod", `is`("PASSWORD"))
+
+        given().header("Authorization", "Bearer $token")
+            .contentType(ContentType.JSON)
+            .body("""{"encryptedLabel":"sealed-label"}""")
+            .put("/api/me/login-sessions/$rootSessionId")
+            .then().statusCode(204)
+
+        given().header("Authorization", "Bearer $token")
+            .get("/api/me/login-sessions")
+            .then().statusCode(200)
+            .body("sessions[0].encryptedLabel", `is`("sealed-label"))
+
+        val refreshedToken = given()
+            .cookie("VEYQ_REFRESH_TOKEN", refreshToken)
+            .post("/api/auth/refresh")
+            .then().statusCode(200)
+            .extract().path<String>("sessionToken")
+
+        given().header("Authorization", "Bearer $refreshedToken")
+            .get("/api/me/login-sessions")
+            .then().statusCode(200)
+            .body("sessions.size()", `is`(1))
+            .body("sessions[0].rootSessionId", `is`(rootSessionId))
+            .body("sessions[0].encryptedLabel", `is`("sealed-label"))
+
+        given().header("Authorization", "Bearer $refreshedToken")
+            .delete("/api/me/login-sessions/$rootSessionId")
+            .then().statusCode(204)
+
+        given().header("Authorization", "Bearer $refreshedToken")
+            .get("/api/me")
             .then().statusCode(401)
     }
 

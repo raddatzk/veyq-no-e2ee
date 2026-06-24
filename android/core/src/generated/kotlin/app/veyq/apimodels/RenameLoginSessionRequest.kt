@@ -32,14 +32,14 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param encryptedName 
+ * @param encryptedLabel 
  */
 @Serializable
 
-data class RenameLoginDeviceRequest (
+data class RenameLoginSessionRequest (
 
-    @SerialName(value = "encryptedName")
-    val encryptedName: kotlin.String
+    @SerialName(value = "encryptedLabel")
+    val encryptedLabel: kotlin.String
 
 ) {
 

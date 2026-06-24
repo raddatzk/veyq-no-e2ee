@@ -7,7 +7,7 @@ import Security
 /// launch, one biometric prompt yields the credentials and we re-login. No app-side crypto — the Keychain
 /// is the secure store.
 enum DeviceUnlock {
-    struct Creds: Codable { let apiBase, email, password, secretKey: String; let deviceRef: String? }
+    struct Creds: Codable { let apiBase, email, password, secretKey: String }
 
     private static let service = "app.veyq.deviceUnlock"
     private static let account = "credentials"

@@ -14,21 +14,21 @@ import AnyCodable
 public struct LoginResponse: Codable {
 
     public private(set) var sessionToken: String
-    /** Stable opaque login-device identifier attached to the issued session. */
-    public private(set) var deviceRef: String
+    /** Stable root login-session identifier attached to the issued session family. */
+    public private(set) var rootSessionId: String
     public private(set) var user: UserSummary
     public private(set) var keyBag: KeyBag
 
-    public init(sessionToken: String, deviceRef: String, user: UserSummary, keyBag: KeyBag) {
+    public init(sessionToken: String, rootSessionId: String, user: UserSummary, keyBag: KeyBag) {
         self.sessionToken = sessionToken
-        self.deviceRef = deviceRef
+        self.rootSessionId = rootSessionId
         self.user = user
         self.keyBag = keyBag
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case sessionToken
-        case deviceRef
+        case rootSessionId
         case user
         case keyBag
     }
@@ -38,9 +38,8 @@ public struct LoginResponse: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(sessionToken, forKey: .sessionToken)
-        try container.encode(deviceRef, forKey: .deviceRef)
+        try container.encode(rootSessionId, forKey: .rootSessionId)
         try container.encode(user, forKey: .user)
         try container.encode(keyBag, forKey: .keyBag)
     }
 }
-

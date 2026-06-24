@@ -15,19 +15,15 @@ public struct LoginRequest: Codable {
 
     public private(set) var email: String
     public private(set) var password: String
-    /** Optional stable client-generated login device identifier to attach to the issued session. */
-    public private(set) var deviceRef: String?
 
-    public init(email: String, password: String, deviceRef: String? = nil) {
+    public init(email: String, password: String) {
         self.email = email
         self.password = password
-        self.deviceRef = deviceRef
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case email
         case password
-        case deviceRef
     }
 
     // Encodable protocol methods
@@ -36,7 +32,5 @@ public struct LoginRequest: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(email, forKey: .email)
         try container.encode(password, forKey: .password)
-        try container.encodeIfPresent(deviceRef, forKey: .deviceRef)
     }
 }
-

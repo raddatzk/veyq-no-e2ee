@@ -72,7 +72,7 @@ acceptanceCriteria:
   coverage:
     backend:
       integration:
-      - testName: purgeExpiredDropsOnlyExpiredRows
+      - testName: purgeExpiredDropsOnlyRowsPastAuditRetention
         kind: positive
         ref: backend/src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt
 - id: uc.account.login.remembered-secret-key

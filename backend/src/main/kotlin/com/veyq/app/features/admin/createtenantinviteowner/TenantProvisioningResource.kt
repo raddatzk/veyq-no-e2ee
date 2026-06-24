@@ -14,13 +14,10 @@ import jakarta.ws.rs.core.Response
 class TenantProvisioningResource(
     private val handler: TenantProvisioningHandler,
     private val currentTenant: CurrentTenantResolver,
-) : TenantLifecycleApi, TenantBrandingApi, CurrentTenantApi {
+) : TenantLifecycleApi {
 
     override fun createTenant(authorization: String, createTenantRequest: CreateTenantRequest): Response =
         Response.ok(handler.createTenant(authorization, createTenantRequest)).build()
-
-    override fun getCurrentTenant(authorization: String): Response =
-        Response.ok(handler.currentTenant(authorization, currentTenant.currentTenant())).build()
 
     override fun deleteTenant(authorization: String): Response {
         val tenantId = currentTenant.currentTenantId()
@@ -33,7 +30,13 @@ class TenantProvisioningResource(
         handler.cancelTenantDeletion(authorization, tenantId)
         return Response.noContent().build()
     }
+}
 
+@ApplicationScoped
+class TenantBrandingResource(
+    private val handler: TenantProvisioningHandler,
+    private val currentTenant: CurrentTenantResolver,
+) : TenantBrandingApi {
     override fun uploadTenantLogo(authorization: String, uploadTenantLogoRequest: UploadTenantLogoRequest): Response =
         Response.ok(handler.uploadTenantLogo(authorization, currentTenant.currentTenantId(), uploadTenantLogoRequest)).build()
 
@@ -44,5 +47,13 @@ class TenantProvisioningResource(
         val logo = handler.getTenantLogo(currentTenant.currentTenantId())
         return Response.ok(logo.bytes, logo.contentType).build()
     }
+}
 
+@ApplicationScoped
+class CurrentTenantResource(
+    private val handler: TenantProvisioningHandler,
+    private val currentTenant: CurrentTenantResolver,
+) : CurrentTenantApi {
+    override fun getCurrentTenant(authorization: String): Response =
+        Response.ok(handler.currentTenant(authorization, currentTenant.currentTenant())).build()
 }

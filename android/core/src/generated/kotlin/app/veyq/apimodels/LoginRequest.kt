@@ -34,7 +34,6 @@ import kotlinx.serialization.Contextual
  *
  * @param email 
  * @param password 
- * @param deviceRef Optional stable client-generated login device identifier to attach to the issued session.
  */
 @Serializable
 
@@ -44,14 +43,9 @@ data class LoginRequest (
     val email: kotlin.String,
 
     @SerialName(value = "password")
-    val password: kotlin.String,
-
-    /* Optional stable client-generated login device identifier to attach to the issued session. */
-    @SerialName(value = "deviceRef")
-    val deviceRef: kotlin.String? = null
+    val password: kotlin.String
 
 ) {
 
 
 }
-

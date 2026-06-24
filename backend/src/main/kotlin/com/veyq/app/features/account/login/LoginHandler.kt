@@ -100,11 +100,11 @@ class LoginHandler(
             masterKeyWraps = keyBlobs.listByUserId(user.id).filter { it.unlockMethod != "RECOVERY" }.map(::toWrap),
         )
 
-        val issued = sessions.issuePair(user.id, req.deviceRef)
+        val issued = sessions.issuePair(user.id)
         return LoginResult(
             response = LoginResponse(
                 sessionToken = issued.accessToken,
-                deviceRef = issued.deviceRef,
+                rootSessionId = issued.rootSessionId,
                 user = avatarUrls.currentUserSummary(user),
                 keyBag = keyBag,
             ),

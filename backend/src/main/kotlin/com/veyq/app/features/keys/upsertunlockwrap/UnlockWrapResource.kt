@@ -12,8 +12,7 @@ import jakarta.ws.rs.core.Response
 class UnlockWrapResource(
     private val unlockWraps: UnlockWrapHandler,
     private val removeUnlockWraps: com.veyq.app.features.keys.removeunlockwrap.RemoveUnlockWrapHandler,
-    private val scopeGrants: com.veyq.app.features.keys.rewrapscopegrant.ScopeGrantRewrapHandler,
-) : MasterKeyWrapsApi, ScopeGrantsApi {
+) : MasterKeyWrapsApi {
     override fun listMyKeyWraps(authorization: String): Response =
         Response.ok(unlockWraps.listMyKeyWraps(authorization)).build()
 
@@ -28,7 +27,12 @@ class UnlockWrapResource(
         removeUnlockWraps.removeMyMasterKeyWrap(authorization, unlockMethod, credentialRef)
         return Response.noContent().build()
     }
+}
 
+@ApplicationScoped
+class ScopeGrantsResource(
+    private val scopeGrants: com.veyq.app.features.keys.rewrapscopegrant.ScopeGrantRewrapHandler,
+) : ScopeGrantsApi {
     override fun rewrapMyScopeGrant(
         authorization: String,
         scopeId: String,

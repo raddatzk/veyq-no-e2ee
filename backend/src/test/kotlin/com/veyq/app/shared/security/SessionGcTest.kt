@@ -36,31 +36,39 @@ class SessionGcTest {
         }
     }
 
-    private fun seed(token: String, expiresAt: Instant) {
+    private fun seed(token: String, expiresAt: Instant, revokedAt: Instant? = null) {
         QuarkusTransaction.requiringNew().run {
             sessions.persist(
                 Session().apply {
                     id = UUID.randomUUID().toString(); this.tokenHash = token; userId = "gc-user"
+                    rootSessionId = id
                     createdAt = Instant.now().minus(40, ChronoUnit.DAYS); this.expiresAt = expiresAt
+                    this.revokedAt = revokedAt
                 },
             )
         }
     }
 
     @Test
-    fun purgeExpiredDropsOnlyExpiredRows() {
+    fun purgeExpiredDropsOnlyRowsPastAuditRetention() {
         val now = Instant.now()
-        seed("gc-expired", now.minus(1, ChronoUnit.DAYS))
+        seed("gc-expired-old", now.minus(31, ChronoUnit.DAYS))
+        seed("gc-expired-recent", now.minus(1, ChronoUnit.DAYS))
+        seed("gc-revoked-old", now.plus(1, ChronoUnit.DAYS), now.minus(31, ChronoUnit.DAYS))
+        seed("gc-revoked-recent", now.plus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS))
         seed("gc-valid", now.plus(1, ChronoUnit.DAYS))
 
         val purged = service.purgeExpired()
 
-        assertEquals(1, purged, "exactly the expired session is swept")
+        assertEquals(2, purged, "only expired/revoked rows past retention are swept")
         QuarkusTransaction.requiringNew().run {
-            assertNull(sessions.findByTokenHash("gc-expired"), "expired row is gone")
+            assertNull(sessions.findByTokenHash("gc-expired-old"), "old expired row is gone")
+            assertNotNull(sessions.findByTokenHash("gc-expired-recent"), "recent expired row survives audit retention")
+            assertNull(sessions.findByTokenHash("gc-revoked-old"), "old revoked row is gone")
+            assertNotNull(sessions.findByTokenHash("gc-revoked-recent"), "recent revoked row survives audit retention")
             assertNotNull(sessions.findByTokenHash("gc-valid"), "valid row survives")
         }
         // a swept token never resolves
-        assertNull(service.resolve("Bearer gc-expired"))
+        assertNull(service.resolve("Bearer gc-expired-old"))
     }
 }

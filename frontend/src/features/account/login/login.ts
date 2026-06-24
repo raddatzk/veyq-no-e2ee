@@ -13,7 +13,7 @@ export type KeyBag = {
 }
 export type LoginResponse = {
   sessionToken: string
-  deviceRef: string
+  rootSessionId: string
   user: { id: string; email: string; displayName: string; serverRole: string; username: string; avatarUrl?: string }
   keyBag: KeyBag
 }
@@ -33,10 +33,8 @@ export type UnlockedSession = {
   identity: v1.Identity['priv']
   identityPublicKey: KeyBag['identityPublicKey']
   masterKey: Uint8Array
-  deviceRef: string
+  rootSessionId: string
 }
-
-const LOGIN_DEVICE_ID_PREFIX = 'veyq.loginDevice.'
 
 /** Authenticate with the password path (password + Secret Key from the Emergency Kit). */
 export async function login(
@@ -45,12 +43,11 @@ export async function login(
   password: string,
   secretKeyB64: string,
 ): Promise<UnlockedSession> {
-  const knownDeviceRef = readLoginDeviceId(email)
   const res = await fetch(`${apiBase}/api/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ email, password, deviceRef: knownDeviceRef }),
+    body: JSON.stringify({ email, password }),
   })
   if (!res.ok) throw await apiError(res, 'login')
   const body: LoginResponse = await res.json()
@@ -65,18 +62,14 @@ export async function login(
   const privBytes = v1.symUnwrap(masterKey, fromB64url(body.keyBag.wrappedIdentityPrivateKey.bytes), 'identity-priv')
   const identity = v1.deserializeIdentityPrivate(privBytes)
 
-  saveLoginDeviceId(email, body.deviceRef)
-  return { sessionToken: body.sessionToken, user: body.user, identity, identityPublicKey: body.keyBag.identityPublicKey, masterKey, deviceRef: body.deviceRef }
-}
-
-function readLoginDeviceId(loginIdentity: string): string | undefined {
-  const normalized = loginIdentity.trim().toLowerCase()
-  return localStorage.getItem(LOGIN_DEVICE_ID_PREFIX + normalized) ?? undefined
-}
-
-function saveLoginDeviceId(loginIdentity: string, deviceRef: string): void {
-  const normalized = loginIdentity.trim().toLowerCase()
-  localStorage.setItem(LOGIN_DEVICE_ID_PREFIX + normalized, deviceRef)
+  return {
+    sessionToken: body.sessionToken,
+    user: body.user,
+    identity,
+    identityPublicKey: body.keyBag.identityPublicKey,
+    masterKey,
+    rootSessionId: body.rootSessionId,
+  }
 }
 
 /** Logout: invalidate the current session token server-side. Idempotent for an already-dead token. */

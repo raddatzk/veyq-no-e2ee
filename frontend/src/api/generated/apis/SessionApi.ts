@@ -18,7 +18,9 @@ import type {
   ErrorResponse,
   LoginRequest,
   LoginResponse,
+  LoginSessionList,
   RefreshSessionResponse,
+  RenameLoginSessionRequest,
 } from '../models/index';
 import {
     ErrorResponseFromJSON,
@@ -27,9 +29,17 @@ import {
     LoginRequestToJSON,
     LoginResponseFromJSON,
     LoginResponseToJSON,
+    LoginSessionListFromJSON,
+    LoginSessionListToJSON,
     RefreshSessionResponseFromJSON,
     RefreshSessionResponseToJSON,
+    RenameLoginSessionRequestFromJSON,
+    RenameLoginSessionRequestToJSON,
 } from '../models/index';
+
+export interface ListLoginSessionsRequest {
+    authorization: string;
+}
 
 export interface LoginOperationRequest {
     loginRequest: LoginRequest;
@@ -37,6 +47,17 @@ export interface LoginOperationRequest {
 
 export interface LogoutRequest {
     authorization: string;
+}
+
+export interface RemoveLoginSessionRequest {
+    authorization: string;
+    rootSessionId: string;
+}
+
+export interface RenameLoginSessionOperationRequest {
+    authorization: string;
+    rootSessionId: string;
+    renameLoginSessionRequest: RenameLoginSessionRequest;
 }
 
 /**
@@ -47,6 +68,30 @@ export interface LogoutRequest {
  */
 export interface SessionApiInterface {
     /**
+     * Creates request options for listLoginSessions without sending the request
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    listLoginSessionsRequestOpts(requestParameters: ListLoginSessionsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns one entry per active root login-session family. Refresh rotation rows are retained for audit and replay detection but are not exposed as separate user-facing sessions. The session label is client-encrypted opaque text. 
+     * @summary List active login-session families for the authenticated user.
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    listLoginSessionsRaw(requestParameters: ListLoginSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionList>>;
+
+    /**
+     * Returns one entry per active root login-session family. Refresh rotation rows are retained for audit and replay detection but are not exposed as separate user-facing sessions. The session label is client-encrypted opaque text. 
+     * List active login-session families for the authenticated user.
+     */
+    listLoginSessions(requestParameters: ListLoginSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionList>;
+
+    /**
      * Creates request options for login without sending the request
      * @param {LoginRequest} loginRequest 
      * @throws {RequiredError}
@@ -55,7 +100,7 @@ export interface SessionApiInterface {
     loginRequestOpts(requestParameters: LoginOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). If the client already knows a stable deviceRef for this browser/login identity it may send it; otherwise the server generates one and returns it in the login response. 
+     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). The response includes the root login-session identifier; refreshes append rotated child sessions under that root. 
      * @summary Authenticate (password) and receive a session + the wrapped key bag.
      * @param {LoginRequest} loginRequest 
      * @param {*} [options] Override http request option.
@@ -65,7 +110,7 @@ export interface SessionApiInterface {
     loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>>;
 
     /**
-     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). If the client already knows a stable deviceRef for this browser/login identity it may send it; otherwise the server generates one and returns it in the login response. 
+     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). The response includes the root login-session identifier; refreshes append rotated child sessions under that root. 
      * Authenticate (password) and receive a session + the wrapped key bag.
      */
     login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse>;
@@ -79,7 +124,7 @@ export interface SessionApiInterface {
     logoutRequestOpts(requestParameters: LogoutRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes the session row for the presented bearer token so it can never resolve again. Idempotent — an unknown or already-expired token still returns 204. Holds no key material; unlock state is local. 
+     * Revokes the caller\'s root login-session family for the presented bearer token or refresh cookie. Holds no key material; unlock state is local. 
      * @summary Invalidate the caller\'s current session token (logout).
      * @param {string} authorization Bearer &lt;sessionToken&gt;
      * @param {*} [options] Override http request option.
@@ -89,7 +134,7 @@ export interface SessionApiInterface {
     logoutRaw(requestParameters: LogoutRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes the session row for the presented bearer token so it can never resolve again. Idempotent — an unknown or already-expired token still returns 204. Holds no key material; unlock state is local. 
+     * Revokes the caller\'s root login-session family for the presented bearer token or refresh cookie. Holds no key material; unlock state is local. 
      * Invalidate the caller\'s current session token (logout).
      */
     logout(requestParameters: LogoutRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -102,7 +147,7 @@ export interface SessionApiInterface {
     refreshSessionRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local device-unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. 
+     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. Each successful refresh appends a new session row under the same root session and revokes the previous row as ROTATED. 
      * @summary Rotate the HttpOnly refresh cookie and receive a fresh access session token.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -111,10 +156,62 @@ export interface SessionApiInterface {
     refreshSessionRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RefreshSessionResponse>>;
 
     /**
-     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local device-unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. 
+     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. Each successful refresh appends a new session row under the same root session and revokes the previous row as ROTATED. 
      * Rotate the HttpOnly refresh cookie and receive a fresh access session token.
      */
     refreshSession(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RefreshSessionResponse>;
+
+    /**
+     * Creates request options for removeLoginSession without sending the request
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @param {string} rootSessionId 
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    removeLoginSessionRequestOpts(requestParameters: RemoveLoginSessionRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Revoke one root login-session family.
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @param {string} rootSessionId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    removeLoginSessionRaw(requestParameters: RemoveLoginSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Revoke one root login-session family.
+     */
+    removeLoginSession(requestParameters: RemoveLoginSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for renameLoginSession without sending the request
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @param {string} rootSessionId 
+     * @param {RenameLoginSessionRequest} renameLoginSessionRequest 
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    renameLoginSessionRequestOpts(requestParameters: RenameLoginSessionOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Update the encrypted display label for one login-session family.
+     * @param {string} authorization Bearer &lt;sessionToken&gt;
+     * @param {string} rootSessionId 
+     * @param {RenameLoginSessionRequest} renameLoginSessionRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SessionApiInterface
+     */
+    renameLoginSessionRaw(requestParameters: RenameLoginSessionOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Update the encrypted display label for one login-session family.
+     */
+    renameLoginSession(requestParameters: RenameLoginSessionOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
 }
 
@@ -122,6 +219,56 @@ export interface SessionApiInterface {
  * 
  */
 export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
+
+    /**
+     * Creates request options for listLoginSessions without sending the request
+     */
+    async listLoginSessionsRequestOpts(requestParameters: ListLoginSessionsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['authorization'] == null) {
+            throw new runtime.RequiredError(
+                'authorization',
+                'Required parameter "authorization" was null or undefined when calling listLoginSessions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['authorization'] != null) {
+            headerParameters['Authorization'] = String(requestParameters['authorization']);
+        }
+
+
+        let urlPath = `/api/me/login-sessions`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns one entry per active root login-session family. Refresh rotation rows are retained for audit and replay detection but are not exposed as separate user-facing sessions. The session label is client-encrypted opaque text. 
+     * List active login-session families for the authenticated user.
+     */
+    async listLoginSessionsRaw(requestParameters: ListLoginSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionList>> {
+        const requestOptions = await this.listLoginSessionsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => LoginSessionListFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns one entry per active root login-session family. Refresh rotation rows are retained for audit and replay detection but are not exposed as separate user-facing sessions. The session label is client-encrypted opaque text. 
+     * List active login-session families for the authenticated user.
+     */
+    async listLoginSessions(requestParameters: ListLoginSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionList> {
+        const response = await this.listLoginSessionsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for login without sending the request
@@ -153,7 +300,7 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). If the client already knows a stable deviceRef for this browser/login identity it may send it; otherwise the server generates one and returns it in the login response. 
+     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). The response includes the root login-session identifier; refreshes append rotated child sessions under that root. 
      * Authenticate (password) and receive a session + the wrapped key bag.
      */
     async loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>> {
@@ -164,7 +311,7 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). If the client already knows a stable deviceRef for this browser/login identity it may send it; otherwise the server generates one and returns it in the login response. 
+     * The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock). The response includes the root login-session identifier; refreshes append rotated child sessions under that root. 
      * Authenticate (password) and receive a session + the wrapped key bag.
      */
     async login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse> {
@@ -203,7 +350,7 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * Deletes the session row for the presented bearer token so it can never resolve again. Idempotent — an unknown or already-expired token still returns 204. Holds no key material; unlock state is local. 
+     * Revokes the caller\'s root login-session family for the presented bearer token or refresh cookie. Holds no key material; unlock state is local. 
      * Invalidate the caller\'s current session token (logout).
      */
     async logoutRaw(requestParameters: LogoutRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -214,7 +361,7 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * Deletes the session row for the presented bearer token so it can never resolve again. Idempotent — an unknown or already-expired token still returns 204. Holds no key material; unlock state is local. 
+     * Revokes the caller\'s root login-session family for the presented bearer token or refresh cookie. Holds no key material; unlock state is local. 
      * Invalidate the caller\'s current session token (logout).
      */
     async logout(requestParameters: LogoutRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -241,7 +388,7 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local device-unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. 
+     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. Each successful refresh appends a new session row under the same root session and revokes the previous row as ROTATED. 
      * Rotate the HttpOnly refresh cookie and receive a fresh access session token.
      */
     async refreshSessionRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RefreshSessionResponse>> {
@@ -252,12 +399,132 @@ export class SessionApi extends runtime.BaseAPI implements SessionApiInterface {
     }
 
     /**
-     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local device-unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. 
+     * Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. Each successful refresh appends a new session row under the same root session and revokes the previous row as ROTATED. 
      * Rotate the HttpOnly refresh cookie and receive a fresh access session token.
      */
     async refreshSession(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RefreshSessionResponse> {
         const response = await this.refreshSessionRaw(initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for removeLoginSession without sending the request
+     */
+    async removeLoginSessionRequestOpts(requestParameters: RemoveLoginSessionRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['authorization'] == null) {
+            throw new runtime.RequiredError(
+                'authorization',
+                'Required parameter "authorization" was null or undefined when calling removeLoginSession().'
+            );
+        }
+
+        if (requestParameters['rootSessionId'] == null) {
+            throw new runtime.RequiredError(
+                'rootSessionId',
+                'Required parameter "rootSessionId" was null or undefined when calling removeLoginSession().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['authorization'] != null) {
+            headerParameters['Authorization'] = String(requestParameters['authorization']);
+        }
+
+
+        let urlPath = `/api/me/login-sessions/{rootSessionId}`;
+        urlPath = urlPath.replace(`{${"rootSessionId"}}`, encodeURIComponent(String(requestParameters['rootSessionId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Revoke one root login-session family.
+     */
+    async removeLoginSessionRaw(requestParameters: RemoveLoginSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.removeLoginSessionRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Revoke one root login-session family.
+     */
+    async removeLoginSession(requestParameters: RemoveLoginSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.removeLoginSessionRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for renameLoginSession without sending the request
+     */
+    async renameLoginSessionRequestOpts(requestParameters: RenameLoginSessionOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['authorization'] == null) {
+            throw new runtime.RequiredError(
+                'authorization',
+                'Required parameter "authorization" was null or undefined when calling renameLoginSession().'
+            );
+        }
+
+        if (requestParameters['rootSessionId'] == null) {
+            throw new runtime.RequiredError(
+                'rootSessionId',
+                'Required parameter "rootSessionId" was null or undefined when calling renameLoginSession().'
+            );
+        }
+
+        if (requestParameters['renameLoginSessionRequest'] == null) {
+            throw new runtime.RequiredError(
+                'renameLoginSessionRequest',
+                'Required parameter "renameLoginSessionRequest" was null or undefined when calling renameLoginSession().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['authorization'] != null) {
+            headerParameters['Authorization'] = String(requestParameters['authorization']);
+        }
+
+
+        let urlPath = `/api/me/login-sessions/{rootSessionId}`;
+        urlPath = urlPath.replace(`{${"rootSessionId"}}`, encodeURIComponent(String(requestParameters['rootSessionId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RenameLoginSessionRequestToJSON(requestParameters['renameLoginSessionRequest']),
+        };
+    }
+
+    /**
+     * Update the encrypted display label for one login-session family.
+     */
+    async renameLoginSessionRaw(requestParameters: RenameLoginSessionOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.renameLoginSessionRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Update the encrypted display label for one login-session family.
+     */
+    async renameLoginSession(requestParameters: RenameLoginSessionOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.renameLoginSessionRaw(requestParameters, initOverrides);
     }
 
 }

@@ -41,11 +41,11 @@ export interface LoginResponse {
      */
     sessionToken: string;
     /**
-     * Stable opaque login-device identifier attached to the issued session.
+     * Stable opaque identifier for this root login-session family.
      * @type {string}
      * @memberof LoginResponse
      */
-    deviceRef: string;
+    rootSessionId: string;
     /**
      * 
      * @type {UserSummary}
@@ -65,7 +65,7 @@ export interface LoginResponse {
  */
 export function instanceOfLoginResponse(value: object): value is LoginResponse {
     if (!('sessionToken' in value) || value['sessionToken'] === undefined) return false;
-    if (!('deviceRef' in value) || value['deviceRef'] === undefined) return false;
+    if (!('rootSessionId' in value) || value['rootSessionId'] === undefined) return false;
     if (!('user' in value) || value['user'] === undefined) return false;
     if (!('keyBag' in value) || value['keyBag'] === undefined) return false;
     return true;
@@ -82,7 +82,7 @@ export function LoginResponseFromJSONTyped(json: any, ignoreDiscriminator: boole
     return {
         
         'sessionToken': json['sessionToken'],
-        'deviceRef': json['deviceRef'],
+        'rootSessionId': json['rootSessionId'],
         'user': UserSummaryFromJSON(json['user']),
         'keyBag': KeyBagFromJSON(json['keyBag']),
     };
@@ -100,7 +100,7 @@ export function LoginResponseToJSONTyped(value?: LoginResponse | null, ignoreDis
     return {
         
         'sessionToken': value['sessionToken'],
-        'deviceRef': value['deviceRef'],
+        'rootSessionId': value['rootSessionId'],
         'user': UserSummaryToJSON(value['user']),
         'keyBag': KeyBagToJSON(value['keyBag']),
     };

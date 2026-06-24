@@ -22,11 +22,11 @@ import {
   updateProfile
 } from '../../../features/account/login/login'
 import {
-  listLoginDevices,
-  removeLoginDevice,
-  renameLoginDevice,
-  type LoginDeviceSummary
-} from '../../../features/keys/deviceUnlock'
+  listLoginSessions,
+  removeLoginSession,
+  renameLoginSession,
+  type LoginSessionSummary
+} from '../../../features/keys/loginSessions'
 import { clearRememberedLogin } from '../../../features/account/rememberedLogin/rememberedLogin'
 import { requireSession, session, setUnlocked } from '../../../app/session'
 
@@ -53,7 +53,7 @@ const passwordMessage = ref('')
 const deletePassword = ref('')
 const deleteConfirmation = ref('')
 const deletingAccount = ref(false)
-const devices = ref<LoginDeviceSummary[]>([])
+const devices = ref<LoginSessionSummary[]>([])
 const loading = ref(false)
 const savingProfile = ref(false)
 const changingDisplayName = ref(false)
@@ -142,7 +142,7 @@ async function load() {
   error.value = ''
   try {
     const s = requireSession()
-    thisDeviceId.value = s.deviceRef
+    thisDeviceId.value = s.rootSessionId
     displayName.value = s.user.displayName
     displayNameDraft.value = s.user.displayName
     username.value = s.user.username
@@ -150,7 +150,7 @@ async function load() {
     email.value = s.user.email
     avatarUrl.value = s.user.avatarUrl || ''
     newEmail.value = ''
-    devices.value = await listLoginDevices(session.apiBase, s)
+    devices.value = await listLoginSessions(session.apiBase, s)
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
   } finally {
@@ -375,13 +375,13 @@ async function submitAccountDelete() {
   }
 }
 
-function isCurrentDevice(device: LoginDeviceSummary): boolean {
-  return device.credentialRef === thisDeviceId.value
+function isCurrentDevice(device: LoginSessionSummary): boolean {
+  return device.rootSessionId === thisDeviceId.value
 }
 
-function startRename(device: LoginDeviceSummary) {
-  if (!device.credentialRef) return
-  editingRef.value = device.credentialRef
+function startRename(device: LoginSessionSummary) {
+  if (!device.rootSessionId) return
+  editingRef.value = device.rootSessionId
   editingName.value = device.name || ''
   deviceMessage.value = ''
 }
@@ -391,16 +391,16 @@ function cancelRename() {
   editingName.value = ''
 }
 
-async function saveDeviceName(device: LoginDeviceSummary) {
-  if (!device.credentialRef) return
+async function saveDeviceName(device: LoginSessionSummary) {
+  if (!device.rootSessionId) return
   const name = editingName.value.trim()
   if (!name) return
-  savingDeviceRef.value = device.credentialRef
+  savingDeviceRef.value = device.rootSessionId
   error.value = ''
   deviceMessage.value = ''
   try {
     const s = requireSession()
-    await renameLoginDevice(session.apiBase, s, device.credentialRef, name)
+    await renameLoginSession(session.apiBase, s, device.rootSessionId, name)
     device.name = name
     cancelRename()
     deviceMessage.value = t('device.renamed')
@@ -411,16 +411,16 @@ async function saveDeviceName(device: LoginDeviceSummary) {
   }
 }
 
-async function removeDevice(device: LoginDeviceSummary) {
-  if (!device.credentialRef) return
-  removingRef.value = device.credentialRef
+async function removeDevice(device: LoginSessionSummary) {
+  if (!device.rootSessionId) return
+  removingRef.value = device.rootSessionId
   error.value = ''
   deviceMessage.value = ''
   const removingCurrentDevice = isCurrentDevice(device)
   try {
     const s = requireSession()
-    await removeLoginDevice(session.apiBase, s.sessionToken, device.credentialRef)
-    devices.value = devices.value.filter((d) => d.credentialRef !== device.credentialRef)
+    await removeLoginSession(session.apiBase, s.sessionToken, device.rootSessionId)
+    devices.value = devices.value.filter((d) => d.rootSessionId !== device.rootSessionId)
     if (removingCurrentDevice) {
       clearRememberedLogin()
       setUnlocked(null)
@@ -584,10 +584,10 @@ function formatTimestamp(value?: string): string {
         }}</Message>
 
         <div v-else class="passkey-list">
-          <div v-for="device in devices" :key="device.credentialRef" class="passkey-row">
+          <div v-for="device in devices" :key="device.rootSessionId" class="passkey-row">
             <div class="device-details">
               <form
-                v-if="editingRef === device.credentialRef"
+                v-if="editingRef === device.rootSessionId"
                 class="device-name-form"
                 @submit.prevent="saveDeviceName(device)"
               >
@@ -596,7 +596,7 @@ function formatTimestamp(value?: string): string {
                   type="submit"
                   icon="pi pi-check"
                   :aria-label="t('common.save')"
-                  :loading="savingDeviceRef === device.credentialRef"
+                  :loading="savingDeviceRef === device.rootSessionId"
                   :disabled="!editingName.trim()"
                 />
                 <Button
@@ -613,8 +613,8 @@ function formatTimestamp(value?: string): string {
                 <span v-if="isCurrentDevice(device)" class="device-current">{{
                   t('device.thisDevice')
                 }}</span>
-                <span v-if="device.lastLoginAt"
-                  >{{ t('device.lastLogin') }}: {{ formatTimestamp(device.lastLoginAt) }}</span
+                <span v-if="device.lastUsedAt"
+                  >{{ t('device.lastLogin') }}: {{ formatTimestamp(device.lastUsedAt) }}</span
                 >
               </template>
             </div>
@@ -624,7 +624,7 @@ function formatTimestamp(value?: string): string {
                 icon="pi pi-pencil"
                 severity="secondary"
                 text
-                :disabled="editingRef === device.credentialRef"
+                :disabled="editingRef === device.rootSessionId"
                 :aria-label="t('device.edit')"
                 @click="startRename(device)"
               />
@@ -633,7 +633,7 @@ function formatTimestamp(value?: string): string {
                 icon="pi pi-trash"
                 severity="danger"
                 text
-                :loading="removingRef === device.credentialRef"
+                :loading="removingRef === device.rootSessionId"
                 :aria-label="t('device.remove')"
                 @click="removeDevice(device)"
               />

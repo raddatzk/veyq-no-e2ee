@@ -51,5 +51,6 @@ function unlockedSession(sessionToken: string): UnlockedSession {
     identity: {} as UnlockedSession['identity'],
     identityPublicKey: { suiteId: 'v1', kemPublicKey: '', signPublicKey: '' },
     masterKey: new Uint8Array(32),
+    rootSessionId: 'root-session-1',
   }
 }

@@ -57,6 +57,7 @@ interface RateLimitConfig {
 interface SessionConfig {
     @WithName("access-ttl") @WithDefault("PT15M") fun accessTtl(): Duration
     @WithName("refresh-ttl") @WithDefault("P30D") fun refreshTtl(): Duration
+    @WithName("audit-retention") @WithDefault("P30D") fun auditRetention(): Duration
 }
 
 /** `veyq.tenant.*` — grace window before a soft-deleted tenant is hard-purged. */

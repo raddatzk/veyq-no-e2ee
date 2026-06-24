@@ -32,7 +32,7 @@ else password
   C -> C : Argon2id(password + Secret Key) -> KEK -> unlock Master Key
 end
 C -> C : private identity key available; content decrypts
-C -> S : register login device (identifier + encrypted name)
+C -> S : label root login session (encrypted name)
 @enduml
 ```
 
@@ -43,9 +43,8 @@ C -> S : register login device (identifier + encrypted name)
 3. The server verifies the password and issues a **short-lived access session** plus a rotatable
    HttpOnly refresh session.
 4. The client unlocks the Master Key locally with `Argon2id(password + Secret Key)`.
-5. The client derives a best-effort browser/device name locally, registers it with a stable
-   browser/device identifier as client-encrypted metadata for this session, then decrypts content with
-   the private identity key.
+5. The client derives a best-effort browser/device label locally, stores it as client-encrypted
+   metadata on the root login-session family, then decrypts content with the private identity key.
 
 ## Alternate / exception flows
 - A1 — **New device, passkey:** after auth, WebAuthn **PRF** derives the KEK → unlocks the Master Key
@@ -58,12 +57,12 @@ C -> S : register login device (identifier + encrypted name)
 - A4 — **Logout:** the current access/refresh token family is dropped; remembered email + Secret Key
   stay local only if the user chose that option.
 - A4b — **Access refresh:** when the access session expires but the refresh session is still valid, the
-  client rotates the refresh cookie and receives a new access `sessionToken`; local key material is not
-  sent back to the server.
-- A4c — **Expired session cleanup:** expired session rows are swept opportunistically or by the
-  scheduled job; still-valid sessions remain usable.
-- A5 — **Deauthorize device** (e.g. lost device): the user removes a login device
-  (`uc.account.manage-login-devices`), invalidating all server sessions with that device identifier.
+  client rotates the refresh cookie and receives a new access `sessionToken`; the server appends a
+  child session row under the same root and revokes the previous row as `ROTATED`.
+- A4c — **Expired session cleanup:** expired/revoked session rows are retained briefly for audit and
+  then swept by the scheduled job; still-valid sessions remain usable.
+- A5 — **Revoke login session** (e.g. lost browser/app login): the user removes a login session
+  (`uc.account.manage-login-sessions`), revoking all rows in that root session family.
   If that browser also stored email + Secret Key locally, it still cannot silently re-authenticate
   without the password.
 - E1 — **Authenticated but locked:** auth succeeds but unlock fails (wrong Secret Key, no PRF) → the UI
@@ -79,8 +78,8 @@ C -> S : register login device (identifier + encrypted name)
 - *Remembered login:* remembering login stores email + Secret Key and local unlock material, but never
   the password. Repeat visits can restore the unlocked client state only while the server-side refresh
   session is still valid.
-- *Revocation:* deauthorizing a login device invalidates that device's server sessions. Unlock-wrap
-  removal and key rotation are handled by the Keys feature ([AD-24](../../../decisions/README.md)).
+- *Revocation:* removing a login session revokes that root session family. Unlock-wrap removal and key
+  rotation are handled by the Keys feature ([AD-24](../../../decisions/README.md)).
 - *Operator-blind:* the server stores the auth verifier, the session and the wrapped key bag — never the
   Master Key or the Secret Key.
 
@@ -89,4 +88,4 @@ C -> S : register login device (identifier + encrypted name)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy, Secret Key,
   recovery, revocation), [Platform Concepts](../../../crosscutting/platform-concepts.md) (auth & sessions)
 - Decisions: [AD-02](../../../decisions/README.md) (E2EE), [AD-08](../../../decisions/README.md) (Secret Key), [AD-06](../../../decisions/README.md) (recovery/multi-device), [AD-24](../../../decisions/README.md) (revocation), [AD-23](../../../decisions/README.md) (capability/PRF)
-- Related use-cases: `uc.account.register-via-invitation`, `uc.account.recover-keys`, `uc.account.manage-login-devices`
+- Related use-cases: `uc.account.register-via-invitation`, `uc.account.recover-keys`, `uc.account.manage-login-sessions`

@@ -18,7 +18,7 @@ object Login {
 
     data class UnlockedSession(
         val sessionToken: String,
-        val deviceRef: String,
+        val rootSessionId: String,
         val email: String,
         val serverRole: String,
         val userId: String = "",
@@ -28,11 +28,10 @@ object Login {
         val masterKey: ByteArray,
     )
 
-    fun login(apiBase: String, email: String, password: String, secretKeyB64: String, deviceRef: String? = null): UnlockedSession {
+    fun login(apiBase: String, email: String, password: String, secretKeyB64: String): UnlockedSession {
         val loginBody = JSONObject()
             .put("email", email)
             .put("password", password)
-        if (!deviceRef.isNullOrBlank()) loginBody.put("deviceRef", deviceRef)
 
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/login"))
             .header("Content-Type", "application/json")
@@ -61,7 +60,7 @@ object Login {
         val user = body.getJSONObject("user")
         return UnlockedSession(
             sessionToken = body.getString("sessionToken"),
-            deviceRef = body.getString("deviceRef"),
+            rootSessionId = body.getString("rootSessionId"),
             email = user.getString("email"),
             serverRole = user.getString("serverRole"),
             userId = user.optString("id", ""),

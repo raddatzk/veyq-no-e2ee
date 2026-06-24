@@ -106,5 +106,6 @@ function unlockedSession(): UnlockedSession {
       signPublicKey: b64url(identity.pub.sign),
     },
     masterKey: v1.randomBytes(32),
+    rootSessionId: 'root-session-1',
   }
 }

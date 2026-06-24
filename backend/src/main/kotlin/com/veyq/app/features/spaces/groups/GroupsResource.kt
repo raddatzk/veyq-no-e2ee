@@ -14,7 +14,7 @@ import jakarta.ws.rs.core.Response
 class GroupsResource(
     private val handler: GroupProvisioningHandler,
     private val currentTenant: CurrentTenantResolver,
-) : GroupLifecycleApi, GroupMembersApi {
+) : GroupLifecycleApi {
     override fun listGroups(authorization: String): Response =
         Response.ok(handler.listGroups(authorization, currentTenant.currentTenantId())).build()
 
@@ -25,7 +25,13 @@ class GroupsResource(
         handler.deleteGroup(authorization, currentTenant.currentTenantId(), groupId)
         return Response.noContent().build()
     }
+}
 
+@ApplicationScoped
+class GroupMembersResource(
+    private val handler: GroupProvisioningHandler,
+    private val currentTenant: CurrentTenantResolver,
+) : GroupMembersApi {
     override fun listGroupMembers(authorization: String, groupId: String): Response =
         Response.ok(handler.listGroupMembers(authorization, currentTenant.currentTenantId(), groupId)).build()
 

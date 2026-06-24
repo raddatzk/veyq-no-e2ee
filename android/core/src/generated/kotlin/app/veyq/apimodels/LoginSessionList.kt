@@ -24,7 +24,7 @@
 
 package app.veyq.apimodels
 
-import app.veyq.apimodels.LoginDeviceSummary
+import app.veyq.apimodels.LoginSessionSummary
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -33,14 +33,14 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param devices 
+ * @param sessions 
  */
 @Serializable
 
-data class LoginDeviceList (
+data class LoginSessionList (
 
-    @SerialName(value = "devices")
-    val devices: kotlin.collections.List<LoginDeviceSummary>
+    @SerialName(value = "sessions")
+    val sessions: kotlin.collections.List<LoginSessionSummary>
 
 ) {
 

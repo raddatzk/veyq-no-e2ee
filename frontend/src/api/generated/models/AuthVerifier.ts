@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * Proves an unlock to the server without revealing the master key.
+ * Proves account authentication to the server without revealing the master key. For ARGON2_PROOF, `verifier` is an Argon2id PHC string (`$argon2id$v=19$m=32768,t=3,p=1$...$...`).
  * @export
  * @interface AuthVerifier
  */

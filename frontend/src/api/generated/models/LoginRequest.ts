@@ -31,12 +31,6 @@ export interface LoginRequest {
      * @memberof LoginRequest
      */
     password: string;
-    /**
-     * Optional stable client-generated login device identifier to attach to the issued session.
-     * @type {string}
-     * @memberof LoginRequest
-     */
-    deviceRef?: string;
 }
 
 /**
@@ -60,7 +54,6 @@ export function LoginRequestFromJSONTyped(json: any, ignoreDiscriminator: boolea
         
         'email': json['email'],
         'password': json['password'],
-        'deviceRef': json['deviceRef'] == null ? undefined : json['deviceRef'],
     };
 }
 
@@ -77,7 +70,6 @@ export function LoginRequestToJSONTyped(value?: LoginRequest | null, ignoreDiscr
         
         'email': value['email'],
         'password': value['password'],
-        'deviceRef': value['deviceRef'],
     };
 }
 

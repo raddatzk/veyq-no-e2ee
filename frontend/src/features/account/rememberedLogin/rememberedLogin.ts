@@ -12,6 +12,7 @@ type RememberedUnlock = {
   identityPublicKey: UnlockedSession['identityPublicKey']
   identityPrivateKey: string
   masterKey: string
+  rootSessionId?: string
 }
 type SessionUnlock = RememberedUnlock & { sessionToken?: string }
 
@@ -47,6 +48,7 @@ function toRememberedUnlock(session: UnlockedSession): RememberedUnlock {
     identityPublicKey: session.identityPublicKey,
     identityPrivateKey: b64url(v1.concat(v1.lp(session.identity.kemX), v1.lp(session.identity.mlkemSeed), v1.lp(session.identity.sign))),
     masterKey: b64url(session.masterKey),
+    rootSessionId: session.rootSessionId,
   }
 }
 
@@ -65,6 +67,7 @@ function fromRememberedUnlock(unlock: RememberedUnlock, sessionToken: string): U
       identity: v1.deserializeIdentityPrivate(fromB64url(unlock.identityPrivateKey)),
       identityPublicKey: unlock.identityPublicKey,
       masterKey: fromB64url(unlock.masterKey),
+      rootSessionId: unlock.rootSessionId ?? '',
     }
   } catch {
     return null

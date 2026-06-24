@@ -4,7 +4,7 @@ info:
   version: 1.0
   description: >
     Authenticated account lifecycle endpoints for profile metadata, avatar management,
-    password changes, login-device sessions, password recovery and email changes. The API keeps
+    password changes, password recovery and email changes. The API keeps
     content and key material operator-blind: private keys and master keys never leave the client, and
     the server stores only opaque wraps, verifiers and low-sensitivity account metadata.
 paths:
@@ -241,96 +241,6 @@ paths:
           $ref: "./common.openapi.yaml#/components/responses/BadRequest"
         '401':
           $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
-  /api/me/devices:
-    get:
-      tags:
-        - LoginDevices
-      operationId: listLoginDevices
-      summary: List active login devices for the authenticated user.
-      description: |
-        Groups active server sessions by the client-generated device identifier. The human-readable device name is stored as client-encrypted opaque text; the server can invalidate sessions for a device without learning the name or any key material.
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Active login devices.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LoginDeviceList"
-              examples:
-                multipleDevices:
-                  summary: Two active login devices
-                  value:
-                    devices:
-                      - deviceRef: dev_01J0HA0B7K8M9N2P3Q4R5S6T7V
-                        encryptedName: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
-                        lastLoginAt: '2026-06-24T08:31:12Z'
-                      - deviceRef: dev_01J0HA0W8X7Y6Z5A4B3C2D1E0F
-                        encryptedName: eyJjdCI6InBob25lLWNpcGhlcnRleHQifQ
-                        lastLoginAt: '2026-06-23T19:04:51Z'
-                empty:
-                  summary: No active devices
-                  value:
-                    devices: []
-        '401':
-          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
-  /api/me/devices/{deviceRef}:
-    put:
-      tags:
-        - LoginDevices
-      operationId: renameLoginDevice
-      summary: Update the encrypted display name for one login device.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: deviceRef
-          in: path
-          required: true
-          example: dev_01J0HA0B7K8M9N2P3Q4R5S6T7V
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RenameLoginDeviceRequest"
-            examples:
-              laptop:
-                summary: Encrypted laptop name
-                value:
-                  encryptedName: eyJjdCI6IkF2YXMtTWFjQm9vay1jaXBoZXJ0ZXh0In0
-              phone:
-                summary: Encrypted phone name
-                value:
-                  encryptedName: eyJjdCI6IkF2YXMtUGhvbmUtY2lwaGVydGV4dCJ9
-      responses:
-        '204':
-          description: The encrypted device name was updated.
-        '400':
-          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
-        '401':
-          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
-    delete:
-      tags:
-        - LoginDevices
-      operationId: removeLoginDevice
-      summary: Sign out all active sessions for one login device.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: deviceRef
-          in: path
-          required: true
-          example: dev_01J0HA0B7K8M9N2P3Q4R5S6T7V
-          schema:
-            type: string
-      responses:
-        '204':
-          description: All sessions for that device identifier were invalidated.
-        '401':
-          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
   /api/me/password-reset/request:
     post:
       tags:
@@ -494,51 +404,6 @@ components:
       bearerFormat: opaque session token
       description: Bearer session token returned by the session login/refresh endpoints.
   schemas:
-    RenameLoginDeviceRequest:
-      type: object
-      example:
-        encryptedName: eyJjdCI6IkF2YXMtTWFjQm9vay1jaXBoZXJ0ZXh0In0
-      required:
-        - encryptedName
-      properties:
-        encryptedName:
-          type: string
-          maxLength: 16384
-          x-field-extra-annotation:
-            - '@field:jakarta.validation.constraints.Size(max = 16384)'
-    LoginDeviceSummary:
-      type: object
-      example:
-        deviceRef: dev_01J0HA0B7K8M9N2P3Q4R5S6T7V
-        encryptedName: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
-        lastLoginAt: '2026-06-24T08:31:12Z'
-      required:
-        - deviceRef
-        - encryptedName
-        - lastLoginAt
-      properties:
-        deviceRef:
-          type: string
-        encryptedName:
-          type: string
-          description: Client-encrypted human-readable device/login name.
-        lastLoginAt:
-          type: string
-          format: date-time
-    LoginDeviceList:
-      type: object
-      example:
-        devices:
-          - deviceRef: dev_01J0HA0B7K8M9N2P3Q4R5S6T7V
-            encryptedName: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
-            lastLoginAt: '2026-06-24T08:31:12Z'
-      required:
-        - devices
-      properties:
-        devices:
-          type: array
-          items:
-            $ref: "#/components/schemas/LoginDeviceSummary"
     UpdateProfileRequest:
       type: object
       example:

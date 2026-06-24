@@ -67,7 +67,7 @@ struct LoginView: View {
             defer { busy = false }
             do {
                 let session = try await Login.login(apiBase: app.apiBase, email: email, password: password, secretKeyB64: secretKey)
-                if remember { DeviceUnlock.save(DeviceUnlock.Creds(apiBase: app.apiBase, email: email, password: password, secretKey: secretKey, deviceRef: session.deviceRef)) }
+                if remember { DeviceUnlock.save(DeviceUnlock.Creds(apiBase: app.apiBase, email: email, password: password, secretKey: secretKey)) }
                 app.loggedIn(session)
             } catch {
                 self.error = T("login.error")
@@ -81,8 +81,8 @@ struct LoginView: View {
             defer { busy = false }
             guard let creds = await DeviceUnlock.load() else { error = T("login.unlockFailed"); return }
             do {
-                let session = try await Login.login(apiBase: creds.apiBase, email: creds.email, password: creds.password, secretKeyB64: creds.secretKey, deviceRef: creds.deviceRef)
-                DeviceUnlock.save(DeviceUnlock.Creds(apiBase: creds.apiBase, email: creds.email, password: creds.password, secretKey: creds.secretKey, deviceRef: session.deviceRef))
+                let session = try await Login.login(apiBase: creds.apiBase, email: creds.email, password: creds.password, secretKeyB64: creds.secretKey)
+                DeviceUnlock.save(creds)
                 app.loggedIn(session)
             } catch {
                 self.error = T("login.unlockFailed")

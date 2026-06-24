@@ -1,7 +1,7 @@
 # Feature: Account & Auth
 
 Accounts and authentication - passwords, invitations, profile metadata, avatar handling, login
-devices, key recovery and account deletion.
+sessions, key recovery and account deletion.
 
 - **Touched contexts:** Identity & Access — see [System Architecture](../../overview/architecture.md).
 - **Cross-cutting:** [Platform Concepts → Auth & sessions](../../crosscutting/platform-concepts.md),
@@ -17,7 +17,7 @@ devices, key recovery and account deletion.
 - ★ [Delete avatar](use-cases/uc.account.delete-avatar.md) — remove the profile image
 - ★ [Change password](use-cases/uc.account.change-password.md) — replace the PASSWORD master-key wrap
 - ★ [Reset password](use-cases/uc.account.reset-password.md) — email-token + Secret-Key recovery wrap flow
-- ★ [Manage login devices](use-cases/uc.account.manage-login-devices.md) — list, rename and deauthorize login devices
+- ★ [Manage login sessions](use-cases/uc.account.manage-login-sessions.md) — list, rename and revoke login sessions
 - ★ [Change account email](use-cases/uc.account.change-email.md) — verified, token-gated email swap
 - ★ [Recover key access](use-cases/uc.account.recover-keys.md) — recovery code / Emergency Kit / another device
 - ★ [Delete account](use-cases/uc.account.delete-account.md) — self-service deletion (crypto-erasure)

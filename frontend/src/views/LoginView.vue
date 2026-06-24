@@ -10,7 +10,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { login } from '../features/account/login/login'
-import { registerLoginDevice } from '../features/keys/deviceUnlock'
+import { registerLoginSession } from '../features/keys/loginSessions'
 import { parseKit } from '../features/account/emergencyKit/emergencyKit'
 import { requestPasswordReset } from '../features/account/resetPassword/resetPassword'
 import {
@@ -86,7 +86,7 @@ async function submit() {
   try {
     const unlocked = await login(session.apiBase, email.value, password.value, secretKey.value)
     setUnlocked(unlocked)
-    await registerLoginDevice(session.apiBase, unlocked)
+    await registerLoginSession(session.apiBase, unlocked)
     if (remember.value && canRemember)
       saveRememberedLogin({ email: email.value, secretKey: secretKey.value }, unlocked)
     else clearRememberedLogin()
