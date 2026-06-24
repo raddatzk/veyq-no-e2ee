@@ -20,14 +20,14 @@ documents:
     ref: apple/Sources/VeyqCrypto/SwitchActiveSpace.swift
 acceptanceCriteria:
   - id: uc.spaces.switch-active-space.unified-roster
-    statement: The switcher lists enterable tenant/group spaces and includes tenant-bound personal spaces only for tenant contexts; a membership without the grant is not an enterable space.
+    statement: The switcher lists enterable TENANT_ROOT/GROUP_ROOT spaces and includes tenant-bound personal spaces only for tenant contexts; a membership without the matching scope grant is not an enterable space.
     coverage:
       backend:
         integration:
-          - testName: listsPersonalPlusHeldGroupSpaces
+          - testName: listsPersonalPlusHeldTenantRootSpaces
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
-          - testName: listsPersonalPlusHeldGroupSpaces
+          - testName: listsPersonalPlusHeldTenantRootSpaces
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
       web:
@@ -40,16 +40,16 @@ acceptanceCriteria:
     coverage:
       web:
         e2e:
-          - testName: lists personal + group spaces and switches between them with already-held keys
+          - testName: lists personal + tenant-root spaces and switches between them with already-held keys
             kind: positive
             ref: frontend/src/features/spaces/switchActiveSpace/switchActiveSpace.e2e.test.ts
       android:
         e2e:
-          - testName: listsPersonalPlusGroupAndSwitchesBetweenThem
+          - testName: listsPersonalPlusTenantRootAndSwitchesBetweenThem
             kind: positive
             ref: android/core/src/test/kotlin/app/veyq/crypto/SwitchActiveSpaceE2ETest.kt
       apple:
         e2e:
-          - testName: testListsPersonalPlusGroupAndSwitchesBetweenThem
+          - testName: testListsPersonalPlusTenantRootAndSwitchesBetweenThem
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/SwitchActiveSpaceE2ETests.swift

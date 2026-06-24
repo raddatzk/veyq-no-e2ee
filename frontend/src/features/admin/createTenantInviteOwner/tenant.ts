@@ -25,7 +25,7 @@ export const createTenant = (apiBase: string, token: string, name: string, displ
   post<TenantSummary>(apiBase, '/api/tenants', token, { name, displayName, domain })
 
 export const issueOwnerInvite = (apiBase: string, token: string, tenantId: string, email = '') =>
-  post<OwnerInvite>(apiBase, `/api/tenants/${tenantId}/owner-invite`, token, { email })
+  post<OwnerInvite>(apiBase, '/api/tenant/owner-invite', token, { email })
 
 /** A URL-safe tenant handle from a display name (the server keys tenants by it). */
 function slugify(name: string): string {
@@ -53,7 +53,7 @@ export async function createTenantOwnerInvite(apiBase: string, token: string, di
 }
 
 export async function uploadTenantLogo(apiBase: string, token: string, tenantId: string, logo: ScaledTenantLogo): Promise<TenantSummary> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/logo`, {
+  const res = await fetch(`${apiBase}/api/tenant/logo`, {
     method: 'PUT',
     headers: json(token),
     body: JSON.stringify({ contentType: logo.contentType, bytes: logo.bytes }),
@@ -63,7 +63,7 @@ export async function uploadTenantLogo(apiBase: string, token: string, tenantId:
 }
 
 export async function clearTenantLogo(apiBase: string, token: string, tenantId: string): Promise<TenantSummary> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/logo`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } })
+  const res = await fetch(`${apiBase}/api/tenant/logo`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } })
   if (!res.ok) throw await apiError(res, 'clear tenant logo')
   return res.json()
 }
@@ -127,7 +127,11 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export async function getMyScopeGrant(apiBase: string, token: string, tenantId: string): Promise<MyScopeGrant> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope`, { headers: { authorization: `Bearer ${token}` } })
+  const current = await fetch(`${apiBase}/api/tenant`, { headers: { authorization: `Bearer ${token}` } })
+  if (!current.ok) throw new Error(`tenant fetch failed: ${current.status}`)
+  const tenant = await current.json()
+  if (tenantId && tenant.tenantId !== tenantId) throw new Error('requested tenant does not match current host')
+  const res = await fetch(`${apiBase}/api/scopes/${tenant.tenantScopeId}/grants/me`, { headers: { authorization: `Bearer ${token}` } })
   if (!res.ok) throw new Error(`scope fetch failed: ${res.status}`)
   return res.json()
 }

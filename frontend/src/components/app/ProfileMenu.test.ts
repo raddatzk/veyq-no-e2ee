@@ -36,7 +36,7 @@ describe('ProfileMenu', () => {
       userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
-      permalink: 'member',
+      username: 'member',
       serverRole: 'ServerMember'
     }
 
@@ -62,7 +62,7 @@ describe('ProfileMenu', () => {
       userId: '1',
       email: 'owner@example.com',
       displayName: 'Owner',
-      permalink: 'owner',
+      username: 'owner',
       serverRole: 'ServerOwner'
     }
 
@@ -83,7 +83,7 @@ describe('ProfileMenu', () => {
       userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
-      permalink: 'member',
+      username: 'member',
       serverRole: 'ServerMember'
     }
 
@@ -107,7 +107,7 @@ describe('ProfileMenu', () => {
       userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
-      permalink: 'member',
+      username: 'member',
       serverRole: 'ServerMember'
     }
 
@@ -133,7 +133,7 @@ describe('ProfileMenu', () => {
       userId: '1',
       email: 'member@example.com',
       displayName: 'Member',
-      permalink: 'member',
+      username: 'member',
       serverRole: 'ServerMember'
     }
     authState.tenants = []
@@ -144,7 +144,7 @@ describe('ProfileMenu', () => {
         email: 'member@example.com',
         displayName: 'Member',
         serverRole: 'ServerMember',
-        permalink: 'member'
+        username: 'member'
       },
       identity: {} as never,
       identityPublicKey: {

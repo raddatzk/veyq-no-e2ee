@@ -9,7 +9,7 @@ public enum Groups {
     struct BlobDTO: Codable { let suiteId, bytes: String }
 
     public struct GroupSummary: Codable, Sendable {
-        public let scopeId, tenantId, role: String
+        public let groupId, scopeId, tenantId, role: String
         let scopePublicKey: KemDTO
         let sealedName: BlobDTO
     }
@@ -58,13 +58,13 @@ public enum Groups {
             wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(grant)),
             contentKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrappedCk)),
             sealedName: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(sealedName)))
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups", session.sessionToken, method: "POST", body: try JSONEncoder().encode(req))
+        let (data, code) = try await send(apiBase, "/api/groups", session.sessionToken, method: "POST", body: try JSONEncoder().encode(req))
         guard code == 200 else { throw err("create group failed: \(String(data: data, encoding: .utf8) ?? "")") }
         return try JSONDecoder().decode(GroupSummary.self, from: data)
     }
 
     public static func listGroupMembers(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String) async throws -> [GroupMember] {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups/\(scopeId)/members", session.sessionToken)
+        let (data, code) = try await send(apiBase, "/api/groups/\(scopeId)/members", session.sessionToken)
         guard code == 200 else { throw err("list group members failed: \(String(data: data, encoding: .utf8) ?? "")") }
         return try JSONDecoder().decode(GroupMemberListDTO.self, from: data).members
     }
@@ -82,25 +82,25 @@ public enum Groups {
         let wrapped = try V1.asymWrap(pkX: Data(tKem.prefix(32)), pkM: Data(tKem.dropFirst(32)), targetKey: scopePrivBytes, context: "scope-grant", nonce: V1.randomBytes(12))
 
         let req = AddMemberReq(userId: userId, wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrapped)), role: role)
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups/\(scopeId)/members", session.sessionToken, method: "POST", body: try JSONEncoder().encode(req))
+        let (data, code) = try await send(apiBase, "/api/groups/\(scopeId)/members", session.sessionToken, method: "POST", body: try JSONEncoder().encode(req))
         guard code == 200 else { throw err("add group member failed: \(String(data: data, encoding: .utf8) ?? "")") }
         return try JSONDecoder().decode(GroupMember.self, from: data)
     }
 
     @discardableResult
     public static func setGroupMemberRole(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String, userId: String, role: String) async throws -> GroupMember {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups/\(scopeId)/members/\(userId)", session.sessionToken, method: "PATCH", body: try JSONEncoder().encode(SetRoleReq(role: role)))
+        let (data, code) = try await send(apiBase, "/api/groups/\(scopeId)/members/\(userId)/role", session.sessionToken, method: "PUT", body: try JSONEncoder().encode(SetRoleReq(role: role)))
         guard code == 200 else { throw err("set group role failed: \(String(data: data, encoding: .utf8) ?? "")") }
         return try JSONDecoder().decode(GroupMember.self, from: data)
     }
 
     public static func removeGroupMember(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String, userId: String) async throws {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups/\(scopeId)/members/\(userId)", session.sessionToken, method: "DELETE")
+        let (data, code) = try await send(apiBase, "/api/groups/\(scopeId)/members/\(userId)", session.sessionToken, method: "DELETE")
         guard code == 204 else { throw err("remove group member failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
 
     public static func deleteGroup(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String) async throws {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/groups/\(scopeId)", session.sessionToken, method: "DELETE")
+        let (data, code) = try await send(apiBase, "/api/groups/\(scopeId)", session.sessionToken, method: "DELETE")
         guard code == 204 else { throw err("delete group failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
 
@@ -116,12 +116,12 @@ public enum Groups {
     /// Schedule a tenant for deletion after a grace period (owner only). The tenant stays usable until the
     /// deadline (members secure their data), then the server GC purges it. Idempotent.
     public static func deleteTenant(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)", session.sessionToken, method: "DELETE")
+        let (data, code) = try await send(apiBase, "/api/tenant", session.sessionToken, method: "DELETE")
         guard code == 204 else { throw err("delete tenant failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
     /// Cancel a scheduled tenant deletion — clears the deadline (owner only).
     public static func cancelTenantDeletion(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws {
-        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/cancel-deletion", session.sessionToken, method: "POST")
+        let (data, code) = try await send(apiBase, "/api/tenant/cancel-deletion", session.sessionToken, method: "POST")
         guard code == 204 else { throw err("cancel tenant deletion failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
 }

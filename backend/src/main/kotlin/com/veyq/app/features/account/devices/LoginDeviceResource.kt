@@ -18,11 +18,6 @@ import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 
-data class RegisterLoginDeviceRequest(
-    @field:Size(max = 255) val deviceRef: String = "",
-    @field:Size(max = 16384) val encryptedName: String = "",
-)
-
 data class RenameLoginDeviceRequest(
     @field:Size(max = 16384) val encryptedName: String = "",
 )
@@ -40,22 +35,6 @@ data class LoginDeviceList(val devices: List<LoginDeviceSummary>)
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 class LoginDeviceResource(private val sessions: SessionService) {
-    @PUT
-    @Path("/current")
-    @Transactional
-    fun registerCurrentDevice(
-        @HeaderParam("Authorization") authorization: String?,
-        request: RegisterLoginDeviceRequest,
-    ): Response {
-        sessions.resolve(authorization) ?: throw unauthorized()
-        val deviceRef = request.deviceRef.trim()
-        val encryptedName = request.encryptedName.trim()
-        if (deviceRef.isBlank()) throw ApiException(400, "DEVICE_REF_REQUIRED", "Device identifier is required")
-        if (encryptedName.isBlank()) throw ApiException(400, "DEVICE_NAME_REQUIRED", "Encrypted device name is required")
-        sessions.registerDevice(authorization, deviceRef, encryptedName)
-        return Response.noContent().build()
-    }
-
     @GET
     @Transactional
     fun listDevices(@HeaderParam("Authorization") authorization: String?): LoginDeviceList {

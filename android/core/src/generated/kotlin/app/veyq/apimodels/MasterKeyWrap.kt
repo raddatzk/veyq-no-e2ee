@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param wrappedKey 
  * @param kdfParams 
  * @param credentialRef 
+ * @param name 
  */
 @Serializable
 
@@ -56,7 +57,10 @@ data class MasterKeyWrap (
     val kdfParams: kotlin.String? = null,
 
     @SerialName(value = "credentialRef")
-    val credentialRef: kotlin.String? = null
+    val credentialRef: kotlin.String? = null,
+
+    @SerialName(value = "name")
+    val name: kotlin.String? = null
 
 ) {
 

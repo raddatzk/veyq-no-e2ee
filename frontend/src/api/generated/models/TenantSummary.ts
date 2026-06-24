@@ -13,21 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { TenantRole } from './TenantRole';
-import {
-    TenantRoleFromJSON,
-    TenantRoleFromJSONTyped,
-    TenantRoleToJSON,
-    TenantRoleToJSONTyped,
-} from './TenantRole';
-import type { UserSummary } from './UserSummary';
-import {
-    UserSummaryFromJSON,
-    UserSummaryFromJSONTyped,
-    UserSummaryToJSON,
-    UserSummaryToJSONTyped,
-} from './UserSummary';
-
 /**
  * 
  * @export
@@ -36,10 +21,10 @@ import {
 export interface TenantSummary {
     /**
      * 
-     * @type {number}
+     * @type {string}
      * @memberof TenantSummary
      */
-    id: number;
+    id: string;
     /**
      * 
      * @type {string}
@@ -57,7 +42,7 @@ export interface TenantSummary {
      * @type {string}
      * @memberof TenantSummary
      */
-    domain: string;
+    domain?: string;
     /**
      * 
      * @type {string}
@@ -66,18 +51,21 @@ export interface TenantSummary {
     logoUrl?: string;
     /**
      * 
-     * @type {TenantRole}
+     * @type {TenantSummaryStatusEnum}
      * @memberof TenantSummary
      */
-    role: TenantRole;
-    /**
-     * 
-     * @type {Array<UserSummary>}
-     * @memberof TenantSummary
-     */
-    admins: Array<UserSummary>;
+    status: TenantSummaryStatusEnum;
 }
 
+
+/**
+ * @export
+ */
+export const TenantSummaryStatusEnum = {
+    Pending: 'PENDING',
+    Active: 'ACTIVE'
+} as const;
+export type TenantSummaryStatusEnum = typeof TenantSummaryStatusEnum[keyof typeof TenantSummaryStatusEnum];
 
 
 /**
@@ -87,9 +75,7 @@ export function instanceOfTenantSummary(value: object): value is TenantSummary {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('domain' in value) || value['domain'] === undefined) return false;
-    if (!('role' in value) || value['role'] === undefined) return false;
-    if (!('admins' in value) || value['admins'] === undefined) return false;
+    if (!('status' in value) || value['status'] === undefined) return false;
     return true;
 }
 
@@ -106,10 +92,9 @@ export function TenantSummaryFromJSONTyped(json: any, ignoreDiscriminator: boole
         'id': json['id'],
         'name': json['name'],
         'displayName': json['displayName'],
-        'domain': json['domain'],
+        'domain': json['domain'] == null ? undefined : json['domain'],
         'logoUrl': json['logoUrl'] == null ? undefined : json['logoUrl'],
-        'role': TenantRoleFromJSON(json['role']),
-        'admins': ((json['admins'] as Array<any>).map(UserSummaryFromJSON)),
+        'status': json['status'],
     };
 }
 
@@ -129,8 +114,7 @@ export function TenantSummaryToJSONTyped(value?: TenantSummary | null, ignoreDis
         'displayName': value['displayName'],
         'domain': value['domain'],
         'logoUrl': value['logoUrl'],
-        'role': TenantRoleToJSON(value['role']),
-        'admins': ((value['admins'] as Array<any>).map(UserSummaryToJSON)),
+        'status': value['status'],
     };
 }
 

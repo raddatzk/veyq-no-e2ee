@@ -1,7 +1,9 @@
 package com.veyq.app.features.account.login
 
 import com.veyq.app.generated.model.Blob
+import com.veyq.app.generated.model.AvatarUploadTicket
 import com.veyq.app.generated.model.ChangePasswordRequest
+import com.veyq.app.generated.model.CompleteAvatarUploadRequest
 import com.veyq.app.generated.model.DeleteAccountRequest
 import com.veyq.app.generated.model.IdentityPublicKey
 import com.veyq.app.generated.model.KeyBag
@@ -9,29 +11,26 @@ import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.LoginRequest
 import com.veyq.app.generated.model.LoginResponse
 import com.veyq.app.generated.model.MasterKeyWrap
-import com.veyq.app.generated.model.PersonalScopeGrant
+import com.veyq.app.generated.model.StartAvatarUploadRequest
 import com.veyq.app.generated.model.UpdateProfileRequest
-import com.veyq.app.generated.model.UpdateAvatarRequest
 import com.veyq.app.generated.model.UserProfileSummary
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.content.ContentPurge
+import com.veyq.app.shared.identity.AvatarUrls
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.identity.ProfilePermalinks
+import com.veyq.app.shared.identity.Usernames
 import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.storage.BlobStore
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.MembershipStatus
-import com.veyq.app.shared.tenancy.Tenant
-import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.security.IssuedSession
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.features.account.emailchange.EmailChangeRepository
@@ -43,12 +42,10 @@ import java.util.Base64
 import java.util.UUID
 import com.veyq.app.platform.error.unauthorized
 import com.veyq.app.shared.identity.ServerRole
-import com.veyq.app.shared.identity.effectivePermalink
+import com.veyq.app.shared.identity.effectiveUsername
 import com.veyq.app.shared.identity.toUserSummary
 
 data class LoginResult(val response: LoginResponse, val issuedSession: IssuedSession)
-data class AvatarBytes(val contentType: String, val bytes: ByteArray)
-
 /**
  * uc.account.login — authenticate, issue a session, and serve the wrapped key bag.
  * The server verifies a password proof (Argon2id) and returns ciphertext only; unlock is client-side.
@@ -60,7 +57,6 @@ class LoginHandler(
     private val keyBlobs: KeyBlobRepository,
     private val authVerifiers: AuthVerifierRepository,
     private val scopes: ScopeRepository,
-    private val grants: ScopeGrantRepository,
     private val argon2: Argon2Verifier,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
@@ -68,8 +64,8 @@ class LoginHandler(
     private val purge: ContentPurge,
     private val passwordResetTokens: PasswordResetRepository,
     private val emailChangeTokens: EmailChangeRepository,
-    private val tenants: TenantRepository,
     private val memberships: MembershipRepository,
+    private val avatarUrls: AvatarUrls,
 ) {
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -106,11 +102,12 @@ class LoginHandler(
             masterKeyWraps = keyBlobs.listByUserId(user.id).filter { it.unlockMethod != "RECOVERY" }.map(::toWrap),
         )
 
-        val issued = sessions.issuePair(user.id)
+        val issued = sessions.issuePair(user.id, req.deviceRef)
         return LoginResult(
             response = LoginResponse(
                 sessionToken = issued.accessToken,
-                user = user.toUserSummary(),
+                deviceRef = issued.deviceRef,
+                user = avatarUrls.currentUserSummary(user),
                 keyBag = keyBag,
             ),
             issuedSession = issued,
@@ -121,7 +118,7 @@ class LoginHandler(
     fun currentUser(authorization: String?): UserSummary {
         val userId = sessions.resolve(authorization) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
-        return user.toUserSummary()
+        return avatarUrls.currentUserSummary(user)
     }
 
     @Transactional
@@ -129,28 +126,50 @@ class LoginHandler(
         val userId = sessions.resolve(authorization) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
         user.displayName = req.displayName.trim()
-        val nextPermalink = requireProfilePermalink(req.permalink)
-        val taken = users.findByPermalink(nextPermalink)
+        val nextUsername = requireUsername(req.username)
+        val taken = users.findByUsername(nextUsername)
         if (taken != null && taken.id != user.id) {
-            throw ApiException(409, "PERMALINK_TAKEN", "Profile address is already in use")
+            throw ApiException(409, "USERNAME_TAKEN", "Username is already in use")
         }
-        user.permalink = nextPermalink
-        return user.toUserSummary()
+        user.username = nextUsername
+        return avatarUrls.currentUserSummary(user)
     }
 
     @Transactional
-    fun updateAvatar(authorization: String?, req: UpdateAvatarRequest): UserSummary {
+    fun startAvatarUpload(authorization: String?, req: StartAvatarUploadRequest): AvatarUploadTicket {
+        val userId = sessions.resolve(authorization) ?: throw unauthorized()
+        users.findById(userId) ?: throw unauthorized()
+        if (req.byteSize <= 0) throw ApiException(400, "AVATAR_EMPTY", "Profile image is empty")
+        if (req.byteSize > maxAvatarBytes) throw ApiException(400, "AVATAR_TOO_LARGE", "Profile image is too large")
+        val key = "profile-avatars/$userId/${UUID.randomUUID()}"
+        val uploadUrl = store.presignPut(key, avatarUploadTtlSeconds)
+            ?: throw ApiException(409, "PRESIGN_UNAVAILABLE", "Avatar direct upload requires a presign-capable object store")
+        return AvatarUploadTicket(uploadRef = key, uploadUrl = uploadUrl, expiresInSeconds = avatarUploadTtlSeconds)
+    }
+
+    @Transactional
+    fun completeAvatarUpload(authorization: String?, req: CompleteAvatarUploadRequest): UserSummary {
         val userId = sessions.resolve(authorization) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
-        if (req.bytes.isEmpty()) throw ApiException(400, "AVATAR_EMPTY", "Profile image is empty")
-        if (req.bytes.size > maxAvatarBytes) throw ApiException(400, "AVATAR_TOO_LARGE", "Profile image is too large")
+        val key = req.uploadRef.trim()
+        val prefix = "profile-avatars/$userId/"
+        val version = key.removePrefix(prefix)
+        if (!key.startsWith(prefix) || version.isBlank() || "/" in version) {
+            throw ApiException(400, "BAD_AVATAR_UPLOAD_REF", "Avatar upload reference is invalid")
+        }
+        val size = store.stat(key) ?: throw ApiException(404, "AVATAR_UPLOAD_NOT_FOUND", "Uploaded avatar object not found")
+        if (size <= 0) {
+            runCatching { store.delete(key) }
+            throw ApiException(400, "AVATAR_EMPTY", "Profile image is empty")
+        }
+        if (size > maxAvatarBytes) {
+            runCatching { store.delete(key) }
+            throw ApiException(400, "AVATAR_TOO_LARGE", "Profile image is too large")
+        }
         val oldKey = user.avatarObjectKey
-        val key = "profile-avatars/${user.id}/${UUID.randomUUID()}"
-        store.put(key, req.bytes, req.contentType.value)
         user.avatarObjectKey = key
-        user.avatarContentType = req.contentType.value
-        oldKey?.let { runCatching { store.delete(it) } }
-        return user.toUserSummary()
+        if (oldKey != null && oldKey != key) oldKey.let { runCatching { store.delete(it) } }
+        return avatarUrls.currentUserSummary(user)
     }
 
     @Transactional
@@ -159,39 +178,23 @@ class LoginHandler(
         val user = users.findById(userId) ?: throw unauthorized()
         val oldKey = user.avatarObjectKey
         user.avatarObjectKey = null
-        user.avatarContentType = null
         oldKey?.let { runCatching { store.delete(it) } }
-        return user.toUserSummary()
+        return avatarUrls.currentUserSummary(user)
     }
 
     @Transactional
-    fun currentAvatar(authorization: String?): AvatarBytes {
-        val userId = sessions.resolve(authorization) ?: throw unauthorized()
-        val user = users.findById(userId) ?: throw unauthorized()
-        return avatarBytes(user)
-    }
-
-    @Transactional
-    fun publicProfile(authorization: String?, tenantName: String, permalink: String): UserProfileSummary {
-        val tenant = requireTenantVisible(authorization, tenantName)
-        val user = users.findByPermalink(permalink) ?: throw ApiException(404, "PROFILE_NOT_FOUND", "Profile not found")
-        requireProfileVisible(tenant.id, user.id)
+    fun publicProfile(authorization: String?, tenantId: String, username: String): UserProfileSummary {
+        requireTenantVisible(authorization, tenantId)
+        val user = users.findByUsername(username) ?: throw ApiException(404, "PROFILE_NOT_FOUND", "Profile not found")
+        requireProfileVisible(tenantId, user.id)
         return UserProfileSummary(
             id = user.id,
             displayName = user.displayName,
-            permalink = user.effectivePermalink(),
+            username = user.effectiveUsername(),
             initials = initials(user.displayName),
-            avatarUrl = user.avatarObjectKey?.let { "/api/$tenantName/profiles/${user.effectivePermalink()}/avatar?v=${it.substringAfterLast('/')}" },
+            avatarUrl = avatarUrls.profileAvatarUrl(user),
             memories = emptyList(),
         )
-    }
-
-    @Transactional
-    fun publicAvatar(authorization: String?, tenantName: String, permalink: String): AvatarBytes {
-        val tenant = requireTenantVisible(authorization, tenantName)
-        val user = users.findByPermalink(permalink) ?: throw ApiException(404, "PROFILE_NOT_FOUND", "Profile not found")
-        requireProfileVisible(tenant.id, user.id)
-        return avatarBytes(user)
     }
 
     @Transactional
@@ -204,7 +207,7 @@ class LoginHandler(
             throw ApiException(400, "EXPECTED_PASSWORD_WRAP", "Password change must submit a PASSWORD master-key wrap")
         }
         suites.require(wrap.suiteId)
-        suites.require(req.authVerifier.suiteId)
+        suites.require("v1")
         val passwordBlob = keyBlobs.findByUserIdAndUnlockMethod(user.id, "PASSWORD").firstOrNull()
             ?: KeyBlob().apply {
                 id = UUID.randomUUID().toString(); this.userId = user.id; unlockMethod = "PASSWORD"; createdAt = Instant.now()
@@ -215,9 +218,9 @@ class LoginHandler(
         passwordBlob.kdfParams = wrap.kdfParams?.let { dec.decode(it) }
 
         authVerifiers.findByUserId(user.id)?.apply {
-            kind = req.authVerifier.kind.value
-            suiteId = req.authVerifier.suiteId
-            verifier = dec.decode(req.authVerifier.verifier)
+            kind = "ARGON2_PROOF"
+            suiteId = "v1"
+            verifier = argon2.createPasswordVerifier(req.newPassword)
         } ?: throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
         sessions.invalidateAll(user.id)
     }
@@ -240,10 +243,9 @@ class LoginHandler(
         identityKeys.deleteByUserId(user.id)
         user.avatarObjectKey?.let { runCatching { store.delete(it) } }
         user.email = "deleted-${user.id}@deleted.veyq.local"
-        user.permalink = null
+        user.username = null
         user.displayName = "Deleted user"
         user.avatarObjectKey = null
-        user.avatarContentType = null
         user.serverRole = ServerRole.ServerMember
         user.systemAccount = true
         user.deletedAt = Instant.now()
@@ -253,24 +255,6 @@ class LoginHandler(
     @Transactional
     fun logout(authorization: String?, refreshToken: String?) {
         if (!sessions.invalidate(authorization, refreshToken)) throw unauthorized()
-    }
-
-    @Transactional
-    fun personalScope(authorization: String?): PersonalScopeGrant {
-        val userId = sessions.resolve(authorization) ?: throw unauthorized()
-        val scope = scopes.findPersonalByOwnerUserId(userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope not found")
-        val grant = grants.find(scope.id, userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope grant not found")
-        return PersonalScopeGrant(
-            scopeId = scope.id,
-            scopePublicKey = KemPublicKey(
-                suiteId = scope.suiteId,
-                kemPublicKey = b64.encodeToString(scope.kemPublicKey),
-            ),
-            wrappedScopePrivateKey = Blob(
-                suiteId = grant.suiteId,
-                bytes = b64.encodeToString(grant.wrappedPrivateKey),
-            ),
-        )
     }
 
     private fun toWrap(blob: KeyBlob): MasterKeyWrap =
@@ -289,22 +273,20 @@ class LoginHandler(
         }
     }
 
-    private fun requireProfilePermalink(raw: String): String {
-        val normalized = ProfilePermalinks.normalize(raw)
-        if (normalized.length < 2) throw ApiException(400, "BAD_PERMALINK", "Profile address is too short")
-        if (normalized != raw.trim().lowercase()) throw ApiException(400, "BAD_PERMALINK", "Profile address must be lowercase URL-safe text")
+    private fun requireUsername(raw: String): String {
+        val normalized = Usernames.normalize(raw)
+        if (normalized.length < 2) throw ApiException(400, "BAD_USERNAME", "Username is too short")
+        if (normalized != raw.trim().lowercase()) throw ApiException(400, "BAD_USERNAME", "Username must be lowercase URL-safe text")
         return normalized
     }
 
-    private fun requireTenantVisible(authorization: String?, tenantName: String): Tenant {
+    private fun requireTenantVisible(authorization: String?, tenantId: String) {
         val currentUserId = sessions.resolve(authorization) ?: throw unauthorized()
-        val tenant = tenants.findByName(tenantName) ?: throw ApiException(404, "TENANT_NOT_FOUND", "Tenant not found")
-        val membership = memberships.find(tenant.id, currentUserId)
+        val membership = memberships.find(tenantId, currentUserId)
             ?: throw ApiException(403, "FORBIDDEN", "Tenant membership required")
         if (membership.status != MembershipStatus.ACTIVE) {
             throw ApiException(403, "FORBIDDEN", "Tenant membership required")
         }
-        return tenant
     }
 
     private fun requireProfileVisible(tenantId: String, userId: String) {
@@ -313,12 +295,6 @@ class LoginHandler(
         if (membership.status != MembershipStatus.ACTIVE) {
             throw ApiException(404, "PROFILE_NOT_FOUND", "Profile not found")
         }
-    }
-
-    private fun avatarBytes(user: User): AvatarBytes {
-        val key = user.avatarObjectKey ?: throw ApiException(404, "AVATAR_NOT_FOUND", "Profile image not found")
-        val bytes = store.get(key) ?: throw ApiException(404, "AVATAR_NOT_FOUND", "Profile image not found")
-        return AvatarBytes(contentType = user.avatarContentType ?: "application/octet-stream", bytes = bytes)
     }
 
     private fun initials(displayName: String): String =
@@ -332,5 +308,6 @@ class LoginHandler(
 
     private companion object {
         const val maxAvatarBytes = 700_000
+        const val avatarUploadTtlSeconds = 900
     }
 }

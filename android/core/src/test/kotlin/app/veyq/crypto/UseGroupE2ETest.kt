@@ -9,10 +9,10 @@ import kotlin.test.assertTrue
 class UseGroupE2ETest {
     private val apiBase = System.getenv("VEYQ_API_BASE") ?: "http://localhost:8080"
 
-    private fun groupFor(groups: org.json.JSONArray, tenantId: String): JSONObject? {
-        for (i in 0 until groups.length()) {
-            val g = groups.getJSONObject(i)
-            if (g.getString("tenantId") == tenantId) return g
+    private fun tenantSpaceFor(spaces: org.json.JSONArray, tenantId: String): JSONObject? {
+        for (i in 0 until spaces.length()) {
+            val space = spaces.getJSONObject(i)
+            if (space.getString("kind") == "TENANT" && space.getString("tenantId") == tenantId) return space
         }
         return null
     }
@@ -37,11 +37,11 @@ class UseGroupE2ETest {
             apiBase, memberInvite.inviteId, memberInvite.bootstrapSecret, memberInvite.tempPrivateKey, "b@example.com", "B", bPass)
         val b = Login.login(apiBase, "b@example.com", bPass, bReg.emergencyKit.secretKey)
 
-        // the group roster shows T1 to both — with each member's own role
-        val aT1 = groupFor(UseGroup.listMyGroups(apiBase, a), t1Id)
+        // the unified space roster shows the tenant-root space to both — with each member's own role
+        val aT1 = tenantSpaceFor(SwitchActiveSpace.listMySpaces(apiBase, a), t1Id)
         assertEquals("Owner", aT1?.getString("role"))
         assertEquals("Acme Group", aT1?.getString("displayName"))
-        val bT1 = groupFor(UseGroup.listMyGroups(apiBase, b), t1Id)
+        val bT1 = tenantSpaceFor(SwitchActiveSpace.listMySpaces(apiBase, b), t1Id)
         assertEquals("Member", bT1?.getString("role"))
 
         // both members write shared content under the one group scope (content key provisioned once)

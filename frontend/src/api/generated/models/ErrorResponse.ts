@@ -20,13 +20,13 @@ import { mapValues } from '../runtime';
  */
 export interface ErrorResponse {
     /**
-     * Stable machine-readable error code.
+     * 
      * @type {string}
      * @memberof ErrorResponse
      */
     code: string;
     /**
-     * English fallback message. Frontends should prefer localized text for the code.
+     * 
      * @type {string}
      * @memberof ErrorResponse
      */

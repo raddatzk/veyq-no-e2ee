@@ -6,9 +6,9 @@ import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.config.AppConfig
 import com.veyq.app.shared.config.EmailChangeConfig
+import com.veyq.app.shared.identity.AvatarUrls
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
@@ -33,6 +33,7 @@ class EmailChangeHandler(
     private val tokens: EmailChangeRepository,
     private val sessions: SessionService,
     private val mailer: Mailer,
+    private val avatarUrls: AvatarUrls,
     app: AppConfig,
     emailChangeCfg: EmailChangeConfig,
 ) {
@@ -81,7 +82,7 @@ class EmailChangeHandler(
         if (holder != null && holder.id != user.id) throw emailTaken()
         user.email = token.newEmail
         token.confirmedAt = Instant.now()
-        return user.toUserSummary()
+        return avatarUrls.currentUserSummary(user)
     }
 
     private fun requireUser(auth: String?): User {

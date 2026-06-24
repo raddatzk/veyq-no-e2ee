@@ -11,18 +11,18 @@ describe('TenantRouteView', () => {
     authState.activeTenantName = ''
   })
 
-  it('renders a user profile route for another user permalink', async () => {
+  it('renders a user profile route for another user username', async () => {
     const { wrapper } = await mountAt('/~anna')
 
     expect(wrapper.find('[data-testid="user-profile-view"]').exists()).toBe(true)
   })
 
-  it('redirects the current user permalink to the personal memory route', async () => {
+  it('redirects the current user username to the personal memory route', async () => {
     authState.user = {
       userId: 1,
       email: 'kevin@example.test',
       displayName: 'Kevin',
-      permalink: 'kevin',
+      username: 'kevin',
       serverRole: 'ServerOwner',
       passkeyCount: 0,
       hasPassword: true

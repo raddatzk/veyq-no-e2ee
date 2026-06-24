@@ -13,6 +13,8 @@ import AnyCodable
 
 public struct GroupSummary: Codable {
 
+    /** The group identifier for group management APIs. Currently equal to scopeId internally. */
+    public private(set) var groupId: String
     public private(set) var scopeId: String
     public private(set) var tenantId: String
     /** The caller's group role (GroupOwner | GroupMember). */
@@ -20,7 +22,8 @@ public struct GroupSummary: Codable {
     public private(set) var scopePublicKey: KemPublicKey
     public private(set) var sealedName: Blob
 
-    public init(scopeId: String, tenantId: String, role: String, scopePublicKey: KemPublicKey, sealedName: Blob) {
+    public init(groupId: String, scopeId: String, tenantId: String, role: String, scopePublicKey: KemPublicKey, sealedName: Blob) {
+        self.groupId = groupId
         self.scopeId = scopeId
         self.tenantId = tenantId
         self.role = role
@@ -29,6 +32,7 @@ public struct GroupSummary: Codable {
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
+        case groupId
         case scopeId
         case tenantId
         case role
@@ -40,6 +44,7 @@ public struct GroupSummary: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(groupId, forKey: .groupId)
         try container.encode(scopeId, forKey: .scopeId)
         try container.encode(tenantId, forKey: .tenantId)
         try container.encode(role, forKey: .role)

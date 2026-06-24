@@ -39,6 +39,7 @@ import kotlinx.serialization.Contextual
  * @param role 
  * @param status 
  * @param kind 
+ * @param existingAccount True when the invite targets an existing account, so the user must sign in and accept instead of registering.
  * @param scopePublicKey MEMBER invites only — the existing scope's public key (a public key, safe to expose).
  */
 @Serializable
@@ -59,6 +60,10 @@ data class TenantInviteInfo (
 
     @SerialName(value = "kind")
     val kind: TenantInviteInfo.Kind,
+
+    /* True when the invite targets an existing account, so the user must sign in and accept instead of registering. */
+    @SerialName(value = "existingAccount")
+    val existingAccount: kotlin.Boolean,
 
     /* MEMBER invites only — the existing scope's public key (a public key, safe to expose). */
     @SerialName(value = "scopePublicKey")

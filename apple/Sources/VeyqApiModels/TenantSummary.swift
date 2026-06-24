@@ -21,13 +21,15 @@ public struct TenantSummary: Codable {
     public private(set) var name: String
     public private(set) var displayName: String
     public private(set) var domain: String?
+    public private(set) var logoUrl: String?
     public private(set) var status: Status
 
-    public init(id: String, name: String, displayName: String, domain: String? = nil, status: Status) {
+    public init(id: String, name: String, displayName: String, domain: String? = nil, logoUrl: String? = nil, status: Status) {
         self.id = id
         self.name = name
         self.displayName = displayName
         self.domain = domain
+        self.logoUrl = logoUrl
         self.status = status
     }
 
@@ -36,6 +38,7 @@ public struct TenantSummary: Codable {
         case name
         case displayName
         case domain
+        case logoUrl
         case status
     }
 
@@ -47,6 +50,7 @@ public struct TenantSummary: Codable {
         try container.encode(name, forKey: .name)
         try container.encode(displayName, forKey: .displayName)
         try container.encodeIfPresent(domain, forKey: .domain)
+        try container.encodeIfPresent(logoUrl, forKey: .logoUrl)
         try container.encode(status, forKey: .status)
     }
 }

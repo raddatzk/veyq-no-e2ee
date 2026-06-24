@@ -17,12 +17,17 @@ public struct UserSummary: Codable {
     public private(set) var email: String
     public private(set) var displayName: String
     public private(set) var serverRole: ServerRole
+    /** URL-safe stable profile address segment. */
+    public private(set) var username: String
+    public private(set) var avatarUrl: String?
 
-    public init(id: String, email: String, displayName: String, serverRole: ServerRole) {
+    public init(id: String, email: String, displayName: String, serverRole: ServerRole, username: String, avatarUrl: String? = nil) {
         self.id = id
         self.email = email
         self.displayName = displayName
         self.serverRole = serverRole
+        self.username = username
+        self.avatarUrl = avatarUrl
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -30,6 +35,8 @@ public struct UserSummary: Codable {
         case email
         case displayName
         case serverRole
+        case username
+        case avatarUrl
     }
 
     // Encodable protocol methods
@@ -40,6 +47,8 @@ public struct UserSummary: Codable {
         try container.encode(email, forKey: .email)
         try container.encode(displayName, forKey: .displayName)
         try container.encode(serverRole, forKey: .serverRole)
+        try container.encode(username, forKey: .username)
+        try container.encodeIfPresent(avatarUrl, forKey: .avatarUrl)
     }
 }
 

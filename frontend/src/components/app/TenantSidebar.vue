@@ -1,14 +1,14 @@
 <script setup lang="ts">
 // Workspace sidebar wired to the E2EE backend: the personal space, the group spaces the user can enter, and
 // the active space's favourite memories. Space/group names are decrypted client-side (app/spaces.loadSpaces);
-// entering a space opens its scope + content key. Replaces the legacy tenant/permalink-driven navigation.
+// entering a space opens its scope + content key. Replaces the legacy tenant/username-driven navigation.
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { useThemeState } from '../../shared/state/useThemeState'
-import { ensureSpaces, reloadSpaces, spaces } from '../../app/spaces'
+import { ensureSpaces, spaces } from '../../app/spaces'
 import {
   enterSpace,
   loadMemoryById,

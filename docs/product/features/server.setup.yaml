@@ -5,7 +5,7 @@ capabilities:
   - server.setup
 productArea: Self-hosted setup, first admin and first Memory space.
 entryPoints:
-  - docs/api/setup.openapi.yaml
+  - docs/api/admin.openapi.yaml
   - frontend/src/views/SetupView.vue
 acceptanceCriteria:
   - id: server.setup.display-name-validation

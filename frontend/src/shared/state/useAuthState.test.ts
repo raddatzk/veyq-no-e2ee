@@ -24,7 +24,7 @@ describe('useAuthState', () => {
         userId: 7,
         email: 'kevin@example.test',
         displayName: 'Kevin',
-        permalink: 'kevin',
+        username: 'kevin',
         serverRole: 'ServerMember',
         passkeyCount: 0,
         hasPassword: true
@@ -44,7 +44,7 @@ describe('useAuthState', () => {
         userId: 7,
         email: 'kevin@example.test',
         displayName: 'Kevin',
-        permalink: 'kevin',
+        username: 'kevin',
         serverRole: 'ServerMember',
         passkeyCount: 0,
         hasPassword: true
@@ -62,7 +62,7 @@ describe('useAuthState', () => {
         userId: 7,
         email: 'kevin@example.test',
         displayName: 'Kevin',
-        permalink: 'kevin',
+        username: 'kevin',
         serverRole: 'ServerMember',
         passkeyCount: 0,
         hasPassword: true
@@ -82,7 +82,7 @@ describe('useAuthState', () => {
         userId: 7,
         email: 'kevin@example.test',
         displayName: 'Kevin',
-        permalink: 'kevin',
+        username: 'kevin',
         serverRole: 'ServerMember',
         passkeyCount: 0,
         hasPassword: true

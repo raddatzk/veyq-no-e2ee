@@ -18,6 +18,7 @@ object Login {
 
     data class UnlockedSession(
         val sessionToken: String,
+        val deviceRef: String,
         val email: String,
         val serverRole: String,
         val userId: String = "",
@@ -27,10 +28,15 @@ object Login {
         val masterKey: ByteArray,
     )
 
-    fun login(apiBase: String, email: String, password: String, secretKeyB64: String): UnlockedSession {
+    fun login(apiBase: String, email: String, password: String, secretKeyB64: String, deviceRef: String? = null): UnlockedSession {
+        val loginBody = JSONObject()
+            .put("email", email)
+            .put("password", password)
+        if (!deviceRef.isNullOrBlank()) loginBody.put("deviceRef", deviceRef)
+
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/login"))
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(JSONObject().put("email", email).put("password", password).toString()))
+            .POST(HttpRequest.BodyPublishers.ofString(loginBody.toString()))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() != 200) throw RuntimeException("login failed: ${resp.statusCode()}")
@@ -55,6 +61,7 @@ object Login {
         val user = body.getJSONObject("user")
         return UnlockedSession(
             sessionToken = body.getString("sessionToken"),
+            deviceRef = body.getString("deviceRef"),
             email = user.getString("email"),
             serverRole = user.getString("serverRole"),
             userId = user.optString("id", ""),
@@ -84,7 +91,14 @@ object Login {
 
     /** Returns the authenticated user's unshared personal scope grant, or throws on non-200. */
     fun fetchPersonalScope(apiBase: String, sessionToken: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/personal-scope"))
+        val spacesReq = HttpRequest.newBuilder(URI.create("$apiBase/api/spaces"))
+            .header("Authorization", "Bearer $sessionToken").GET().build()
+        val spacesResp = client.send(spacesReq, HttpResponse.BodyHandlers.ofString())
+        if (spacesResp.statusCode() != 200) throw RuntimeException("list spaces failed: ${spacesResp.statusCode()}")
+        val spaces = JSONObject(spacesResp.body()).getJSONArray("spaces")
+        val scopeId = (0 until spaces.length()).map { spaces.getJSONObject(it) }.firstOrNull { it.getString("kind") == "PERSONAL" }?.getString("scopeId")
+            ?: throw RuntimeException("personal space not found")
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/grants/me"))
             .header("Authorization", "Bearer $sessionToken").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() != 200) throw RuntimeException("personal scope failed: ${resp.statusCode()}")

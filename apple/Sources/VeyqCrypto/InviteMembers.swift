@@ -27,7 +27,7 @@ public enum InviteMembers {
 
     /// List a tenant's members with their published identity public keys (for re-wrapping a rotated scope).
     public static func listTenantMembers(apiBase: String, token: String, tenantId: String) async throws -> [TenantMemberDTO] {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/members")!)
         r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, resp) = try await URLSession.shared.data(for: r)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
@@ -102,7 +102,7 @@ public enum InviteMembers {
         let req = RotateScopeRequestDTO(
             scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(newScope.pubKemX + newScope.pubKemM)), grants: grants,
             wrappedContentKey: wrappedContentKey, reSealedItems: reSealedItems, reSealedNodes: reSealedNodes)
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/scope/rotate")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/scope/rotate")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -117,7 +117,7 @@ public enum InviteMembers {
 
     /// Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto.
     public static func changeMemberRole(apiBase: String, ownerToken: String, tenantId: String, userId: String, role: String) async throws -> MembershipSummaryDTO {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members/\(userId)/role")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/members/\(userId)/role")!)
         r.httpMethod = "PUT"
         r.setValue("Bearer \(ownerToken)", forHTTPHeaderField: "Authorization")
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -132,7 +132,7 @@ public enum InviteMembers {
 
     /// Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto.
     public static func removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String) async throws -> MembershipSummaryDTO {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members/\(userId)")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/members/\(userId)")!)
         r.httpMethod = "DELETE"
         r.setValue("Bearer \(ownerToken)", forHTTPHeaderField: "Authorization")
         let (data, resp) = try await URLSession.shared.data(for: r)
@@ -169,7 +169,7 @@ public enum InviteMembers {
             role: role,
             tempPublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(temp.pubKemX + temp.pubKemM)),
             tempWrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(tempWrapped)))
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/member-invites")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/member-invites")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -238,7 +238,7 @@ public enum InviteMembers {
     /// only the encrypted temp key). The server validates ownership + that the link targets this instance.
     public static func emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) async throws {
         let req = EmailInviteRequest(email: email.trimmingCharacters(in: .whitespacesAndNewlines), inviteId: inviteId, link: link)
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/member-invites/email")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/member-invites/email")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")

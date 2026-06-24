@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface CreateTenantRequest {
     /**
-     * 
+     * Unique slug-like tenant name.
      * @type {string}
      * @memberof CreateTenantRequest
      */
@@ -32,17 +32,11 @@ export interface CreateTenantRequest {
      */
     displayName: string;
     /**
-     * 
+     * Required + unique: the host that resolves to this tenant (e.g. acme.veyq.app).
      * @type {string}
      * @memberof CreateTenantRequest
      */
     domain: string;
-    /**
-     * Email address. The backend trims whitespace and stores it lowercase.
-     * @type {string}
-     * @memberof CreateTenantRequest
-     */
-    ownerEmail: string;
 }
 
 /**
@@ -52,7 +46,6 @@ export function instanceOfCreateTenantRequest(value: object): value is CreateTen
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('domain' in value) || value['domain'] === undefined) return false;
-    if (!('ownerEmail' in value) || value['ownerEmail'] === undefined) return false;
     return true;
 }
 
@@ -69,7 +62,6 @@ export function CreateTenantRequestFromJSONTyped(json: any, ignoreDiscriminator:
         'name': json['name'],
         'displayName': json['displayName'],
         'domain': json['domain'],
-        'ownerEmail': json['ownerEmail'],
     };
 }
 
@@ -87,7 +79,6 @@ export function CreateTenantRequestToJSONTyped(value?: CreateTenantRequest | nul
         'name': value['name'],
         'displayName': value['displayName'],
         'domain': value['domain'],
-        'ownerEmail': value['ownerEmail'],
     };
 }
 

@@ -3,89 +3,59 @@ info:
   title: veyq spaces
   version: 0.1.0
 paths:
-  /api/me/groups:
+  /api/spaces:
     get:
       tags: [Spaces]
-      operationId: listMyGroups
-      summary: List the group spaces the caller can enter (active member + holds the scope key).
+      operationId: listSpaces
+      summary: The current tenant space switcher — every space the caller can enter on this host.
       description: >
-        A group space is a tenant the caller is an ACTIVE member of AND holds the tenant-root scope grant
-        for (access = the wrap, ADR 0005 — no separate per-action permission). Returns human context
-        (tenant name + role) plus the scope id + public key so the client can open it and decrypt content.
-        Personal scopes are excluded (that is uc.spaces.use-personal).
+        One list backing the space switcher for the tenant resolved from the request host: the caller's
+        tenant-bound personal space, the TENANT_ROOT entry and GROUP_ROOT entries. TENANT appears only when
+        the caller is an ACTIVE tenant member and holds the TENANT_ROOT scope grant; GROUP appears only when
+        the caller is a group member and holds the GROUP_ROOT scope grant. Access = the wrap (ADR 0005), so a
+        space appears only if its scope key is actually held. Switching fetches no secrets, only public scope
+        material; opening the selected space uses /api/scopes/{scopeId}/grants/me.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-      responses:
-        '200':
-          description: The caller's group spaces.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MyGroupList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-  # NB: own tag (SpaceRoster) — keeping one operation per tag avoids the jaxrs-spec greedy class-@Path that
-  # would otherwise shadow sibling /api/me/* routes (see docs note on the codegen gotcha).
-  /api/me/spaces:
-    get:
-      tags: [SpaceRoster]
-      operationId: listMySpaces
-      summary: The unified space switcher — every space the caller can enter (personal + groups).
-      description: >
-        One list backing the space switcher: the caller's personal space plus every group they are an
-        active member of AND hold the scope key for (access = the wrap, ADR 0005 — a space appears only if
-        its scope key is actually held). Switching between them is pure client-side context; this fetches no
-        secrets, only the public scope material the client already holds wraps for.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '200':
           description: The caller's spaces.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MySpaceList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+              schema: { $ref: "#/components/schemas/MySpaceList" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          description: Caller is not an active member of the current host tenant.
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
 components:
   schemas:
-    GroupSpace:
-      type: object
-      required: [tenantId, name, displayName, role, scopeId, scopePublicKey]
-      properties:
-        tenantId: { type: string }
-        name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
-        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
-        logoUrl: { type: string, description: 'Optional tenant branding image URL shown in the space switcher.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
-        role: { type: string, description: 'The caller''s role in the tenant (membership authority, not content access).' }
-        scopeId: { type: string }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-    MyGroupList:
-      type: object
-      required: [groups]
-      properties:
-        groups:
-          type: array
-          items: { $ref: '#/components/schemas/GroupSpace' }
     SpaceEntry:
       type: object
       description: >
-        One entry in the space switcher. PERSONAL = the user's private scope. TENANT = a tenant-wide space
-        (every active tenant member). GROUP = a sub-space within a tenant (a subset of members); its name is
-        sealed under the group content key, so the client decrypts sealedName rather than reading displayName.
+        One entry in the space switcher. PERSONAL = the user's tenant-bound private scope. TENANT = the
+        tenant-wide TENANT_ROOT space (active tenant member + held tenant-root grant). GROUP = a GROUP_ROOT
+        sub-space within a tenant (group member + held group-root grant); its name is sealed under the group
+        content key, so the client decrypts sealedName rather than reading displayName.
       required: [kind, scopeId, scopePublicKey]
       properties:
         kind: { type: string, enum: [PERSONAL, TENANT, GROUP] }
-        tenantId: { type: string, description: 'TENANT/GROUP — the backing tenant.' }
+        tenantId: { type: string, description: 'The current host tenant backing this space.' }
+        groupId: { type: string, description: 'GROUP only — the group identifier for group management APIs. Currently equal to the GROUP_ROOT scopeId internally.' }
         name: { type: string, description: 'TENANT — the tenant name (slug).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         domain: { type: string, description: 'TENANT/GROUP — the tenant''s domain (the host that resolves to it). The client routes/switches by it.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
         logoUrl: { type: string, description: 'TENANT/GROUP — optional tenant branding image URL shown in the space switcher.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
         displayName: { type: string, description: 'PERSONAL: the user''s display name; TENANT: the tenant display name; GROUP: empty (use sealedName).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string, description: 'TENANT: tenant role; GROUP: group role; absent for PERSONAL.' }
-        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'GROUP only — the group name sealed under its content key.' }
+        sealedName: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'GROUP only — the group name sealed under its content key.' }
         scheduledDeletionAt: { type: string, format: date-time, description: 'TENANT only — set when the tenant is scheduled for deletion (in-app warning + cancel).' }
         scopeId: { type: string }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
     MySpaceList:
       type: object
       required: [spaces]
       properties:
         spaces:
           type: array
-          items: { $ref: '#/components/schemas/SpaceEntry' }
+          items: { $ref: "#/components/schemas/SpaceEntry" }

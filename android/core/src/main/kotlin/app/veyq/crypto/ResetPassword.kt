@@ -1,14 +1,13 @@
 package app.veyq.crypto
 
 import org.json.JSONObject
-import java.text.Normalizer
 import java.util.Base64
 
 /**
  * uc.account.recover-keys (Android) — recover a forgotten password with the Secret Key (Emergency Kit) AND
  * email access. The email delivers a one-time token (email factor); the Secret Key decrypts the RECOVERY
  * master-key wrap (crypto factor). The client unwraps the master key, re-wraps it under the new password and
- * ships the new PASSWORD wrap + auth verifier. The server sees neither secret.
+ * ships the new PASSWORD wrap. The server sees the new password, but never the Secret Key or master key.
  */
 object ResetPassword {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -21,12 +20,12 @@ object ResetPassword {
 
     /** Ask the server to email a reset token. Always succeeds (the server never reveals account existence). */
     fun requestReset(apiBase: String, email: String) {
-        val (code, body) = post(apiBase, "/api/account/password-reset/request", JSONObject().put("email", email.trim()).toString())
+        val (code, body) = post(apiBase, "/api/me/password-reset/request", JSONObject().put("email", email.trim()).toString())
         if (code != 204) throw RuntimeException("reset request failed: $code")
     }
 
     private fun material(apiBase: String, token: String): JSONObject {
-        val (code, body) = post(apiBase, "/api/account/password-reset/material", JSONObject().put("token", token).toString())
+        val (code, body) = post(apiBase, "/api/me/password-reset/material", JSONObject().put("token", token).toString())
         if (code != 200) throw RuntimeException("reset material failed: $code")
         return JSONObject(body)
     }
@@ -36,7 +35,7 @@ object ResetPassword {
 
     /**
      * Complete the reset: unwrap the master key with the Secret Key, re-wrap under the new password, submit
-     * the new PASSWORD wrap + auth verifier. Returns the account email so the caller can sign in. Throws on a
+     * the new PASSWORD wrap and new password. Returns the account email so the caller can sign in. Throws on a
      * wrong Secret Key (the RECOVERY wrap fails to open).
      */
     fun confirmReset(apiBase: String, token: String, secretKeyB64: String, newPassword: String): String {
@@ -49,17 +48,15 @@ object ResetPassword {
         // re-wrap under the NEW password (PASSWORD KEK still folds in the Secret Key — login stays 2-factor)
         val newSalt = V1.randomBytes(16)
         val newWrap = V1.symWrap(V1.kekPasswordSecret(secretKey, newPassword, newSalt, argon), masterKey, "master-key", V1.randomBytes(12))
-        val authSalt = V1.randomBytes(16)
-        val verifier = V1.kekRecovery(Normalizer.normalize(newPassword, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), authSalt, argon)
 
         val body = JSONObject()
             .put("token", token)
+            .put("newPassword", newPassword)
             .put("masterKeyWrap", JSONObject().put("unlockMethod", "PASSWORD").put("suiteId", "v1").put("wrappedKey", enc.encodeToString(newWrap)).put("kdfParams", enc.encodeToString(V1.encodeKdfParams(argon, newSalt))))
-            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", enc.encodeToString(authSalt + verifier)))
             // prove Secret-Key possession: reproduce the commitment the server stored for this master key
             .put("recoveryAuthTag", enc.encodeToString(V1.recoveryAuthTag(masterKey)))
             .toString()
-        val (code, resp) = post(apiBase, "/api/account/password-reset/confirm", body)
+        val (code, resp) = post(apiBase, "/api/me/password-reset/confirm", body)
         if (code != 204) throw RuntimeException("reset confirm failed: $code")
         return mat.getString("email")
     }

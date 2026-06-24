@@ -14,6 +14,7 @@ public enum Tenant {
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
     struct MyScopeGrantDTO: Codable { let scopeId: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
+    struct CurrentTenantDTO: Codable { let tenantId, tenantScopeId: String }
     struct ClaimRequest: Codable { let bootstrapSecret: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
 
     private static func send<T: Decodable>(_ apiBase: String, _ path: String, _ token: String, method: String, body: Data? = nil) async throws -> T {
@@ -38,11 +39,15 @@ public enum Tenant {
     }
 
     static func issueOwnerInvite(apiBase: String, token: String, tenantId: String) async throws -> OwnerInviteDTO {
-        try await send(apiBase, "/api/tenants/\(tenantId)/owner-invite", token, method: "POST")
+        try await send(apiBase, "/api/tenant/owner-invite", token, method: "POST")
     }
 
     static func getMyScopeGrant(apiBase: String, token: String, tenantId: String) async throws -> MyScopeGrantDTO {
-        try await send(apiBase, "/api/tenants/\(tenantId)/scope", token, method: "GET")
+        let tenant: CurrentTenantDTO = try await send(apiBase, "/api/tenant", token, method: "GET")
+        if !tenantId.isEmpty && tenant.tenantId != tenantId {
+            throw NSError(domain: "veyq.tenant", code: 2, userInfo: [NSLocalizedDescriptionKey: "requested tenant does not match current host"])
+        }
+        return try await send(apiBase, "/api/scopes/\(tenant.tenantScopeId)/grants/me", token, method: "GET")
     }
 
     public static func claimTenantOwnership(

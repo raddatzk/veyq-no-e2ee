@@ -57,7 +57,7 @@ function user(serverRole: 'ServerOwner' | 'ServerMember') {
     userId: '1',
     email: 'owner@example.test',
     displayName: 'Owner',
-    permalink: 'owner',
+    username: 'owner',
     serverRole,
     passkeyCount: 0,
     hasPassword: true

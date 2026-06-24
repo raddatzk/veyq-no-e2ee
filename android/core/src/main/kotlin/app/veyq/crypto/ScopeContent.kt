@@ -21,34 +21,37 @@ object ScopeContent {
 
     /** Fetch + open the caller's personal scope: unwrap its private key with the user's identity. */
     fun openPersonalScope(apiBase: String, session: Login.UnlockedSession): OpenScope {
-        val (code, body) = req(apiBase, "/api/me/personal-scope", session.sessionToken)
-        if (code != 200) throw RuntimeException("personal-scope failed: $code")
-        val g = JSONObject(body)
-        val idKem = session.kemPublicKey
-        val scopePrivBytes = V1.asymUnwrap(
-            session.identity.kemX, session.identity.mlkemSeed, idKem.copyOfRange(0, 32), idKem.copyOfRange(32, idKem.size),
-            dec.decode(g.getJSONObject("wrappedScopePrivateKey").getString("bytes")), "personal-scope-grant",
-        )
-        val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
-        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), V1.deserializeIdentityPrivate(scopePrivBytes))
+        val (code, body) = req(apiBase, "/api/spaces", session.sessionToken)
+        if (code != 200) throw RuntimeException("list spaces failed: $code")
+        val spaces = JSONObject(body).getJSONArray("spaces")
+        val personal = (0 until spaces.length()).map { spaces.getJSONObject(it) }.firstOrNull { it.getString("kind") == "PERSONAL" }
+            ?: throw RuntimeException("personal space not found")
+        return openScopeById(apiBase, session, personal.getString("scopeId"), "personal-scope-grant")
     }
 
     /** Fetch + open a tenant scope the caller holds a grant for (re-fetches the current grant each call). */
     fun openTenantScope(apiBase: String, session: Login.UnlockedSession, tenantId: String): OpenScope {
-        val g = Tenant.getMyScopeGrant(apiBase, session.sessionToken, tenantId)
-        val scopePriv = Tenant.openScopeGrant(g, session.identity, session.kemPublicKey)
-        val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
-        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), scopePriv)
+        val (code, body) = req(apiBase, "/api/spaces", session.sessionToken)
+        if (code != 200) throw RuntimeException("list spaces failed: $code")
+        val spaces = JSONObject(body).getJSONArray("spaces")
+        val tenant = (0 until spaces.length()).map { spaces.getJSONObject(it) }
+            .firstOrNull { it.getString("kind") == "TENANT" && it.optString("tenantId") == tenantId }
+            ?: throw RuntimeException("tenant space not found")
+        return openScopeById(apiBase, session, tenant.getString("scopeId"))
     }
 
     /** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope — no tenant path). */
-    fun openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String): OpenScope {
+    fun openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String, context: String = "scope-grant"): OpenScope {
         val (code, body) = req(apiBase, "/api/scopes/$scopeId/grants/me", session.sessionToken)
         if (code != 200) throw RuntimeException("scope grant failed: $code")
         val g = JSONObject(body)
-        val scopePriv = Tenant.openScopeGrant(g, session.identity, session.kemPublicKey)
+        val idKem = session.kemPublicKey
+        val scopePrivBytes = V1.asymUnwrap(
+            session.identity.kemX, session.identity.mlkemSeed, idKem.copyOfRange(0, 32), idKem.copyOfRange(32, idKem.size),
+            dec.decode(g.getJSONObject("wrappedScopePrivateKey").getString("bytes")), context,
+        )
         val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
-        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), scopePriv)
+        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), V1.deserializeIdentityPrivate(scopePrivBytes))
     }
 
     /** Get the scope's content key, provisioning one (wrapped to the scope) on first use. */

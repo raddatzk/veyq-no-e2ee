@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { MasterKeyWrap } from './MasterKeyWrap';
+import {
+    MasterKeyWrapFromJSON,
+    MasterKeyWrapFromJSONTyped,
+    MasterKeyWrapToJSON,
+    MasterKeyWrapToJSONTyped,
+} from './MasterKeyWrap';
+
 /**
  * 
  * @export
@@ -20,24 +28,32 @@ import { mapValues } from '../runtime';
  */
 export interface ChangePasswordRequest {
     /**
-     * Required when the user already has a password. Omitted when setting the first password for a passkey-only account.
+     * 
      * @type {string}
      * @memberof ChangePasswordRequest
      */
-    currentPassword?: string;
+    currentPassword: string;
     /**
-     * User account password. Account passwords require at least 10 characters and are checked against the configured compromised-password provider when they are set or changed.
+     * 
      * @type {string}
      * @memberof ChangePasswordRequest
      */
     newPassword: string;
+    /**
+     * 
+     * @type {MasterKeyWrap}
+     * @memberof ChangePasswordRequest
+     */
+    masterKeyWrap: MasterKeyWrap;
 }
 
 /**
  * Check if a given object implements the ChangePasswordRequest interface.
  */
 export function instanceOfChangePasswordRequest(value: object): value is ChangePasswordRequest {
+    if (!('currentPassword' in value) || value['currentPassword'] === undefined) return false;
     if (!('newPassword' in value) || value['newPassword'] === undefined) return false;
+    if (!('masterKeyWrap' in value) || value['masterKeyWrap'] === undefined) return false;
     return true;
 }
 
@@ -51,8 +67,9 @@ export function ChangePasswordRequestFromJSONTyped(json: any, ignoreDiscriminato
     }
     return {
         
-        'currentPassword': json['currentPassword'] == null ? undefined : json['currentPassword'],
+        'currentPassword': json['currentPassword'],
         'newPassword': json['newPassword'],
+        'masterKeyWrap': MasterKeyWrapFromJSON(json['masterKeyWrap']),
     };
 }
 
@@ -69,6 +86,7 @@ export function ChangePasswordRequestToJSONTyped(value?: ChangePasswordRequest |
         
         'currentPassword': value['currentPassword'],
         'newPassword': value['newPassword'],
+        'masterKeyWrap': MasterKeyWrapToJSON(value['masterKeyWrap']),
     };
 }
 

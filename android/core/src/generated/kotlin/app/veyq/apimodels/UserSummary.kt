@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param email 
  * @param displayName 
  * @param serverRole 
+ * @param username URL-safe stable profile address segment.
+ * @param avatarUrl 
  */
 @Serializable
 
@@ -52,7 +54,14 @@ data class UserSummary (
     val displayName: kotlin.String,
 
     @Contextual @SerialName(value = "serverRole")
-    val serverRole: ServerRole
+    val serverRole: ServerRole,
+
+    /* URL-safe stable profile address segment. */
+    @SerialName(value = "username")
+    val username: kotlin.String,
+
+    @SerialName(value = "avatarUrl")
+    val avatarUrl: kotlin.String? = null
 
 ) {
 

@@ -32,14 +32,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * One entry in the space switcher. PERSONAL = the user's private scope. TENANT = a tenant-wide space (every active tenant member). GROUP = a sub-space within a tenant (a subset of members); its name is sealed under the group content key, so the client decrypts sealedName rather than reading displayName. 
+ * One entry in the space switcher. PERSONAL = the user's tenant-bound private scope. TENANT = the tenant-wide TENANT_ROOT space (active tenant member + held tenant-root grant). GROUP = a GROUP_ROOT sub-space within a tenant (group member + held group-root grant); its name is sealed under the group content key, so the client decrypts sealedName rather than reading displayName. 
  *
  * @param kind 
  * @param scopeId 
  * @param scopePublicKey 
- * @param tenantId TENANT/GROUP — the backing tenant.
+ * @param tenantId The current host tenant backing this space.
+ * @param groupId GROUP only — the group identifier for group management APIs. Currently equal to the GROUP_ROOT scopeId internally.
  * @param name TENANT — the tenant name (slug).
  * @param domain TENANT/GROUP — the tenant's domain (the host that resolves to it). The client routes/switches by it.
+ * @param logoUrl TENANT/GROUP — optional tenant branding image URL shown in the space switcher.
  * @param displayName PERSONAL: the user's display name; TENANT: the tenant display name; GROUP: empty (use sealedName).
  * @param role TENANT: tenant role; GROUP: group role; absent for PERSONAL.
  * @param sealedName GROUP only — the group name sealed under its content key.
@@ -58,9 +60,13 @@ data class SpaceEntry (
     @SerialName(value = "scopePublicKey")
     val scopePublicKey: KemPublicKey,
 
-    /* TENANT/GROUP — the backing tenant. */
+    /* The current host tenant backing this space. */
     @SerialName(value = "tenantId")
     val tenantId: kotlin.String? = null,
+
+    /* GROUP only — the group identifier for group management APIs. Currently equal to the GROUP_ROOT scopeId internally. */
+    @SerialName(value = "groupId")
+    val groupId: kotlin.String? = null,
 
     /* TENANT — the tenant name (slug). */
     @SerialName(value = "name")
@@ -69,6 +75,10 @@ data class SpaceEntry (
     /* TENANT/GROUP — the tenant's domain (the host that resolves to it). The client routes/switches by it. */
     @SerialName(value = "domain")
     val domain: kotlin.String? = null,
+
+    /* TENANT/GROUP — optional tenant branding image URL shown in the space switcher. */
+    @SerialName(value = "logoUrl")
+    val logoUrl: kotlin.String? = null,
 
     /* PERSONAL: the user's display name; TENANT: the tenant display name; GROUP: empty (use sealedName). */
     @SerialName(value = "displayName")

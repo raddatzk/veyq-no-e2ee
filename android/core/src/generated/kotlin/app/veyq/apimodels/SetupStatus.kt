@@ -35,6 +35,9 @@ import kotlinx.serialization.Contextual
  * @param setupRequired 
  * @param suites 
  * @param appBaseUrl This instance's public app origin (the web client base URL). Clients that assemble invite links (e.g. mobile owners emailing an invite) build them against this so the server's anti-abuse origin check passes. Low-sensitivity config — same value the web app is served from. 
+ * @param supportUrl Optional URL where users can support/fund this instance. When set, clients show a dismissible support banner pointing here. Low-sensitivity operator config; absent when unset. 
+ * @param serverVersion The deployed server version string (advisory). Clients may surface it; future compatibility checks can build on it. Low-sensitivity config. 
+ * @param directTransport Whether this instance can transfer media DIRECTLY to/from its object store via presigned URLs (ADR 0021) — the only transport path. `ok` for a presign-capable store (S3/MinIO); `unavailable` when the store can't presign (the in-memory dev backend) → media upload/download won't work and the operator must fix the store config. Advisory; clients surface it as an operator hint. 
  */
 @Serializable
 
@@ -48,10 +51,32 @@ data class SetupStatus (
 
     /* This instance's public app origin (the web client base URL). Clients that assemble invite links (e.g. mobile owners emailing an invite) build them against this so the server's anti-abuse origin check passes. Low-sensitivity config — same value the web app is served from.  */
     @SerialName(value = "appBaseUrl")
-    val appBaseUrl: kotlin.String? = null
+    val appBaseUrl: kotlin.String? = null,
+
+    /* Optional URL where users can support/fund this instance. When set, clients show a dismissible support banner pointing here. Low-sensitivity operator config; absent when unset.  */
+    @SerialName(value = "supportUrl")
+    val supportUrl: kotlin.String? = null,
+
+    /* The deployed server version string (advisory). Clients may surface it; future compatibility checks can build on it. Low-sensitivity config.  */
+    @SerialName(value = "serverVersion")
+    val serverVersion: kotlin.String? = null,
+
+    /* Whether this instance can transfer media DIRECTLY to/from its object store via presigned URLs (ADR 0021) — the only transport path. `ok` for a presign-capable store (S3/MinIO); `unavailable` when the store can't presign (the in-memory dev backend) → media upload/download won't work and the operator must fix the store config. Advisory; clients surface it as an operator hint.  */
+    @SerialName(value = "directTransport")
+    val directTransport: SetupStatus.DirectTransport? = null
 
 ) {
 
+    /**
+     * Whether this instance can transfer media DIRECTLY to/from its object store via presigned URLs (ADR 0021) — the only transport path. `ok` for a presign-capable store (S3/MinIO); `unavailable` when the store can't presign (the in-memory dev backend) → media upload/download won't work and the operator must fix the store config. Advisory; clients surface it as an operator hint. 
+     *
+     * Values: ok,unavailable
+     */
+    @Serializable
+    enum class DirectTransport(val value: kotlin.String) {
+        @SerialName(value = "ok") ok("ok"),
+        @SerialName(value = "unavailable") unavailable("unavailable");
+    }
 
 }
 

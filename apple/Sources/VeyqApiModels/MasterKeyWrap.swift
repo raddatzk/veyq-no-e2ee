@@ -26,13 +26,15 @@ public struct MasterKeyWrap: Codable {
     public private(set) var wrappedKey: String
     public private(set) var kdfParams: String?
     public private(set) var credentialRef: String?
+    public private(set) var name: String?
 
-    public init(unlockMethod: UnlockMethod, suiteId: String, wrappedKey: String, kdfParams: String? = nil, credentialRef: String? = nil) {
+    public init(unlockMethod: UnlockMethod, suiteId: String, wrappedKey: String, kdfParams: String? = nil, credentialRef: String? = nil, name: String? = nil) {
         self.unlockMethod = unlockMethod
         self.suiteId = suiteId
         self.wrappedKey = wrappedKey
         self.kdfParams = kdfParams
         self.credentialRef = credentialRef
+        self.name = name
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -41,6 +43,7 @@ public struct MasterKeyWrap: Codable {
         case wrappedKey
         case kdfParams
         case credentialRef
+        case name
     }
 
     // Encodable protocol methods
@@ -52,6 +55,7 @@ public struct MasterKeyWrap: Codable {
         try container.encode(wrappedKey, forKey: .wrappedKey)
         try container.encodeIfPresent(kdfParams, forKey: .kdfParams)
         try container.encodeIfPresent(credentialRef, forKey: .credentialRef)
+        try container.encodeIfPresent(name, forKey: .name)
     }
 }
 

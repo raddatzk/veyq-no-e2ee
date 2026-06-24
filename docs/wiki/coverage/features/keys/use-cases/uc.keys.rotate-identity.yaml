@@ -11,7 +11,7 @@ documents:
   - type: crosscutting
     ref: docs/wiki/crosscutting/account-key-model.md
   - type: api
-    ref: docs/api/identity.openapi.yaml
+    ref: docs/api/crypto.openapi.yaml
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/keys/rotateidentity/MyGrantsHandler.kt
   - type: entryPoint

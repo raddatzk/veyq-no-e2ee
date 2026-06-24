@@ -15,6 +15,7 @@ import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.storage.BlobStore
+import com.veyq.app.shared.tenancy.MembershipStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.OffsetDateTime
@@ -23,9 +24,9 @@ import java.util.Base64
 import com.veyq.app.platform.error.unauthorized
 
 /**
- * uc.spaces.switch-active-space (roster) — the unified space switcher: tenant contexts the caller can
- * enter, plus the caller's personal space once at least one tenant context exists. A space appears only if
- * its scope key is actually held; switching between entries is pure client context.
+ * uc.spaces.switch-active-space (roster) — the unified space switcher: tenant-bound personal scopes,
+ * TENANT_ROOT scopes and GROUP_ROOT scopes the caller can enter. A space appears only if its scope key is
+ * actually held; switching between entries is pure client context.
  */
 @ApplicationScoped
 class MySpacesHandler(
@@ -42,37 +43,47 @@ class MySpacesHandler(
     private val logoUrlTtlSeconds = 900
 
     @Transactional
-    fun listMySpaces(auth: String?): MySpaceList {
+    fun listSpaces(auth: String?, tenantId: String): MySpaceList {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
         val entries = mutableListOf<SpaceEntry>()
 
-        // Batch the roster so the query count is fixed, not O(tenants + groups): one read of every grant the
-        // caller holds (access = the wrap, ADR 0005), then the memberships, the relevant scopes and tenants by
-        // id-set — assembled in memory. "Holds the scope key" = the scope id is in `held`.
-        val held = grants.listByUserId(userId).mapTo(HashSet()) { it.scopeId }
-        val activeMemberships = memberships.listActiveByUserId(userId)
-        val groupMemberships = groupMembers.listByUserId(userId)
-        val tenantRootByTenantId = scopes.listTenantRootsByTenantIds(activeMemberships.map { it.tenantId }.toSet()).associateBy { it.tenantId }
-        val groupScopeById = scopes.listByIds(groupMemberships.map { it.scopeId }.toSet()).associateBy { it.id }
-        val tenantsById = tenants.listByIds(
-            (activeMemberships.map { it.tenantId } + groupScopeById.values.mapNotNull { it.tenantId }).toSet(),
-        ).associateBy { it.id }
+        val tenant = tenants.findById(tenantId) ?: throw ApiException(404, "TENANT_NOT_FOUND", "Tenant not found")
+        val membership = memberships.find(tenantId, userId)
+        if (membership == null || membership.status != MembershipStatus.ACTIVE) {
+            throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
+        }
 
-        // tenant spaces — the tenant-wide space for every tenant the caller is an active member of (+ holds the grant)
-        val tenantEntries = mutableListOf<SpaceEntry>()
-        activeMemberships.forEach { m ->
-            val tenant = tenantsById[m.tenantId] ?: return@forEach
-            val scope = tenantRootByTenantId[m.tenantId] ?: return@forEach
-            if (scope.id !in held) return@forEach
-            tenantEntries += SpaceEntry(
+        // Batch the roster so the query count is fixed. "Holds the scope key" = the scope id is in `held`.
+        val held = grants.listByUserId(userId).mapTo(HashSet()) { it.scopeId }
+        val groupMemberships = groupMembers.listByUserId(userId)
+        val groupScopeById = scopes.listByIds(groupMemberships.map { it.scopeId }.toSet()).associateBy { it.id }
+        val tenantRoot = scopes.findByTenantId(tenantId)
+
+        scopes.listPersonalRootsByOwnerAndTenantIds(userId, setOf(tenantId)).forEach { personal ->
+            if (personal.id !in held) return@forEach
+            entries += SpaceEntry(
+                kind = SpaceEntry.Kind.PERSONAL,
+                tenantId = personal.tenantId,
+                name = tenant.name,
+                displayName = user.displayName,
+                domain = tenant.domain,
+                logoUrl = tenant.logoUrl(),
+                scopeId = personal.id,
+                scopePublicKey = personal.toPublicKey(),
+            )
+        }
+
+        // tenant space — the TENANT_ROOT space for the current host tenant (+ held grant)
+        tenantRoot?.takeIf { it.id in held }?.let { scope ->
+            entries += SpaceEntry(
                 kind = SpaceEntry.Kind.TENANT,
                 tenantId = tenant.id,
                 name = tenant.name,
                 displayName = tenant.displayName,
                 domain = tenant.domain,
                 logoUrl = tenant.logoUrl(),
-                role = m.role.name,
+                role = membership.role.name,
                 scheduledDeletionAt = tenant.scheduledDeletionAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
                 scopeId = scope.id,
                 scopePublicKey = scope.toPublicKey(),
@@ -81,42 +92,22 @@ class MySpacesHandler(
 
         // group spaces — every GROUP_ROOT scope the caller is a member of and holds the grant for. The name
         // is sealed under the group content key, so it ships as ciphertext (the client decrypts it).
-        val groupEntries = mutableListOf<SpaceEntry>()
         groupMemberships.forEach { gm ->
             val scope = groupScopeById[gm.scopeId] ?: return@forEach
+            if (scope.tenantId != tenantId) return@forEach
             if (scope.id !in held) return@forEach
-            groupEntries += SpaceEntry(
+            entries += SpaceEntry(
                 kind = SpaceEntry.Kind.GROUP,
                 tenantId = scope.tenantId,
-                // the group's tenant domain — so a cross-host tenant switch can navigate to the right host
-                domain = scope.tenantId?.let { tenantsById[it]?.domain },
-                logoUrl = scope.tenantId?.let { tenantsById[it]?.logoUrl() },
+                groupId = scope.id,
+                domain = tenant.domain,
+                logoUrl = tenant.logoUrl(),
                 role = gm.role,
                 sealedName = Blob(suiteId = scope.nameSuiteId ?: scope.suiteId, bytes = enc.encodeToString(scope.sealedName ?: ByteArray(0))),
                 scopeId = scope.id,
                 scopePublicKey = scope.toPublicKey(),
             )
         }
-
-        // Personal spaces are part of a tenant, not a global workspace. Tenant purge therefore removes them
-        // with the rest of that tenant's scopes.
-        val visibleTenantIds = (tenantEntries.mapNotNull { it.tenantId } + groupEntries.mapNotNull { it.tenantId }).toSet()
-        scopes.listPersonalRootsByOwnerAndTenantIds(userId, visibleTenantIds).forEach { personal ->
-            if (personal.id !in held) return@forEach
-            val tenant = personal.tenantId?.let { tenantsById[it] }
-            entries += SpaceEntry(
-                kind = SpaceEntry.Kind.PERSONAL,
-                tenantId = personal.tenantId,
-                name = tenant?.name,
-                displayName = user.displayName,
-                domain = tenant?.domain,
-                logoUrl = tenant?.logoUrl(),
-                scopeId = personal.id,
-                scopePublicKey = personal.toPublicKey(),
-            )
-        }
-        entries += tenantEntries
-        entries += groupEntries
 
         return MySpaceList(spaces = entries)
     }
@@ -125,7 +116,7 @@ class MySpacesHandler(
 
     private fun Tenant.logoUrl(): String? {
         val key = logoObjectKey ?: return null
-        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenants/$id/logo?v=${key.substringAfterLast('/')}"
+        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenant/logo?v=${key.substringAfterLast('/')}"
     }
 
 }

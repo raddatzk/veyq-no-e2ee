@@ -19,7 +19,7 @@ class SwitchActiveSpaceE2ETest {
     }
 
     @Test
-    fun listsPersonalPlusGroupAndSwitchesBetweenThem() {
+    fun listsPersonalPlusTenantRootAndSwitchesBetweenThem() {
         if (System.getenv("VEYQ_E2E") != "1") return // opt-in: requires a live backend
 
         val pass = "correct horse battery staple"
@@ -30,21 +30,21 @@ class SwitchActiveSpaceE2ETest {
         val inv = Tenant.issueOwnerInvite(apiBase, a.sessionToken, t1Id)
         Tenant.claimTenantOwnership(apiBase, a.sessionToken, inv.getString("inviteId"), inv.getString("bootstrapSecret"), a.kemPublicKey)
 
-        // the switcher lists both spaces: the personal one + the group just claimed
+        // the switcher lists both spaces: the personal one + the tenant root just claimed
         val spaces = SwitchActiveSpace.listMySpaces(apiBase, a)
         val personal = firstOfKind(spaces, "PERSONAL")
-        val group = firstOfKind(spaces, "TENANT")
+        val tenant = firstOfKind(spaces, "TENANT")
         assertEquals("Admin", personal?.getString("displayName"))
-        assertEquals("Owner", group?.getString("role"))
-        assertEquals(t1Id, group?.getString("tenantId"))
+        assertEquals("Owner", tenant?.getString("role"))
+        assertEquals(t1Id, tenant?.getString("tenantId"))
 
         // switch into the personal space and write there (keys already held)
         val pScope = SwitchActiveSpace.openSpace(apiBase, a, personal!!)
         val pCk = ScopeContent.getOrCreateContentKey(apiBase, a, pScope)
         ScopeContent.writeItem(apiBase, a, pScope, pCk, "personal note")
 
-        // switch into the group space and write there
-        val gScope = SwitchActiveSpace.openSpace(apiBase, a, group!!)
+        // switch into the tenant-root space and write there
+        val gScope = SwitchActiveSpace.openSpace(apiBase, a, tenant!!)
         val gCk = ScopeContent.getOrCreateContentKey(apiBase, a, gScope)
         ScopeContent.writeItem(apiBase, a, gScope, gCk, "group note")
 

@@ -13,21 +13,37 @@ import AnyCodable
 
 public struct SetupStatus: Codable {
 
+    public enum DirectTransport: String, Codable, CaseIterable {
+        case ok = "ok"
+        case unavailable = "unavailable"
+    }
     public private(set) var setupRequired: Bool
     public private(set) var suites: [String]
     /** This instance's public app origin (the web client base URL). Clients that assemble invite links (e.g. mobile owners emailing an invite) build them against this so the server's anti-abuse origin check passes. Low-sensitivity config — same value the web app is served from.  */
     public private(set) var appBaseUrl: String?
+    /** Optional URL where users can support/fund this instance. When set, clients show a dismissible support banner pointing here. Low-sensitivity operator config; absent when unset.  */
+    public private(set) var supportUrl: String?
+    /** The deployed server version string (advisory). Clients may surface it; future compatibility checks can build on it. Low-sensitivity config.  */
+    public private(set) var serverVersion: String?
+    /** Whether this instance can transfer media DIRECTLY to/from its object store via presigned URLs (ADR 0021) — the only transport path. `ok` for a presign-capable store (S3/MinIO); `unavailable` when the store can't presign (the in-memory dev backend) → media upload/download won't work and the operator must fix the store config. Advisory; clients surface it as an operator hint.  */
+    public private(set) var directTransport: DirectTransport?
 
-    public init(setupRequired: Bool, suites: [String], appBaseUrl: String? = nil) {
+    public init(setupRequired: Bool, suites: [String], appBaseUrl: String? = nil, supportUrl: String? = nil, serverVersion: String? = nil, directTransport: DirectTransport? = nil) {
         self.setupRequired = setupRequired
         self.suites = suites
         self.appBaseUrl = appBaseUrl
+        self.supportUrl = supportUrl
+        self.serverVersion = serverVersion
+        self.directTransport = directTransport
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case setupRequired
         case suites
         case appBaseUrl
+        case supportUrl
+        case serverVersion
+        case directTransport
     }
 
     // Encodable protocol methods
@@ -37,6 +53,9 @@ public struct SetupStatus: Codable {
         try container.encode(setupRequired, forKey: .setupRequired)
         try container.encode(suites, forKey: .suites)
         try container.encodeIfPresent(appBaseUrl, forKey: .appBaseUrl)
+        try container.encodeIfPresent(supportUrl, forKey: .supportUrl)
+        try container.encodeIfPresent(serverVersion, forKey: .serverVersion)
+        try container.encodeIfPresent(directTransport, forKey: .directTransport)
     }
 }
 

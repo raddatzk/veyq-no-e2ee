@@ -33,13 +33,17 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param displayName 
+ * @param username 
  */
 @Serializable
 
 data class UpdateProfileRequest (
 
     @SerialName(value = "displayName")
-    val displayName: kotlin.String
+    val displayName: kotlin.String,
+
+    @SerialName(value = "username")
+    val username: kotlin.String
 
 ) {
 

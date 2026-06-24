@@ -1,13 +1,17 @@
 package com.veyq.app.features.spaces.switchactivespace
 
-import com.veyq.app.generated.api.SpaceRosterApi
+import com.veyq.app.generated.api.SpacesApi
+import com.veyq.app.shared.tenancy.CurrentTenantResolver
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
-/** Thin REST entry implementing the generated SpaceRosterApi; delegates to the handler. */
+/** Thin REST entry implementing the generated SpacesApi; delegates to the handler. */
 @ApplicationScoped
-class MySpacesResource(private val handler: MySpacesHandler) : SpaceRosterApi {
+class MySpacesResource(
+    private val handler: MySpacesHandler,
+    private val currentTenant: CurrentTenantResolver,
+) : SpacesApi {
 
-    override fun listMySpaces(authorization: String): Response =
-        Response.ok(handler.listMySpaces(authorization)).build()
+    override fun listSpaces(authorization: String): Response =
+        Response.ok(handler.listSpaces(authorization, currentTenant.currentTenantId())).build()
 }

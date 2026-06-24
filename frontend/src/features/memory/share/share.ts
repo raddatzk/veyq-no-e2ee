@@ -99,14 +99,14 @@ export type TenantTerms = { tenantId: string; termsMarkdown?: string; version: n
 
 /** Read a tenant's ToS (Owner only). */
 export async function getTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string): Promise<TenantTerms> {
-  const res = await authFetch(apiBase, session, `/api/tenants/${tenantId}/terms`)
+  const res = await authFetch(apiBase, session, '/api/tenant/terms')
   if (!res.ok) throw await apiError(res, 'get terms')
   return res.json()
 }
 
 /** Set a tenant's ToS (Owner only); bumps the version so guests re-accept. */
 export async function setTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string, termsMarkdown: string): Promise<TenantTerms> {
-  const res = await authFetch(apiBase, session, `/api/tenants/${tenantId}/terms`, {
+  const res = await authFetch(apiBase, session, '/api/tenant/terms', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ termsMarkdown }),

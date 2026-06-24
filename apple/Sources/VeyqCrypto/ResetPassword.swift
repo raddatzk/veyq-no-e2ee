@@ -3,18 +3,17 @@ import Foundation
 /// uc.account.recover-keys (Apple) — recover a forgotten password with the Secret Key (Emergency Kit) AND
 /// email access. The email delivers a one-time token (email factor); the Secret Key decrypts the RECOVERY
 /// master-key wrap (crypto factor). The client unwraps the master key, re-wraps it under the new password and
-/// ships the new PASSWORD wrap + auth verifier. The server sees neither secret.
+/// ships the new PASSWORD wrap. The server sees the new password, but never the Secret Key or master key.
 public enum ResetPassword {
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
-    struct AuthVerifierDTO: Codable { let kind, suiteId, verifier: String }
     struct MaterialResponse: Codable { let email: String; let recoveryWrap: MasterKeyWrapDTO }
     struct RequestBody: Codable { let email: String }
     struct TokenBody: Codable { let token: String }
-    struct ConfirmBody: Codable { let token: String; let masterKeyWrap: MasterKeyWrapDTO; let authVerifier: AuthVerifierDTO; let recoveryAuthTag: String }
+    struct ConfirmBody: Codable { let token: String; let newPassword: String; let masterKeyWrap: MasterKeyWrapDTO; let recoveryAuthTag: String }
 
     /// Ask the server to email a reset token. Always succeeds (the server never reveals account existence).
     public static func requestReset(apiBase: String, email: String) async throws {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/account/password-reset/request")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/me/password-reset/request")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try JSONEncoder().encode(RequestBody(email: email.trimmingCharacters(in: .whitespacesAndNewlines)))
@@ -30,7 +29,7 @@ public enum ResetPassword {
     }
 
     private static func material(apiBase: String, token: String) async throws -> MaterialResponse {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/account/password-reset/material")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/me/password-reset/material")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try JSONEncoder().encode(TokenBody(token: token))
@@ -42,7 +41,7 @@ public enum ResetPassword {
     }
 
     /// Complete the reset: unwrap the master key with the Secret Key, re-wrap under the new password, submit
-    /// the new PASSWORD wrap + auth verifier. Returns the account email so the caller can sign in. Throws on a
+    /// the new PASSWORD wrap and new password. Returns the account email so the caller can sign in. Throws on a
     /// wrong Secret Key (the RECOVERY wrap fails to open).
     public static func confirmReset(apiBase: String, token: String, secretKeyB64: String, newPassword: String) async throws -> String {
         let mat = try await material(apiBase: apiBase, token: token)
@@ -55,16 +54,14 @@ public enum ResetPassword {
         // re-wrap under the NEW password (PASSWORD KEK still folds in the Secret Key — login stays 2-factor)
         let newSalt = V1.randomBytes(16)
         let newWrap = try V1.symWrap(kek: try V1.kekPasswordSecret(secretKey: secretKey, password: newPassword, salt: newSalt, params: SetupServer.argon), targetKey: masterKey, context: "master-key", nonce: V1.randomBytes(12))
-        let authSalt = V1.randomBytes(16)
-        let verifier = try V1.kekRecovery(recoveryCode: Data(newPassword.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: SetupServer.argon)
 
         let body = ConfirmBody(
             token: token,
+            newPassword: newPassword,
             masterKeyWrap: MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(newWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: newSalt))),
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
             // prove Secret-Key possession: reproduce the commitment the server stored for this master key
             recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)))
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/account/password-reset/confirm")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/me/password-reset/confirm")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try JSONEncoder().encode(body)

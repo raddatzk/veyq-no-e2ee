@@ -11,33 +11,35 @@ documents:
   - type: api
     ref: docs/api/spaces.openapi.yaml
   - type: api
-    ref: docs/api/content.openapi.yaml
+    ref: docs/api/crypto.openapi.yaml
+  - type: api
+    ref: docs/api/media.openapi.yaml
   - type: entryPoint
-    ref: backend/src/main/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsHandler.kt
+    ref: backend/src/main/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesHandler.kt
   - type: entryPoint
-    ref: frontend/src/features/spaces/useGroup/useGroup.ts
+    ref: frontend/src/features/spaces/switchActiveSpace/switchActiveSpace.ts
   - type: entryPoint
-    ref: android/core/src/main/kotlin/app/veyq/crypto/UseGroup.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/SwitchActiveSpace.kt
   - type: entryPoint
-    ref: apple/Sources/VeyqCrypto/UseGroup.swift
+    ref: apple/Sources/VeyqCrypto/SwitchActiveSpace.swift
 acceptanceCriteria:
   - id: uc.spaces.use-group.roster-is-the-wrap
-    statement: The group roster lists exactly the tenants the caller is an active member of AND holds the scope key for (access = the wrap); a member without the grant sees nothing.
+    statement: The unified space roster lists TENANT entries exactly for tenants where the caller is an active member and holds the TENANT_ROOT scope key (access = the wrap); a member without the grant sees no enterable tenant-root space.
     coverage:
       backend:
         integration:
-          - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
+          - testName: listsPersonalPlusHeldTenantRootSpaces
             kind: positive
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
-          - testName: listsOnlyGroupsTheCallerHoldsTheKeyFor
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
+          - testName: listsPersonalPlusHeldTenantRootSpaces
             kind: negative
-            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
   - id: uc.spaces.use-group.shared-collaboration
     statement: Two members of one group write and read the same shared content under a single scope content key; each sees the other's items.
     coverage:
       web:
         e2e:
-          - testName: "lists the group for both members and both read each other's shared items"
+          - testName: "lists the tenant-root space for both members and both read each other's shared items"
             kind: positive
             ref: frontend/src/features/spaces/useGroup/useGroup.e2e.test.ts
       android:

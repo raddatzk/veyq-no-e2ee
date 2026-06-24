@@ -33,8 +33,8 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param inviteId 
- * @param bootstrapSecret One-time secret (base64url); goes in the URL fragment.
  * @param expiresAt 
+ * @param bootstrapSecret One-time secret (base64url); member invites return it to the key-holding owner
  */
 @Serializable
 
@@ -43,12 +43,12 @@ data class OwnerInvite (
     @SerialName(value = "inviteId")
     val inviteId: kotlin.String,
 
-    /* One-time secret (base64url); goes in the URL fragment. */
-    @SerialName(value = "bootstrapSecret")
-    val bootstrapSecret: kotlin.String,
-
     @Contextual @SerialName(value = "expiresAt")
-    val expiresAt: java.time.OffsetDateTime
+    val expiresAt: java.time.OffsetDateTime,
+
+    /* One-time secret (base64url); member invites return it to the key-holding owner */
+    @SerialName(value = "bootstrapSecret")
+    val bootstrapSecret: kotlin.String? = null
 
 ) {
 

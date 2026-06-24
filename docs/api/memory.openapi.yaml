@@ -13,7 +13,7 @@ paths:
         and the sealed name/metadata). The client reconstructs the tree and decrypts names locally; the
         server never sees names or paths. A root-level node reports parentId = null.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - name: parentId
           in: query
@@ -28,10 +28,13 @@ paths:
           description: The scope's nodes.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MemoryNodeList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/MemoryNodeList" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     post:
       tags: [MemoryTree]
       operationId: createNode
@@ -43,24 +46,29 @@ paths:
         among the parent's children → SLUG_EXISTS). The name/title is sealed client-side; the server stores
         ciphertext, the structural type, the slug token and the order index only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateNodeRequest' }
+            schema: { $ref: "#/components/schemas/CreateNodeRequest" }
       responses:
         '200':
           description: The created node.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MemoryNode' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/MemoryNode" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/scopes/{scopeId}/nodes/{nodeId}:
     patch:
       tags: [NodeCurate]
@@ -73,21 +81,26 @@ paths:
         (NODE_CYCLE). Reorder = orderIndex. Cover = coverMediaId (must be a media of this node). The server
         stays blind to names.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateNodeRequest' }
+            schema: { $ref: "#/components/schemas/UpdateNodeRequest" }
       responses:
-        '200': { description: The updated node., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryNode' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+        '200': { description: The updated node., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryNode" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
     delete:
       tags: [NodeCurate]
       operationId: deleteNode
@@ -97,19 +110,22 @@ paths:
         derivatives, journal, tracks, shares). Any key holder of the scope may delete; the client gates it
         behind a confirm-by-name dialog. Irreversible.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Deleted. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/favorites:
     get:
       # Own tag → the generated MemoryFavoritesApi gets the specific class-@Path /api/scopes/{scopeId}/favorites
       # instead of the greedy /api/scopes/{scopeId} that the toggle path would otherwise force (which shadows
-      # sibling routes like KeysApi /grants/me). See the password-reset "one tag per op" note.
+      # sibling routes like ScopeGrantsApi /grants/me). See the password-reset "one tag per op" note.
       tags: [MemoryFavorites]
       operationId: listMemoryFavorites
       summary: List the caller's personal Memory favorites in a scope.
@@ -117,17 +133,20 @@ paths:
         Returns node ids the authenticated user has personally marked as favorite in this scope. This is
         navigation state only: the server sees ids, but not Memory titles, covers or content.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
       responses:
         '200':
           description: Favorite node ids for this user in this scope.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MemoryFavoriteList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/MemoryFavoriteList" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/favorite:
     put:
       tags: [MemoryFavorite]
@@ -137,29 +156,37 @@ paths:
         Creates an idempotent per-user favorite relation for a Memory. Folders and Chapters cannot be favorited.
         The server stores only user id, scope id and node id; encrypted Memory metadata is unchanged.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Favorite status., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryFavoriteStatus' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: Favorite status., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryFavoriteStatus" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
       tags: [MemoryFavorite]
       operationId: unfavoriteMemory
       summary: Remove a Memory from the caller's personal favorites.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Favorite status., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryFavoriteStatus' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: Favorite status., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryFavoriteStatus" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/journal:
     get:
       tags: [MemoryJournal]
@@ -170,14 +197,17 @@ paths:
         content key) plus the last-updated timestamp. A Memory with no journal yet reports a null body.
         Journals live only on a Memory or Chapter (not a Folder).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The journal (body may be null)., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The journal (body may be null)., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryJournal" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/journal/live:
     get:
       tags: [MemoryJournal]
@@ -188,14 +218,17 @@ paths:
         with seq > baseSeq. A client applies the snapshot then the updates to reconstruct the document, then
         edits and appends. Ciphertext only; the server never reads it.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: '#/components/schemas/JournalLiveState' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: "#/components/schemas/JournalLiveState" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/journal/updates:
     post:
       tags: [MemoryJournal]
@@ -204,20 +237,24 @@ paths:
       description: >
         Persists a sealed Yjs update and returns its server-assigned monotonic seq. Ciphertext only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/AppendJournalUpdateRequest' }
+            schema: { $ref: "#/components/schemas/AppendJournalUpdateRequest" }
       responses:
-        '200': { description: The assigned seq., content: { application/json: { schema: { $ref: '#/components/schemas/AppendJournalUpdateResponse' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The assigned seq., content: { application/json: { schema: { $ref: "#/components/schemas/AppendJournalUpdateResponse" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/journal/snapshot:
     put:
       tags: [MemoryJournal]
@@ -227,20 +264,24 @@ paths:
         Replaces the sealed Yjs state snapshot and the sealed Markdown read projection, sets baseSeq to the
         covered seq, and deletes every update with seq <= coveredSeq. Whole-document, operator-blind.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CompactJournalRequest' }
+            schema: { $ref: "#/components/schemas/CompactJournalRequest" }
       responses:
-        '200': { description: The compacted journal (Markdown projection)., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The compacted journal (Markdown projection)., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryJournal" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/tracks:
     get:
       tags: [MemoryTrack]
@@ -251,14 +292,17 @@ paths:
         content key; the server stores ciphertext + a timestamp only and never sees the route. Tracks live
         on a Memory or Chapter (not a Folder).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrackList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryTrackList" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     post:
       tags: [MemoryTrack]
       operationId: createTrack
@@ -267,18 +311,22 @@ paths:
         Stores one track as a sealed blob ({name, points} sealed client-side). The server stays blind to the
         route; it stores ciphertext + a timestamp only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateTrackRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateTrackRequest" } } }
       responses:
-        '200': { description: The created track., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrack' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The created track., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryTrack" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/tracks/{trackId}:
     patch:
       tags: [MemoryTrack]
@@ -289,97 +337,118 @@ paths:
         new ciphertext. The server stays blind — it only swaps the stored blob, keeping the track id (so journal
         ::track embeds keep resolving).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: trackId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateTrackRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateTrackRequest" } } }
       responses:
-        '200': { description: The updated track., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrack' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The updated track., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryTrack" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
       tags: [MemoryTrack]
       operationId: deleteTrack
       summary: Remove a track from a Memory/Chapter.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: trackId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Deleted. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/playlists:
     get:
       tags: [MemoryPlaylist]
       operationId: listPlaylists
       summary: A Memory/Chapter's sealed streaming-playlist links (ciphertext; the server is blind to them).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The playlists., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryPlaylistList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The playlists., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryPlaylistList" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     post:
       tags: [MemoryPlaylist]
       operationId: createPlaylist
       summary: Add a sealed playlist link ({provider, url, title?, note?} sealed client-side) to a Memory/Chapter.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreatePlaylistRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreatePlaylistRequest" } } }
       responses:
-        '200': { description: The created playlist., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryPlaylist' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The created playlist., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryPlaylist" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/playlists/{playlistId}:
     patch:
       tags: [MemoryPlaylist]
       operationId: updatePlaylist
       summary: Update a playlist's sealed content and/or its featured flag (at most one featured per node).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: playlistId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdatePlaylistRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdatePlaylistRequest" } } }
       responses:
-        '200': { description: The updated playlist., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryPlaylist' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The updated playlist., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryPlaylist" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
       tags: [MemoryPlaylist]
       operationId: deletePlaylist
       summary: Remove a playlist link from a Memory/Chapter.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: playlistId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Deleted. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/participants:
     get:
       tags: [MemoryParticipant]
@@ -390,14 +459,17 @@ paths:
         sealed client-side under the Memory content key; the server stores ciphertext only and never sees who
         participates in which Memory.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The participants., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipantList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The participants., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryParticipantList" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     post:
       tags: [MemoryParticipant]
       operationId: createParticipant
@@ -406,18 +478,22 @@ paths:
         Stores one participant as an opaque sealed payload. Linked-vs-anonymous semantics are inside the
         ciphertext; the server only validates auth, node type and crypto-suite id.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateParticipantRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateParticipantRequest" } } }
       responses:
-        '200': { description: The created participant., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipant' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The created participant., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryParticipant" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/participants/{participantId}:
     patch:
       tags: [MemoryParticipant]
@@ -427,47 +503,57 @@ paths:
         The client re-seals the participant payload (for example after rename or linking to a user) and swaps
         the ciphertext. The participant id stays stable for embeds/local UI references.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: participantId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateParticipantRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateParticipantRequest" } } }
       responses:
-        '200': { description: The updated participant., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipant' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The updated participant., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryParticipant" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
       tags: [MemoryParticipant]
       operationId: deleteParticipant
       summary: Remove a participant from a Memory/Chapter.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: participantId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Deleted. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/shares:
     get:
       tags: [MemoryShare]
       operationId: listShares
       summary: The read-only public share links for a Memory.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The node's shares., content: { application/json: { schema: { $ref: '#/components/schemas/ShareList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The node's shares., content: { application/json: { schema: { $ref: "#/components/schemas/ShareList" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     post:
       tags: [MemoryShare]
       operationId: createShare
@@ -477,18 +563,22 @@ paths:
         fragment and never reaches the server). The server is blind to the content and only gates which
         ciphertext a guest can fetch to this node's subtree.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateShareRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateShareRequest" } } }
       responses:
-        '200': { description: The created share., content: { application/json: { schema: { $ref: '#/components/schemas/ShareSummary' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The created share., content: { application/json: { schema: { $ref: "#/components/schemas/ShareSummary" } } } }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/scopes/{scopeId}/nodes/{nodeId}/shares/{shareId}:
     patch:
       tags: [MemoryShare]
@@ -498,32 +588,38 @@ paths:
         Replaces the editable, server-side fields of a share. Omitting expiresAt deactivates the expiry;
         an empty label/notice clears it. The wrapped content key, role and password are immutable.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: shareId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateShareRequest' } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateShareRequest" } } }
       responses:
-        '200': { description: The updated share., content: { application/json: { schema: { $ref: '#/components/schemas/ShareSummary' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The updated share., content: { application/json: { schema: { $ref: "#/components/schemas/ShareSummary" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
       tags: [MemoryShare]
       operationId: revokeShare
       summary: Revoke a public share link.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
         - { name: shareId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Revoked. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}:
     get:
       tags: [PublicShareTree]
@@ -536,8 +632,9 @@ paths:
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The share., content: { application/json: { schema: { $ref: '#/components/schemas/PublicShare' } } } }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The share., content: { application/json: { schema: { $ref: "#/components/schemas/PublicShare" } } } }
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes:
     get:
       tags: [PublicShareTree]
@@ -546,8 +643,9 @@ paths:
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The subtree nodes., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryNodeList' } } } }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The subtree nodes., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryNodeList" } } } }
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes/{nodeId}/journal:
     get:
       tags: [PublicShareTree]
@@ -557,9 +655,11 @@ paths:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The journal., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryJournal" } } } }
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes/{nodeId}/journal/live:
     get:
       tags: [PublicShareTree]
@@ -572,9 +672,11 @@ paths:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: '#/components/schemas/JournalLiveState' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: "#/components/schemas/JournalLiveState" } } } }
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes/{nodeId}/tracks:
     get:
       tags: [PublicShareTree]
@@ -588,9 +690,11 @@ paths:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrackList' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryTrackList" } } } }
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes/{nodeId}/playlists:
     get:
       tags: [PublicShareTree]
@@ -603,9 +707,11 @@ paths:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The node's playlists., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryPlaylistList' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The node's playlists., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryPlaylistList" } } } }
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/public/shares/{shareId}/nodes/{nodeId}/participants:
     get:
       tags: [PublicShareTree]
@@ -619,9 +725,11 @@ paths:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The node's participants., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryParticipantList' } } } }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The node's participants., content: { application/json: { schema: { $ref: "#/components/schemas/MemoryParticipantList" } } } }
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
 components:
   schemas:
     NodeType:
@@ -634,16 +742,16 @@ components:
         parentId:
           type: string
           description: The parent node id; omit (or null) to create at the scope root.
-        type: { $ref: '#/components/schemas/NodeType' }
+        type: { $ref: "#/components/schemas/NodeType" }
         slugToken:
           type: string
           description: Blinded slug token (HMAC of the normalized slug under a per-scope slug key); opaque to the server.
         orderIndex: { type: integer, description: 'Manual sibling ordering (server-visible integer; no name exposure).' }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     UpdateNodeRequest:
       type: object
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         slugToken: { type: string, description: 'Recomputed blinded slug token (required with a rename or a move).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         newParentId: { type: string, description: 'Move target: a node id, or "root" for the scope root. Omit to keep the parent.' }
         orderIndex: { type: integer }
@@ -655,10 +763,10 @@ components:
         id: { type: string }
         parentId: { type: string, description: 'The parent node id, or null for a root-level node.' }
         scopeId: { type: string }
-        type: { $ref: '#/components/schemas/NodeType' }
+        type: { $ref: "#/components/schemas/NodeType" }
         slugToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         orderIndex: { type: integer }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         coverMediaId: { type: string, description: 'The pinned cover media id, if any.' }
         createdAt: { type: string, format: date-time }
     MemoryNodeList:
@@ -667,7 +775,7 @@ components:
       properties:
         nodes:
           type: array
-          items: { $ref: '#/components/schemas/MemoryNode' }
+          items: { $ref: "#/components/schemas/MemoryNode" }
     MemoryFavoriteList:
       type: object
       required: [nodeIds]
@@ -685,30 +793,30 @@ components:
       required: [nodeId]
       properties:
         nodeId: { type: string }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         updatedAt: { type: string, format: date-time, description: 'When the journal was last written, if ever.' }
     JournalLiveState:
       type: object
       description: The operator-blind CRDT state of a journal — a sealed Yjs snapshot + the sealed update log.
       required: [baseSeq, updates]
       properties:
-        snapshot: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Yjs state; null until first compaction
+        snapshot: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }   # sealed Yjs state; null until first compaction
         baseSeq: { type: integer, format: int64, description: 'The highest update seq folded into the snapshot.' }
         updates:
           type: array
-          items: { $ref: '#/components/schemas/JournalUpdate' }
+          items: { $ref: "#/components/schemas/JournalUpdate" }
     JournalUpdate:
       type: object
       required: [seq, sealedUpdate, authorId]
       properties:
         seq: { type: integer, format: int64 }
-        sealedUpdate: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedUpdate: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         authorId: { type: string, description: 'The user id that appended this update (low-sensitivity metadata).' }
     AppendJournalUpdateRequest:
       type: object
       required: [sealedUpdate]
       properties:
-        sealedUpdate: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedUpdate: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     AppendJournalUpdateResponse:
       type: object
       required: [seq]
@@ -719,8 +827,8 @@ components:
       description: A fresh snapshot covering seq <= coveredSeq, plus the Markdown read projection.
       required: [snapshot, markdown, coveredSeq]
       properties:
-        snapshot: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Yjs state
-        markdown: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Markdown body (reader projection)
+        snapshot: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }   # sealed Yjs state
+        markdown: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }   # sealed Markdown body (reader projection)
         coveredSeq: { type: integer, format: int64 }
     MemoryTrack:
       type: object
@@ -728,7 +836,7 @@ components:
       properties:
         id: { type: string }
         nodeId: { type: string }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         createdAt: { type: string, format: date-time }
     MemoryTrackList:
       type: object
@@ -736,14 +844,14 @@ components:
       properties:
         tracks:
           type: array
-          items: { $ref: '#/components/schemas/MemoryTrack' }
+          items: { $ref: "#/components/schemas/MemoryTrack" }
     MemoryPlaylist:
       type: object
       required: [id, nodeId, sealedContent, featured, createdAt]
       properties:
         id: { type: string }
         nodeId: { type: string }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # AEAD {provider, url, title?, note?}
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }   # AEAD {provider, url, title?, note?}
         featured: { type: boolean }
         createdAt: { type: string, format: date-time }
     MemoryPlaylistList:
@@ -752,7 +860,7 @@ components:
       properties:
         playlists:
           type: array
-          items: { $ref: '#/components/schemas/MemoryPlaylist' }
+          items: { $ref: "#/components/schemas/MemoryPlaylist" }
     MemoryParticipant:
       type: object
       required: [id, nodeId, sealedPayload, createdAt]
@@ -760,7 +868,7 @@ components:
         id: { type: string }
         nodeId: { type: string }
         sealedPayload:
-          allOf: [{ $ref: './common.openapi.yaml#/components/schemas/Blob' }]
+          allOf: [{ $ref: "./common.openapi.yaml#/components/schemas/Blob" }]
           description: 'AEAD payload such as {displayName, linkedUserId?, presentation?}; opaque to the server.'
         createdAt: { type: string, format: date-time }
     MemoryParticipantList:
@@ -769,38 +877,38 @@ components:
       properties:
         participants:
           type: array
-          items: { $ref: '#/components/schemas/MemoryParticipant' }
+          items: { $ref: "#/components/schemas/MemoryParticipant" }
     CreatePlaylistRequest:
       type: object
       required: [sealedContent]
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         featured: { type: boolean }
     UpdatePlaylistRequest:
       type: object
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         featured: { type: boolean }
     CreateTrackRequest:
       type: object
       required: [sealedContent]
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     UpdateTrackRequest:
       type: object
       required: [sealedContent]
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     CreateParticipantRequest:
       type: object
       required: [sealedPayload]
       properties:
-        sealedPayload: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedPayload: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     UpdateParticipantRequest:
       type: object
       required: [sealedPayload]
       properties:
-        sealedPayload: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedPayload: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     ShareRole:
       type: string
       enum: [VIEWER, CONTRIBUTOR, UPLOADER]
@@ -808,10 +916,10 @@ components:
       type: object
       required: [wrappedContentKey]
       properties:
-        wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        role: { $ref: '#/components/schemas/ShareRole' }
-        uploadCapabilityHash: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints.' }
-        passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        wrappedContentKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        role: { $ref: "#/components/schemas/ShareRole" }
+        uploadCapabilityHash: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'SHA-256 of the blind upload-capability token. Required for CONTRIBUTOR/UPLOADER shares; the raw token is derived client-side and sent only to guest upload endpoints.' }
+        passwordSalt: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         expiresAt: { type: string, format: date-time, description: 'When the link stops working (omit for never).' }
         label: { type: string, description: 'An owner-facing label for the link (not shown to guests).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         noticeMarkdown: { type: string, description: 'Extra terms a guest must accept for THIS share (markdown).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
@@ -827,7 +935,7 @@ components:
       properties:
         shareId: { type: string }
         nodeId: { type: string }
-        role: { $ref: '#/components/schemas/ShareRole' }
+        role: { $ref: "#/components/schemas/ShareRole" }
         passwordProtected: { type: boolean }
         expiresAt: { type: string, format: date-time }
         label: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
@@ -839,7 +947,7 @@ components:
       properties:
         shares:
           type: array
-          items: { $ref: '#/components/schemas/ShareSummary' }
+          items: { $ref: "#/components/schemas/ShareSummary" }
     ShareNotice:
       type: object
       required: [scope, version, markdown]
@@ -857,11 +965,11 @@ components:
         shareId: { type: string }
         scopeId: { type: string }
         rootNodeId: { type: string }
-        role: { $ref: '#/components/schemas/ShareRole' }
+        role: { $ref: "#/components/schemas/ShareRole" }
         passwordProtected: { type: boolean }
-        passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        passwordSalt: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         notices:
           type: array
-          items: { $ref: '#/components/schemas/ShareNotice' }
-        wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        root: { $ref: '#/components/schemas/MemoryNode' }
+          items: { $ref: "#/components/schemas/ShareNotice" }
+        wrappedContentKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        root: { $ref: "#/components/schemas/MemoryNode" }

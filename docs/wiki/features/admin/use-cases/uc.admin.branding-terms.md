@@ -16,7 +16,7 @@ Markdown, **versioned independently**; guest acceptance is recorded only in the 
 no account to bind it to server-side.
 
 ## Main flow
-1. The owner reads the current terms (`GET /api/tenants/{tenantId}/terms`) → Markdown + version
+1. The owner reads the current terms (`GET /api/tenant/terms`) → Markdown + version
    (initially empty / `0`).
 2. The owner edits the terms (a **template builder** offers standard clauses) and saves
    (`PUT …/terms`).

@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
+ * @param groupId The group identifier for group management APIs. Currently equal to scopeId internally.
  * @param scopeId 
  * @param tenantId 
  * @param role The caller's group role (GroupOwner | GroupMember).
@@ -43,6 +44,10 @@ import kotlinx.serialization.Contextual
 @Serializable
 
 data class GroupSummary (
+
+    /* The group identifier for group management APIs. Currently equal to scopeId internally. */
+    @SerialName(value = "groupId")
+    val groupId: kotlin.String,
 
     @SerialName(value = "scopeId")
     val scopeId: kotlin.String,

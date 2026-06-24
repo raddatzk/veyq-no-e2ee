@@ -14,7 +14,7 @@ const { authState } = useAuthState()
 const tenantName = computed(() => authState.activeTenantName || authState.tenants[0]?.name || '')
 const path = computed(() => routePathToMemoryPath(route.params.pathMatch))
 const firstSegment = computed(() => path.value.split('/').filter(Boolean)[0] || '')
-const ownProfileSegment = computed(() => authState.user?.permalink ? `~${authState.user.permalink}` : '')
+const ownProfileSegment = computed(() => authState.user?.username ? `~${authState.user.username}` : '')
 const isSettingsRoute = computed(() => isSettingsPath(path.value))
 const ownProfileRedirectPath = computed(() =>
   tenantName.value && ownProfileSegment.value && firstSegment.value === ownProfileSegment.value

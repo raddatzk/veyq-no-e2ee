@@ -9,7 +9,7 @@ documents:
 - type: crosscutting
   ref: docs/wiki/crosscutting/security-model.md
 - type: api
-  ref: docs/api/auth.openapi.yaml
+  ref: docs/api/account.openapi.yaml
 - type: decision
   ref: docs/wiki/decisions/0031-profile-fields-server-visible.md
 - type: entryPoint

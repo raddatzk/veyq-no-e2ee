@@ -1112,11 +1112,11 @@ export const messages = {
         'Verwalte die E-Mail-Adresse und den Passwort-Login für deinen Account.',
       profile: 'Profil',
       profileAndLogin: 'Profil und Anmeldung',
-      profileLink: 'Profil-Link',
-      profileLinkChange: 'Profil-Link ändern',
-      profileLinkNew: 'Neuer Profil-Link',
-      profileLinkWarning:
-        'Der Profil-Link ist die Adresse, über die andere dich in Memories als Teilnehmer erkennen und dein Profil mit sichtbaren Memories öffnen. Wenn du ihn änderst, funktionieren alte Profil-Links nicht mehr.',
+      username: 'Username',
+      usernameChange: 'Username ändern',
+      usernameNew: 'Neuer Username',
+      usernameWarning:
+        'Der Username ist die Adresse, über die andere dich in Memories als Teilnehmer erkennen und dein Profil mit sichtbaren Memories öffnen. Wenn du ihn änderst, funktionieren alte Profil-Links nicht mehr.',
       profileLoadFailed: 'User-Einstellungen konnten nicht geladen werden.',
       profileSaveFailed: 'Profil konnte nicht gespeichert werden.',
       profileSavePendingEmail: 'Profil wurde gespeichert. Bitte bestätige die neue E-Mail-Adresse.',
@@ -2404,11 +2404,11 @@ export const messages = {
       loginSectionSubtitle: 'Manage the email address and password login for your account.',
       profile: 'Profile',
       profileAndLogin: 'Profile and login',
-      profileLink: 'Profile link',
-      profileLinkChange: 'Change profile link',
-      profileLinkNew: 'New profile link',
-      profileLinkWarning:
-        'The profile link is the address others use to recognize you as a participant in Memories and open your profile with visible Memories. If you change it, old profile links will stop working.',
+      username: 'Username',
+      usernameChange: 'Change username',
+      usernameNew: 'New username',
+      usernameWarning:
+        'The username is the address others use to recognize you as a participant in Memories and open your profile with visible Memories. If you change it, old profile links will stop working.',
       profileLoadFailed: 'User settings could not be loaded.',
       profileSaveFailed: 'Profile could not be saved.',
       profileSavePendingEmail: 'Profile saved. Please confirm the new email address.',

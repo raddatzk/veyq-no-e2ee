@@ -56,12 +56,12 @@ class EmailChangeSliceTest {
         val newEmail = "ec-new@example.com"
 
         given().header("Authorization", session).contentType(ContentType.JSON).body("""{"newEmail":"$newEmail"}""")
-            .post("/api/account/email-change/request").then().statusCode(204)
+            .post("/api/me/email-change/request").then().statusCode(204)
 
         val token = tokenFromEmail(newEmail)
 
         given().contentType(ContentType.JSON).body("""{"token":"$token"}""")
-            .post("/api/account/email-change/confirm").then().statusCode(200)
+            .post("/api/me/email-change/confirm").then().statusCode(200)
             .body("email", iz(newEmail))
 
         // the swap persisted: the same (still-valid) session now reports the new email
@@ -69,26 +69,26 @@ class EmailChangeSliceTest {
 
         // the token is single-use: a second confirm fails
         given().contentType(ContentType.JSON).body("""{"token":"$token"}""")
-            .post("/api/account/email-change/confirm").then().statusCode(400)
+            .post("/api/me/email-change/confirm").then().statusCode(400)
     }
 
     @Test
     fun rejectsChangeToTakenEmail() {
         val session = "Bearer ${sessions.issue("ec-user")}"
         given().header("Authorization", session).contentType(ContentType.JSON).body("""{"newEmail":"$takenEmail"}""")
-            .post("/api/account/email-change/request").then().statusCode(409)
+            .post("/api/me/email-change/request").then().statusCode(409)
         assertTrue(mailbox.getMessagesSentTo(takenEmail).isEmpty())
     }
 
     @Test
     fun rejectsConfirmWithInvalidToken() {
         given().contentType(ContentType.JSON).body("""{"token":"not-a-real-token"}""")
-            .post("/api/account/email-change/confirm").then().statusCode(400)
+            .post("/api/me/email-change/confirm").then().statusCode(400)
     }
 
     @Test
     fun rejectsRequestWithoutValidSession() {
         given().header("Authorization", "Bearer bogus-token").contentType(ContentType.JSON).body("""{"newEmail":"x@example.com"}""")
-            .post("/api/account/email-change/request").then().statusCode(401)
+            .post("/api/me/email-change/request").then().statusCode(401)
     }
 }

@@ -46,8 +46,8 @@ class RateLimitFilter(
 
     private val buckets = listOf(
         Bucket("login", "/api/login", config.loginPerMin(), 60_000),
-        Bucket("reset-request", "/api/account/password-reset/request", config.resetRequestPerMin(), 60_000),
-        Bucket("reset", "/api/account/password-reset/", config.resetPerMin(), 60_000), // material + confirm
+        Bucket("reset-request", "/api/me/password-reset/request", config.resetRequestPerMin(), 60_000),
+        Bucket("reset", "/api/me/password-reset/", config.resetPerMin(), 60_000), // material + confirm
         Bucket("invite", "/api/tenant-invites/", config.invitePerMin(), 60_000),
         Bucket("share-upload", "/api/public/shares/", config.shareUploadPerMin(), 60_000),
     )

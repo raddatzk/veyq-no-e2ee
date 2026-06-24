@@ -11,17 +11,16 @@ const bundledSpec = resolve(root, 'build', 'generated', 'openapi', 'frontend.ope
 
 const domains = [
   'common',
-  'settings',
+  'admin',
   'auth',
-  'setup',
-  'users',
+  'account',
+  'profiles',
   'tenants',
-  'tenant-registration-invites',
   'groups',
-  'memories',
-  'shares',
-  'server',
-  'frontend'
+  'spaces',
+  'crypto',
+  'memory',
+  'media'
 ]
 
 const generatorOptions = [
@@ -111,20 +110,10 @@ function mergeComponents(componentKey, components) {
 
 function rewriteExternalComponentRefs(value) {
   if (typeof value === 'string') {
-    return value
-      .replace('./common.openapi.yaml#/components/schemas/', '#/components/schemas/')
-      .replace('./common.openapi.yaml#/components/responses/', '#/components/responses/')
-      .replace('./common.openapi.yaml#/components/parameters/', '#/components/parameters/')
-      .replace('./tenants.openapi.yaml#/components/schemas/', '#/components/schemas/')
-      .replace('./tenants.openapi.yaml#/components/responses/', '#/components/responses/')
-      .replace('./tenants.openapi.yaml#/components/parameters/', '#/components/parameters/')
-      .replace('./users.openapi.yaml#/components/schemas/', '#/components/schemas/')
-      .replace('./users.openapi.yaml#/components/responses/', '#/components/responses/')
-      .replace('./users.openapi.yaml#/components/parameters/', '#/components/parameters/')
-      .replace('./memories.openapi.yaml#/components/schemas/', '#/components/schemas/')
-      .replace('./memories.openapi.yaml#/components/responses/', '#/components/responses/')
-      .replace('./memories.openapi.yaml#/components/requestBodies/', '#/components/requestBodies/')
-      .replace('./memories.openapi.yaml#/components/parameters/', '#/components/parameters/')
+    return value.replace(
+      /\.\/[^/]+\.openapi\.yaml#\/components\/(schemas|responses|parameters|requestBodies|examples)\//g,
+      '#/components/$1/'
+    )
   }
 
   if (Array.isArray(value)) {

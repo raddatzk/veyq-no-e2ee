@@ -4,9 +4,9 @@ import com.veyq.app.generated.model.RotateIdentityRequest
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
+import com.veyq.app.shared.identity.AvatarUrls
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.identity.toUserSummary
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.security.SessionService
@@ -27,6 +27,7 @@ class RotateIdentityHandler(
     private val grants: ScopeGrantRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
+    private val avatarUrls: AvatarUrls,
 ) {
     private val dec = Base64.getUrlDecoder()
 
@@ -63,6 +64,6 @@ class RotateIdentityHandler(
             grant.wrappedPrivateKey = dec.decode(rewrap.wrappedScopePrivateKey.bytes)
         }
 
-        return user.toUserSummary()
+        return avatarUrls.currentUserSummary(user)
     }
 }

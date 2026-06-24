@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface LoginRequest {
     /**
-     * Email address. The backend trims whitespace and stores it lowercase.
+     * 
      * @type {string}
      * @memberof LoginRequest
      */
@@ -32,11 +32,11 @@ export interface LoginRequest {
      */
     password: string;
     /**
-     * Required only when TOTP is enabled for password login.
+     * Optional stable client-generated login device identifier to attach to the issued session.
      * @type {string}
      * @memberof LoginRequest
      */
-    totpCode?: string;
+    deviceRef?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ export function LoginRequestFromJSONTyped(json: any, ignoreDiscriminator: boolea
         
         'email': json['email'],
         'password': json['password'],
-        'totpCode': json['totpCode'] == null ? undefined : json['totpCode'],
+        'deviceRef': json['deviceRef'] == null ? undefined : json['deviceRef'],
     };
 }
 
@@ -77,7 +77,7 @@ export function LoginRequestToJSONTyped(value?: LoginRequest | null, ignoreDiscr
         
         'email': value['email'],
         'password': value['password'],
-        'totpCode': value['totpCode'],
+        'deviceRef': value['deviceRef'],
     };
 }
 

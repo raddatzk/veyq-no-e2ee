@@ -230,7 +230,8 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
                     val creds = DeviceUnlock.load(activity)
                     if (creds == null) { error = L10n.t("login.unlockFailed"); busy = false; return@launch }
                     try {
-                        val session = withContext(Dispatchers.IO) { Login.login(creds.apiBase, creds.email, creds.password, creds.secretKey) }
+                        val session = withContext(Dispatchers.IO) { Login.login(creds.apiBase, creds.email, creds.password, creds.secretKey, creds.deviceRef) }
+                        DeviceUnlock.save(ctx, creds.copy(deviceRef = session.deviceRef))
                         onLoggedIn(session)
                     } catch (e: Exception) {
                         error = L10n.t("login.unlockFailed")
@@ -254,7 +255,7 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
             scope.launch {
                 try {
                     val session = withContext(Dispatchers.IO) { Login.login(apiBase, email, password, secretKey) }
-                    if (remember0) DeviceUnlock.save(ctx, DeviceUnlock.Creds(apiBase, email, password, secretKey))
+                    if (remember0) DeviceUnlock.save(ctx, DeviceUnlock.Creds(apiBase, email, password, secretKey, session.deviceRef))
                     onLoggedIn(session)
                 } catch (e: Exception) {
                     error = L10n.t("login.error")

@@ -1,19 +1,19 @@
-// uc.spaces.switch-active-space (web) — the unified space switcher: list every space the caller can enter
-// (personal + groups) and switch the active context into any of them. Switching fetches no secrets — it
-// opens the chosen scope with the wrap the client already holds. Content ops reuse the content slice.
+// uc.spaces.switch-active-space (web) — the unified space switcher: list every enterable PERSONAL,
+// TENANT_ROOT and GROUP_ROOT space and switch the active context into any of them. Switching fetches no
+// secrets — it opens the chosen scope with the wrap the client already holds. Content ops reuse the content slice.
 import { apiError } from '../../../shared/apiError'
 import { authFetch } from '../../../shared/api/sessionFetch'
 import type { UnlockedSession } from '../../account/login/login'
 import {
   openPersonalScopeById,
   openScopeById,
-  openTenantScope,
   type OpenScope
 } from '../../content/scopeContent'
 
 export type SpaceEntry = {
   kind: 'PERSONAL' | 'TENANT' | 'GROUP'
   tenantId?: string
+  groupId?: string
   name?: string
   // TENANT/GROUP — the tenant's domain (the host that resolves to it); used for routing + cross-host switch.
   domain?: string
@@ -29,12 +29,12 @@ export type SpaceEntry = {
   scopePublicKey: { suiteId: string; kemPublicKey: string }
 }
 
-/** List every space the caller can enter (personal + every group they hold the scope key for). */
+/** List every PERSONAL, TENANT_ROOT and GROUP_ROOT space the caller can enter. */
 export async function listMySpaces(
   apiBase: string,
   session: UnlockedSession
 ): Promise<SpaceEntry[]> {
-  const res = await authFetch(apiBase, session, '/api/me/spaces')
+  const res = await authFetch(apiBase, session, '/api/spaces')
   if (!res.ok) throw await apiError(res, 'list spaces')
   return (await res.json()).spaces
 }
@@ -46,8 +46,7 @@ export async function openSpace(
   entry: SpaceEntry
 ): Promise<OpenScope> {
   if (entry.kind === 'PERSONAL') return openPersonalScopeById(apiBase, session, entry.scopeId)
-  // A group is opened by scope id (no tenant-keyed grant path); a tenant-wide space by its tenant id.
+  // Every space is opened by scope id; groupId is only for group-management APIs.
   if (entry.kind === 'GROUP') return openScopeById(apiBase, session, entry.scopeId)
-  if (!entry.tenantId) throw new Error('tenant space entry is missing its tenantId')
-  return openTenantScope(apiBase, session, entry.tenantId)
+  return openScopeById(apiBase, session, entry.scopeId)
 }

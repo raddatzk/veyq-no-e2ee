@@ -11,7 +11,7 @@ const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const suite = env.VEYQ_E2E === '1' ? describe : describe.skip
 
 suite('switch-active-space E2E (web -> live backend)', () => {
-  it('lists personal + group spaces and switches between them with already-held keys', async () => {
+  it('lists personal + tenant-root spaces and switches between them with already-held keys', async () => {
     const pass = 'correct horse battery staple'
     const { emergencyKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', pass)
     const a = await login(apiBase, 'admin@example.com', pass, emergencyKit.secretKey)
@@ -22,18 +22,18 @@ suite('switch-active-space E2E (web -> live backend)', () => {
     // the switcher lists both spaces: the personal one + the tenant just claimed
     const spaces = await listMySpaces(apiBase, a)
     const personal = spaces.find((s) => s.kind === 'PERSONAL')
-    const group = spaces.find((s) => s.kind === 'TENANT')
+    const tenant = spaces.find((s) => s.kind === 'TENANT')
     expect(personal?.displayName).toBe('Admin')
-    expect(group?.role).toBe('Owner')
-    expect(group?.tenantId).toBe(t1.id)
+    expect(tenant?.role).toBe('Owner')
+    expect(tenant?.tenantId).toBe(t1.id)
 
     // switch into the personal space and write there (keys already held — no secrets fetched)
     const pScope = await openSpace(apiBase, a, personal!)
     const pCk = await getOrCreateContentKey(apiBase, a, pScope)
     await writeItem(apiBase, a, pScope, pCk, 'personal note')
 
-    // switch into the group space and write there
-    const gScope = await openSpace(apiBase, a, group!)
+    // switch into the tenant-root space and write there
+    const gScope = await openSpace(apiBase, a, tenant!)
     const gCk = await getOrCreateContentKey(apiBase, a, gScope)
     await writeItem(apiBase, a, gScope, gCk, 'group note')
 

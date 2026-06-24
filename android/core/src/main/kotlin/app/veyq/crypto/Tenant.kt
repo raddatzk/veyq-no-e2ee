@@ -23,10 +23,13 @@ object Tenant {
     }
 
     fun issueOwnerInvite(apiBase: String, token: String, tenantId: String): JSONObject =
-        JSONObject(send(apiBase, "/api/tenants/$tenantId/owner-invite", token, "POST"))
+        JSONObject(send(apiBase, "/api/tenant/owner-invite", token, "POST"))
 
-    fun getMyScopeGrant(apiBase: String, token: String, tenantId: String): JSONObject =
-        JSONObject(send(apiBase, "/api/tenants/$tenantId/scope", token, "GET"))
+    fun getMyScopeGrant(apiBase: String, token: String, tenantId: String): JSONObject {
+        val tenant = JSONObject(send(apiBase, "/api/tenant", token, "GET"))
+        if (tenantId.isNotBlank() && tenant.getString("tenantId") != tenantId) throw RuntimeException("requested tenant does not match current host")
+        return JSONObject(send(apiBase, "/api/scopes/${tenant.getString("tenantScopeId")}/grants/me", token, "GET"))
+    }
 
     fun claimTenantOwnership(
         apiBase: String, token: String, inviteId: String, bootstrapSecret: String, identityKemPublicKey: ByteArray,

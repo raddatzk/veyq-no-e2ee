@@ -27,15 +27,18 @@ public struct TenantInviteInfo: Codable {
     public private(set) var role: String
     public private(set) var status: Status
     public private(set) var kind: Kind
+    /** True when the invite targets an existing account, so the user must sign in and accept instead of registering. */
+    public private(set) var existingAccount: Bool
     /** MEMBER invites only — the existing scope's public key (a public key, safe to expose). */
     public private(set) var scopePublicKey: KemPublicKey?
 
-    public init(inviteId: String, tenant: TenantSummary, role: String, status: Status, kind: Kind, scopePublicKey: KemPublicKey? = nil) {
+    public init(inviteId: String, tenant: TenantSummary, role: String, status: Status, kind: Kind, existingAccount: Bool, scopePublicKey: KemPublicKey? = nil) {
         self.inviteId = inviteId
         self.tenant = tenant
         self.role = role
         self.status = status
         self.kind = kind
+        self.existingAccount = existingAccount
         self.scopePublicKey = scopePublicKey
     }
 
@@ -45,6 +48,7 @@ public struct TenantInviteInfo: Codable {
         case role
         case status
         case kind
+        case existingAccount
         case scopePublicKey
     }
 
@@ -57,6 +61,7 @@ public struct TenantInviteInfo: Codable {
         try container.encode(role, forKey: .role)
         try container.encode(status, forKey: .status)
         try container.encode(kind, forKey: .kind)
+        try container.encode(existingAccount, forKey: .existingAccount)
         try container.encodeIfPresent(scopePublicKey, forKey: .scopePublicKey)
     }
 }

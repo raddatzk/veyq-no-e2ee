@@ -17,7 +17,7 @@ object InviteMembers {
 
     /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
     fun listTenantMembers(apiBase: String, token: String, tenantId: String): JSONArray {
-        return JSONObject(ApiClient.ok(apiBase, token, "/api/tenants/$tenantId/members", "GET", label = "list members")).getJSONArray("members")
+        return JSONObject(ApiClient.ok(apiBase, token, "/api/tenant/members", "GET", label = "list members")).getJSONArray("members")
     }
 
     /**
@@ -79,18 +79,18 @@ object InviteMembers {
             throw RuntimeException("content-key fetch failed: ${ckResp.statusCode()}")
         }
 
-        return JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenants/$tenantId/scope/rotate", "POST", body.toString(), label = "rotate scope"))
+        return JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenant/scope/rotate", "POST", body.toString(), label = "rotate scope"))
     }
 
     /** Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto. */
     fun changeMemberRole(apiBase: String, ownerToken: String, tenantId: String, userId: String, role: String): JSONObject {
         val json = JSONObject().put("role", role).toString()
-        return JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenants/$tenantId/members/$userId/role", "PUT", json, label = "change role"))
+        return JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenant/members/$userId/role", "PUT", json, label = "change role"))
     }
 
     /** Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto. */
     fun removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String): JSONObject =
-        JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenants/$tenantId/members/$userId", "DELETE", label = "remove member"))
+        JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenant/members/$userId", "DELETE", label = "remove member"))
 
     data class MemberInvite(val inviteId: String, val bootstrapSecret: String, val tempPrivateKey: String)
 
@@ -114,7 +114,7 @@ object InviteMembers {
             .put("tempPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(temp.pubKemX + temp.pubKemM)))
             .put("tempWrappedScopePrivateKey", blob(tempWrapped))
             .toString()
-        val body = JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenants/$tenantId/member-invites", "POST", json, label = "member-invite"))
+        val body = JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenant/member-invites", "POST", json, label = "member-invite"))
         return MemberInvite(
             inviteId = body.getString("inviteId"),
             bootstrapSecret = body.getString("bootstrapSecret"),
@@ -193,7 +193,7 @@ object InviteMembers {
      */
     fun emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) {
         val json = JSONObject().put("email", email.trim()).put("inviteId", inviteId).put("link", link).toString()
-        val resp = ApiClient.send(apiBase, token, "/api/tenants/$tenantId/member-invites/email", "POST", json)
+        val resp = ApiClient.send(apiBase, token, "/api/tenant/member-invites/email", "POST", json)
         if (resp.statusCode() != 204) throw RuntimeException("email invite failed: ${resp.statusCode()}")
     }
 }

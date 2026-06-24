@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.text.Normalizer
 
 /**
@@ -16,6 +17,7 @@ import java.text.Normalizer
 class Argon2Verifier {
     private val saltLen = 16
     private val proofLen = 32
+    private val rng = SecureRandom()
 
     fun verifyPassword(password: String, storedVerifier: ByteArray): Boolean {
         if (storedVerifier.size != saltLen + proofLen) return false
@@ -24,6 +26,13 @@ class Argon2Verifier {
         val nfc = Normalizer.normalize(password, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
         val actual = argon2id(nfc, salt)
         return MessageDigest.isEqual(actual, expected)
+    }
+
+    fun createPasswordVerifier(password: String): ByteArray {
+        val salt = ByteArray(saltLen)
+        rng.nextBytes(salt)
+        val nfc = Normalizer.normalize(password, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
+        return salt + argon2id(nfc, salt)
     }
 
     private fun argon2id(input: ByteArray, salt: ByteArray): ByteArray {

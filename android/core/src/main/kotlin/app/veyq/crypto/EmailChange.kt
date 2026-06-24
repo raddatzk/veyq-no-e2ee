@@ -18,7 +18,7 @@ object EmailChange {
     class EmailTakenException : RuntimeException("EMAIL_TAKEN")
 
     fun requestChange(apiBase: String, sessionToken: String, newEmail: String) {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/account/email-change/request"))
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/email-change/request"))
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $sessionToken")
             .POST(HttpRequest.BodyPublishers.ofString(JSONObject().put("newEmail", newEmail).toString()))
@@ -33,7 +33,7 @@ object EmailChange {
 
     /** Confirm an email change with the token from the email link. Token-only — no session required. Returns the new email. */
     fun confirm(apiBase: String, token: String): String {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/account/email-change/confirm"))
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/email-change/confirm"))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(JSONObject().put("token", token).toString()))
             .build()

@@ -31,16 +31,17 @@ describe('MemoryParticipantsStrip', () => {
   })
 
   it('renders avatar images when available', async () => {
+    const avatarUrl = 'https://objects.example.com/veyq/profile-avatars/usr_alex/7e5f64dc?X-Amz-Expires=900&X-Amz-Signature=test'
     const wrapper = mount(MemoryParticipantsStrip, {
       props: {
         tenantName: 'family',
-        participants: [participant({ displayName: 'Alex', avatarUrl: '/api/users/me/avatar?v=1' })]
+        participants: [participant({ displayName: 'Alex', avatarUrl })]
       },
       global: { stubs: primeStubs() }
     })
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('img.memory-participant-avatar-image').attributes('src')).toBe('/api/users/me/avatar?v=1')
+    expect(wrapper.find('img.memory-participant-avatar-image').attributes('src')).toBe(avatarUrl)
   })
 
   it('moves additional participants behind the overflow control', async () => {

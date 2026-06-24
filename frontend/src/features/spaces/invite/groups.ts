@@ -99,7 +99,7 @@ export async function emailInviteToGroup(
   const link = passphrase && passphrase.length > 0
     ? buildProtectedInviteLink(origin, { inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, ...protectTempKey(invite.tempPrivateKey, passphrase) })
     : buildInviteLink(origin, { inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, tempPrivateKey: invite.tempPrivateKey })
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/member-invites/email`, {
+  const res = await fetch(`${apiBase}/api/tenant/member-invites/email`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ email: email.trim(), inviteId: invite.inviteId, link }),
@@ -113,12 +113,12 @@ export async function emailInviteToGroup(
  * invites. Idempotent; the deadline is exposed on the roster as scheduledDeletionAt.
  */
 export async function deleteTenant(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}`, { method: 'DELETE', headers: { authorization: `Bearer ${session.sessionToken}` } })
+  const res = await fetch(`${apiBase}/api/tenant`, { method: 'DELETE', headers: { authorization: `Bearer ${session.sessionToken}` } })
   if (!res.ok) throw await apiError(res, 'delete tenant')
 }
 
 /** Cancel a scheduled tenant deletion (clears the deadline). Owner only. */
 export async function cancelTenantDeletion(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/cancel-deletion`, { method: 'POST', headers: { authorization: `Bearer ${session.sessionToken}` } })
+  const res = await fetch(`${apiBase}/api/tenant/cancel-deletion`, { method: 'POST', headers: { authorization: `Bearer ${session.sessionToken}` } })
   if (!res.ok) throw await apiError(res, 'cancel tenant deletion')
 }

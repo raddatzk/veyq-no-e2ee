@@ -25,13 +25,13 @@ final class UseGroupE2ETests: XCTestCase {
             tempPrivateKeyB64: memberInvite.tempPrivateKey, email: "b@example.com", displayName: "B", password: bPass)
         let b = try await Login.login(apiBase: apiBase, email: "b@example.com", password: bPass, secretKeyB64: bReg.emergencyKit.secretKey)
 
-        // the group roster shows T1 to both — with each member's own role
-        let aGroups = try await UseGroup.listMyGroups(apiBase: apiBase, session: a)
-        let aT1 = aGroups.first { $0.tenantId == t1.id }
+        // the unified space roster shows the tenant-root space to both — with each member's own role
+        let aSpaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: a)
+        let aT1 = aSpaces.first { $0.kind == "TENANT" && $0.tenantId == t1.id }
         XCTAssertEqual(aT1?.role, "Owner")
         XCTAssertEqual(aT1?.displayName, "Acme Group")
-        let bGroups = try await UseGroup.listMyGroups(apiBase: apiBase, session: b)
-        XCTAssertEqual(bGroups.first { $0.tenantId == t1.id }?.role, "Member")
+        let bSpaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: b)
+        XCTAssertEqual(bSpaces.first { $0.kind == "TENANT" && $0.tenantId == t1.id }?.role, "Member")
 
         // both members write shared content under the one group scope (content key provisioned once)
         let aScope = try await ScopeContent.openTenantScope(apiBase: apiBase, session: a, tenantId: t1.id)

@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param sessionToken 
+ * @param deviceRef Stable opaque login-device identifier attached to the issued session.
  * @param user 
  * @param keyBag 
  */
@@ -44,6 +45,10 @@ data class LoginResponse (
 
     @SerialName(value = "sessionToken")
     val sessionToken: kotlin.String,
+
+    /* Stable opaque login-device identifier attached to the issued session. */
+    @SerialName(value = "deviceRef")
+    val deviceRef: kotlin.String,
 
     @SerialName(value = "user")
     val user: UserSummary,

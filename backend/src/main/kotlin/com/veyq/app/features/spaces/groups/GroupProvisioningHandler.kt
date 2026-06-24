@@ -198,6 +198,7 @@ class GroupProvisioningHandler(
 
 
     private fun toSummary(scope: Scope, role: String) = GroupSummary(
+        groupId = scope.id,
         scopeId = scope.id,
         tenantId = scope.tenantId!!,
         role = role,

@@ -13,14 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { MemorySummary } from './MemorySummary';
-import {
-    MemorySummaryFromJSON,
-    MemorySummaryFromJSONTyped,
-    MemorySummaryToJSON,
-    MemorySummaryToJSONTyped,
-} from './MemorySummary';
-
 /**
  * 
  * @export
@@ -32,13 +24,19 @@ export interface UserProfileSummary {
      * @type {string}
      * @memberof UserProfileSummary
      */
-    displayName: string;
+    id: string;
     /**
-     * URL-safe stable permalink segment.
+     * 
      * @type {string}
      * @memberof UserProfileSummary
      */
-    permalink: string;
+    displayName: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof UserProfileSummary
+     */
+    username: string;
     /**
      * 
      * @type {string}
@@ -46,25 +44,26 @@ export interface UserProfileSummary {
      */
     initials: string;
     /**
-     * 
+     * Short-lived presigned object-store URL for the avatar. The avatar object key contains the cache-busting version segment.
      * @type {string}
      * @memberof UserProfileSummary
      */
     avatarUrl?: string;
     /**
-     * Visible root Memories where this profile user participates. Child-Memory participation is represented by the nearest visible root Memory.
-     * @type {Array<MemorySummary>}
+     * 
+     * @type {Array<object>}
      * @memberof UserProfileSummary
      */
-    memories: Array<MemorySummary>;
+    memories: Array<object>;
 }
 
 /**
  * Check if a given object implements the UserProfileSummary interface.
  */
 export function instanceOfUserProfileSummary(value: object): value is UserProfileSummary {
+    if (!('id' in value) || value['id'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('permalink' in value) || value['permalink'] === undefined) return false;
+    if (!('username' in value) || value['username'] === undefined) return false;
     if (!('initials' in value) || value['initials'] === undefined) return false;
     if (!('memories' in value) || value['memories'] === undefined) return false;
     return true;
@@ -80,11 +79,12 @@ export function UserProfileSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
     }
     return {
         
+        'id': json['id'],
         'displayName': json['displayName'],
-        'permalink': json['permalink'],
+        'username': json['username'],
         'initials': json['initials'],
         'avatarUrl': json['avatarUrl'] == null ? undefined : json['avatarUrl'],
-        'memories': ((json['memories'] as Array<any>).map(MemorySummaryFromJSON)),
+        'memories': json['memories'],
     };
 }
 
@@ -99,11 +99,12 @@ export function UserProfileSummaryToJSONTyped(value?: UserProfileSummary | null,
 
     return {
         
+        'id': value['id'],
         'displayName': value['displayName'],
-        'permalink': value['permalink'],
+        'username': value['username'],
         'initials': value['initials'],
         'avatarUrl': value['avatarUrl'],
-        'memories': ((value['memories'] as Array<any>).map(MemorySummaryToJSON)),
+        'memories': value['memories'],
     };
 }
 

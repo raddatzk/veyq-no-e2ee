@@ -24,7 +24,7 @@ export type TenantMember = {
 
 /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
 export async function listTenantMembers(apiBase: string, token: string, tenantId: string): Promise<TenantMember[]> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members`, { headers: { authorization: `Bearer ${token}` } })
+  const res = await fetch(`${apiBase}/api/tenant/members`, { headers: { authorization: `Bearer ${token}` } })
   if (!res.ok) throw await apiError(res, 'list members')
   return (await res.json()).members
 }
@@ -94,7 +94,7 @@ export async function rotateScope(
     })
   } else if (ckRes.status !== 404) throw new Error(`content-key fetch failed: ${ckRes.status}`)
 
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope/rotate`, {
+  const res = await fetch(`${apiBase}/api/tenant/scope/rotate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.sessionToken}` },
     body: JSON.stringify({
@@ -119,7 +119,7 @@ export async function removeMember(
   tenantId: string,
   userId: string,
 ): Promise<MembershipSummary> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members/${encodeURIComponent(userId)}`, {
+  const res = await fetch(`${apiBase}/api/tenant/members/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
     headers: { authorization: `Bearer ${ownerToken}` },
   })
@@ -135,7 +135,7 @@ export async function changeMemberRole(
   userId: string,
   role: MemberRole,
 ): Promise<MembershipSummary> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members/${encodeURIComponent(userId)}/role`, {
+  const res = await fetch(`${apiBase}/api/tenant/members/${encodeURIComponent(userId)}/role`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ role }),
@@ -173,7 +173,7 @@ export async function issueMemberInvite(
     nonce: v1.randomBytes(12),
   })
 
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/member-invites`, {
+  const res = await fetch(`${apiBase}/api/tenant/member-invites`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.sessionToken}` },
     body: JSON.stringify({

@@ -75,9 +75,8 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
 - [x] **E1 · `Node.type` String → `NodeType`-Enum** *(Maintainability, Low, S)* — E4-Leftover: sechs Tenancy/Scope-
   Felder wurden zu `@Enumerated`-Enums, `Node.type` blieb String → verstreute `NodeType.valueOf(node.type)` in 7+
   Handlern. Genau 1 Schreibstelle (`type = req.type.value`) → winzige Migration, kein Wire-Change.
-- [x] **E2 · `MyGroupsHandler.listMyGroups` N+1** *(Perf, Low, S)* — von D2 (nur `MySpaces`) übersehen: 3 Queries je
-  Tenant. Auf `listActiveByUserId` + `listTenantRootsByTenantIds` + `tenants.listByIds` + held-Set umbauen (wie
-  `MySpacesHandler`).
+- [x] **E2 · tenant-root roster N+1** *(Perf, Low, S)* — von D2 (nur `MySpaces`) übersehen: 3 Queries je
+  Tenant. Auf `listActiveByUserId` + `listTenantRootsByTenantIds` + `tenants.listByIds` + held-Set umbauen.
 - [x] **E3 · 3× byte-identischer `MemoryNode`-Mapper** *(Maintainability, Low, S)* — `MemoryTreeHandler.toApi` +
   `CurateHandler.toApi` + `ShareHandler.nodeToApi` (letzterer ist schon geteilt). Auf einen `NodeApiMapper`
   (`shared/content`, neben `MediaApiMapper`) konsolidieren.

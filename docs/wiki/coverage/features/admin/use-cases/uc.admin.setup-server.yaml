@@ -15,7 +15,7 @@ documents:
 - type: overview
   ref: docs/wiki/overview/architecture.md
 - type: api
-  ref: docs/api/setup.openapi.yaml
+  ref: docs/api/admin.openapi.yaml
 - type: api
   ref: docs/api/crypto-vectors/v1.json
 - type: entryPoint

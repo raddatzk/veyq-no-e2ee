@@ -6,7 +6,7 @@ import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.GetInviteMaterialRequest
 import com.veyq.app.generated.model.IssueOwnerInviteRequest
 import com.veyq.app.generated.model.KemPublicKey
-import com.veyq.app.generated.model.MyScopeGrant
+import com.veyq.app.generated.model.CurrentTenant
 import com.veyq.app.generated.model.OwnerInvite
 import com.veyq.app.generated.model.TenantInviteInfo
 import com.veyq.app.generated.model.TenantInviteMaterial
@@ -44,7 +44,6 @@ import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
@@ -96,8 +95,7 @@ class TenantProvisioningHandler(
             throw ApiException(409, "TENANT_EXISTS", "A tenant with that name already exists")
         }
         // A tenant is domain-scoped: the host resolves the tenant, so the domain is required + unique.
-        val domain = req.domain.trim().lowercase()
-        if (domain.isEmpty()) throw ApiException(400, "DOMAIN_REQUIRED", "A tenant domain is required")
+        val domain = normalizeDomain(req.domain)
         if (tenants.findByDomain(domain) != null) throw ApiException(409, "DOMAIN_TAKEN", "That domain is already in use")
         val tenant = Tenant().apply {
             id = newId(); name = req.name; displayName = req.displayName; this.domain = domain
@@ -157,6 +155,25 @@ class TenantProvisioningHandler(
         val key = tenant.logoObjectKey ?: throw notFound("Tenant logo")
         val bytes = store.get(key) ?: throw notFound("Tenant logo")
         return TenantLogoBytes(contentType = tenant.logoContentType ?: "application/octet-stream", bytes = bytes)
+    }
+
+    @Transactional
+    fun currentTenant(auth: String?, tenant: Tenant): CurrentTenant {
+        val user = requireUser(auth)
+        val membership = memberships.find(tenant.id, user.id)
+        if (membership == null || membership.status != MembershipStatus.ACTIVE) {
+            throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
+        }
+        val scope = scopes.findByTenantId(tenant.id) ?: throw notFound("Scope")
+        return CurrentTenant(
+            tenantId = tenant.id,
+            name = tenant.name,
+            displayName = tenant.displayName,
+            domain = tenant.domain,
+            logoUrl = tenant.logoUrl(),
+            role = membership.role.name,
+            tenantScopeId = scope.id,
+        )
     }
 
     /** The tenants whose grace period has passed — a read, so the scheduler can purge them one tx each. */
@@ -301,36 +318,22 @@ class TenantProvisioningHandler(
         }
     }
 
-    @Transactional
-    fun getMyScopeGrant(auth: String?, tenantId: String): MyScopeGrant {
-        val user = requireUser(auth)
-        val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
-        val grant = grants.find(scope.id, user.id) ?: throw notFound("Scope grant")
-        return MyScopeGrant(
-            scopeId = scope.id,
-            scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
-            wrappedScopePrivateKey = Blob(suiteId = grant.suiteId, bytes = enc.encodeToString(grant.wrappedPrivateKey)),
-        )
-    }
-
     private fun Tenant.toSummary(): TenantSummary =
         TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain, logoUrl = logoUrl())
 
     private fun tenantInviteBaseUrl(tenant: Tenant): String {
-        val domain = tenant.domain.trim().trimEnd('/')
+        val domain = tenant.domain.trim()
         if (domain.isBlank()) return appBaseUrl
-        if (domain.startsWith("http://", ignoreCase = true) || domain.startsWith("https://", ignoreCase = true)) {
-            return domain
-        }
-        val scheme = runCatching { URI(appBaseUrl).scheme?.lowercase() }.getOrNull()
-            ?.takeIf { it == "http" || it == "https" }
+        val scheme = appBaseUrl.substringBefore("://", missingDelimiterValue = "https")
+            .lowercase()
+            .takeIf { it == "http" || it == "https" }
             ?: "https"
         return "$scheme://$domain"
     }
 
     private fun Tenant.logoUrl(): String? {
         val key = logoObjectKey ?: return null
-        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenants/$id/logo?v=${key.substringAfterLast('/')}"
+        return store.presignGet(key, logoUrlTtlSeconds) ?: "/api/tenant/logo?v=${key.substringAfterLast('/')}"
     }
 
     data class TenantLogoBytes(val contentType: String, val bytes: ByteArray)
@@ -346,6 +349,19 @@ class TenantProvisioningHandler(
         return user
     }
 
+    private fun normalizeDomain(raw: String): String {
+        val domain = raw.trim().lowercase().trimEnd('.')
+        if (domain.isEmpty()) throw ApiException(400, "DOMAIN_REQUIRED", "A tenant domain is required")
+        if ("://" in domain || "/" in domain || "?" in domain || "#" in domain || ":" in domain) {
+            throw ApiException(400, "INVALID_DOMAIN", "Tenant domain must be a host name without scheme, port, or path")
+        }
+        val labels = domain.split('.')
+        val labelPattern = Regex("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+        if (domain.length > 253 || labels.any { !labelPattern.matches(it) }) {
+            throw ApiException(400, "INVALID_DOMAIN", "Tenant domain must be a valid host name")
+        }
+        return domain
+    }
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
     private fun newId(): String = UUID.randomUUID().toString()

@@ -287,7 +287,7 @@ const localPrimaryUploader = computed(() => {
   return {
     type: 'USER' as const,
     displayName: user.displayName || user.email,
-    permalink: user.permalink,
+    permalink: user.username,
     userId: user.userId
   }
 })
@@ -698,7 +698,7 @@ function materializedSelfPrimaryBucket(memoryId: string, bucketId: string): Memo
     uploader: {
       type: 'USER',
       displayName,
-      permalink: user?.permalink,
+      permalink: user?.username,
       userId: user?.userId
     },
     canManage: true,

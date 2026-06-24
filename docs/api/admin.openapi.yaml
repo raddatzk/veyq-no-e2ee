@@ -3,6 +3,41 @@ info:
   title: veyq server admin
   version: 0.1.0
 paths:
+  /api/setup:
+    get:
+      tags: [SetupServer]
+      operationId: getSetupStatus
+      summary: Setup status and advertised crypto suites.
+      responses:
+        '200':
+          description: Setup status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SetupStatus" }
+  /api/setup/owner:
+    post:
+      tags: [SetupServer]
+      operationId: createServerOwner
+      summary: Create the first Server Owner (cold E2EE registration).
+      description: >
+        The client generates all key material; the server stores opaque ciphertext + public keys + an
+        auth verifier and flips the setup gate. The server never sees a private key, the master key,
+        a KEK, the secret key or the recovery code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateServerOwnerRequest" }
+      responses:
+        '200':
+          description: The created Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/admin/users:
     get:
       tags: [ServerAdmin]
@@ -13,15 +48,17 @@ paths:
         content or memberships are returned, only the low-sensitivity account fields the owner needs to
         assign the instance-level Server Owner role.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '200':
           description: The instance account roster.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ServerUserList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+              schema: { $ref: "#/components/schemas/ServerUserList" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
   /api/admin/users/{userId}/server-role:
     put:
       tags: [ServerAdmin]
@@ -32,35 +69,93 @@ paths:
         the last remaining Server Owner (the instance must keep at least one). No crypto — server role gates
         instance-level authority (e.g. tenant creation), not content access.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: userId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/SetServerRoleRequest' }
+            schema: { $ref: "#/components/schemas/SetServerRoleRequest" }
       responses:
         '200':
           description: The updated account.
           content:
             application/json:
-              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+              schema: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
 components:
   schemas:
+    SetupStatus:
+      type: object
+      required: [setupRequired, suites]
+      properties:
+        setupRequired: { type: boolean }
+        suites:
+          type: array
+          items: { $ref: "./common.openapi.yaml#/components/schemas/CryptoSuiteId" }
+        appBaseUrl:
+          type: string
+          description: >
+            This instance's public app origin (the web client base URL). Clients that assemble invite links
+            (e.g. mobile owners emailing an invite) build them against this so the server's anti-abuse origin
+            check passes. Low-sensitivity config — same value the web app is served from.
+        supportUrl:
+          type: string
+          description: >
+            Optional URL where users can support/fund this instance. When set, clients show a dismissible
+            support banner pointing here. Low-sensitivity operator config; absent when unset.
+        serverVersion:
+          type: string
+          description: >
+            The deployed server version string (advisory). Clients may surface it; future compatibility
+            checks can build on it. Low-sensitivity config.
+        directTransport:
+          type: string
+          enum: [ok, unavailable]
+          description: >
+            Whether this instance can transfer media DIRECTLY to/from its object store via presigned URLs
+            (ADR 0021) — the only transport path. `ok` for a presign-capable store (S3/MinIO); `unavailable`
+            when the store can't presign (the in-memory dev backend) → media upload/download won't work and the
+            operator must fix the store config. Advisory; clients surface it as an operator hint.
+    CreateServerOwnerRequest:
+      type: object
+      required:
+        [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps,
+         authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey]
+      properties:
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        identityPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey" }
+        wrappedIdentityPrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        masterKeyWraps:
+          type: array
+          minItems: 1
+          items: { $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap" }
+        authVerifier: { $ref: "./common.openapi.yaml#/components/schemas/AuthVerifier" }
+        # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url. Required when a RECOVERY wrap is included:
+        # the server stores it as the recovery commitment, so a password reset must later prove the client
+        # recovered the real master key with the Secret Key (not email-token possession alone).
+        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
+        personalScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedPersonalScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     ServerUserList:
       type: object
       required: [users]
       properties:
         users:
           type: array
-          items: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+          items: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
     SetServerRoleRequest:
       type: object
       required: [serverRole]
       properties:
-        serverRole: { $ref: './common.openapi.yaml#/components/schemas/ServerRole' }
+        serverRole: { $ref: "./common.openapi.yaml#/components/schemas/ServerRole" }

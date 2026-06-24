@@ -1,67 +1,93 @@
 openapi: 3.1.0
 info:
-  title: veyq tenant provisioning
+  title: veyq tenants
   version: 0.1.0
 paths:
   /api/tenants:
     post:
-      tags: [TenantProvisioning]
+      tags: [TenantLifecycle]
       operationId: createTenant
       summary: Create a tenant shell (metadata only — no content keys). Server Owner only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateTenantRequest' }
+            schema: { $ref: "#/components/schemas/CreateTenantRequest" }
       responses:
         '200':
           description: The created (PENDING) tenant shell.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}:
+              schema: { $ref: "#/components/schemas/TenantSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+  /api/tenant:
+    get:
+      tags: [CurrentTenant]
+      operationId: getCurrentTenant
+      summary: Resolve the tenant for the current request host.
+      description: >
+        Resolves the normalized request host to a tenant domain and returns the caller's current membership
+        context plus the tenant-root scope id. Tenant domains are routing metadata and are stored in plaintext.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+      responses:
+        '200':
+          description: The current tenant context.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentTenant" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
-      tags: [TenantProvisioning]
+      tags: [TenantLifecycle]
       operationId: deleteTenant
-      summary: Schedule a tenant for deletion after a grace period. Tenant Owner only.
+      summary: Schedule the current host tenant for deletion after a grace period. Tenant Owner only.
       description: >
         Schedules the tenant's deletion (it stays fully usable until the deadline so members can secure
         their data); the deadline rides the space roster as an in-app warning, the owner can cancel, and an
         hourly GC hard-purges it once the deadline passes (scope + groups + content + memberships + invites).
         Only an active Tenant Owner may; the client gates it behind a confirm-by-name dialog. Idempotent.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '204': { description: Scheduled for deletion (or already scheduled). }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/cancel-deletion:
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/cancel-deletion:
     post:
-      tags: [TenantProvisioning]
+      tags: [TenantLifecycle]
       operationId: cancelTenantDeletion
-      summary: Cancel a scheduled tenant deletion before the deadline. Tenant Owner only.
+      summary: Cancel current host tenant deletion before the deadline. Tenant Owner only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '204': { description: Cancelled (the tenant is no longer scheduled for deletion). }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/logo:
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/logo:
     get:
-      tags: [TenantProvisioning]
+      tags: [TenantBranding]
       operationId: getTenantLogo
-      summary: Read the tenant logo bytes. Public branding endpoint; used when the BlobStore cannot presign.
-      parameters:
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      summary: Read the current host tenant logo bytes. Public branding endpoint; used when the BlobStore cannot presign.
       responses:
         '200':
           description: The tenant logo image.
@@ -69,9 +95,10 @@ paths:
             image/png: { schema: { type: string, format: binary } }
             image/jpeg: { schema: { type: string, format: binary } }
             image/webp: { schema: { type: string, format: binary } }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     put:
-      tags: [TenantProvisioning]
+      tags: [TenantBranding]
       operationId: uploadTenantLogo
       summary: Upload the tenant logo image. Tenant Owner only.
       description: >
@@ -79,165 +106,47 @@ paths:
         selected image before upload; the server still enforces content-type and byte-size bounds. This is
         branding metadata, not Memory/media content.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UploadTenantLogoRequest' }
+            schema: { $ref: "#/components/schemas/UploadTenantLogoRequest" }
       responses:
         '200':
           description: The updated tenant summary.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/TenantSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     delete:
-      tags: [TenantProvisioning]
+      tags: [TenantBranding]
       operationId: clearTenantLogo
       summary: Clear the tenant logo image. Tenant Owner only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '200':
           description: The updated tenant summary.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantSummary' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/groups:
-    get:
-      tags: [Groups]
-      operationId: listGroups
-      summary: List the groups in this tenant the caller can enter (holds the group scope grant).
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-      responses:
-        '200': { description: The caller's groups in this tenant., content: { application/json: { schema: { $ref: '#/components/schemas/GroupList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/TenantSummary" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/owner-invite:
     post:
-      tags: [Groups]
-      operationId: createGroup
-      summary: Create a group (a sub-space within a tenant). Any active tenant member may; they become GroupOwner.
-      description: >
-        Mints a GROUP_ROOT scope inside the tenant. The caller supplies the scope public key, the scope
-        private key wrapped to their own identity (self-grant), the content key wrapped to the scope public
-        key, and the group name sealed under that content key (operator-blind). The creator becomes the
-        first GroupOwner. The server stays blind to the group name and content.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateGroupRequest' } } }
-      responses:
-        '200': { description: The created group., content: { application/json: { schema: { $ref: '#/components/schemas/GroupSummary' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/groups/{scopeId}:
-    delete:
-      tags: [Groups]
-      operationId: deleteGroup
-      summary: Delete a group and all its content (GroupOwner only).
-      description: >
-        Cascades the group scope — all nodes + their media/journal/tracks/shares, the content key, items,
-        and every member's grant + group membership. Only a GroupOwner may; the client gates it behind a
-        confirm-by-name dialog. The tenant and other groups are untouched. Irreversible.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-      responses:
-        '204': { description: Deleted. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/groups/{scopeId}/members:
-    get:
-      tags: [Groups]
-      operationId: listGroupMembers
-      summary: List the members of a group (any group member may).
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-      responses:
-        '200': { description: The group's members., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMemberList' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-    post:
-      tags: [Groups]
-      operationId: addGroupMember
-      summary: Add a tenant member to the group (GroupOwner only).
-      description: >
-        The GroupOwner wraps the group scope private key to the target member's identity and posts it as a
-        grant. The target must be an active member of the tenant. Defaults to the GroupMember role.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/AddGroupMemberRequest' } } }
-      responses:
-        '200': { description: The added member., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMember' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}/groups/{scopeId}/members/{userId}:
-    patch:
-      tags: [Groups]
-      operationId: setGroupMemberRole
-      summary: Change a group member's role (GroupOwner only). Cannot demote the last GroupOwner.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-        - { name: userId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/SetGroupRoleRequest' } } }
-      responses:
-        '200': { description: The updated member., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMember' } } } }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-    delete:
-      tags: [Groups]
-      operationId: removeGroupMember
-      summary: Remove a member from the group (GroupOwner only). Cannot remove the last GroupOwner.
-      description: Drops the member's group scope grant + membership. Already-downloaded content cannot be retracted.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-        - { name: scopeId, in: path, required: true, schema: { type: string } }
-        - { name: userId, in: path, required: true, schema: { type: string } }
-      responses:
-        '204': { description: Removed. }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}/owner-invite:
-    post:
-      tags: [TenantProvisioning]
+      tags: [TenantInvites]
       operationId: issueOwnerInvite
       summary: Issue a single-use owner-claim invitation. Server Owner only.
       description: >
@@ -246,24 +155,25 @@ paths:
         there are no scope keys to temp-wrap; the claimer's client mints the tenant scope keypair. The
         claim/register email must match the invite target email.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/IssueOwnerInviteRequest' }
+            schema: { $ref: "#/components/schemas/IssueOwnerInviteRequest" }
       responses:
         '200':
           description: The owner invitation metadata (secret delivered only by email).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/OwnerInvite' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/member-invites:
+              schema: { $ref: "#/components/schemas/OwnerInvite" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/member-invites:
     post:
-      tags: [MemberInvites]
+      tags: [TenantInvites]
       operationId: issueMemberInvite
       summary: Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
       description: >
@@ -272,25 +182,27 @@ paths:
         a new user unwraps with it and re-wraps the scope to their own identity during
         register-via-invitation. The server stores only the temp public key + ciphertext.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/IssueMemberInviteRequest' }
+            schema: { $ref: "#/components/schemas/IssueMemberInviteRequest" }
       responses:
         '200':
           description: The member invitation (bootstrap secret shown once).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/OwnerInvite' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/member-invites/email:
+              schema: { $ref: "#/components/schemas/OwnerInvite" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/member-invites/email:
     post:
-      tags: [MemberInvites]
+      tags: [TenantInvites]
       operationId: emailMemberInvite
       summary: Email an already-issued member invite link to an address (Tenant Owner only).
       description: >
@@ -299,22 +211,25 @@ paths:
         temp key) is whatever the client chose to put in it. The server only relays it. Must reference a
         pending invite of this tenant, and the link must point at this instance's configured app origin.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/EmailInviteRequest' }
+            schema: { $ref: "#/components/schemas/EmailInviteRequest" }
       responses:
         '204': { description: Sent. }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/tenant-invites/{inviteId}:
     get:
-      tags: [TenantProvisioning]
+      tags: [TenantInvites]
       operationId: getTenantInvite
       summary: Public invite metadata (the bootstrap secret is never sent to the server here).
       parameters:
@@ -324,11 +239,12 @@ paths:
           description: Public invite metadata.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantInviteInfo' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/TenantInviteInfo" }
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/tenant-invites/{inviteId}/material:
     post:
-      tags: [TenantProvisioning]
+      tags: [TenantInvites]
       operationId: getInviteMaterial
       summary: The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
       description: >
@@ -342,18 +258,20 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/GetInviteMaterialRequest' }
+            schema: { $ref: "#/components/schemas/GetInviteMaterialRequest" }
       responses:
         '200':
           description: The temp-wrapped onboarding material.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantInviteMaterial' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/TenantInviteMaterial" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
   /api/tenant-invites/{inviteId}/claim:
     post:
-      tags: [TenantProvisioning]
+      tags: [TenantInvites]
       operationId: claimTenantOwnership
       summary: Claim ownership of an empty tenant; the caller becomes its first key-holder.
       description: >
@@ -361,26 +279,30 @@ paths:
         public key and the scope private key wrapped to their own identity public key (a self scope
         grant). The server activates the tenant + membership and stores ciphertext only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: inviteId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ClaimTenantOwnershipRequest' }
+            schema: { $ref: "#/components/schemas/ClaimTenantOwnershipRequest" }
       responses:
         '200':
           description: The activated tenant.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/TenantSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/tenant-invites/{inviteId}/register:
     post:
-      tags: [RegisterViaInvitation]
+      tags: [TenantInvites]
       operationId: registerViaInvitation
       summary: Register a brand-new account from an owner invite and claim the tenant in one step.
       description: >
@@ -396,19 +318,22 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RegisterViaInvitationRequest' }
+            schema: { $ref: "#/components/schemas/RegisterViaInvitationRequest" }
       responses:
         '200':
           description: The new account's session + the activated tenant.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/RegisterViaInvitationResponse' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/RegisterViaInvitationResponse" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/tenant-invites/{inviteId}/accept:
     post:
-      tags: [AcceptInvite]
+      tags: [TenantInvites]
       operationId: acceptMemberInvite
       summary: Accept a member invite onto an EXISTING account (no new account).
       description: >
@@ -417,62 +342,52 @@ paths:
         the grant + membership on the existing scope and consumes the invite. No new account, no session
         issued — the caller is already logged in.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: inviteId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/AcceptMemberInviteRequest' }
+            schema: { $ref: "#/components/schemas/AcceptMemberInviteRequest" }
       responses:
         '200':
           description: The caller's new membership.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MembershipSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}/scope:
+              schema: { $ref: "#/components/schemas/MembershipSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+  /api/tenant/members:
     get:
-      tags: [TenantProvisioning]
-      operationId: getMyScopeGrant
-      summary: The caller's scope grant for a tenant (wrapped scope private key + scope public key).
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-      responses:
-        '200':
-          description: The caller's scope grant.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MyScopeGrant' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/members:
-    get:
-      tags: [MemberList]
+      tags: [TenantMembers]
       operationId: listTenantMembers
       summary: List a tenant's members with their published identity public keys.
       description: >
         For a member (e.g. an Owner driving a scope rotation) to enumerate who must receive a re-wrapped
         grant. Returns public material only.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '200':
           description: The tenant's members.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TenantMemberList' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/scope/rotate:
+              schema: { $ref: "#/components/schemas/TenantMemberList" }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/scope/rotate:
     post:
-      tags: [ScopeRotation]
+      tags: [TenantScope]
       operationId: rotateScope
       summary: Rotate the tenant scope keypair and re-wrap it to all remaining members (AD-24 eventual layer).
       description: >
@@ -481,25 +396,27 @@ paths:
         removal this denies the removed member key access to future content. The request must cover
         exactly the active members (no member left without a grant, no grant for a non-member).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RotateScopeRequest' }
+            schema: { $ref: "#/components/schemas/RotateScopeRequest" }
       responses:
         '200':
           description: The rotated scope.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/RotateScopeResponse' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/members/{userId}:
+              schema: { $ref: "#/components/schemas/RotateScopeResponse" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/members/{userId}:
     delete:
-      tags: [MemberRemoval]
+      tags: [TenantMembers]
       operationId: removeMember
       summary: Remove a member — revoke their scope grant + sessions (the instant layer of AD-24).
       description: >
@@ -508,75 +425,84 @@ paths:
         handing them keys or resolving their tokens. Eventual scope-key rotation is a separate step —
         already-downloaded content cannot be retracted (AD-24).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: userId, in: path, required: true, schema: { type: string } }
       responses:
         '200':
           description: The removed membership.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MembershipSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-  /api/tenants/{tenantId}/members/{userId}/role:
+              schema: { $ref: "#/components/schemas/MembershipSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/tenant/members/{userId}/role:
     put:
-      tags: [MemberRole]
+      tags: [TenantMembers]
       operationId: changeMemberRole
       summary: Change a member's role (membership/settings authority only — not content access, ADR 0005).
       description: >
         A Tenant Owner reassigns a member's role. Roles govern membership and settings; the set of
         decryptable scopes governs content, so this touches no grants. Demoting the last Owner is rejected.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: userId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ChangeMemberRoleRequest' }
+            schema: { $ref: "#/components/schemas/ChangeMemberRoleRequest" }
       responses:
         '200':
           description: The updated membership.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MembershipSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}/terms:
+              schema: { $ref: "#/components/schemas/MembershipSummary" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+  /api/tenant/terms:
     get:
       tags: [TenantTerms]
       operationId: getTenantTerms
       summary: The tenant's Terms of Service (guests must accept these on any share of its memories).
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
-        '200': { description: The terms., content: { application/json: { schema: { $ref: '#/components/schemas/TenantTerms' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The terms., content: { application/json: { schema: { $ref: "#/components/schemas/TenantTerms" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
     put:
       tags: [TenantTerms]
       operationId: setTenantTerms
       summary: Set the tenant's Terms of Service (Owner only). Bumps the version so guests re-accept.
       parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateTenantTermsRequest' }
+            schema: { $ref: "#/components/schemas/UpdateTenantTermsRequest" }
       responses:
-        '200': { description: The updated terms., content: { application/json: { schema: { $ref: '#/components/schemas/TenantTerms' } } } }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '200': { description: The updated terms., content: { application/json: { schema: { $ref: "#/components/schemas/TenantTerms" } } } }
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
 components:
   schemas:
     TenantTerms:
@@ -613,52 +539,6 @@ components:
         domain: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
         logoUrl: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
         status: { type: string, enum: [PENDING, ACTIVE] }
-    CreateGroupRequest:
-      type: object
-      required: [scopePublicKey, wrappedScopePrivateKey, contentKey, sealedName]
-      properties:
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group scope private key wrapped to the creator''s identity (self-grant).' }
-        contentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Content key wrapped to the group scope public key.' }
-        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group name sealed under the content key (operator-blind).' }
-    GroupSummary:
-      type: object
-      required: [scopeId, tenantId, role, scopePublicKey, sealedName]
-      properties:
-        scopeId: { type: string }
-        tenantId: { type: string }
-        role: { type: string, description: 'The caller''s group role (GroupOwner | GroupMember).' }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-    GroupList:
-      type: object
-      required: [groups]
-      properties:
-        groups: { type: array, items: { $ref: '#/components/schemas/GroupSummary' } }
-    AddGroupMemberRequest:
-      type: object
-      required: [userId, wrappedScopePrivateKey]
-      properties:
-        userId: { type: string }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group scope private key wrapped to the target member''s identity.' }
-        role: { type: string, description: 'GroupOwner | GroupMember (defaults to GroupMember).' }
-    SetGroupRoleRequest:
-      type: object
-      required: [role]
-      properties:
-        role: { type: string, description: 'GroupOwner | GroupMember.' }
-    GroupMember:
-      type: object
-      required: [userId, displayName, role]
-      properties:
-        userId: { type: string }
-        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
-        role: { type: string }
-    GroupMemberList:
-      type: object
-      required: [members]
-      properties:
-        members: { type: array, items: { $ref: '#/components/schemas/GroupMember' } }
     OwnerInvite:
       type: object
       required: [inviteId, expiresAt]
@@ -685,7 +565,7 @@ components:
       properties:
         bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         wrappedScopePrivateKey:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
           description: The scope private key re-wrapped to the caller's own identity public key.
     TenantMember:
       type: object
@@ -695,14 +575,14 @@ components:
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string }
         status: { type: string }
-        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+        identityPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey" }
     TenantMemberList:
       type: object
       required: [members]
       properties:
         members:
           type: array
-          items: { $ref: '#/components/schemas/TenantMember' }
+          items: { $ref: "#/components/schemas/TenantMember" }
     ChangeMemberRoleRequest:
       type: object
       required: [role]
@@ -713,7 +593,7 @@ components:
       required: [id, sealedContent]
       properties:
         id: { type: string }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     ScopeNodeReseal:
       type: object
       description: A Memory-tree node re-sealed under the fresh content key — new sealed name + new slug token.
@@ -721,24 +601,24 @@ components:
       properties:
         id: { type: string }
         slugToken: { type: string, description: 'The blinded slug token recomputed under the fresh content key.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedContent: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     ScopeGrantInput:
       type: object
       required: [userId, wrappedScopePrivateKey]
       properties:
         userId: { type: string }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     RotateScopeRequest:
       type: object
       required: [scopePublicKey, grants]
       properties:
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
         grants:
           type: array
           minItems: 1
-          items: { $ref: '#/components/schemas/ScopeGrantInput' }
+          items: { $ref: "#/components/schemas/ScopeGrantInput" }
         wrappedContentKey:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
           description: >
             Required iff the scope has a content key — a FRESH content key wrapped to the NEW scope public
             key. Rotation mints a new content key (not a re-wrap), so a removed member who cached the old
@@ -748,14 +628,14 @@ components:
           description: >
             Required iff the scope has a content key — every existing item re-sealed under the fresh
             content key, so existing content stays readable. Must cover exactly the scope's current items.
-          items: { $ref: '#/components/schemas/ScopeItemReseal' }
+          items: { $ref: "#/components/schemas/ScopeItemReseal" }
         reSealedNodes:
           type: array
           description: >
             Required iff the scope has a content key — every Memory-tree node re-sealed under the fresh
             content key (new sealed name + recomputed slug token). Must cover exactly the scope's current
             nodes, or their names become unreadable and a removed member's cached key could still read them.
-          items: { $ref: '#/components/schemas/ScopeNodeReseal' }
+          items: { $ref: "#/components/schemas/ScopeNodeReseal" }
     RotateScopeResponse:
       type: object
       required: [scopeId, memberCount]
@@ -767,7 +647,7 @@ components:
       required: [inviteId, tenant, role, status, kind, existingAccount]
       properties:
         inviteId: { type: string }
-        tenant: { $ref: '#/components/schemas/TenantSummary' }
+        tenant: { $ref: "#/components/schemas/TenantSummary" }
         role: { type: string }
         status: { type: string, enum: [PENDING, CONSUMED, REVOKED] }
         kind: { type: string, enum: [OWNER, MEMBER] }
@@ -775,7 +655,7 @@ components:
           type: boolean
           description: True when the invite targets an existing account, so the user must sign in and accept instead of registering.
         scopePublicKey:
-          $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
+          $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
           description: MEMBER invites only — the existing scope's public key (a public key, safe to expose).
     GetInviteMaterialRequest:
       type: object
@@ -789,15 +669,15 @@ components:
         is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side.
       required: [tempPublicKey, tempWrappedScopePrivateKey]
       properties:
-        tempPublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        tempWrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        tempPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        tempWrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     IssueMemberInviteRequest:
       type: object
       required: [role, tempPublicKey, tempWrappedScopePrivateKey]
       properties:
         role: { type: string, enum: [Owner, Member] }
-        tempPublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        tempWrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        tempPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        tempWrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     EmailInviteRequest:
       type: object
       required: [email, inviteId, link]
@@ -810,15 +690,8 @@ components:
       required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]
       properties:
         bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-    MyScopeGrant:
-      type: object
-      required: [scopeId, scopePublicKey, wrappedScopePrivateKey]
-      properties:
-        scopeId: { type: string }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     RegisterViaInvitationRequest:
       type: object
       required:
@@ -829,23 +702,34 @@ components:
         bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
-        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
-        wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        identityPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey" }
+        wrappedIdentityPrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
         masterKeyWraps:
           type: array
           minItems: 1
-          items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
-        authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+          items: { $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap" }
+        authVerifier: { $ref: "./common.openapi.yaml#/components/schemas/AuthVerifier" }
         # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — the recovery commitment (see setup spec).
         recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
-        personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
-        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        personalScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedPersonalScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     RegisterViaInvitationResponse:
       type: object
       required: [sessionToken, user, tenant]
       properties:
         sessionToken: { type: string }
-        user: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
-        tenant: { $ref: '#/components/schemas/TenantSummary' }
+        user: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
+        tenant: { $ref: "#/components/schemas/TenantSummary" }
+    CurrentTenant:
+      type: object
+      required: [tenantId, name, displayName, domain, role, tenantScopeId]
+      properties:
+        tenantId: { type: string }
+        name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        domain: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+        logoUrl: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
+        role: { type: string }
+        tenantScopeId: { type: string }

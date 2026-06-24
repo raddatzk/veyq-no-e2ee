@@ -1,0 +1,390 @@
+openapi: 3.1.0
+info:
+  title: veyq crypto
+  version: 0.1.0
+paths:
+  /api/me/key-wraps:
+    get:
+      tags:
+        - MasterKeyWraps
+      operationId: listMyKeyWraps
+      summary: List the authenticated user's master-key unlock wraps (metadata only).
+      description: |
+        Returns one entry per stored unlock wrap (method, optional credentialRef, optional device name and creation time) WITHOUT any key ciphertext. Drives the "Devices" list in user settings — each DEVICE entry is one enrolled browser/login that can be named and removed.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+      responses:
+        '200':
+          description: The caller's unlock wraps.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyWrapList"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/me/key-wraps/{unlockMethod}:
+    put:
+      tags:
+        - MasterKeyWraps
+      operationId: upsertMyMasterKeyWrap
+      summary: Add or replace one of the authenticated user's master-key unlock wraps.
+      description: |
+        The client has already unlocked the master key locally and uploads a replacement wrapped copy for one unlock method. The server stores only opaque ciphertext and does not learn the master key or the KEK that can open this wrap.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: unlockMethod
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - PASSWORD
+              - PASSKEY
+              - RECOVERY
+              - DEVICE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertMasterKeyWrapRequest"
+      responses:
+        '200':
+          description: The stored master-key wrap.
+          content:
+            application/json:
+              schema:
+                $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap"
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+    delete:
+      tags:
+        - MasterKeyWraps
+      operationId: removeMyMasterKeyWrap
+      summary: Remove one of the authenticated user's master-key unlock wraps.
+      description: |
+        Removes a stored wrapped copy of the Master Key for the current user. Removing the final surviving unlock wrap is rejected so an account cannot be locked out through this endpoint.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: unlockMethod
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - PASSWORD
+              - PASSKEY
+              - RECOVERY
+              - DEVICE
+        - name: credentialRef
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The unlock wrap was removed.
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+  /api/scopes/{scopeId}/grants/me:
+    get:
+      tags:
+        - ScopeGrants
+      operationId: getMyScopeGrant
+      summary: Fetch the authenticated user's wrapped grant for a scope (to open it by scope id).
+      description: |
+        Returns the caller's existing grant — the scope public key + the scope private key wrapped to the caller's identity. Used to open any scope the caller holds, e.g. a group scope (which has no tenant-keyed grant path). The server never sees the scope private key.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: scopeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The caller's grant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopeGrantResponse"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+    put:
+      tags:
+        - ScopeGrants
+      operationId: rewrapMyScopeGrant
+      summary: Replace the authenticated user's wrapped grant for a scope.
+      description: |
+        The caller must already hold a grant for the scope. The client unwraps the scope key locally, wraps it to the current identity key and uploads only the replacement ciphertext. The server never sees scope private key material and cannot create new access through this endpoint.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: scopeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RewrapMyScopeGrantRequest"
+      responses:
+        '200':
+          description: The updated caller grant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopeGrantResponse"
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+  /api/me/grants:
+    get:
+      tags:
+        - IdentityGrants
+      operationId: listMyGrants
+      summary: List every scope grant the caller holds (for re-wrapping on identity rotation).
+      description: |
+        Returns the scope id, kind, scope public key and the grant ciphertext for each scope the caller holds. Public material + opaque ciphertext only.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+      responses:
+        '200':
+          description: The caller's grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyGrantList"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/me/identity/rotate:
+    post:
+      tags:
+        - IdentityRotation
+      operationId: rotateIdentity
+      summary: Rotate the account identity keypair and re-wrap every owned grant to it.
+      description: |
+        The client generates a new identity keypair, wraps its private key under the unchanged master key, and re-wraps each scope grant to the new identity public key. The server swaps the identity public key + wrapped private key and atomically replaces every grant. The re-wrapped grants must cover exactly the caller's current grants. The server never sees a private key.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateIdentityRequest"
+      responses:
+        '200':
+          description: The account after rotation.
+          content:
+            application/json:
+              schema:
+                $ref: "./common.openapi.yaml#/components/schemas/UserSummary"
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/scopes/{scopeId}/content-key:
+    get:
+      tags:
+        - ScopeContentKey
+      operationId: getScopeContentKey
+      summary: Fetch the scope's content key, wrapped to the scope public key (key-holders only).
+      description: |
+        The stable per-scope content key (AD-03) wrapped to the scope public key. A key-holder unwraps it with the scope private key from their grant; the server only ever sees ciphertext. 404 until the first key-holder provisions it.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: scopeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The wrapped content key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopeContentKeyResponse"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+    put:
+      tags:
+        - ScopeContentKey
+      operationId: provisionScopeContentKey
+      summary: Provision the scope's content key once (first key-holder wins).
+      description: |
+        A key-holder mints a content key, wraps it to the scope public key and provisions it. Single-shot per scope — a second provision is rejected so all holders converge on one content key.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: scopeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionContentKeyRequest"
+      responses:
+        '200':
+          description: The provisioned wrapped content key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopeContentKeyResponse"
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '401':
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
+components:
+  schemas:
+    KeyWrapSummary:
+      type: object
+      required:
+        - unlockMethod
+      properties:
+        unlockMethod:
+          type: string
+          enum:
+            - PASSWORD
+            - PASSKEY
+            - RECOVERY
+            - DEVICE
+        credentialRef:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+    KeyWrapList:
+      type: object
+      required:
+        - wraps
+      properties:
+        wraps:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeyWrapSummary"
+    UpsertMasterKeyWrapRequest:
+      type: object
+      required:
+        - masterKeyWrap
+      properties:
+        masterKeyWrap:
+          $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap"
+        recoveryAuthTag:
+          type: string
+          x-field-extra-annotation:
+            - '@field:jakarta.validation.constraints.Size(max = 128)'
+    RewrapMyScopeGrantRequest:
+      type: object
+      required:
+        - wrappedScopePrivateKey
+      properties:
+        wrappedScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+    ScopeGrantResponse:
+      type: object
+      required:
+        - scopeId
+        - scopePublicKey
+        - wrappedScopePrivateKey
+      properties:
+        scopeId:
+          type: string
+        scopePublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
+        wrappedScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+    OwnedGrant:
+      type: object
+      required:
+        - scopeId
+        - kind
+        - scopePublicKey
+        - wrappedScopePrivateKey
+      properties:
+        scopeId:
+          type: string
+        kind:
+          type: string
+          description: PERSONAL_ROOT or TENANT_ROOT — selects the wrap context.
+        scopePublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
+        wrappedScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+    MyGrantList:
+      type: object
+      required:
+        - grants
+      properties:
+        grants:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnedGrant"
+    IdentityGrantRewrap:
+      type: object
+      required:
+        - scopeId
+        - wrappedScopePrivateKey
+      properties:
+        scopeId:
+          type: string
+        wrappedScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+    RotateIdentityRequest:
+      type: object
+      required:
+        - identityPublicKey
+        - wrappedIdentityPrivateKey
+        - grants
+      properties:
+        identityPublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey"
+        wrappedIdentityPrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+        grants:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/IdentityGrantRewrap"
+    ScopeContentKeyResponse:
+      type: object
+      required:
+        - wrappedContentKey
+      properties:
+        wrappedContentKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+    ProvisionContentKeyRequest:
+      type: object
+      required:
+        - wrappedContentKey
+      properties:
+        wrappedContentKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"

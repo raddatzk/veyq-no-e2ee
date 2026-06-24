@@ -14,7 +14,7 @@ const router = useRouter()
 const { t } = useI18n()
 const { authState } = useAuthState()
 const tenantName = computed(() => authState.activeTenantName || authState.tenants[0]?.name || '')
-const profilePermalink = computed(() => {
+const profileUsername = computed(() => {
   const firstSegment = routePathToMemoryPath(route.params.pathMatch).split('/').filter(Boolean)[0] || ''
   return firstSegment.startsWith('~') ? firstSegment.slice(1) : ''
 })
@@ -22,14 +22,14 @@ const profile = ref<UserProfile | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-watch([tenantName, profilePermalink], loadProfile, { immediate: true })
+watch([tenantName, profileUsername], loadProfile, { immediate: true })
 
 async function loadProfile() {
-  if (!tenantName.value || !profilePermalink.value) return
+  if (!tenantName.value || !profileUsername.value) return
   loading.value = true
   error.value = ''
   try {
-    profile.value = await getUserProfile(tenantName.value, profilePermalink.value)
+    profile.value = await getUserProfile(tenantName.value, profileUsername.value)
   } catch (caught) {
     profile.value = null
     error.value = caught instanceof Error ? caught.message : t('profile.loadFailed')
@@ -57,7 +57,7 @@ function openMemory(memory: { path: string }) {
       </div>
       <div>
         <h1>{{ profile.displayName }}</h1>
-        <p>~{{ profile.permalink }}</p>
+        <p>~{{ profile.username }}</p>
       </div>
     </section>
     <section v-if="profile" class="profile-memories" :aria-label="t('profile.memories')">

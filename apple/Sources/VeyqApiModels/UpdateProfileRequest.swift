@@ -14,13 +14,16 @@ import AnyCodable
 public struct UpdateProfileRequest: Codable {
 
     public private(set) var displayName: String
+    public private(set) var username: String
 
-    public init(displayName: String) {
+    public init(displayName: String, username: String) {
         self.displayName = displayName
+        self.username = username
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case displayName
+        case username
     }
 
     // Encodable protocol methods
@@ -28,6 +31,7 @@ public struct UpdateProfileRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(displayName, forKey: .displayName)
+        try container.encode(username, forKey: .username)
     }
 }
 

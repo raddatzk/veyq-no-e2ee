@@ -257,29 +257,29 @@ class LoginSliceTest {
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer $sessionToken")
-            .body("""{"displayName":"  Curator Name  ","permalink":"curator-name"}""")
-            .patch("/api/me/profile")
+            .body("""{"displayName":"  Curator Name  ","username":"curator-name"}""")
+            .patch("/api/me")
             .then().statusCode(200)
             .body("email", `is`(email))
             .body("displayName", `is`("Curator Name"))
-            .body("permalink", `is`("curator-name"))
+            .body("username", `is`("curator-name"))
 
         given().header("Authorization", "Bearer $sessionToken")
             .get("/api/me")
             .then().statusCode(200)
             .body("displayName", `is`("Curator Name"))
-            .body("permalink", `is`("curator-name"))
+            .body("username", `is`("curator-name"))
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer $sessionToken")
-            .body("""{"displayName":"","permalink":"curator-name"}""")
-            .patch("/api/me/profile")
+            .body("""{"displayName":"","username":"curator-name"}""")
+            .patch("/api/me")
             .then().statusCode(400)
 
         given().contentType(ContentType.JSON)
             .header("Authorization", "Bearer nope")
-            .body("""{"displayName":"Nobody","permalink":"nobody"}""")
-            .patch("/api/me/profile")
+            .body("""{"displayName":"Nobody","username":"nobody"}""")
+            .patch("/api/me")
             .then().statusCode(401)
     }
 }

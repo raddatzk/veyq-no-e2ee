@@ -228,7 +228,7 @@ function addMember() {
         user: {
           userId: user.user.userId,
           displayName: user.user.displayName,
-          permalink: user.user.permalink
+          permalink: user.user.username
         },
         role: selectedRole.value
       }

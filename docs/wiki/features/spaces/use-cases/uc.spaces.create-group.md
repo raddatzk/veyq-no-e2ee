@@ -20,7 +20,7 @@ group once joined is [use-group](uc.spaces.use-group.md); this UC is about **cre
 1. The creator generates a group **scope keypair** and a 32-byte **content key** client-side, seals the
    group **name** under the content key, wraps the scope private key to their **own identity**, and wraps
    the content key to the scope public key.
-2. The creator posts these artifacts (`POST /api/tenants/{tenantId}/groups`); the server stores the
+2. The creator posts these artifacts (`POST /api/groups`); the server stores the
    scope, a **grant** for the creator, the wrapped content key and a **GroupOwner** membership row.
 3. The creator **invites** a member (shared member-invite mechanism): the scope key is wrapped to a
    one-time **temp key**; the link carries the invite id + bootstrap secret + temp key in its fragment

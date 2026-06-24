@@ -24,7 +24,6 @@
 
 package app.veyq.apimodels
 
-import app.veyq.apimodels.AuthVerifier
 import app.veyq.apimodels.MasterKeyWrap
 
 import kotlinx.serialization.Serializable
@@ -35,8 +34,8 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param token 
+ * @param newPassword 
  * @param masterKeyWrap 
- * @param authVerifier 
  * @param recoveryAuthTag 
  */
 @Serializable
@@ -46,11 +45,11 @@ data class PasswordResetConfirmRequest (
     @SerialName(value = "token")
     val token: kotlin.String,
 
+    @SerialName(value = "newPassword")
+    val newPassword: kotlin.String,
+
     @SerialName(value = "masterKeyWrap")
     val masterKeyWrap: MasterKeyWrap,
-
-    @SerialName(value = "authVerifier")
-    val authVerifier: AuthVerifier,
 
     @SerialName(value = "recoveryAuthTag")
     val recoveryAuthTag: kotlin.String

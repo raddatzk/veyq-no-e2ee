@@ -4,7 +4,7 @@
 import { apiError } from '../../shared/apiError'
 import { authFetch } from '../../shared/api/sessionFetch'
 import * as v1 from '../../shared/crypto/v1'
-import { getMyScopeGrant, openScopeGrant } from '../admin/createTenantInviteOwner/tenant'
+import { openScopeGrant } from '../admin/createTenantInviteOwner/tenant'
 import type { UnlockedSession } from '../account/login/login'
 import { b64url, fromB64url } from '../../shared/base64'
 
@@ -21,22 +21,11 @@ export async function openPersonalScope(
   apiBase: string,
   session: UnlockedSession
 ): Promise<OpenScope> {
-  const res = await authFetch(apiBase, session, '/api/me/personal-scope')
-  if (!res.ok) throw await apiError(res, 'personal-scope')
-  const g = await res.json()
-  const idKem = fromB64url(session.identityPublicKey.kemPublicKey)
-  const scopePrivBytes = v1.asymUnwrap(
-    v1.hybridSecret(session.identity),
-    { x: idKem.slice(0, 32), m: idKem.slice(32) },
-    fromB64url(g.wrappedScopePrivateKey.bytes),
-    'personal-scope-grant'
-  )
-  const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
-  return {
-    scopeId: g.scopeId,
-    scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) },
-    scopePriv: v1.deserializeIdentityPrivate(scopePrivBytes)
-  }
+  const res = await authFetch(apiBase, session, '/api/spaces')
+  if (!res.ok) throw await apiError(res, 'list spaces')
+  const personal = (await res.json()).spaces.find((space: { kind: string }) => space.kind === 'PERSONAL')
+  if (!personal) throw new Error('personal space not found')
+  return openPersonalScopeById(apiBase, session, personal.scopeId)
 }
 
 /** Open a concrete tenant-bound personal scope from the space roster. */
@@ -69,14 +58,11 @@ export async function openTenantScope(
   session: UnlockedSession,
   tenantId: string
 ): Promise<OpenScope> {
-  const g = await getMyScopeGrant(apiBase, session.sessionToken, tenantId)
-  const scopePriv = openScopeGrant(g, session.identity, session.identityPublicKey.kemPublicKey)
-  const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
-  return {
-    scopeId: g.scopeId,
-    scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) },
-    scopePriv
-  }
+  const res = await authFetch(apiBase, session, '/api/spaces')
+  if (!res.ok) throw await apiError(res, 'list spaces')
+  const tenant = (await res.json()).spaces.find((space: { kind: string; tenantId?: string }) => space.kind === 'TENANT' && space.tenantId === tenantId)
+  if (!tenant) throw new Error('tenant space not found')
+  return openScopeById(apiBase, session, tenant.scopeId)
 }
 
 /** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope, which has no tenant path). */

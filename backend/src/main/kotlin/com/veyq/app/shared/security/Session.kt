@@ -56,6 +56,7 @@ data class IssuedSession(
     val refreshToken: String,
     val refreshExpiresAt: Instant,
     val refreshMaxAgeSeconds: Long,
+    val deviceRef: String,
 )
 
 @ApplicationScoped
@@ -75,9 +76,10 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
     }
 
     @Transactional
-    fun issuePair(userId: String): IssuedSession {
+    fun issuePair(userId: String, deviceRef: String? = null): IssuedSession {
         val accessToken = randomToken()
         val refreshToken = randomToken()
+        val resolvedDeviceRef = deviceRef?.trim()?.takeIf { it.isNotBlank() } ?: randomToken()
         val now = Instant.now()
         val refreshExpiresAt = now.plus(refreshTtl)
         sessions.persist(
@@ -86,12 +88,13 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
                 this.tokenHash = hash(accessToken)
                 this.refreshTokenHash = hash(refreshToken)
                 this.userId = userId
+                this.deviceRef = resolvedDeviceRef
                 createdAt = now
                 expiresAt = now.plus(accessTtl)
                 this.refreshExpiresAt = refreshExpiresAt
             },
         )
-        return IssuedSession(accessToken, refreshToken, refreshExpiresAt, refreshTtl.seconds)
+        return IssuedSession(accessToken, refreshToken, refreshExpiresAt, refreshTtl.seconds, resolvedDeviceRef)
     }
 
     @Transactional
@@ -113,24 +116,12 @@ class SessionService(private val sessions: SessionRepository, config: com.veyq.a
         session.refreshTokenHash = hash(nextRefreshToken)
         session.expiresAt = now.plus(accessTtl)
         session.refreshExpiresAt = nextRefreshExpiresAt
-        return IssuedSession(nextAccessToken, nextRefreshToken, nextRefreshExpiresAt, refreshTtl.seconds)
+        return IssuedSession(nextAccessToken, nextRefreshToken, nextRefreshExpiresAt, refreshTtl.seconds, session.deviceRef ?: randomToken())
     }
 
     /** Invalidates every session for a user (instant token revocation). Returns how many were dropped. */
     @Transactional
     fun invalidateAll(userId: String): Long = sessions.deleteByUserId(userId)
-
-    @Transactional
-    fun registerDevice(authorizationHeader: String?, deviceRef: String, encryptedDeviceName: String) {
-        val token = bearer(authorizationHeader) ?: throw IllegalArgumentException("missing bearer token")
-        val session = sessions.findByTokenHash(hash(token)) ?: return
-        if (session.expiresAt.isBefore(Instant.now())) {
-            sessions.deleteByTokenHash(session.tokenHash)
-            return
-        }
-        session.deviceRef = deviceRef
-        session.deviceName = encryptedDeviceName
-    }
 
     @Transactional
     fun listDevices(userId: String): List<Session> = sessions.listDevicesByUserId(userId, Instant.now())

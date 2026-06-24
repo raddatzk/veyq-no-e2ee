@@ -98,7 +98,7 @@ function unlockedSession(): UnlockedSession {
   const identity = v1.generateIdentity()
   return {
     sessionToken: 'session-token',
-    user: { id: 'user-1', email: 'kevin@example.com', displayName: 'Kevin', serverRole: 'ServerOwner', permalink: 'kevin' },
+    user: { id: 'user-1', email: 'kevin@example.com', displayName: 'Kevin', serverRole: 'ServerOwner', username: 'kevin' },
     identity: identity.priv,
     identityPublicKey: {
       suiteId: 'v1',

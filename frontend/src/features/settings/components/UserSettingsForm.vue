@@ -23,7 +23,6 @@ import {
 } from '../../../features/account/login/login'
 import {
   listLoginDevices,
-  loginDeviceId,
   removeLoginDevice,
   renameLoginDevice,
   type LoginDeviceSummary
@@ -36,8 +35,8 @@ const { t } = useI18n()
 
 const displayName = ref('')
 const displayNameDraft = ref('')
-const permalink = ref('')
-const permalinkDraft = ref('')
+const username = ref('')
+const usernameDraft = ref('')
 const email = ref('')
 const avatarUrl = ref('')
 const avatarFile = ref<File | null>(null)
@@ -58,7 +57,7 @@ const devices = ref<LoginDeviceSummary[]>([])
 const loading = ref(false)
 const savingProfile = ref(false)
 const changingDisplayName = ref(false)
-const changingPermalink = ref(false)
+const changingUsername = ref(false)
 const removingRef = ref<string | null>(null)
 const error = ref('')
 const profileMessage = ref('')
@@ -69,7 +68,7 @@ const editingName = ref('')
 const savingDeviceRef = ref<string | null>(null)
 const emailDialogVisible = ref(false)
 const displayNameDialogVisible = ref(false)
-const permalinkDialogVisible = ref(false)
+const usernameDialogVisible = ref(false)
 const passwordDialogVisible = ref(false)
 const deleteAccountDialogVisible = ref(false)
 const scanningSecretKey = ref(false)
@@ -89,11 +88,11 @@ const guardedEmailDialogVisible = computed({
     emailDialogVisible.value = nextVisible
   }
 })
-const guardedPermalinkDialogVisible = computed({
-  get: () => permalinkDialogVisible.value,
+const guardedUsernameDialogVisible = computed({
+  get: () => usernameDialogVisible.value,
   set: (nextVisible: boolean) => {
-    if (!nextVisible && changingPermalink.value) return
-    permalinkDialogVisible.value = nextVisible
+    if (!nextVisible && changingUsername.value) return
+    usernameDialogVisible.value = nextVisible
   }
 })
 const guardedPasswordDialogVisible = computed({
@@ -143,11 +142,11 @@ async function load() {
   error.value = ''
   try {
     const s = requireSession()
-    thisDeviceId.value = loginDeviceId(s.user.id)
+    thisDeviceId.value = s.deviceRef
     displayName.value = s.user.displayName
     displayNameDraft.value = s.user.displayName
-    permalink.value = s.user.permalink
-    permalinkDraft.value = s.user.permalink
+    username.value = s.user.username
+    usernameDraft.value = s.user.username
     email.value = s.user.email
     avatarUrl.value = s.user.avatarUrl || ''
     newEmail.value = ''
@@ -169,7 +168,7 @@ async function saveAvatar(file: File) {
     s.user = updated
     displayName.value = updated.displayName
     displayNameDraft.value = updated.displayName
-    permalink.value = updated.permalink
+    username.value = updated.username
     avatarUrl.value = updated.avatarUrl || ''
     avatarFile.value = null
     revokeAvatarPreview()
@@ -207,7 +206,7 @@ async function removeAvatar() {
     s.user = updated
     displayName.value = updated.displayName
     displayNameDraft.value = updated.displayName
-    permalink.value = updated.permalink
+    username.value = updated.username
     avatarFile.value = null
     revokeAvatarPreview()
     avatarUrl.value = ''
@@ -238,9 +237,9 @@ async function sendEmailChange() {
   }
 }
 
-function openPermalinkDialog() {
-  permalinkDraft.value = permalink.value
-  permalinkDialogVisible.value = true
+function openUsernameDialog() {
+  usernameDraft.value = username.value
+  usernameDialogVisible.value = true
   profileMessage.value = ''
   error.value = ''
 }
@@ -264,12 +263,12 @@ async function submitDisplayNameChange() {
       session.apiBase,
       s.sessionToken,
       nextDisplayName,
-      permalink.value
+      username.value
     )
     s.user = updated
     displayName.value = updated.displayName
     displayNameDraft.value = updated.displayName
-    permalink.value = updated.permalink
+    username.value = updated.username
     displayNameDialogVisible.value = false
     profileMessage.value = t('profile.profileSaveSuccess')
   } catch (caught) {
@@ -308,10 +307,10 @@ function onSecretKitScanned(text: string) {
   applySecretKit(text)
 }
 
-async function submitPermalinkChange() {
-  const nextPermalink = permalinkDraft.value.trim()
-  if (!nextPermalink || changingPermalink.value) return
-  changingPermalink.value = true
+async function submitUsernameChange() {
+  const nextUsername = usernameDraft.value.trim()
+  if (!nextUsername || changingUsername.value) return
+  changingUsername.value = true
   error.value = ''
   profileMessage.value = ''
   try {
@@ -320,17 +319,17 @@ async function submitPermalinkChange() {
       session.apiBase,
       s.sessionToken,
       displayName.value,
-      nextPermalink
+      nextUsername
     )
     s.user = updated
-    permalink.value = updated.permalink
-    permalinkDraft.value = updated.permalink
-    permalinkDialogVisible.value = false
+    username.value = updated.username
+    usernameDraft.value = updated.username
+    usernameDialogVisible.value = false
     profileMessage.value = t('profile.profileSaveSuccess')
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('profile.profileSaveFailed')
   } finally {
-    changingPermalink.value = false
+    changingUsername.value = false
   }
 }
 
@@ -513,15 +512,15 @@ function formatTimestamp(value?: string): string {
           </div>
           <div class="account-row account-row-open">
             <div class="account-row-text">
-              <h3>{{ t('profile.profileLink') }}</h3>
-              <span>~{{ permalink }}</span>
+              <h3>{{ t('profile.username') }}</h3>
+              <span>~{{ username }}</span>
             </div>
             <Button
               type="button"
-              :label="t('profile.profileLinkChange')"
+              :label="t('profile.usernameChange')"
               icon="pi pi-link"
               severity="secondary"
-              @click="openPermalinkDialog"
+              @click="openUsernameDialog"
             />
           </div>
           <Message v-if="profileMessage" severity="success" :closable="false">{{
@@ -763,23 +762,23 @@ function formatTimestamp(value?: string): string {
       </Dialog>
 
       <Dialog
-        v-model:visible="guardedPermalinkDialogVisible"
-        :header="t('profile.profileLinkChange')"
+        v-model:visible="guardedUsernameDialogVisible"
+        :header="t('profile.usernameChange')"
         modal
         class="tenant-dialog account-dialog"
-        :closable="!changingPermalink"
-        :close-on-escape="!changingPermalink"
+        :closable="!changingUsername"
+        :close-on-escape="!changingUsername"
       >
-        <form class="veyq-form account-dialog-form" @submit.prevent="submitPermalinkChange">
-          <p class="veyq-form-copy account-dialog-copy">{{ t('profile.profileLinkWarning') }}</p>
+        <form class="veyq-form account-dialog-form" @submit.prevent="submitUsernameChange">
+          <p class="veyq-form-copy account-dialog-copy">{{ t('profile.usernameWarning') }}</p>
           <label>
-            {{ t('profile.profileLinkNew') }}
+            {{ t('profile.usernameNew') }}
             <InputText
-              v-model="permalinkDraft"
+              v-model="usernameDraft"
               type="text"
               autocomplete="username"
               required
-              :disabled="changingPermalink"
+              :disabled="changingUsername"
             />
           </label>
           <div class="veyq-dialog-action-row">
@@ -789,15 +788,15 @@ function formatTimestamp(value?: string): string {
               icon="pi pi-times"
               severity="secondary"
               outlined
-              :disabled="changingPermalink"
-              @click="guardedPermalinkDialogVisible = false"
+              :disabled="changingUsername"
+              @click="guardedUsernameDialogVisible = false"
             />
             <Button
               type="submit"
               :label="t('common.save')"
               icon="pi pi-save"
-              :loading="changingPermalink"
-              :disabled="!permalinkDraft.trim() || changingPermalink"
+              :loading="changingUsername"
+              :disabled="!usernameDraft.trim() || changingUsername"
             />
           </div>
         </form>

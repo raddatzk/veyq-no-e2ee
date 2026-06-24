@@ -93,7 +93,7 @@ describe('TenantJoinView', () => {
       userId: 42,
       email: 'join@example.test',
       displayName: 'Join',
-      permalink: 'join',
+      username: 'join',
       serverRole: 'ServerMember',
       passkeyCount: 0,
       hasPassword: false
@@ -105,7 +105,7 @@ describe('TenantJoinView', () => {
         userId: 42,
         email: 'join@example.test',
         displayName: 'Join',
-        permalink: 'join',
+        username: 'join',
         serverRole: 'ServerMember',
         passkeyCount: 0,
         hasPassword: false

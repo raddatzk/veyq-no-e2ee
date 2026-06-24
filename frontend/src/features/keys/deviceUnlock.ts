@@ -3,7 +3,6 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../shared/base64'
 import type { UnlockedSession } from '../account/login/login'
 
-const LOGIN_DEVICE_ID_PREFIX = 'veyq.loginDevice.'
 const textDecoder = new TextDecoder()
 
 type NavigatorUserAgentData = {
@@ -17,21 +16,6 @@ export type LoginDeviceSummary = {
   credentialRef?: string
   name?: string
   lastLoginAt?: string
-}
-
-function randomId(): string {
-  return b64url(v1.randomBytes(16))
-}
-
-/** Stable per-user identifier for this browser. It lets Settings invalidate all active sessions for it. */
-export function loginDeviceId(userId: string): string {
-  const key = LOGIN_DEVICE_ID_PREFIX + userId
-  let id = localStorage.getItem(key)
-  if (!id) {
-    id = randomId()
-    localStorage.setItem(key, id)
-  }
-  return id
 }
 
 function userAgentData(): NavigatorUserAgentData | undefined {
@@ -120,13 +104,12 @@ export async function registerLoginDevice(
   apiBase: string,
   session: UnlockedSession,
 ): Promise<void> {
-  const deviceRef = loginDeviceId(session.user.id)
   try {
     const name = await defaultDeviceName(session.user.displayName)
-    const res = await fetch(`${apiBase}/api/me/devices/current`, {
+    const res = await fetch(`${apiBase}/api/me/devices/${encodeURIComponent(session.deviceRef)}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
-      body: JSON.stringify({ deviceRef, encryptedName: sealDeviceName(session.masterKey, name) }),
+      body: JSON.stringify({ encryptedName: sealDeviceName(session.masterKey, name) }),
     })
     if (!res.ok) throw await apiError(res, 'device register')
   } catch {

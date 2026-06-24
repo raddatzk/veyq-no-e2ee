@@ -14,21 +14,21 @@ import AnyCodable
 public struct PasswordResetConfirmRequest: Codable {
 
     public private(set) var token: String
+    public private(set) var newPassword: String
     public private(set) var masterKeyWrap: MasterKeyWrap
-    public private(set) var authVerifier: AuthVerifier
     public private(set) var recoveryAuthTag: String
 
-    public init(token: String, masterKeyWrap: MasterKeyWrap, authVerifier: AuthVerifier, recoveryAuthTag: String) {
+    public init(token: String, newPassword: String, masterKeyWrap: MasterKeyWrap, recoveryAuthTag: String) {
         self.token = token
+        self.newPassword = newPassword
         self.masterKeyWrap = masterKeyWrap
-        self.authVerifier = authVerifier
         self.recoveryAuthTag = recoveryAuthTag
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case token
+        case newPassword
         case masterKeyWrap
-        case authVerifier
         case recoveryAuthTag
     }
 
@@ -37,8 +37,8 @@ public struct PasswordResetConfirmRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(token, forKey: .token)
+        try container.encode(newPassword, forKey: .newPassword)
         try container.encode(masterKeyWrap, forKey: .masterKeyWrap)
-        try container.encode(authVerifier, forKey: .authVerifier)
         try container.encode(recoveryAuthTag, forKey: .recoveryAuthTag)
     }
 }

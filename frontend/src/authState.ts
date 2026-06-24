@@ -11,7 +11,7 @@ export type UserSummary = {
   email: string
   displayName: string
   serverRole: string
-  permalink: string
+  username: string
   // Legacy optional fields some shell/settings components still read. They have no E2EE meaning anymore
   // (avatars/passkeys/TOTP are gone) and stay undefined; kept so deferred components still typecheck.
   avatarUrl?: string
@@ -46,7 +46,7 @@ watchEffect(() => {
       email: u.user.email,
       displayName: u.user.displayName,
       serverRole: u.user.serverRole,
-      permalink: u.user.permalink,
+      username: u.user.username,
     }
     authState.userLabel = u.user.displayName || u.user.email
   } else {

@@ -25,7 +25,7 @@ data class MemoryFavoriteStatus(val favorite: Boolean)
 
 // Two resource classes with SPECIFIC class-level @Paths — never the shared `/api/scopes/{scopeId}` prefix.
 // A root resource whose @Path is that greedy prefix is selected (most-specific match) for ANY
-// `/api/scopes/{scopeId}/...` request and then 404s siblings it has no method for (it shadowed KeysApi's
+// `/api/scopes/{scopeId}/...` request and then 404s siblings it has no method for (it shadowed ScopeGrantsApi's
 // `/grants/me`). Same class-level greedy-prefix gotcha the password-reset spec warns about — keep each
 // favorites route on its own full-path resource so it claims only its own URI.
 

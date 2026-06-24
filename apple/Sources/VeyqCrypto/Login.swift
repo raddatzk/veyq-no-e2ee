@@ -39,21 +39,23 @@ public enum Login {
         public let scopePublicKey: KemPublicKeyDTO
         public let wrappedScopePrivateKey: BlobDTO
     }
-    struct LoginResponseDTO: Codable { let sessionToken: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
+    struct LoginRequestDTO: Codable { let email: String; let password: String; let deviceRef: String? }
+    struct LoginResponseDTO: Codable { let sessionToken: String; let deviceRef: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
 
     public struct UnlockedSession: Sendable {
         public let sessionToken: String
+        public let deviceRef: String
         public let user: UserSummaryDTO
         public let identity: V1.IdentityPrivate
         public let kemPublicKey: Data
         public let masterKey: Data
     }
 
-    public static func login(apiBase: String, email: String, password: String, secretKeyB64: String) async throws -> UnlockedSession {
+    public static func login(apiBase: String, email: String, password: String, secretKeyB64: String, deviceRef: String? = nil) async throws -> UnlockedSession {
         var request = URLRequest(url: URL(string: "\(apiBase)/api/login")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["email": email, "password": password])
+        request.httpBody = try JSONEncoder().encode(LoginRequestDTO(email: email, password: password, deviceRef: deviceRef))
         let (data, resp) = try await URLSession.shared.data(for: request)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
             throw NSError(domain: "veyq.login", code: 1,
@@ -73,7 +75,7 @@ public enum Login {
         let identity = V1.deserializeIdentityPrivate(privBytes)
 
         return UnlockedSession(
-            sessionToken: body.sessionToken, user: body.user, identity: identity,
+            sessionToken: body.sessionToken, deviceRef: body.deviceRef, user: body.user, identity: identity,
             kemPublicKey: b64urlDecode(body.keyBag.identityPublicKey.kemPublicKey), masterKey: masterKey)
     }
 
@@ -99,11 +101,21 @@ public enum Login {
     }
 
     public static func fetchPersonalScope(apiBase: String, sessionToken: String) async throws -> PersonalScopeGrantDTO {
-        var request = URLRequest(url: URL(string: "\(apiBase)/api/me/personal-scope")!)
+        struct SpacesDTO: Codable { let spaces: [SwitchActiveSpace.SpaceEntry] }
+        var spacesRequest = URLRequest(url: URL(string: "\(apiBase)/api/spaces")!)
+        spacesRequest.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+        let (spacesData, spacesResp) = try await URLSession.shared.data(for: spacesRequest)
+        guard let spacesHttp = spacesResp as? HTTPURLResponse, spacesHttp.statusCode == 200 else {
+            throw NSError(domain: "veyq.login", code: 4, userInfo: [NSLocalizedDescriptionKey: "list spaces failed"])
+        }
+        guard let personal = try JSONDecoder().decode(SpacesDTO.self, from: spacesData).spaces.first(where: { $0.kind == "PERSONAL" }) else {
+            throw NSError(domain: "veyq.login", code: 5, userInfo: [NSLocalizedDescriptionKey: "personal space not found"])
+        }
+        var request = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(personal.scopeId)/grants/me")!)
         request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
         let (data, resp) = try await URLSession.shared.data(for: request)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
-            throw NSError(domain: "veyq.login", code: 4, userInfo: [NSLocalizedDescriptionKey: "personal scope failed"])
+            throw NSError(domain: "veyq.login", code: 6, userInfo: [NSLocalizedDescriptionKey: "personal scope failed"])
         }
         return try JSONDecoder().decode(PersonalScopeGrantDTO.self, from: data)
     }

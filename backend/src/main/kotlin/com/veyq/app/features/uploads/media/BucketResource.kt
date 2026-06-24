@@ -1,14 +1,14 @@
 package com.veyq.app.features.uploads.media
 
-import com.veyq.app.generated.api.MemoryBucketApi
+import com.veyq.app.generated.api.MediaBucketsApi
 import com.veyq.app.generated.model.CreateBucketRequest
 import com.veyq.app.generated.model.UpdateBucketRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
-/** Thin REST entry implementing the generated MemoryBucketApi; delegates to BucketHandler (ADR 0023). */
+/** Thin REST entry implementing the generated MediaBucketsApi; delegates to BucketHandler (ADR 0023). */
 @ApplicationScoped
-class BucketResource(private val handler: BucketHandler) : MemoryBucketApi {
+class BucketResource(private val handler: BucketHandler) : MediaBucketsApi {
 
     override fun listBuckets(authorization: String, scopeId: String, nodeId: String): Response =
         Response.ok(handler.listBuckets(authorization, scopeId, nodeId)).build()

@@ -82,7 +82,7 @@ class AccountFactory(
         val userId = newId()
         val user = User().apply {
             id = userId; email = spec.email; displayName = spec.displayName
-            permalink = uniquePermalink(ProfilePermalinks.fallback(spec.displayName, spec.email, userId), userId)
+            username = uniqueUsername(Usernames.fallback(spec.displayName, spec.email, userId), userId)
             serverRole = spec.serverRole; systemAccount = false; createdAt = now
         }
         users.persist(user)
@@ -132,11 +132,11 @@ class AccountFactory(
     }
 
 
-    private fun uniquePermalink(base: String, userId: String): String {
-        val normalized = ProfilePermalinks.normalize(base).ifBlank { "user-${userId.take(8)}" }.take(72).trim('-')
+    private fun uniqueUsername(base: String, userId: String): String {
+        val normalized = Usernames.normalize(base).ifBlank { "user-${userId.take(8)}" }.take(72).trim('-')
         var candidate = normalized
         var suffix = 2
-        while (users.findByPermalink(candidate) != null) {
+        while (users.findByUsername(candidate) != null) {
             candidate = "${normalized.take(72)}-$suffix"
             suffix += 1
         }

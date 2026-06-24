@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param displayName 
  * @param status 
  * @param domain 
+ * @param logoUrl 
  */
 @Serializable
 
@@ -55,7 +56,10 @@ data class TenantSummary (
     val status: TenantSummary.Status,
 
     @SerialName(value = "domain")
-    val domain: kotlin.String? = null
+    val domain: kotlin.String? = null,
+
+    @SerialName(value = "logoUrl")
+    val logoUrl: kotlin.String? = null
 
 ) {
 

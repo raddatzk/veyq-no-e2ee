@@ -32,7 +32,7 @@ export type TenantScopeProvider = (idPub: { x: Uint8Array; m: Uint8Array }) => {
 }
 export type RegisterResult = {
   sessionToken: string
-  user: { id: string; email: string; displayName: string; serverRole: string; permalink: string; avatarUrl?: string }
+  user: { id: string; email: string; displayName: string; serverRole: string; username: string; avatarUrl?: string }
   tenant: TenantSummary
   emergencyKit: EmergencyKit
 }

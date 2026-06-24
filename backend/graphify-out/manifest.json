@@ -1,0 +1,842 @@
+{
+  "build.gradle.kts": {
+    "mtime": 1781796687.4243968,
+    "ast_hash": "b669f4c007add716f2a9534dd425ef68",
+    "semantic_hash": "b669f4c007add716f2a9534dd425ef68"
+  },
+  "gradle/openapi.gradle.kts": {
+    "mtime": 1781882296.2044835,
+    "ast_hash": "6352a1f8d6a9cdd74b6158301a10f9eb",
+    "semantic_hash": "6352a1f8d6a9cdd74b6158301a10f9eb"
+  },
+  "gradlew": {
+    "mtime": 1781347798.4053075,
+    "ast_hash": "794669d78aef1dd5c7d889ef618b311a",
+    "semantic_hash": "794669d78aef1dd5c7d889ef618b311a"
+  },
+  "settings.gradle.kts": {
+    "mtime": 1781347798.4060419,
+    "ast_hash": "9720002458725949b15d37fac57594b5",
+    "semantic_hash": "9720002458725949b15d37fac57594b5"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteHandler.kt": {
+    "mtime": 1781682387.6736057,
+    "ast_hash": "e0c5a17954df31539ba52abd1afda215",
+    "semantic_hash": "e0c5a17954df31539ba52abd1afda215"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteResource.kt": {
+    "mtime": 1781380726.3291893,
+    "ast_hash": "3035e1f6e3d23e4277969e53b7751807",
+    "semantic_hash": "3035e1f6e3d23e4277969e53b7751807"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/devices/LoginDeviceResource.kt": {
+    "mtime": 1782125073.5157044,
+    "ast_hash": "616fcc6cf5ae2a8793385752f79fa72e",
+    "semantic_hash": "616fcc6cf5ae2a8793385752f79fa72e"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/emailchange/EmailChangeHandler.kt": {
+    "mtime": 1782128627.2989292,
+    "ast_hash": "2c4cc9f50035bb6c96818b4af3a0e743",
+    "semantic_hash": "2c4cc9f50035bb6c96818b4af3a0e743"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/emailchange/EmailChangeResource.kt": {
+    "mtime": 1781899090.855645,
+    "ast_hash": "e249942926bc097f8bde6526910c7e21",
+    "semantic_hash": "e249942926bc097f8bde6526910c7e21"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/emailchange/EmailChangeStore.kt": {
+    "mtime": 1781899059.2696652,
+    "ast_hash": "698a49b20e487026bf072b1e0314528b",
+    "semantic_hash": "698a49b20e487026bf072b1e0314528b"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt": {
+    "mtime": 1782138319.9697742,
+    "ast_hash": "24c8ee85f5592d7e54f7a29bf7f170df",
+    "semantic_hash": "24c8ee85f5592d7e54f7a29bf7f170df"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/login/LoginResource.kt": {
+    "mtime": 1782128584.71705,
+    "ast_hash": "3c94bae1452cd481a551b7864bded740",
+    "semantic_hash": "3c94bae1452cd481a551b7864bded740"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/login/ProfileResource.kt": {
+    "mtime": 1782128584.8241167,
+    "ast_hash": "442750f79818f9a782b7233aa461eb4f",
+    "semantic_hash": "442750f79818f9a782b7233aa461eb4f"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt": {
+    "mtime": 1782151171.439024,
+    "ast_hash": "ff19873b5addb468c3dcc6e3c8172c80",
+    "semantic_hash": "ff19873b5addb468c3dcc6e3c8172c80"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationResource.kt": {
+    "mtime": 1782126678.6890476,
+    "ast_hash": "a4468fb13730b97d53fab1bf8ac53d9e",
+    "semantic_hash": "a4468fb13730b97d53fab1bf8ac53d9e"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/resetpassword/PasswordResetHandler.kt": {
+    "mtime": 1781705786.5989635,
+    "ast_hash": "58d56cc87305d849e14f05431f457967",
+    "semantic_hash": "58d56cc87305d849e14f05431f457967"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/resetpassword/PasswordResetResource.kt": {
+    "mtime": 1781554702.9442673,
+    "ast_hash": "c71d1ca20418c903773f5ed7de969376",
+    "semantic_hash": "c71d1ca20418c903773f5ed7de969376"
+  },
+  "src/main/kotlin/com/veyq/app/features/account/resetpassword/PasswordResetStore.kt": {
+    "mtime": 1781554384.2616634,
+    "ast_hash": "ca2ebd62605f4b4da02a29fcd5938c79",
+    "semantic_hash": "ca2ebd62605f4b4da02a29fcd5938c79"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantDeletionGc.kt": {
+    "mtime": 1781618259.3172574,
+    "ast_hash": "6b8b40043609db59778cced93f44005e",
+    "semantic_hash": "6b8b40043609db59778cced93f44005e"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningHandler.kt": {
+    "mtime": 1782153220.8635209,
+    "ast_hash": "d9181bc256941c63180445decada2043",
+    "semantic_hash": "d9181bc256941c63180445decada2043"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningResource.kt": {
+    "mtime": 1782150826.0378783,
+    "ast_hash": "cd26d39a80ed09a78205d58f88f9e119",
+    "semantic_hash": "cd26d39a80ed09a78205d58f88f9e119"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ChangeMemberRoleHandler.kt": {
+    "mtime": 1781682415.3941193,
+    "ast_hash": "b0ebcb11d4b1b9e0409ee1e8e690e600",
+    "semantic_hash": "b0ebcb11d4b1b9e0409ee1e8e690e600"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ChangeMemberRoleResource.kt": {
+    "mtime": 1781375809.6618254,
+    "ast_hash": "55ad8dc15b51acaa055237dfb2279d85",
+    "semantic_hash": "55ad8dc15b51acaa055237dfb2279d85"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/EmailInviteHandler.kt": {
+    "mtime": 1782152864.4164896,
+    "ast_hash": "08d03f5b421584fc43f0481e8c5e7753",
+    "semantic_hash": "08d03f5b421584fc43f0481e8c5e7753"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberInviteHandler.kt": {
+    "mtime": 1781682461.5404794,
+    "ast_hash": "91f3ea966c7d7604ba5c178e36a782e8",
+    "semantic_hash": "91f3ea966c7d7604ba5c178e36a782e8"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberInviteResource.kt": {
+    "mtime": 1781547237.7375042,
+    "ast_hash": "4bf1ebfaf188d37b339c075589246a2b",
+    "semantic_hash": "4bf1ebfaf188d37b339c075589246a2b"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberListHandler.kt": {
+    "mtime": 1781690918.3302438,
+    "ast_hash": "57e3e32c3f717a69f71ca94325dc4a8b",
+    "semantic_hash": "57e3e32c3f717a69f71ca94325dc4a8b"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberListResource.kt": {
+    "mtime": 1781370292.3466716,
+    "ast_hash": "95090e15b3a53fff85d10b1c912d19ef",
+    "semantic_hash": "95090e15b3a53fff85d10b1c912d19ef"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/RemoveMemberHandler.kt": {
+    "mtime": 1781686238.3461611,
+    "ast_hash": "ec06a82244cf42f80debf86490355515",
+    "semantic_hash": "ec06a82244cf42f80debf86490355515"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/RemoveMemberResource.kt": {
+    "mtime": 1781368275.0429497,
+    "ast_hash": "61c714766c41663394b7741200a33047",
+    "semantic_hash": "61c714766c41663394b7741200a33047"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ScopeRotationHandler.kt": {
+    "mtime": 1781649905.6184115,
+    "ast_hash": "fb8ef70415b7d774432f21b41b8a438a",
+    "semantic_hash": "fb8ef70415b7d774432f21b41b8a438a"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/ScopeRotationResource.kt": {
+    "mtime": 1781370301.047839,
+    "ast_hash": "99bd2181f372e58b0285a0f6fed7090e",
+    "semantic_hash": "99bd2181f372e58b0285a0f6fed7090e"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminHandler.kt": {
+    "mtime": 1782128627.6109767,
+    "ast_hash": "ee86287079ab651424ca1207fc72485e",
+    "semantic_hash": "ee86287079ab651424ca1207fc72485e"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminResource.kt": {
+    "mtime": 1781882321.285107,
+    "ast_hash": "187adf5faf1516dbf79f502cd6b6f57a",
+    "semantic_hash": "187adf5faf1516dbf79f502cd6b6f57a"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt": {
+    "mtime": 1782128665.1219056,
+    "ast_hash": "8fc653708f599be8a1faedd5005ecedb",
+    "semantic_hash": "8fc653708f599be8a1faedd5005ecedb"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerResource.kt": {
+    "mtime": 1781347800.1721687,
+    "ast_hash": "1b988a98fd0e54ebd82405ec099a1f39",
+    "semantic_hash": "1b988a98fd0e54ebd82405ec099a1f39"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/tenantterms/TenantTermsHandler.kt": {
+    "mtime": 1781648612.5028453,
+    "ast_hash": "9424ad8bf12941b261a6fe25a2142e09",
+    "semantic_hash": "9424ad8bf12941b261a6fe25a2142e09"
+  },
+  "src/main/kotlin/com/veyq/app/features/admin/tenantterms/TenantTermsResource.kt": {
+    "mtime": 1781519582.1215541,
+    "ast_hash": "8d27884051130632d8740fc310fca55d",
+    "semantic_hash": "8d27884051130632d8740fc310fca55d"
+  },
+  "src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentKeyHandler.kt": {
+    "mtime": 1781649905.623389,
+    "ast_hash": "3c005ea0321da3143e30f3e6d2613431",
+    "semantic_hash": "3c005ea0321da3143e30f3e6d2613431"
+  },
+  "src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentKeyResource.kt": {
+    "mtime": 1781384749.1671367,
+    "ast_hash": "8482d925457a175cc75bffbde357a726",
+    "semantic_hash": "8482d925457a175cc75bffbde357a726"
+  },
+  "src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeItemsHandler.kt": {
+    "mtime": 1781726967.3634443,
+    "ast_hash": "3a17d44103452efb54b588bdc1fc34d4",
+    "semantic_hash": "3a17d44103452efb54b588bdc1fc34d4"
+  },
+  "src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeItemsResource.kt": {
+    "mtime": 1781384758.6434906,
+    "ast_hash": "9d8e4f6c8d6a46e2d448042e90882613",
+    "semantic_hash": "9d8e4f6c8d6a46e2d448042e90882613"
+  },
+  "src/main/kotlin/com/veyq/app/features/dev/smoke/DevSmokeHandler.kt": {
+    "mtime": 1782128665.2289014,
+    "ast_hash": "5819cb23759a10c7cf08cd38c663198a",
+    "semantic_hash": "5819cb23759a10c7cf08cd38c663198a"
+  },
+  "src/main/kotlin/com/veyq/app/features/dev/smoke/DevSmokeResource.kt": {
+    "mtime": 1781811108.3072617,
+    "ast_hash": "2b383160cfb675843ddb6089bd412ee2",
+    "semantic_hash": "2b383160cfb675843ddb6089bd412ee2"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/removeunlockwrap/RemoveUnlockWrapHandler.kt": {
+    "mtime": 1781649905.6265495,
+    "ast_hash": "fad002a569d36b9fd8c74fda6a876421",
+    "semantic_hash": "fad002a569d36b9fd8c74fda6a876421"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/rewrapscopegrant/ScopeGrantRewrapHandler.kt": {
+    "mtime": 1781649905.6272018,
+    "ast_hash": "51c533f59801a224e6494336d75bd7cb",
+    "semantic_hash": "51c533f59801a224e6494336d75bd7cb"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/rotateidentity/MyGrantsHandler.kt": {
+    "mtime": 1781690956.1911514,
+    "ast_hash": "861b6fa8ce0f77c823dac77294886535",
+    "semantic_hash": "861b6fa8ce0f77c823dac77294886535"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/rotateidentity/MyGrantsResource.kt": {
+    "mtime": 1781388897.693024,
+    "ast_hash": "cc03502e63309afc730789aaf3bf06ae",
+    "semantic_hash": "cc03502e63309afc730789aaf3bf06ae"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentityHandler.kt": {
+    "mtime": 1782128627.504658,
+    "ast_hash": "d69a9bf74886e46aeff2ad9658685fef",
+    "semantic_hash": "d69a9bf74886e46aeff2ad9658685fef"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentityResource.kt": {
+    "mtime": 1781388906.903283,
+    "ast_hash": "2f845f404e45e764d4737f6a416bbbf1",
+    "semantic_hash": "2f845f404e45e764d4737f6a416bbbf1"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/upsertunlockwrap/UnlockWrapHandler.kt": {
+    "mtime": 1782028607.3918436,
+    "ast_hash": "4b45772cc3737a8adb26296a7bb7aa9f",
+    "semantic_hash": "4b45772cc3737a8adb26296a7bb7aa9f"
+  },
+  "src/main/kotlin/com/veyq/app/features/keys/upsertunlockwrap/UnlockWrapResource.kt": {
+    "mtime": 1782028624.5388424,
+    "ast_hash": "6844b77fa8a941e6ba4b71490a36c287",
+    "semantic_hash": "6844b77fa8a941e6ba4b71490a36c287"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeHandler.kt": {
+    "mtime": 1781726983.9680007,
+    "ast_hash": "06afcf4f1338dd5ecfb3e3f9cf507f0a",
+    "semantic_hash": "06afcf4f1338dd5ecfb3e3f9cf507f0a"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeResource.kt": {
+    "mtime": 1781441095.9295218,
+    "ast_hash": "3963e288ab7896fce3b2b9b3acb110e9",
+    "semantic_hash": "3963e288ab7896fce3b2b9b3acb110e9"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/curate/CurateHandler.kt": {
+    "mtime": 1781727000.455778,
+    "ast_hash": "237a74ab9a3108124b5ff8c0629c57d1",
+    "semantic_hash": "237a74ab9a3108124b5ff8c0629c57d1"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/curate/CurateResource.kt": {
+    "mtime": 1781533021.8293977,
+    "ast_hash": "46ef8b394a89a8a2b54e54bb168a82be",
+    "semantic_hash": "46ef8b394a89a8a2b54e54bb168a82be"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/favorite/MemoryFavoriteResource.kt": {
+    "mtime": 1781900804.5248694,
+    "ast_hash": "5cf75e20ad0d95809216ac1d3b791e69",
+    "semantic_hash": "5cf75e20ad0d95809216ac1d3b791e69"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/journal/JournalHandler.kt": {
+    "mtime": 1781727057.3864899,
+    "ast_hash": "0ebf64cdabcbe1a067f10ec91c2fd0cb",
+    "semantic_hash": "0ebf64cdabcbe1a067f10ec91c2fd0cb"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/journal/JournalResource.kt": {
+    "mtime": 1781611583.6160705,
+    "ast_hash": "ec907f93ac4eeb030711dc7539ada6dd",
+    "semantic_hash": "ec907f93ac4eeb030711dc7539ada6dd"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/journallive/JournalLiveTicketResource.kt": {
+    "mtime": 1781643336.9412997,
+    "ast_hash": "6be06b01993bc18506a22f5a009f2374",
+    "semantic_hash": "6be06b01993bc18506a22f5a009f2374"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/journallive/JournalLiveTicketService.kt": {
+    "mtime": 1781643327.2398877,
+    "ast_hash": "c4a1e5b1b34999ffd48a256971bfa732",
+    "semantic_hash": "c4a1e5b1b34999ffd48a256971bfa732"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/journallive/JournalRelay.kt": {
+    "mtime": 1781647988.6447542,
+    "ast_hash": "737ae373cb57c90c0c333d1f42927266",
+    "semantic_hash": "737ae373cb57c90c0c333d1f42927266"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/playlist/PlaylistHandler.kt": {
+    "mtime": 1781774948.0796854,
+    "ast_hash": "d95c883220394409cdfead972148b49b",
+    "semantic_hash": "d95c883220394409cdfead972148b49b"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/playlist/PlaylistResource.kt": {
+    "mtime": 1781774973.7698433,
+    "ast_hash": "db4684a5647613793fe61b10e3cd82ea",
+    "semantic_hash": "db4684a5647613793fe61b10e3cd82ea"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/share/PublicShareContributeHandler.kt": {
+    "mtime": 1781956576.791861,
+    "ast_hash": "9f065a82d1d2a9cd35226948706db6fd",
+    "semantic_hash": "9f065a82d1d2a9cd35226948706db6fd"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/share/PublicShareMediaHandler.kt": {
+    "mtime": 1781956645.4140048,
+    "ast_hash": "8f2d136fa96d2f25916e97f426f2a959",
+    "semantic_hash": "8f2d136fa96d2f25916e97f426f2a959"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/share/PublicShareTreeHandler.kt": {
+    "mtime": 1781850228.414625,
+    "ast_hash": "e4b124ab53ccc706c0b3d421c6e45ca6",
+    "semantic_hash": "e4b124ab53ccc706c0b3d421c6e45ca6"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/share/ShareHandler.kt": {
+    "mtime": 1781819123.886197,
+    "ast_hash": "99eff33584b71634f3022bd34f6ade72",
+    "semantic_hash": "99eff33584b71634f3022bd34f6ade72"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/share/ShareResources.kt": {
+    "mtime": 1781956672.3962126,
+    "ast_hash": "847219eb3302e8ea0905e48053024e9f",
+    "semantic_hash": "847219eb3302e8ea0905e48053024e9f"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/track/TrackHandler.kt": {
+    "mtime": 1781773371.1065266,
+    "ast_hash": "6dc932f0c2edeb98b78fa82d7f78dada",
+    "semantic_hash": "6dc932f0c2edeb98b78fa82d7f78dada"
+  },
+  "src/main/kotlin/com/veyq/app/features/memory/track/TrackResource.kt": {
+    "mtime": 1781773420.2470276,
+    "ast_hash": "184dd2d4dac7d6ca7746abbe38e0a2c5",
+    "semantic_hash": "184dd2d4dac7d6ca7746abbe38e0a2c5"
+  },
+  "src/main/kotlin/com/veyq/app/features/people/participant/ParticipantHandler.kt": {
+    "mtime": 1781850210.4075491,
+    "ast_hash": "639657b1d0385a42974793774eaaed4b",
+    "semantic_hash": "639657b1d0385a42974793774eaaed4b"
+  },
+  "src/main/kotlin/com/veyq/app/features/people/participant/ParticipantResource.kt": {
+    "mtime": 1781850210.5139422,
+    "ast_hash": "433f556019b4a9ad8a689a54b677f8ee",
+    "semantic_hash": "433f556019b4a9ad8a689a54b677f8ee"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/groups/GroupProvisioningHandler.kt": {
+    "mtime": 1781690927.087557,
+    "ast_hash": "921404c93d6dd4791a449962e77a7cdb",
+    "semantic_hash": "921404c93d6dd4791a449962e77a7cdb"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/groups/GroupsResource.kt": {
+    "mtime": 1781536110.231414,
+    "ast_hash": "1b942c37895f6eab47648afe38680688",
+    "semantic_hash": "1b942c37895f6eab47648afe38680688"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesHandler.kt": {
+    "mtime": 1782138274.3628473,
+    "ast_hash": "783f79ca54015164d7bf8ddc57b7e28c",
+    "semantic_hash": "783f79ca54015164d7bf8ddc57b7e28c"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesResource.kt": {
+    "mtime": 1781431720.8612006,
+    "ast_hash": "2c3dbe3e8484519f0719c4ffb25f23d6",
+    "semantic_hash": "2c3dbe3e8484519f0719c4ffb25f23d6"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsHandler.kt": {
+    "mtime": 1781862688.1822734,
+    "ast_hash": "943e965d3125520bd5100f42e3b8c9c5",
+    "semantic_hash": "943e965d3125520bd5100f42e3b8c9c5"
+  },
+  "src/main/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsResource.kt": {
+    "mtime": 1781430416.449711,
+    "ast_hash": "663a08ebdb470357fad9ae00f9f4efbf",
+    "semantic_hash": "663a08ebdb470357fad9ae00f9f4efbf"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/blob/BlobUploadGc.kt": {
+    "mtime": 1781723991.1484582,
+    "ast_hash": "ed23ba1043d9d94fc7795c8676ed0b6a",
+    "semantic_hash": "ed23ba1043d9d94fc7795c8676ed0b6a"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/blob/BlobUploadHandler.kt": {
+    "mtime": 1781956539.9408479,
+    "ast_hash": "12191a82e4c86baf8a47c3f0028d79de",
+    "semantic_hash": "12191a82e4c86baf8a47c3f0028d79de"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/blob/BlobUploadResources.kt": {
+    "mtime": 1781956556.7187698,
+    "ast_hash": "a980fb2b07cbe98ce5c2e9525aaea3cb",
+    "semantic_hash": "a980fb2b07cbe98ce5c2e9525aaea3cb"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/media/BucketHandler.kt": {
+    "mtime": 1781768721.1050146,
+    "ast_hash": "2f105cdd9c7310aab781c77a27f92fd5",
+    "semantic_hash": "2f105cdd9c7310aab781c77a27f92fd5"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/media/BucketResource.kt": {
+    "mtime": 1781768753.942492,
+    "ast_hash": "857b36fe0f7087461f73aa307bdafbed",
+    "semantic_hash": "857b36fe0f7087461f73aa307bdafbed"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/media/MediaHandler.kt": {
+    "mtime": 1781954444.3645284,
+    "ast_hash": "97f7e289a4866f676c47ade94275d071",
+    "semantic_hash": "97f7e289a4866f676c47ade94275d071"
+  },
+  "src/main/kotlin/com/veyq/app/features/uploads/media/MediaResource.kt": {
+    "mtime": 1781954482.326736,
+    "ast_hash": "59060a7bb1e8013101386ad0db3cbe54",
+    "semantic_hash": "59060a7bb1e8013101386ad0db3cbe54"
+  },
+  "src/main/kotlin/com/veyq/app/platform/error/ApiError.kt": {
+    "mtime": 1782148867.5523412,
+    "ast_hash": "45013705c7212b7ecc6f15498172b0c3",
+    "semantic_hash": "45013705c7212b7ecc6f15498172b0c3"
+  },
+  "src/main/kotlin/com/veyq/app/platform/error/ApiErrors.kt": {
+    "mtime": 1781649877.311662,
+    "ast_hash": "df6235cf78541e616615ce393149c663",
+    "semantic_hash": "df6235cf78541e616615ce393149c663"
+  },
+  "src/main/kotlin/com/veyq/app/platform/web/HealthResource.kt": {
+    "mtime": 1781347798.4080133,
+    "ast_hash": "e1111dcf7b7218fe865b6c5ae3b2893e",
+    "semantic_hash": "e1111dcf7b7218fe865b6c5ae3b2893e"
+  },
+  "src/main/kotlin/com/veyq/app/shared/config/VeyqConfig.kt": {
+    "mtime": 1782126589.2453663,
+    "ast_hash": "2017735c2ea48ed6a691f5844a20bcd5",
+    "semantic_hash": "2017735c2ea48ed6a691f5844a20bcd5"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/ContentPurge.kt": {
+    "mtime": 1781857263.803724,
+    "ast_hash": "3bc51b7bc8e6b1f84214addee099faea",
+    "semantic_hash": "3bc51b7bc8e6b1f84214addee099faea"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/ContentStore.kt": {
+    "mtime": 1781532957.358144,
+    "ast_hash": "efa91017fa38fbfdb98f1af55b802253",
+    "semantic_hash": "efa91017fa38fbfdb98f1af55b802253"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MediaApiMapper.kt": {
+    "mtime": 1781768608.839743,
+    "ast_hash": "0b763417be3acb8645f9fd67fda75b26",
+    "semantic_hash": "0b763417be3acb8645f9fd67fda75b26"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MediaStore.kt": {
+    "mtime": 1781878711.3536322,
+    "ast_hash": "88acef948287cbbe8d12f3ef61ef6e87",
+    "semantic_hash": "88acef948287cbbe8d12f3ef61ef6e87"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MemoryFavoriteStore.kt": {
+    "mtime": 1781857263.308467,
+    "ast_hash": "3a2200f748bde35d6e54bb4895b1935b",
+    "semantic_hash": "3a2200f748bde35d6e54bb4895b1935b"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MemoryJournalStore.kt": {
+    "mtime": 1781611643.5823274,
+    "ast_hash": "410ce90f5d06686d9d47e10a0baa9c25",
+    "semantic_hash": "410ce90f5d06686d9d47e10a0baa9c25"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MemoryParticipantStore.kt": {
+    "mtime": 1781850210.2299335,
+    "ast_hash": "78879658763981f5f0c71e9fefabfb34",
+    "semantic_hash": "78879658763981f5f0c71e9fefabfb34"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MemoryPlaylistStore.kt": {
+    "mtime": 1781774822.2332954,
+    "ast_hash": "01bde89cdd79baa142f7df30092f4120",
+    "semantic_hash": "01bde89cdd79baa142f7df30092f4120"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/MemoryTrackStore.kt": {
+    "mtime": 1781532934.0764594,
+    "ast_hash": "95c2625251ad4a6507a23ab123f6a7a2",
+    "semantic_hash": "95c2625251ad4a6507a23ab123f6a7a2"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/NodeApiMapper.kt": {
+    "mtime": 1781694770.52984,
+    "ast_hash": "4b71b36910888825c07610d18df02460",
+    "semantic_hash": "4b71b36910888825c07610d18df02460"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/NodeStore.kt": {
+    "mtime": 1781694818.49745,
+    "ast_hash": "b1a818c61b08665b8a69287304d11373",
+    "semantic_hash": "b1a818c61b08665b8a69287304d11373"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/NodeStructure.kt": {
+    "mtime": 1781691559.2956603,
+    "ast_hash": "d6ba58c1406756ea49b518d7b19c8572",
+    "semantic_hash": "d6ba58c1406756ea49b518d7b19c8572"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/SealedContent.kt": {
+    "mtime": 1781726932.600117,
+    "ast_hash": "c544679082d19885bb7ed6c43fdaa437",
+    "semantic_hash": "c544679082d19885bb7ed6c43fdaa437"
+  },
+  "src/main/kotlin/com/veyq/app/shared/content/ShareStore.kt": {
+    "mtime": 1781819015.1046236,
+    "ast_hash": "323b0825e159bd3738a65e35702338eb",
+    "semantic_hash": "323b0825e159bd3738a65e35702338eb"
+  },
+  "src/main/kotlin/com/veyq/app/shared/crypto/Argon2Verifier.kt": {
+    "mtime": 1781616527.0522208,
+    "ast_hash": "4f5b5be9583c13ccd564e055750c9d37",
+    "semantic_hash": "4f5b5be9583c13ccd564e055750c9d37"
+  },
+  "src/main/kotlin/com/veyq/app/shared/crypto/CryptoSuiteRegistry.kt": {
+    "mtime": 1781649871.8106494,
+    "ast_hash": "59617b7e1d9765c3056d7b5151d703ac",
+    "semantic_hash": "59617b7e1d9765c3056d7b5151d703ac"
+  },
+  "src/main/kotlin/com/veyq/app/shared/identity/AccountFactory.kt": {
+    "mtime": 1782138274.0531242,
+    "ast_hash": "d9cd2a7633f0f0ee7156fcd01de1a4ac",
+    "semantic_hash": "d9cd2a7633f0f0ee7156fcd01de1a4ac"
+  },
+  "src/main/kotlin/com/veyq/app/shared/identity/Identity.kt": {
+    "mtime": 1782128441.1616352,
+    "ast_hash": "24f63336601325ff5795dd1af453606d",
+    "semantic_hash": "24f63336601325ff5795dd1af453606d"
+  },
+  "src/main/kotlin/com/veyq/app/shared/keymgmt/KeyStore.kt": {
+    "mtime": 1782128521.5508764,
+    "ast_hash": "9d9832fb5b57c35f79ef21614a8ebd5f",
+    "semantic_hash": "9d9832fb5b57c35f79ef21614a8ebd5f"
+  },
+  "src/main/kotlin/com/veyq/app/shared/keymgmt/ScopeStore.kt": {
+    "mtime": 1782138319.8649251,
+    "ast_hash": "51996488cf1f2266cf8dc0095daf94a9",
+    "semantic_hash": "51996488cf1f2266cf8dc0095daf94a9"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/RateLimitFilter.kt": {
+    "mtime": 1781710769.3415709,
+    "ast_hash": "9f8eaa9688c52121cf5cfd5fd5275239",
+    "semantic_hash": "9f8eaa9688c52121cf5cfd5fd5275239"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/RateLimiter.kt": {
+    "mtime": 1781687220.6148283,
+    "ast_hash": "ff3b8917442d560d67389184deaf617c",
+    "semantic_hash": "ff3b8917442d560d67389184deaf617c"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/RefreshSessionCookie.kt": {
+    "mtime": 1782126636.063816,
+    "ast_hash": "f49b3fb4638d5ad4674467e29d4301ac",
+    "semantic_hash": "f49b3fb4638d5ad4674467e29d4301ac"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/ScopeAccessGuard.kt": {
+    "mtime": 1782138334.8393903,
+    "ast_hash": "585991ff458923226dabe4c590ca244e",
+    "semantic_hash": "585991ff458923226dabe4c590ca244e"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/ServerSetup.kt": {
+    "mtime": 1781643092.9797254,
+    "ast_hash": "6493e424687b4bb3036e4e4b796cdbf5",
+    "semantic_hash": "6493e424687b4bb3036e4e4b796cdbf5"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/Session.kt": {
+    "mtime": 1782127468.3254895,
+    "ast_hash": "36c9e5aca95155dbf90b6d473ce1ab9a",
+    "semantic_hash": "36c9e5aca95155dbf90b6d473ce1ab9a"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/SessionGc.kt": {
+    "mtime": 1781427975.827602,
+    "ast_hash": "b6ce38ef8a09d66bd868f01657c448dd",
+    "semantic_hash": "b6ce38ef8a09d66bd868f01657c448dd"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/SetupGate.kt": {
+    "mtime": 1781347800.204114,
+    "ast_hash": "ced157bb93d2f1401ec7a5f42e3a321c",
+    "semantic_hash": "ced157bb93d2f1401ec7a5f42e3a321c"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/ShareEgressAccountingFilter.kt": {
+    "mtime": 1781687267.6982236,
+    "ast_hash": "6ba510f6cd21412d21dfb631e0e32b78",
+    "semantic_hash": "6ba510f6cd21412d21dfb631e0e32b78"
+  },
+  "src/main/kotlin/com/veyq/app/shared/security/TenantAdminGuard.kt": {
+    "mtime": 1781682060.1600792,
+    "ast_hash": "44b43530f42deeba493ae7cda15d3a66",
+    "semantic_hash": "44b43530f42deeba493ae7cda15d3a66"
+  },
+  "src/main/kotlin/com/veyq/app/shared/storage/BlobStore.kt": {
+    "mtime": 1781965918.5714142,
+    "ast_hash": "94f82d2d23b10f31bc2da2b36e069c2e",
+    "semantic_hash": "94f82d2d23b10f31bc2da2b36e069c2e"
+  },
+  "src/main/kotlin/com/veyq/app/shared/storage/BlobStorePreflight.kt": {
+    "mtime": 1781956251.6086934,
+    "ast_hash": "cef5a40d3012eea942a743ae7ebc8564",
+    "semantic_hash": "cef5a40d3012eea942a743ae7ebc8564"
+  },
+  "src/main/kotlin/com/veyq/app/shared/tenancy/GroupMembershipStore.kt": {
+    "mtime": 1781686211.4527092,
+    "ast_hash": "15556f89d5f0e5f08aa742c25ed45dd8",
+    "semantic_hash": "15556f89d5f0e5f08aa742c25ed45dd8"
+  },
+  "src/main/kotlin/com/veyq/app/shared/tenancy/Tenancy.kt": {
+    "mtime": 1782150783.250186,
+    "ast_hash": "7c722d837f477e9571f857d96604fdbc",
+    "semantic_hash": "7c722d837f477e9571f857d96604fdbc"
+  },
+  "src/main/kotlin/com/veyq/app/shared/validation/DisplayName.kt": {
+    "mtime": 1781710359.8616815,
+    "ast_hash": "625caedc2fe39030c8df46a85ff80d8e",
+    "semantic_hash": "625caedc2fe39030c8df46a85ff80d8e"
+  },
+  "src/main/kotlin/com/veyq/app/shared/validation/Email.kt": {
+    "mtime": 1781710371.2390153,
+    "ast_hash": "3247a9ef4b6d013380e7a85d8c321952",
+    "semantic_hash": "3247a9ef4b6d013380e7a85d8c321952"
+  },
+  "src/main/resources/db/migration/V1__baseline.sql": {
+    "mtime": 1782150788.9568644,
+    "ast_hash": "aa07a9557b1bb86a700978ccf29b5aa7",
+    "semantic_hash": "aa07a9557b1bb86a700978ccf29b5aa7"
+  },
+  "src/test/kotlin/com/veyq/app/HealthResourceTest.kt": {
+    "mtime": 1781347798.4129596,
+    "ast_hash": "d443e850c1960c6055effc9c2f7948df",
+    "semantic_hash": "d443e850c1960c6055effc9c2f7948df"
+  },
+  "src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt": {
+    "mtime": 1781682741.1502323,
+    "ast_hash": "2f37d46c30df8ee76100cb8bbad0a212",
+    "semantic_hash": "2f37d46c30df8ee76100cb8bbad0a212"
+  },
+  "src/test/kotlin/com/veyq/app/features/account/emailchange/EmailChangeSliceTest.kt": {
+    "mtime": 1781899145.1164122,
+    "ast_hash": "c777e695558c44ed1026d68a05726d9e",
+    "semantic_hash": "c777e695558c44ed1026d68a05726d9e"
+  },
+  "src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt": {
+    "mtime": 1782129066.501874,
+    "ast_hash": "bcd11c41c08a722223b5c0836211b3d1",
+    "semantic_hash": "bcd11c41c08a722223b5c0836211b3d1"
+  },
+  "src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt": {
+    "mtime": 1782150895.6533089,
+    "ast_hash": "d0092847845654b82ab1ab3acdaa3621",
+    "semantic_hash": "d0092847845654b82ab1ab3acdaa3621"
+  },
+  "src/test/kotlin/com/veyq/app/features/account/resetpassword/PasswordResetSliceTest.kt": {
+    "mtime": 1781601729.4766796,
+    "ast_hash": "7e082fcfde4ca403723651d42e4aa505",
+    "semantic_hash": "7e082fcfde4ca403723651d42e4aa505"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningSliceTest.kt": {
+    "mtime": 1782153276.2195766,
+    "ast_hash": "0142e8a80c88cee329367a84d98b4d41",
+    "semantic_hash": "0142e8a80c88cee329367a84d98b4d41"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/EmailInviteSliceTest.kt": {
+    "mtime": 1782152878.3607287,
+    "ast_hash": "bd7f789bf18f6e6bb94f0f1404df7c0d",
+    "semantic_hash": "bd7f789bf18f6e6bb94f0f1404df7c0d"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt": {
+    "mtime": 1781694664.3204863,
+    "ast_hash": "e77689a1cd8a528c2cee8f1e229bf184",
+    "semantic_hash": "e77689a1cd8a528c2cee8f1e229bf184"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/serverusers/ServerAdminSliceTest.kt": {
+    "mtime": 1781882468.9051452,
+    "ast_hash": "1e27cc0914e4ea599922b9eb29f176b1",
+    "semantic_hash": "1e27cc0914e4ea599922b9eb29f176b1"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt": {
+    "mtime": 1781901088.6909015,
+    "ast_hash": "e32fdf6593da4ed0e83ff933d423a019",
+    "semantic_hash": "e32fdf6593da4ed0e83ff933d423a019"
+  },
+  "src/test/kotlin/com/veyq/app/features/admin/tenantterms/TenantTermsSliceTest.kt": {
+    "mtime": 1781694664.3264484,
+    "ast_hash": "2993569461c7855a8145da0d7ee4ec53",
+    "semantic_hash": "2993569461c7855a8145da0d7ee4ec53"
+  },
+  "src/test/kotlin/com/veyq/app/features/content/scopecontent/ContentDecodeCapSliceTest.kt": {
+    "mtime": 1781727124.718535,
+    "ast_hash": "46717d2e688cf7f11495ffef867ad731",
+    "semantic_hash": "46717d2e688cf7f11495ffef867ad731"
+  },
+  "src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt": {
+    "mtime": 1781682741.1619565,
+    "ast_hash": "e2198cd811350be5003ab12ace44e2fd",
+    "semantic_hash": "e2198cd811350be5003ab12ace44e2fd"
+  },
+  "src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt": {
+    "mtime": 1781694664.3308108,
+    "ast_hash": "efec011261e663e22bc7ffbbb9312258",
+    "semantic_hash": "efec011261e663e22bc7ffbbb9312258"
+  },
+  "src/test/kotlin/com/veyq/app/features/keys/removeunlockwrap/RemoveUnlockWrapSliceTest.kt": {
+    "mtime": 1781360150.3244488,
+    "ast_hash": "09934beb924f2c85738a6c2bc891c1fd",
+    "semantic_hash": "09934beb924f2c85738a6c2bc891c1fd"
+  },
+  "src/test/kotlin/com/veyq/app/features/keys/rewrapscopegrant/ScopeGrantRewrapSliceTest.kt": {
+    "mtime": 1781682741.1640365,
+    "ast_hash": "372b4b2d99a5da84455e66e6eba4a582",
+    "semantic_hash": "372b4b2d99a5da84455e66e6eba4a582"
+  },
+  "src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt": {
+    "mtime": 1781682823.9866123,
+    "ast_hash": "3a5a93e505de3d01977c735e4da68251",
+    "semantic_hash": "3a5a93e505de3d01977c735e4da68251"
+  },
+  "src/test/kotlin/com/veyq/app/features/keys/upsertunlockwrap/UnlockWrapSliceTest.kt": {
+    "mtime": 1781356851.087164,
+    "ast_hash": "649546f7f36cde26199502f98cc3bcc7",
+    "semantic_hash": "649546f7f36cde26199502f98cc3bcc7"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt": {
+    "mtime": 1781857875.0907934,
+    "ast_hash": "cd552ef65c61456443d678562135fdc8",
+    "semantic_hash": "cd552ef65c61456443d678562135fdc8"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt": {
+    "mtime": 1781694664.339373,
+    "ast_hash": "2abcac26042829737dd892b9a50ee3d2",
+    "semantic_hash": "2abcac26042829737dd892b9a50ee3d2"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/journal/JournalSliceTest.kt": {
+    "mtime": 1781694664.343598,
+    "ast_hash": "224e3d10bbe9479f330e2f5ad6cd45e1",
+    "semantic_hash": "224e3d10bbe9479f330e2f5ad6cd45e1"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/playlist/PlaylistSliceTest.kt": {
+    "mtime": 1781775105.2698607,
+    "ast_hash": "cf2d293309465a134a5d88c4c774e6fa",
+    "semantic_hash": "cf2d293309465a134a5d88c4c774e6fa"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt": {
+    "mtime": 1781956918.0683954,
+    "ast_hash": "540e3731df68c7b6712c818464c80fb2",
+    "semantic_hash": "540e3731df68c7b6712c818464c80fb2"
+  },
+  "src/test/kotlin/com/veyq/app/features/memory/track/TrackSliceTest.kt": {
+    "mtime": 1781694664.3514643,
+    "ast_hash": "1785b954710423aba7360a6d19c7ebc2",
+    "semantic_hash": "1785b954710423aba7360a6d19c7ebc2"
+  },
+  "src/test/kotlin/com/veyq/app/features/people/participant/ParticipantSliceTest.kt": {
+    "mtime": 1781850283.5358393,
+    "ast_hash": "0d9975ee28ee0ca146c75941b8970759",
+    "semantic_hash": "0d9975ee28ee0ca146c75941b8970759"
+  },
+  "src/test/kotlin/com/veyq/app/features/spaces/groups/GroupSliceTest.kt": {
+    "mtime": 1781686514.865829,
+    "ast_hash": "63316a20bc293db50535c9fd35f3516a",
+    "semantic_hash": "63316a20bc293db50535c9fd35f3516a"
+  },
+  "src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt": {
+    "mtime": 1782138319.7597218,
+    "ast_hash": "89e9478ad97e64d550114fd26fabf6d3",
+    "semantic_hash": "89e9478ad97e64d550114fd26fabf6d3"
+  },
+  "src/test/kotlin/com/veyq/app/features/spaces/usegroup/MyGroupsSliceTest.kt": {
+    "mtime": 1781862852.8398156,
+    "ast_hash": "625c7115b9ed08624a405ad4ce2a09e2",
+    "semantic_hash": "625c7115b9ed08624a405ad4ce2a09e2"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/blob/BlobBatchE2ETest.kt": {
+    "mtime": 1781957730.0957427,
+    "ast_hash": "22aa4f973daa7701ab7f419ffe796691",
+    "semantic_hash": "22aa4f973daa7701ab7f419ffe796691"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/blob/BlobGcSliceTest.kt": {
+    "mtime": 1781724192.088219,
+    "ast_hash": "833f12e400303706411708aaa33d4aa1",
+    "semantic_hash": "833f12e400303706411708aaa33d4aa1"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadGcSliceTest.kt": {
+    "mtime": 1781682741.1721077,
+    "ast_hash": "d0261c692ca4223dc0d6235c4a9e6692",
+    "semantic_hash": "d0261c692ca4223dc0d6235c4a9e6692"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt": {
+    "mtime": 1781956851.5320427,
+    "ast_hash": "8f77e12795da9395cfc88fb2443f54d5",
+    "semantic_hash": "8f77e12795da9395cfc88fb2443f54d5"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt": {
+    "mtime": 1781957750.9878209,
+    "ast_hash": "a586bfd868f1c41c68b5837cf2a24367",
+    "semantic_hash": "a586bfd868f1c41c68b5837cf2a24367"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/media/BucketSliceTest.kt": {
+    "mtime": 1781769162.241797,
+    "ast_hash": "a0bb1a7e88f71d906576af3ed8514210",
+    "semantic_hash": "a0bb1a7e88f71d906576af3ed8514210"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/media/MediaSliceTest.kt": {
+    "mtime": 1781694664.3552935,
+    "ast_hash": "b01016a0fe069719dbcddae7222bdc28",
+    "semantic_hash": "b01016a0fe069719dbcddae7222bdc28"
+  },
+  "src/test/kotlin/com/veyq/app/features/uploads/media/MediaUpdateSliceTest.kt": {
+    "mtime": 1781733774.9615216,
+    "ast_hash": "fffdef98c595ff79378deb74927e1419",
+    "semantic_hash": "fffdef98c595ff79378deb74927e1419"
+  },
+  "src/test/kotlin/com/veyq/app/platform/error/UnhandledExceptionMapperTest.kt": {
+    "mtime": 1782148734.8106906,
+    "ast_hash": "2b2b7827d2a53c9cdd9db1d43675f6c4",
+    "semantic_hash": "2b2b7827d2a53c9cdd9db1d43675f6c4"
+  },
+  "src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt": {
+    "mtime": 1781710788.2327957,
+    "ast_hash": "ac899a5f60a8de386eac69ead9824bed",
+    "semantic_hash": "ac899a5f60a8de386eac69ead9824bed"
+  },
+  "src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt": {
+    "mtime": 1781687317.0830078,
+    "ast_hash": "34b0beb62f8668afdcc4efbf28739aa1",
+    "semantic_hash": "34b0beb62f8668afdcc4efbf28739aa1"
+  },
+  "src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt": {
+    "mtime": 1781610183.7036812,
+    "ast_hash": "613637e4fe2386e39481759ef88afc54",
+    "semantic_hash": "613637e4fe2386e39481759ef88afc54"
+  }
+}

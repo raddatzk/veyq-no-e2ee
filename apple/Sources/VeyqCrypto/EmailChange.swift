@@ -6,7 +6,7 @@ import Foundation
 public enum EmailChange {
     /// Ask the server to email a confirmation token to a NEW address. Throws code 409 if the address is taken.
     public static func requestEmailChange(apiBase: String, sessionToken: String, newEmail: String) async throws {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/account/email-change/request")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/me/email-change/request")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
@@ -21,7 +21,7 @@ public enum EmailChange {
 
     /// Confirm an email change with the token from the email link. Token-only — no session required.
     public static func confirmEmailChange(apiBase: String, token: String) async throws -> Login.UserSummaryDTO {
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/account/email-change/confirm")!)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/me/email-change/confirm")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try JSONEncoder().encode(["token": token])

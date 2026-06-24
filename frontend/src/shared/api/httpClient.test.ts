@@ -298,7 +298,7 @@ function userSummary() {
     userId: 1,
     email: 'kevin@example.test',
     displayName: 'Kevin',
-    permalink: 'kevin',
+    username: 'kevin',
     serverRole: 'ServerOwner',
     passkeyCount: 1,
     hasPassword: true

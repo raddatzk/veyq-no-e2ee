@@ -19,11 +19,10 @@ create table veyq_user (
     server_role          varchar(32)  not null,
     system_account       boolean      not null default false,
     created_at           timestamp    not null,
-    permalink            varchar(80),
+    username             varchar(80),
     avatar_object_key    varchar(256),
-    avatar_content_type  varchar(64),
     deleted_at           timestamp,
-    constraint uq_veyq_user_permalink unique (permalink)
+    constraint uq_veyq_user_username unique (username)
 );
 
 create table veyq_identity_key (

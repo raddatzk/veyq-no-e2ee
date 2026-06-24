@@ -56,8 +56,8 @@ The `/api/me/*` surface exposes the caller's own wrapped material and membership
 | Bucket | Limit / window | Method · path |
 | --- | --- | --- |
 | `login` | 10 / min | POST `/api/login` |
-| `reset-request` | 5 / min | POST `/api/account/password-reset/request` |
-| `reset` | 15 / min | POST `/api/account/password-reset/` |
+| `reset-request` | 5 / min | POST `/api/me/password-reset/request` |
+| `reset` | 15 / min | POST `/api/me/password-reset/` |
 | `invite` | 30 / min | POST `/api/tenant-invites/` |
 | `invite-read` | 60 / min | GET `/api/tenant-invites/` (existence/metadata) |
 | `share-upload` | 60 / min | POST `/api/public/shares/` |

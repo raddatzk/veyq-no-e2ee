@@ -5,15 +5,15 @@ import { requireSession, session } from '../../../app/session'
 export type UserProfile = {
   id: string
   displayName: string
-  permalink: string
+  username: string
   initials: string
   avatarUrl?: string
   memories: Memory[]
 }
 
-export async function getUserProfile(tenantName: string, userPermalink: string): Promise<UserProfile> {
+export async function getUserProfile(tenantName: string, userUsername: string): Promise<UserProfile> {
   const s = requireSession()
-  const res = await fetch(`${session.apiBase}/api/${encodeURIComponent(tenantName)}/profiles/${encodeURIComponent(userPermalink)}`, {
+  const res = await fetch(`${session.apiBase}/api/profiles/${encodeURIComponent(userUsername)}`, {
     headers: { authorization: `Bearer ${s.sessionToken}` },
   })
   if (!res.ok) throw await apiError(res, 'profile')
@@ -21,7 +21,7 @@ export async function getUserProfile(tenantName: string, userPermalink: string):
   return { ...profile, memories: await listParticipantMemories(tenantName, profile) }
 }
 
-async function listParticipantMemories(tenantName: string, profile: Pick<UserProfile, 'id' | 'permalink'>): Promise<Memory[]> {
+async function listParticipantMemories(tenantName: string, profile: Pick<UserProfile, 'id' | 'username'>): Promise<Memory[]> {
   const matches: Memory[] = []
   const seen = new Set<string>()
   const stack = [...await listMemories(tenantName)]
@@ -35,9 +35,10 @@ async function listParticipantMemories(tenantName: string, profile: Pick<UserPro
       getMemoryHeader(tenantName, memory.id),
       listChildMemories(tenantName, memory.id),
     ])
-    if (header.participants.some((participant) =>
-      participant.permalink === profile.permalink || String(participant.userId) === profile.id
-    )) {
+    if (header.participants.some((participant: { username?: string; permalink?: string; userId?: string | number }) => {
+      const address = participant.username ?? participant.permalink
+      return address === profile.username || String(participant.userId) === profile.id
+    })) {
       matches.push(memory)
     }
     stack.push(...children)

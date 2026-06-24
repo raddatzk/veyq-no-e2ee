@@ -25,17 +25,14 @@ class User {
     @Column(nullable = false, unique = true)
     var email: String = ""
 
-    @Column(unique = true, length = 80)
-    var permalink: String? = null
+    @Column(name = "username", unique = true, length = 80)
+    var username: String? = null
 
     @Column(name = "display_name", nullable = false)
     var displayName: String = ""
 
     @Column(name = "avatar_object_key", length = 256)
     var avatarObjectKey: String? = null
-
-    @Column(name = "avatar_content_type", length = 64)
-    var avatarContentType: String? = null
 
     @Enumerated(EnumType.STRING)
     @Column(name = "server_role", nullable = false)
@@ -56,8 +53,8 @@ class UserRepository : PanacheRepositoryBase<User, String> {
     fun findByEmail(email: String): User? =
         find("email = ?1 and deletedAt is null", email).firstResult()
 
-    fun findByPermalink(permalink: String): User? =
-        find("permalink = ?1 and deletedAt is null", permalink).firstResult()
+    fun findByUsername(username: String): User? =
+        find("username = ?1 and deletedAt is null", username).firstResult()
 
     /** Batch lookup by id (one IN-query) — used by roster listings to avoid an N+1 per member. */
     fun listByIds(ids: Collection<String>): List<User> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
@@ -66,19 +63,19 @@ class UserRepository : PanacheRepositoryBase<User, String> {
         count("serverRole = ?1 and systemAccount = false and deletedAt is null", ServerRole.ServerOwner)
 }
 
-fun User.toUserSummary(): UserSummary =
+fun User.toUserSummary(avatarUrl: String? = null): UserSummary =
     UserSummary(
         id = id,
         email = email,
         displayName = displayName,
         serverRole = ApiServerRole.decode(serverRole.name),
-        permalink = effectivePermalink(),
-        avatarUrl = avatarObjectKey?.let { "/api/me/avatar?v=${it.substringAfterLast('/')}" },
+        username = effectiveUsername(),
+        avatarUrl = avatarUrl,
     )
 
-fun User.effectivePermalink(): String = permalink ?: ProfilePermalinks.fallback(displayName, email, id)
+fun User.effectiveUsername(): String = username ?: Usernames.fallback(displayName, email, id)
 
-object ProfilePermalinks {
+object Usernames {
     private val duplicateDash = Regex("-+")
     private val invalid = Regex("[^a-z0-9-]")
 

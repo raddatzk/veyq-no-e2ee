@@ -70,8 +70,8 @@ class MySpacesSliceTest {
     }
 
     @Test
-    fun listsPersonalPlusHeldGroupSpaces() {
-        // the multi-space user sees their personal space + the one group they hold the key for
+    fun listsPersonalPlusHeldTenantRootSpaces() {
+        // the multi-space user sees their personal space + the one TENANT_ROOT they hold the key for
         given().header("Authorization", multiToken).get("/api/me/spaces").then().statusCode(200)
             .body("spaces.size()", `is`(2))
             .body("spaces.find { it.kind == 'PERSONAL' }.displayName", `is`("Multi User"))

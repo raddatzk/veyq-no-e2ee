@@ -11,7 +11,7 @@ import Foundation
 import AnyCodable
 #endif
 
-/** One entry in the space switcher. PERSONAL &#x3D; the user&#39;s private scope. TENANT &#x3D; a tenant-wide space (every active tenant member). GROUP &#x3D; a sub-space within a tenant (a subset of members); its name is sealed under the group content key, so the client decrypts sealedName rather than reading displayName.  */
+/** One entry in the space switcher. PERSONAL &#x3D; the user&#39;s tenant-bound private scope. TENANT &#x3D; the tenant-wide TENANT_ROOT space (active tenant member + held tenant-root grant). GROUP &#x3D; a GROUP_ROOT sub-space within a tenant (group member + held group-root grant); its name is sealed under the group content key, so the client decrypts sealedName rather than reading displayName.  */
 public struct SpaceEntry: Codable {
 
     public enum Kind: String, Codable, CaseIterable {
@@ -20,12 +20,16 @@ public struct SpaceEntry: Codable {
         case group = "GROUP"
     }
     public private(set) var kind: Kind
-    /** TENANT/GROUP — the backing tenant. */
+    /** The current host tenant backing this space. */
     public private(set) var tenantId: String?
+    /** GROUP only — the group identifier for group management APIs. Currently equal to the GROUP_ROOT scopeId internally. */
+    public private(set) var groupId: String?
     /** TENANT — the tenant name (slug). */
     public private(set) var name: String?
     /** TENANT/GROUP — the tenant's domain (the host that resolves to it). The client routes/switches by it. */
     public private(set) var domain: String?
+    /** TENANT/GROUP — optional tenant branding image URL shown in the space switcher. */
+    public private(set) var logoUrl: String?
     /** PERSONAL: the user's display name; TENANT: the tenant display name; GROUP: empty (use sealedName). */
     public private(set) var displayName: String?
     /** TENANT: tenant role; GROUP: group role; absent for PERSONAL. */
@@ -37,11 +41,13 @@ public struct SpaceEntry: Codable {
     public private(set) var scopeId: String
     public private(set) var scopePublicKey: KemPublicKey
 
-    public init(kind: Kind, tenantId: String? = nil, name: String? = nil, domain: String? = nil, displayName: String? = nil, role: String? = nil, sealedName: Blob? = nil, scheduledDeletionAt: Date? = nil, scopeId: String, scopePublicKey: KemPublicKey) {
+    public init(kind: Kind, tenantId: String? = nil, groupId: String? = nil, name: String? = nil, domain: String? = nil, logoUrl: String? = nil, displayName: String? = nil, role: String? = nil, sealedName: Blob? = nil, scheduledDeletionAt: Date? = nil, scopeId: String, scopePublicKey: KemPublicKey) {
         self.kind = kind
         self.tenantId = tenantId
+        self.groupId = groupId
         self.name = name
         self.domain = domain
+        self.logoUrl = logoUrl
         self.displayName = displayName
         self.role = role
         self.sealedName = sealedName
@@ -53,8 +59,10 @@ public struct SpaceEntry: Codable {
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case kind
         case tenantId
+        case groupId
         case name
         case domain
+        case logoUrl
         case displayName
         case role
         case sealedName
@@ -69,8 +77,10 @@ public struct SpaceEntry: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(kind, forKey: .kind)
         try container.encodeIfPresent(tenantId, forKey: .tenantId)
+        try container.encodeIfPresent(groupId, forKey: .groupId)
         try container.encodeIfPresent(name, forKey: .name)
         try container.encodeIfPresent(domain, forKey: .domain)
+        try container.encodeIfPresent(logoUrl, forKey: .logoUrl)
         try container.encodeIfPresent(displayName, forKey: .displayName)
         try container.encodeIfPresent(role, forKey: .role)
         try container.encodeIfPresent(sealedName, forKey: .sealedName)

@@ -30,29 +30,20 @@ public enum ScopeContent {
 
     /// Fetch + open the caller's personal scope: unwrap its private key with the user's identity.
     public static func openPersonalScope(apiBase: String, session: Login.UnlockedSession) async throws -> OpenScope {
-        let (data, code) = try await send(apiBase, "/api/me/personal-scope", session.sessionToken)
-        guard code == 200 else { throw err("personal-scope failed: \(String(data: data, encoding: .utf8) ?? "")") }
-        let g = try JSONDecoder().decode(PersonalScopeDTO.self, from: data)
-        let idKem = session.kemPublicKey
-        let scopePrivBytes = try V1.asymUnwrap(
-            skX: session.identity.kemX, mlkemSeed: session.identity.mlkemSeed,
-            pkX: Data(idKem.prefix(32)), pkM: Data(idKem.dropFirst(32)),
-            blob: Login.b64urlDecode(g.wrappedScopePrivateKey.bytes), context: "personal-scope-grant")
-        let scopeKem = Login.b64urlDecode(g.scopePublicKey.kemPublicKey)
-        return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)),
-                         scopePriv: V1.deserializeIdentityPrivate(scopePrivBytes))
+        let spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
+        guard let personal = spaces.first(where: { $0.kind == "PERSONAL" }) else { throw err("personal space not found") }
+        return try await openScopeById(apiBase: apiBase, session: session, scopeId: personal.scopeId, context: "personal-scope-grant")
     }
 
     /// Fetch + open a tenant scope the caller holds a grant for (re-fetches the current grant each call).
     public static func openTenantScope(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws -> OpenScope {
-        let g = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: session.sessionToken, tenantId: tenantId)
-        let scopePriv = try Tenant.openScopeGrant(grant: g, identity: session.identity, identityKemPublicKey: session.kemPublicKey)
-        let scopeKem = Login.b64urlDecode(g.scopePublicKey.kemPublicKey)
-        return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)), scopePriv: scopePriv)
+        let spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
+        guard let tenant = spaces.first(where: { $0.kind == "TENANT" && $0.tenantId == tenantId }) else { throw err("tenant space not found") }
+        return try await openScopeById(apiBase: apiBase, session: session, scopeId: tenant.scopeId)
     }
 
     /// Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope — no tenant path).
-    public static func openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String) async throws -> OpenScope {
+    public static func openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String, context: String = "scope-grant") async throws -> OpenScope {
         let (data, code) = try await send(apiBase, "/api/scopes/\(scopeId)/grants/me", session.sessionToken)
         guard code == 200 else { throw err("scope grant failed: \(String(data: data, encoding: .utf8) ?? "")") }
         let g = try JSONDecoder().decode(PersonalScopeDTO.self, from: data)
@@ -60,7 +51,7 @@ public enum ScopeContent {
         let scopePrivBytes = try V1.asymUnwrap(
             skX: session.identity.kemX, mlkemSeed: session.identity.mlkemSeed,
             pkX: Data(idKem.prefix(32)), pkM: Data(idKem.dropFirst(32)),
-            blob: Login.b64urlDecode(g.wrappedScopePrivateKey.bytes), context: "scope-grant")
+            blob: Login.b64urlDecode(g.wrappedScopePrivateKey.bytes), context: context)
         let scopeKem = Login.b64urlDecode(g.scopePublicKey.kemPublicKey)
         return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)),
                          scopePriv: V1.deserializeIdentityPrivate(scopePrivBytes))

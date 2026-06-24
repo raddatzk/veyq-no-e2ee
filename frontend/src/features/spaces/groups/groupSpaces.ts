@@ -11,7 +11,7 @@ const EMPTY = new Uint8Array(0)
 const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type Blob = { suiteId: string; bytes: string }
-export type GroupSummary = { scopeId: string; tenantId: string; role: string; scopePublicKey: { suiteId: string; kemPublicKey: string }; sealedName: Blob }
+export type GroupSummary = { groupId: string; scopeId: string; tenantId: string; role: string; scopePublicKey: { suiteId: string; kemPublicKey: string }; sealedName: Blob }
 export type GroupMember = { userId: string; displayName: string; role: string }
 
 /** Seal a name under a content key (nonce || AEAD, EMPTY aad) — same framing as a sealed item. */
@@ -36,7 +36,7 @@ export async function createGroupSpace(apiBase: string, session: UnlockedSession
   const ck = v1.randomBytes(32)
   const wrappedCk = v1.asymWrap(scopePub, ck, 'content-key', { nonce: v1.randomBytes(12) })
 
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups`, {
+  const res = await fetch(`${apiBase}/api/groups`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({
@@ -53,8 +53,8 @@ export async function createGroupSpace(apiBase: string, session: UnlockedSession
 export type GroupRole = 'GroupOwner' | 'GroupMember'
 
 /** List a group's members (any group member may). */
-export async function listGroupMembers(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<GroupMember[]> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members`, { headers: auth(session.sessionToken) })
+export async function listGroupMembers(apiBase: string, session: UnlockedSession, tenantId: string, groupId: string): Promise<GroupMember[]> {
+  const res = await fetch(`${apiBase}/api/groups/${groupId}/members`, { headers: auth(session.sessionToken) })
   if (!res.ok) throw await apiError(res, 'list group members')
   return (await res.json()).members
 }
@@ -67,11 +67,11 @@ export async function addGroupMember(
   apiBase: string,
   session: UnlockedSession,
   tenantId: string,
-  scopeId: string,
+  groupId: string,
   target: { userId: string; kemPublicKeyB64: string },
   role: GroupRole = 'GroupMember',
 ): Promise<GroupMember> {
-  const gRes = await fetch(`${apiBase}/api/scopes/${scopeId}/grants/me`, { headers: auth(session.sessionToken) })
+  const gRes = await fetch(`${apiBase}/api/scopes/${groupId}/grants/me`, { headers: auth(session.sessionToken) })
   if (!gRes.ok) throw await apiError(gRes, 'group grant')
   const g = await gRes.json()
   const myKem = fromB64url(session.identityPublicKey.kemPublicKey)
@@ -79,7 +79,7 @@ export async function addGroupMember(
   const tKem = fromB64url(target.kemPublicKeyB64)
   const wrapped = v1.asymWrap({ x: tKem.slice(0, 32), m: tKem.slice(32) }, scopePrivBytes, 'scope-grant', { nonce: v1.randomBytes(12) })
 
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members`, {
+  const res = await fetch(`${apiBase}/api/groups/${groupId}/members`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({ userId: target.userId, wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role }),
@@ -89,9 +89,9 @@ export async function addGroupMember(
 }
 
 /** Change a group member's role (GroupOwner only; the server refuses to demote the last GroupOwner). */
-export async function setGroupMemberRole(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string, userId: string, role: GroupRole): Promise<GroupMember> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members/${userId}`, {
-    method: 'PATCH',
+export async function setGroupMemberRole(apiBase: string, session: UnlockedSession, tenantId: string, groupId: string, userId: string, role: GroupRole): Promise<GroupMember> {
+  const res = await fetch(`${apiBase}/api/groups/${groupId}/members/${userId}/role`, {
+    method: 'PUT',
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({ role }),
   })
@@ -100,13 +100,13 @@ export async function setGroupMemberRole(apiBase: string, session: UnlockedSessi
 }
 
 /** Remove a member from a group (GroupOwner only; the server refuses to remove the last GroupOwner). */
-export async function removeGroupMember(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string, userId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members/${userId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
+export async function removeGroupMember(apiBase: string, session: UnlockedSession, tenantId: string, groupId: string, userId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/groups/${groupId}/members/${userId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
   if (!res.ok) throw await apiError(res, 'remove group member')
 }
 
 /** Delete a group entirely (GroupOwner only). */
-export async function deleteGroup(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
+export async function deleteGroup(apiBase: string, session: UnlockedSession, tenantId: string, groupId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/groups/${groupId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
   if (!res.ok) throw await apiError(res, 'delete group')
 }

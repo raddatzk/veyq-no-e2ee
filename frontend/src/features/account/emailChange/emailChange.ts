@@ -7,7 +7,7 @@ import type { UserSummary } from '../login/login'
 
 /** Ask the server to email a confirmation token to a NEW address. Rejects (409) if the address is taken. */
 export async function requestEmailChange(apiBase: string, sessionToken: string, newEmail: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/account/email-change/request`, {
+  const res = await fetch(`${apiBase}/api/me/email-change/request`, {
     method: 'POST',
     headers: { authorization: `Bearer ${sessionToken}`, 'content-type': 'application/json' },
     body: JSON.stringify({ newEmail: newEmail.trim() }),
@@ -17,7 +17,7 @@ export async function requestEmailChange(apiBase: string, sessionToken: string, 
 
 /** Confirm an email change with the token from the email link. Token-only — no session required. */
 export async function confirmEmailChange(apiBase: string, token: string): Promise<UserSummary> {
-  const res = await fetch(`${apiBase}/api/account/email-change/confirm`, {
+  const res = await fetch(`${apiBase}/api/me/email-change/confirm`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ token }),

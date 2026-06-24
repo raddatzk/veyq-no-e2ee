@@ -1,12 +1,12 @@
 package com.veyq.app.features.account.resetpassword
 
-import com.veyq.app.generated.model.AuthVerifier as AuthVerifierDto
 import com.veyq.app.generated.model.MasterKeyWrap
 import com.veyq.app.generated.model.PasswordResetConfirmRequest
 import com.veyq.app.generated.model.PasswordResetMaterial
 import com.veyq.app.generated.model.PasswordResetRequestRequest
 import com.veyq.app.generated.model.PasswordResetTokenRequest
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.keymgmt.AuthVerifierRepository
@@ -30,7 +30,7 @@ import java.util.UUID
  * uc.account.reset-password — recover a forgotten password with the Secret Key (Emergency Kit) AND email
  * access. `request` emails a one-time token; `material` (token-gated) releases the RECOVERY master-key wrap
  * so the client can unwrap the master key with the Secret Key; `confirm` (token-gated) swaps the new PASSWORD
- * wrap + auth verifier the client built under the new password. The server sees neither secret.
+ * wrap and derives the auth verifier from the new password. The server never sees the Secret Key or master key.
  */
 @ApplicationScoped
 class PasswordResetHandler(
@@ -40,6 +40,7 @@ class PasswordResetHandler(
     private val tokens: PasswordResetRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
+    private val argon2: Argon2Verifier,
     private val mailer: Mailer,
     app: AppConfig,
     resetCfg: PasswordResetConfig,
@@ -97,7 +98,7 @@ class PasswordResetHandler(
             throw ApiException(400, "EXPECTED_PASSWORD_WRAP", "Reset must submit a PASSWORD master-key wrap")
         }
         suites.require(wrap.suiteId)
-        suites.require(req.authVerifier.suiteId)
+        suites.require("v1")
         val userId = token.userId
 
         // Enforce Secret-Key possession: the client must reproduce the recovery commitment
@@ -114,7 +115,7 @@ class PasswordResetHandler(
             throw ApiException(403, "RECOVERY_AUTH_MISMATCH", "Secret Key proof failed")
         }
 
-        // swap the PASSWORD wrap (re-keyed under the new password) and the auth verifier
+        // swap the PASSWORD wrap (re-keyed under the new password) and derive the auth verifier
         val passwordBlob = keyBlobs.findByUserIdAndUnlockMethod(userId, "PASSWORD").firstOrNull()
             ?: KeyBlob().apply {
                 id = UUID.randomUUID().toString(); this.userId = userId; unlockMethod = "PASSWORD"; createdAt = Instant.now()
@@ -125,9 +126,9 @@ class PasswordResetHandler(
         passwordBlob.kdfParams = wrap.kdfParams?.let { dec.decode(it) }
 
         authVerifiers.findByUserId(userId)?.apply {
-            kind = req.authVerifier.kind.value
-            suiteId = req.authVerifier.suiteId
-            verifier = dec.decode(req.authVerifier.verifier)
+            kind = "ARGON2_PROOF"
+            suiteId = "v1"
+            verifier = argon2.createPasswordVerifier(req.newPassword)
         } ?: throw ApiException(400, "NO_VERIFIER", "Account has no auth verifier")
 
         token.consumedAt = Instant.now()

@@ -22,19 +22,19 @@ import {
 } from './ServerRole';
 
 /**
- * Current authenticated user.
+ * 
  * @export
  * @interface UserSummary
  */
 export interface UserSummary {
     /**
      * 
-     * @type {number}
+     * @type {string}
      * @memberof UserSummary
      */
-    userId: number;
+    id: string;
     /**
-     * Email address. The backend trims whitespace and stores it lowercase.
+     * 
      * @type {string}
      * @memberof UserSummary
      */
@@ -46,47 +46,23 @@ export interface UserSummary {
      */
     displayName: string;
     /**
-     * URL-safe stable permalink segment.
-     * @type {string}
-     * @memberof UserSummary
-     */
-    permalink: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof UserSummary
-     */
-    avatarUrl?: string;
-    /**
      * 
      * @type {ServerRole}
      * @memberof UserSummary
      */
     serverRole: ServerRole;
     /**
-     * Email address. The backend trims whitespace and stores it lowercase.
+     * URL-safe stable username/profile address segment.
      * @type {string}
      * @memberof UserSummary
      */
-    pendingEmail?: string;
+    username: string;
     /**
-     * 
-     * @type {number}
+     * Short-lived presigned object-store URL for the user's avatar. The avatar object key contains a generated version segment that changes on every upload and acts as the cache-buster.
+     * @type {string}
      * @memberof UserSummary
      */
-    passkeyCount: number;
-    /**
-     * Whether the user has set a password login method.
-     * @type {boolean}
-     * @memberof UserSummary
-     */
-    hasPassword: boolean;
-    /**
-     * Whether password login requires a TOTP second factor.
-     * @type {boolean}
-     * @memberof UserSummary
-     */
-    totpEnabled?: boolean;
+    avatarUrl?: string;
 }
 
 
@@ -95,13 +71,11 @@ export interface UserSummary {
  * Check if a given object implements the UserSummary interface.
  */
 export function instanceOfUserSummary(value: object): value is UserSummary {
-    if (!('userId' in value) || value['userId'] === undefined) return false;
+    if (!('id' in value) || value['id'] === undefined) return false;
     if (!('email' in value) || value['email'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('permalink' in value) || value['permalink'] === undefined) return false;
     if (!('serverRole' in value) || value['serverRole'] === undefined) return false;
-    if (!('passkeyCount' in value) || value['passkeyCount'] === undefined) return false;
-    if (!('hasPassword' in value) || value['hasPassword'] === undefined) return false;
+    if (!('username' in value) || value['username'] === undefined) return false;
     return true;
 }
 
@@ -115,16 +89,12 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
     }
     return {
         
-        'userId': json['userId'],
+        'id': json['id'],
         'email': json['email'],
         'displayName': json['displayName'],
-        'permalink': json['permalink'],
-        'avatarUrl': json['avatarUrl'] == null ? undefined : json['avatarUrl'],
         'serverRole': ServerRoleFromJSON(json['serverRole']),
-        'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
-        'passkeyCount': json['passkeyCount'],
-        'hasPassword': json['hasPassword'],
-        'totpEnabled': json['totpEnabled'] == null ? undefined : json['totpEnabled'],
+        'username': json['username'],
+        'avatarUrl': json['avatarUrl'] == null ? undefined : json['avatarUrl'],
     };
 }
 
@@ -139,16 +109,12 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
 
     return {
         
-        'userId': value['userId'],
+        'id': value['id'],
         'email': value['email'],
         'displayName': value['displayName'],
-        'permalink': value['permalink'],
-        'avatarUrl': value['avatarUrl'],
         'serverRole': ServerRoleToJSON(value['serverRole']),
-        'pendingEmail': value['pendingEmail'],
-        'passkeyCount': value['passkeyCount'],
-        'hasPassword': value['hasPassword'],
-        'totpEnabled': value['totpEnabled'],
+        'username': value['username'],
+        'avatarUrl': value['avatarUrl'],
     };
 }
 

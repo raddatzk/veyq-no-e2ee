@@ -14,11 +14,11 @@ import AnyCodable
 public struct OwnerInvite: Codable {
 
     public private(set) var inviteId: String
-    /** One-time secret (base64url); goes in the URL fragment. */
-    public private(set) var bootstrapSecret: String
+    /** One-time secret (base64url); member invites return it to the key-holding owner */
+    public private(set) var bootstrapSecret: String?
     public private(set) var expiresAt: Date
 
-    public init(inviteId: String, bootstrapSecret: String, expiresAt: Date) {
+    public init(inviteId: String, bootstrapSecret: String? = nil, expiresAt: Date) {
         self.inviteId = inviteId
         self.bootstrapSecret = bootstrapSecret
         self.expiresAt = expiresAt
@@ -35,7 +35,7 @@ public struct OwnerInvite: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(inviteId, forKey: .inviteId)
-        try container.encode(bootstrapSecret, forKey: .bootstrapSecret)
+        try container.encodeIfPresent(bootstrapSecret, forKey: .bootstrapSecret)
         try container.encode(expiresAt, forKey: .expiresAt)
     }
 }

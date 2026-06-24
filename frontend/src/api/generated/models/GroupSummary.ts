@@ -13,13 +13,20 @@
  */
 
 import { mapValues } from '../runtime';
-import type { GroupMemberSummary } from './GroupMemberSummary';
+import type { Blob } from './Blob';
 import {
-    GroupMemberSummaryFromJSON,
-    GroupMemberSummaryFromJSONTyped,
-    GroupMemberSummaryToJSON,
-    GroupMemberSummaryToJSONTyped,
-} from './GroupMemberSummary';
+    BlobFromJSON,
+    BlobFromJSONTyped,
+    BlobToJSON,
+    BlobToJSONTyped,
+} from './Blob';
+import type { KemPublicKey } from './KemPublicKey';
+import {
+    KemPublicKeyFromJSON,
+    KemPublicKeyFromJSONTyped,
+    KemPublicKeyToJSON,
+    KemPublicKeyToJSONTyped,
+} from './KemPublicKey';
 
 /**
  * 
@@ -28,39 +35,53 @@ import {
  */
 export interface GroupSummary {
     /**
-     * 
-     * @type {number}
+     * The group identifier for group management APIs. Currently equal to scopeId internally.
+     * @type {string}
      * @memberof GroupSummary
      */
-    id: number;
+    groupId: string;
     /**
      * 
      * @type {string}
      * @memberof GroupSummary
      */
-    name: string;
+    scopeId: string;
     /**
      * 
      * @type {string}
      * @memberof GroupSummary
      */
-    displayName: string;
+    tenantId: string;
     /**
-     * 
-     * @type {Array<GroupMemberSummary>}
+     * The caller's group role (GroupOwner | GroupMember).
+     * @type {string}
      * @memberof GroupSummary
      */
-    members: Array<GroupMemberSummary>;
+    role: string;
+    /**
+     * 
+     * @type {KemPublicKey}
+     * @memberof GroupSummary
+     */
+    scopePublicKey: KemPublicKey;
+    /**
+     * 
+     * @type {Blob}
+     * @memberof GroupSummary
+     */
+    sealedName: Blob;
 }
 
 /**
  * Check if a given object implements the GroupSummary interface.
  */
 export function instanceOfGroupSummary(value: object): value is GroupSummary {
-    if (!('id' in value) || value['id'] === undefined) return false;
-    if (!('name' in value) || value['name'] === undefined) return false;
-    if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('members' in value) || value['members'] === undefined) return false;
+    if (!('groupId' in value) || value['groupId'] === undefined) return false;
+    if (!('scopeId' in value) || value['scopeId'] === undefined) return false;
+    if (!('tenantId' in value) || value['tenantId'] === undefined) return false;
+    if (!('role' in value) || value['role'] === undefined) return false;
+    if (!('scopePublicKey' in value) || value['scopePublicKey'] === undefined) return false;
+    if (!('sealedName' in value) || value['sealedName'] === undefined) return false;
     return true;
 }
 
@@ -74,10 +95,12 @@ export function GroupSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolea
     }
     return {
         
-        'id': json['id'],
-        'name': json['name'],
-        'displayName': json['displayName'],
-        'members': ((json['members'] as Array<any>).map(GroupMemberSummaryFromJSON)),
+        'groupId': json['groupId'],
+        'scopeId': json['scopeId'],
+        'tenantId': json['tenantId'],
+        'role': json['role'],
+        'scopePublicKey': KemPublicKeyFromJSON(json['scopePublicKey']),
+        'sealedName': BlobFromJSON(json['sealedName']),
     };
 }
 
@@ -92,10 +115,12 @@ export function GroupSummaryToJSONTyped(value?: GroupSummary | null, ignoreDiscr
 
     return {
         
-        'id': value['id'],
-        'name': value['name'],
-        'displayName': value['displayName'],
-        'members': ((value['members'] as Array<any>).map(GroupMemberSummaryToJSON)),
+        'groupId': value['groupId'],
+        'scopeId': value['scopeId'],
+        'tenantId': value['tenantId'],
+        'role': value['role'],
+        'scopePublicKey': KemPublicKeyToJSON(value['scopePublicKey']),
+        'sealedName': BlobToJSON(value['sealedName']),
     };
 }
 

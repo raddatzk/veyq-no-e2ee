@@ -54,12 +54,12 @@ val sharedSchemaMappings = mapOf(
 
 val openApiSpecs = listOf(
     OpenApiSpec("common", "../docs/api/common.openapi.yaml", generateApi = false),
-    OpenApiSpec("setup", "../docs/api/setup.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("account", "../docs/api/account.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("profiles", "../docs/api/profiles.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("keys", "../docs/api/keys.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("content", "../docs/api/content.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("identity", "../docs/api/identity.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("groups", "../docs/api/groups.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("crypto", "../docs/api/crypto.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("spaces", "../docs/api/spaces.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("memory", "../docs/api/memory.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("media", "../docs/api/media.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),

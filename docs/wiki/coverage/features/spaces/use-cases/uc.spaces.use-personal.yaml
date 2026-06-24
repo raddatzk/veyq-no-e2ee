@@ -13,11 +13,13 @@ documents:
   - type: api
     ref: docs/api/auth.openapi.yaml
   - type: api
-    ref: docs/api/setup.openapi.yaml
+    ref: docs/api/admin.openapi.yaml
   - type: api
     ref: docs/api/tenants.openapi.yaml
   - type: api
-    ref: docs/api/content.openapi.yaml
+    ref: docs/api/crypto.openapi.yaml
+  - type: api
+    ref: docs/api/media.openapi.yaml
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
   - type: entryPoint
