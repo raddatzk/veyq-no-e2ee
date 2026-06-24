@@ -24,8 +24,8 @@
 
 ## Quality notes
 - *Identifier swap, not a key change:* the email is **not** part of the KEK (Argon2id over Secret Key +
-  password + a random salt), so changing it re-wraps no key material — unlike the credential changes in
-  [manage-profile](uc.account.manage-profile.md).
+  password + a random salt), so changing it re-wraps no key material. Password changes are handled by
+  [change password](uc.account.change-password.md).
 - *Proof = control of the new inbox:* confirm is token-only (like password reset); possession of the
   emailed token proves the requester controls the destination address.
 - *Single-use, time-boxed token:* the token is stored hashed, expires, and is consumed on first confirm.
@@ -35,4 +35,5 @@
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy — email is outside it),
   [Platform Concepts](../../../crosscutting/platform-concepts.md) (auth & sessions)
 - Decisions: [AD-08](../../../decisions/README.md) (Secret Key), [AD-31](../../../decisions/0031-profile-fields-server-visible.md) (profile fields server-visible)
-- Related use-cases: `uc.account.manage-profile`, `uc.account.login`, `uc.account.recover-keys`
+- Related use-cases: `uc.account.update-profile`, `uc.account.change-password`, `uc.account.login`,
+  `uc.account.recover-keys`

@@ -48,6 +48,17 @@ acceptanceCriteria:
       - testName: testLoginAndUnlock
         kind: positive
         ref: apple/Tests/VeyqCryptoTests/LoginE2ETests.swift
+- id: uc.account.login.password-secret-key-ui
+  statement: The login view presents the active email, password and Secret Key flow without retired auth prompts, and does not ask for a device name during login.
+  coverage:
+    web:
+      unit:
+      - testName: renders email + password + Secret Key and omits retired auth prompts
+        kind: positive
+        ref: frontend/src/views/LoginView.test.ts
+      - testName: does not ask for the device name during login
+        kind: positive
+        ref: frontend/src/views/LoginView.test.ts
 - id: uc.account.login.rejects-invalid-credentials
   statement: Wrong passwords and bogus sessions are rejected.
   coverage:
@@ -72,11 +83,22 @@ acceptanceCriteria:
       - testName: "stores and restores the local unlock state with a fresh session token"
         kind: positive
         ref: frontend/src/features/account/rememberedLogin/rememberedLogin.test.ts
+      - testName: prefills remembered email and Secret Key without remembering the password
+        kind: positive
+        ref: frontend/src/views/LoginView.test.ts
 - id: uc.account.login.refresh-rotation
   statement: Refresh rotates the HttpOnly refresh cookie, issues a new access session token, and invalidates the old access and refresh tokens.
   coverage:
     backend:
       integration:
       - testName: refreshRotatesTheRefreshCookieAndAccessSession
+        kind: positive
+        ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+- id: uc.account.login.logout-token-family
+  statement: Logout invalidates the associated access and refresh token family and clears the refresh cookie.
+  coverage:
+    backend:
+      integration:
+      - testName: logoutInvalidatesTheAssociatedAccessAndRefreshTokenFamily
         kind: positive
         ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt

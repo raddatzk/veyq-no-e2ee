@@ -25,6 +25,8 @@
 ## Alternate / exception flows
 - A1: The owner is an **existing user** → they claim ownership and generate the tenant scope keypair
   under their existing account (no new account).
+- A2: After activation, the Tenant Owner can schedule tenant deletion, cancel it during the grace
+  period, or let the garbage collector hard-purge the tenant after the deadline.
 - E1: The invite is expired/revoked → rejected.
 - E2: A different account email tries to claim/register with the owner invite → rejected.
 
@@ -36,6 +38,8 @@
 - *No immediate self-claim by the provisioning client:* the Server Owner can create the shell and trigger
   delivery, but cannot activate the tenant unless they control the target inbox and accept that invite as
   the target account.
+- *Tenant deletion is owner-controlled:* deleting a tenant is not account deletion. It is scheduled,
+  cancellable during the grace period, and finally purged by the tenant lifecycle garbage collector.
 
 ## Related
 - Feature: [Administration & Operations](../_index.md) · Actors: [Server Owner](../../../actors.md), [Tenant Owner](../../../actors.md)

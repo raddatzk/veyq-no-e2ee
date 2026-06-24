@@ -15,6 +15,8 @@ documents:
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantProvisioningHandler.kt
   - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/createtenantinviteowner/TenantDeletionGc.kt
+  - type: entryPoint
     ref: frontend/src/features/admin/createTenantInviteOwner/tenant.ts
   - type: entryPoint
     ref: android/core/src/main/kotlin/app/veyq/crypto/Tenant.kt
@@ -79,3 +81,14 @@ acceptanceCriteria:
           - testName: registersNewOwnerAndActivatesTenant
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+  - id: uc.admin.create-tenant-invite-owner.tenant-deletion-lifecycle
+    statement: A Tenant Owner can schedule tenant deletion, cancel it during the grace window, and the garbage collector hard-purges due tenants.
+    coverage:
+      backend:
+        integration:
+          - testName: schedulesTenantDeletionOwnerOnlyThenCancelsAndGcPurges
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
+          - testName: schedulesTenantDeletionOwnerOnlyThenCancelsAndGcPurges
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt

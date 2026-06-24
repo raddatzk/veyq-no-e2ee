@@ -15,7 +15,7 @@ const router = createRouter({
 describe('LoginView (E2EE)', () => {
   beforeEach(() => localStorage.clear())
 
-  it('renders email + password + Secret Key and drops passkey/TOTP', async () => {
+  it('renders email + password + Secret Key and omits retired auth prompts', async () => {
     router.push('/login')
     await router.isReady()
     const wrapper = mount(LoginView, { global: { plugins: [router, PrimeVue] } })

@@ -38,6 +38,10 @@ acceptanceCriteria:
           - testName: registers a new owner from an invite, then logs in and round-trips the scope grant
             kind: positive
             ref: frontend/src/features/account/registerViaInvitation/registerViaInvitation.e2e.test.ts
+        unit:
+          - testName: lets new users join with a passkey by default
+            kind: positive
+            ref: frontend/src/views/TenantJoinView.test.ts
       android:
         e2e:
           - testName: registerNewOwnerThenLoginAndGrant
@@ -56,6 +60,16 @@ acceptanceCriteria:
           - testName: registers a new owner from an invite, then logs in and round-trips the scope grant
             kind: positive
             ref: frontend/src/features/account/registerViaInvitation/registerViaInvitation.e2e.test.ts
+        unit:
+          - testName: renders the translated email label on tenant registration links
+            kind: positive
+            ref: frontend/src/views/TenantJoinView.test.ts
+          - testName: exposes language and theme controls on tenant registration links
+            kind: positive
+            ref: frontend/src/views/TenantJoinView.test.ts
+          - testName: still reads tokens from legacy tenant registration paths
+            kind: positive
+            ref: frontend/src/views/TenantJoinView.test.ts
       android:
         e2e:
           - testName: registerNewOwnerThenLoginAndGrant

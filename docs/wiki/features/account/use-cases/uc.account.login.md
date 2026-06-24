@@ -20,7 +20,7 @@ actor "User" as U
 participant "Client" as C
 participant "Server (blind)" as S
 
-U -> C : authenticate (passkey assertion / password +TOTP)
+U -> C : authenticate (passkey assertion / password)
 C -> S : auth request
 S --> C : session (access + refresh)
 C -> S : fetch key bag (wrapped private key + unlock wraps)
@@ -50,7 +50,7 @@ C -> S : register login device (identifier + encrypted name)
 ## Alternate / exception flows
 - A1 — **New device, passkey:** after auth, WebAuthn **PRF** derives the KEK → unlocks the Master Key
   (from the fetched key bag); the device is then **enrolled** (a device wrap is added). No Secret Key.
-- A2 — **New device, password:** after password (+TOTP) auth, the user enters the **Secret Key**
+- A2 — **New device, password:** after password auth, the user enters the **Secret Key**
   (Emergency Kit); `Argon2id(password + Secret Key)` → KEK → unlocks the Master Key; the device is
   **enrolled**.
 - A3 — **New device, device-to-device:** an existing trusted device approves the new one and wraps the
@@ -62,9 +62,10 @@ C -> S : register login device (identifier + encrypted name)
   sent back to the server.
 - A4c — **Expired session cleanup:** expired session rows are swept opportunistically or by the
   scheduled job; still-valid sessions remain usable.
-- A5 — **Deauthorize device** (e.g. lost device): all server sessions with that device identifier are
-  invalidated. If that browser also stored email + Secret Key locally, it still cannot silently
-  re-authenticate without the password.
+- A5 — **Deauthorize device** (e.g. lost device): the user removes a login device
+  (`uc.account.manage-login-devices`), invalidating all server sessions with that device identifier.
+  If that browser also stored email + Secret Key locally, it still cannot silently re-authenticate
+  without the password.
 - E1 — **Authenticated but locked:** auth succeeds but unlock fails (wrong Secret Key, no PRF) → the UI
   shows a **locked** state and routes to unlock retry or **recovery** (`uc.account.recover-keys`); the
   session alone grants **no** content access.
@@ -73,13 +74,13 @@ C -> S : register login device (identifier + encrypted name)
 ## Quality notes
 - *Auth ≠ unlock:* the **session** proves identity to the server; the **Master Key** unlocks content
   client-side. The server can authenticate a user it can never grant content access to — it holds no keys.
-- *New-device requirements:* password ⇒ **password + Secret Key**; passkey ⇒ **PRF**. TOTP is a
-  password-auth second factor only ([AD-18](../../../decisions/README.md)), independent of the keys.
+- *New-device requirements:* password ⇒ **password + Secret Key**; passkey ⇒ **PRF**. Authentication
+  alone is insufficient without a local unlock path.
 - *Remembered login:* remembering login stores email + Secret Key and local unlock material, but never
   the password. Repeat visits can restore the unlocked client state only while the server-side refresh
   session is still valid.
-- *Revocation:* deauthorizing a device removes its wrap — instant server-side token invalidation +
-  eventual key rotation ([AD-24](../../../decisions/README.md)).
+- *Revocation:* deauthorizing a login device invalidates that device's server sessions. Unlock-wrap
+  removal and key rotation are handled by the Keys feature ([AD-24](../../../decisions/README.md)).
 - *Operator-blind:* the server stores the auth verifier, the session and the wrapped key bag — never the
   Master Key or the Secret Key.
 
@@ -87,5 +88,5 @@ C -> S : register login device (identifier + encrypted name)
 - Feature: [Account & Auth](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy, Secret Key,
   recovery, revocation), [Platform Concepts](../../../crosscutting/platform-concepts.md) (auth & sessions)
-- Decisions: [AD-02](../../../decisions/README.md) (E2EE), [AD-08](../../../decisions/README.md) (Secret Key), [AD-06](../../../decisions/README.md) (recovery/multi-device), [AD-24](../../../decisions/README.md) (revocation), [AD-18](../../../decisions/README.md) (TOTP), [AD-23](../../../decisions/README.md) (capability/PRF)
-- Related use-cases: `uc.account.register-via-invitation`, `uc.account.recover-keys`
+- Decisions: [AD-02](../../../decisions/README.md) (E2EE), [AD-08](../../../decisions/README.md) (Secret Key), [AD-06](../../../decisions/README.md) (recovery/multi-device), [AD-24](../../../decisions/README.md) (revocation), [AD-23](../../../decisions/README.md) (capability/PRF)
+- Related use-cases: `uc.account.register-via-invitation`, `uc.account.recover-keys`, `uc.account.manage-login-devices`

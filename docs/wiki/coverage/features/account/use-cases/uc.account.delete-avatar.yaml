@@ -1,0 +1,29 @@
+id: uc.account.delete-avatar
+title: Delete avatar
+status: partial
+documents:
+- type: feature
+  ref: docs/wiki/features/account/_index.md
+- type: useCase
+  ref: docs/wiki/features/account/use-cases/uc.account.delete-avatar.md
+- type: crosscutting
+  ref: docs/wiki/crosscutting/security-model.md
+- type: api
+  ref: docs/api/account.openapi.yaml
+- type: decision
+  ref: docs/wiki/decisions/0031-profile-fields-server-visible.md
+- type: entryPoint
+  ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
+- type: entryPoint
+  ref: frontend/src/features/account/login/login.ts
+acceptanceCriteria:
+- id: uc.account.delete-avatar.clears-profile-image
+  statement: Deleting the current avatar clears the avatar pointer and returns a UserSummary without avatarUrl.
+  gaps:
+  - reason: The backend handler and web helper implement avatar deletion, but no active acceptance test maps to this endpoint.
+    followUp: Add backend integration coverage for clearing an existing avatar and for the no-existing-avatar case.
+- id: uc.account.delete-avatar.requires-session
+  statement: Deleting an avatar requires a valid session.
+  gaps:
+  - reason: Session enforcement is implemented through the handler, but this endpoint has no direct negative coverage.
+    followUp: Add a backend integration assertion for an invalid or missing bearer token.

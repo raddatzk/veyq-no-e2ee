@@ -48,4 +48,4 @@
   content keys, revocation)
 - Decisions: [AD-21](../../../decisions/README.md) (onboarding), [AD-03](../../../decisions/README.md)
   (content keys), [AD-24](../../../decisions/README.md) (revocation); ADR 0005, ADR 0017 (legacy)
-- Related use-cases: `uc.account.register-via-invitation`, `uc.spaces.use-group`, `uc.account.erase-account`
+- Related use-cases: `uc.account.register-via-invitation`, `uc.spaces.use-group`, `uc.account.delete-account`

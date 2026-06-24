@@ -2,8 +2,8 @@
 
 - **ID:** uc.account.recover-keys
 - **Primary actor:** Memory Curator
-- **Goal:** Regain access to the Master Key (and thus all content) after losing a device, password or
-  Secret Key — without escrow.
+- **Goal:** Regain access to the Master Key (and thus all content) after losing a device or Secret Key
+  path — without escrow.
 - **Preconditions:** Holds at least one surviving path — another trusted device, the Emergency Kit
   (Secret Key + remembered password), or the single-use recovery code.
 - **Postconditions (success):** The Master Key / private identity key is recovered → **all scope access
@@ -69,9 +69,9 @@ C -> U : show new Emergency Kit (new Secret Key + new recovery code) -> confirm 
   a new one (must be re-backed-up).
 - *Fresh Emergency Kit (recovery-code path):* recovery issues a **new Secret Key + new recovery code**
   and a new password; the **Master Key (and content) is unchanged** — only its unlock wraps are rebuilt.
-- *Consequence for the legacy flow:* an email "forgot password" alone is **insufficient** under E2EE —
-  it resets only the auth verifier ("authenticated but locked") and cannot unlock keys; the recovery
-  code is the canonical forgot-password path.
+- *Password reset is separate:* an email "forgot password" flow is covered by
+  [reset password](uc.account.reset-password.md). It still needs the Secret Key-backed RECOVERY wrap;
+  email control alone cannot unlock content.
 - *No escrow:* losing every path is total loss — the deliberate trade-off for operator-blindness.
 
 ## Related
@@ -79,4 +79,4 @@ C -> U : show new Emergency Kit (new Secret Key + new recovery code) -> confirm 
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key recovery, Secret Key, key
   hierarchy), [Platform Concepts](../../../crosscutting/platform-concepts.md) (auth & sessions)
 - Decisions: [AD-06](../../../decisions/README.md) (recovery), [AD-08](../../../decisions/README.md) (Secret Key), [AD-02](../../../decisions/README.md) (E2EE), [AD-24](../../../decisions/README.md) (revocation), [AD-25](../../../decisions/README.md) (crypto)
-- Related use-cases: `uc.account.login`, `uc.account.register-via-invitation`
+- Related use-cases: `uc.account.login`, `uc.account.register-via-invitation`, `uc.account.reset-password`
