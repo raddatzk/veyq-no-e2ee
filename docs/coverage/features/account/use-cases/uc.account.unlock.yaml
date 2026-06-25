@@ -1,11 +1,37 @@
 useCase: uc.account.unlock
 feature: account
-title: Unlock the Master Key (password + Secret Key)
-# Refined use-case, not yet implemented — no acceptance criteria are tracked until its implementation CR.
-# Every surface is an explicit gap so the trust chain stays honest (no silent omission).
-acceptanceCriteria: []
+title: Account unlock (PASSWORD wrap)
+acceptanceCriteria:
+  - id: unlock-opens-master-key
+    text: The correct password + Secret Key derive the Unlock KEK, open the Master Key, and unwrap the identity private key into memory.
+    coverage:
+      web: { unit: [src/features/account/unlock/unlock.test.ts] }
+  - id: wrong-credentials-generic-failure
+    text: A wrong password or wrong Secret Key fails with a generic unlock failure (AEAD tag mismatch) and holds no key material; the server is uninvolved (E1).
+    coverage:
+      web: { unit: [src/features/account/unlock/unlock.test.ts] }
+  - id: no-password-wrap-generic-failure
+    text: An account with no PASSWORD wrap surfaces the same generic failure rather than a distinct error (E2).
+    coverage:
+      web: { unit: [src/features/account/unlock/unlock.test.ts] }
+  - id: key-material-authed-only
+    text: Key material is served only to an authenticated caller — a missing, malformed, expired, or revoked access token is a generic 401 (no anonymous read).
+    coverage:
+      backend: { integration: [AccountKeyMaterialSliceTest.missingTokenIsGeneric401, AccountKeyMaterialSliceTest.malformedTokenIsGeneric401, AccountKeyMaterialSliceTest.expiredTokenIs401, AccountKeyMaterialSliceTest.revokedFamilyTokenIs401] }
+      http: { e2e: [http/account/unlock.http] }
+  - id: no-cross-account-read
+    text: A valid token returns only the caller's own wraps + identity blob, never another account's material.
+    coverage:
+      backend: { integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial, AccountKeyMaterialSliceTest.tokenReturnsOnlyOwnMaterialNotAnothers] }
+  - id: operator-blind-ciphertext-only
+    text: The endpoint serves only ciphertext (wraps + wrapped identity private key) plus the public suite id; the server never derives a KEK or unwraps anything.
+    coverage:
+      backend: { integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial] }
+      web: { unit: [src/features/account/unlock/unlock.test.ts] }
 gaps:
-  backend: not implemented yet — refined use-case awaiting its implementation CR
-  web: not implemented yet — refined use-case awaiting its implementation CR
-  apple: no native client yet
-  android: no native client yet
+  apple: no native client yet — native unlock is deferred to a later CR
+  android: no native client yet — native unlock is deferred to a later CR
+# Note: the authenticated happy path (200 returning the caller's wraps) is not expressible on the http
+# surface — a .http handler cannot produce the Ed25519-signed session needed for a valid access token — so
+# it is covered by the backend slice (validTokenReturnsCallersMaterial) and the web unlock round-trip. http
+# covers the signature-free 401 boundaries above.

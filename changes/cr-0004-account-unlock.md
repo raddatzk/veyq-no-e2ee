@@ -1,7 +1,7 @@
 ---
 id: cr-0004
 title: Account unlock (PASSWORD wrap — open the Master Key client-side)
-status: planned          # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.unlock]
 adrs: [0003, 0005]
 invariants: [operator-blind]
@@ -123,11 +123,12 @@ wraps each open the *same* Master Key via their own wrap and are **separate, pla
   smoke on a fresh quarkusDev: setup → login → **Unlock** card → wrong Secret Key gave the generic failure
   (vault stayed locked) → correct password+Secret Key reached the **Unlocked** state with
   `vault.unlocked = true` and the password + Secret Key cleared to length 0.
-- [ ] **5 — verify + coverage.** Add
-  `docs/coverage/features/account/use-cases/uc.account.unlock.yaml` mapping each acceptance criterion to the
-  tests above (explicit `gaps` for the http authenticated-path and for apple/android), and add the
-  `uc.account.unlock` row to [platform-parity.md](../docs/crosscutting/platform-parity.md) (backend/http/web
-  ✅, apple/android ◻ planned). **Done when:** `python3 scripts/validate_coverage.py` green.
+- [x] **5 — verify + coverage.** Filled in
+  `docs/coverage/features/account/use-cases/uc.account.unlock.yaml` (6 acceptance criteria → the web
+  round-trip + backend slice + http boundaries; `gaps` for apple/android, with a note that the authed
+  happy-path isn't http-expressible), and added the `uc.account.unlock` row to
+  [platform-parity.md](../docs/crosscutting/platform-parity.md) (backend/http/web ✅, apple/android ◻).
+  **Done:** `python3 scripts/validate_coverage.py` green (3 use-cases mapped, all criteria covered).
 
 ## Definition of done
 
