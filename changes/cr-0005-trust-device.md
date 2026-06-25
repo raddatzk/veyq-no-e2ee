@@ -99,14 +99,15 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   `kdfParams` description (DEVICE carries it) in both account + setup specs to keep them identical. **Done:**
   both clients generate (web `AccountWrapsApi` + `AccountApi`; backend `AccountWrapsApi` interface, the
   existing `AccountResource` unchanged so `compileKotlin` stays green), web typecheck green.
-- [ ] **2 — backend.** A thin `AccountWrapsResource` implementing the generated `AccountWrapsApi` (reusing
-  `resolveUserId` + `bearerToken`), delegating to store methods `addWrap(userId, method, wrappedKey,
-  kdfParams) → id` (append a new row) and `deleteWrap(userId, id)` (delete only if the row is the caller's
-  **and** not PASSWORD; otherwise a no-op). No migration (`MasterKeyWrapEntity` already supports DEVICE + has
-  a UUID id). Slice tests: add a DEVICE wrap → it appears in `key-material` (+ returns an id); a second
-  DEVICE wrap coexists (multi-device); delete by id removes it; **another user's token deleting this user's
-  wrap is a no-op (204) and the wrap survives**; deleting a **PASSWORD** wrap is a no-op (floor survives);
-  unauthenticated `POST`/`DELETE` → 401. **Done when:** `./gradlew check` green.
+- [x] **2 — backend.** Added `AccountWrapsResource` (implements the generated `AccountWrapsApi`, reuses
+  `bearerToken`) → `WrapsHandler` (resolves the caller via `resolveUserId`, one `@Transactional`) →
+  `KeyMaterialStore.addWrap`/`deleteWrap` (`deleteWrap` only removes the caller's own **non-PASSWORD** wrap;
+  otherwise a no-op). No migration. 7 slice tests green: add a DEVICE wrap → it appears in `key-material` (+
+  returns an id); a second DEVICE wrap coexists (multi-device); delete by id removes it; **another user's
+  delete is a no-op (204), the wrap survives**; deleting the **PASSWORD** floor is a no-op; a non-DEVICE
+  method → 400; unauthenticated `POST`/`DELETE` → 401. **Done:** `./gradlew check` green (and the cr-0004
+  `AccountKeyMaterialSliceTest` still 7/7 — no cross-class wrap pollution; the per-test reset is scoped to
+  the wraps-test users).
 - [ ] **3 — http.** Add `http/account/trust-device.http`: unauthenticated/bogus-bearer `POST` and `DELETE`
   → generic 401; a malformed `POST` body → 400. **Parity gap (slice-only):** the authed add/delete
   round-trip needs a signed session no `.http` handler can produce (same limit as cr-0003/0004) — covered
