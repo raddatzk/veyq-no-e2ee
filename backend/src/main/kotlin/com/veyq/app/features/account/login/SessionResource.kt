@@ -1,6 +1,7 @@
 package com.veyq.app.features.account.login
 
 import com.veyq.app.generated.api.SessionApi
+import com.veyq.app.shared.http.bearerToken
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
@@ -13,10 +14,7 @@ class SessionResource(private val sessions: SessionService) : SessionApi {
     lateinit var headers: HttpHeaders
 
     override fun logout(): Response {
-        val token = headers.getHeaderString("Authorization")
-            ?.removePrefix("Bearer ")
-            ?.trim()
-        if (!token.isNullOrEmpty()) sessions.revokeByAccessToken(token)
+        bearerToken(headers)?.let { sessions.revokeByAccessToken(it) }
         return Response.noContent().build()
     }
 }

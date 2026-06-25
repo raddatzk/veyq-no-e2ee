@@ -23,8 +23,14 @@ export function setUnlocked(masterKey: Uint8Array, identityPrivate: Identity['pr
   vaultState.unlocked = true
 }
 
-/** Drop all key material (sign-out / re-lock). */
+/** Drop all key material (sign-out / re-lock). Zeroes the key bytes before releasing the references, so
+ *  the Master Key / identity private key don't linger in the heap until GC (best-effort: JS can't guarantee
+ *  no copy was made, but it shortens the window for a heap snapshot to recover a key after sign-out). */
 export function clearVault(): void {
+  keys.masterKey?.fill(0)
+  keys.identityPrivate?.kemX.fill(0)
+  keys.identityPrivate?.mlkemSeed.fill(0)
+  keys.identityPrivate?.sign.fill(0)
   keys.masterKey = null
   keys.identityPrivate = null
   vaultState.unlocked = false

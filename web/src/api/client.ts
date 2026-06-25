@@ -16,29 +16,23 @@ export function setupApi(): SetupApi {
   return new SetupApi(new Configuration({ basePath: session.apiBase }))
 }
 
-// Auth clients send the access token as the bearer credential (used by the authed endpoints, e.g. logout).
-function authConfig(): AuthConfiguration {
-  return new AuthConfiguration({
-    basePath: session.apiBase,
-    accessToken: () => session.accessToken ?? '',
-  })
-}
+// The one bearer-credential contract every authed client shares: same-origin basePath + the access token
+// from the in-memory session. Each generated package has its own Configuration class but the same parameter
+// shape, so this single source feeds them all — change the token source once, here.
+const bearerParams = () => ({ basePath: session.apiBase, accessToken: () => session.accessToken ?? '' })
 
 export function loginApi(): LoginApi {
-  return new LoginApi(authConfig())
+  return new LoginApi(new AuthConfiguration(bearerParams()))
 }
 
 export function tokenApi(): TokenApi {
-  return new TokenApi(authConfig())
+  return new TokenApi(new AuthConfiguration(bearerParams()))
 }
 
 export function sessionApi(): SessionApi {
-  return new SessionApi(authConfig())
+  return new SessionApi(new AuthConfiguration(bearerParams()))
 }
 
-// The account client also sends the access token as the bearer credential (authed key-material read).
 export function accountApi(): AccountApi {
-  return new AccountApi(
-    new AccountConfiguration({ basePath: session.apiBase, accessToken: () => session.accessToken ?? '' }),
-  )
+  return new AccountApi(new AccountConfiguration(bearerParams()))
 }

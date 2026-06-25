@@ -154,7 +154,18 @@ Security review of the cr-0004 diff surfaced three fixes, applied on top:
 - **#4 (altitude):** re-lock (`clearVault`) was bolted onto the view's `signOut`. Moved into the `logout()`
   primitive so every sign-out path drops the unlocked keys; test covers it.
 
-Lower-severity findings logged but not actioned (robustness/cleanup): `enum.valueOf` on stored
-suite/method strings can 500 on non-canonical data (latent); bearer-token parsing duplicated across
-resources; no `…Handler` layer in the account slice; no `Uint8Array` zeroize in `clearVault`; `accountApi`
-duplicates `authConfig`; second main-thread Argon2id; double per-request transaction.
+Second batch (robustness/cleanup), all applied:
+- **#3:** `AccountResource` maps suite/method by enum **value** (not `Enum.valueOf` by name): unknown wrap
+  methods are skipped (forward-compatible), an unknown suite is a controlled 500 — no uncaught exception.
+- **#5:** shared `com.veyq.app.shared.http.bearerToken(headers)` extractor; `AccountResource` and
+  `SessionResource.logout` both route through it (kills the `takeIf` vs `isNullOrEmpty` drift).
+- **#6:** added `KeyMaterialHandler` (Resource → Handler → Store per ADR 0001); the resource is now a thin
+  adapter.
+- **#7:** `clearVault()` zero-fills the Master Key + identity-key `Uint8Array`s before dropping the refs.
+- **#8:** `client.ts` shares one `bearerParams()` source across all authed clients.
+- **#10:** `KeyMaterialHandler.forAccessToken` is `@Transactional`, so the token resolve + material read
+  share **one** transaction.
+
+Deferred (own change): **#9** moving Argon2id off the main thread — a Web Worker touches the
+conformance-pinned `v1.ts` and the test strategy, so it warrants a dedicated slice rather than a review
+fix.
