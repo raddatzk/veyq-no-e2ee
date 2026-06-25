@@ -46,7 +46,7 @@ Honour these (links, not copies):
   - **Done when:** the spec validates as OpenAPI 3.1 (standalone check). Codegen wiring and the actually
     generated interfaces/models are confirmed in phase 2, where the build exists.
 
-- [ ] **2 — backend.** Stand up the Quarkus/Kotlin module (Gradle wrapper, Flyway, OpenAPI codegen wired
+- [x] **2 — backend.** Stand up the Quarkus/Kotlin module (Gradle wrapper, Flyway, OpenAPI codegen wired
   per the styleguide); Flyway migration for the owner + setup-lock tables (H2∩MariaDB common subset);
   `SetupResource` (implements the generated interface, thin) + `SetupHandler` (store ciphertext +
   `authPublicKey`, enforce the **single-owner lock** — **no content crypto, no signature check**; the

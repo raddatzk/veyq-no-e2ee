@@ -10,6 +10,10 @@ info:
     low-sensitivity operational metadata. It performs **no content crypto** and never sees the raw
     password — authentication uses a password-derived Ed25519 keypair (the client registers only the
     public key; login is challenge-response). See ADR 0003.
+
+    Field validation and sanitization are declared here and enforced by the generated code via the
+    `x-field-extra-annotation` vendor extension (bean-validation constraints + a trimming Jackson
+    deserializer), so malformed input is rejected at the boundary (400) before any handler runs.
 tags:
   - name: setup
     description: First-run instance setup and the single-owner lock.
@@ -52,22 +56,36 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateServerOwnerRequest" }
+            example:
+              displayName: Kevin
+              instanceName: Our Family veyq
+              suiteId: v1
+              identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
+              wrappedIdentityPrivateKey: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+              authPublicKey: ZWQyNTUxOS1hdXRoLXB1Yg==
+              masterKeyWraps:
+                - method: PASSWORD
+                  wrappedKey: d3JhcHBlZC1tYXN0ZXIta2V5
+              recoveryMasterKeyTag: cmVjb3ZlcnktdGFn
       responses:
         "201":
           description: The Server Owner was created and setup is now locked.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SetupResult" }
+              example: { userId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
         "400":
           description: The request was malformed (missing/invalid fields).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
         "409":
           description: Setup is already complete; a second owner cannot be bootstrapped.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: setup_already_complete }
 
 components:
   schemas:
@@ -78,10 +96,12 @@ components:
         setupRequired:
           type: boolean
           description: True while the instance has no owner yet.
+          example: true
         suites:
           type: array
           description: Crypto suite ids the server advertises (e.g. "v1").
-          items: { type: string, maxLength: 16 }
+          items: { type: string, maxLength: 16, example: v1 }
+          example: [v1]
 
     MasterKeyWrap:
       type: object
@@ -92,11 +112,14 @@ components:
           type: string
           description: Which unlock method opens this wrap.
           enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE]
+          example: PASSWORD
         wrappedKey:
           type: string
-          description: The Master Key wrapped to this method's KEK (opaque ciphertext).
+          description: The Master Key wrapped to this method's KEK (opaque base64 ciphertext).
           contentEncoding: base64
           maxLength: 8192
+          example: d3JhcHBlZC1tYXN0ZXIta2V5
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     CreateServerOwnerRequest:
       type: object
@@ -111,30 +134,35 @@ components:
       properties:
         displayName:
           type: string
-          description: The owner's human display name (server-visible identity metadata).
-          minLength: 1
+          description: The owner's human display name (server-visible identity metadata). Trimmed on input.
           maxLength: 100
-          pattern: "\\S"
+          example: Kevin
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
         instanceName:
           type: string
-          description: Display name of the instance (server-visible).
-          minLength: 1
+          description: Display name of the instance (server-visible). Trimmed on input.
           maxLength: 100
-          pattern: "\\S"
+          example: Our Family veyq
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
         suiteId:
           type: string
           description: Crypto suite the client used to produce the wrapped material.
           enum: [v1]
+          example: v1
         identityPublicKey:
           type: string
-          description: The owner's identity public key bundle (opaque).
+          description: The owner's identity public key bundle (opaque base64).
           contentEncoding: base64
           maxLength: 8192
+          example: aWRlbnRpdHktcHVibGljLWtleQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         wrappedIdentityPrivateKey:
           type: string
-          description: The identity private key wrapped under the Master Key (opaque).
+          description: The identity private key wrapped under the Master Key (opaque base64).
           contentEncoding: base64
           maxLength: 8192
+          example: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         masterKeyWraps:
           type: array
           description: One wrap per chosen unlock method; PASSWORD is the mandatory floor.
@@ -147,11 +175,15 @@ components:
             credential — login proves possession of the matching private key via challenge-response.
           contentEncoding: base64
           maxLength: 8192
+          example: ZWQyNTUxOS1hdXRoLXB1Yg==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         recoveryMasterKeyTag:
           type: string
-          description: One-way tag proving recovery of the same Master Key during reset (opaque).
+          description: One-way tag proving recovery of the same Master Key during reset (opaque base64).
           contentEncoding: base64
           maxLength: 256
+          example: cmVjb3ZlcnktdGFn
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     SetupResult:
       type: object
@@ -161,6 +193,7 @@ components:
           type: string
           format: uuid
           description: Opaque id of the created Server Owner.
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
 
     ErrorResponse:
       type: object
@@ -170,7 +203,9 @@ components:
           type: string
           description: Stable, client-localizable error code.
           maxLength: 64
+          example: invalid_request
         message:
           type: [string, "null"]
           description: Optional developer-facing detail; never contains secrets or content.
           maxLength: 512
+          example: null

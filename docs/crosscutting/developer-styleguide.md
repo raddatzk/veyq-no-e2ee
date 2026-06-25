@@ -60,9 +60,15 @@
 - **The OpenAPI schema is the source of truth for input shape and limits.** Declare constraints on
   request fields (`maxLength`/`minLength`, `pattern`, `format`, `minimum`/`maximum`, `required`).
   Required-field + structural validation is enforced by generated bean validation → a malformed body is
-  rejected **before the handler** (400). *(The exact mechanism for enforcing field-level constraints
-  through the chosen generator is a first-backend-CR decision; the principle — schema is the validation
-  contract — is fixed.)*
+  rejected **before the handler** (400).
+- **Field-level validation AND sanitization are declared in the spec via `x-field-extra-annotation`.**
+  The `kotlin` model generator ignores standard `maxLength`/`pattern`, but emits whatever
+  `x-field-extra-annotation` holds onto the field. Use it to attach (a) **bean-validation** constraints
+  (`@field:…NotBlank`/`Size`/`Pattern`) — enforced by `@Valid` at the boundary, 400 before the handler —
+  and (b) a **trimming Jackson deserializer**
+  (`@field:…JsonDeserialize(using = TrimmingStringDeserializer::class)`) to normalize server-visible name
+  metadata. Keep the standard `maxLength` alongside as the human-readable contract. Only **server-visible**
+  fields may be sanitized server-side; content is ciphertext and stays untouched.
 - **Stateful / cross-field / domain checks stay imperative** in the handler or a guard, close to the
   invariant, and small/named/fail-closed (e.g. crypto-suite allow-list, scope-grant checks, upload
   quota/path-traversal guards). Anything needing DB state does not belong in a field annotation.
