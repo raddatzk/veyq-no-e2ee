@@ -7,7 +7,8 @@ holds only **public** keys and ciphertext, never the password and never a conten
 - **Cross-cutting:** [Account & Key Model](../../crosscutting/account-key-model.md) (auth vs. unlock, the
   one-Master-Key/many-wraps model), [Security Model](../../crosscutting/security-model.md)
   (operator-blind, non-enumerability), [ADR 0003](../../decisions/0003-operator-blind-password-auth.md)
-  (password-derived keypair + challenge-response).
+  (password-derived keypair + challenge-response), [ADR 0005](../../decisions/0005-unlock-methods-and-device-trust.md)
+  (unlock methods, device trust, re-lock & precedence).
 - **Note:** *auth* (proving who you are to the server) and *unlock* (opening your Master Key on the
   device) are deliberately **separate layers** — they appear as separate use-cases here.
 
@@ -15,8 +16,9 @@ holds only **public** keys and ciphertext, never the password and never a conten
 
 - ★ [Account login (password)](use-cases/uc.account.login.md) — **refined**
 - ★ [Unlock the Master Key (password + Secret Key)](use-cases/uc.account.unlock.md) — **refined**
-- Log in with a passkey — planned (alternate auth + PRF-derived unlock)
-- Trust this device — planned (DEVICE wrap, skip Secret Key re-entry)
+- Log in with a passkey — planned (alternate auth + PRF-derived unlock; [ADR 0005](../../decisions/0005-unlock-methods-and-device-trust.md))
+- Trust this device — planned (DEVICE wrap, skip Secret Key re-entry; [ADR 0005](../../decisions/0005-unlock-methods-and-device-trust.md))
+- Onboard a new device from an existing one — planned (QR / push trigger; E2E unlock-transfer relayed by the blind server; [ADR 0005 → related/future](../../decisions/0005-unlock-methods-and-device-trust.md))
 - Change password / Secret Key — planned (re-register auth key, re-wrap Master Key)
 - Recover access with a recovery code — planned (RECOVERY wrap, reissue code)
 - Manage active sessions — planned (list session families by their **E2EE** client-built name, revoke individually; unlock-gated; [ADR 0004](../../decisions/0004-session-tokens.md))
