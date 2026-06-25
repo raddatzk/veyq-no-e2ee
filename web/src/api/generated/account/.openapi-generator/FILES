@@ -1,0 +1,9 @@
+.openapi-generator-ignore
+apis/AccountApi.ts
+apis/index.ts
+index.ts
+models/AccountKeyMaterial.ts
+models/ErrorResponse.ts
+models/MasterKeyWrap.ts
+models/index.ts
+runtime.ts

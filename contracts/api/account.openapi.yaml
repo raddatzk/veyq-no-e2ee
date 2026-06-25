@@ -1,0 +1,120 @@
+openapi: 3.1.0
+info:
+  title: veyq Account API
+  version: 0.1.0
+  description: >
+    The authenticated account surface beyond login/session lifecycle. Operator-blind: every field served
+    here is ciphertext or a public, low-sensitivity descriptor — the server performs no content crypto.
+
+    `GET /api/account/key-material` returns the caller's own wrapped key material so the client can
+    **unlock** the Master Key entirely on-device (uc.account.unlock): the PASSWORD `MasterKeyWrap` plus its
+    KDF params, the Master-Key-wrapped identity private key, and the crypto suite id. The client derives the
+    unlock KEK from the password and Secret Key (2SKD, ADR 0003/0005), unwraps the Master Key, then unwraps
+    the identity private key — all in memory. The server never sees the password, the Secret Key, the KEK,
+    or any unwrapped key. Auth ≠ unlock: a valid session lets you fetch ciphertext, never open it.
+
+    The endpoint is keyed off the bearer access token and returns **only the caller's own** material — never
+    an email or id in the request — so it is no cross-account read and no enumeration vector. A stolen
+    access token yields only ciphertext, which is useless without the password and Secret Key.
+tags:
+  - name: account
+    description: Authenticated account key material (for client-side unlock).
+
+paths:
+  /api/account/key-material:
+    get:
+      tags: [account]
+      operationId: getAccountKeyMaterial
+      summary: Fetch the caller's wrapped key material for client-side unlock.
+      description: >
+        Returns the authenticated caller's Master Key wraps (one per unlock method; PASSWORD is the floor),
+        the Master-Key-wrapped identity private key, and the crypto suite id. All opaque ciphertext — the
+        client derives the unlock KEK and unwraps locally. Resolved from the bearer access token; a missing,
+        malformed, expired, or revoked token is a single generic 401.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's wrapped key material (ciphertext only).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountKeyMaterial" }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The opaque access token issued by login / refresh.
+
+  schemas:
+    # NOTE: MasterKeyWrap and ErrorResponse are intentionally identical to their definitions in
+    # setup.openapi.yaml / auth.openapi.yaml. Specs are self-contained (no cross-file $ref); the backend
+    # generator writes one model per name, so identical duplicates overwrite harmlessly (see V1 setup).
+    MasterKeyWrap:
+      type: object
+      description: One wrap of the Master Key, openable by a single unlock method.
+      required: [method, wrappedKey]
+      properties:
+        method:
+          type: string
+          description: Which unlock method opens this wrap.
+          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE]
+          example: PASSWORD
+        wrappedKey:
+          type: string
+          description: The Master Key wrapped to this method's KEK (opaque base64 ciphertext).
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1tYXN0ZXIta2V5
+        kdfParams:
+          type: string
+          description: >
+            KDF parameters + salt needed to re-derive this method's unlock KEK at login (opaque base64;
+            present for password/recovery methods, absent for device/passkey).
+          contentEncoding: base64
+          maxLength: 256
+          example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
+
+    AccountKeyMaterial:
+      type: object
+      description: The caller's wrapped key material, enough to unlock the Master Key on-device.
+      required: [suiteId, wraps, wrappedIdentityPrivateKey]
+      properties:
+        suiteId:
+          type: string
+          description: Crypto suite the wrapped material was produced under (selects the client crypto suite).
+          enum: [v1]
+          example: v1
+        wraps:
+          type: array
+          description: One wrap per unlock method the account has; PASSWORD is the floor used by this flow.
+          minItems: 1
+          items: { $ref: "#/components/schemas/MasterKeyWrap" }
+        wrappedIdentityPrivateKey:
+          type: string
+          description: The identity private key wrapped under the Master Key (opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable, client-localizable error code.
+          maxLength: 64
+          example: authentication_failed
+        message:
+          type: [string, "null"]
+          description: Optional developer-facing detail; never contains secrets or content.
+          maxLength: 512
+          example: null
