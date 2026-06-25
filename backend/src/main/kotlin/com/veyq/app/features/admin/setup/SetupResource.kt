@@ -17,7 +17,13 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
 
     override fun getSetupStatus(): Response {
         val state = handler.state()
-        return Response.ok(SetupStatus(setupRequired = state.setupRequired, suites = state.suites)).build()
+        return Response.ok(
+            SetupStatus(
+                setupRequired = state.setupRequired,
+                suites = state.suites,
+                instanceSalt = state.instanceSalt,
+            ),
+        ).build()
     }
 
     override fun createServerOwner(createServerOwnerRequest: CreateServerOwnerRequest): Response =

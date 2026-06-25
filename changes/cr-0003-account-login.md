@@ -73,7 +73,7 @@ phases 1–2 below.
   `POST /api/logout` (revoke the current family). The family is **nameless** here — the E2EE session name
   is unlock-gated and belongs to `uc.account.sessions`, not this CR. **Done when:** the spec lints and the
   backend/web clients generate from it.
-- [ ] **2 — backend.** *Setup side:* generate `instanceSalt` once at first-run, persist it (migration),
+- [x] **2 — backend.** *Setup side:* generate `instanceSalt` once at first-run, persist it (migration),
   and return it from `GET /api/setup`; the existing owner-create path already stores the client-derived
   `authPublicKey`, so no owner-side change beyond the salt now flowing. *Login side:* nonce issuance
   (single-use, time-bounded, server-stored), Ed25519 signature verification against the stored

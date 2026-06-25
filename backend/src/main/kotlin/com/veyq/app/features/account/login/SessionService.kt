@@ -1,0 +1,97 @@
+package com.veyq.app.features.account.login
+
+import com.veyq.app.shared.crypto.Tokens
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.UUID
+
+/** A freshly issued session: the family id plus the opaque token pair handed to the client. */
+data class IssuedSession(val familyId: String, val accessToken: String, val refreshToken: String)
+
+/** A rotated token pair. */
+data class RotatedTokens(val accessToken: String, val refreshToken: String)
+
+/**
+ * Session families and their opaque, rotating access + refresh tokens (ADR 0004). The server stores only
+ * token hashes; refresh rotates the pair and a replayed superseded refresh token revokes the whole
+ * family (reuse detection). DoS-safe by construction: a family is only revoked when a presented token's
+ * **hash matches** a stored superseded row, which cannot be forged without the token itself.
+ */
+@ApplicationScoped
+class SessionService {
+
+    /** Issue a fresh nameless session family for a user. */
+    @Transactional
+    fun issue(userId: String): IssuedSession {
+        val now = Instant.now()
+        val family = SessionFamilyEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            status = SessionFamilyEntity.ACTIVE
+            createdAt = now
+            lastUsedAt = now
+        }
+        family.persist()
+        val (access, refresh) = mint(family.id, generation = 1, now)
+        return IssuedSession(family.id, access, refresh)
+    }
+
+    /** Rotate a refresh token. Returns null (→ 401) on any failure; a superseded-token replay revokes
+     *  the family as a side effect. */
+    @Transactional
+    fun refresh(presented: String): RotatedTokens? {
+        val row = RefreshTokenEntity.find("tokenHash", Tokens.hash(presented)).firstResult() ?: return null
+        val family = SessionFamilyEntity.findById(row.familyId) ?: return null
+        if (family.status != SessionFamilyEntity.ACTIVE) return null
+
+        if (row.status == RefreshTokenEntity.SUPERSEDED) {
+            family.status = SessionFamilyEntity.REVOKED // reuse detected → kill the whole family
+            return null
+        }
+        if (row.expiresAt.isBefore(Instant.now())) return null
+
+        val now = Instant.now()
+        row.status = RefreshTokenEntity.SUPERSEDED
+        family.lastUsedAt = now
+        val (access, refresh) = mint(family.id, row.generation + 1, now)
+        return RotatedTokens(access, refresh)
+    }
+
+    /** Revoke the family of the presented access token. Idempotent — a missing/invalid token is a no-op. */
+    @Transactional
+    fun revokeByAccessToken(accessToken: String) {
+        val row = AccessTokenEntity.find("tokenHash", Tokens.hash(accessToken)).firstResult() ?: return
+        SessionFamilyEntity.findById(row.familyId)?.let { it.status = SessionFamilyEntity.REVOKED }
+    }
+
+    private fun mint(familyId: String, generation: Int, now: Instant): Pair<String, String> {
+        val access = Tokens.random()
+        AccessTokenEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.familyId = familyId
+            tokenHash = Tokens.hash(access)
+            createdAt = now
+            expiresAt = now.plus(ACCESS_TTL_MINUTES, ChronoUnit.MINUTES)
+        }.persist()
+
+        val refresh = Tokens.random()
+        RefreshTokenEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.familyId = familyId
+            tokenHash = Tokens.hash(refresh)
+            this.generation = generation
+            status = RefreshTokenEntity.CURRENT
+            createdAt = now
+            expiresAt = now.plus(REFRESH_TTL_DAYS, ChronoUnit.DAYS)
+        }.persist()
+
+        return access to refresh
+    }
+
+    companion object {
+        const val ACCESS_TTL_MINUTES = 15L
+        const val REFRESH_TTL_DAYS = 30L
+    }
+}
