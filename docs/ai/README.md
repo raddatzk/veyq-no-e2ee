@@ -54,6 +54,10 @@ a real contract-level verification surface, not docs that rot. CR phases follow 
 - **Scripts and utilities in Python.** Bash only for thin CI/hook glue.
 - **`legacy/` is read-only reference.** Never edit it. The inbox may point to it as source material,
   but durable state must not depend on or link to it.
+- **Frontends reuse legacy UI/UX — never invent new UI.** Web orients on `legacy/frontend` (Vue 3 +
+  PrimeVue); native UI on the first iOS version. Port the existing UI/UX and change only the underlying
+  data layer (contracts-generated clients + client-side crypto). Apple is the universal-app direction;
+  Android is built fresh in parallel to Apple as a universal app.
 - **Start light.** Heavier machinery — validators, hooks, the wiki generator, the full `contracts/`
   tree, `.claude/` commands + subagents — is added when there is code/feature surface that justifies
   it, not up front.
