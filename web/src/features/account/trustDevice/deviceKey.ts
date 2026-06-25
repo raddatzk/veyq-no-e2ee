@@ -22,6 +22,7 @@ function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => req.result.createObjectStore(STORE)
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
+    req.onblocked = () => reject(new Error('indexeddb_blocked')) // else a blocked open would hang the caller
   })
 }
 
@@ -29,10 +30,26 @@ function run<T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequ
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
-        const req = op(db.transaction(STORE, mode).objectStore(STORE))
-        req.onsuccess = () => resolve(req.result)
-        req.onerror = () => reject(req.error)
-        req.transaction!.oncomplete = () => db.close()
+        const tx = db.transaction(STORE, mode)
+        const req = op(tx.objectStore(STORE))
+        let result: T
+        req.onsuccess = () => {
+          result = req.result
+        }
+        // Settle on COMMIT, not on req.onsuccess: a write can still abort at commit (quota, clone failure)
+        // after the request "succeeded", so resolving early would report a success that never persisted.
+        tx.oncomplete = () => {
+          db.close()
+          resolve(result)
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error)
+        }
+        tx.onabort = () => {
+          db.close()
+          reject(tx.error)
+        }
       }),
   )
 }

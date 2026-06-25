@@ -43,7 +43,18 @@ export async function trustThisDevice(email: string, password: string, masterKey
       addWrapRequest: { method: AddWrapRequestMethodEnum.Device, wrappedKey: b64std(wrap), kdfParams },
     }),
   )
-  await device.saveTrust(email, { cryptoKey, kdfParams, wrapId: result.id })
+  try {
+    await device.saveTrust(email, { cryptoKey, kdfParams, wrapId: result.id })
+  } catch (e) {
+    // The server wrap landed but the local key didn't persist — roll the wrap back so it isn't an orphan,
+    // then signal the failure (the caller tells the user trust didn't take, rather than silently misleading).
+    try {
+      await withRefresh(() => accountWrapsApi().deleteAccountWrap({ id: result.id }))
+    } catch {
+      /* best-effort rollback */
+    }
+    throw e
+  }
 }
 
 /** Untrust this device: remove the server wrap (best-effort) and the local key. */

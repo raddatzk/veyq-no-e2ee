@@ -53,10 +53,11 @@ export async function unlockWithDevice(email: string, password: string): Promise
   const wrap = material.wraps.find(
     (w) => w.method === MasterKeyWrapMethodEnum.Device && w.kdfParams === trust.kdfParams,
   )
-  if (!wrap?.kdfParams) {
-    await device.clearTrust(email) // the server wrap is gone — drop the dangling local key
-    return false
-  }
+  // No matching wrap → fall back to the floor, but DON'T destroy the local key on a single server response:
+  // the operator is blind but could withhold the wrap to force every trusted device to wipe its key. A stale
+  // local key is harmless (it opens nothing without the wrap + password); the user clears it via explicit
+  // untrust or a re-trust replaces it.
+  if (!wrap?.kdfParams) return false
   const deviceFactor = await device.deviceFactor(trust.cryptoKey)
   const { params, salt } = v1.decodeKdfParams(fromB64std(wrap.kdfParams))
   const kek = await deviceKekAsync(deviceFactor, password, salt, params)

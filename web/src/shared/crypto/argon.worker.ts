@@ -14,12 +14,11 @@ const ctx = self as unknown as { postMessage(message: unknown): void }
 self.addEventListener('message', (event: MessageEvent<Request>) => {
   const msg = event.data
   try {
-    const result =
-      msg.op === 'authKeypair'
-        ? v1.deriveAuthKeypair(msg.password, msg.salt, msg.params)
-        : msg.op === 'unlockKek'
-          ? v1.kekPasswordSecret(msg.secretKey, msg.password, msg.salt, msg.params)
-          : v1.kekDevicePassword(msg.deviceFactor, msg.password, msg.salt, msg.params)
+    let result: unknown
+    if (msg.op === 'authKeypair') result = v1.deriveAuthKeypair(msg.password, msg.salt, msg.params)
+    else if (msg.op === 'unlockKek') result = v1.kekPasswordSecret(msg.secretKey, msg.password, msg.salt, msg.params)
+    else if (msg.op === 'deviceKek') result = v1.kekDevicePassword(msg.deviceFactor, msg.password, msg.salt, msg.params)
+    else throw new Error('unknown_op') // explicit — a new op must be wired here, not silently misrouted
     ctx.postMessage({ id: msg.id, ok: true, result })
   } catch (err) {
     ctx.postMessage({ id: msg.id, ok: false, error: String(err) })

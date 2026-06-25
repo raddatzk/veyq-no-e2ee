@@ -52,6 +52,7 @@ const en = {
     deviceUnavailable: 'This device is no longer trusted. Enter your Secret Key.',
     trustDevice: 'Trust this device',
     trustDeviceHint: 'Next time, unlock on this device with just your password — your Secret Key stays in your kit.',
+    trustFailed: 'Couldn’t trust this device — you unlocked fine, but you’ll need your Secret Key next time.',
     untrust: 'Untrust this device',
   },
 }
@@ -104,6 +105,7 @@ const de: typeof en = {
     deviceUnavailable: 'Diesem Gerät wird nicht mehr vertraut. Gib deinen Secret Key ein.',
     trustDevice: 'Diesem Gerät vertrauen',
     trustDeviceHint: 'Beim nächsten Mal entsperrst du auf diesem Gerät nur mit deinem Passwort — dein Secret Key bleibt im Kit.',
+    trustFailed: 'Konnte diesem Gerät nicht vertrauen — entsperrt hat es geklappt, aber beim nächsten Mal brauchst du deinen Secret Key.',
     untrust: 'Vertrauen aufheben',
   },
 }

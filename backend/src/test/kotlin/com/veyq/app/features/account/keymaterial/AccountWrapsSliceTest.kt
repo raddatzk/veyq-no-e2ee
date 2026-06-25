@@ -81,6 +81,26 @@ class AccountWrapsSliceTest {
     }
 
     @Test
+    fun deletingNonDeviceWrapIsNoOp() {
+        // A RECOVERY wrap must NOT be removable through this device-untrust endpoint (whitelist DEVICE).
+        val recId = "$USER_A-rec"
+        QuarkusTransaction.requiringNew().run {
+            if (MasterKeyWrapEntity.findById(recId) == null) {
+                MasterKeyWrapEntity().apply {
+                    id = recId
+                    userId = USER_A
+                    method = "RECOVERY"
+                    wrappedKey = "cmVjb3Zlcnktd3JhcA=="
+                    kdfParams = KDF
+                }.persist()
+            }
+        }
+        val token = issueToken(USER_A)
+        delete(token, recId).then().statusCode(204)
+        keyMaterial(token).then().statusCode(200).body("wraps.method", hasItems("RECOVERY"))
+    }
+
+    @Test
     fun nonDeviceMethodIsRejected() {
         given().header("Authorization", "Bearer ${issueToken(USER_A)}").contentType(ContentType.JSON)
             .body("""{"method":"PASSWORD","wrappedKey":"QQ==","kdfParams":"$KDF"}""")

@@ -97,9 +97,10 @@ paths:
       summary: Remove a wrap by id (untrust this device).
       description: >
         Removes the caller's wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it
-        is the caller's own **and** not the PASSWORD floor; an unknown id, another account's wrap, or the
-        floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be
-        removed this way.
+        is the caller's own **DEVICE** wrap (the only kind this untrust endpoint creates); an unknown id,
+        another account's wrap, the PASSWORD floor, or any other method is a silent no-op. Always 204 — no
+        cross-account enumeration, the 2SKD floor can never be removed, and the RECOVERY/PASSKEY methods are
+        out of reach of this endpoint.
       parameters:
         - name: id
           in: path

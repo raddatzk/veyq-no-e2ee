@@ -23,6 +23,7 @@ const busy = ref(false)
 const error = ref('')
 const loggedIn = ref(false)
 const deviceTrusted = ref(false)
+const trustFailed = ref(false)
 const unlockMode = ref<'device' | 'password'>('password')
 const trustChecked = ref(false)
 const trustSupported = isTrustSupported()
@@ -36,7 +37,8 @@ async function submit() {
   try {
     await login(email.value, password.value)
     loggedIn.value = true
-    deviceTrusted.value = await isTrusted(email.value)
+    // An IndexedDB hiccup must not break a successful login — default to the floor if the check fails.
+    deviceTrusted.value = await isTrusted(email.value).catch(() => false)
     unlockMode.value = deviceTrusted.value ? 'device' : 'password'
     secretKey.value = pendingSecretKey
     pendingSecretKey = ''
@@ -57,6 +59,7 @@ async function unlock() {
       const ok = await unlockWithDevice(email.value, password.value)
       if (ok) {
         password.value = ''
+        secretKey.value = ''
       } else {
         // the local key or the server wrap is gone — fall back to the Secret-Key floor
         deviceTrusted.value = false
@@ -70,13 +73,16 @@ async function unlock() {
     await unlockMasterKey(password.value, secretKey.value)
     if (trustChecked.value && trustSupported) {
       // Enrol now, while the just-entered (known-correct) password is still in hand and the vault is open.
+      // Enrolment is best-effort — the unlock already succeeded — but a failure is surfaced (not silent) so
+      // the user isn't misled into thinking the device is trusted when it isn't.
       try {
         await trustThisDevice(email.value, password.value, masterKey()!)
         deviceTrusted.value = true
       } catch {
-        /* enrolment is best-effort — the unlock itself succeeded */
+        trustFailed.value = true
       }
     }
+    trustChecked.value = false
     password.value = ''
     secretKey.value = ''
   } catch {
@@ -109,6 +115,8 @@ async function signOut() {
   secretKey.value = ''
   pendingSecretKey = ''
   trustChecked.value = false
+  deviceTrusted.value = false
+  trustFailed.value = false
   unlockMode.value = 'password'
   error.value = ''
 }
@@ -228,6 +236,7 @@ onMounted(() => {
       <div v-else class="veyq-form">
         <Message severity="success" :closable="false">{{ t('unlock.unlockedTitle') }}</Message>
         <p class="veyq-form-copy">{{ t('unlock.unlockedNote') }}</p>
+        <Message v-if="trustFailed" severity="warn" :closable="false" class="form-message">{{ t('unlock.trustFailed') }}</Message>
         <Button
           v-if="deviceTrusted"
           type="button"

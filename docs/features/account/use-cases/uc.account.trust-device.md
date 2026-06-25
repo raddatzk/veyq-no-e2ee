@@ -93,14 +93,18 @@ a trusted device defaults to password-only, and **"unlock another way"** always 
 
 Delete **this device's** DEVICE wrap server-side (by its stored id) **and** delete the IndexedDB entry. The
 account falls back to the PASSWORD floor on this device; other trusted devices keep their own wraps. Removing
-a trust removes **one wrap**; content is never re-encrypted. The server **refuses** to delete a PASSWORD wrap
-through this path, so the 2SKD floor can never be removed.
+a trust removes **one wrap**; content is never re-encrypted. The endpoint deletes **only DEVICE wraps**
+(whitelist): the PASSWORD floor *and* the RECOVERY/PASSKEY methods are out of its reach, so this device-trust
+control can never strip the 2SKD floor or a recovery path.
 
 ## Alternate / exception flows
 
-- **E1 — device key absent** (cleared storage, a different browser/profile): the server's DEVICE wrap is
-  unusable here → the client falls back to the **PASSWORD floor** (password + Secret Key). The orphan wrap
-  is harmless ciphertext; the user can re-trust to mint a fresh one.
+- **E1 — device key absent or wrap missing**: if the local key is gone (cleared storage, a different
+  browser/profile) the server's DEVICE wrap is unusable here; if the server has no matching wrap, the local
+  key opens nothing. Either way the client falls back to the **PASSWORD floor** — and it does **not** destroy
+  the local key on a single server response (a blind operator could otherwise withhold the wrap to force
+  every trusted device to wipe its key). A stale key/wrap is harmless ciphertext + an unusable handle;
+  explicit untrust, or a re-trust (which replaces), is what cleans it up.
 - **E2 — enrol without a successful unlock:** there is no in-memory Master Key (and no in-hand password) to
   wrap → nothing to enrol. "Trust this device" is bound to the unlock action, so it can only succeed when the
   unlock it rides on succeeds.

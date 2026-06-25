@@ -42,12 +42,14 @@ class KeyMaterialStore {
         return id
     }
 
-    /** Remove a wrap by id — but only the caller's own and never the PASSWORD floor; otherwise a no-op
-     *  (idempotent: an unknown id, another user's wrap, or the floor changes nothing). */
+    /** Remove a wrap by id — but only the caller's own **DEVICE** wrap (the only kind this untrust endpoint
+     *  creates); otherwise a no-op (idempotent). Whitelisting DEVICE — rather than blacklisting only the
+     *  PASSWORD floor — keeps the floor un-removable AND protects the RECOVERY/PASSKEY methods from being
+     *  stripped through this device-trust endpoint, and doesn't hinge on the exact floor casing. */
     @Transactional
     fun deleteWrap(userId: String, id: String) {
         val wrap = MasterKeyWrapEntity.findById(id) ?: return
-        if (wrap.userId != userId || wrap.method == "PASSWORD") return
+        if (wrap.userId != userId || wrap.method != "DEVICE") return
         wrap.delete()
     }
 }

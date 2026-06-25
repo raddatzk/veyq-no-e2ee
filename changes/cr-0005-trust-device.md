@@ -148,3 +148,28 @@ Master Key, or Secret Key; the PASSWORD floor can't be deleted and is always rea
 way". Coverage for `uc.account.trust-device` is green and the parity matrix reflects it (backend/http/web).
 Worker-cached re-lock, passkey/biometric, cross-device onboarding and native trust remain separate, planned
 work. After merge, keep this file as a record (per the cr convention).
+
+## Review follow-ups (post-phase-5)
+
+An intensive code + security review (7 parallel angles) confirmed the crypto core is sound (password is a
+real second factor, the HMAC key is non-extractable, the KEK mirrors the floor's construction, wrong inputs
+fail at the AEAD tag, nothing secret crosses the wire) and surfaced robustness/hygiene fixes, applied:
+- **#1 (security):** `deleteWrap` now **whitelists DEVICE** instead of blacklisting only PASSWORD — the
+  untrust endpoint can no longer strip a RECOVERY/PASSKEY method (and doesn't hinge on the floor's casing).
+  Contract + use-case `Untrust` updated; slice test for a RECOVERY delete being a no-op.
+- **#2 (robustness):** `unlockWithDevice` no longer **destroys the local device key** when a wrap is
+  missing — a blind operator could otherwise withhold it to force every trusted device to wipe its key. It
+  just falls back to the floor; explicit untrust / re-trust cleans up. Use-case E1 updated.
+- **#3 (UX/robustness):** enrol failure is no longer silently swallowed — a `saveTrust` failure **rolls
+  back** the just-added server wrap (no orphan), and the UI shows a "couldn't trust this device" warning.
+- **#5 (robustness):** the IndexedDB adapter rejects on `onblocked` (no hang) and settles writes on
+  `transaction.oncomplete` (a commit-time abort no longer reports a false success).
+- **#7 (hygiene):** `signOut` resets `deviceTrusted`/`trustFailed`; the device success path clears
+  `secretKey` too; `submit()` guards the `isTrusted` IndexedDB call; `argon.worker` dispatches the op
+  explicitly (no fallthrough). Re-verified by a live preview smoke (enrol → re-login DEVICE unlock) after
+  the IndexedDB-timing change.
+
+Logged, not actioned (out of this batch): cap on DEVICE wraps per account (#4), matching the wrap by
+`wrapId` instead of `kdfParams` — needs the GET to expose the id (#6), folding `WrapsHandler` into
+`KeyMaterialHandler` (#8). By design (ADR 0005, not a defect): a stolen *unlocked* device / in-session XSS
+reduces to password strength — "wraps protect against key theft, not session misuse".

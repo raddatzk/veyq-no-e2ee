@@ -65,6 +65,17 @@ describe('trustThisDevice / untrustThisDevice', () => {
     expect(device.saveTrust).toHaveBeenCalledWith(EMAIL, expect.objectContaining({ wrapId: 'new-1' }))
   })
 
+  it('rolls back the server wrap when the local save fails (no orphan)', async () => {
+    vi.mocked(device.loadTrust).mockResolvedValue(null)
+    vi.mocked(device.saveTrust).mockRejectedValue(new Error('idb_write_failed'))
+    const add = vi.fn().mockResolvedValue({ id: 'wrap-x' })
+    const del = vi.fn().mockResolvedValue(undefined)
+    mockWrapsApi(add, del)
+
+    await expect(trustThisDevice(EMAIL, 'pw', new Uint8Array(32).fill(1))).rejects.toThrow()
+    expect(del).toHaveBeenCalledWith({ id: 'wrap-x' }) // the just-added wrap is rolled back
+  })
+
   it('untrust removes the server wrap and the local key', async () => {
     vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'x', wrapId: 'w1' })
     const del = vi.fn().mockResolvedValue(undefined)

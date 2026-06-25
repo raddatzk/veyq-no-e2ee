@@ -75,7 +75,7 @@ describe('unlockWithDevice (uc.account.trust-device)', () => {
     expect(isUnlocked()).toBe(false)
   })
 
-  it('clears a dangling trust and returns false when the server wrap is gone (orphan)', async () => {
+  it('falls back (returns false) without destroying the local key when no wrap matches (orphan)', async () => {
     const { material } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
     mockMaterial(material)
     // a stored trust whose kdfParams matches no server wrap → orphan
@@ -83,7 +83,8 @@ describe('unlockWithDevice (uc.account.trust-device)', () => {
     vi.mocked(device.deviceFactor).mockResolvedValue(DEVICE_FACTOR)
 
     expect(await unlockWithDevice(EMAIL, PASSWORD)).toBe(false)
-    expect(device.clearTrust).toHaveBeenCalledWith(EMAIL)
+    // the local device key is NOT wiped on a single server response (no operator-forced key destruction)
+    expect(device.clearTrust).not.toHaveBeenCalled()
     expect(isUnlocked()).toBe(false)
   })
 
