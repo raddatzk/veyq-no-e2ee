@@ -128,8 +128,9 @@ restating the code. Avoid `// loop over the items` and comments that drift from 
 ## 11. Cross-platform parity
 
 Keep **http / web / apple / android** (plus backend) behavior in parity; when a platform intentionally
-differs, **mark it explicitly** in code and parity notes. Crypto parity is enforced mechanically by the
-conformance vectors (§9).
+differs, **mark it explicitly** in code and in the [parity matrix](platform-parity.md) (use-case ×
+surface, with reasons for intentional N/A). Crypto parity is enforced mechanically by the conformance
+vectors (§9).
 
 ## 12. Git & PR
 

@@ -36,6 +36,6 @@ acceptanceCriteria:
     coverage:
       backend: { unit: [SetupRequestSanitizationTest.trimsNameFields] }
 gaps:
-  web: deferred to a follow-up CR (web client setup UI)
-  apple: deferred to a follow-up CR
-  android: deferred to a follow-up CR
+  web: implemented (cr-0002); web-surface acceptance tests not yet linked
+  apple: not applicable by design — first-run setup is done in the browser while installing the server; native clients only connect to an already-bootstrapped instance (see platform-parity.md)
+  android: not applicable by design — first-run setup is done in the browser while installing the server; native clients only connect to an already-bootstrapped instance (see platform-parity.md)
