@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { buildCreateServerOwnerRequest } from './setupServer'
+import { describe, it, expect, vi } from 'vitest'
+
+// Mock the contracts client so registerServerOwner's network call is controllable. The build path
+// (buildCreateServerOwnerRequest) is pure and untouched by this mock.
+vi.mock('../../../api/client', () => ({ setupApi: vi.fn() }))
+
+import { buildCreateServerOwnerRequest, registerServerOwner } from './setupServer'
+import { setupApi } from '../../../api/client'
 import * as v1 from '../../../shared/crypto/v1'
 
 // Standard base64 (padded or not) — the encoding the operator-blind setup contract pins for its wire fields
@@ -57,9 +63,23 @@ describe('Model B auth derivation (ADR 0003)', () => {
     // normalization: trim + lowercase
     expect(v1.deriveAuthSalt(' User@Example.com ')).toEqual(salt)
 
+    // a different account (email) → different salt → different keypair (non-enumerable per-account)
+    expect(v1.deriveAuthSalt('other@example.com')).not.toEqual(salt)
+
     const a = v1.deriveAuthKeypair('pw-abc', salt)
     const b = v1.deriveAuthKeypair('pw-abc', salt)
     expect(b.publicKey).toEqual(a.publicKey)
     expect(v1.deriveAuthKeypair('different', salt).publicKey).not.toEqual(a.publicKey)
+  })
+})
+
+describe('registerServerOwner — API error propagation', () => {
+  it('rejects when the server rejects the registration (drives the setup-failed UX)', async () => {
+    vi.mocked(setupApi).mockReturnValue({
+      createServerOwner: () => Promise.reject(new Error('setup_already_complete')),
+    } as unknown as ReturnType<typeof setupApi>)
+    await expect(
+      registerServerOwner('owner@example.com', 'Kevin', 'correct horse battery', 'Our Family veyq'),
+    ).rejects.toThrow('setup_already_complete')
   })
 })

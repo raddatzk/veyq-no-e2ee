@@ -186,6 +186,9 @@ components:
           description: One wrap per chosen unlock method; PASSWORD is the mandatory floor.
           minItems: 1
           items: { $ref: "#/components/schemas/MasterKeyWrap" }
+          # @Valid cascades bean-validation into each MasterKeyWrap (wrappedKey/kdfParams/method), and
+          # @Size(min=1) enforces minItems (the PASSWORD floor) — both at the boundary, before the handler.
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(min = 1) @field:jakarta.validation.Valid'
         authPublicKey:
           type: string
           description: >
