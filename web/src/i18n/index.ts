@@ -29,7 +29,15 @@ const en = {
     strong: 'Nice and long — that is a strong password.',
     pwnedWarning: 'This password appeared in {count} known data breaches. Consider a different one.',
   },
-  login: { title: 'Sign in', stub: 'Login is not available yet — it arrives in a later change.' },
+  login: {
+    title: 'Sign in',
+    submit: 'Sign in',
+    submitting: 'Signing in…',
+    failed: 'Sign-in failed. Check your email and password.',
+    lockedTitle: 'Signed in',
+    lockedNote: 'Your session is active. Unlocking your encrypted memories with your Secret Key arrives in a later change.',
+    signOut: 'Sign out',
+  },
 }
 
 const de: typeof en = {
@@ -57,7 +65,15 @@ const de: typeof en = {
     strong: 'Schön lang — ein starkes Passwort.',
     pwnedWarning: 'Dieses Passwort tauchte in {count} bekannten Datenlecks auf. Wähle besser ein anderes.',
   },
-  login: { title: 'Anmelden', stub: 'Anmeldung ist noch nicht verfügbar — sie kommt in einer späteren Änderung.' },
+  login: {
+    title: 'Anmelden',
+    submit: 'Anmelden',
+    submitting: 'Wird angemeldet…',
+    failed: 'Anmeldung fehlgeschlagen. Prüfe E-Mail und Passwort.',
+    lockedTitle: 'Angemeldet',
+    lockedNote: 'Deine Sitzung ist aktiv. Das Entsperren deiner verschlüsselten Erinnerungen mit deinem Secret Key kommt in einer späteren Änderung.',
+    signOut: 'Abmelden',
+  },
 }
 
 function initialLocale(): SupportedLocale {
