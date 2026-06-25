@@ -23,6 +23,7 @@ disagree.
 | [uc.admin.setup-server](../features/admin/use-cases/uc.admin.setup-server.md) — First-run server setup | ✅ | ✅ | ✅ | N/A | N/A |
 | [uc.account.login](../features/account/use-cases/uc.account.login.md) — Account login (password) | ✅ | ✅ | ✅ | ◻ | ◻ |
 | [uc.account.unlock](../features/account/use-cases/uc.account.unlock.md) — Account unlock (PASSWORD wrap) | ✅ | ✅ | ✅ | ◻ | ◻ |
+| [uc.account.trust-device](../features/account/use-cases/uc.account.trust-device.md) — Trust this device (DEVICE wrap) | ✅ | ✅ | ✅ | ◻ | ◻ |
 
 ### Intentional N/A
 

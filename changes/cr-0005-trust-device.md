@@ -1,7 +1,7 @@
 ---
 id: cr-0005
 title: Trust this device (web DEVICE wrap — unlock with only the password)
-status: planned          # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.trust-device]
 adrs: [0005, 0003]
 invariants: [operator-blind]
@@ -131,11 +131,12 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   console errors): setup → floor unlock with "trust this device" ticked (a non-extractable key + a DEVICE
   wrap landed, `deviceTrusted=true`) → sign out → re-login → **DEVICE mode, unlocked with only the
   password** → untrust (server wrap + IndexedDB key removed) → re-login → back to the Secret-Key floor.
-- [ ] **5 — verify + coverage.** Fill `docs/coverage/features/account/use-cases/uc.account.trust-device.yaml`
-  (criteria → the web round-trip + backend slice + http boundaries; `gaps` for apple/android and the http
-  authed-path), and add the `uc.account.trust-device` row to
+- [x] **5 — verify + coverage.** Filled `docs/coverage/features/account/use-cases/uc.account.trust-device.yaml`
+  (10 acceptance criteria → the web round-trip + device round-trip + KEK conformance + the backend wraps
+  slice + http boundaries; `gaps` for apple/android, with a note that the authed add/untrust round-trip
+  isn't http-expressible), and added the `uc.account.trust-device` row to
   [platform-parity.md](../docs/crosscutting/platform-parity.md) (backend/http/web ✅, apple/android ◻).
-  **Done when:** `python3 scripts/validate_coverage.py` green.
+  **Done:** `python3 scripts/validate_coverage.py` green (4 use-cases mapped, all criteria covered).
 
 ## Definition of done
 
