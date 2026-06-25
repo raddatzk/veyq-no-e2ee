@@ -89,8 +89,9 @@ Authenticated --> [*]
   [Account & Key Model → Auth vs. unlock](../../../crosscutting/account-key-model.md).
 - **Replay-resistant.** Authentication is a signature over a fresh single-use nonce, not a transmitted
   bearer secret.
-- **Session shape is a platform concern.** The exact session token/cookie format is fixed in
-  `contracts/` and the platform/session concept — intentionally **not** pinned by this use-case.
+- **Session shape is decided in [ADR 0004](../../../decisions/0004-session-tokens.md).** Opaque,
+  server-stored, rotating access + refresh tokens grouped into named session families; this use-case
+  issues such a session on success but does not restate the mechanics.
 - **PQ posture.** Ed25519 now; migrate to a PQ/hybrid signature (ML-DSA) later via a suite bump. A login
   signature is a one-time live check — there is no harvest-now-decrypt-later for authentication.
 
@@ -115,8 +116,8 @@ Passwort nicht von einem nicht existierenden Konto unterscheiden und verrät so 
 - Feature: [Account & auth](../_index.md)
 - Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (auth vs. unlock, auth
   keypair), [Security Model](../../../crosscutting/security-model.md) (operator-blind, non-enumerability)
-- Decision: [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (password-derived keypair
-  + challenge-response)
+- Decisions: [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (password-derived keypair
+  + challenge-response), [ADR 0004](../../../decisions/0004-session-tokens.md) (session token form)
 - Related use-cases: [setup-server](../../admin/use-cases/uc.admin.setup-server.md) (registers
   `authPublicKey`); unlock the Master Key — planned; log in with a passkey — planned; change password /
   Secret Key — planned

@@ -19,3 +19,4 @@ holds only **public** keys and ciphertext, never the password and never a conten
 - Trust this device — planned (DEVICE wrap, skip Secret Key re-entry)
 - Change password / Secret Key — planned (re-register auth key, re-wrap Master Key)
 - Recover access with a recovery code — planned (RECOVERY wrap, reissue code)
+- Manage active sessions — planned (list session families by codename, revoke individually; [ADR 0004](../../decisions/0004-session-tokens.md))
