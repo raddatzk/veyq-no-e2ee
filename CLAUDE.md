@@ -22,7 +22,7 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 - `docs/` — internal engineering state (English) + working flow (`ai/`, `inbox.md`).
 - `wiki/` — **published** end-user GitHub Wiki: plain language, **EN+DE**, focused on what you can do
   and "your data is safe, here's why".
-- `changes/` — temporary change-requests. `legacy/` — read-only reference.
+- `changes/` — change-requests, kept as a work-order record. `legacy/` — read-only reference.
 
 ## How we work
 - Working rules + workflow: **`docs/ai/README.md`** (inbox → refine → change-request).
@@ -30,7 +30,8 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
   simpler alternatives — don't just agree. The hard invariants above are the only thing not up
   for debate.
 - Scripts and utilities in **Python** (bash only for thin CI/hook glue).
-- Durable state lives in `docs/`; change-requests in `changes/` are **temporary** (deleted when done).
+- Durable engineering state lives in `docs/`; change-requests in `changes/` are **kept** as a record of
+  each piece of work (no longer deleted when done).
 
 ## Prove your work
 Per-platform verification commands are added to each platform's own `CLAUDE.md` as that code

@@ -1,7 +1,7 @@
 ---
 id: cr-0002
 title: Web setup flow (reuse legacy UI on the E2EE data layer)
-status: done             # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.admin.setup-server]
 adrs: [0001, 0003]
 invariants: [operator-blind]
@@ -69,5 +69,5 @@ to setup (login identifier + Model B `authSalt` source).
 ## Definition of done
 
 A fresh instance can be set up from the **web UI** (reused from legacy) on the operator-blind data layer
-(Model B), with the crypto suite v1 adopted and conformance-pinned. Login UI deferred. After merge,
-delete this file.
+(Model B), with the crypto suite v1 adopted and conformance-pinned. Login UI deferred. This CR is kept
+as a record of the work.

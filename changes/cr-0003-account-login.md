@@ -1,7 +1,7 @@
 ---
 id: cr-0003
 title: Account login (operator-blind password challenge-response)
-status: done             # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.account.login]
 adrs: [0003, 0004]
 invariants: [operator-blind, non-enumerable]
@@ -122,4 +122,4 @@ A web user logs in against the operator-blind backend via challenge-response and
 **refresh rotation** and **reuse-detection** (superseded refresh → family revoked) verified by tests; the
 web login stub is gone; coverage for `uc.account.login` is green and the parity matrix reflects it.
 Master-Key unlock, the **E2EE-named** session-management UI (`uc.account.sessions`), and native login
-remain separate, planned work. After merge, delete this file.
+remain separate, planned work. This CR is kept as a record of the work.

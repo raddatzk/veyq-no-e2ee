@@ -1,9 +1,10 @@
-# Change requests (temporary)
+# Change requests
 
 A change-request (CR) is the **self-contained work order** for an implementation. It is derived
-from refined state and is **temporary**: deleted once done. The durable trace of what changed
-lives in git history + the updated `docs/` state + (for decisions) ADRs. CRs are **not**
-documentation.
+from refined state. **CRs are kept as a record** (not deleted when done) — they form a readable log
+of what each piece of work delivered. The durable *engineering* truth still lives in the updated
+`docs/` state + (for decisions) ADRs + git history; CRs are the work-order trail alongside it, not a
+substitute for state docs.
 
 - One file per CR: `cr-NNNN-slug.md`.
 - **Self-contained as a work order:** it *links* to the durable truth (use-cases, contracts,
@@ -20,7 +21,7 @@ documentation.
 ---
 id: cr-0001
 title: <short title>
-status: planned          # planned → in-progress → done (then delete the file)
+status: planned          # planned → in-progress → done (the file is kept as a record)
 satisfies: []            # use-case ids this fulfills (trust-chain link)
 adrs: []                 # related ADR ids
 invariants: []           # hard rules this work could threaten

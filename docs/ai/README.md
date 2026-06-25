@@ -22,8 +22,8 @@ invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
    orphan concepts. Durable decisions → an ADR in `docs/decisions/`. This is a sparring
    conversation, not transcription. **Scope each refinement** — don't refine all of crypto at once.
 3. **Change-request** (`changes/cr-NNNN-slug.md`) — a self-contained, phased work order derived from
-   the refined state. See [`changes/README.md`](../../changes/README.md). CRs are **temporary**:
-   deleted when done; the durable trace is git history + the updated state + ADRs.
+   the refined state. See [`changes/README.md`](../../changes/README.md). CRs are **kept** as a record
+   of each piece of work; the durable engineering truth still lives in the updated state + ADRs.
 
 ## Two documentation audiences
 
