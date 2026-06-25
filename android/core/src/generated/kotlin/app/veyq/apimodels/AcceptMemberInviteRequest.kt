@@ -34,7 +34,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param bootstrapSecret 
- * @param wrappedScopePrivateKey The scope private key re-wrapped to the caller's own identity public key.
+ * @param wrappedTenantScopePrivateKey The tenant scope private key re-wrapped to the caller's own identity public key.
  */
 @Serializable
 
@@ -43,9 +43,9 @@ data class AcceptMemberInviteRequest (
     @SerialName(value = "bootstrapSecret")
     val bootstrapSecret: kotlin.String,
 
-    /* The scope private key re-wrapped to the caller's own identity public key. */
-    @SerialName(value = "wrappedScopePrivateKey")
-    val wrappedScopePrivateKey: Blob
+    /* The tenant scope private key re-wrapped to the caller's own identity public key. */
+    @SerialName(value = "wrappedTenantScopePrivateKey")
+    val wrappedTenantScopePrivateKey: Blob
 
 ) {
 

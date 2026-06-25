@@ -17,6 +17,7 @@ public struct UserProfileSummary: Codable {
     public private(set) var displayName: String
     public private(set) var username: String
     public private(set) var initials: String
+    /** Short-lived presigned object-store URL for the avatar. The avatar object key contains the cache-busting version segment. */
     public private(set) var avatarUrl: String?
     public private(set) var memories: [AnyCodable]
 

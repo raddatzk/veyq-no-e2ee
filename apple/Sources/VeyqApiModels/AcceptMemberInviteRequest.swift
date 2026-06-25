@@ -14,17 +14,17 @@ import AnyCodable
 public struct AcceptMemberInviteRequest: Codable {
 
     public private(set) var bootstrapSecret: String
-    /** The scope private key re-wrapped to the caller's own identity public key. */
-    public private(set) var wrappedScopePrivateKey: Blob
+    /** The tenant scope private key re-wrapped to the caller's own identity public key. */
+    public private(set) var wrappedTenantScopePrivateKey: Blob
 
-    public init(bootstrapSecret: String, wrappedScopePrivateKey: Blob) {
+    public init(bootstrapSecret: String, wrappedTenantScopePrivateKey: Blob) {
         self.bootstrapSecret = bootstrapSecret
-        self.wrappedScopePrivateKey = wrappedScopePrivateKey
+        self.wrappedTenantScopePrivateKey = wrappedTenantScopePrivateKey
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case bootstrapSecret
-        case wrappedScopePrivateKey
+        case wrappedTenantScopePrivateKey
     }
 
     // Encodable protocol methods
@@ -32,7 +32,7 @@ public struct AcceptMemberInviteRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(bootstrapSecret, forKey: .bootstrapSecret)
-        try container.encode(wrappedScopePrivateKey, forKey: .wrappedScopePrivateKey)
+        try container.encode(wrappedTenantScopePrivateKey, forKey: .wrappedTenantScopePrivateKey)
     }
 }
 

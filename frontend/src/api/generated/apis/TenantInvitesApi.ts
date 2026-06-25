@@ -24,8 +24,6 @@ import type {
   IssueOwnerInviteRequest,
   MembershipSummary,
   OwnerInvite,
-  RegisterViaInvitationRequest,
-  RegisterViaInvitationResponse,
   TenantInviteInfo,
   TenantInviteMaterial,
   TenantSummary,
@@ -49,10 +47,6 @@ import {
     MembershipSummaryToJSON,
     OwnerInviteFromJSON,
     OwnerInviteToJSON,
-    RegisterViaInvitationRequestFromJSON,
-    RegisterViaInvitationRequestToJSON,
-    RegisterViaInvitationResponseFromJSON,
-    RegisterViaInvitationResponseToJSON,
     TenantInviteInfoFromJSON,
     TenantInviteInfoToJSON,
     TenantInviteMaterialFromJSON,
@@ -97,11 +91,6 @@ export interface IssueOwnerInviteOperationRequest {
     issueOwnerInviteRequest: IssueOwnerInviteRequest;
 }
 
-export interface RegisterViaInvitationOperationRequest {
-    inviteId: string;
-    registerViaInvitationRequest: RegisterViaInvitationRequest;
-}
-
 /**
  * TenantInvitesApi - interface
  * 
@@ -120,7 +109,7 @@ export interface TenantInvitesApiInterface {
     acceptMemberInviteRequestOpts(requestParameters: AcceptMemberInviteOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
+     * An already-authenticated user accepts an invite-wrap member invite: their client unwrapped the scope with the invite wrapping key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
      * @summary Accept a member invite onto an EXISTING account (no new account).
      * @param {string} authorization Bearer &lt;sessionToken&gt;
      * @param {string} inviteId 
@@ -132,7 +121,7 @@ export interface TenantInvitesApiInterface {
     acceptMemberInviteRaw(requestParameters: AcceptMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MembershipSummary>>;
 
     /**
-     * An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
+     * An already-authenticated user accepts an invite-wrap member invite: their client unwrapped the scope with the invite wrapping key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
      * Accept a member invite onto an EXISTING account (no new account).
      */
     acceptMemberInvite(requestParameters: AcceptMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MembershipSummary>;
@@ -175,7 +164,7 @@ export interface TenantInvitesApiInterface {
     emailMemberInviteRequestOpts(requestParameters: EmailMemberInviteRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted temp key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
+     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the invite wrapping private key, or — in passphrase mode — only the passphrase-encrypted invite wrapping key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
      * @summary Email an already-issued member invite link to an address (Tenant Owner only).
      * @param {string} authorization Bearer &lt;sessionToken&gt;
      * @param {EmailInviteRequest} emailInviteRequest 
@@ -186,7 +175,7 @@ export interface TenantInvitesApiInterface {
     emailMemberInviteRaw(requestParameters: EmailMemberInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted temp key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
+     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the invite wrapping private key, or — in passphrase mode — only the passphrase-encrypted invite wrapping key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
      * Email an already-issued member invite link to an address (Tenant Owner only).
      */
     emailMemberInvite(requestParameters: EmailMemberInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -201,8 +190,8 @@ export interface TenantInvitesApiInterface {
     getInviteMaterialRequestOpts(requestParameters: GetInviteMaterialOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides the invite URL fragment and never reaches the server. 
-     * @summary The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+     * A MEMBER invite carries the scope private key wrapped to a one-time invite wrapping keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The invite wrapping private key still rides the invite URL fragment and never reaches the server. 
+     * @summary The invite-wrapped onboarding key material, released only on proof of the bootstrap secret.
      * @param {string} inviteId 
      * @param {GetInviteMaterialRequest} getInviteMaterialRequest 
      * @param {*} [options] Override http request option.
@@ -212,8 +201,8 @@ export interface TenantInvitesApiInterface {
     getInviteMaterialRaw(requestParameters: GetInviteMaterialOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantInviteMaterial>>;
 
     /**
-     * A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides the invite URL fragment and never reaches the server. 
-     * The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+     * A MEMBER invite carries the scope private key wrapped to a one-time invite wrapping keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The invite wrapping private key still rides the invite URL fragment and never reaches the server. 
+     * The invite-wrapped onboarding key material, released only on proof of the bootstrap secret.
      */
     getInviteMaterial(requestParameters: GetInviteMaterialOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantInviteMaterial>;
 
@@ -250,8 +239,8 @@ export interface TenantInvitesApiInterface {
     issueMemberInviteRequestOpts(requestParameters: IssueMemberInviteOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and issues an invite. The temp private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the temp public key + ciphertext. 
-     * @summary Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time invite wrapping public key and issues an invite. The invite wrapping private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the invite wrapping public key + ciphertext. 
+     * @summary Issue an invite-wrap member invite carrying the tenant scope key wrapped to a one-time invite wrapping key.
      * @param {string} authorization Bearer &lt;sessionToken&gt;
      * @param {IssueMemberInviteRequest} issueMemberInviteRequest 
      * @param {*} [options] Override http request option.
@@ -261,8 +250,8 @@ export interface TenantInvitesApiInterface {
     issueMemberInviteRaw(requestParameters: IssueMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<OwnerInvite>>;
 
     /**
-     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and issues an invite. The temp private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the temp public key + ciphertext. 
-     * Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time invite wrapping public key and issues an invite. The invite wrapping private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the invite wrapping public key + ciphertext. 
+     * Issue an invite-wrap member invite carrying the tenant scope key wrapped to a one-time invite wrapping key.
      */
     issueMemberInvite(requestParameters: IssueMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OwnerInvite>;
 
@@ -291,32 +280,6 @@ export interface TenantInvitesApiInterface {
      * Issue a single-use owner-claim invitation. Server Owner only.
      */
     issueOwnerInvite(requestParameters: IssueOwnerInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OwnerInvite>;
-
-    /**
-     * Creates request options for registerViaInvitation without sending the request
-     * @param {string} inviteId 
-     * @param {RegisterViaInvitationRequest} registerViaInvitationRequest 
-     * @throws {RequiredError}
-     * @memberof TenantInvitesApiInterface
-     */
-    registerViaInvitationRequestOpts(requestParameters: RegisterViaInvitationOperationRequest): Promise<runtime.RequestOpts>;
-
-    /**
-     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key, master-key unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope private key wrapped to their own identity (a self scope grant). The server creates the account, activates the tenant + Owner membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
-     * @summary Register a brand-new account from an owner invite and claim the tenant in one step.
-     * @param {string} inviteId 
-     * @param {RegisterViaInvitationRequest} registerViaInvitationRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof TenantInvitesApiInterface
-     */
-    registerViaInvitationRaw(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RegisterViaInvitationResponse>>;
-
-    /**
-     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key, master-key unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope private key wrapped to their own identity (a self scope grant). The server creates the account, activates the tenant + Owner membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
-     * Register a brand-new account from an owner invite and claim the tenant in one step.
-     */
-    registerViaInvitation(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RegisterViaInvitationResponse>;
 
 }
 
@@ -374,7 +337,7 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
+     * An already-authenticated user accepts an invite-wrap member invite: their client unwrapped the scope with the invite wrapping key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
      * Accept a member invite onto an EXISTING account (no new account).
      */
     async acceptMemberInviteRaw(requestParameters: AcceptMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MembershipSummary>> {
@@ -385,7 +348,7 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
+     * An already-authenticated user accepts an invite-wrap member invite: their client unwrapped the scope with the invite wrapping key (from the URL fragment) and re-wrapped it to their own identity. The server adds the grant + membership on the existing scope and consumes the invite. No new account, no session issued — the caller is already logged in. 
      * Accept a member invite onto an EXISTING account (no new account).
      */
     async acceptMemberInvite(requestParameters: AcceptMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MembershipSummary> {
@@ -502,7 +465,7 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted temp key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
+     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the invite wrapping private key, or — in passphrase mode — only the passphrase-encrypted invite wrapping key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
      * Email an already-issued member invite link to an address (Tenant Owner only).
      */
     async emailMemberInviteRaw(requestParameters: EmailMemberInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -513,7 +476,7 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted temp key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
+     * Sends the client-assembled invite link to the given email. The link itself is built client-side, so its secret material (the invite wrapping private key, or — in passphrase mode — only the passphrase-encrypted invite wrapping key) is whatever the client chose to put in it. The server only relays it. Must reference a pending invite of this tenant, and the link must point at this instance\'s configured app origin. 
      * Email an already-issued member invite link to an address (Tenant Owner only).
      */
     async emailMemberInvite(requestParameters: EmailMemberInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -558,8 +521,8 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides the invite URL fragment and never reaches the server. 
-     * The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+     * A MEMBER invite carries the scope private key wrapped to a one-time invite wrapping keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The invite wrapping private key still rides the invite URL fragment and never reaches the server. 
+     * The invite-wrapped onboarding key material, released only on proof of the bootstrap secret.
      */
     async getInviteMaterialRaw(requestParameters: GetInviteMaterialOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantInviteMaterial>> {
         const requestOptions = await this.getInviteMaterialRequestOpts(requestParameters);
@@ -569,8 +532,8 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides the invite URL fragment and never reaches the server. 
-     * The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+     * A MEMBER invite carries the scope private key wrapped to a one-time invite wrapping keypair. That ciphertext is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in depth: knowing only the inviteId never yields the wrapped grant). The invite wrapping private key still rides the invite URL fragment and never reaches the server. 
+     * The invite-wrapped onboarding key material, released only on proof of the bootstrap secret.
      */
     async getInviteMaterial(requestParameters: GetInviteMaterialOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantInviteMaterial> {
         const response = await this.getInviteMaterialRaw(requestParameters, initOverrides);
@@ -663,8 +626,8 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and issues an invite. The temp private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the temp public key + ciphertext. 
-     * Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time invite wrapping public key and issues an invite. The invite wrapping private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the invite wrapping public key + ciphertext. 
+     * Issue an invite-wrap member invite carrying the tenant scope key wrapped to a one-time invite wrapping key.
      */
     async issueMemberInviteRaw(requestParameters: IssueMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<OwnerInvite>> {
         const requestOptions = await this.issueMemberInviteRequestOpts(requestParameters);
@@ -674,8 +637,8 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
     }
 
     /**
-     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and issues an invite. The temp private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the temp public key + ciphertext. 
-     * Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+     * A key-holding Tenant Owner wraps the tenant scope private key to a one-time invite wrapping public key and issues an invite. The invite wrapping private key travels in the invite URL fragment (never to the server); a new user unwraps with it and re-wraps the scope to their own identity during register-via-invitation. The server stores only the invite wrapping public key + ciphertext. 
+     * Issue an invite-wrap member invite carrying the tenant scope key wrapped to a one-time invite wrapping key.
      */
     async issueMemberInvite(requestParameters: IssueMemberInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OwnerInvite> {
         const response = await this.issueMemberInviteRaw(requestParameters, initOverrides);
@@ -739,63 +702,6 @@ export class TenantInvitesApi extends runtime.BaseAPI implements TenantInvitesAp
      */
     async issueOwnerInvite(requestParameters: IssueOwnerInviteOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<OwnerInvite> {
         const response = await this.issueOwnerInviteRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Creates request options for registerViaInvitation without sending the request
-     */
-    async registerViaInvitationRequestOpts(requestParameters: RegisterViaInvitationOperationRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['inviteId'] == null) {
-            throw new runtime.RequiredError(
-                'inviteId',
-                'Required parameter "inviteId" was null or undefined when calling registerViaInvitation().'
-            );
-        }
-
-        if (requestParameters['registerViaInvitationRequest'] == null) {
-            throw new runtime.RequiredError(
-                'registerViaInvitationRequest',
-                'Required parameter "registerViaInvitationRequest" was null or undefined when calling registerViaInvitation().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/api/tenant-invites/{inviteId}/register`;
-        urlPath = urlPath.replace(`{${"inviteId"}}`, encodeURIComponent(String(requestParameters['inviteId'])));
-
-        return {
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: RegisterViaInvitationRequestToJSON(requestParameters['registerViaInvitationRequest']),
-        };
-    }
-
-    /**
-     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key, master-key unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope private key wrapped to their own identity (a self scope grant). The server creates the account, activates the tenant + Owner membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
-     * Register a brand-new account from an owner invite and claim the tenant in one step.
-     */
-    async registerViaInvitationRaw(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RegisterViaInvitationResponse>> {
-        const requestOptions = await this.registerViaInvitationRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => RegisterViaInvitationResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key, master-key unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope private key wrapped to their own identity (a self scope grant). The server creates the account, activates the tenant + Owner membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
-     * Register a brand-new account from an owner invite and claim the tenant in one step.
-     */
-    async registerViaInvitation(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RegisterViaInvitationResponse> {
-        const response = await this.registerViaInvitationRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

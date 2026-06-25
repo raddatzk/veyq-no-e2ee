@@ -130,7 +130,7 @@ components:
       type: object
       required:
         [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps,
-         authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey]
+         password, personalScopePublicKey, wrappedPersonalScopePrivateKey]
       properties:
         email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
         displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
@@ -140,11 +140,14 @@ components:
           type: array
           minItems: 1
           items: { $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap" }
-        authVerifier: { $ref: "./common.openapi.yaml#/components/schemas/AuthVerifier" }
+        password:
+          type: string
+          description: The account password. The server derives and stores the ARGON2_PROOF auth verifier.
+          x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)']
         # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url. Required when a RECOVERY wrap is included:
         # the server stores it as the recovery commitment, so a password reset must later prove the client
         # recovered the real master key with the Secret Key (not email-token possession alone).
-        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
+        recoveryMasterKeyTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         personalScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
         wrappedPersonalScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     ServerUserList:

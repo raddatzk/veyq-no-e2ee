@@ -35,7 +35,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param sessionToken 
- * @param rootSessionId Stable root login-session identifier attached to the issued session family.
+ * @param rootSessionId Stable opaque identifier for this root login-session family.
  * @param user 
  * @param keyBag 
  */
@@ -46,7 +46,7 @@ data class LoginResponse (
     @SerialName(value = "sessionToken")
     val sessionToken: kotlin.String,
 
-    /* Stable root login-session identifier attached to the issued session family. */
+    /* Stable opaque identifier for this root login-session family. */
     @SerialName(value = "rootSessionId")
     val rootSessionId: kotlin.String,
 
@@ -60,3 +60,4 @@ data class LoginResponse (
 
 
 }
+

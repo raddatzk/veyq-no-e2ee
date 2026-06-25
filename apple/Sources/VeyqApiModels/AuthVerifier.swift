@@ -11,7 +11,7 @@ import Foundation
 import AnyCodable
 #endif
 
-/** Proves an unlock to the server without revealing the master key. */
+/** Proves account authentication to the server without revealing the master key. For ARGON2_PROOF, &#x60;verifier&#x60; is an Argon2id PHC string (&#x60;$argon2id$v&#x3D;19$m&#x3D;32768,t&#x3D;3,p&#x3D;1$...$...&#x60;). */
 public struct AuthVerifier: Codable {
 
     public enum Kind: String, Codable, CaseIterable {

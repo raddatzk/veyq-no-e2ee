@@ -15,9 +15,9 @@ public struct RegisterViaInvitationResponse: Codable {
 
     public private(set) var sessionToken: String
     public private(set) var user: UserSummary
-    public private(set) var tenant: TenantSummary
+    public private(set) var tenant: RegistrationTenantSummary
 
-    public init(sessionToken: String, user: UserSummary, tenant: TenantSummary) {
+    public init(sessionToken: String, user: UserSummary, tenant: RegistrationTenantSummary) {
         self.sessionToken = sessionToken
         self.user = user
         self.tenant = tenant

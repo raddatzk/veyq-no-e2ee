@@ -41,17 +41,17 @@ export interface IssueMemberInviteRequest {
      */
     role: IssueMemberInviteRequestRoleEnum;
     /**
-     * 
+     * Public half of the one-time invite wrapping keypair. The owner keeps the private half in the invite link fragment.
      * @type {KemPublicKey}
      * @memberof IssueMemberInviteRequest
      */
-    tempPublicKey: KemPublicKey;
+    inviteWrappingPublicKey: KemPublicKey;
     /**
-     * 
+     * Tenant scope private key wrapped to inviteWrappingPublicKey.
      * @type {Blob}
      * @memberof IssueMemberInviteRequest
      */
-    tempWrappedScopePrivateKey: Blob;
+    wrappedTenantScopePrivateKey: Blob;
 }
 
 
@@ -70,8 +70,8 @@ export type IssueMemberInviteRequestRoleEnum = typeof IssueMemberInviteRequestRo
  */
 export function instanceOfIssueMemberInviteRequest(value: object): value is IssueMemberInviteRequest {
     if (!('role' in value) || value['role'] === undefined) return false;
-    if (!('tempPublicKey' in value) || value['tempPublicKey'] === undefined) return false;
-    if (!('tempWrappedScopePrivateKey' in value) || value['tempWrappedScopePrivateKey'] === undefined) return false;
+    if (!('inviteWrappingPublicKey' in value) || value['inviteWrappingPublicKey'] === undefined) return false;
+    if (!('wrappedTenantScopePrivateKey' in value) || value['wrappedTenantScopePrivateKey'] === undefined) return false;
     return true;
 }
 
@@ -86,8 +86,8 @@ export function IssueMemberInviteRequestFromJSONTyped(json: any, ignoreDiscrimin
     return {
         
         'role': json['role'],
-        'tempPublicKey': KemPublicKeyFromJSON(json['tempPublicKey']),
-        'tempWrappedScopePrivateKey': BlobFromJSON(json['tempWrappedScopePrivateKey']),
+        'inviteWrappingPublicKey': KemPublicKeyFromJSON(json['inviteWrappingPublicKey']),
+        'wrappedTenantScopePrivateKey': BlobFromJSON(json['wrappedTenantScopePrivateKey']),
     };
 }
 
@@ -103,8 +103,8 @@ export function IssueMemberInviteRequestToJSONTyped(value?: IssueMemberInviteReq
     return {
         
         'role': value['role'],
-        'tempPublicKey': KemPublicKeyToJSON(value['tempPublicKey']),
-        'tempWrappedScopePrivateKey': BlobToJSON(value['tempWrappedScopePrivateKey']),
+        'inviteWrappingPublicKey': KemPublicKeyToJSON(value['inviteWrappingPublicKey']),
+        'wrappedTenantScopePrivateKey': BlobToJSON(value['wrappedTenantScopePrivateKey']),
     };
 }
 

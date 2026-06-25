@@ -29,32 +29,32 @@ import {
 } from './KemPublicKey';
 
 /**
- * The temp-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side.
+ * The invite-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The invite wrapping private key (URL fragment) opens wrappedTenantScopePrivateKey client-side.
  * 
  * @export
  * @interface TenantInviteMaterial
  */
 export interface TenantInviteMaterial {
     /**
-     * 
+     * Public half of the one-time invite wrapping keypair. The private half stays in the invite URL fragment.
      * @type {KemPublicKey}
      * @memberof TenantInviteMaterial
      */
-    tempPublicKey: KemPublicKey;
+    inviteWrappingPublicKey: KemPublicKey;
     /**
-     * 
+     * Tenant scope private key wrapped to inviteWrappingPublicKey.
      * @type {Blob}
      * @memberof TenantInviteMaterial
      */
-    tempWrappedScopePrivateKey: Blob;
+    wrappedTenantScopePrivateKey: Blob;
 }
 
 /**
  * Check if a given object implements the TenantInviteMaterial interface.
  */
 export function instanceOfTenantInviteMaterial(value: object): value is TenantInviteMaterial {
-    if (!('tempPublicKey' in value) || value['tempPublicKey'] === undefined) return false;
-    if (!('tempWrappedScopePrivateKey' in value) || value['tempWrappedScopePrivateKey'] === undefined) return false;
+    if (!('inviteWrappingPublicKey' in value) || value['inviteWrappingPublicKey'] === undefined) return false;
+    if (!('wrappedTenantScopePrivateKey' in value) || value['wrappedTenantScopePrivateKey'] === undefined) return false;
     return true;
 }
 
@@ -68,8 +68,8 @@ export function TenantInviteMaterialFromJSONTyped(json: any, ignoreDiscriminator
     }
     return {
         
-        'tempPublicKey': KemPublicKeyFromJSON(json['tempPublicKey']),
-        'tempWrappedScopePrivateKey': BlobFromJSON(json['tempWrappedScopePrivateKey']),
+        'inviteWrappingPublicKey': KemPublicKeyFromJSON(json['inviteWrappingPublicKey']),
+        'wrappedTenantScopePrivateKey': BlobFromJSON(json['wrappedTenantScopePrivateKey']),
     };
 }
 
@@ -84,8 +84,8 @@ export function TenantInviteMaterialToJSONTyped(value?: TenantInviteMaterial | n
 
     return {
         
-        'tempPublicKey': KemPublicKeyToJSON(value['tempPublicKey']),
-        'tempWrappedScopePrivateKey': BlobToJSON(value['tempWrappedScopePrivateKey']),
+        'inviteWrappingPublicKey': KemPublicKeyToJSON(value['inviteWrappingPublicKey']),
+        'wrappedTenantScopePrivateKey': BlobToJSON(value['wrappedTenantScopePrivateKey']),
     };
 }
 

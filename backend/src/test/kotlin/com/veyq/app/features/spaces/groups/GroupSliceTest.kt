@@ -54,7 +54,7 @@ class GroupSliceTest {
     private val body = """
         {"scopePublicKey":{"suiteId":"v1","kemPublicKey":"AAAA"},
          "wrappedScopePrivateKey":{"suiteId":"v1","bytes":"BBBB"},
-         "contentKey":{"suiteId":"v1","bytes":"CCCC"},
+         "wrappedContentKey":{"suiteId":"v1","bytes":"CCCC"},
          "sealedName":{"suiteId":"v1","bytes":"DDDD"}}
     """.trimIndent()
 

@@ -32,20 +32,22 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * The temp-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side. 
+ * The invite-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The invite wrapping private key (URL fragment) opens wrappedTenantScopePrivateKey client-side. 
  *
- * @param tempPublicKey 
- * @param tempWrappedScopePrivateKey 
+ * @param inviteWrappingPublicKey Public half of the one-time invite wrapping keypair. The private half stays in the invite URL fragment.
+ * @param wrappedTenantScopePrivateKey Tenant scope private key wrapped to inviteWrappingPublicKey.
  */
 @Serializable
 
 data class TenantInviteMaterial (
 
-    @SerialName(value = "tempPublicKey")
-    val tempPublicKey: KemPublicKey,
+    /* Public half of the one-time invite wrapping keypair. The private half stays in the invite URL fragment. */
+    @SerialName(value = "inviteWrappingPublicKey")
+    val inviteWrappingPublicKey: KemPublicKey,
 
-    @SerialName(value = "tempWrappedScopePrivateKey")
-    val tempWrappedScopePrivateKey: Blob
+    /* Tenant scope private key wrapped to inviteWrappingPublicKey. */
+    @SerialName(value = "wrappedTenantScopePrivateKey")
+    val wrappedTenantScopePrivateKey: Blob
 
 ) {
 

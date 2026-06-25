@@ -51,7 +51,7 @@ export interface CreateGroupRequest {
      * @type {Blob}
      * @memberof CreateGroupRequest
      */
-    contentKey: Blob;
+    wrappedContentKey: Blob;
     /**
      * Group name sealed under the content key (operator-blind).
      * @type {Blob}
@@ -66,7 +66,7 @@ export interface CreateGroupRequest {
 export function instanceOfCreateGroupRequest(value: object): value is CreateGroupRequest {
     if (!('scopePublicKey' in value) || value['scopePublicKey'] === undefined) return false;
     if (!('wrappedScopePrivateKey' in value) || value['wrappedScopePrivateKey'] === undefined) return false;
-    if (!('contentKey' in value) || value['contentKey'] === undefined) return false;
+    if (!('wrappedContentKey' in value) || value['wrappedContentKey'] === undefined) return false;
     if (!('sealedName' in value) || value['sealedName'] === undefined) return false;
     return true;
 }
@@ -83,7 +83,7 @@ export function CreateGroupRequestFromJSONTyped(json: any, ignoreDiscriminator: 
         
         'scopePublicKey': KemPublicKeyFromJSON(json['scopePublicKey']),
         'wrappedScopePrivateKey': BlobFromJSON(json['wrappedScopePrivateKey']),
-        'contentKey': BlobFromJSON(json['contentKey']),
+        'wrappedContentKey': BlobFromJSON(json['wrappedContentKey']),
         'sealedName': BlobFromJSON(json['sealedName']),
     };
 }
@@ -101,7 +101,7 @@ export function CreateGroupRequestToJSONTyped(value?: CreateGroupRequest | null,
         
         'scopePublicKey': KemPublicKeyToJSON(value['scopePublicKey']),
         'wrappedScopePrivateKey': BlobToJSON(value['wrappedScopePrivateKey']),
-        'contentKey': BlobToJSON(value['contentKey']),
+        'wrappedContentKey': BlobToJSON(value['wrappedContentKey']),
         'sealedName': BlobToJSON(value['sealedName']),
     };
 }

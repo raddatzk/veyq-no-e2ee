@@ -32,32 +32,27 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param contentType 
- * @param bytes 
+ * @param uploadRef Opaque reference to the server-generated avatar object key. Submit it unchanged to complete the upload.
+ * @param uploadUrl Short-lived presigned PUT URL. The client PUTs the image bytes directly to this URL.
+ * @param expiresInSeconds 
  */
 @Serializable
 
-data class UpdateAvatarRequest (
+data class AvatarUploadTicket (
 
-    @SerialName(value = "contentType")
-    val contentType: UpdateAvatarRequest.ContentType,
+    /* Opaque reference to the server-generated avatar object key. Submit it unchanged to complete the upload. */
+    @SerialName(value = "uploadRef")
+    val uploadRef: kotlin.String,
 
-    @SerialName(value = "bytes")
-    val bytes: kotlin.ByteArray
+    /* Short-lived presigned PUT URL. The client PUTs the image bytes directly to this URL. */
+    @SerialName(value = "uploadUrl")
+    val uploadUrl: kotlin.String,
+
+    @SerialName(value = "expiresInSeconds")
+    val expiresInSeconds: kotlin.Int
 
 ) {
 
-    /**
-     * 
-     *
-     * Values: imageSlashPng,imageSlashJpeg,imageSlashWebp
-     */
-    @Serializable
-    enum class ContentType(val value: kotlin.String) {
-        @SerialName(value = "image/png") imageSlashPng("image/png"),
-        @SerialName(value = "image/jpeg") imageSlashJpeg("image/jpeg"),
-        @SerialName(value = "image/webp") imageSlashWebp("image/webp");
-    }
 
 }
 

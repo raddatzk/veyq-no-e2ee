@@ -17,8 +17,9 @@ public struct UserSummary: Codable {
     public private(set) var email: String
     public private(set) var displayName: String
     public private(set) var serverRole: ServerRole
-    /** URL-safe stable profile address segment. */
+    /** URL-safe stable username/profile address segment. */
     public private(set) var username: String
+    /** Short-lived presigned object-store URL for the user's avatar. The avatar object key contains a generated version segment that changes on every upload and acts as the cache-buster. */
     public private(set) var avatarUrl: String?
 
     public init(id: String, email: String, displayName: String, serverRole: ServerRole, username: String, avatarUrl: String? = nil) {

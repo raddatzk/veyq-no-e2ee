@@ -35,8 +35,8 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param bootstrapSecret 
- * @param scopePublicKey 
- * @param wrappedScopePrivateKey 
+ * @param tenantScopePublicKey 
+ * @param wrappedTenantScopePrivateKey 
  */
 @Serializable
 
@@ -45,11 +45,11 @@ data class ClaimTenantOwnershipRequest (
     @SerialName(value = "bootstrapSecret")
     val bootstrapSecret: kotlin.String,
 
-    @SerialName(value = "scopePublicKey")
-    val scopePublicKey: KemPublicKey,
+    @SerialName(value = "tenantScopePublicKey")
+    val tenantScopePublicKey: KemPublicKey,
 
-    @SerialName(value = "wrappedScopePrivateKey")
-    val wrappedScopePrivateKey: Blob
+    @SerialName(value = "wrappedTenantScopePrivateKey")
+    val wrappedTenantScopePrivateKey: Blob
 
 ) {
 

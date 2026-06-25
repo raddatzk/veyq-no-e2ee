@@ -100,6 +100,7 @@ export * from './PublicShare';
 export * from './RefreshSessionResponse';
 export * from './RegisterViaInvitationRequest';
 export * from './RegisterViaInvitationResponse';
+export * from './RegistrationTenantSummary';
 export * from './RenameLoginSessionRequest';
 export * from './RewrapMyScopeGrantRequest';
 export * from './RotateIdentityRequest';

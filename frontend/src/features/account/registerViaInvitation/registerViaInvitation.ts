@@ -1,9 +1,10 @@
 // uc.account.register-via-invitation (web) — a brand-new invitee accepts an owner invite. All key
 // material is born here; one POST creates the account, mints the tenant scope as a self grant, and
-// returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
+// returns a session. The server only ever receives ciphertext, public keys and the account password.
+// It derives the auth verifier server-side.
 import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
-import { b64url, phcB64 } from '../../../shared/base64'
+import { b64url } from '../../../shared/base64'
 
 // Must match the params used to wrap the master key (see setupServer.ts / login.ts).
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
@@ -18,17 +19,17 @@ export type InviteMetadata = {
   status: string
   kind: string
   existingAccount: boolean
-  scopePublicKey?: KemPublicKey
+  tenantScopePublicKey?: KemPublicKey
 }
 /** Temp-wrapped onboarding material, released only on proof of the bootstrap secret (defense in depth). */
 export type InviteMaterial = {
-  tempPublicKey: KemPublicKey
-  tempWrappedScopePrivateKey: Blob
+  inviteWrappingPublicKey: KemPublicKey
+  wrappedTenantScopePrivateKey: Blob
 }
 /** Builds the tenant scope grant for the new account, given the invitee's identity public key. */
 export type TenantScopeProvider = (idPub: { x: Uint8Array; m: Uint8Array }) => {
-  scopePublicKey: string
-  wrappedScopePrivateKey: string
+  tenantScopePublicKey: string
+  wrappedTenantScopePrivateKey: string
 }
 export type RegisterResult = {
   sessionToken: string
@@ -45,7 +46,7 @@ export async function getInviteMetadata(apiBase: string, inviteId: string): Prom
   return res.json()
 }
 
-/** Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata). */
+/** Fetch the invite-wrapped onboarding material by proving the bootstrap secret (not in public metadata). */
 export async function getInviteMaterial(apiBase: string, inviteId: string, bootstrapSecret: string): Promise<InviteMaterial> {
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/material`, {
     method: 'POST',
@@ -57,7 +58,7 @@ export async function getInviteMaterial(apiBase: string, inviteId: string, boots
 }
 
 /**
- * Core registration assembly shared by the owner-claim and temp-wrap member flows. The invitee
+ * Core registration assembly shared by the owner-claim and invite-wrap member flows. The invitee
  * generates a fresh identity + master-key unlock wrap + auth verifier + personal scope; the tenant
  * scope grant is supplied by `tenantScope` (mint a new scope for an owner claim, or re-wrap a
  * temp-unwrapped scope for a member invite).
@@ -88,11 +89,6 @@ export async function registerWithScope(
   const recSalt = v1.randomBytes(16)
   const recWrap = v1.symWrap(v1.kekRecovery(secretKey, recSalt, ARGON), masterKey, 'master-key', v1.randomBytes(12))
 
-  // server-side auth verifier: Argon2id(password, authSalt) stored as a PHC string
-  const authSalt = v1.randomBytes(16)
-  const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
-  const authPhc = `$argon2id$v=19$m=${ARGON.m},t=${ARGON.t},p=${ARGON.p}$${phcB64(authSalt)}$${phcB64(verifier)}`
-
   // create the unshared personal scope; only this user receives a grant
   const personal = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
   const personalPublic = v1.concat(personal.pub.kemX, personal.pub.kemM)
@@ -120,13 +116,13 @@ export async function registerWithScope(
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, salt)) },
       { unlockMethod: 'RECOVERY', suiteId: 'v1', wrappedKey: b64url(recWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, recSalt)) },
     ],
-    authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: authPhc },
+    password,
     // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-    recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
+    recoveryMasterKeyTag: b64url(v1.recoveryAuthTag(masterKey)),
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
     wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
-    scopePublicKey: { suiteId: 'v1', kemPublicKey: scope.scopePublicKey },
-    wrappedScopePrivateKey: { suiteId: 'v1', bytes: scope.wrappedScopePrivateKey },
+    tenantScopePublicKey: { suiteId: 'v1', kemPublicKey: scope.tenantScopePublicKey },
+    wrappedTenantScopePrivateKey: { suiteId: 'v1', bytes: scope.wrappedTenantScopePrivateKey },
   }
 
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/register`, {
@@ -152,8 +148,8 @@ export function registerViaInvitation(
   return registerWithScope(apiBase, inviteId, bootstrapSecret, email, displayName, password, (idPub) => {
     const scope = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
     return {
-      scopePublicKey: b64url(v1.concat(scope.pub.kemX, scope.pub.kemM)),
-      wrappedScopePrivateKey: b64url(
+      tenantScopePublicKey: b64url(v1.concat(scope.pub.kemX, scope.pub.kemM)),
+      wrappedTenantScopePrivateKey: b64url(
         v1.asymWrap(idPub, v1.serializeIdentityPrivate(scope), 'scope-grant', { nonce: v1.randomBytes(12) }),
       ),
     }

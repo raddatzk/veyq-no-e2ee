@@ -13,10 +13,16 @@ import AnyCodable
 
 public struct LoginSessionSummary: Codable {
 
+    public enum LoginMethod: String, Codable, CaseIterable {
+        case password = "PASSWORD"
+        case passkey = "PASSKEY"
+        case deviceApproval = "DEVICE_APPROVAL"
+        case recovery = "RECOVERY"
+    }
     public private(set) var rootSessionId: String
-    /** Client-encrypted human-readable login session label. */
+    /** Client-encrypted human-readable label for the login-session family. */
     public private(set) var encryptedLabel: String
-    /** Initial authentication flow used to create the session family. */
+    /** Initial login flow that created the root session. */
     public private(set) var loginMethod: LoginMethod
     public private(set) var createdAt: Date
     public private(set) var lastUsedAt: Date
@@ -27,12 +33,6 @@ public struct LoginSessionSummary: Codable {
         self.loginMethod = loginMethod
         self.createdAt = createdAt
         self.lastUsedAt = lastUsedAt
-    }
-
-    public enum LoginMethod: String, Codable, CaseIterable {
-        case password = "PASSWORD"
-        case passkey = "PASSKEY"
-        case qr = "QR"
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {

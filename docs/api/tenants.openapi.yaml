@@ -152,7 +152,7 @@ paths:
       description: >
         Sends a one-time bootstrap link to the target owner email. The API response does not expose the
         bootstrap secret to the provisioning client. Claiming the (empty) tenant is an ownership claim —
-        there are no scope keys to temp-wrap; the claimer's client mints the tenant scope keypair. The
+        there are no scope keys to invite-wrap; the claimer's client mints the tenant scope keypair. The
         claim/register email must match the invite target email.
       parameters:
         - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
@@ -175,12 +175,12 @@ paths:
     post:
       tags: [TenantInvites]
       operationId: issueMemberInvite
-      summary: Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+      summary: Issue an invite-wrap member invite carrying the tenant scope key wrapped to a one-time invite wrapping key.
       description: >
-        A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and
-        issues an invite. The temp private key travels in the invite URL fragment (never to the server);
+        A key-holding Tenant Owner wraps the tenant scope private key to a one-time invite wrapping public key and
+        issues an invite. The invite wrapping private key travels in the invite URL fragment (never to the server);
         a new user unwraps with it and re-wraps the scope to their own identity during
-        register-via-invitation. The server stores only the temp public key + ciphertext.
+        register-via-invitation. The server stores only the invite wrapping public key + ciphertext.
       parameters:
         - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       requestBody:
@@ -207,8 +207,8 @@ paths:
       summary: Email an already-issued member invite link to an address (Tenant Owner only).
       description: >
         Sends the client-assembled invite link to the given email. The link itself is built client-side, so
-        its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted
-        temp key) is whatever the client chose to put in it. The server only relays it. Must reference a
+        its secret material (the invite wrapping private key, or — in passphrase mode — only the
+        passphrase-encrypted invite wrapping key) is whatever the client chose to put in it. The server only relays it. Must reference a
         pending invite of this tenant, and the link must point at this instance's configured app origin.
       parameters:
         - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
@@ -246,11 +246,11 @@ paths:
     post:
       tags: [TenantInvites]
       operationId: getInviteMaterial
-      summary: The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+      summary: The invite-wrapped onboarding key material, released only on proof of the bootstrap secret.
       description: >
-        A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext
+        A MEMBER invite carries the scope private key wrapped to a one-time invite wrapping keypair. That ciphertext
         is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in
-        depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides
+        depth: knowing only the inviteId never yields the wrapped grant). The invite wrapping private key still rides
         the invite URL fragment and never reaches the server.
       parameters:
         - { name: inviteId, in: path, required: true, schema: { type: string } }
@@ -261,7 +261,7 @@ paths:
             schema: { $ref: "#/components/schemas/GetInviteMaterialRequest" }
       responses:
         '200':
-          description: The temp-wrapped onboarding material.
+          description: The invite-wrapped onboarding material.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TenantInviteMaterial" }
@@ -300,45 +300,14 @@ paths:
           $ref: "./common.openapi.yaml#/components/responses/NotFound"
         '409':
           $ref: "./common.openapi.yaml#/components/responses/Conflict"
-  /api/tenant-invites/{inviteId}/register:
-    post:
-      tags: [TenantInvites]
-      operationId: registerViaInvitation
-      summary: Register a brand-new account from an owner invite and claim the tenant in one step.
-      description: >
-        The invitee (not yet authenticated) presents the bootstrap secret together with all freshly
-        generated key material — identity public key, the wrapped identity private key, master-key
-        unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope
-        private key wrapped to their own identity (a self scope grant). The server creates the account,
-        activates the tenant + Owner membership, consumes the invite and issues a session. It stores
-        ciphertext + public material only; it never sees a private key.
-      parameters:
-        - { name: inviteId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/RegisterViaInvitationRequest" }
-      responses:
-        '200':
-          description: The new account's session + the activated tenant.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RegisterViaInvitationResponse" }
-        '400':
-          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
-        '404':
-          $ref: "./common.openapi.yaml#/components/responses/NotFound"
-        '409':
-          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/tenant-invites/{inviteId}/accept:
     post:
       tags: [TenantInvites]
       operationId: acceptMemberInvite
       summary: Accept a member invite onto an EXISTING account (no new account).
       description: >
-        An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope
-        with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds
+        An already-authenticated user accepts an invite-wrap member invite: their client unwrapped the scope
+        with the invite wrapping key (from the URL fragment) and re-wrapped it to their own identity. The server adds
         the grant + membership on the existing scope and consumes the invite. No new account, no session
         issued — the caller is already logged in.
       parameters:
@@ -561,12 +530,12 @@ components:
         status: { type: string }
     AcceptMemberInviteRequest:
       type: object
-      required: [bootstrapSecret, wrappedScopePrivateKey]
+      required: [bootstrapSecret, wrappedTenantScopePrivateKey]
       properties:
         bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
-        wrappedScopePrivateKey:
+        wrappedTenantScopePrivateKey:
           $ref: "./common.openapi.yaml#/components/schemas/Blob"
-          description: The scope private key re-wrapped to the caller's own identity public key.
+          description: The tenant scope private key re-wrapped to the caller's own identity public key.
     TenantMember:
       type: object
       required: [userId, displayName, role, status, identityPublicKey]
@@ -654,9 +623,9 @@ components:
         existingAccount:
           type: boolean
           description: True when the invite targets an existing account, so the user must sign in and accept instead of registering.
-        scopePublicKey:
+        tenantScopePublicKey:
           $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
-          description: MEMBER invites only — the existing scope's public key (a public key, safe to expose).
+          description: MEMBER invites only — the existing tenant scope's public key (a public key, safe to expose).
     GetInviteMaterialRequest:
       type: object
       required: [bootstrapSecret]
@@ -665,19 +634,27 @@ components:
     TenantInviteMaterial:
       type: object
       description: >
-        The temp-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret
-        is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side.
-      required: [tempPublicKey, tempWrappedScopePrivateKey]
+        The invite-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret
+        is proven. The invite wrapping private key (URL fragment) opens wrappedTenantScopePrivateKey client-side.
+      required: [inviteWrappingPublicKey, wrappedTenantScopePrivateKey]
       properties:
-        tempPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
-        tempWrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        inviteWrappingPublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
+          description: Public half of the one-time invite wrapping keypair. The private half stays in the invite URL fragment.
+        wrappedTenantScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+          description: Tenant scope private key wrapped to inviteWrappingPublicKey.
     IssueMemberInviteRequest:
       type: object
-      required: [role, tempPublicKey, tempWrappedScopePrivateKey]
+      required: [role, inviteWrappingPublicKey, wrappedTenantScopePrivateKey]
       properties:
         role: { type: string, enum: [Owner, Member] }
-        tempPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
-        tempWrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        inviteWrappingPublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey"
+          description: Public half of the one-time invite wrapping keypair. The owner keeps the private half in the invite link fragment.
+        wrappedTenantScopePrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+          description: Tenant scope private key wrapped to inviteWrappingPublicKey.
     EmailInviteRequest:
       type: object
       required: [email, inviteId, link]
@@ -687,41 +664,11 @@ components:
         link: { type: string, description: 'The client-assembled invite URL (must point at this instance''s app origin).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
     ClaimTenantOwnershipRequest:
       type: object
-      required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]
+      required: [bootstrapSecret, tenantScopePublicKey, wrappedTenantScopePrivateKey]
       properties:
         bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
-        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
-        wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
-    RegisterViaInvitationRequest:
-      type: object
-      required:
-        [bootstrapSecret, email, displayName, identityPublicKey, wrappedIdentityPrivateKey,
-         masterKeyWraps, authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey,
-         scopePublicKey, wrappedScopePrivateKey]
-      properties:
-        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
-        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
-        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
-        identityPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey" }
-        wrappedIdentityPrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
-        masterKeyWraps:
-          type: array
-          minItems: 1
-          items: { $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap" }
-        authVerifier: { $ref: "./common.openapi.yaml#/components/schemas/AuthVerifier" }
-        # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — the recovery commitment (see setup spec).
-        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
-        personalScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
-        wrappedPersonalScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
-        scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
-        wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
-    RegisterViaInvitationResponse:
-      type: object
-      required: [sessionToken, user, tenant]
-      properties:
-        sessionToken: { type: string }
-        user: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
-        tenant: { $ref: "#/components/schemas/TenantSummary" }
+        tenantScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedTenantScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
     CurrentTenant:
       type: object
       required: [tenantId, name, displayName, domain, role, tenantScopeId]

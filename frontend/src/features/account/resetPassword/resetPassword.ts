@@ -61,7 +61,7 @@ export async function confirmPasswordReset(apiBase: string, token: string, secre
       newPassword,
       masterKeyWrap: { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(newPwWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, newSalt)) },
       // prove Secret-Key possession: reproduce the commitment the server stored for this master key
-      recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
+      recoveryMasterKeyTag: b64url(v1.recoveryAuthTag(masterKey)),
     }),
   })
   if (!res.ok) throw await apiError(res, 'reset confirm')

@@ -15,7 +15,7 @@ documents:
   - type: decision
     ref: docs/wiki/decisions/README.md
   - type: api
-    ref: docs/api/tenants.openapi.yaml
+    ref: docs/api/account.openapi.yaml
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt
   - type: entryPoint

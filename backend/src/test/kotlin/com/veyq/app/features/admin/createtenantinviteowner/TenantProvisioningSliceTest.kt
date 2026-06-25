@@ -144,8 +144,8 @@ class TenantProvisioningSliceTest {
     private fun claimBody(secret: String) = """
         {
           "bootstrapSecret": "$secret",
-          "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },
-          "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
+          "tenantScopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },
+          "wrappedTenantScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
         }
     """.trimIndent()
 

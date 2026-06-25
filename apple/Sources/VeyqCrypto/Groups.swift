@@ -20,7 +20,7 @@ public enum Groups {
     struct GroupMemberListDTO: Codable { let members: [GroupMember] }
     struct GrantDTO: Codable { let scopeId: String; let scopePublicKey: KemDTO; let wrappedScopePrivateKey: BlobDTO }
 
-    struct CreateGroupReq: Codable { let scopePublicKey: KemDTO; let wrappedScopePrivateKey, contentKey, sealedName: BlobDTO }
+    struct CreateGroupReq: Codable { let scopePublicKey: KemDTO; let wrappedScopePrivateKey, wrappedContentKey, sealedName: BlobDTO }
     struct AddMemberReq: Codable { let userId: String; let wrappedScopePrivateKey: BlobDTO; let role: String }
     struct SetRoleReq: Codable { let role: String }
 
@@ -56,7 +56,7 @@ public enum Groups {
         let req = CreateGroupReq(
             scopePublicKey: KemDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(scopePublic)),
             wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(grant)),
-            contentKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrappedCk)),
+            wrappedContentKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrappedCk)),
             sealedName: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(sealedName)))
         let (data, code) = try await send(apiBase, "/api/groups", session.sessionToken, method: "POST", body: try JSONEncoder().encode(req))
         guard code == 200 else { throw err("create group failed: \(String(data: data, encoding: .utf8) ?? "")") }

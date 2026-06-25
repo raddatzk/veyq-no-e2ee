@@ -12,24 +12,17 @@ public enum SetupServer {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    static func authVerifierPhc(salt: Data, verifier: Data) -> String {
-        let s = salt.base64EncodedString().replacingOccurrences(of: "=", with: "")
-        let v = verifier.base64EncodedString().replacingOccurrences(of: "=", with: "")
-        return "$argon2id$v=19$m=\(argon.m),t=\(argon.t),p=\(argon.p)$\(s)$\(v)"
-    }
-
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
-    struct AuthVerifierDTO: Codable { let kind, suiteId, verifier: String }
     struct CreateServerOwnerRequest: Codable {
         let email, displayName: String
         let identityPublicKey: IdentityPublicKeyDTO
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
-        let authVerifier: AuthVerifierDTO
-        let recoveryAuthTag: String
+        let password: String
+        let recoveryMasterKeyTag: String
         let personalScopePublicKey: KemPublicKeyDTO
         let wrappedPersonalScopePrivateKey: BlobDTO
     }
@@ -52,9 +45,6 @@ public enum SetupServer {
         let recSalt = V1.randomBytes(16)
         let recWrap = try V1.symWrap(kek: try V1.kekRecovery(recoveryCode: secretKey, salt: recSalt, params: argon), targetKey: masterKey, context: "master-key", nonce: V1.randomBytes(12))
 
-        let authSalt = V1.randomBytes(16)
-        let verifier = try V1.kekRecovery(recoveryCode: Data(password.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: argon)
-
         // personal scope is self-owned and unshared; grant it only to this identity.
         let personal = try V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
         let personalPublic = personal.pubKemX + personal.pubKemM
@@ -70,9 +60,9 @@ public enum SetupServer {
                 MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: salt))),
                 MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: b64url(recWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: recSalt))),
             ],
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: authVerifierPhc(salt: authSalt, verifier: verifier)),
+            password: password,
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-            recoveryAuthTag: b64url(V1.recoveryAuthTag(masterKey: masterKey)),
+            recoveryMasterKeyTag: b64url(V1.recoveryAuthTag(masterKey: masterKey)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(personalGrant))
         )

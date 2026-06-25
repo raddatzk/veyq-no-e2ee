@@ -30,7 +30,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * Proves an unlock to the server without revealing the master key.
+ * Proves account authentication to the server without revealing the master key. For ARGON2_PROOF, `verifier` is an Argon2id PHC string (`$argon2id$v=19$m=32768,t=3,p=1$...$...`).
  *
  * @param kind 
  * @param suiteId Versioned crypto-suite identifier, e.g. \"v1\".

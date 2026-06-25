@@ -35,7 +35,7 @@ data class NewAccount(
     val identityPublicKey: IdentityPublicKey,
     val wrappedIdentityPrivateKey: Blob,
     val masterKeyWraps: List<MasterKeyWrap>,
-    val recoveryAuthTag: String?,
+    val recoveryMasterKeyTag: String?,
     val authVerifier: ApiAuthVerifier,
     val personalScopePublicKey: KemPublicKey,
     val wrappedPersonalScopePrivateKey: Blob,
@@ -68,8 +68,8 @@ class AccountFactory(
         }
         // A RECOVERY wrap must carry the master-key commitment, or password reset could never prove Secret-Key
         // possession (and the reset confirm would always be rejected).
-        if (spec.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && spec.recoveryAuthTag.isNullOrBlank()) {
-            throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
+        if (spec.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && spec.recoveryMasterKeyTag.isNullOrBlank()) {
+            throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryMasterKeyTag")
         }
         suites.require(spec.identityPublicKey.suiteId)
         suites.require(spec.wrappedIdentityPrivateKey.suiteId)
@@ -111,7 +111,7 @@ class AccountFactory(
                     id = newId(); this.userId = user.id; unlockMethod = wrap.unlockMethod.value
                     suiteId = wrap.suiteId; wrappedKey = dec.decode(wrap.wrappedKey)
                     kdfParams = wrap.kdfParams?.let { dec.decode(it) }; credentialRef = wrap.credentialRef; createdAt = now
-                    if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = spec.recoveryAuthTag?.let { dec.decode(it) }
+                    if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = spec.recoveryMasterKeyTag?.let { dec.decode(it) }
                 },
             )
         }

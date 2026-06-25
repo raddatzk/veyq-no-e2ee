@@ -14,19 +14,19 @@ import AnyCodable
 public struct ClaimTenantOwnershipRequest: Codable {
 
     public private(set) var bootstrapSecret: String
-    public private(set) var scopePublicKey: KemPublicKey
-    public private(set) var wrappedScopePrivateKey: Blob
+    public private(set) var tenantScopePublicKey: KemPublicKey
+    public private(set) var wrappedTenantScopePrivateKey: Blob
 
-    public init(bootstrapSecret: String, scopePublicKey: KemPublicKey, wrappedScopePrivateKey: Blob) {
+    public init(bootstrapSecret: String, tenantScopePublicKey: KemPublicKey, wrappedTenantScopePrivateKey: Blob) {
         self.bootstrapSecret = bootstrapSecret
-        self.scopePublicKey = scopePublicKey
-        self.wrappedScopePrivateKey = wrappedScopePrivateKey
+        self.tenantScopePublicKey = tenantScopePublicKey
+        self.wrappedTenantScopePrivateKey = wrappedTenantScopePrivateKey
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case bootstrapSecret
-        case scopePublicKey
-        case wrappedScopePrivateKey
+        case tenantScopePublicKey
+        case wrappedTenantScopePrivateKey
     }
 
     // Encodable protocol methods
@@ -34,8 +34,8 @@ public struct ClaimTenantOwnershipRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(bootstrapSecret, forKey: .bootstrapSecret)
-        try container.encode(scopePublicKey, forKey: .scopePublicKey)
-        try container.encode(wrappedScopePrivateKey, forKey: .wrappedScopePrivateKey)
+        try container.encode(tenantScopePublicKey, forKey: .tenantScopePublicKey)
+        try container.encode(wrappedTenantScopePrivateKey, forKey: .wrappedTenantScopePrivateKey)
     }
 }
 

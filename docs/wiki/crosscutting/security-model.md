@@ -133,6 +133,123 @@ ck --> share : a subtree key wrapped to a share key (token-unlocked)
   that opens it is derived on demand on the client and **never stored server-side**. Adding/removing a
   method changes one wrap, not the content. See *Key recovery* and *Secret Key* below.
 
+## Key inventory and naming
+
+This is the canonical glossary for key names in docs and APIs. Public keys and ciphertext blobs are
+server-visible; raw symmetric keys, private keys, Secret Keys, recovery codes and invite fragment
+secrets are not. A `wrapped*` field is always ciphertext: the server stores it and returns it, but
+cannot open it.
+
+| Name / API field | Kind | Server-visible form | Used for |
+|---|---|---|---|
+| Account password | Human secret, not a content key | Sent during auth and setup/reset; stored only as `auth_verifier` (`Argon2id` PHC, password-only) | Server session auth. It is also used client-side with the Secret Key to derive the password unlock KEK, but the server-side verifier never unlocks content. |
+| Secret Key | High-entropy user-held secret (Emergency Kit / enrolled devices) | Never stored server-side | Combined with the password for two-secret key derivation (2SKD). Protects content unlock after a server DB breach. |
+| Master Key | 32-byte symmetric account root key | Only as `MasterKeyWrap.wrappedKey`, one wrap per unlock method (`PASSWORD`, `RECOVERY`, `PASSKEY`, `DEVICE`) | Opens `wrappedIdentityPrivateKey`. Stable across password changes; adding/removing an unlock method replaces only the corresponding wrap. |
+| Unlock KEK | Derived in-memory wrapping key | Never stored server-side | Opens one Master Key wrap. Derived from password+Secret Key, recovery code, passkey PRF output or a device key, then discarded. |
+| Identity public key (`identityPublicKey`) | Hybrid KEM public bundle plus signing public key | Published in the key directory | Recipient address for scope grants; fingerprint/safety number input; signature verification for key/device changes. |
+| Identity private key (`wrappedIdentityPrivateKey`) | Hybrid KEM private bundle plus signing private key | Only wrapped under the Master Key | Opens scope grants wrapped to this user and signs account/key operations. |
+| Personal scope keypair (`personalScopePublicKey`, `wrappedPersonalScopePrivateKey`) | `PERSONAL_ROOT` scope keypair | Public key plus private key wrapped to the user's identity | Opens the user's unshared personal scope content key. Usually only self-granted. |
+| Tenant scope keypair (`tenantScopePublicKey`, `wrappedTenantScopePrivateKey`) | `TENANT_ROOT` scope keypair | Public key plus one wrapped private-key grant per tenant member | Opens tenant-root content keys and lets owners/members create tenant-scope grants. Tenant-specific registration/owner-claim requests use the `tenant*` prefix so they are not confused with personal keys in the same payload. |
+| Group scope keypair (`scopePublicKey`, `wrappedScopePrivateKey` in group APIs) | `GROUP_ROOT` scope keypair | Public key plus one wrapped private-key grant per group member | Opens group content keys. A GroupOwner can add only users who are already active tenant members; group membership does not invite external users into the tenant. |
+| Scope content key (`wrappedContentKey`) | Symmetric content key for one scope/subtree | Wrapped to the corresponding scope public key or share key | Encrypts sealed names, Memories, media, journal data and sensitive metadata. Rotated/re-wrapped when access changes require defense in depth. |
+| Public share key | Per-share unwrap key derived from the share token/fragment | Server stores only share metadata and wrapped subtree content keys | Grants token-bearer access to the specific shared subtree, not membership in the source scope. |
+| Invite wrapping keypair (`inviteWrappingPublicKey`, fragment-only `inviteWrappingPrivateKey`) | One-time onboarding KEM keypair | Only the public half is stored with the pending member invite and returned with invite material | Temporary transport recipient for a member invite. It is not a tenant, group or personal scope key. See *Member invite wrap* below. |
+| Tenant scope invite grant (`wrappedTenantScopePrivateKey` in invite material) | `TENANT_ROOT` private-key ciphertext for onboarding | Stored with the pending member invite and returned only after `bootstrapSecret` proof | Temporary ciphertext carrying the tenant scope private key to the invitee. Same field name as the later persistent member grant, but a different recipient. See *Member invite wrap* below. |
+| Bootstrap secret (`bootstrapSecret`) | Invite proof secret, not a content key | Server stores/verifies a proof of it | Authorizes reading invite material or claiming/accepting an invite. Possessing an `inviteId` alone is not enough. |
+| Recovery master-key tag (`recoveryMasterKeyTag`) | Master-key commitment/tag, not an unlock key | `SHA-256("veyq/v1/recovery-auth" || masterKey)`, base64url | Proves during reset/recovery flows that the client recovered the same Master Key before replacing password auth material. It is not a login token and cannot decrypt anything. |
+| Derived blind tokens (`slugToken`, `dedupToken`, upload-capability token) | MAC/proof outputs, not keys | Server-visible tokens or token hashes | Blind uniqueness, deduplication or public-share upload authorization. They are derived client-side from content/share secrets and do not reveal plaintext. |
+
+Naming rules:
+
+- Use `tenantScope*` when a payload can also contain personal-scope material (for example account
+  registration and tenant ownership claim).
+- Use generic `scopePublicKey` / `wrappedScopePrivateKey` in APIs whose route already fixes the scope
+  context, such as group creation, generic scope grants or tenant member grants.
+- `wrapped*PrivateKey` means "a private key encrypted to an identity public key or invite wrapping public key";
+  `wrappedContentKey` means "a symmetric content key encrypted to a scope/share key".
+- `auth_verifier` / `authVerifier` is server credential material only. It is not a key, not a wrap and
+  never participates in content unlock.
+
+### Member invite wrap
+
+A member invite has to transfer an existing tenant's scope private key to a person who does not yet
+have a veyq identity keypair. That is why it uses a **temporary invite wrapping keypair**. This keypair
+is only a transport envelope; it is not the tenant scope keypair.
+
+There are three different keys involved:
+
+| Thing | Where it lives | Purpose |
+|---|---|---|
+| `tenantScopePublicKey` | Tenant invite metadata; safe to expose | Public half of the existing `TENANT_ROOT` scope keypair. It identifies the tenant scope keypair whose private half is being granted. It does not open the invite wrap. |
+| `inviteWrappingPublicKey` | Pending member invite + invite material | Public half of a one-time transport keypair. The owner wraps the tenant scope private key to this key so the blind server can store the ciphertext. |
+| `inviteWrappingPrivateKey` | URL fragment only, or encrypted in the fragment in passphrase mode | Private half of the one-time transport keypair. The invitee's browser/app uses it once to open the invite material. It is not an API field because URL fragments are never sent to the server. |
+
+`wrappedTenantScopePrivateKey` always names the **target key**: the tenant scope private key. The field
+does not say who can open it; the endpoint context does:
+
+| Flow step | Field | Opened by | Lifetime |
+|---|---|---|---|
+| Owner issues member invite | `wrappedTenantScopePrivateKey` in `IssueMemberInviteRequest` / `TenantInviteMaterial` | `inviteWrappingPrivateKey` from the invite link fragment | Temporary; consumed with the invite |
+| Invitee registers or accepts | `wrappedTenantScopePrivateKey` in registration / accept request | Invitee `identityPrivateKey` | Persistent tenant member grant |
+
+So the member invite flow is:
+
+1. Existing owner locally unwraps the raw tenant scope private key from their own grant.
+2. Owner client generates `inviteWrappingPublicKey` / `inviteWrappingPrivateKey`.
+3. Owner client posts `inviteWrappingPublicKey` and `wrappedTenantScopePrivateKey` encrypted to that
+   invite wrapping public key. The server stores both but can open neither the ciphertext nor the
+   fragment-only private key.
+4. Invitee opens the link. The server sees only `inviteId` and later `bootstrapSecret`; it never sees
+   `inviteWrappingPrivateKey`.
+5. Invitee client fetches invite material, opens `wrappedTenantScopePrivateKey` with
+   `inviteWrappingPrivateKey`, then immediately re-wraps the same tenant scope private key to the
+   invitee's new `identityPublicKey`.
+6. Registration / accept posts the new persistent `wrappedTenantScopePrivateKey`; the temporary invite
+   material is consumed.
+
+**Mental model: one passenger, two envelopes.** The whole flow delivers exactly **one** secret — the
+raw **tenant scope private key** (the *passenger*) — from the owner to someone who has **no identity
+keypair yet**. A throwaway *invite wrapping keypair* is the envelope in between. `wrappedTenantScopePrivateKey`
+names the **same passenger at two stages**: at issue it is sealed to `inviteWrappingPublicKey`; at the
+persistent grant it is sealed to the invitee's `identityPublicKey`. Same field name, different recipient —
+the invitee simply opens the throwaway envelope and re-seals into its own. The `bootstrapSecret` is **not a
+key**: it only gates the material fetch. The server is blind at both ends — it never holds the
+`inviteWrappingPrivateKey` (URL-fragment only).
+
+```plantuml
+@startuml
+title Member invite -- one passenger (tenant scope private key), two envelopes
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Owner\n(holds scope key)" as O
+participant "Server\n(blind)" as S
+actor "Invitee\n(no keypair yet)" as I
+
+== 1. Owner issues invite  (issueMemberInvite) ==
+O -> O : open own scope grant\n  asymUnwrap(identityPriv) -> **scope priv (raw)** = passenger
+O -> O : generate throwaway keypair\n  -> inviteWrappingPublic / inviteWrappingPrivate
+O -> O : seal passenger into envelope\n  asymWrap(inviteWrappingPublic) -> wrappedTenantScopePrivateKey
+O -> S : POST /member-invites\n  { inviteWrappingPublicKey, wrappedTenantScopePrivateKey }
+note right of S : stores both,\nopens **neither**\n(envelope key absent)
+S --> O : { inviteId, bootstrapSecret }
+O -> O : build link:\n  #fragment = inviteWrappingPrivate  <- never reaches server
+O ->> I : invite link (email or direct)
+
+== 2. Invitee redeems  (registerViaMemberInvite / acceptMemberInvite) ==
+I -> S : GET invite metadata (inviteId)
+S --> I : tenantScopePublicKey  (which scope -- public)
+I -> S : GET invite material  + **bootstrapSecret** (possession proof)
+S --> I : { inviteWrappingPublicKey, wrappedTenantScopePrivateKey }
+I -> I : open envelope\n  asymUnwrap(inviteWrappingPrivate from #fragment) -> **scope priv (raw)**
+I -> I : generate own identity -> identityPublicKey
+I -> I : re-seal passenger\n  asymWrap(identityPublicKey) -> **new** wrappedTenantScopePrivateKey
+I -> S : register/accept\n  { ..., wrappedTenantScopePrivateKey (persistent) }
+note right of S : throwaway material **deleted**\n-> window closes
+S --> I : member, persistent scope grant
+@enduml
+```
+
 ## Cryptographic primitives, agility & post-quantum
 
 The envelope above uses **standard, well-reviewed primitives** — no home-grown crypto:
@@ -261,14 +378,20 @@ Bootstrapping access is **always an explicit, informed act by the granting owner
 confidentiality is lowered). Three shapes:
 
 **1. Single-use bootstrap — the default (email invite *and* self-serve link are the same thing).**
-The inviter (who holds the scope key) creates a **single-use temp-wrap**: the scope key wrapped to a
-key derived from a one-time **token**. The token lives **only in the link's URL fragment**, never
-server-side → the **operator stays blind**. On registration the new user generates a keypair, uses the
-token to unwrap the scope key, **re-wraps it to their own public key**, and the temp-wrap is **deleted**
+The inviter (who holds the tenant scope private key) creates a **single-use invite wrapping keypair**.
+The public half is posted as `inviteWrappingPublicKey`; the tenant scope private key is wrapped to it
+as `wrappedTenantScopePrivateKey`. The invite wrapping private key lives **only in the link's URL
+fragment** (or in equivalent out-of-band client-held material), never server-side → the **operator
+stays blind**. A separate `bootstrapSecret` proves possession of the invite before the server returns
+the invite-wrapped material, but it is not a content key. On registration the new user generates their
+identity and personal scope keys, uses the invite wrapping private key to unwrap the tenant scope
+private key, **re-wraps it to their own identity public key** as `wrappedTenantScopePrivateKey` in the
+registration payload, and the invite wrapping material is **deleted**
 → the window closes. Bounded: single-use, short **TTL**, revocable. Delivery is just a detail — the
 system can **email** the link (owner sets the address) or the owner shares the link and the
 **recipient sets their own email** at registration. A **batch** of these is N independent single-use
-links (each its own token), operator-blind, each window closing on use.
+links (each its own invite wrapping keypair and bootstrap secret), operator-blind, each window closing
+on use. See *Member invite wrap* above for the exact key roles.
 
 **2. Shared public link — convenience, riskier, explicit opt-in.**
 One token (in the fragment) usable by up to **X registrants**. The secret is **shared**, so anyone with

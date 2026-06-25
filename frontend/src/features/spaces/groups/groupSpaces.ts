@@ -42,7 +42,7 @@ export async function createGroupSpace(apiBase: string, session: UnlockedSession
     body: JSON.stringify({
       scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(scopePublic) },
       wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(grant) },
-      contentKey: { suiteId: 'v1', bytes: b64url(wrappedCk) },
+      wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrappedCk) },
       sealedName: { suiteId: 'v1', bytes: b64url(sealName(ck, name.trim())) },
     }),
   })

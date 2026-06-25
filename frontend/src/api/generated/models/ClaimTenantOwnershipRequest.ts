@@ -45,13 +45,13 @@ export interface ClaimTenantOwnershipRequest {
      * @type {KemPublicKey}
      * @memberof ClaimTenantOwnershipRequest
      */
-    scopePublicKey: KemPublicKey;
+    tenantScopePublicKey: KemPublicKey;
     /**
      * 
      * @type {Blob}
      * @memberof ClaimTenantOwnershipRequest
      */
-    wrappedScopePrivateKey: Blob;
+    wrappedTenantScopePrivateKey: Blob;
 }
 
 /**
@@ -59,8 +59,8 @@ export interface ClaimTenantOwnershipRequest {
  */
 export function instanceOfClaimTenantOwnershipRequest(value: object): value is ClaimTenantOwnershipRequest {
     if (!('bootstrapSecret' in value) || value['bootstrapSecret'] === undefined) return false;
-    if (!('scopePublicKey' in value) || value['scopePublicKey'] === undefined) return false;
-    if (!('wrappedScopePrivateKey' in value) || value['wrappedScopePrivateKey'] === undefined) return false;
+    if (!('tenantScopePublicKey' in value) || value['tenantScopePublicKey'] === undefined) return false;
+    if (!('wrappedTenantScopePrivateKey' in value) || value['wrappedTenantScopePrivateKey'] === undefined) return false;
     return true;
 }
 
@@ -75,8 +75,8 @@ export function ClaimTenantOwnershipRequestFromJSONTyped(json: any, ignoreDiscri
     return {
         
         'bootstrapSecret': json['bootstrapSecret'],
-        'scopePublicKey': KemPublicKeyFromJSON(json['scopePublicKey']),
-        'wrappedScopePrivateKey': BlobFromJSON(json['wrappedScopePrivateKey']),
+        'tenantScopePublicKey': KemPublicKeyFromJSON(json['tenantScopePublicKey']),
+        'wrappedTenantScopePrivateKey': BlobFromJSON(json['wrappedTenantScopePrivateKey']),
     };
 }
 
@@ -92,8 +92,8 @@ export function ClaimTenantOwnershipRequestToJSONTyped(value?: ClaimTenantOwners
     return {
         
         'bootstrapSecret': value['bootstrapSecret'],
-        'scopePublicKey': KemPublicKeyToJSON(value['scopePublicKey']),
-        'wrappedScopePrivateKey': BlobToJSON(value['wrappedScopePrivateKey']),
+        'tenantScopePublicKey': KemPublicKeyToJSON(value['tenantScopePublicKey']),
+        'wrappedTenantScopePrivateKey': BlobToJSON(value['wrappedTenantScopePrivateKey']),
     };
 }
 

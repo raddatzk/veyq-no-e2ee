@@ -71,11 +71,11 @@ export interface TenantInviteInfo {
      */
     existingAccount: boolean;
     /**
-     * MEMBER invites only — the existing scope's public key (a public key, safe to expose).
+     * MEMBER invites only — the existing tenant scope's public key (a public key, safe to expose).
      * @type {KemPublicKey}
      * @memberof TenantInviteInfo
      */
-    scopePublicKey?: KemPublicKey;
+    tenantScopePublicKey?: KemPublicKey;
 }
 
 
@@ -128,7 +128,7 @@ export function TenantInviteInfoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'status': json['status'],
         'kind': json['kind'],
         'existingAccount': json['existingAccount'],
-        'scopePublicKey': json['scopePublicKey'] == null ? undefined : KemPublicKeyFromJSON(json['scopePublicKey']),
+        'tenantScopePublicKey': json['tenantScopePublicKey'] == null ? undefined : KemPublicKeyFromJSON(json['tenantScopePublicKey']),
     };
 }
 
@@ -149,7 +149,7 @@ export function TenantInviteInfoToJSONTyped(value?: TenantInviteInfo | null, ign
         'status': value['status'],
         'kind': value['kind'],
         'existingAccount': value['existingAccount'],
-        'scopePublicKey': KemPublicKeyToJSON(value['scopePublicKey']),
+        'tenantScopePublicKey': KemPublicKeyToJSON(value['tenantScopePublicKey']),
     };
 }
 

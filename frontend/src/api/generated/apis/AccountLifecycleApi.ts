@@ -17,6 +17,8 @@ import * as runtime from '../runtime';
 import type {
   DeleteAccountRequest,
   ErrorResponse,
+  RegisterViaInvitationRequest,
+  RegisterViaInvitationResponse,
   UpdateProfileRequest,
   UserSummary,
 } from '../models/index';
@@ -25,6 +27,10 @@ import {
     DeleteAccountRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    RegisterViaInvitationRequestFromJSON,
+    RegisterViaInvitationRequestToJSON,
+    RegisterViaInvitationResponseFromJSON,
+    RegisterViaInvitationResponseToJSON,
     UpdateProfileRequestFromJSON,
     UpdateProfileRequestToJSON,
     UserSummaryFromJSON,
@@ -33,6 +39,11 @@ import {
 
 export interface DeleteCurrentAccountRequest {
     deleteAccountRequest: DeleteAccountRequest;
+}
+
+export interface RegisterViaInvitationOperationRequest {
+    inviteId: string;
+    registerViaInvitationRequest: RegisterViaInvitationRequest;
 }
 
 export interface UpdateCurrentProfileRequest {
@@ -90,6 +101,32 @@ export interface AccountLifecycleApiInterface {
      * The authenticated user for a session token (proves the session resolves).
      */
     getCurrentUser(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+
+    /**
+     * Creates request options for registerViaInvitation without sending the request
+     * @param {string} inviteId 
+     * @param {RegisterViaInvitationRequest} registerViaInvitationRequest 
+     * @throws {RequiredError}
+     * @memberof AccountLifecycleApiInterface
+     */
+    registerViaInvitationRequestOpts(requestParameters: RegisterViaInvitationOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key and master-key unlock wraps — plus the account password and the tenant scope private key wrapped to their own identity. The server derives the auth verifier from the password. For an OWNER invite the client also mints the empty tenant\'s scope public key; for a MEMBER invite it reuses the invited tenant scope public key from the public invite metadata. The server creates the account, activates membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
+     * @summary Register a brand-new account from an invitation.
+     * @param {string} inviteId 
+     * @param {RegisterViaInvitationRequest} registerViaInvitationRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AccountLifecycleApiInterface
+     */
+    registerViaInvitationRaw(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RegisterViaInvitationResponse>>;
+
+    /**
+     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key and master-key unlock wraps — plus the account password and the tenant scope private key wrapped to their own identity. The server derives the auth verifier from the password. For an OWNER invite the client also mints the empty tenant\'s scope public key; for a MEMBER invite it reuses the invited tenant scope public key from the public invite metadata. The server creates the account, activates membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
+     * Register a brand-new account from an invitation.
+     */
+    registerViaInvitation(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RegisterViaInvitationResponse>;
 
     /**
      * Creates request options for updateCurrentProfile without sending the request
@@ -220,6 +257,63 @@ export class AccountLifecycleApi extends runtime.BaseAPI implements AccountLifec
      */
     async getCurrentUser(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
         const response = await this.getCurrentUserRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for registerViaInvitation without sending the request
+     */
+    async registerViaInvitationRequestOpts(requestParameters: RegisterViaInvitationOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['inviteId'] == null) {
+            throw new runtime.RequiredError(
+                'inviteId',
+                'Required parameter "inviteId" was null or undefined when calling registerViaInvitation().'
+            );
+        }
+
+        if (requestParameters['registerViaInvitationRequest'] == null) {
+            throw new runtime.RequiredError(
+                'registerViaInvitationRequest',
+                'Required parameter "registerViaInvitationRequest" was null or undefined when calling registerViaInvitation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/tenant-invites/{inviteId}/register`;
+        urlPath = urlPath.replace(`{${"inviteId"}}`, encodeURIComponent(String(requestParameters['inviteId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RegisterViaInvitationRequestToJSON(requestParameters['registerViaInvitationRequest']),
+        };
+    }
+
+    /**
+     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key and master-key unlock wraps — plus the account password and the tenant scope private key wrapped to their own identity. The server derives the auth verifier from the password. For an OWNER invite the client also mints the empty tenant\'s scope public key; for a MEMBER invite it reuses the invited tenant scope public key from the public invite metadata. The server creates the account, activates membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
+     * Register a brand-new account from an invitation.
+     */
+    async registerViaInvitationRaw(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RegisterViaInvitationResponse>> {
+        const requestOptions = await this.registerViaInvitationRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RegisterViaInvitationResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * The invitee (not yet authenticated) presents the bootstrap secret together with all freshly generated key material — identity public key, the wrapped identity private key and master-key unlock wraps — plus the account password and the tenant scope private key wrapped to their own identity. The server derives the auth verifier from the password. For an OWNER invite the client also mints the empty tenant\'s scope public key; for a MEMBER invite it reuses the invited tenant scope public key from the public invite metadata. The server creates the account, activates membership, consumes the invite and issues a session. It stores ciphertext + public material only; it never sees a private key. 
+     * Register a brand-new account from an invitation.
+     */
+    async registerViaInvitation(requestParameters: RegisterViaInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RegisterViaInvitationResponse> {
+        const response = await this.registerViaInvitationRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

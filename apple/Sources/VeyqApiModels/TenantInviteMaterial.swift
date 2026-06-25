@@ -11,28 +11,30 @@ import Foundation
 import AnyCodable
 #endif
 
-/** The temp-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side.  */
+/** The invite-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret is proven. The invite wrapping private key (URL fragment) opens wrappedTenantScopePrivateKey client-side.  */
 public struct TenantInviteMaterial: Codable {
 
-    public private(set) var tempPublicKey: KemPublicKey
-    public private(set) var tempWrappedScopePrivateKey: Blob
+    /** Public half of the one-time invite wrapping keypair. The private half stays in the invite URL fragment. */
+    public private(set) var inviteWrappingPublicKey: KemPublicKey
+    /** Tenant scope private key wrapped to inviteWrappingPublicKey. */
+    public private(set) var wrappedTenantScopePrivateKey: Blob
 
-    public init(tempPublicKey: KemPublicKey, tempWrappedScopePrivateKey: Blob) {
-        self.tempPublicKey = tempPublicKey
-        self.tempWrappedScopePrivateKey = tempWrappedScopePrivateKey
+    public init(inviteWrappingPublicKey: KemPublicKey, wrappedTenantScopePrivateKey: Blob) {
+        self.inviteWrappingPublicKey = inviteWrappingPublicKey
+        self.wrappedTenantScopePrivateKey = wrappedTenantScopePrivateKey
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
-        case tempPublicKey
-        case tempWrappedScopePrivateKey
+        case inviteWrappingPublicKey
+        case wrappedTenantScopePrivateKey
     }
 
     // Encodable protocol methods
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(tempPublicKey, forKey: .tempPublicKey)
-        try container.encode(tempWrappedScopePrivateKey, forKey: .tempWrappedScopePrivateKey)
+        try container.encode(inviteWrappingPublicKey, forKey: .inviteWrappingPublicKey)
+        try container.encode(wrappedTenantScopePrivateKey, forKey: .wrappedTenantScopePrivateKey)
     }
 }
 

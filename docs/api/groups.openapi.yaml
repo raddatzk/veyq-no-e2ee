@@ -84,7 +84,8 @@ paths:
       summary: Add a tenant member to the group (GroupOwner only).
       description: >
         The GroupOwner wraps the group scope private key to the target member's identity and posts it as a
-        grant. The target must be an active member of the tenant. Defaults to the GroupMember role.
+        grant. The target must already be an active member of the tenant; this endpoint does not invite
+        external users into the tenant. Defaults to the GroupMember role.
       parameters:
         - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -151,11 +152,11 @@ components:
   schemas:
     CreateGroupRequest:
       type: object
-      required: [scopePublicKey, wrappedScopePrivateKey, contentKey, sealedName]
+      required: [scopePublicKey, wrappedScopePrivateKey, wrappedContentKey, sealedName]
       properties:
         scopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
         wrappedScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'Group scope private key wrapped to the creator''s identity (self-grant).' }
-        contentKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'Content key wrapped to the group scope public key.' }
+        wrappedContentKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'Content key wrapped to the group scope public key.' }
         sealedName: { $ref: "./common.openapi.yaml#/components/schemas/Blob", description: 'Group name sealed under the content key (operator-blind).' }
     GroupSummary:
       type: object

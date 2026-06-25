@@ -9,9 +9,11 @@ import com.veyq.app.generated.model.LoginSessionList
 import com.veyq.app.generated.model.LoginSessionSummary
 import com.veyq.app.generated.model.LoginRequest
 import com.veyq.app.generated.model.RefreshSessionResponse
+import com.veyq.app.generated.model.RegisterViaInvitationRequest
 import com.veyq.app.generated.model.RenameLoginSessionRequest
 import com.veyq.app.generated.model.StartAvatarUploadRequest
 import com.veyq.app.generated.model.UpdateProfileRequest
+import com.veyq.app.features.account.registerviainvitation.RegisterViaInvitationHandler
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.platform.error.unauthorized
 import com.veyq.app.shared.security.REFRESH_SESSION_COOKIE
@@ -96,7 +98,10 @@ class LoginResource(
 }
 
 @ApplicationScoped
-class AccountLifecycleResource(private val handler: LoginHandler) : AccountLifecycleApi {
+class AccountLifecycleResource(
+    private val handler: LoginHandler,
+    private val registration: RegisterViaInvitationHandler,
+) : AccountLifecycleApi {
     @Context
     lateinit var httpHeaders: HttpHeaders
 
@@ -110,6 +115,13 @@ class AccountLifecycleResource(private val handler: LoginHandler) : AccountLifec
         handler.deleteAccount(authorization(), deleteAccountRequest)
         return Response.noContent()
             .header("Set-Cookie", clearRefreshSessionCookie())
+            .build()
+    }
+
+    override fun registerViaInvitation(inviteId: String, registerViaInvitationRequest: RegisterViaInvitationRequest): Response {
+        val result = registration.registerViaInvitation(inviteId, registerViaInvitationRequest)
+        return Response.ok(result.response)
+            .header("Set-Cookie", refreshSessionCookie(result.issuedSession))
             .build()
     }
 

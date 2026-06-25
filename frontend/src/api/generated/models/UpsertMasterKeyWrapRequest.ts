@@ -38,7 +38,7 @@ export interface UpsertMasterKeyWrapRequest {
      * @type {string}
      * @memberof UpsertMasterKeyWrapRequest
      */
-    recoveryAuthTag?: string;
+    recoveryMasterKeyTag?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ export function UpsertMasterKeyWrapRequestFromJSONTyped(json: any, ignoreDiscrim
     return {
         
         'masterKeyWrap': MasterKeyWrapFromJSON(json['masterKeyWrap']),
-        'recoveryAuthTag': json['recoveryAuthTag'] == null ? undefined : json['recoveryAuthTag'],
+        'recoveryMasterKeyTag': json['recoveryMasterKeyTag'] == null ? undefined : json['recoveryMasterKeyTag'],
     };
 }
 
@@ -76,7 +76,7 @@ export function UpsertMasterKeyWrapRequestToJSONTyped(value?: UpsertMasterKeyWra
     return {
         
         'masterKeyWrap': MasterKeyWrapToJSON(value['masterKeyWrap']),
-        'recoveryAuthTag': value['recoveryAuthTag'],
+        'recoveryMasterKeyTag': value['recoveryMasterKeyTag'],
     };
 }
 

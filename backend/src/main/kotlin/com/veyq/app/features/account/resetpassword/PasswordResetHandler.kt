@@ -107,8 +107,8 @@ class PasswordResetHandler(
             ?: throw ApiException(400, "NO_RECOVERY", "This account has no recovery wrap")
         val expectedTag = recovery.recoveryAuthTag
             ?: throw ApiException(400, "NO_RECOVERY_AUTH", "This account has no recovery commitment")
-        val providedTag = runCatching { dec.decode(req.recoveryAuthTag) }.getOrNull()
-            ?: throw ApiException(400, "BAD_RECOVERY_AUTH", "Malformed recoveryAuthTag")
+        val providedTag = runCatching { dec.decode(req.recoveryMasterKeyTag) }.getOrNull()
+            ?: throw ApiException(400, "BAD_RECOVERY_AUTH", "Malformed recoveryMasterKeyTag")
         if (!MessageDigest.isEqual(expectedTag, providedTag)) {
             throw ApiException(403, "RECOVERY_AUTH_MISMATCH", "Secret Key proof failed")
         }

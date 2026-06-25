@@ -1,6 +1,6 @@
 import Foundation
 
-/// uc.admin.invite-members-roles (Apple) — member management for a tenant: temp-wrap invites for new
+/// uc.admin.invite-members-roles (Apple) — member management for a tenant: invite-wrap invites for new
 /// people (email / white-label link), listing + rotating the scope, removing members and changing roles.
 /// Adding people is invite-only — there is no directory lookup of arbitrary emails. The server stays blind.
 public enum InviteMembers {
@@ -144,13 +144,13 @@ public enum InviteMembers {
     }
 
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
-    struct MemberInviteRequest: Codable { let role: String; let tempPublicKey: KemPublicKeyDTO; let tempWrappedScopePrivateKey: BlobDTO }
+    struct MemberInviteRequest: Codable { let role: String; let inviteWrappingPublicKey: KemPublicKeyDTO; let wrappedTenantScopePrivateKey: BlobDTO }
     struct OwnerInviteDTO: Codable { let inviteId, bootstrapSecret, expiresAt: String }
     public struct MemberInvite { public let inviteId, bootstrapSecret, tempPrivateKey: String }
 
-    /// Issue a temp-wrap invite for a NEW user. The owner unwraps their own scope private key, generates a
-    /// one-time temp keypair, and wraps the scope to the temp public key. The temp private key is returned
-    /// to ride the invite URL fragment; the server stores only the temp public key + ciphertext.
+    /// Issue a invite-wrap invite for a NEW user. The owner unwraps their own scope private key, generates a
+    /// one-time invite wrapping keypair, and wraps the scope to the invite wrapping public key. The invite wrapping private key is returned
+    /// to ride the invite URL fragment; the server stores only the invite wrapping public key + ciphertext.
     public static func issueMemberInvite(
         apiBase: String, owner: Login.UnlockedSession, tenantId: String, role: String
     ) async throws -> MemberInvite {
@@ -167,8 +167,8 @@ public enum InviteMembers {
 
         let req = MemberInviteRequest(
             role: role,
-            tempPublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(temp.pubKemX + temp.pubKemM)),
-            tempWrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(tempWrapped)))
+            inviteWrappingPublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(temp.pubKemX + temp.pubKemM)),
+            wrappedTenantScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(tempWrapped)))
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/member-invites")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
@@ -185,39 +185,42 @@ public enum InviteMembers {
             tempPrivateKey: SetupServer.b64url(V1.serializeIdentityPrivate(temp)))
     }
 
-    /// Register a NEW account from a temp-wrap member invite: unwrap the scope with the temp private key
+    /// Register a NEW account from a invite-wrap member invite: unwrap the scope with the invite wrapping private key
     /// (from the URL fragment), re-wrap it to the new identity, register onto the existing scope.
     public static func registerViaMemberInvite(
         apiBase: String, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String,
         email: String, displayName: String, password: String
     ) async throws -> RegisterViaInvitation.RegisterResult {
         let meta = try await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId)
-        guard let scopePub = meta.scopePublicKey else {
-            throw NSError(domain: "veyq.memberinvite", code: 2, userInfo: [NSLocalizedDescriptionKey: "not a temp-wrap member invite"])
+        guard let scopePub = meta.tenantScopePublicKey else {
+            throw NSError(domain: "veyq.memberinvite", code: 2, userInfo: [NSLocalizedDescriptionKey: "not a invite-wrap member invite"])
         }
-        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        // the invite-wrapped grant is gated behind the bootstrap secret (not in public metadata)
         let material = try await RegisterViaInvitation.getInviteMaterial(apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret)
         let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
-        let tempKem = Login.b64urlDecode(material.tempPublicKey.kemPublicKey)
+        let tempKem = Login.b64urlDecode(material.inviteWrappingPublicKey.kemPublicKey)
         let scopePrivateBytes = try V1.asymUnwrap(
             skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
-            blob: Login.b64urlDecode(material.tempWrappedScopePrivateKey.bytes), context: "scope-grant")
-        let scopePublicKey = scopePub.kemPublicKey
+            blob: Login.b64urlDecode(material.wrappedTenantScopePrivateKey.bytes), context: "scope-grant")
+        let tenantScopePublicKey = scopePub.kemPublicKey
         return try await RegisterViaInvitation.registerWithScope(
             apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret, email: email, displayName: displayName, password: password
         ) { idX, idM in
-            (scopePublicKey, SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))))
+            (
+                tenantScopePublicKey: tenantScopePublicKey,
+                wrappedTenantScopePrivateKey: SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12)))
+            )
         }
     }
 
-    // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id. The params are NOT
+    // A passphrase that protects an invite's invite wrapping key is folded into a KEK via Argon2id. The params are NOT
     // carried in the link, so they MUST equal the web ARGON params (t=3, m=32768, p=1) or a link minted on one
-    // platform won't open on another. The temp key is sym-wrapped under it; the link carries only the
+    // platform won't open on another. The invite wrapping key is sym-wrapped under it; the link carries only the
     // ciphertext + salt, so the email relay can't resolve it without the passphrase.
     static let inviteArgon = V1.ArgonParams(t: 3, m: 32768, p: 1, dkLen: 32)
     static let tempKeyContext = "invite-temp-key"
 
-    /// Encrypt a temp private key (b64) under a passphrase → the `ek`/`ps` link fields (operator-blind invite).
+    /// Encrypt a invite wrapping private key (b64) under a passphrase → the `ek`/`ps` link fields (operator-blind invite).
     public static func protectTempKey(tempPrivateKeyB64: String, passphrase: String) throws -> (encTempKey: String, pwSalt: String) {
         let salt = V1.randomBytes(16)
         let kek = try V1.kekRecovery(recoveryCode: Data(passphrase.precomposedStringWithCanonicalMapping.utf8), salt: salt, params: inviteArgon)
@@ -225,7 +228,7 @@ public enum InviteMembers {
         return (SetupServer.b64url(enc), SetupServer.b64url(salt))
     }
 
-    /// Decrypt a passphrase-protected temp key back to its b64 form (wrong passphrase → throws on AEAD failure).
+    /// Decrypt a passphrase-protected invite wrapping key back to its b64 form (wrong passphrase → throws on AEAD failure).
     public static func unprotectTempKey(encTempKey: String, pwSalt: String, passphrase: String) throws -> String {
         let kek = try V1.kekRecovery(recoveryCode: Data(passphrase.precomposedStringWithCanonicalMapping.utf8), salt: Login.b64urlDecode(pwSalt), params: inviteArgon)
         return SetupServer.b64url(try V1.symUnwrap(kek: kek, blob: Login.b64urlDecode(encTempKey), context: tempKeyContext))
@@ -234,8 +237,8 @@ public enum InviteMembers {
     struct EmailInviteRequest: Codable { let email, inviteId, link: String }
 
     /// Have the server email an already-assembled invite link to an address. The link is built client-side,
-    /// so the mode decides what the server/mail relay sees (pragmatic = temp key in the clear; passphrase =
-    /// only the encrypted temp key). The server validates ownership + that the link targets this instance.
+    /// so the mode decides what the server/mail relay sees (pragmatic = invite wrapping key in the clear; passphrase =
+    /// only the encrypted invite wrapping key). The server validates ownership + that the link targets this instance.
     public static func emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) async throws {
         let req = EmailInviteRequest(email: email.trimmingCharacters(in: .whitespacesAndNewlines), inviteId: inviteId, link: link)
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant/member-invites/email")!)
@@ -250,25 +253,25 @@ public enum InviteMembers {
         }
     }
 
-    struct AcceptRequest: Codable { let bootstrapSecret: String; let wrappedScopePrivateKey: BlobDTO }
+    struct AcceptRequest: Codable { let bootstrapSecret: String; let wrappedTenantScopePrivateKey: BlobDTO }
 
-    /// Accept a temp-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.
-    /// Unwrap with the temp key, re-wrap to the caller's own identity; the server adds grant + membership.
+    /// Accept a invite-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.
+    /// Unwrap with the invite wrapping key, re-wrap to the caller's own identity; the server adds grant + membership.
     public static func acceptMemberInvite(
         apiBase: String, session: Login.UnlockedSession, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String
     ) async throws -> MembershipSummaryDTO {
-        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        // the invite-wrapped grant is gated behind the bootstrap secret (not in public metadata)
         let material = try await RegisterViaInvitation.getInviteMaterial(apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret)
         let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
-        let tempKem = Login.b64urlDecode(material.tempPublicKey.kemPublicKey)
+        let tempKem = Login.b64urlDecode(material.inviteWrappingPublicKey.kemPublicKey)
         let scopePrivateBytes = try V1.asymUnwrap(
             skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
-            blob: Login.b64urlDecode(material.tempWrappedScopePrivateKey.bytes), context: "scope-grant")
+            blob: Login.b64urlDecode(material.wrappedTenantScopePrivateKey.bytes), context: "scope-grant")
         let rewrapped = try V1.asymWrap(
             pkX: Data(session.kemPublicKey.prefix(32)), pkM: Data(session.kemPublicKey.dropFirst(32)),
             targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))
 
-        let req = AcceptRequest(bootstrapSecret: bootstrapSecret, wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(rewrapped)))
+        let req = AcceptRequest(bootstrapSecret: bootstrapSecret, wrappedTenantScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(rewrapped)))
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant-invites/\(inviteId)/accept")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")

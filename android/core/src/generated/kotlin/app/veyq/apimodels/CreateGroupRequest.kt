@@ -36,7 +36,7 @@ import kotlinx.serialization.Contextual
  *
  * @param scopePublicKey 
  * @param wrappedScopePrivateKey Group scope private key wrapped to the creator's identity (self-grant).
- * @param contentKey Content key wrapped to the group scope public key.
+ * @param wrappedContentKey Content key wrapped to the group scope public key.
  * @param sealedName Group name sealed under the content key (operator-blind).
  */
 @Serializable
@@ -51,8 +51,8 @@ data class CreateGroupRequest (
     val wrappedScopePrivateKey: Blob,
 
     /* Content key wrapped to the group scope public key. */
-    @SerialName(value = "contentKey")
-    val contentKey: Blob,
+    @SerialName(value = "wrappedContentKey")
+    val wrappedContentKey: Blob,
 
     /* Group name sealed under the content key (operator-blind). */
     @SerialName(value = "sealedName")

@@ -40,7 +40,7 @@ object Groups {
         val json = JSONObject()
             .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(scopePublic)))
             .put("wrappedScopePrivateKey", blob(grant))
-            .put("contentKey", blob(wrappedCk))
+            .put("wrappedContentKey", blob(wrappedCk))
             .put("sealedName", blob(sealedName))
             .toString()
         val (code, body) = send(apiBase, "/api/groups", session.sessionToken, "POST", json)

@@ -42,8 +42,8 @@ object Tenant {
         val grant = V1.asymWrap(pkX, pkM, scopePrivate, "scope-grant", V1.randomBytes(12))
         val json = JSONObject()
             .put("bootstrapSecret", bootstrapSecret)
-            .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(scopePublic)))
-            .put("wrappedScopePrivateKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(grant)))
+            .put("tenantScopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(scopePublic)))
+            .put("wrappedTenantScopePrivateKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(grant)))
             .toString()
         return JSONObject(send(apiBase, "/api/tenant-invites/$inviteId/claim", token, "POST", json))
     }

@@ -90,7 +90,7 @@ class PasswordResetSliceTest {
         val newPassword = "new-password-from-reset"
         val recTag = enc.encodeToString("rec-tag".toByteArray())
         given().contentType(ContentType.JSON).body(
-            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap","kdfParams":"$newPwWrap"},"recoveryAuthTag":"$recTag"}""",
+            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap","kdfParams":"$newPwWrap"},"recoveryMasterKeyTag":"$recTag"}""",
         ).post("/api/me/password-reset/confirm").then().statusCode(204)
 
         QuarkusTransaction.requiringNew().run {
@@ -108,7 +108,7 @@ class PasswordResetSliceTest {
 
         // the token is single-use: a second confirm with it fails
         given().contentType(ContentType.JSON).body(
-            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"recoveryAuthTag":"$recTag"}""",
+            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"recoveryMasterKeyTag":"$recTag"}""",
         ).post("/api/me/password-reset/confirm").then().statusCode(400)
     }
 
@@ -128,7 +128,7 @@ class PasswordResetSliceTest {
 
         // wrong commitment (attacker guessed without the Secret Key) → 403, account untouched
         given().contentType(ContentType.JSON).body(
-            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"recoveryAuthTag":"$wrongTag"}""",
+            """{"token":"$token","newPassword":"$newPassword","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"recoveryMasterKeyTag":"$wrongTag"}""",
         ).post("/api/me/password-reset/confirm").then().statusCode(403)
 
         // the attacker's password + PASSWORD wrap were NOT applied — the takeover is blocked. (Assert "not the

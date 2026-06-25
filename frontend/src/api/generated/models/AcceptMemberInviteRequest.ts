@@ -34,11 +34,11 @@ export interface AcceptMemberInviteRequest {
      */
     bootstrapSecret: string;
     /**
-     * The scope private key re-wrapped to the caller's own identity public key.
+     * The tenant scope private key re-wrapped to the caller's own identity public key.
      * @type {Blob}
      * @memberof AcceptMemberInviteRequest
      */
-    wrappedScopePrivateKey: Blob;
+    wrappedTenantScopePrivateKey: Blob;
 }
 
 /**
@@ -46,7 +46,7 @@ export interface AcceptMemberInviteRequest {
  */
 export function instanceOfAcceptMemberInviteRequest(value: object): value is AcceptMemberInviteRequest {
     if (!('bootstrapSecret' in value) || value['bootstrapSecret'] === undefined) return false;
-    if (!('wrappedScopePrivateKey' in value) || value['wrappedScopePrivateKey'] === undefined) return false;
+    if (!('wrappedTenantScopePrivateKey' in value) || value['wrappedTenantScopePrivateKey'] === undefined) return false;
     return true;
 }
 
@@ -61,7 +61,7 @@ export function AcceptMemberInviteRequestFromJSONTyped(json: any, ignoreDiscrimi
     return {
         
         'bootstrapSecret': json['bootstrapSecret'],
-        'wrappedScopePrivateKey': BlobFromJSON(json['wrappedScopePrivateKey']),
+        'wrappedTenantScopePrivateKey': BlobFromJSON(json['wrappedTenantScopePrivateKey']),
     };
 }
 
@@ -77,7 +77,7 @@ export function AcceptMemberInviteRequestToJSONTyped(value?: AcceptMemberInviteR
     return {
         
         'bootstrapSecret': value['bootstrapSecret'],
-        'wrappedScopePrivateKey': BlobToJSON(value['wrappedScopePrivateKey']),
+        'wrappedTenantScopePrivateKey': BlobToJSON(value['wrappedTenantScopePrivateKey']),
     };
 }
 

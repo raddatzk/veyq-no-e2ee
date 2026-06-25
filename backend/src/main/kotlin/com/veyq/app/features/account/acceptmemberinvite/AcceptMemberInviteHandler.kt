@@ -53,7 +53,7 @@ class AcceptMemberInviteHandler(
         if (invite.kind != InviteKind.MEMBER) {
             throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites can be accepted onto an existing account")
         }
-        suites.require(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.wrappedTenantScopePrivateKey.suiteId)
 
         val scope = invite.scopeId?.let { scopes.findById(it) } ?: throw notFound("Scope")
         if (grants.find(scope.id, userId) != null) {
@@ -64,8 +64,8 @@ class AcceptMemberInviteHandler(
         grants.persist(
             ScopeGrant().apply {
                 id = newId(); scopeId = scope.id; this.userId = userId
-                suiteId = req.wrappedScopePrivateKey.suiteId
-                wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                suiteId = req.wrappedTenantScopePrivateKey.suiteId
+                wrappedPrivateKey = dec.decode(req.wrappedTenantScopePrivateKey.bytes); createdAt = now
             },
         )
         // upsert membership — a previously-removed member rejoining flips back to ACTIVE

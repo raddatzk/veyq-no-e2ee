@@ -13,13 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { AuthVerifier } from './AuthVerifier';
-import {
-    AuthVerifierFromJSON,
-    AuthVerifierFromJSONTyped,
-    AuthVerifierToJSON,
-    AuthVerifierToJSONTyped,
-} from './AuthVerifier';
 import type { Blob } from './Blob';
 import {
     BlobFromJSON,
@@ -92,17 +85,17 @@ export interface RegisterViaInvitationRequest {
      */
     masterKeyWraps: Array<MasterKeyWrap>;
     /**
-     * 
-     * @type {AuthVerifier}
+     * The account password. The server derives and stores the ARGON2_PROOF auth verifier; content unlock still requires the client-held Secret Key.
+     * @type {string}
      * @memberof RegisterViaInvitationRequest
      */
-    authVerifier: AuthVerifier;
+    password: string;
     /**
      * 
      * @type {string}
      * @memberof RegisterViaInvitationRequest
      */
-    recoveryAuthTag?: string;
+    recoveryMasterKeyTag: string;
     /**
      * 
      * @type {KemPublicKey}
@@ -120,13 +113,13 @@ export interface RegisterViaInvitationRequest {
      * @type {KemPublicKey}
      * @memberof RegisterViaInvitationRequest
      */
-    scopePublicKey: KemPublicKey;
+    tenantScopePublicKey: KemPublicKey;
     /**
      * 
      * @type {Blob}
      * @memberof RegisterViaInvitationRequest
      */
-    wrappedScopePrivateKey: Blob;
+    wrappedTenantScopePrivateKey: Blob;
 }
 
 /**
@@ -139,11 +132,12 @@ export function instanceOfRegisterViaInvitationRequest(value: object): value is 
     if (!('identityPublicKey' in value) || value['identityPublicKey'] === undefined) return false;
     if (!('wrappedIdentityPrivateKey' in value) || value['wrappedIdentityPrivateKey'] === undefined) return false;
     if (!('masterKeyWraps' in value) || value['masterKeyWraps'] === undefined) return false;
-    if (!('authVerifier' in value) || value['authVerifier'] === undefined) return false;
+    if (!('password' in value) || value['password'] === undefined) return false;
+    if (!('recoveryMasterKeyTag' in value) || value['recoveryMasterKeyTag'] === undefined) return false;
     if (!('personalScopePublicKey' in value) || value['personalScopePublicKey'] === undefined) return false;
     if (!('wrappedPersonalScopePrivateKey' in value) || value['wrappedPersonalScopePrivateKey'] === undefined) return false;
-    if (!('scopePublicKey' in value) || value['scopePublicKey'] === undefined) return false;
-    if (!('wrappedScopePrivateKey' in value) || value['wrappedScopePrivateKey'] === undefined) return false;
+    if (!('tenantScopePublicKey' in value) || value['tenantScopePublicKey'] === undefined) return false;
+    if (!('wrappedTenantScopePrivateKey' in value) || value['wrappedTenantScopePrivateKey'] === undefined) return false;
     return true;
 }
 
@@ -163,12 +157,12 @@ export function RegisterViaInvitationRequestFromJSONTyped(json: any, ignoreDiscr
         'identityPublicKey': IdentityPublicKeyFromJSON(json['identityPublicKey']),
         'wrappedIdentityPrivateKey': BlobFromJSON(json['wrappedIdentityPrivateKey']),
         'masterKeyWraps': ((json['masterKeyWraps'] as Array<any>).map(MasterKeyWrapFromJSON)),
-        'authVerifier': AuthVerifierFromJSON(json['authVerifier']),
-        'recoveryAuthTag': json['recoveryAuthTag'] == null ? undefined : json['recoveryAuthTag'],
+        'password': json['password'],
+        'recoveryMasterKeyTag': json['recoveryMasterKeyTag'],
         'personalScopePublicKey': KemPublicKeyFromJSON(json['personalScopePublicKey']),
         'wrappedPersonalScopePrivateKey': BlobFromJSON(json['wrappedPersonalScopePrivateKey']),
-        'scopePublicKey': KemPublicKeyFromJSON(json['scopePublicKey']),
-        'wrappedScopePrivateKey': BlobFromJSON(json['wrappedScopePrivateKey']),
+        'tenantScopePublicKey': KemPublicKeyFromJSON(json['tenantScopePublicKey']),
+        'wrappedTenantScopePrivateKey': BlobFromJSON(json['wrappedTenantScopePrivateKey']),
     };
 }
 
@@ -189,12 +183,12 @@ export function RegisterViaInvitationRequestToJSONTyped(value?: RegisterViaInvit
         'identityPublicKey': IdentityPublicKeyToJSON(value['identityPublicKey']),
         'wrappedIdentityPrivateKey': BlobToJSON(value['wrappedIdentityPrivateKey']),
         'masterKeyWraps': ((value['masterKeyWraps'] as Array<any>).map(MasterKeyWrapToJSON)),
-        'authVerifier': AuthVerifierToJSON(value['authVerifier']),
-        'recoveryAuthTag': value['recoveryAuthTag'],
+        'password': value['password'],
+        'recoveryMasterKeyTag': value['recoveryMasterKeyTag'],
         'personalScopePublicKey': KemPublicKeyToJSON(value['personalScopePublicKey']),
         'wrappedPersonalScopePrivateKey': BlobToJSON(value['wrappedPersonalScopePrivateKey']),
-        'scopePublicKey': KemPublicKeyToJSON(value['scopePublicKey']),
-        'wrappedScopePrivateKey': BlobToJSON(value['wrappedScopePrivateKey']),
+        'tenantScopePublicKey': KemPublicKeyToJSON(value['tenantScopePublicKey']),
+        'wrappedTenantScopePrivateKey': BlobToJSON(value['wrappedTenantScopePrivateKey']),
     };
 }
 

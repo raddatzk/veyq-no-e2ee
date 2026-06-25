@@ -40,8 +40,9 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
 - [x] **P2.2 Argon2 8 → 32 MiB.** `Argon2Verifier` + all client setup/register/reset paths (web/iOS/Android,
   incl. `v1.ARGON` which drives web reset) + `LoginSliceTest` now use `m=32768` — above the OWASP floor while
   keeping JS login responsive. This also fixed a latent bug — web reset already minted a verifier the 8192
-  backend couldn't verify. The client authVerifier-creation params must match the backend verifier (it
-  hardcodes them, no kdfParams on the verifier), so they move in lockstep; register+login verified
+  backend couldn't verify. Account registration now sends the password and lets the backend derive the
+  auth verifier with the canonical `Argon2Verifier` params; any remaining client-side verifier producers
+  must match those backend params because the verifier carries no `kdfParams`. Register+login verified
   cross-stack on web + Android. (The invite-temp-key Argon stays 65536 — it's a separate params-carried KDF,
   not the auth verifier.)
 - [~] **P2.3 Live-journal bugs.** The seed race is largely resolved by 6a (all platforms now reconstruct from

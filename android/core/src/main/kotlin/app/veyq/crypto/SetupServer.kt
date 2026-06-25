@@ -11,11 +11,8 @@ import java.util.Base64
 object SetupServer {
     private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private val b64 = Base64.getUrlEncoder().withoutPadding()
-    private val phcB64 = Base64.getEncoder().withoutPadding()
     private fun b64url(b: ByteArray): String = b64.encodeToString(b)
     private fun blob(bytes: ByteArray): JSONObject = JSONObject().put("suiteId", "v1").put("bytes", b64url(bytes))
-    fun authVerifierPhc(salt: ByteArray, verifier: ByteArray): String =
-        "\$argon2id\$v=19\$m=${argon.m},t=${argon.t},p=${argon.p}\$${phcB64.encodeToString(salt)}\$${phcB64.encodeToString(verifier)}"
 
     data class EmergencyKit(val secretKey: String)
 
@@ -34,12 +31,6 @@ object SetupServer {
         val recSalt = V1.randomBytes(16)
         val recWrap = V1.symWrap(V1.kekRecovery(secretKey, recSalt, argon), masterKey, "master-key", V1.randomBytes(12))
 
-        val authSalt = V1.randomBytes(16)
-        val verifier = V1.kekRecovery(
-            java.text.Normalizer.normalize(password, java.text.Normalizer.Form.NFC).toByteArray(Charsets.UTF_8),
-            authSalt, argon,
-        )
-
         // personal scope is self-owned and unshared; grant it only to this identity.
         val personal = V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
         val personalPublic = personal.pubKemX + personal.pubKemM
@@ -57,9 +48,9 @@ object SetupServer {
             .put("identityPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(id.pubKemX + id.pubKemM)).put("signPublicKey", b64url(id.pubSign)))
             .put("wrappedIdentityPrivateKey", blob(wrappedPriv))
             .put("masterKeyWraps", masterKeyWraps)
-            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", authVerifierPhc(authSalt, verifier)))
+            .put("password", password)
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-            .put("recoveryAuthTag", b64url(V1.recoveryAuthTag(masterKey)))
+            .put("recoveryMasterKeyTag", b64url(V1.recoveryAuthTag(masterKey)))
             .put("personalScopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(personalPublic)))
             .put("wrappedPersonalScopePrivateKey", blob(personalGrant))
             .toString()

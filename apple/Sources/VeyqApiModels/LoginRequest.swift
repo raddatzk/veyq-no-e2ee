@@ -34,3 +34,4 @@ public struct LoginRequest: Codable {
         try container.encode(password, forKey: .password)
     }
 }
+

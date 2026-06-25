@@ -8,6 +8,42 @@ info:
     content and key material operator-blind: private keys and master keys never leave the client, and
     the server stores only opaque wraps, verifiers and low-sensitivity account metadata.
 paths:
+  /api/tenant-invites/{inviteId}/register:
+    post:
+      tags:
+        - AccountLifecycle
+      operationId: registerViaInvitation
+      summary: Register a brand-new account from an invitation.
+      description: >
+        The invitee (not yet authenticated) presents the bootstrap secret together with all freshly
+        generated key material — identity public key, the wrapped identity private key and master-key
+        unlock wraps — plus the account password and the tenant scope private key wrapped to their own
+        identity. The server derives the auth verifier from the password. For an OWNER invite the
+        client also mints the empty tenant's scope public key; for a MEMBER invite it reuses the
+        invited tenant scope public key from the public invite metadata. The server creates the
+        account, activates membership, consumes the invite and issues a session. It stores ciphertext +
+        public material only; it never sees a private key.
+      parameters:
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterViaInvitationRequest" }
+      responses:
+        '200':
+          description: The new account's session + tenant context.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisterViaInvitationResponse" }
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
+        '403':
+          $ref: "./common.openapi.yaml#/components/responses/Forbidden"
+        '404':
+          $ref: "./common.openapi.yaml#/components/responses/NotFound"
+        '409':
+          $ref: "./common.openapi.yaml#/components/responses/Conflict"
   /api/me:
     get:
       tags:
@@ -322,7 +358,7 @@ paths:
                 suiteId: v1
                 wrappedKey: bmV3LXBhc3N3b3JkLXdyYXA
                 kdfParams: eyJhbGciOiJhcmdvbjJpZCIsIm0iOjE5NDU2fQ
-              recoveryAuthTag: uB0qY8XopHdt7vR8Uqq93w
+              recoveryMasterKeyTag: uB0qY8XopHdt7vR8Uqq93w
       responses:
         '204':
           description: The password was reset.
@@ -404,6 +440,49 @@ components:
       bearerFormat: opaque session token
       description: Bearer session token returned by the session login/refresh endpoints.
   schemas:
+    RegisterViaInvitationRequest:
+      type: object
+      required:
+        [bootstrapSecret, email, displayName, identityPublicKey, wrappedIdentityPrivateKey,
+         masterKeyWraps, password, recoveryMasterKeyTag, personalScopePublicKey,
+         wrappedPersonalScopePrivateKey, tenantScopePublicKey, wrappedTenantScopePrivateKey]
+      properties:
+        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        identityPublicKey: { $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey" }
+        wrappedIdentityPrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        masterKeyWraps:
+          type: array
+          minItems: 1
+          items: { $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap" }
+        password:
+          type: string
+          description: The account password. The server derives and stores the ARGON2_PROOF auth verifier; content unlock still requires the client-held Secret Key.
+          x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)']
+        # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — the recovery commitment (see setup spec).
+        recoveryMasterKeyTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
+        personalScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedPersonalScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+        tenantScopePublicKey: { $ref: "./common.openapi.yaml#/components/schemas/KemPublicKey" }
+        wrappedTenantScopePrivateKey: { $ref: "./common.openapi.yaml#/components/schemas/Blob" }
+    RegisterViaInvitationResponse:
+      type: object
+      required: [sessionToken, user, tenant]
+      properties:
+        sessionToken: { type: string }
+        user: { $ref: "./common.openapi.yaml#/components/schemas/UserSummary" }
+        tenant: { $ref: "#/components/schemas/RegistrationTenantSummary" }
+    RegistrationTenantSummary:
+      type: object
+      required: [id, name, displayName, status]
+      properties:
+        id: { type: string }
+        name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        domain: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+        logoUrl: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
+        status: { type: string, enum: [PENDING, ACTIVE] }
     UpdateProfileRequest:
       type: object
       example:
@@ -576,12 +655,12 @@ components:
           suiteId: v1
           wrappedKey: bmV3LXBhc3N3b3JkLXdyYXA
           kdfParams: eyJhbGciOiJhcmdvbjJpZCIsIm0iOjE5NDU2fQ
-        recoveryAuthTag: uB0qY8XopHdt7vR8Uqq93w
+        recoveryMasterKeyTag: uB0qY8XopHdt7vR8Uqq93w
       required:
         - token
         - newPassword
         - masterKeyWrap
-        - recoveryAuthTag
+        - recoveryMasterKeyTag
       properties:
         token:
           type: string
@@ -593,7 +672,7 @@ components:
             - '@field:jakarta.validation.constraints.Size(max = 1024)'
         masterKeyWrap:
           $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap"
-        recoveryAuthTag:
+        recoveryMasterKeyTag:
           type: string
           x-field-extra-annotation:
             - '@field:jakarta.validation.constraints.Size(max = 128)'

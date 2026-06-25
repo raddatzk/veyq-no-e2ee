@@ -34,7 +34,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param masterKeyWrap 
- * @param recoveryAuthTag 
+ * @param recoveryMasterKeyTag 
  */
 @Serializable
 
@@ -43,8 +43,8 @@ data class UpsertMasterKeyWrapRequest (
     @SerialName(value = "masterKeyWrap")
     val masterKeyWrap: MasterKeyWrap,
 
-    @SerialName(value = "recoveryAuthTag")
-    val recoveryAuthTag: kotlin.String? = null
+    @SerialName(value = "recoveryMasterKeyTag")
+    val recoveryMasterKeyTag: kotlin.String? = null
 
 ) {
 

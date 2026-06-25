@@ -1,9 +1,11 @@
 package com.veyq.app.features.dev.smoke
 
+import com.veyq.app.generated.model.AuthVerifier
 import com.veyq.app.generated.model.CreateServerOwnerRequest
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.config.DevToolsConfig
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
@@ -23,6 +25,7 @@ class DevSmokeHandler(
     private val config: DevToolsConfig,
     private val accounts: AccountFactory,
     private val users: UserRepository,
+    private val argon2: Argon2Verifier,
 ) {
     @Transactional
     fun createAccount(req: CreateServerOwnerRequest): UserSummary {
@@ -42,8 +45,12 @@ class DevSmokeHandler(
                 identityPublicKey = req.identityPublicKey,
                 wrappedIdentityPrivateKey = req.wrappedIdentityPrivateKey,
                 masterKeyWraps = req.masterKeyWraps,
-                recoveryAuthTag = req.recoveryAuthTag,
-                authVerifier = req.authVerifier,
+                recoveryMasterKeyTag = req.recoveryMasterKeyTag,
+                authVerifier = AuthVerifier(
+                    kind = AuthVerifier.Kind.ARGON2_PROOF,
+                    suiteId = "v1",
+                    verifier = argon2.createPasswordVerifier(req.password),
+                ),
                 personalScopePublicKey = req.personalScopePublicKey,
                 wrappedPersonalScopePrivateKey = req.wrappedPersonalScopePrivateKey,
             ),

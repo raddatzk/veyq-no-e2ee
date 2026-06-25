@@ -25,9 +25,9 @@ import java.util.UUID
 import com.veyq.app.platform.error.notFound
 
 /**
- * uc.admin.invite-members-roles (temp-wrap invite) — a key-holding Tenant Owner issues an invite for a
+ * uc.admin.invite-members-roles (invite-wrap invite) — a key-holding Tenant Owner issues an invite for a
  * brand-new user. The owner has already wrapped the tenant scope private key to a one-time temp public
- * key (client-side); the server stores only the temp public key + that ciphertext. The temp private key
+ * key (client-side); the server stores only the invite wrapping public key + that ciphertext. The invite wrapping private key
  * travels in the invite URL fragment and never reaches the server, so the operator stays blind.
  */
 @ApplicationScoped
@@ -48,8 +48,8 @@ class MemberInviteHandler(
         // only an active Owner who actually holds the scope can hand it on (you can only grant what you read)
         val callerId = guard.requireOwner(auth, tenantId)
         val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
-        suites.require(req.tempPublicKey.suiteId)
-        suites.require(req.tempWrappedScopePrivateKey.suiteId)
+        suites.require(req.inviteWrappingPublicKey.suiteId)
+        suites.require(req.wrappedTenantScopePrivateKey.suiteId)
         grants.find(scope.id, callerId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
 
         val secret = ByteArray(32).also { rng.nextBytes(it) }
@@ -59,9 +59,9 @@ class MemberInviteHandler(
             id = UUID.randomUUID().toString(); this.tenantId = tenantId; role = MemberRole.valueOf(req.role.value)
             secretHash = sha256(secret); status = InviteStatus.PENDING; kind = InviteKind.MEMBER
             scopeId = scope.id
-            tempPublicKey = dec.decode(req.tempPublicKey.kemPublicKey)
-            tempWrappedScopePrivateKey = dec.decode(req.tempWrappedScopePrivateKey.bytes)
-            tempWrapSuiteId = req.tempWrappedScopePrivateKey.suiteId
+            tempPublicKey = dec.decode(req.inviteWrappingPublicKey.kemPublicKey)
+            tempWrappedScopePrivateKey = dec.decode(req.wrappedTenantScopePrivateKey.bytes)
+            tempWrapSuiteId = req.wrappedTenantScopePrivateKey.suiteId
             createdBy = callerId; createdAt = now; expiresAt = expires
         }
         invites.persist(invite)

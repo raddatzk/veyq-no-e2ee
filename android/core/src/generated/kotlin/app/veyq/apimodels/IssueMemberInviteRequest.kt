@@ -35,8 +35,8 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param role 
- * @param tempPublicKey 
- * @param tempWrappedScopePrivateKey 
+ * @param inviteWrappingPublicKey Public half of the one-time invite wrapping keypair. The owner keeps the private half in the invite link fragment.
+ * @param wrappedTenantScopePrivateKey Tenant scope private key wrapped to inviteWrappingPublicKey.
  */
 @Serializable
 
@@ -45,11 +45,13 @@ data class IssueMemberInviteRequest (
     @SerialName(value = "role")
     val role: IssueMemberInviteRequest.Role,
 
-    @SerialName(value = "tempPublicKey")
-    val tempPublicKey: KemPublicKey,
+    /* Public half of the one-time invite wrapping keypair. The owner keeps the private half in the invite link fragment. */
+    @SerialName(value = "inviteWrappingPublicKey")
+    val inviteWrappingPublicKey: KemPublicKey,
 
-    @SerialName(value = "tempWrappedScopePrivateKey")
-    val tempWrappedScopePrivateKey: Blob
+    /* Tenant scope private key wrapped to inviteWrappingPublicKey. */
+    @SerialName(value = "wrappedTenantScopePrivateKey")
+    val wrappedTenantScopePrivateKey: Blob
 
 ) {
 

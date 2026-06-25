@@ -24,7 +24,6 @@
 
 package app.veyq.apimodels
 
-import app.veyq.apimodels.AuthVerifier
 import app.veyq.apimodels.Blob
 import app.veyq.apimodels.IdentityPublicKey
 import app.veyq.apimodels.KemPublicKey
@@ -43,12 +42,12 @@ import kotlinx.serialization.Contextual
  * @param identityPublicKey 
  * @param wrappedIdentityPrivateKey 
  * @param masterKeyWraps 
- * @param authVerifier 
+ * @param password The account password. The server derives and stores the ARGON2_PROOF auth verifier; content unlock still requires the client-held Secret Key.
+ * @param recoveryMasterKeyTag 
  * @param personalScopePublicKey 
  * @param wrappedPersonalScopePrivateKey 
- * @param scopePublicKey 
- * @param wrappedScopePrivateKey 
- * @param recoveryAuthTag 
+ * @param tenantScopePublicKey 
+ * @param wrappedTenantScopePrivateKey 
  */
 @Serializable
 
@@ -72,8 +71,12 @@ data class RegisterViaInvitationRequest (
     @SerialName(value = "masterKeyWraps")
     val masterKeyWraps: kotlin.collections.List<MasterKeyWrap>,
 
-    @SerialName(value = "authVerifier")
-    val authVerifier: AuthVerifier,
+    /* The account password. The server derives and stores the ARGON2_PROOF auth verifier; content unlock still requires the client-held Secret Key. */
+    @SerialName(value = "password")
+    val password: kotlin.String,
+
+    @SerialName(value = "recoveryMasterKeyTag")
+    val recoveryMasterKeyTag: kotlin.String,
 
     @SerialName(value = "personalScopePublicKey")
     val personalScopePublicKey: KemPublicKey,
@@ -81,14 +84,11 @@ data class RegisterViaInvitationRequest (
     @SerialName(value = "wrappedPersonalScopePrivateKey")
     val wrappedPersonalScopePrivateKey: Blob,
 
-    @SerialName(value = "scopePublicKey")
-    val scopePublicKey: KemPublicKey,
+    @SerialName(value = "tenantScopePublicKey")
+    val tenantScopePublicKey: KemPublicKey,
 
-    @SerialName(value = "wrappedScopePrivateKey")
-    val wrappedScopePrivateKey: Blob,
-
-    @SerialName(value = "recoveryAuthTag")
-    val recoveryAuthTag: kotlin.String? = null
+    @SerialName(value = "wrappedTenantScopePrivateKey")
+    val wrappedTenantScopePrivateKey: Blob
 
 ) {
 

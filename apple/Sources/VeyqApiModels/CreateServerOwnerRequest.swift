@@ -18,19 +18,20 @@ public struct CreateServerOwnerRequest: Codable {
     public private(set) var identityPublicKey: IdentityPublicKey
     public private(set) var wrappedIdentityPrivateKey: Blob
     public private(set) var masterKeyWraps: [MasterKeyWrap]
-    public private(set) var authVerifier: AuthVerifier
-    public private(set) var recoveryAuthTag: String?
+    /** The account password. The server derives and stores the ARGON2_PROOF auth verifier. */
+    public private(set) var password: String
+    public private(set) var recoveryMasterKeyTag: String?
     public private(set) var personalScopePublicKey: KemPublicKey
     public private(set) var wrappedPersonalScopePrivateKey: Blob
 
-    public init(email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], authVerifier: AuthVerifier, recoveryAuthTag: String? = nil, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob) {
+    public init(email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], password: String, recoveryMasterKeyTag: String? = nil, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob) {
         self.email = email
         self.displayName = displayName
         self.identityPublicKey = identityPublicKey
         self.wrappedIdentityPrivateKey = wrappedIdentityPrivateKey
         self.masterKeyWraps = masterKeyWraps
-        self.authVerifier = authVerifier
-        self.recoveryAuthTag = recoveryAuthTag
+        self.password = password
+        self.recoveryMasterKeyTag = recoveryMasterKeyTag
         self.personalScopePublicKey = personalScopePublicKey
         self.wrappedPersonalScopePrivateKey = wrappedPersonalScopePrivateKey
     }
@@ -41,8 +42,8 @@ public struct CreateServerOwnerRequest: Codable {
         case identityPublicKey
         case wrappedIdentityPrivateKey
         case masterKeyWraps
-        case authVerifier
-        case recoveryAuthTag
+        case password
+        case recoveryMasterKeyTag
         case personalScopePublicKey
         case wrappedPersonalScopePrivateKey
     }
@@ -56,8 +57,8 @@ public struct CreateServerOwnerRequest: Codable {
         try container.encode(identityPublicKey, forKey: .identityPublicKey)
         try container.encode(wrappedIdentityPrivateKey, forKey: .wrappedIdentityPrivateKey)
         try container.encode(masterKeyWraps, forKey: .masterKeyWraps)
-        try container.encode(authVerifier, forKey: .authVerifier)
-        try container.encodeIfPresent(recoveryAuthTag, forKey: .recoveryAuthTag)
+        try container.encode(password, forKey: .password)
+        try container.encodeIfPresent(recoveryMasterKeyTag, forKey: .recoveryMasterKeyTag)
         try container.encode(personalScopePublicKey, forKey: .personalScopePublicKey)
         try container.encode(wrappedPersonalScopePrivateKey, forKey: .wrappedPersonalScopePrivateKey)
     }

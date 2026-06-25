@@ -17,21 +17,21 @@ public struct CreateGroupRequest: Codable {
     /** Group scope private key wrapped to the creator's identity (self-grant). */
     public private(set) var wrappedScopePrivateKey: Blob
     /** Content key wrapped to the group scope public key. */
-    public private(set) var contentKey: Blob
+    public private(set) var wrappedContentKey: Blob
     /** Group name sealed under the content key (operator-blind). */
     public private(set) var sealedName: Blob
 
-    public init(scopePublicKey: KemPublicKey, wrappedScopePrivateKey: Blob, contentKey: Blob, sealedName: Blob) {
+    public init(scopePublicKey: KemPublicKey, wrappedScopePrivateKey: Blob, wrappedContentKey: Blob, sealedName: Blob) {
         self.scopePublicKey = scopePublicKey
         self.wrappedScopePrivateKey = wrappedScopePrivateKey
-        self.contentKey = contentKey
+        self.wrappedContentKey = wrappedContentKey
         self.sealedName = sealedName
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case scopePublicKey
         case wrappedScopePrivateKey
-        case contentKey
+        case wrappedContentKey
         case sealedName
     }
 
@@ -41,7 +41,7 @@ public struct CreateGroupRequest: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(scopePublicKey, forKey: .scopePublicKey)
         try container.encode(wrappedScopePrivateKey, forKey: .wrappedScopePrivateKey)
-        try container.encode(contentKey, forKey: .contentKey)
+        try container.encode(wrappedContentKey, forKey: .wrappedContentKey)
         try container.encode(sealedName, forKey: .sealedName)
     }
 }

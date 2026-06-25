@@ -37,7 +37,7 @@ import kotlinx.serialization.Contextual
  * @param username 
  * @param initials 
  * @param memories 
- * @param avatarUrl 
+ * @param avatarUrl Short-lived presigned object-store URL for the avatar. The avatar object key contains the cache-busting version segment.
  */
 @Serializable
 
@@ -58,6 +58,7 @@ data class UserProfileSummary (
     @SerialName(value = "memories")
     val memories: kotlin.collections.List<@Contextual kotlin.Any>,
 
+    /* Short-lived presigned object-store URL for the avatar. The avatar object key contains the cache-busting version segment. */
     @SerialName(value = "avatarUrl")
     val avatarUrl: kotlin.String? = null
 

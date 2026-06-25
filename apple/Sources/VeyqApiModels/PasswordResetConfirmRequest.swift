@@ -16,20 +16,20 @@ public struct PasswordResetConfirmRequest: Codable {
     public private(set) var token: String
     public private(set) var newPassword: String
     public private(set) var masterKeyWrap: MasterKeyWrap
-    public private(set) var recoveryAuthTag: String
+    public private(set) var recoveryMasterKeyTag: String
 
-    public init(token: String, newPassword: String, masterKeyWrap: MasterKeyWrap, recoveryAuthTag: String) {
+    public init(token: String, newPassword: String, masterKeyWrap: MasterKeyWrap, recoveryMasterKeyTag: String) {
         self.token = token
         self.newPassword = newPassword
         self.masterKeyWrap = masterKeyWrap
-        self.recoveryAuthTag = recoveryAuthTag
+        self.recoveryMasterKeyTag = recoveryMasterKeyTag
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case token
         case newPassword
         case masterKeyWrap
-        case recoveryAuthTag
+        case recoveryMasterKeyTag
     }
 
     // Encodable protocol methods
@@ -39,7 +39,7 @@ public struct PasswordResetConfirmRequest: Codable {
         try container.encode(token, forKey: .token)
         try container.encode(newPassword, forKey: .newPassword)
         try container.encode(masterKeyWrap, forKey: .masterKeyWrap)
-        try container.encode(recoveryAuthTag, forKey: .recoveryAuthTag)
+        try container.encode(recoveryMasterKeyTag, forKey: .recoveryMasterKeyTag)
     }
 }
 

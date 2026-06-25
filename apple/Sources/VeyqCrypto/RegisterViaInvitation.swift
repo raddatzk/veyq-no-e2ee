@@ -2,40 +2,40 @@ import Foundation
 
 /// uc.account.register-via-invitation (Apple) — a brand-new invitee accepts an owner invite. All key
 /// material is born here; one POST creates the account, mints the tenant scope as a self grant, and
-/// returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
+/// returns a session. The server only ever receives ciphertext, public keys and the account password.
+/// It derives the auth verifier server-side.
 public enum RegisterViaInvitation {
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
-    struct AuthVerifierDTO: Codable { let kind, suiteId, verifier: String }
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct RegisterRequest: Codable {
         let bootstrapSecret, email, displayName: String
         let identityPublicKey: IdentityPublicKeyDTO
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
-        let authVerifier: AuthVerifierDTO
-        let recoveryAuthTag: String
+        let password: String
+        let recoveryMasterKeyTag: String
         let personalScopePublicKey: KemPublicKeyDTO
         let wrappedPersonalScopePrivateKey: BlobDTO
-        let scopePublicKey: KemPublicKeyDTO
-        let wrappedScopePrivateKey: BlobDTO
+        let tenantScopePublicKey: KemPublicKeyDTO
+        let wrappedTenantScopePrivateKey: BlobDTO
     }
     public struct TenantInviteInfoDTO: Codable {
         public let inviteId: String
         public let tenant: Tenant.TenantSummary
         public let role, status, kind: String
-        let scopePublicKey: KemPublicKeyDTO?
+        let tenantScopePublicKey: KemPublicKeyDTO?
     }
     /// Temp-wrapped onboarding material, released only on proof of the bootstrap secret (defense in depth).
     public struct TenantInviteMaterialDTO: Codable {
-        let tempPublicKey: KemPublicKeyDTO
-        let tempWrappedScopePrivateKey: BlobDTO
+        let inviteWrappingPublicKey: KemPublicKeyDTO
+        let wrappedTenantScopePrivateKey: BlobDTO
     }
     struct GetInviteMaterialRequest: Codable { let bootstrapSecret: String }
 
     /// Builds the tenant scope grant for the new account, given the invitee's identity public key.
-    public typealias TenantScopeProvider = (_ idPubKemX: Data, _ idPubKemM: Data) throws -> (scopePublicKey: String, wrappedScopePrivateKey: String)
+    public typealias TenantScopeProvider = (_ idPubKemX: Data, _ idPubKemM: Data) throws -> (tenantScopePublicKey: String, wrappedTenantScopePrivateKey: String)
     struct RegisterResponseDTO: Codable {
         let sessionToken: String
         let user: Login.UserSummaryDTO
@@ -60,7 +60,7 @@ public enum RegisterViaInvitation {
         return try JSONDecoder().decode(TenantInviteInfoDTO.self, from: data)
     }
 
-    /// Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata).
+    /// Fetch the invite-wrapped onboarding material by proving the bootstrap secret (not in public metadata).
     public static func getInviteMaterial(apiBase: String, inviteId: String, bootstrapSecret: String) async throws -> TenantInviteMaterialDTO {
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant-invites/\(inviteId)/material")!)
         r.httpMethod = "POST"
@@ -91,9 +91,6 @@ public enum RegisterViaInvitation {
         let recSalt = V1.randomBytes(16)
         let recWrap = try V1.symWrap(kek: try V1.kekRecovery(recoveryCode: secretKey, salt: recSalt, params: SetupServer.argon), targetKey: masterKey, context: "master-key", nonce: V1.randomBytes(12))
 
-        let authSalt = V1.randomBytes(16)
-        let verifier = try V1.kekRecovery(recoveryCode: Data(password.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: SetupServer.argon)
-
         // create the unshared personal scope; only this user receives a grant
         let personal = try V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
         let personalPublic = personal.pubKemX + personal.pubKemM
@@ -112,13 +109,13 @@ public enum RegisterViaInvitation {
                 MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(masterWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: salt))),
                 MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: SetupServer.b64url(recWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: recSalt))),
             ],
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.authVerifierPhc(salt: authSalt, verifier: verifier)),
+            password: password,
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-            recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)),
+            recoveryMasterKeyTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(personalGrant)),
-            scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: scope.scopePublicKey),
-            wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: scope.wrappedScopePrivateKey))
+            tenantScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: scope.tenantScopePublicKey),
+            wrappedTenantScopePrivateKey: BlobDTO(suiteId: "v1", bytes: scope.wrappedTenantScopePrivateKey))
         return (req, SetupServer.EmergencyKit(secretKey: SetupServer.b64url(secretKey)))
     }
 
@@ -130,12 +127,14 @@ public enum RegisterViaInvitation {
             apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret, email: email, displayName: displayName, password: password
         ) { idX, idM in
             let scope = try V1.generateIdentity()
-            return (SetupServer.b64url(scope.pubKemX + scope.pubKemM),
-                    SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: V1.serializeIdentityPrivate(scope), context: "scope-grant", nonce: V1.randomBytes(12))))
+            return (
+                tenantScopePublicKey: SetupServer.b64url(scope.pubKemX + scope.pubKemM),
+                wrappedTenantScopePrivateKey: SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: V1.serializeIdentityPrivate(scope), context: "scope-grant", nonce: V1.randomBytes(12)))
+            )
         }
     }
 
-    /// Core registration assembly shared by the owner-claim and temp-wrap member flows.
+    /// Core registration assembly shared by the owner-claim and invite-wrap member flows.
     public static func registerWithScope(
         apiBase: String, inviteId: String, bootstrapSecret: String, email: String, displayName: String, password: String,
         tenantScope: TenantScopeProvider

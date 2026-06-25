@@ -33,8 +33,8 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param rootSessionId 
- * @param encryptedLabel Client-encrypted human-readable login session label.
- * @param loginMethod Initial authentication flow used to create the session family.
+ * @param encryptedLabel Client-encrypted human-readable label for the login-session family.
+ * @param loginMethod Initial login flow that created the root session.
  * @param createdAt 
  * @param lastUsedAt 
  */
@@ -45,13 +45,13 @@ data class LoginSessionSummary (
     @SerialName(value = "rootSessionId")
     val rootSessionId: kotlin.String,
 
-    /* Client-encrypted human-readable login session label. */
+    /* Client-encrypted human-readable label for the login-session family. */
     @SerialName(value = "encryptedLabel")
     val encryptedLabel: kotlin.String,
 
-    /* Initial authentication flow used to create the session family. */
+    /* Initial login flow that created the root session. */
     @SerialName(value = "loginMethod")
-    val loginMethod: LoginMethod,
+    val loginMethod: LoginSessionSummary.LoginMethod,
 
     @Contextual @SerialName(value = "createdAt")
     val createdAt: java.time.OffsetDateTime,
@@ -62,15 +62,16 @@ data class LoginSessionSummary (
 ) {
 
     /**
-     * Initial authentication flow used to create the session family.
+     * Initial login flow that created the root session.
      *
-     * Values: PASSWORD,PASSKEY,QR
+     * Values: PASSWORD,PASSKEY,DEVICE_APPROVAL,RECOVERY
      */
     @Serializable
     enum class LoginMethod(val value: kotlin.String) {
         @SerialName(value = "PASSWORD") PASSWORD("PASSWORD"),
         @SerialName(value = "PASSKEY") PASSKEY("PASSKEY"),
-        @SerialName(value = "QR") QR("QR");
+        @SerialName(value = "DEVICE_APPROVAL") DEVICE_APPROVAL("DEVICE_APPROVAL"),
+        @SerialName(value = "RECOVERY") RECOVERY("RECOVERY");
     }
 
 }

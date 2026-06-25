@@ -1,10 +1,12 @@
 package com.veyq.app.features.admin.setupserver
 
+import com.veyq.app.generated.model.AuthVerifier
 import com.veyq.app.generated.model.CreateServerOwnerRequest
 import com.veyq.app.generated.model.SetupStatus
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.config.AppConfig
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
@@ -25,6 +27,7 @@ class SetupServerHandler(
     private val setupGate: SetupGate,
     private val serverSetup: ServerSetupRepository,
     private val store: BlobStore,
+    private val argon2: Argon2Verifier,
     app: AppConfig,
 ) {
     private val appBaseUrl: String = app.baseUrl()
@@ -60,8 +63,12 @@ class SetupServerHandler(
                 identityPublicKey = req.identityPublicKey,
                 wrappedIdentityPrivateKey = req.wrappedIdentityPrivateKey,
                 masterKeyWraps = req.masterKeyWraps,
-                recoveryAuthTag = req.recoveryAuthTag,
-                authVerifier = req.authVerifier,
+                recoveryMasterKeyTag = req.recoveryMasterKeyTag,
+                authVerifier = AuthVerifier(
+                    kind = AuthVerifier.Kind.ARGON2_PROOF,
+                    suiteId = "v1",
+                    verifier = argon2.createPasswordVerifier(req.password),
+                ),
                 personalScopePublicKey = req.personalScopePublicKey,
                 wrappedPersonalScopePrivateKey = req.wrappedPersonalScopePrivateKey,
             ),

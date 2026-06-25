@@ -80,7 +80,10 @@ SWIFT_OUT = ROOT / "apple" / "Sources" / "VeyqApiModels"
 KOTLIN_PKG = "app.veyq.apimodels"
 KOTLIN_OUT = ROOT / "android" / "core" / "src" / "generated" / "kotlin" / "app" / "veyq" / "apimodels"
 
-GENERATOR = ["npx", "--yes", "@openapitools/openapi-generator-cli", "generate"]
+LOCAL_GENERATOR = ROOT / "frontend" / "node_modules" / ".bin" / "openapi-generator-cli"
+LOCAL_GENERATOR_JAR = ROOT / "frontend" / "node_modules" / "@openapitools" / "openapi-generator-cli" / "versions" / "7.21.0.jar"
+GENERATOR = ["java", "-jar", str(LOCAL_GENERATOR_JAR), "generate"] if LOCAL_GENERATOR_JAR.exists() else ["npx", "--yes", "@openapitools/openapi-generator-cli", "generate"]
+GENERATOR_CWD = ROOT
 
 HEADER = "// GENERATED from docs/api/*.openapi.yaml by scripts/gen_mobile_models.py — DO NOT EDIT.\n"
 
@@ -93,7 +96,7 @@ def run_generator(spec: Path, gen: str, out: Path, extra: list[str]) -> None:
         "--global-property", "models,modelTests=false,modelDocs=false",  # model classes only
         "--skip-validate-spec",
     ] + extra
-    res = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+    res = subprocess.run(cmd, cwd=GENERATOR_CWD, capture_output=True, text=True)
     if res.returncode != 0:
         sys.stderr.write(f"\n[gen {gen}] FAILED\n{res.stdout[-3000:]}\n{res.stderr[-2000:]}\n")
         raise SystemExit(1)

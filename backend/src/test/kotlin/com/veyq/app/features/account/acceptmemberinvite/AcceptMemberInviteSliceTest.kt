@@ -115,7 +115,7 @@ class AcceptMemberInviteSliceTest {
     }
 
     private fun acceptBody(secret: String, bytes: String) =
-        """{"bootstrapSecret":"$secret","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$bytes"}}"""
+        """{"bootstrapSecret":"$secret","wrappedTenantScopePrivateKey":{"suiteId":"v1","bytes":"$bytes"}}"""
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
 }

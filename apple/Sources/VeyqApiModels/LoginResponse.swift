@@ -14,7 +14,7 @@ import AnyCodable
 public struct LoginResponse: Codable {
 
     public private(set) var sessionToken: String
-    /** Stable root login-session identifier attached to the issued session family. */
+    /** Stable opaque identifier for this root login-session family. */
     public private(set) var rootSessionId: String
     public private(set) var user: UserSummary
     public private(set) var keyBag: KeyBag
@@ -43,3 +43,4 @@ public struct LoginResponse: Codable {
         try container.encode(keyBag, forKey: .keyBag)
     }
 }
+

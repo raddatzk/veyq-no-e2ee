@@ -146,6 +146,7 @@ models/PublicShare.ts
 models/RefreshSessionResponse.ts
 models/RegisterViaInvitationRequest.ts
 models/RegisterViaInvitationResponse.ts
+models/RegistrationTenantSummary.ts
 models/RenameLoginSessionRequest.ts
 models/RewrapMyScopeGrantRequest.ts
 models/RotateIdentityRequest.ts

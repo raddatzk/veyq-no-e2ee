@@ -2,7 +2,7 @@
 // All key material is generated here; the server only ever receives ciphertext + public keys.
 import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
-import { b64url, phcB64 } from '../../../shared/base64'
+import { b64url } from '../../../shared/base64'
 
 // Argon2id params (t=3, m=32 MiB) — must match the server's auth verifier; carried in kdfParams for agility.
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
@@ -13,8 +13,8 @@ export type CreateServerOwnerRequest = {
   identityPublicKey: { suiteId: string; kemPublicKey: string; signPublicKey: string }
   wrappedIdentityPrivateKey: { suiteId: string; bytes: string }
   masterKeyWraps: Array<{ unlockMethod: string; suiteId: string; wrappedKey: string; kdfParams?: string }>
-  authVerifier: { kind: string; suiteId: string; verifier: string }
-  recoveryAuthTag?: string
+  password: string
+  recoveryMasterKeyTag?: string
   personalScopePublicKey: { suiteId: string; kemPublicKey: string }
   wrappedPersonalScopePrivateKey: { suiteId: string; bytes: string }
 }
@@ -45,11 +45,6 @@ export function buildCreateServerOwnerRequest(
   const recSalt = v1.randomBytes(16)
   const recWrap = v1.symWrap(v1.kekRecovery(secretKey, recSalt, ARGON), masterKey, 'master-key', v1.randomBytes(12))
 
-  // server-side auth verifier: Argon2id(password, authSalt) stored as a PHC string
-  const authSalt = v1.randomBytes(16)
-  const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
-  const authPhc = `$argon2id$v=19$m=${ARGON.m},t=${ARGON.t},p=${ARGON.p}$${phcB64(authSalt)}$${phcB64(verifier)}`
-
   // personal scope is self-owned and unshared; grant it only to this identity
   const personal = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
   const personalPublic = v1.concat(personal.pub.kemX, personal.pub.kemM)
@@ -73,9 +68,9 @@ export function buildCreateServerOwnerRequest(
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, salt)) },
       { unlockMethod: 'RECOVERY', suiteId: 'v1', wrappedKey: b64url(recWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, recSalt)) },
     ],
-    authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: authPhc },
+    password,
     // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-    recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
+    recoveryMasterKeyTag: b64url(v1.recoveryAuthTag(masterKey)),
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
     wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
   }

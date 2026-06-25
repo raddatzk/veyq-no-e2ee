@@ -24,7 +24,6 @@
 
 package app.veyq.apimodels
 
-import app.veyq.apimodels.AuthVerifier
 import app.veyq.apimodels.Blob
 import app.veyq.apimodels.IdentityPublicKey
 import app.veyq.apimodels.KemPublicKey
@@ -42,10 +41,10 @@ import kotlinx.serialization.Contextual
  * @param identityPublicKey 
  * @param wrappedIdentityPrivateKey 
  * @param masterKeyWraps 
- * @param authVerifier 
+ * @param password The account password. The server derives and stores the ARGON2_PROOF auth verifier.
  * @param personalScopePublicKey 
  * @param wrappedPersonalScopePrivateKey 
- * @param recoveryAuthTag 
+ * @param recoveryMasterKeyTag 
  */
 @Serializable
 
@@ -66,8 +65,9 @@ data class CreateServerOwnerRequest (
     @SerialName(value = "masterKeyWraps")
     val masterKeyWraps: kotlin.collections.List<MasterKeyWrap>,
 
-    @SerialName(value = "authVerifier")
-    val authVerifier: AuthVerifier,
+    /* The account password. The server derives and stores the ARGON2_PROOF auth verifier. */
+    @SerialName(value = "password")
+    val password: kotlin.String,
 
     @SerialName(value = "personalScopePublicKey")
     val personalScopePublicKey: KemPublicKey,
@@ -75,8 +75,8 @@ data class CreateServerOwnerRequest (
     @SerialName(value = "wrappedPersonalScopePrivateKey")
     val wrappedPersonalScopePrivateKey: Blob,
 
-    @SerialName(value = "recoveryAuthTag")
-    val recoveryAuthTag: kotlin.String? = null
+    @SerialName(value = "recoveryMasterKeyTag")
+    val recoveryMasterKeyTag: kotlin.String? = null
 
 ) {
 

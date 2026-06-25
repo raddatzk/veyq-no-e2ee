@@ -9,7 +9,7 @@ public enum ResetPassword {
     struct MaterialResponse: Codable { let email: String; let recoveryWrap: MasterKeyWrapDTO }
     struct RequestBody: Codable { let email: String }
     struct TokenBody: Codable { let token: String }
-    struct ConfirmBody: Codable { let token: String; let newPassword: String; let masterKeyWrap: MasterKeyWrapDTO; let recoveryAuthTag: String }
+    struct ConfirmBody: Codable { let token: String; let newPassword: String; let masterKeyWrap: MasterKeyWrapDTO; let recoveryMasterKeyTag: String }
 
     /// Ask the server to email a reset token. Always succeeds (the server never reveals account existence).
     public static func requestReset(apiBase: String, email: String) async throws {
@@ -60,7 +60,7 @@ public enum ResetPassword {
             newPassword: newPassword,
             masterKeyWrap: MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(newWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: newSalt))),
             // prove Secret-Key possession: reproduce the commitment the server stored for this master key
-            recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)))
+            recoveryMasterKeyTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)))
         var r = URLRequest(url: URL(string: "\(apiBase)/api/me/password-reset/confirm")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")

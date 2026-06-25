@@ -298,7 +298,7 @@ components:
       properties:
         masterKeyWrap:
           $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap"
-        recoveryAuthTag:
+        recoveryMasterKeyTag:
           type: string
           x-field-extra-annotation:
             - '@field:jakarta.validation.constraints.Size(max = 128)'

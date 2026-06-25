@@ -159,8 +159,8 @@ export async function claimTenantOwnership(
 
   return post<TenantSummary>(apiBase, `/api/tenant-invites/${inviteId}/claim`, token, {
     bootstrapSecret,
-    scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(scopePublic) },
-    wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(grant) },
+    tenantScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(scopePublic) },
+    wrappedTenantScopePrivateKey: { suiteId: 'v1', bytes: b64url(grant) },
   })
 }
 

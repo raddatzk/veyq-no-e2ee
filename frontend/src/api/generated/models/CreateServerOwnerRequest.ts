@@ -13,13 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { AuthVerifier } from './AuthVerifier';
-import {
-    AuthVerifierFromJSON,
-    AuthVerifierFromJSONTyped,
-    AuthVerifierToJSON,
-    AuthVerifierToJSONTyped,
-} from './AuthVerifier';
 import type { Blob } from './Blob';
 import {
     BlobFromJSON,
@@ -86,17 +79,17 @@ export interface CreateServerOwnerRequest {
      */
     masterKeyWraps: Array<MasterKeyWrap>;
     /**
-     * 
-     * @type {AuthVerifier}
+     * The account password. The server derives and stores the ARGON2_PROOF auth verifier.
+     * @type {string}
      * @memberof CreateServerOwnerRequest
      */
-    authVerifier: AuthVerifier;
+    password: string;
     /**
      * 
      * @type {string}
      * @memberof CreateServerOwnerRequest
      */
-    recoveryAuthTag?: string;
+    recoveryMasterKeyTag?: string;
     /**
      * 
      * @type {KemPublicKey}
@@ -120,7 +113,7 @@ export function instanceOfCreateServerOwnerRequest(value: object): value is Crea
     if (!('identityPublicKey' in value) || value['identityPublicKey'] === undefined) return false;
     if (!('wrappedIdentityPrivateKey' in value) || value['wrappedIdentityPrivateKey'] === undefined) return false;
     if (!('masterKeyWraps' in value) || value['masterKeyWraps'] === undefined) return false;
-    if (!('authVerifier' in value) || value['authVerifier'] === undefined) return false;
+    if (!('password' in value) || value['password'] === undefined) return false;
     if (!('personalScopePublicKey' in value) || value['personalScopePublicKey'] === undefined) return false;
     if (!('wrappedPersonalScopePrivateKey' in value) || value['wrappedPersonalScopePrivateKey'] === undefined) return false;
     return true;
@@ -141,8 +134,8 @@ export function CreateServerOwnerRequestFromJSONTyped(json: any, ignoreDiscrimin
         'identityPublicKey': IdentityPublicKeyFromJSON(json['identityPublicKey']),
         'wrappedIdentityPrivateKey': BlobFromJSON(json['wrappedIdentityPrivateKey']),
         'masterKeyWraps': ((json['masterKeyWraps'] as Array<any>).map(MasterKeyWrapFromJSON)),
-        'authVerifier': AuthVerifierFromJSON(json['authVerifier']),
-        'recoveryAuthTag': json['recoveryAuthTag'] == null ? undefined : json['recoveryAuthTag'],
+        'password': json['password'],
+        'recoveryMasterKeyTag': json['recoveryMasterKeyTag'] == null ? undefined : json['recoveryMasterKeyTag'],
         'personalScopePublicKey': KemPublicKeyFromJSON(json['personalScopePublicKey']),
         'wrappedPersonalScopePrivateKey': BlobFromJSON(json['wrappedPersonalScopePrivateKey']),
     };
@@ -164,8 +157,8 @@ export function CreateServerOwnerRequestToJSONTyped(value?: CreateServerOwnerReq
         'identityPublicKey': IdentityPublicKeyToJSON(value['identityPublicKey']),
         'wrappedIdentityPrivateKey': BlobToJSON(value['wrappedIdentityPrivateKey']),
         'masterKeyWraps': ((value['masterKeyWraps'] as Array<any>).map(MasterKeyWrapToJSON)),
-        'authVerifier': AuthVerifierToJSON(value['authVerifier']),
-        'recoveryAuthTag': value['recoveryAuthTag'],
+        'password': value['password'],
+        'recoveryMasterKeyTag': value['recoveryMasterKeyTag'],
         'personalScopePublicKey': KemPublicKeyToJSON(value['personalScopePublicKey']),
         'wrappedPersonalScopePrivateKey': BlobToJSON(value['wrappedPersonalScopePrivateKey']),
     };

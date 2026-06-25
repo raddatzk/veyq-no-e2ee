@@ -161,29 +161,29 @@ class InviteMembersRolesSliceTest {
             .post("/api/tenants/$tenantId/member-invites").then().statusCode(403)
             .body("code", `is`("NOT_A_KEY_HOLDER"))
 
-        // the key-holding Owner issues a temp-wrap member invite
+        // the key-holding Owner issues a invite-wrap member invite
         val invite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
             .body(memberInviteBody("Member"))
             .post("/api/tenants/$tenantId/member-invites").then().statusCode(200).extract()
         val inviteId = invite.path<String>("inviteId")
         val bootstrapSecret = invite.path<String>("bootstrapSecret")
 
-        // public metadata exposes the scope public key but NOT the temp-wrapped grant (defense in depth)
+        // public metadata exposes the scope public key but NOT the invite-wrapped grant (defense in depth)
         val meta = given().get("/api/tenant-invites/$inviteId").then().statusCode(200)
             .body("kind", `is`("MEMBER"))
             .body("role", `is`("Member"))
-            .body("tempWrappedScopePrivateKey", nullValue())
+            .body("wrappedTenantScopePrivateKey", nullValue())
             .extract()
-        val scopePub = meta.path<String>("scopePublicKey.kemPublicKey")
+        val scopePub = meta.path<String>("tenantScopePublicKey.kemPublicKey")
 
-        // the temp-wrapped grant is released only on proof of the bootstrap secret
+        // the invite-wrapped grant is released only on proof of the bootstrap secret
         given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"AAAA"}""")
             .post("/api/tenant-invites/$inviteId/material").then().statusCode(400)
             .body("code", `is`("BAD_BOOTSTRAP_SECRET"))
         given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$bootstrapSecret"}""")
             .post("/api/tenant-invites/$inviteId/material").then().statusCode(200)
-            .body("tempWrappedScopePrivateKey.bytes", `is`("dGVtcC13cmFwcGVk"))
-            .body("tempPublicKey.kemPublicKey", `is`("dGVtcC1wdWI"))
+            .body("wrappedTenantScopePrivateKey.bytes", `is`("dGVtcC13cmFwcGVk"))
+            .body("inviteWrappingPublicKey.kemPublicKey", `is`("dGVtcC1wdWI"))
 
         // a wrong scope public key is rejected (integrity)
         given().contentType(ContentType.JSON)
@@ -199,7 +199,7 @@ class InviteMembersRolesSliceTest {
             .body("tenant.status", `is`("ACTIVE"))
             .extract().path<String>("sessionToken")
 
-        // consumed, expired and revoked invites no longer release temp-wrapped material even with the secret
+        // consumed, expired and revoked invites no longer release invite-wrapped material even with the secret
         given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$bootstrapSecret"}""")
             .post("/api/tenant-invites/$inviteId/material").then().statusCode(409)
             .body("code", `is`("INVITE_NOT_PENDING"))
@@ -406,8 +406,8 @@ class InviteMembersRolesSliceTest {
     private fun memberInviteBody(role: String) = """
         {
           "role": "$role",
-          "tempPublicKey": { "suiteId": "v1", "kemPublicKey": "dGVtcC1wdWI" },
-          "tempWrappedScopePrivateKey": { "suiteId": "v1", "bytes": "dGVtcC13cmFwcGVk" }
+          "inviteWrappingPublicKey": { "suiteId": "v1", "kemPublicKey": "dGVtcC1wdWI" },
+          "wrappedTenantScopePrivateKey": { "suiteId": "v1", "bytes": "dGVtcC13cmFwcGVk" }
         }
     """.trimIndent()
 
@@ -419,11 +419,11 @@ class InviteMembersRolesSliceTest {
           "identityPublicKey": { "suiteId": "v1", "kemPublicKey": "a2VtcHVi", "signPublicKey": "c2lnbg" },
           "wrappedIdentityPrivateKey": { "suiteId": "v1", "bytes": "d3JhcHBlZA" },
           "masterKeyWraps": [ { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "bWs", "kdfParams": "c2FsdA" } ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "${'$'}argon2id${'$'}v=19${'$'}m=32768,t=3,p=1${'$'}AAAAAAAAAAAAAAAAAAAAAA${'$'}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+          "password": "correct-horse-battery-staple",
           "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "cGVyc29uYWw" },
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWwtZ3JhbnQ" },
-          "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "$scopePub" },
-          "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "bWVtYmVyLWdyYW50" }
+          "tenantScopePublicKey": { "suiteId": "v1", "kemPublicKey": "$scopePub" },
+          "wrappedTenantScopePrivateKey": { "suiteId": "v1", "bytes": "bWVtYmVyLWdyYW50" }
         }
     """.trimIndent()
 }

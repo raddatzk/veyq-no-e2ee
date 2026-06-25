@@ -24,7 +24,7 @@
 
 package app.veyq.apimodels
 
-import app.veyq.apimodels.TenantSummary
+import app.veyq.apimodels.RegistrationTenantSummary
 import app.veyq.apimodels.UserSummary
 
 import kotlinx.serialization.Serializable
@@ -49,7 +49,7 @@ data class RegisterViaInvitationResponse (
     val user: UserSummary,
 
     @SerialName(value = "tenant")
-    val tenant: TenantSummary
+    val tenant: RegistrationTenantSummary
 
 ) {
 

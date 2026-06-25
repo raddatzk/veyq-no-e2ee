@@ -18,19 +18,21 @@ public struct IssueMemberInviteRequest: Codable {
         case member = "Member"
     }
     public private(set) var role: Role
-    public private(set) var tempPublicKey: KemPublicKey
-    public private(set) var tempWrappedScopePrivateKey: Blob
+    /** Public half of the one-time invite wrapping keypair. The owner keeps the private half in the invite link fragment. */
+    public private(set) var inviteWrappingPublicKey: KemPublicKey
+    /** Tenant scope private key wrapped to inviteWrappingPublicKey. */
+    public private(set) var wrappedTenantScopePrivateKey: Blob
 
-    public init(role: Role, tempPublicKey: KemPublicKey, tempWrappedScopePrivateKey: Blob) {
+    public init(role: Role, inviteWrappingPublicKey: KemPublicKey, wrappedTenantScopePrivateKey: Blob) {
         self.role = role
-        self.tempPublicKey = tempPublicKey
-        self.tempWrappedScopePrivateKey = tempWrappedScopePrivateKey
+        self.inviteWrappingPublicKey = inviteWrappingPublicKey
+        self.wrappedTenantScopePrivateKey = wrappedTenantScopePrivateKey
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case role
-        case tempPublicKey
-        case tempWrappedScopePrivateKey
+        case inviteWrappingPublicKey
+        case wrappedTenantScopePrivateKey
     }
 
     // Encodable protocol methods
@@ -38,8 +40,8 @@ public struct IssueMemberInviteRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(role, forKey: .role)
-        try container.encode(tempPublicKey, forKey: .tempPublicKey)
-        try container.encode(tempWrappedScopePrivateKey, forKey: .tempWrappedScopePrivateKey)
+        try container.encode(inviteWrappingPublicKey, forKey: .inviteWrappingPublicKey)
+        try container.encode(wrappedTenantScopePrivateKey, forKey: .wrappedTenantScopePrivateKey)
     }
 }
 

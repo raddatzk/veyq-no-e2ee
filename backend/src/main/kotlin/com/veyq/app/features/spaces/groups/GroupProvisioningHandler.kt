@@ -61,7 +61,7 @@ class GroupProvisioningHandler(
         val userId = requireTenantMember(tenantId, auth)
         suites.require(req.scopePublicKey.suiteId)
         suites.require(req.wrappedScopePrivateKey.suiteId)
-        suites.require(req.contentKey.suiteId)
+        suites.require(req.wrappedContentKey.suiteId)
         suites.require(req.sealedName.suiteId)
         val now = Instant.now()
 
@@ -76,7 +76,7 @@ class GroupProvisioningHandler(
             suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
         })
         contentKeys.persist(ScopeContentKey().apply {
-            id = newId(); scopeId = scope.id; suiteId = req.contentKey.suiteId; wrappedKey = dec.decode(req.contentKey.bytes); createdAt = now
+            id = newId(); scopeId = scope.id; suiteId = req.wrappedContentKey.suiteId; wrappedKey = dec.decode(req.wrappedContentKey.bytes); createdAt = now
         })
         groupMembers.persist(GroupMembership().apply {
             id = newId(); scopeId = scope.id; this.userId = userId; role = GroupRole.GroupOwner.name; createdAt = now
@@ -119,6 +119,8 @@ class GroupProvisioningHandler(
     fun addGroupMember(auth: String?, tenantId: String, scopeId: String, req: AddGroupMemberRequest): ApiGroupMember {
         requireGroupOwner(tenantId, scopeId, auth)
         val target = memberships.find(tenantId, req.userId)
+        // Group membership is not an invite path. GroupOwners can only grant GROUP_ROOT access to users who
+        // are already active members of the tenant.
         if (target == null || target.status != MembershipStatus.ACTIVE) throw ApiException(400, "NOT_A_TENANT_MEMBER", "Target is not an active tenant member")
         if (groupMembers.find(scopeId, req.userId) != null) throw ApiException(409, "ALREADY_GROUP_MEMBER", "Already a member of this group")
         suites.require(req.wrappedScopePrivateKey.suiteId)

@@ -50,7 +50,7 @@ export interface PasswordResetConfirmRequest {
      * @type {string}
      * @memberof PasswordResetConfirmRequest
      */
-    recoveryAuthTag: string;
+    recoveryMasterKeyTag: string;
 }
 
 /**
@@ -60,7 +60,7 @@ export function instanceOfPasswordResetConfirmRequest(value: object): value is P
     if (!('token' in value) || value['token'] === undefined) return false;
     if (!('newPassword' in value) || value['newPassword'] === undefined) return false;
     if (!('masterKeyWrap' in value) || value['masterKeyWrap'] === undefined) return false;
-    if (!('recoveryAuthTag' in value) || value['recoveryAuthTag'] === undefined) return false;
+    if (!('recoveryMasterKeyTag' in value) || value['recoveryMasterKeyTag'] === undefined) return false;
     return true;
 }
 
@@ -77,7 +77,7 @@ export function PasswordResetConfirmRequestFromJSONTyped(json: any, ignoreDiscri
         'token': json['token'],
         'newPassword': json['newPassword'],
         'masterKeyWrap': MasterKeyWrapFromJSON(json['masterKeyWrap']),
-        'recoveryAuthTag': json['recoveryAuthTag'],
+        'recoveryMasterKeyTag': json['recoveryMasterKeyTag'],
     };
 }
 
@@ -95,7 +95,7 @@ export function PasswordResetConfirmRequestToJSONTyped(value?: PasswordResetConf
         'token': value['token'],
         'newPassword': value['newPassword'],
         'masterKeyWrap': MasterKeyWrapToJSON(value['masterKeyWrap']),
-        'recoveryAuthTag': value['recoveryAuthTag'],
+        'recoveryMasterKeyTag': value['recoveryMasterKeyTag'],
     };
 }
 

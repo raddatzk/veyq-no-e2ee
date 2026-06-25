@@ -234,7 +234,7 @@ class TenantProvisioningHandler(
     fun getTenantInvite(inviteId: String): TenantInviteInfo {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
-        // Public metadata only. The temp-wrapped scope grant is NOT exposed here — it is released by
+        // Public metadata only. The invite-wrapped scope grant is NOT exposed here — it is released by
         // getInviteMaterial on proof of the bootstrap secret, so an inviteId alone never yields ciphertext.
         val scope = invite.scopeId?.let { scopes.findById(it) }
         return TenantInviteInfo(
@@ -244,18 +244,18 @@ class TenantProvisioningHandler(
             status = TenantInviteInfo.Status.valueOf(invite.status.name),
             kind = TenantInviteInfo.Kind.valueOf(invite.kind.name),
             existingAccount = invite.targetEmail?.let { users.findByEmail(it) != null } ?: false,
-            scopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
+            tenantScopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
         )
     }
 
-    /** Release the temp-wrapped onboarding material — only to a caller who proves the bootstrap secret. */
+    /** Release the invite-wrapped onboarding material — only to a caller who proves the bootstrap secret. */
     @Transactional
     fun getInviteMaterial(inviteId: String, req: GetInviteMaterialRequest): TenantInviteMaterial {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
         if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (invite.kind != InviteKind.MEMBER) {
-            throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites expose temp-wrapped onboarding material")
+            throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites expose invite-wrapped onboarding material")
         }
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
@@ -264,8 +264,8 @@ class TenantProvisioningHandler(
         val tempWrapped = invite.tempWrappedScopePrivateKey ?: throw notFound("Invite material")
         val scope = invite.scopeId?.let { scopes.findById(it) }
         return TenantInviteMaterial(
-            tempPublicKey = KemPublicKey(suiteId = invite.tempWrapSuiteId ?: (scope?.suiteId ?: ""), kemPublicKey = enc.encodeToString(tempPub)),
-            tempWrappedScopePrivateKey = Blob(suiteId = invite.tempWrapSuiteId ?: "", bytes = enc.encodeToString(tempWrapped)),
+            inviteWrappingPublicKey = KemPublicKey(suiteId = invite.tempWrapSuiteId ?: (scope?.suiteId ?: ""), kemPublicKey = enc.encodeToString(tempPub)),
+            wrappedTenantScopePrivateKey = Blob(suiteId = invite.tempWrapSuiteId ?: "", bytes = enc.encodeToString(tempWrapped)),
         )
     }
 
@@ -280,8 +280,8 @@ class TenantProvisioningHandler(
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }
         requireTargetEmail(invite, user.email)
-        suites.require(req.scopePublicKey.suiteId)
-        suites.require(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.tenantScopePublicKey.suiteId)
+        suites.require(req.wrappedTenantScopePrivateKey.suiteId)
 
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
         if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
@@ -289,13 +289,13 @@ class TenantProvisioningHandler(
 
         val scope = Scope().apply {
             id = newId(); tenantId = tenant.id; kind = ScopeKind.TENANT_ROOT
-            suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
+            suiteId = req.tenantScopePublicKey.suiteId; kemPublicKey = dec.decode(req.tenantScopePublicKey.kemPublicKey); createdAt = now
         }
         scopes.persist(scope)
         grants.persist(
             ScopeGrant().apply {
                 id = newId(); scopeId = scope.id; userId = user.id
-                suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                suiteId = req.wrappedTenantScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedTenantScopePrivateKey.bytes); createdAt = now
             },
         )
         scopes.findUnassignedPersonalByOwnerUserId(user.id)?.tenantId = tenant.id

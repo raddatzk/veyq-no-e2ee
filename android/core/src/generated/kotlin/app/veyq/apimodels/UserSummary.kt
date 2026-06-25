@@ -37,8 +37,8 @@ import kotlinx.serialization.Contextual
  * @param email 
  * @param displayName 
  * @param serverRole 
- * @param username URL-safe stable profile address segment.
- * @param avatarUrl 
+ * @param username URL-safe stable username/profile address segment.
+ * @param avatarUrl Short-lived presigned object-store URL for the user's avatar. The avatar object key contains a generated version segment that changes on every upload and acts as the cache-buster.
  */
 @Serializable
 
@@ -56,10 +56,11 @@ data class UserSummary (
     @Contextual @SerialName(value = "serverRole")
     val serverRole: ServerRole,
 
-    /* URL-safe stable profile address segment. */
+    /* URL-safe stable username/profile address segment. */
     @SerialName(value = "username")
     val username: kotlin.String,
 
+    /* Short-lived presigned object-store URL for the user's avatar. The avatar object key contains a generated version segment that changes on every upload and acts as the cache-buster. */
     @SerialName(value = "avatarUrl")
     val avatarUrl: kotlin.String? = null
 

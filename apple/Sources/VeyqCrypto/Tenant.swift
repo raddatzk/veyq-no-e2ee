@@ -15,7 +15,7 @@ public enum Tenant {
     struct BlobDTO: Codable { let suiteId, bytes: String }
     struct MyScopeGrantDTO: Codable { let scopeId: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
     struct CurrentTenantDTO: Codable { let tenantId, tenantScopeId: String }
-    struct ClaimRequest: Codable { let bootstrapSecret: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
+    struct ClaimRequest: Codable { let bootstrapSecret: String; let tenantScopePublicKey: KemPublicKeyDTO; let wrappedTenantScopePrivateKey: BlobDTO }
 
     private static func send<T: Decodable>(_ apiBase: String, _ path: String, _ token: String, method: String, body: Data? = nil) async throws -> T {
         var r = URLRequest(url: URL(string: "\(apiBase)\(path)")!)
@@ -61,8 +61,8 @@ public enum Tenant {
         let grant = try V1.asymWrap(pkX: pkX, pkM: pkM, targetKey: scopePrivate, context: "scope-grant", nonce: V1.randomBytes(12))
         let req = ClaimRequest(
             bootstrapSecret: bootstrapSecret,
-            scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64urlEncode(scopePublic)),
-            wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64urlEncode(grant)))
+            tenantScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64urlEncode(scopePublic)),
+            wrappedTenantScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64urlEncode(grant)))
         return try await send(apiBase, "/api/tenant-invites/\(inviteId)/claim", token, method: "POST", body: try JSONEncoder().encode(req))
     }
 

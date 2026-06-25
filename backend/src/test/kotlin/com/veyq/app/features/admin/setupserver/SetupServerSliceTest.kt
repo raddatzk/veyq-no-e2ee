@@ -55,7 +55,7 @@ class SetupServerSliceTest {
           "masterKeyWraps": [
             { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "$passwordWrap" }
           ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "${'$'}argon2id${'$'}v=19${'$'}m=32768,t=3,p=1${'$'}AAAAAAAAAAAAAAAAAAAAAA${'$'}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+          "password": "correct-horse-battery-staple",
           "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "$personalPublicKey" },
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "$personalGrant" }
         }

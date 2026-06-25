@@ -1,10 +1,12 @@
 package com.veyq.app.features.account.registerviainvitation
 
+import com.veyq.app.generated.model.AuthVerifier
 import com.veyq.app.generated.model.RegisterViaInvitationRequest
 import com.veyq.app.generated.model.RegisterViaInvitationResponse
-import com.veyq.app.generated.model.TenantSummary
+import com.veyq.app.generated.model.RegistrationTenantSummary
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.crypto.Argon2Verifier
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
@@ -62,6 +64,7 @@ class RegisterViaInvitationHandler(
     private val grants: ScopeGrantRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
+    private val argon2: Argon2Verifier,
 ) {
     private val dec = Base64.getUrlDecoder()
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -82,8 +85,8 @@ class RegisterViaInvitationHandler(
         }
         // tenant-scope suites are validated here; the account material (identity/wraps/verifier/personal
         // scope) is validated by the AccountFactory below.
-        suites.require(req.scopePublicKey.suiteId)
-        suites.require(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.tenantScopePublicKey.suiteId)
+        suites.require(req.wrappedTenantScopePrivateKey.suiteId)
         if (users.findByEmail(req.email) != null) {
             throw ApiException(409, "EMAIL_TAKEN", "An account with that email already exists")
         }
@@ -100,8 +103,12 @@ class RegisterViaInvitationHandler(
                 identityPublicKey = req.identityPublicKey,
                 wrappedIdentityPrivateKey = req.wrappedIdentityPrivateKey,
                 masterKeyWraps = req.masterKeyWraps,
-                recoveryAuthTag = req.recoveryAuthTag,
-                authVerifier = req.authVerifier,
+                recoveryMasterKeyTag = req.recoveryMasterKeyTag,
+                authVerifier = AuthVerifier(
+                    kind = AuthVerifier.Kind.ARGON2_PROOF,
+                    suiteId = "v1",
+                    verifier = argon2.createPasswordVerifier(req.password),
+                ),
                 personalScopePublicKey = req.personalScopePublicKey,
                 wrappedPersonalScopePrivateKey = req.wrappedPersonalScopePrivateKey,
             ),
@@ -115,13 +122,13 @@ class RegisterViaInvitationHandler(
             // fragment) and re-wrapped it to their own identity — add their grant only. No new scope, no
             // re-activation. The posted scope public key must match the existing scope (integrity).
             val scope = invite.scopeId?.let { scopes.findById(it) } ?: throw notFound("Scope")
-            if (enc.encodeToString(scope.kemPublicKey) != req.scopePublicKey.kemPublicKey) {
+            if (enc.encodeToString(scope.kemPublicKey) != req.tenantScopePublicKey.kemPublicKey) {
                 throw ApiException(400, "SCOPE_MISMATCH", "Scope public key does not match the invite")
             }
             grants.persist(
                 ScopeGrant().apply {
                     id = newId(); scopeId = scope.id; userId = user.id
-                    suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                    suiteId = req.wrappedTenantScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedTenantScopePrivateKey.bytes); createdAt = now
                 },
             )
         } else {
@@ -129,13 +136,13 @@ class RegisterViaInvitationHandler(
             if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
             val scope = Scope().apply {
                 id = newId(); tenantId = tenant.id; kind = ScopeKind.TENANT_ROOT
-                suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
+                suiteId = req.tenantScopePublicKey.suiteId; kemPublicKey = dec.decode(req.tenantScopePublicKey.kemPublicKey); createdAt = now
             }
             scopes.persist(scope)
             grants.persist(
                 ScopeGrant().apply {
                     id = newId(); scopeId = scope.id; userId = user.id
-                    suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                    suiteId = req.wrappedTenantScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedTenantScopePrivateKey.bytes); createdAt = now
                 },
             )
             tenant.status = TenantStatus.ACTIVE
@@ -162,8 +169,14 @@ class RegisterViaInvitationHandler(
         )
     }
 
-    private fun Tenant.toSummary(): TenantSummary =
-        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain)
+    private fun Tenant.toSummary(): RegistrationTenantSummary =
+        RegistrationTenantSummary(
+            id = id,
+            name = name,
+            displayName = displayName,
+            status = RegistrationTenantSummary.Status.valueOf(status.name),
+            domain = domain,
+        )
 
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)

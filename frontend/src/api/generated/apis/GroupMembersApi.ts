@@ -76,7 +76,7 @@ export interface GroupMembersApiInterface {
     addGroupMemberRequestOpts(requestParameters: AddGroupMemberOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must be an active member of the tenant. Defaults to the GroupMember role. 
+     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must already be an active member of the tenant; this endpoint does not invite external users into the tenant. Defaults to the GroupMember role. 
      * @summary Add a tenant member to the group (GroupOwner only).
      * @param {string} authorization Bearer &lt;sessionToken&gt;
      * @param {string} groupId 
@@ -88,7 +88,7 @@ export interface GroupMembersApiInterface {
     addGroupMemberRaw(requestParameters: AddGroupMemberOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupMember>>;
 
     /**
-     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must be an active member of the tenant. Defaults to the GroupMember role. 
+     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must already be an active member of the tenant; this endpoint does not invite external users into the tenant. Defaults to the GroupMember role. 
      * Add a tenant member to the group (GroupOwner only).
      */
     addGroupMember(requestParameters: AddGroupMemberOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupMember>;
@@ -231,7 +231,7 @@ export class GroupMembersApi extends runtime.BaseAPI implements GroupMembersApiI
     }
 
     /**
-     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must be an active member of the tenant. Defaults to the GroupMember role. 
+     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must already be an active member of the tenant; this endpoint does not invite external users into the tenant. Defaults to the GroupMember role. 
      * Add a tenant member to the group (GroupOwner only).
      */
     async addGroupMemberRaw(requestParameters: AddGroupMemberOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupMember>> {
@@ -242,7 +242,7 @@ export class GroupMembersApi extends runtime.BaseAPI implements GroupMembersApiI
     }
 
     /**
-     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must be an active member of the tenant. Defaults to the GroupMember role. 
+     * The GroupOwner wraps the group scope private key to the target member\'s identity and posts it as a grant. The target must already be an active member of the tenant; this endpoint does not invite external users into the tenant. Defaults to the GroupMember role. 
      * Add a tenant member to the group (GroupOwner only).
      */
     async addGroupMember(requestParameters: AddGroupMemberOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupMember> {

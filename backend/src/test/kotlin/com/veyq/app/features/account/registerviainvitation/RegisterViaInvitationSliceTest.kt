@@ -126,11 +126,11 @@ class RegisterViaInvitationSliceTest {
           "masterKeyWraps": [
             { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "bWs", "kdfParams": "c2FsdA" }
           ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "${'$'}argon2id${'$'}v=19${'$'}m=32768,t=3,p=1${'$'}AAAAAAAAAAAAAAAAAAAAAA${'$'}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+          "password": "correct-horse-battery-staple",
           "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "cGVyc29uYWw" },
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWxncmFudA" },
-          "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },
-          "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
+          "tenantScopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },
+          "wrappedTenantScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
         }
     """.trimIndent()
 

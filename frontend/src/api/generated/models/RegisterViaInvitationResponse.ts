@@ -13,13 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { TenantSummary } from './TenantSummary';
-import {
-    TenantSummaryFromJSON,
-    TenantSummaryFromJSONTyped,
-    TenantSummaryToJSON,
-    TenantSummaryToJSONTyped,
-} from './TenantSummary';
 import type { UserSummary } from './UserSummary';
 import {
     UserSummaryFromJSON,
@@ -27,6 +20,13 @@ import {
     UserSummaryToJSON,
     UserSummaryToJSONTyped,
 } from './UserSummary';
+import type { RegistrationTenantSummary } from './RegistrationTenantSummary';
+import {
+    RegistrationTenantSummaryFromJSON,
+    RegistrationTenantSummaryFromJSONTyped,
+    RegistrationTenantSummaryToJSON,
+    RegistrationTenantSummaryToJSONTyped,
+} from './RegistrationTenantSummary';
 
 /**
  * 
@@ -48,10 +48,10 @@ export interface RegisterViaInvitationResponse {
     user: UserSummary;
     /**
      * 
-     * @type {TenantSummary}
+     * @type {RegistrationTenantSummary}
      * @memberof RegisterViaInvitationResponse
      */
-    tenant: TenantSummary;
+    tenant: RegistrationTenantSummary;
 }
 
 /**
@@ -76,7 +76,7 @@ export function RegisterViaInvitationResponseFromJSONTyped(json: any, ignoreDisc
         
         'sessionToken': json['sessionToken'],
         'user': UserSummaryFromJSON(json['user']),
-        'tenant': TenantSummaryFromJSON(json['tenant']),
+        'tenant': RegistrationTenantSummaryFromJSON(json['tenant']),
     };
 }
 
@@ -93,7 +93,7 @@ export function RegisterViaInvitationResponseToJSONTyped(value?: RegisterViaInvi
         
         'sessionToken': value['sessionToken'],
         'user': UserSummaryToJSON(value['user']),
-        'tenant': TenantSummaryToJSON(value['tenant']),
+        'tenant': RegistrationTenantSummaryToJSON(value['tenant']),
     };
 }
 
