@@ -2,6 +2,7 @@ package com.veyq.app.features.account.login
 
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.LockModeType
 import jakarta.transaction.Transactional
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -42,7 +43,11 @@ class SessionService {
      *  the family as a side effect. */
     @Transactional
     fun refresh(presented: String): RotatedTokens? {
-        val row = RefreshTokenEntity.find("tokenHash", Tokens.hash(presented)).firstResult() ?: return null
+        // Lock the row so two concurrent refreshes of the SAME token serialize: the second blocks until
+        // the first commits, then sees status = SUPERSEDED and takes the reuse-detection path instead of
+        // minting a second token pair from one refresh (ADR 0004).
+        val row = RefreshTokenEntity.find("tokenHash", Tokens.hash(presented))
+            .withLock(LockModeType.PESSIMISTIC_WRITE).firstResult() ?: return null
         val family = SessionFamilyEntity.findById(row.familyId) ?: return null
         if (family.status != SessionFamilyEntity.ACTIVE) return null
 

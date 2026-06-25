@@ -24,6 +24,7 @@ data class ChallengeResult(val nonce: String, val instanceSalt: String)
 class LoginHandler(
     private val instanceStore: InstanceStore,
     private val sessions: SessionService,
+    private val challengeStore: LoginChallengeStore,
 ) {
 
     /** Issue a single-use, time-bounded challenge. A nonce is always returned; it is only stored (and
@@ -33,12 +34,14 @@ class LoginHandler(
         val normalized = normalize(email)
         val nonce = randomNonce()
         if (VeyqUser.find("email", normalized).firstResult() != null) {
-            LoginChallengeEntity.delete("email", normalized)
-            LoginChallengeEntity().apply {
-                this.email = normalized
-                this.nonce = nonce
-                expiresAt = Instant.now().plus(CHALLENGE_TTL_MINUTES, ChronoUnit.MINUTES)
-            }.persist()
+            // Store in its own transaction and swallow a concurrent-insert race: the response must be
+            // identical (200 + nonce) whether or not the account exists — a PK conflict from a racing
+            // request for the same email must never surface as a different status (non-enumerability).
+            try {
+                challengeStore.replace(normalized, nonce, Instant.now().plus(CHALLENGE_TTL_MINUTES, ChronoUnit.MINUTES))
+            } catch (e: Exception) {
+                // a racing request already stored a challenge for this email — fine, ignore.
+            }
         }
         return ChallengeResult(nonce = nonce, instanceSalt = instanceStore.instanceSalt())
     }
