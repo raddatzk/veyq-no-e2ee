@@ -64,6 +64,21 @@ describe('login (uc.account.login)', () => {
     expect(isUnlocked()).toBe(false)
   })
 
+  it('clears the dead tokens when a refresh is rejected (no wedged session)', async () => {
+    session.accessToken = 'a1'
+    session.refreshToken = 'r1'
+    session.familyId = 'f1'
+    vi.mocked(tokenApi).mockReturnValue({
+      refreshSession: () => Promise.reject(new Error('refresh_rejected')),
+    } as unknown as ReturnType<typeof tokenApi>)
+
+    await expect(refreshSession()).rejects.toThrow()
+
+    // tokens dropped → next authed call won't loop 401→refresh→throw
+    expect(session.accessToken).toBeNull()
+    expect(session.refreshToken).toBeNull()
+  })
+
   it('rotates the tokens on refresh', async () => {
     session.accessToken = 'a1'
     session.refreshToken = 'r1'

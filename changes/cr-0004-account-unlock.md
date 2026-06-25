@@ -175,3 +175,14 @@ Second batch (robustness/cleanup), all applied:
   errors.
 
 All ten review findings are now resolved.
+
+A second review pass (over the fix commits themselves) found three more, all applied:
+- **R2-#1:** a Web Worker `error` was not fatal — a dead/failed worker was reused, so a later call could
+  hang forever with no fallback. The worker is now retired on error (`workerUnavailable`) and each
+  outstanding request finishes on the **synchronous fallback** (a per-request `fallback()` thunk); a
+  sync `postMessage` failure falls back too. Test drives a dying worker → sync result, byte-identical.
+- **R2-#2:** `refreshSession` now `clearTokens()` on a rejected refresh, so a dead refresh token lands the
+  session in a clean logged-out state instead of looping 401→refresh→throw on every authed call. Tested.
+- **R2-#3:** the unlock failure path no longer wipes the Secret-Key field — a transient (network/5xx) error
+  must not throw away a correct, hard-to-re-paste key; the field is the user's active input. Inputs are
+  still cleared on success and on sign-out.

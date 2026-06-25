@@ -56,10 +56,10 @@ async function unlock() {
     secretKey.value = ''
   } catch {
     // Wrong password, wrong Secret Key, or no PASSWORD wrap all surface as one generic failure (E1/E2).
+    // Keep the inputs so the user can correct and retry — the Secret Key field is the active input, and a
+    // transient error (network/5xx) must not throw away a correct, possibly hard-to-re-paste key. Both are
+    // cleared on success and on sign-out.
     error.value = t('unlock.failed')
-    // Don't leave the pasted Secret Key in the reactive ref after a failed attempt. The password is carried
-    // from login (no field to re-enter it on this card), so it stays for the retry.
-    secretKey.value = ''
   } finally {
     busy.value = false
   }

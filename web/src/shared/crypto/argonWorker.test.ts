@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 
 import { deriveAuthKeypairAsync, unlockKekAsync } from './argonWorker'
 import * as v1 from './v1'
@@ -19,5 +19,36 @@ describe('argonWorker sync fallback', () => {
     const salt = new Uint8Array(16).fill(7)
     const got = await unlockKekAsync(secretKey, 'pw', salt)
     expect(got).toEqual(v1.kekPasswordSecret(secretKey, 'pw', salt))
+  })
+})
+
+describe('argonWorker graceful degradation', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
+  it('finishes on the sync path when the worker errors instead of hanging or failing', async () => {
+    // A Worker that "dies" on its first postMessage by firing its error listener — the wrapper must then
+    // resolve the request on the synchronous fallback, byte-identical to the worker result.
+    class DyingWorker {
+      private handlers: Record<string, Array<(e: unknown) => void>> = {}
+      addEventListener(type: string, cb: (e: unknown) => void): void {
+        ;(this.handlers[type] ??= []).push(cb)
+      }
+      postMessage(): void {
+        queueMicrotask(() => this.handlers['error']?.forEach((cb) => cb({})))
+      }
+      terminate(): void {}
+    }
+    vi.resetModules()
+    vi.stubGlobal('Worker', DyingWorker as unknown as typeof Worker)
+    const mod = await import('./argonWorker')
+    const fresh = await import('./v1')
+
+    const salt = new Uint8Array(16).fill(5)
+    const got = await mod.deriveAuthKeypairAsync('correct horse battery', salt)
+
+    expect(got.publicKey).toEqual(fresh.deriveAuthKeypair('correct horse battery', salt).publicKey)
   })
 })

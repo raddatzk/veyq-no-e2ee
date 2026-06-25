@@ -24,12 +24,19 @@ export async function login(email: string, password: string): Promise<void> {
   setTokens(result.accessToken, result.refreshToken, result.family.id)
 }
 
-/** Rotate the session tokens (silent refresh). Throws if the refresh is rejected. */
+/** Rotate the session tokens (silent refresh). Throws if the refresh is rejected — and on rejection drops
+ *  the dead tokens so the session lands in a clean logged-out state instead of looping 401→refresh→throw on
+ *  every subsequent authed call. */
 export async function refreshSession(): Promise<void> {
   const refreshToken = session.refreshToken
   if (refreshToken === null) throw new Error('no_session')
-  const pair = await tokenApi().refreshSession({ refreshRequest: { refreshToken } })
-  setTokens(pair.accessToken, pair.refreshToken)
+  try {
+    const pair = await tokenApi().refreshSession({ refreshRequest: { refreshToken } })
+    setTokens(pair.accessToken, pair.refreshToken)
+  } catch (e) {
+    clearTokens()
+    throw e
+  }
 }
 
 /** Revoke the current session family, drop local tokens, and re-lock the vault. Idempotent. Centralising
