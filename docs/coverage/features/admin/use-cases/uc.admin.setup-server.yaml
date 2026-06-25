@@ -4,35 +4,38 @@ title: First-run server setup
 acceptanceCriteria:
   - id: status-required-when-fresh
     text: A fresh instance reports setupRequired=true and advertises the supported suites.
-    tests:
-      - { area: backend, ref: "SetupServerSliceTest.setupRequiredInitially" }
-      - { area: http, ref: "http/admin/setup.http" }
+    coverage:
+      backend: { integration: [SetupServerSliceTest.setupRequiredInitially] }
+      http: { e2e: [http/admin/setup.http] }
   - id: create-owner-and-complete
     text: A valid request creates the Server Owner (201) and marks setup complete.
-    tests:
-      - { area: backend, ref: "SetupServerSliceTest.createsOwner" }
-      - { area: backend, ref: "SetupServerSliceTest.setupNoLongerRequired" }
-      - { area: http, ref: "http/admin/setup.http" }
+    coverage:
+      backend: { integration: [SetupServerSliceTest.createsOwner, SetupServerSliceTest.setupNoLongerRequired] }
+      http: { e2e: [http/admin/setup.http] }
   - id: single-owner-lock
     text: A second owner is rejected with 409 once setup is complete.
-    tests:
-      - { area: backend, ref: "SetupServerSliceTest.rejectsSecondOwner" }
-      - { area: http, ref: "http/admin/setup.http" }
+    coverage:
+      backend: { integration: [SetupServerSliceTest.rejectsSecondOwner] }
+      http: { e2e: [http/admin/setup.http] }
   - id: reject-blank-name
     text: A blank/whitespace display name is rejected at the boundary (400).
-    tests:
-      - { area: backend, ref: "SetupServerSliceTest.rejectsBlankDisplayName" }
-      - { area: http, ref: "http/admin/setup.http" }
+    coverage:
+      backend: { integration: [SetupServerSliceTest.rejectsBlankDisplayName] }
+      http: { e2e: [http/admin/setup.http] }
   - id: reject-non-base64-key
     text: Non-base64 key material is rejected (400).
-    tests:
-      - { area: backend, ref: "SetupServerSliceTest.rejectsNonBase64Key" }
-      - { area: http, ref: "http/admin/setup.http" }
+    coverage:
+      backend: { integration: [SetupServerSliceTest.rejectsNonBase64Key] }
+      http: { e2e: [http/admin/setup.http] }
+  - id: reject-invalid-email
+    text: A malformed email is rejected at the boundary (400).
+    coverage:
+      backend: { integration: [SetupServerSliceTest.rejectsInvalidEmail] }
   - id: trim-name-fields
-    text: Display and instance names are trimmed before validation and storage.
-    tests:
-      - { area: backend, ref: "SetupRequestSanitizationTest.trimsNameFields" }
+    text: Email, display and instance names are trimmed before validation and storage.
+    coverage:
+      backend: { unit: [SetupRequestSanitizationTest.trimsNameFields] }
 gaps:
-  - { area: web, reason: "deferred to a follow-up CR (web client setup UI)" }
-  - { area: apple, reason: "deferred to a follow-up CR" }
-  - { area: android, reason: "deferred to a follow-up CR" }
+  web: deferred to a follow-up CR (web client setup UI)
+  apple: deferred to a follow-up CR
+  android: deferred to a follow-up CR
