@@ -1,0 +1,98 @@
+### Account wrap management — trust / untrust this device (uc.account.trust-device)
+# Runnable acceptance for the add/remove-wrap endpoints. Run against any running instance — these paths are
+# all pre-auth rejections or boundary validation, so no seed is needed. The server only ever receives
+# ciphertext + KDF params here, and never from an unauthenticated caller.
+#
+# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid access token can be
+# obtained): the authed add (201 + id) and untrust (204) round-trip. Those need a signed session and are
+# covered by the backend slice (AccountWrapsSliceTest) + the web round-trip (cr-0005 phase 4). This file
+# covers what needs no signature: the no-anonymous-write 401s and the body/method 400s.
+#
+# Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/trust-device.http
+
+### 1. Add a wrap with no bearer → generic 401 (no anonymous write)
+POST {{host}}/api/account/wraps
+Content-Type: application/json
+
+{ "method": "DEVICE", "wrappedKey": "ZGV2aWNlLXdyYXA=", "kdfParams": "a2RmLXBhcmFtcw==" }
+
+> {%
+client.test("anonymous add is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 2. Add a wrap with a bogus bearer → the SAME generic 401
+POST {{host}}/api/account/wraps
+Content-Type: application/json
+Authorization: Bearer this-token-was-never-issued
+
+{ "method": "DEVICE", "wrappedKey": "ZGV2aWNlLXdyYXA=", "kdfParams": "a2RmLXBhcmFtcw==" }
+
+> {%
+client.test("bogus-bearer add is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 3. Add with a missing field (no wrappedKey) → rejected at the boundary (400, before the handler)
+POST {{host}}/api/account/wraps
+Content-Type: application/json
+Authorization: Bearer this-token-was-never-issued
+
+{ "method": "DEVICE", "kdfParams": "a2RmLXBhcmFtcw==" }
+
+> {%
+client.test("missing wrappedKey is rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 4. Add with a non-DEVICE method → rejected at the boundary (400; this endpoint only adds DEVICE wraps)
+POST {{host}}/api/account/wraps
+Content-Type: application/json
+Authorization: Bearer this-token-was-never-issued
+
+{ "method": "PASSWORD", "wrappedKey": "ZGV2aWNlLXdyYXA=", "kdfParams": "a2RmLXBhcmFtcw==" }
+
+> {%
+client.test("non-DEVICE method is rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 5. Add with a non-base64 wrappedKey → rejected at the boundary (400)
+POST {{host}}/api/account/wraps
+Content-Type: application/json
+Authorization: Bearer this-token-was-never-issued
+
+{ "method": "DEVICE", "wrappedKey": "not base64!!", "kdfParams": "a2RmLXBhcmFtcw==" }
+
+> {%
+client.test("non-base64 wrappedKey is rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 6. Delete a wrap with no bearer → generic 401
+DELETE {{host}}/api/account/wraps/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+
+> {%
+client.test("anonymous delete is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 7. Delete a wrap with a bogus bearer → the SAME generic 401
+DELETE {{host}}/api/account/wraps/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+Authorization: Bearer this-token-was-never-issued
+
+> {%
+client.test("bogus-bearer delete is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}

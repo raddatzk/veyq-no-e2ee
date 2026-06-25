@@ -108,10 +108,12 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   method → 400; unauthenticated `POST`/`DELETE` → 401. **Done:** `./gradlew check` green (and the cr-0004
   `AccountKeyMaterialSliceTest` still 7/7 — no cross-class wrap pollution; the per-test reset is scoped to
   the wraps-test users).
-- [ ] **3 — http.** Add `http/account/trust-device.http`: unauthenticated/bogus-bearer `POST` and `DELETE`
-  → generic 401; a malformed `POST` body → 400. **Parity gap (slice-only):** the authed add/delete
-  round-trip needs a signed session no `.http` handler can produce (same limit as cr-0003/0004) — covered
-  by the phase-2 slice. **Done when:** ijhttp green against a live instance.
+- [x] **3 — http.** Added `http/account/trust-device.http` (7 assertions, **ijhttp green** against a live
+  instance): unauthenticated + bogus-bearer `POST` and `DELETE` → generic 401; and three boundary 400s on
+  `POST` (missing `wrappedKey`, a non-DEVICE `method`, a non-base64 `wrappedKey`) — confirming validation
+  runs **before** the in-handler auth check. **Parity gap (slice-only, in the header):** the authed add
+  (201 + id) / untrust (204) round-trip needs a signed session no `.http` handler can produce (same limit as
+  cr-0003/0004) — covered by the phase-2 slice + the phase-4 web round-trip.
 - [ ] **4 — web.** *Crypto:* add `v1.kekDevicePassword(deviceFactor, password, salt, params)` + its
   conformance vector (suite stays green). *Device adapter* (`features/account/trustDevice/deviceKey.ts`, the
   platform glue): generate/store/read a **non-extractable** HMAC `CryptoKey` in IndexedDB keyed per account,
