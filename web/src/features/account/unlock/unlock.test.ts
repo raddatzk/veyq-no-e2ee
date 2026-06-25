@@ -8,8 +8,10 @@ vi.mock('../../../api/client', () => ({
 }))
 
 import { unlockMasterKey } from './unlock'
-import { accountApi } from '../../../api/client'
+import { accountApi, tokenApi } from '../../../api/client'
+import { ResponseError } from '../../../api/generated/account'
 import { isUnlocked, masterKey, identityPrivate, clearVault } from '../../../app/vault'
+import { session } from '../../../app/session'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64std } from '../../../shared/base64'
 
@@ -47,6 +49,9 @@ function mockMaterial(material: unknown) {
 beforeEach(() => {
   clearVault()
   vi.clearAllMocks()
+  session.accessToken = null
+  session.refreshToken = null
+  session.familyId = null
 })
 
 describe('unlockMasterKey (uc.account.unlock)', () => {
@@ -79,6 +84,33 @@ describe('unlockMasterKey (uc.account.unlock)', () => {
     await expect(unlockMasterKey(PASSWORD, b64std(v1.randomBytes(32)))).rejects.toThrow()
     expect(isUnlocked()).toBe(false)
     expect(masterKey()).toBeNull()
+  })
+
+  it('refreshes the session and retries on a 401 from the account client (cross-package ResponseError)', async () => {
+    // Regression: withRefresh must recognise a 401 thrown by the *account* generated client, whose
+    // ResponseError is a DIFFERENT class than the auth client's — an `instanceof` check on one is false for
+    // the other, which silently disabled the refresh-retry for unlock.
+    const { material, masterKey: expectedMaster, secretKey } = buildMaterial(PASSWORD)
+    session.refreshToken = 'r1'
+    let calls = 0
+    vi.mocked(accountApi).mockReturnValue({
+      getAccountKeyMaterial: () => {
+        calls += 1
+        return calls === 1
+          ? Promise.reject(new ResponseError({ status: 401 } as unknown as Response, 'unauthorized'))
+          : Promise.resolve(material)
+      },
+    } as unknown as ReturnType<typeof accountApi>)
+    vi.mocked(tokenApi).mockReturnValue({
+      refreshSession: () => Promise.resolve({ accessToken: 'a2', refreshToken: 'r2' }),
+    } as unknown as ReturnType<typeof tokenApi>)
+
+    await unlockMasterKey(PASSWORD, b64std(secretKey))
+
+    expect(calls).toBe(2) // first 401 → refresh → retry succeeded
+    expect(session.accessToken).toBe('a2') // tokens rotated by the refresh
+    expect(isUnlocked()).toBe(true)
+    expect(masterKey()).toEqual(expectedMaster)
   })
 
   it('fails when the account has no PASSWORD wrap (E2)', async () => {

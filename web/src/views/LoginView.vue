@@ -8,7 +8,7 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { login, logout } from '../features/account/login/login'
 import { unlockMasterKey } from '../features/account/unlock/unlock'
-import { vaultState, clearVault } from '../app/vault'
+import { vaultState } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
 
 // uc.account.login + uc.account.unlock (web). Login is challenge-response sign-in (auth only); a successful
@@ -23,12 +23,20 @@ const busy = ref(false)
 const error = ref('')
 const loggedIn = ref(false)
 
+// A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds,
+// so it only enters the reactive form ref during the brief unlock step — never through the whole pre-login
+// phase. Plain string, not displayed and not in the reactive graph.
+let pendingSecretKey = ''
+
 async function submit() {
   error.value = ''
   busy.value = true
   try {
     await login(email.value, password.value)
     loggedIn.value = true
+    // Surface the setup-provided Secret Key only now that the unlock card is shown.
+    secretKey.value = pendingSecretKey
+    pendingSecretKey = ''
   } catch {
     // wrong password and unknown account both surface as the same generic failure (non-enumerable)
     error.value = t('login.failed')
@@ -49,28 +57,32 @@ async function unlock() {
   } catch {
     // Wrong password, wrong Secret Key, or no PASSWORD wrap all surface as one generic failure (E1/E2).
     error.value = t('unlock.failed')
+    // Don't leave the pasted Secret Key in the reactive ref after a failed attempt. The password is carried
+    // from login (no field to re-enter it on this card), so it stays for the retry.
+    secretKey.value = ''
   } finally {
     busy.value = false
   }
 }
 
 async function signOut() {
-  await logout()
-  clearVault()
+  await logout() // revokes the session, drops tokens, and re-locks the vault (centralised in logout)
   loggedIn.value = false
   password.value = ''
   secretKey.value = ''
+  pendingSecretKey = ''
   error.value = ''
 }
 
 onMounted(() => {
   // Right after first-run setup the owner has just seen their email + Secret Key, so setup hands both over
-  // (in memory, consumed once) to pre-fill the form — the email for sign-in and the Secret Key for the
-  // unlock step that follows. A returning user has no prefill and pastes their Secret Key from the kit.
+  // (in memory, consumed once). The email pre-fills the sign-in field; the Secret Key is parked off the
+  // reactive ref (see `pendingSecretKey`) and surfaces only once login succeeds and the unlock card shows.
+  // A returning user has no prefill and pastes their Secret Key from the kit.
   const prefill = takeAuthPrefill()
   if (prefill) {
     email.value = prefill.email
-    secretKey.value = prefill.secretKey
+    pendingSecretKey = prefill.secretKey
   }
 })
 </script>

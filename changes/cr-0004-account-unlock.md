@@ -139,3 +139,22 @@ wrong password or Secret Key (server uninvolved) and **no cross-account read** a
 card is replaced by a working unlock flow; coverage for `uc.account.unlock` is green and the parity matrix
 reflects it (backend/http/web). Passkey / recovery / trusted-device unlock, content decryption (no content
 feature yet), and native unlock remain separate, planned work. After merge, delete this file.
+
+## Review follow-ups (post-merge of phases 1–5)
+
+Security review of the cr-0004 diff surfaced three fixes, applied on top:
+- **#1 (bug):** `withRefresh` matched `instanceof ResponseError` from the `generated/auth` package, but the
+  account client throws its OWN `ResponseError` class — so the 401→refresh-retry was dead for the unlock
+  fetch (its first real consumer). Switched to a package-agnostic duck-typed 401 check
+  (`name === 'ResponseError' && response.status === 401`); regression test drives a real `account`
+  `ResponseError` through `withRefresh`.
+- **#2 (secret hygiene):** the pasted/pre-filled Secret Key lingered in the reactive ref on failure paths.
+  Now a setup-provided Secret Key is parked off the reactive ref until login succeeds, and a failed unlock
+  clears the Secret-Key ref (the password is kept — no field to re-enter it).
+- **#4 (altitude):** re-lock (`clearVault`) was bolted onto the view's `signOut`. Moved into the `logout()`
+  primitive so every sign-out path drops the unlocked keys; test covers it.
+
+Lower-severity findings logged but not actioned (robustness/cleanup): `enum.valueOf` on stored
+suite/method strings can 500 on non-canonical data (latent); bearer-token parsing duplicated across
+resources; no `…Handler` layer in the account slice; no `Uint8Array` zeroize in `clearVault`; `accountApi`
+duplicates `authConfig`; second main-thread Argon2id; double per-request transaction.

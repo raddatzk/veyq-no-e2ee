@@ -4,8 +4,8 @@
 import * as v1 from '../../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../../shared/base64'
 import { loginApi, sessionApi, tokenApi } from '../../../api/client'
-import { ResponseError } from '../../../api/generated/auth'
 import { clearTokens, session, setTokens } from '../../../app/session'
+import { clearVault } from '../../../app/vault'
 
 /**
  * Log in with email + password. Requests a challenge, derives the auth keypair with the instance salt the
@@ -31,24 +31,43 @@ export async function refreshSession(): Promise<void> {
   setTokens(pair.accessToken, pair.refreshToken)
 }
 
-/** Revoke the current session family and drop local tokens. Idempotent. */
+/** Revoke the current session family, drop local tokens, and re-lock the vault. Idempotent. Centralising
+ *  the vault clear here means every sign-out path (this view, a future silent logout on refresh failure, a
+ *  route guard) drops the unlocked keys — auth and unlock can never drift out of sync. */
 export async function logout(): Promise<void> {
   try {
     await sessionApi().logout()
   } finally {
     clearTokens()
+    clearVault()
   }
 }
 
 /**
+ * Is this a 401 from a generated client? Duck-typed on purpose: each generated client package
+ * (`generated/auth`, `generated/account`, …) defines its OWN `ResponseError` class, so
+ * `instanceof ResponseError` from one package is false for an error thrown by another. We match the shared
+ * shape (`name === 'ResponseError'` + `response.status`) instead, so the refresh-retry works for every
+ * authed client, not just the auth one.
+ */
+function isUnauthorized(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { name?: unknown }).name === 'ResponseError' &&
+    (e as { response?: { status?: unknown } }).response?.status === 401
+  )
+}
+
+/**
  * Run an authed call, transparently refreshing once on a 401 and retrying — the retry-on-401→refresh wiring
- * future authed resource calls use. (This CR has only the idempotent logout; the helper is the pattern.)
+ * authed resource calls (e.g. unlock's key-material fetch) use.
  */
 export async function withRefresh<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call()
   } catch (e) {
-    if (e instanceof ResponseError && e.response.status === 401 && session.refreshToken !== null) {
+    if (isUnauthorized(e) && session.refreshToken !== null) {
       await refreshSession()
       return await call()
     }

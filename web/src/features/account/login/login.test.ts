@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../../api/client', () => ({ loginApi: vi.fn(), tokenApi: vi.fn(), sessionApi: vi.fn() }))
 
-import { login, refreshSession } from './login'
-import { loginApi, tokenApi } from '../../../api/client'
+import { login, refreshSession, logout } from './login'
+import { loginApi, tokenApi, sessionApi } from '../../../api/client'
 import { session } from '../../../app/session'
+import { setUnlocked, isUnlocked } from '../../../app/vault'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../../shared/base64'
 
@@ -45,6 +46,22 @@ describe('login (uc.account.login)', () => {
     // a wrong password derives a different key → the same signature would not verify (generic 401 server-side)
     const wrongPub = v1.deriveAuthKeypair('wrong password', authSalt).publicKey
     expect(v1.authVerify(wrongPub, NONCE, fromB64std(captured))).toBe(false)
+  })
+
+  it('re-locks the vault on logout (every sign-out path drops the unlocked keys)', async () => {
+    vi.mocked(sessionApi).mockReturnValue({
+      logout: () => Promise.resolve(),
+    } as unknown as ReturnType<typeof sessionApi>)
+    setUnlocked(new Uint8Array(32).fill(7), {
+      kemX: new Uint8Array(1),
+      mlkemSeed: new Uint8Array(1),
+      sign: new Uint8Array(1),
+    })
+    expect(isUnlocked()).toBe(true)
+
+    await logout()
+
+    expect(isUnlocked()).toBe(false)
   })
 
   it('rotates the tokens on refresh', async () => {
