@@ -1,0 +1,155 @@
+### Account login + sessions (uc.account.login)
+# Runnable acceptance for the login/token/session API. Run against a FRESH instance; request 1 creates
+# the owner so an account exists, then the surface is exercised top-to-bottom (shared server state).
+#
+# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid session can be
+# obtained): the signed happy-path login, refresh ROTATION success, and reuse→family-revoke. Those are
+# covered by the backend slice (LoginSliceTest). This file covers what needs no signature: challenge
+# non-enumerability, boundary 400s, the generic 401, the DoS-safe unknown-refresh path, idempotent logout.
+#
+# Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/login.http
+
+### 1. Seed: create the owner so an account (kevin@example.com) exists
+POST {{host}}/api/setup/owner
+Content-Type: application/json
+
+{
+  "email": "kevin@example.com",
+  "displayName": "Kevin",
+  "instanceName": "Our Family veyq",
+  "suiteId": "v1",
+  "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
+  "wrappedIdentityPrivateKey": "d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
+  "authPublicKey": "ZWQyNTUxOS1hdXRoLXB1Yg==",
+  "masterKeyWraps": [{ "method": "PASSWORD", "wrappedKey": "d3JhcHBlZC1tYXN0ZXIta2V5", "kdfParams": "AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz" }],
+  "recoveryMasterKeyTag": "cmVjb3ZlcnktdGFn"
+}
+
+> {%
+client.test("owner created", function () {
+    client.assert(response.status === 201, "expected 201, got " + response.status);
+});
+%}
+
+### 2. A challenge for an EXISTING account returns a nonce + instance salt
+POST {{host}}/api/login/challenge
+Content-Type: application/json
+
+{ "email": "kevin@example.com" }
+
+> {%
+client.test("challenge for existing account", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(response.body.nonce !== null && response.body.nonce.length > 0, "expected a nonce");
+    client.assert(response.body.instanceSalt !== null && response.body.instanceSalt.length > 0, "expected instanceSalt");
+});
+%}
+
+### 3. A challenge for an UNKNOWN account returns the SAME shape (non-enumerable)
+POST {{host}}/api/login/challenge
+Content-Type: application/json
+
+{ "email": "ghost@example.com" }
+
+> {%
+client.test("challenge for unknown account is indistinguishable", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(response.body.nonce !== null && response.body.nonce.length > 0, "expected a nonce");
+    client.assert(response.body.instanceSalt !== null && response.body.instanceSalt.length > 0, "expected instanceSalt");
+});
+%}
+
+### 4. A challenge with a missing email is rejected at the boundary
+POST {{host}}/api/login/challenge
+Content-Type: application/json
+
+{ }
+
+> {%
+client.test("missing email rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 5. A challenge with a malformed email is rejected at the boundary
+POST {{host}}/api/login/challenge
+Content-Type: application/json
+
+{ "email": "not-an-email" }
+
+> {%
+client.test("malformed email rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 6. Verify with a (well-formed but wrong) signature → single generic 401
+POST {{host}}/api/login/verify
+Content-Type: application/json
+
+{ "email": "kevin@example.com", "signature": "c2lnbmF0dXJlLW92ZXItbm9uY2U=" }
+
+> {%
+client.test("wrong signature is a generic failure", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 7. Verify with a non-base64 signature is rejected at the boundary
+POST {{host}}/api/login/verify
+Content-Type: application/json
+
+{ "email": "kevin@example.com", "signature": "not base64!!" }
+
+> {%
+client.test("non-base64 signature rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 8. Refreshing an unknown token → plain 401 (must NOT revoke anyone — DoS-safe)
+POST {{host}}/api/token/refresh
+Content-Type: application/json
+
+{ "refreshToken": "this-token-was-never-issued" }
+
+> {%
+client.test("unknown refresh token is a plain rejection", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "refresh_rejected", "expected code refresh_rejected");
+});
+%}
+
+### 9. Refresh with a missing token is rejected at the boundary
+POST {{host}}/api/token/refresh
+Content-Type: application/json
+
+{ }
+
+> {%
+client.test("missing refresh token rejected", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 10. Logout with a bogus bearer token is idempotent
+POST {{host}}/api/logout
+Authorization: Bearer this-token-was-never-issued
+
+> {%
+client.test("logout is idempotent", function () {
+    client.assert(response.status === 204, "expected 204, got " + response.status);
+});
+%}
+
+### 11. Setup status carries the instance salt
+GET {{host}}/api/setup
+Accept: application/json
+
+> {%
+client.test("setup status carries instanceSalt", function () {
+    client.assert(response.status === 200, "status " + response.status);
+    client.assert(response.body.instanceSalt !== null && response.body.instanceSalt.length > 0, "expected instanceSalt");
+});
+%}

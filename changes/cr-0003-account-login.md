@@ -86,13 +86,15 @@ phases 1–2 below.
   replayed nonce → rejected; refresh rotates + invalidates the old token; **replayed (superseded) refresh
   → family revoked**; an unverifiable stale token → plain 401, **not** a family-kill (DoS guard);
   `GET /api/setup` carries a stable `instanceSalt`. **Done when:** `./gradlew check` green.
-- [ ] **3 — http.** Add `http/account/login.http` with response-handler assertions for what the surface
-  can drive **without** an Ed25519 signer: challenge issuance is **non-enumerable** (known vs. unknown
-  email → identical), replayed/expired nonce → rejected, malformed requests → 400. The **opaque** token
-  flows *are* expressible here (no signing needed): `refresh` rotates and invalidates the old token, and a
-  replayed (superseded) refresh token → family revoked. **Parity note:** only the **signed login
-  happy-path** is not expressible in a `.http` handler — it is covered by the backend slice (phase 2) and
-  the web e2e (phase 4); mark this one gap explicitly. **Done when:** the ijhttp run is green.
+- [x] **3 — http.** Added `http/account/login.http` (11 assertions, **ijhttp green** against a live
+  instance): challenge **non-enumerability** (existing vs. unknown email → identical 200 shape), boundary
+  400s (missing/malformed email, non-base64 signature, missing refresh token), a generic 401 on a wrong
+  signature, the **DoS-safe** unknown-refresh → plain 401, idempotent logout, and a stable `instanceSalt`.
+  **Parity gap (slice-only):** every path that needs a valid Ed25519 signature — the signed happy-path
+  login, refresh **rotation success**, and **reuse → family-revoke** — cannot be driven from a `.http`
+  handler (no signer), so they are covered only by the backend slice (phase 2). Marked explicitly in the
+  file header and recorded as a coverage gap. *(Correction: the positive token flows are NOT
+  http-expressible after all — obtaining a valid refresh token requires a signed session.)*
 - [ ] **4 — web.** *Setup side:* correct the cr-0002 stopgap — derive `authSalt` from the `instanceSalt`
   now in `SetupStatus` (`HKDF(instanceSalt, email)`), so setup and login derive **identically**. *Login
   side:* replace the login stub with the real flow — derive the auth keypair, request the challenge, sign
