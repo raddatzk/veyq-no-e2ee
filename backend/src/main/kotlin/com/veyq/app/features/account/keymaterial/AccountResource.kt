@@ -8,6 +8,7 @@ import com.veyq.app.shared.http.bearerToken
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
+import org.jboss.logging.Logger
 
 /**
  * HTTP adapter serving the authenticated caller's wrapped key material for client-side unlock
@@ -34,7 +35,15 @@ class AccountResource(private val handler: KeyMaterialHandler) : AccountApi {
         val suiteId = AccountKeyMaterial.SuiteId.entries.firstOrNull { it.value == material.suiteId }
             ?: return Response.serverError().entity(ErrorResponse(code = "internal_error")).build()
         val wraps = material.wraps.mapNotNull { wrap ->
-            MasterKeyWrap.Method.entries.firstOrNull { it.value == wrap.method }?.let { method ->
+            val method = MasterKeyWrap.Method.entries.firstOrNull { it.value == wrap.method }
+            if (method == null) {
+                // Forward-compatible skip, but never silent: a method the current enum doesn't know is
+                // either a newer-client wrap (fine) or data corruption (e.g. a dropped PASSWORD wrap would
+                // lock the account out) — surface it so an operator can tell the two apart. The method
+                // string is low-sensitivity (a small known set), no ciphertext or secret is logged.
+                log.warnf("Skipping master-key wrap with unrecognised method '%s'", wrap.method)
+                null
+            } else {
                 MasterKeyWrap(method = method, wrappedKey = wrap.wrappedKey, kdfParams = wrap.kdfParams)
             }
         }
@@ -52,4 +61,8 @@ class AccountResource(private val handler: KeyMaterialHandler) : AccountApi {
         Response.status(Response.Status.UNAUTHORIZED)
             .entity(ErrorResponse(code = "authentication_failed"))
             .build()
+
+    private companion object {
+        private val log: Logger = Logger.getLogger(AccountResource::class.java)
+    }
 }

@@ -68,6 +68,18 @@ describe('unlockMasterKey (uc.account.unlock)', () => {
     expect(identityPrivate()).toEqual(id.priv)
   })
 
+  it('hands out key copies so clearVault cannot corrupt a held reference (use-after-clear safety)', async () => {
+    const { material, masterKey: expectedMaster, secretKey } = buildMaterial(PASSWORD)
+    mockMaterial(material)
+    await unlockMasterKey(PASSWORD, b64std(secretKey))
+
+    const held = masterKey()!
+    clearVault() // zero-fills the vault's OWN buffer in place
+
+    // the previously returned copy still holds the real bytes, not zeroes
+    expect(held).toEqual(expectedMaster)
+  })
+
   it('fails generically on a wrong password — no key material is held', async () => {
     const { material, secretKey } = buildMaterial(PASSWORD)
     mockMaterial(material)

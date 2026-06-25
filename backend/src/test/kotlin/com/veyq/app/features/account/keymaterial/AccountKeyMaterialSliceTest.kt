@@ -57,6 +57,32 @@ class AccountKeyMaterialSliceTest {
     }
 
     @Test
+    fun unknownWrapMethodIsSkippedNotA500() {
+        val userId = "keymat-user-bogus"
+        QuarkusTransaction.requiringNew().run {
+            if (VeyqUser.findById(userId) == null) {
+                VeyqUser().apply {
+                    id = userId
+                    email = "bogus-keymat@example.com"
+                    displayName = "Bogus Method Test"
+                    serverRole = "SERVER_OWNER"
+                    suiteId = "v1"
+                    identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="
+                    wrappedIdentityPrivateKey = "QS1pZGVudGl0eS1wcml2"
+                    authPublicKey = "YXV0aC1wdWJsaWMta2V5"
+                    createdAt = Instant.now()
+                }.persist()
+                persistWrap(userId, "PASSWORD", A_PW_WRAP)
+                persistWrap(userId, "FUTURE_METHOD", A_REC_WRAP) // not in the enum → must be skipped, not 500
+            }
+        }
+        get(issueToken(userId))
+            .then().statusCode(200)
+            .body("wraps.size()", equalTo(1))
+            .body("wraps[0].method", equalTo("PASSWORD"))
+    }
+
+    @Test
     fun missingTokenIsGeneric401() {
         given().`when`().get(PATH)
             .then().statusCode(401).body("code", equalTo("authentication_failed"))

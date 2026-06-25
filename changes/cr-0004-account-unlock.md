@@ -186,3 +186,11 @@ A second review pass (over the fix commits themselves) found three more, all app
 - **R2-#3:** the unlock failure path no longer wipes the Secret-Key field — a transient (network/5xx) error
   must not throw away a correct, hard-to-re-paste key; the field is the user's active input. Inputs are
   still cleared on success and on sign-out.
+
+The two remaining latent items from the second pass, also applied:
+- **R2-#4:** an unrecognised master-key-wrap method is now WARN-logged when skipped (was a silent
+  `mapNotNull` drop), so a corrupt/critical wrap can be told apart from a forward-compatible new method.
+  Slice test seeds a `FUTURE_METHOD` wrap and asserts it's skipped (200, PASSWORD preserved, no 500).
+- **R2-#5:** the vault getters (`masterKey()` / `identityPrivate()`) now return a fresh **copy**, so the
+  in-place zero-fill in `clearVault()` can never corrupt a reference a caller still holds (use-after-clear).
+  Test holds a copy across `clearVault()` and asserts it still has the real bytes.

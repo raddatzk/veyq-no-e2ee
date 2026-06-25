@@ -40,12 +40,17 @@ export function isUnlocked(): boolean {
   return vaultState.unlocked
 }
 
-/** The unlocked Master Key, or null while locked. Callers must not persist it. */
+// The getters return a fresh COPY, never the vault's own buffer: clearVault() zero-fills the internal bytes
+// in place on re-lock, so handing out the live reference would let a held copy silently read zeroes after a
+// sign-out (use-after-clear). The caller owns its copy and should use it transiently. Callers must not persist it.
+
+/** The unlocked Master Key as a fresh copy, or null while locked. */
 export function masterKey(): Uint8Array | null {
-  return keys.masterKey
+  return keys.masterKey ? keys.masterKey.slice() : null
 }
 
-/** The unlocked identity private key, or null while locked. */
+/** The unlocked identity private key as a fresh copy, or null while locked. */
 export function identityPrivate(): Identity['priv'] | null {
-  return keys.identityPrivate
+  const p = keys.identityPrivate
+  return p ? { kemX: p.kemX.slice(), mlkemSeed: p.mlkemSeed.slice(), sign: p.sign.slice() } : null
 }
