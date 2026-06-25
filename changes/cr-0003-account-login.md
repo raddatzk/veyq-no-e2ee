@@ -49,7 +49,7 @@ deferral** — the auth keypair is derived with `instanceSalt` at **both** regis
     greenfield/dev with no production accounts — the fix is to re-run setup on a fresh instance. Not a
     silent migration: call it out.
 
-## Open decision (settle in phase 1)
+## Design decision — `instanceSalt` placement (settled)
 
 Adopt the full ADR formula `authSalt = HKDF(instanceSalt, normalizedEmail)`. Since **registration also
 needs `instanceSalt`** (not just login), it must live where *both* the setup client and the login client
@@ -98,8 +98,9 @@ phases 1–2 below.
   side:* replace the login stub with the real flow — derive the auth keypair, request the challenge, sign
   the nonce, verify, store the **access + refresh** tokens, and wire **retry-on-`401`→refresh**. (The
   E2EE session name is unlock-gated → `uc.account.sessions`, not here.) Post-auth lands in an
-  **authenticated-but-locked** state
-  (Master-Key unlock is a separate use-case — stub the unlock step). **Done when:** `npm run check` green
+  **authenticated-but-locked** state — Master-Key unlock is
+  [uc.account.unlock](../docs/features/account/use-cases/uc.account.unlock.md), stubbed here.
+  **Done when:** `npm run check` green
   and a preview smoke shows, on a fresh instance, setup → login round-trip (the same email/password logs
   in), a silent access-token refresh, **and** wrong-password → generic failure.
 - [ ] **5 — verify + coverage.** Add `docs/coverage/features/account/use-cases/uc.account.login.yaml`
