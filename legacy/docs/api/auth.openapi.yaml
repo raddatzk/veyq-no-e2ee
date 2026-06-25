@@ -1,1058 +1,263 @@
----
 openapi: 3.1.0
 info:
-  title: veyq Auth API
+  title: veyq authentication
   version: 0.1.0
-  description: >-
-    API-first Zielvertrag fuer veyq Auth API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
-servers:
-- url: "/"
-tags:
-- name: Auth
 paths:
-  "/api/auth/login":
+  /api/login:
     post:
       tags:
-      - Auth
+        - Session
       operationId: login
+      summary: Authenticate (password) and receive a session + the wrapped key bag.
+      description: |
+        The server verifies the password against the stored Argon2id auth verifier, issues a session token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock happens client-side from the returned blobs (auth != unlock).
+        The response includes the root login-session identifier; refreshes append rotated child sessions under that root.
       requestBody:
-        "$ref": "#/components/requestBodies/Login"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         '200':
-          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+          description: Session token + wrapped key bag.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
         '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Anmelden und Auth-Cookies setzen
-      x-implementation-status: partial
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Anmelden und Auth-Cookies setzen.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: partial.
-  "/api/auth/totp/enrollment":
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/auth/refresh:
     post:
       tags:
-      - Auth
-      operationId: createTotpEnrollment
-      security:
-      - accessTokenCookie: []
+        - Session
+      operationId: refreshSession
+      summary: Rotate the HttpOnly refresh cookie and receive a fresh access session token.
+      description: |
+        Refresh restores server authentication only. It never returns key material; a client that wants to continue decrypting after reload must also have a local unlock state for the E2EE keys. The refresh token is held in an HttpOnly SameSite=Lax cookie and stored server-side only as a hash. Each successful refresh appends a new session row under the same root session and revokes the previous row as ROTATED.
       responses:
         '200':
-          "$ref": "#/components/responses/TotpEnrollment"
+          description: Fresh access session token; the refresh cookie is rotated in Set-Cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshSessionResponse"
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: TOTP-Enrollment fuer Passwort-Login vorbereiten
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Erzeugt ein neues TOTP-Secret und eine otpauth-Provisioning-URI fuer den aktuellen Benutzer. Das Secret wird erst gespeichert, wenn es mit einem gueltigen TOTP-Code aktiviert wird.
-
-        Vorbedingungen:
-        - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/totp/enable":
-    post:
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/me/session:
+    delete:
       tags:
-      - Auth
-      operationId: enableTotp
-      security:
-      - accessTokenCookie: []
-      requestBody:
-        "$ref": "#/components/requestBodies/EnableTotp"
+        - Session
+      operationId: logout
+      summary: Invalidate the caller's current session token (logout).
+      description: |
+        Revokes the caller's root login-session family for the presented bearer token or refresh cookie. Holds no key material; unlock state is local.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
-        '200':
-          "$ref": "#/components/responses/UserSummary"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '204':
+          description: The session was invalidated (or did not exist).
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: TOTP fuer Passwort-Login aktivieren
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-      - Der aktuelle Benutzer muss einen Passwort-Login haben und das aktuelle Passwort bestaetigen.
-      - Das Secret muss Base32-kodiert sein und mit einem gueltigen TOTP-Code bestaetigt werden.
-      description: |-
-        Aktiviert TOTP als zweiten Faktor fuer passwortbasierte Logins des aktuellen Benutzers. Passkey-Logins werden dadurch nicht zusaetzlich mit TOTP geschuetzt.
-
-        Vorbedingungen:
-        - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-        - Der aktuelle Benutzer muss einen Passwort-Login haben und das aktuelle Passwort bestaetigen.
-        - Das Secret muss Base32-kodiert sein und mit einem gueltigen TOTP-Code bestaetigt werden.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/totp/disable":
-    post:
-      tags:
-      - Auth
-      operationId: disableTotp
-      security:
-      - accessTokenCookie: []
-      requestBody:
-        "$ref": "#/components/requestBodies/DisableTotp"
-      responses:
-        '200':
-          "$ref": "#/components/responses/UserSummary"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: TOTP fuer Passwort-Login deaktivieren
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-      - Das aktuelle Passwort und ein gueltiger TOTP-Code muessen bestaetigt werden.
-      description: |-
-        Deaktiviert TOTP fuer passwortbasierte Logins des aktuellen Benutzers nach frischer Passwort- und TOTP-Bestaetigung.
-
-        Vorbedingungen:
-        - Ein gueltiger Access-Token Cookie muss vorhanden sein.
-        - Das aktuelle Passwort und ein gueltiger TOTP-Code muessen bestaetigt werden.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/login/options":
-    post:
-      tags:
-      - Auth
-      operationId: passkeyLoginOptions
-      security: []
-      responses:
-        '200':
-          "$ref": "#/components/responses/PasskeyLoginOptions"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-      summary: Passkey-Login-Challenge erzeugen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Passkey-Login-Challenge erzeugen.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/login":
-    post:
-      tags:
-      - Auth
-      operationId: passkeyLogin
-      security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/PasskeyLogin"
-      responses:
-        '200':
-          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Mit Passkey anmelden und Auth-Cookies setzen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Mit Passkey anmelden und Auth-Cookies setzen.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/domains":
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/me/login-sessions:
     get:
       tags:
-      - Auth
-      operationId: passkeyLoginDomains
-      security: []
+        - Session
+      operationId: listLoginSessions
+      summary: List active login-session families for the authenticated user.
+      description: |
+        Returns one entry per active root login-session family. Refresh rotation rows are retained for audit and replay detection but are not exposed as separate user-facing sessions. The session label is client-encrypted opaque text.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
       responses:
         '200':
-          "$ref": "#/components/responses/PasskeyLoginDomains"
-      summary: Verfuegbare Passkey-Login-Domains auflisten
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Listet die Tenant-Domains, die als Passkey-Login-Quelle verwendet werden koennen.
-
-        Vorbedingungen:
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/link":
-    post:
-      tags:
-      - Auth
-      operationId: createPasskeyLink
-      security:
-      - accessTokenCookie: []
-      requestBody:
-        "$ref": "#/components/requestBodies/CreatePasskeyLink"
-      responses:
-        '200':
-          "$ref": "#/components/responses/PasskeyLink"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
+          description: Active login-session families.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSessionList"
+              examples:
+                multipleSessions:
+                  summary: Two active login sessions
+                  value:
+                    sessions:
+                      - rootSessionId: 550e8400-e29b-41d4-a716-446655440000
+                        encryptedLabel: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
+                        loginMethod: PASSWORD
+                        createdAt: '2026-06-24T08:31:12Z'
+                        lastUsedAt: '2026-06-24T09:02:41Z'
+                      - rootSessionId: 550e8400-e29b-41d4-a716-446655440001
+                        encryptedLabel: eyJjdCI6InBob25lLWNpcGhlcnRleHQifQ
+                        loginMethod: PASSWORD
+                        createdAt: '2026-06-23T19:04:51Z'
+                        lastUsedAt: '2026-06-23T19:04:51Z'
+                empty:
+                  summary: No active login sessions
+                  value:
+                    sessions: []
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-      summary: Kurzlebigen Passkey-Link-Code erzeugen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger Access-Token Cookie muss auf der Auth-Domain vorhanden sein.
-      - Ziel-Domain muss eine Tenant-Domain sein.
-      description: |-
-        Erzeugt einen kurzlebigen Einmal-Code, der auf der Ziel-Domain gegen eine Passkey-Link-Berechtigung getauscht wird.
-
-        Vorbedingungen:
-        - Ein gueltiger Access-Token Cookie muss auf der Auth-Domain vorhanden sein.
-        - Ziel-Domain muss eine Tenant-Domain sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/link/exchange":
-    post:
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+  /api/me/login-sessions/{rootSessionId}:
+    put:
       tags:
-      - Auth
-      operationId: exchangePasskeyLinkCode
-      security: []
+        - Session
+      operationId: renameLoginSession
+      summary: Update the encrypted display label for one login-session family.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: rootSessionId
+          in: path
+          required: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+          schema:
+            type: string
       requestBody:
-        "$ref": "#/components/requestBodies/ExchangePasskeyLinkCode"
-      responses:
-        '200':
-          "$ref": "#/components/responses/PasskeyLinkGrant"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '409':
-          "$ref": "./common.openapi.yaml#/components/responses/409"
-      summary: Passkey-Link-Code tauschen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Der Code muss gueltig, noch nicht getauscht und fuer die aktuelle Ziel-Domain ausgestellt sein.
-      description: |-
-        Tauscht einen URL-Code auf der Ziel-Domain gegen eine enge Passkey-Link-Berechtigung, die nur fuer Registrierungs-Challenge und Abschluss verwendet werden kann.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Der Code muss gueltig, noch nicht getauscht und fuer die aktuelle Ziel-Domain ausgestellt sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/link/options":
-    post:
-      tags:
-      - Auth
-      operationId: createPasskeyLinkOptions
-      security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/PasskeyLinkOptions"
-      responses:
-        '200':
-          "$ref": "#/components/responses/PasskeyRegistrationOptions"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-      summary: Passkey-Link-Registrierungs-Challenge erzeugen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
-      description: |-
-        Erzeugt eine Registrierungs-Challenge fuer eine gueltige Passkey-Link-Berechtigung.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/passkeys/link/complete":
-    post:
-      tags:
-      - Auth
-      operationId: completePasskeyLink
-      security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/CompletePasskeyLink"
-      responses:
-        '200':
-          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '409':
-          "$ref": "./common.openapi.yaml#/components/responses/409"
-      summary: Ziel-Domain-Passkey anlegen und anmelden
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token erreichbar.
-      - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
-      - Zuvor muss eine Passkey-Link-Registrierungs-Challenge erzeugt worden sein.
-      description: |-
-        Loest eine Passkey-Link-Berechtigung ein, speichert den Ziel-Domain-Passkey und setzt normale Auth-Cookies.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token erreichbar.
-        - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
-        - Zuvor muss eine Passkey-Link-Registrierungs-Challenge erzeugt worden sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/mobile/session/exchange":
-    post:
-      tags:
-      - Auth
-      operationId: exchangeMobileSessionCode
-      security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/MobileSessionExchange"
-      responses:
-        '200':
-          "$ref": "#/components/responses/NativeMobileSession"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '409':
-          "$ref": "./common.openapi.yaml#/components/responses/409"
-      summary: Mobile-Login-Code gegen native Sitzung tauschen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token-Cookie erreichbar.
-      - Der Code muss gueltig, kurzlebig, noch nicht verwendet und fuer diese Instanz ausgestellt sein.
-      description: |-
-        Tauscht einen kurzlebigen Browser-Handoff-Code aus dem nativen Mobile-Login-Flow gegen eine native Sitzung. Die native Sitzung ist getrennt von Web-Cookies und wird von iOS in der Keychain gespeichert.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token-Cookie erreichbar.
-        - Der Code muss gueltig, kurzlebig, noch nicht verwendet und fuer diese Instanz ausgestellt sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/mobile/session/refresh":
-    post:
-      tags:
-      - Auth
-      operationId: refreshMobileSession
-      security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/MobileSessionRefresh"
-      responses:
-        '200':
-          "$ref": "#/components/responses/NativeMobileSession"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Native Mobile-Sitzung erneuern
-      x-implementation-status: implemented
-      x-preconditions:
-      - Der Endpunkt ist ohne Access-Token-Cookie erreichbar.
-      - Der native Refresh Token muss gueltig, aktiv und nicht abgelaufen sein.
-      description: |-
-        Erneuert eine native Mobile-Sitzung mit dem in der Keychain gespeicherten nativen Refresh Token. Der Refresh Token wird rotiert; alte Access Tokens der nativen Sitzung werden widerrufen.
-
-        Vorbedingungen:
-        - Der Endpunkt ist ohne Access-Token-Cookie erreichbar.
-        - Der native Refresh Token muss gueltig, aktiv und nicht abgelaufen sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/mobile/session/code":
-    post:
-      tags:
-      - Auth
-      operationId: createMobileSessionCode
-      security:
-      - accessTokenCookie: []
-      requestBody:
-        "$ref": "#/components/requestBodies/MobileSessionCode"
-      responses:
-        '200':
-          "$ref": "#/components/responses/MobileSessionCode"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Native Mobile-Handoff-Code erzeugen
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - redirectUri muss ein erlaubter veyq Custom-Scheme Callback sein.
-      description: |-
-        Erzeugt nach erfolgreichem Browser-Login einen kurzlebigen Einmal-Code fuer den nativen Mobile-Handoff. Der Web-Login leitet anschliessend zur zurueckgegebenen redirectUri weiter.
-
-        Vorbedingungen:
-        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - redirectUri muss ein erlaubter veyq Custom-Scheme Callback sein.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/mobile/logout":
-    post:
-      tags:
-      - Auth
-      operationId: logoutMobileSession
-      security:
-      - nativeAccessTokenBearer: []
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameLoginSessionRequest"
+            example:
+              encryptedLabel: eyJjdCI6IkF2YXMtTWFjQm9vay1jaXBoZXJ0ZXh0In0
       responses:
         '204':
-          description: Die native Sitzung wurde widerrufen.
+          description: The encrypted session label was updated.
+        '400':
+          $ref: "./common.openapi.yaml#/components/responses/BadRequest"
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Native Mobile-Sitzung abmelden
-      x-implementation-status: implemented
-      x-preconditions:
-      - Ein gueltiger nativer Bearer Access Token muss im Authorization Header gesendet werden.
-      description: |-
-        Widerruft die aktuelle native Mobile-Sitzung. Dies betrifft native Bearer Tokens und aendert keine bestehenden Web-Cookie-Sitzungen.
-
-        Vorbedingungen:
-        - Ein gueltiger nativer Bearer Access Token muss im Authorization Header gesendet werden.
-
-        Implementierungsstatus: implemented.
-  "/api/auth/logout":
-    post:
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
+    delete:
       tags:
-      - Auth
-      operationId: logout
-      security:
-      - accessTokenCookie: []
+        - Session
+      operationId: removeLoginSession
+      summary: Revoke one root login-session family.
+      parameters:
+        - $ref: "./common.openapi.yaml#/components/parameters/AuthHeader"
+        - name: rootSessionId
+          in: path
+          required: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+          schema:
+            type: string
       responses:
         '204':
-          description: Current auth cookies were cleared.
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
+          description: All rows in that login-session family were revoked.
         '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Aktuelle Sitzung abmelden
-      x-implementation-status: partial
-      x-preconditions:
-      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Aktuelle Sitzung abmelden.
-
-        Vorbedingungen:
-        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: partial.
-  "/api/auth/refresh":
-    post:
-      tags:
-      - Auth
-      operationId: refresh
-      security:
-      - refreshTokenCookie: []
-      responses:
-        '200':
-          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Refresh-Token rotieren und neue Cookies setzen
-      x-implementation-status: partial
-      x-preconditions:
-      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      description: |-
-        Refresh-Token rotieren und neue Cookies setzen.
-
-        Vorbedingungen:
-        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-
-        Implementierungsstatus: partial.
+          $ref: "./common.openapi.yaml#/components/responses/Unauthorized"
 components:
-  securitySchemes:
-    accessTokenCookie:
-      type: apiKey
-      in: cookie
-      name: VEYQ_ACCESS_TOKEN
-    refreshTokenCookie:
-      type: apiKey
-      in: cookie
-      name: VEYQ_REFRESH_TOKEN
-    nativeAccessTokenBearer:
-      type: http
-      scheme: bearer
-      bearerFormat: opaque
-
-  requestBodies:
-    Login:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/LoginRequest"
-          example:
-            email: kevin@example.test
-            password: correct horse battery staple
-            totpCode: "123456"
-    EnableTotp:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/EnableTotpRequest"
-          example:
-            password: correct horse battery staple
-            secret: JBSWY3DPEHPK3PXP
-            code: "123456"
-    DisableTotp:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/DisableTotpRequest"
-          example:
-            password: correct horse battery staple
-            code: "123456"
-    PasskeyLogin:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLoginRequest"
-          example:
-            id: credential-id
-            rawId: credential-id
-            type: public-key
-            response:
-              clientDataJSON: client-data
-              authenticatorData: authenticator-data
-              signature: signature
-    CreatePasskeyLink:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/CreatePasskeyLinkRequest"
-          example:
-            targetOrigin: https://memories.affenbande-climbing.team
-            redirectPath: /friends
-    PasskeyLinkOptions:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLinkOptionsRequest"
-          example:
-            grant: passkey-link-grant
-    ExchangePasskeyLinkCode:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/ExchangePasskeyLinkCodeRequest"
-          example:
-            code: passkey-link-code
-    CompletePasskeyLink:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/CompletePasskeyLinkRequest"
-          example:
-            grant: passkey-link-grant
-            displayName: Apple Passwords
-            credential:
-              id: credential-id
-              rawId: credential-id
-              type: public-key
-              response:
-                clientDataJSON: client-data
-                attestationObject: attestation-object
-    MobileSessionExchange:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/MobileSessionExchangeRequest"
-          example:
-            code: mobile-login-code
-    MobileSessionRefresh:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/MobileSessionRefreshRequest"
-          example:
-            refreshToken: native-refresh-token
-    MobileSessionCode:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/MobileSessionCodeRequest"
-          example:
-            redirectUri: veyq://auth/callback
-            state: ios-state
-
   schemas:
     LoginRequest:
       type: object
-      additionalProperties: false
       required:
         - email
         - password
       properties:
         email:
-          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+          type: string
+          x-field-extra-annotation:
+            - '@field:com.veyq.app.shared.validation.Email'
         password:
           type: string
-        totpCode:
-          type: string
-          pattern: "^[0-9]{6}$"
-          description: Required only when TOTP is enabled for password login.
-      example:
-        email: kevin@example.test
-        password: correct horse battery staple
-        totpCode: "123456"
-    TotpEnrollmentResponse:
+          x-field-extra-annotation:
+            - '@field:jakarta.validation.constraints.Size(max = 1024)'
+    LoginResponse:
       type: object
-      additionalProperties: false
       required:
-        - secret
-        - provisioningUri
-        - issuer
-        - accountName
-        - digits
-        - periodSeconds
+        - sessionToken
+        - rootSessionId
+        - user
+        - keyBag
       properties:
-        secret:
+        sessionToken:
           type: string
-          description: Base32-encoded TOTP secret. Display only during enrollment.
-        provisioningUri:
+        rootSessionId:
           type: string
-          description: otpauth URI for authenticator apps.
-        issuer:
-          type: string
-        accountName:
-          type: string
-        digits:
-          type: integer
-          format: int32
-        periodSeconds:
-          type: integer
-          format: int32
-      example:
-        secret: JBSWY3DPEHPK3PXP
-        provisioningUri: otpauth://totp/veyq:kevin@example.test?secret=JBSWY3DPEHPK3PXP&issuer=veyq&algorithm=SHA1&digits=6&period=30
-        issuer: veyq
-        accountName: kevin@example.test
-        digits: 6
-        periodSeconds: 30
-    EnableTotpRequest:
+          description: Stable opaque identifier for this root login-session family.
+        user:
+          $ref: "./common.openapi.yaml#/components/schemas/UserSummary"
+        keyBag:
+          $ref: "#/components/schemas/KeyBag"
+    RefreshSessionResponse:
       type: object
-      additionalProperties: false
       required:
-        - password
-        - secret
-        - code
+        - sessionToken
       properties:
-        password:
+        sessionToken:
           type: string
-        secret:
-          type: string
-        code:
-          type: string
-          pattern: "^[0-9]{6}$"
-      example:
-        password: correct horse battery staple
-        secret: JBSWY3DPEHPK3PXP
-        code: "123456"
-    DisableTotpRequest:
+          description: Fresh opaque bearer access token.
+    RenameLoginSessionRequest:
       type: object
-      additionalProperties: false
+      example:
+        encryptedLabel: eyJjdCI6IkF2YXMtTWFjQm9vay1jaXBoZXJ0ZXh0In0
       required:
-        - password
-        - code
+        - encryptedLabel
       properties:
-        password:
+        encryptedLabel:
           type: string
-        code:
-          type: string
-          pattern: "^[0-9]{6}$"
-      example:
-        password: correct horse battery staple
-        code: "123456"
-    PasskeyLoginOptionsResponse:
+          maxLength: 16384
+          x-field-extra-annotation:
+            - '@field:jakarta.validation.constraints.Size(max = 16384)'
+    LoginSessionSummary:
       type: object
-      additionalProperties: true
-      description: PublicKeyCredentialRequestOptions encoded for browser WebAuthn APIs.
       example:
-        challenge: challenge
-        timeout: 300000
-        userVerification: required
-        allowCredentials:
-          - type: public-key
-            id: credential-id
-    PasskeyLoginRequest:
-      type: object
-      additionalProperties: false
+        rootSessionId: 550e8400-e29b-41d4-a716-446655440000
+        encryptedLabel: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
+        loginMethod: PASSWORD
+        createdAt: '2026-06-24T08:31:12Z'
+        lastUsedAt: '2026-06-24T09:02:41Z'
       required:
-        - id
-        - rawId
-        - type
-        - response
+        - rootSessionId
+        - encryptedLabel
+        - loginMethod
+        - createdAt
+        - lastUsedAt
       properties:
-        id:
+        rootSessionId:
           type: string
-        rawId:
+        encryptedLabel:
           type: string
-        type:
+          description: Client-encrypted human-readable label for the login-session family.
+        loginMethod:
           type: string
-        response:
-          "$ref": "#/components/schemas/PasskeyAssertionResponse"
-      example:
-        id: credential-id
-        rawId: credential-id
-        type: public-key
-        response:
-          clientDataJSON: client-data
-          authenticatorData: authenticator-data
-          signature: signature
-    PasskeyAssertionResponse:
+          enum: [PASSWORD, PASSKEY, DEVICE_APPROVAL, RECOVERY]
+          description: Initial login flow that created the root session.
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+    LoginSessionList:
       type: object
-      additionalProperties: false
-      required:
-        - clientDataJSON
-        - authenticatorData
-        - signature
-      properties:
-        clientDataJSON:
-          type: string
-        authenticatorData:
-          type: string
-        signature:
-          type: string
-        userHandle:
-          type: string
       example:
-        clientDataJSON: client-data
-        authenticatorData: authenticator-data
-        signature: signature
-    PasskeyLoginDomainsResponse:
-      type: object
-      additionalProperties: false
+        sessions:
+          - rootSessionId: 550e8400-e29b-41d4-a716-446655440000
+            encryptedLabel: eyJjdCI6ImxhcHRvcC1jaXBoZXJ0ZXh0In0
+            loginMethod: PASSWORD
+            createdAt: '2026-06-24T08:31:12Z'
+            lastUsedAt: '2026-06-24T09:02:41Z'
       required:
-        - domains
+        - sessions
       properties:
-        domains:
+        sessions:
           type: array
           items:
-            "$ref": "#/components/schemas/PasskeyLoginDomain"
-      example:
-        domains:
-          - domain: memories.raddatz.me
-            origin: https://memories.raddatz.me
-            current: false
-    PasskeyLoginDomain:
+            $ref: "#/components/schemas/LoginSessionSummary"
+    KeyBag:
       type: object
-      additionalProperties: false
+      description: The wrapped key material needed to unlock the master key client-side.
       required:
-        - domain
-        - origin
-        - current
+        - identityPublicKey
+        - wrappedIdentityPrivateKey
+        - masterKeyWraps
       properties:
-        domain:
-          type: string
-        origin:
-          type: string
-        current:
-          type: boolean
-    CreatePasskeyLinkRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - targetOrigin
-      properties:
-        targetOrigin:
-          type: string
-        redirectPath:
-          type: string
-    PasskeyLinkResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - code
-        - targetOrigin
-        - redirectPath
-      properties:
-        code:
-          type: string
-        targetOrigin:
-          type: string
-        redirectPath:
-          type: string
-    ExchangePasskeyLinkCodeRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - code
-      properties:
-        code:
-          type: string
-    PasskeyLinkGrantResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - grant
-        - redirectPath
-      properties:
-        grant:
-          type: string
-        redirectPath:
-          type: string
-    PasskeyLinkOptionsRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - grant
-      properties:
-        grant:
-          type: string
-    CompletePasskeyLinkRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - grant
-        - credential
-      properties:
-        grant:
-          type: string
-        displayName:
-          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
-        credential:
-          "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationRequest"
-    MobileSessionExchangeRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - code
-      properties:
-        code:
-          type: string
-          description: Kurzlebiger Einmal-Code aus dem browserbasierten Mobile-Handoff.
-      example:
-        code: mobile-login-code
-    MobileSessionRefreshRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - refreshToken
-      properties:
-        refreshToken:
-          type: string
-          description: Nativer Refresh Token der in der Keychain gespeicherten Sitzung.
-      example:
-        refreshToken: native-refresh-token
-    MobileSessionCodeRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - redirectUri
-      properties:
-        redirectUri:
-          type: string
-          format: uri
-          description: Custom-Scheme Callback-URI der nativen App.
-        state:
-          type: string
-          maxLength: 512
-          description: Optionaler nativer CSRF-State, der unveraendert in den Callback uebernommen wird.
-      example:
-        redirectUri: veyq://auth/callback
-        state: ios-state
-    MobileSessionCodeResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - code
-        - redirectUri
-      properties:
-        code:
-          type: string
-          description: Kurzlebiger Einmal-Code fuer den Austausch gegen eine native Sitzung.
-        redirectUri:
-          type: string
-          format: uri
-          description: Vollstaendige Callback-URI inklusive code und optionalem state.
-        state:
-          type: string
-          description: Der im Request gesendete State.
-      example:
-        code: mobile-login-code
-        redirectUri: veyq://auth/callback?code=mobile-login-code&state=ios-state
-        state: ios-state
-    NativeMobileSessionResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - tokenType
-        - accessToken
-        - accessTokenExpiresAt
-        - refreshToken
-        - refreshTokenExpiresAt
-        - user
-      properties:
-        tokenType:
-          type: string
-          enum:
-            - Bearer
-          description: Token-Typ fuer native Authorization-Header.
-        accessToken:
-          type: string
-          description: Nativer Access Token. Dieser Wert wird nicht als Web-Cookie gesetzt.
-        accessTokenExpiresAt:
-          type: string
-          format: date-time
-          description: Ablaufzeit des nativen Access Tokens.
-        refreshToken:
-          type: string
-          description: Nativer Refresh Token fuer die mobile Sitzung. Dieser Wert wird nicht als Web-Cookie gesetzt.
-        refreshTokenExpiresAt:
-          type: string
-          format: date-time
-          description: Ablaufzeit des nativen Refresh Tokens.
-        user:
-          "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
-      example:
-        tokenType: Bearer
-        accessToken: native-access-token
-        accessTokenExpiresAt: "2026-05-29T12:15:00Z"
-        refreshToken: native-refresh-token
-        refreshTokenExpiresAt: "2026-06-28T12:00:00Z"
-        user:
-          userId: 1
-          email: kevin@example.test
-          displayName: Kevin
-          permalink: kevin
-          serverRole: ServerOwner
-          passkeyCount: 1
-          hasPassword: true
-  responses:
-    TotpEnrollment:
-      description: TOTP enrollment secret and provisioning URI.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/TotpEnrollmentResponse"
-          example:
-            secret: JBSWY3DPEHPK3PXP
-            provisioningUri: otpauth://totp/veyq:kevin@example.test?secret=JBSWY3DPEHPK3PXP&issuer=veyq&algorithm=SHA1&digits=6&period=30
-            issuer: veyq
-            accountName: kevin@example.test
-            digits: 6
-            periodSeconds: 30
-    UserSummary:
-      description: Current authenticated user summary.
-      content:
-        application/json:
-          schema:
-            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
-          example:
-            userId: 1
-            email: kevin@example.test
-            displayName: Kevin
-            permalink: kevin
-            serverRole: ServerOwner
-            passkeyCount: 1
-            hasPassword: true
-            totpEnabled: true
-    PasskeyLoginOptions:
-      description: Passkey login options.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLoginOptionsResponse"
-          example:
-            challenge: challenge
-            timeout: 300000
-            userVerification: required
-    PasskeyRegistrationOptions:
-      description: Passkey registration options.
-      content:
-        application/json:
-          schema:
-            "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationOptionsResponse"
-          example:
-            challenge: challenge
-            timeout: 300000
-            attestation: none
-    PasskeyLoginDomains:
-      description: Passkey login domains.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLoginDomainsResponse"
-          example:
-            domains:
-              - domain: memories.raddatz.me
-                origin: https://memories.raddatz.me
-                current: false
-    PasskeyLink:
-      description: Passkey link code.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLinkResponse"
-          example:
-            code: passkey-link-code
-            targetOrigin: https://memories.affenbande-climbing.team
-            redirectPath: /friends
-    PasskeyLinkGrant:
-      description: Passkey link grant.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLinkGrantResponse"
-          example:
-            grant: passkey-link-grant
-            redirectPath: /friends
-    NativeMobileSession:
-      description: Native Mobile-Sitzung. Tokens sind fuer Authorization Bearer Header bestimmt und werden nicht als Web-Cookies gesetzt.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/NativeMobileSessionResponse"
-          example:
-            tokenType: Bearer
-            accessToken: native-access-token
-            accessTokenExpiresAt: "2026-05-29T12:15:00Z"
-            refreshToken: native-refresh-token
-            refreshTokenExpiresAt: "2026-06-28T12:00:00Z"
-            user:
-              userId: 1
-              email: kevin@example.test
-              displayName: Kevin
-              permalink: kevin
-              serverRole: ServerOwner
-              passkeyCount: 1
-              hasPassword: true
-    MobileSessionCode:
-      description: Native Mobile-Handoff-Code.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/MobileSessionCodeResponse"
-          example:
-            code: mobile-login-code
-            redirectUri: veyq://auth/callback?code=mobile-login-code&state=ios-state
-            state: ios-state
+        identityPublicKey:
+          $ref: "./common.openapi.yaml#/components/schemas/IdentityPublicKey"
+        wrappedIdentityPrivateKey:
+          $ref: "./common.openapi.yaml#/components/schemas/Blob"
+        masterKeyWraps:
+          type: array
+          items:
+            $ref: "./common.openapi.yaml#/components/schemas/MasterKeyWrap"
