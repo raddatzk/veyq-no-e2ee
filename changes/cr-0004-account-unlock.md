@@ -103,11 +103,12 @@ wraps each open the *same* Master Key via their own wrap and are **separate, pla
   6 slice tests green: valid token → caller's PASSWORD+RECOVERY wraps + identity blob; **A's token returns
   only A's material, never B's**; missing / malformed / expired token → generic 401; revoked family → 401.
   **Done:** `./gradlew check` green.
-- [ ] **3 — http.** Add `http/account/unlock.http`: `GET /api/account/key-material` with **no** bearer and
-  with a **malformed** bearer → 401 (boundary + no-anonymous-read assertions). **Parity gap (slice-only):**
-  the authenticated happy path needs a valid access token, which requires a signed login no `.http` handler
-  can produce (same limit as cr-0003) — covered by the phase-2 slice + phase-4 web test. Record the gap in
-  the file header and coverage.
+- [x] **3 — http.** Added `http/account/unlock.http` (3 assertions, **ijhttp green** against a live
+  instance): `GET /api/account/key-material` with **no** bearer, a **bogus** bearer, and a **malformed**
+  Authorization header → all a single generic 401 `authentication_failed` (no-anonymous-read + bad-bearer
+  boundaries). **Parity gap (slice-only, in the file header):** the authenticated happy path (200 with the
+  caller's wraps) needs a valid access token, which requires a signed login no `.http` handler can produce
+  (same limit as cr-0003) — covered by the phase-2 slice + phase-4 web test.
 - [ ] **4 — web.** Compose `unlockMasterKey(password, secretKey)` in an `account/unlock` feature: fetch
   `key-material` **through the existing `withRefresh()` helper** (cr-0004 is its first real consumer — a
   silent 401→refresh keeps unlock from failing after the 15-min access-token TTL), pick the PASSWORD wrap,

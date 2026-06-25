@@ -1,0 +1,47 @@
+### Account unlock — key-material read (uc.account.unlock)
+# Runnable acceptance for the authenticated key-material endpoint the client fetches before unlocking the
+# Master Key on-device. Run against any running instance (no seed needed: these paths are all pre-auth
+# rejections). The server only ever serves ciphertext here, and never to an unauthenticated caller.
+#
+# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid access token can be
+# obtained): the authenticated happy path — a 200 returning the caller's wraps + wrappedIdentityPrivateKey.
+# That needs a signed session and is covered by the backend slice (AccountKeyMaterialSliceTest) and the web
+# unlock test (cr-0004 phase 4). This file covers what needs no signature: the no-anonymous-read and
+# bad-bearer boundaries, both a single generic 401.
+#
+# Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/unlock.http
+
+### 1. No bearer token → generic 401 (no anonymous read of key material)
+GET {{host}}/api/account/key-material
+Accept: application/json
+
+> {%
+client.test("anonymous read is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 2. A bogus bearer token → the SAME generic 401 (unknown token is indistinguishable from no token)
+GET {{host}}/api/account/key-material
+Accept: application/json
+Authorization: Bearer this-token-was-never-issued
+
+> {%
+client.test("bogus bearer is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 3. A malformed Authorization header (no Bearer scheme) → still a generic 401
+GET {{host}}/api/account/key-material
+Accept: application/json
+Authorization: this-is-not-a-bearer-header
+
+> {%
+client.test("malformed authorization header is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
