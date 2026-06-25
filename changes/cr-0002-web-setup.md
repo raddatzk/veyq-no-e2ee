@@ -1,7 +1,7 @@
 ---
 id: cr-0002
 title: Web setup flow (reuse legacy UI on the E2EE data layer)
-status: in-progress      # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.admin.setup-server]
 adrs: [0001, 0003]
 invariants: [operator-blind]
@@ -58,8 +58,13 @@ to setup (login identifier + Model B `authSalt` source).
     it was added in-style as the first setup field (per the "extend ported UI to fit the new data model"
     rule) rather than hardcoding a default.
 
-- [ ] **4 — verify.** The setup flow runs web → backend on a fresh instance (Playwright e2e or a
+- [x] **4 — verify.** The setup flow runs web → backend on a fresh instance (Playwright e2e or a
   preview-driven smoke). **Done when:** the setup happy path is observed creating the owner via the API.
+  ✅ Preview-driven smoke against a fresh `quarkusDev` instance (in-memory H2, Flyway V1–V3): `/` → boot
+  → `GET /api/setup {setupRequired:true}` → setup form; filled (instance/name/email/password) → submit →
+  `POST /api/setup/owner` **201** `{userId}` → owner created, UI advanced to the Emergency-Kit step, no
+  console errors. Single-owner lock confirmed: `GET /api/setup` now `{setupRequired:false}` and a second
+  owner POST → **409**.
 
 ## Definition of done
 
