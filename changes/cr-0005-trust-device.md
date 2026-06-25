@@ -51,19 +51,40 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   "master-key")`. New `v1.kekDevicePassword(deviceFactor, password, salt, params)` + a conformance vector;
   the suite stays byte-identical to the vectors. The WebCrypto/IndexedDB device-key handling is **platform
   glue**, NOT in `v1.ts` (it never sees raw key bytes — `v1` only takes the already-derived `deviceFactor`).
-- **Multi-device, server is source of truth.** Each device enrols its **own** wrap (own key, own random
-  salt). Enrol **appends** a wrap (`POST`, server returns its `id`); the client stores `{deviceKey, salt,
-  wrapId}` in IndexedDB. At unlock the client finds **its** DEVICE wrap in the `key-material` set by the
-  stored **salt** (`kdfParams`, already in the response — no schema change) → **one** Argon2id. Untrust
-  deletes that wrap by `id`.
+- **Enrol at unlock time, not as a later action.** cr-0004 clears the password the moment unlock succeeds,
+  so a separate post-unlock "trust this device" control would have to **re-prompt** for it. Instead the
+  unlock card carries a **"Trust this device"** checkbox and enrolment runs **right after a successful
+  unlock**, reusing the just-entered password — which is **known-correct** (it just opened the floor wrap)
+  and not yet cleared. The enrol step reads the Master Key from the vault (a copy), wraps it, and clears the
+  password as before.
+- **Multi-device, server is source of truth; re-trust replaces.** Each device enrols its **own** wrap (own
+  key, own random salt). Enrol **appends** a wrap (`POST`, server returns its `id`); the client stores
+  `{deviceKey, salt, wrapId}` in IndexedDB. At unlock the client finds **its** DEVICE wrap in the
+  `key-material` set by the stored **salt** (`kdfParams`, already in the response — no schema change) →
+  **one** Argon2id. Untrust deletes that wrap by `id`. **Re-trusting an already-trusted device replaces**:
+  if IndexedDB already holds a `wrapId`, enrol first `DELETE`s it (then `POST`s the new one), so a device
+  never accumulates duplicate wraps.
 - **Endpoints (scoped to DEVICE this CR).** `POST /api/account/wraps { method: DEVICE, wrappedKey, kdfParams
   } → 201 { id }`; `DELETE /api/account/wraps/{id} → 204` (ownership-checked; **404** for someone else's or
   unknown id; **refuses** a PASSWORD wrap). The endpoint can generalise to PASSKEY/RECOVERY later.
 - **Unlock precedence (client-side, ADR 0005 §7).** If a device key + matching DEVICE wrap exist, the unlock
   card defaults to **password-only**; **"unlock another way"** always falls back to the PASSWORD floor
-  (password + Secret Key). On a device with no key, only the floor is offered.
+  (password + Secret Key). On a device with no key, only the floor is offered. **Build it additively** — a
+  small list of "available methods on this device" (today: DEVICE, PASSWORD) with a chosen default, **not**
+  a hardcoded 2-way `if`, so PASSKEY / RECOVERY slot in later without a rewrite.
+- **Endpoint nouns.** `POST`/`DELETE /api/account/wraps` sit beside the existing `GET
+  /api/account/key-material` (the unlock bundle = wraps + identity blob + suite). The slight noun split is
+  intentional: per-wrap mutation vs. the unlock-material read are different concerns.
 - **Out of scope:** caching the unlocked Master Key in a worker across reloads (ADR 0005 §6) — orthogonal,
   applies to every method, its own slice.
+
+## Future interactions to keep in mind (not built here)
+
+- **Change-password breaks DEVICE trust.** `KEK = Argon2id(deviceFactor + password)`, so a future password
+  change makes every DEVICE wrap un-openable and the change-password client can't re-wrap them (no access to
+  other devices' `deviceFactor`). Trusted devices fall back to the floor and re-trust on next use — inherent
+  and ADR-0005-consistent; the change-password use-case must own re-offering "trust this device". Recorded in
+  the use-case quality notes.
 
 ## Phases
 
@@ -88,17 +109,21 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   conformance vector (suite stays green). *Device adapter* (`features/account/trustDevice/deviceKey.ts`, the
   platform glue): generate/store/read a **non-extractable** HMAC `CryptoKey` in IndexedDB keyed per account,
   compute `deviceFactor` via `subtle.sign`, and persist/read `{salt, wrapId}`. *Enrol* `trustThisDevice(
-  password)` (only from the unlocked vault): generate the key, derive the KEK, `symWrap` the in-memory
-  Master Key, `POST` it, store `{deviceKey, salt, wrapId}`. *Untrust:* `DELETE` by id + clear IndexedDB.
-  *Unlock:* extend `unlock.ts` — if a device key + a DEVICE wrap matching the stored salt exist, derive the
-  KEK with `kekDevicePassword` (password-only); else the PASSWORD floor. *UI:* a "trust / untrust this
-  device" control in the unlocked state, and the unlock card preferring password-only when trusted with
-  **"unlock another way"** → Secret-Key path. Tests: enrol→unlock-via-DEVICE round-trip (password only →
-  Master Key recovered, using a mocked device adapter + real `kekDevicePassword`); wrong password → generic
-  failure; **E1** device key absent → no DEVICE unlock, floor offered; multi-device salt-match picks the
-  right wrap. **Done when:** `npm run check` green **and** a preview smoke shows, on a fresh instance:
-  setup → unlock → **trust this device** → (reload / re-login) unlock with **only the password** → **untrust**
-  → unlock falls back to password + Secret Key.
+  password, masterKey)` — invoked **at unlock time**, with the just-entered (known-correct) password and the
+  vault Master Key, before the password is cleared: if IndexedDB already holds a `wrapId`, `DELETE` it first
+  (re-trust replaces); generate the key, derive the KEK, `symWrap` the Master Key, `POST` it, store
+  `{deviceKey, salt, wrapId}`. *Untrust:* `DELETE` by id + clear IndexedDB. *Unlock:* extend `unlock.ts` to
+  resolve **available methods on this device** (a small list — today DEVICE if a key + matching DEVICE wrap
+  exist, else/and PASSWORD), pick a default, and derive via `kekDevicePassword` (password-only) or the floor;
+  structured so PASSKEY/RECOVERY are additive. *UI:* a **"Trust this device" checkbox on the unlock card**
+  (enrols right after a successful unlock), an **untrust** control in the unlocked state, and the unlock card
+  defaulting to password-only when trusted with **"unlock another way"** → Secret-Key path. Tests:
+  enrol→unlock-via-DEVICE round-trip (password only → Master Key recovered, using a mocked device adapter +
+  real `kekDevicePassword`); wrong password → generic failure; **E1** device key absent → no DEVICE unlock,
+  floor offered; re-trust replaces (no duplicate wrap); multi-device salt-match picks the right wrap. **Done
+  when:** `npm run check` green **and** a preview smoke shows, on a fresh instance: setup → unlock **with
+  "trust this device" ticked** → (reload / re-login) unlock with **only the password** → **untrust** → unlock
+  falls back to password + Secret Key.
 - [ ] **5 — verify + coverage.** Fill `docs/coverage/features/account/use-cases/uc.account.trust-device.yaml`
   (criteria → the web round-trip + backend slice + http boundaries; `gaps` for apple/android and the http
   authed-path), and add the `uc.account.trust-device` row to

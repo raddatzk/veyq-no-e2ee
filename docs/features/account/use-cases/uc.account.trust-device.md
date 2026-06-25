@@ -6,9 +6,10 @@
 - **Goal:** Enrol a **device-local DEVICE `MasterKeyWrap`** so that future unlocks on *this* device need only
   the **password** — the high-entropy **Secret Key** is no longer required here. Entirely client-side; the
   server stores only the new ciphertext wrap.
-- **Preconditions:** An **authenticated session** exists; the device is **unlocked** (so the in-memory
-  Master Key can be wrapped under a new KEK — see [uc.account.unlock](uc.account.unlock.md)); WebCrypto +
-  IndexedDB are available.
+- **Preconditions:** An **authenticated session** exists; the device is being (or has just been)
+  **unlocked**, so the in-memory Master Key can be wrapped under a new KEK **and** the account password is
+  still in hand (the unlock flow clears it right after — enrolment is offered *at unlock time*, see
+  [uc.account.unlock](uc.account.unlock.md)); WebCrypto + IndexedDB are available.
 - **Postconditions (success):** A **DEVICE** wrap (ciphertext) exists server-side; this device's IndexedDB
   holds its **non-extractable** device key plus the wrap's **salt** and server **id**; subsequent unlocks on
   this device open the Master Key from **password + device key** (2-factor, no Secret Key). The Secret Key
@@ -42,7 +43,14 @@ Secret Key or the raw Master Key in `localStorage`/`sessionStorage` is the **rej
 
 ## Main flow — enrol ("trust this device")
 
-1. From an **unlocked** state the user chooses **"Trust this device."**
+Enrolment happens **at unlock time**, not as a later "settings" action. The unlock flow
+([uc.account.unlock](uc.account.unlock.md)) **clears the password immediately after** deriving the KEK, so a
+separate post-unlock control would have to re-prompt for it; instead the unlock card offers a **"Trust this
+device"** choice and enrolment runs **right after a successful unlock**, reusing the password just entered —
+which is **known-correct** (it just opened the floor wrap) and not yet cleared.
+
+1. On the unlock card the user ticks **"Trust this device"** and unlocks normally (this first time with
+   password + Secret Key). On success, before the password is cleared, enrolment runs:
 2. The client generates a **non-extractable** HMAC `deviceKey` and stores it in **IndexedDB** (this device
    only; it never syncs).
 3. The client computes the device factor `df = HMAC(deviceKey, "veyq/v1/device-bind")`, picks a fresh
@@ -93,8 +101,9 @@ through this path, so the 2SKD floor can never be removed.
 - **E1 — device key absent** (cleared storage, a different browser/profile): the server's DEVICE wrap is
   unusable here → the client falls back to the **PASSWORD floor** (password + Secret Key). The orphan wrap
   is harmless ciphertext; the user can re-trust to mint a fresh one.
-- **E2 — not unlocked at enrol time:** there is no in-memory Master Key to wrap → the user must
-  [unlock](uc.account.unlock.md) first. "Trust this device" is offered only from an unlocked state.
+- **E2 — enrol without a successful unlock:** there is no in-memory Master Key (and no in-hand password) to
+  wrap → nothing to enrol. "Trust this device" is bound to the unlock action, so it can only succeed when the
+  unlock it rides on succeeds.
 - **E3 — wrong password at unlock:** the KEK fails to open the wrap (AEAD tag mismatch) → **generic unlock
   failure**, identical to the PASSWORD path; the server is uninvolved.
 - **E4 — WebCrypto / IndexedDB unavailable** (private mode, locked-down browser): trust-device is
@@ -125,6 +134,17 @@ Trusted --> [*]
 - **Operator-blind.** The server holds only the DEVICE **ciphertext** wrap + opaque metadata — never the
   KEK, the device key, or the Master Key. The add/remove-wrap endpoints are **authenticated** and act only
   on the **caller's own** wraps.
+- **Metadata exposed: a trusted-device count.** Because each trusted device is its own persistent wrap row,
+  the operator can see *how many* devices an account trusts and their coarse creation times — the same
+  device-*count* visibility already accepted for sessions ([ADR 0004](../../../decisions/0004-session-tokens.md)).
+  No per-login unlinkability dance (fresh nonces) is needed here: a DEVICE wrap is inherently per-device and
+  long-lived, not a re-uploaded blob, so there is nothing to correlate that the count doesn't already imply.
+- **A password change invalidates every DEVICE wrap.** Since `KEK = Argon2id(deviceFactor + password)`,
+  changing the account password makes every DEVICE wrap un-openable — and the password-change client can
+  **not** re-wrap them (it lacks the other devices' `deviceFactor`). So after a password change each trusted
+  device falls back to the PASSWORD floor and **re-trusts** on next use. This is inherent to a *device +
+  password* wrap (a stolen device alone must not unlock) and is ADR-0005-consistent; the future
+  **change-password** use-case must state it and re-offer "trust this device" afterwards.
 - **Reuse only the affordance, not the legacy data layer.** The legacy "remember login" stored the Secret
   Key and the raw Master Key in browser storage — exactly the [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)
   rejected pattern; this use-case reuses only the *idea* of a "trust this device" control, with a new
