@@ -1,7 +1,7 @@
 ---
 id: cr-0003
 title: Account login (operator-blind password challenge-response)
-status: in-progress      # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.login]
 adrs: [0003, 0004]
 invariants: [operator-blind, non-enumerable]
@@ -109,7 +109,7 @@ phases 1–2 below.
   with the same email/password reached the authenticated-but-locked state; a wrong password returned the
   generic failure (screenshots captured). The silent refresh is covered by the web unit test
   (`login.test.ts` rotation) + the backend slice + http, since this CR has no UI affordance to trigger it.
-- [ ] **5 — verify + coverage.** Add `docs/coverage/features/account/use-cases/uc.account.login.yaml`
+- [x] **5 — verify + coverage.** Add `docs/coverage/features/account/use-cases/uc.account.login.yaml`
   mapping each acceptance criterion to the tests above (with explicit `gaps` for the http signed-path and
   for apple/android), and add the `uc.account.login` row to
   [platform-parity.md](../docs/crosscutting/platform-parity.md) (backend/http/web ✅, apple/android ◻

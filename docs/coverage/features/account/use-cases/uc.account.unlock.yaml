@@ -1,0 +1,11 @@
+useCase: uc.account.unlock
+feature: account
+title: Unlock the Master Key (password + Secret Key)
+# Refined use-case, not yet implemented — no acceptance criteria are tracked until its implementation CR.
+# Every surface is an explicit gap so the trust chain stays honest (no silent omission).
+acceptanceCriteria: []
+gaps:
+  backend: not implemented yet — refined use-case awaiting its implementation CR
+  web: not implemented yet — refined use-case awaiting its implementation CR
+  apple: no native client yet
+  android: no native client yet
