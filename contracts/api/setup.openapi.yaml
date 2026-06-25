@@ -57,6 +57,7 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CreateServerOwnerRequest" }
             example:
+              email: kevin@example.com
               displayName: Kevin
               instanceName: Our Family veyq
               suiteId: v1
@@ -124,6 +125,7 @@ components:
     CreateServerOwnerRequest:
       type: object
       required:
+        - email
         - displayName
         - instanceName
         - suiteId
@@ -132,6 +134,13 @@ components:
         - masterKeyWraps
         - authPublicKey
       properties:
+        email:
+          type: string
+          format: email
+          description: The owner's login email — identifier and source of the deterministic auth salt (ADR 0003). Server-visible.
+          maxLength: 254
+          example: kevin@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
         displayName:
           type: string
           description: The owner's human display name (server-visible identity metadata). Trimmed on input.

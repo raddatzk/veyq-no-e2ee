@@ -17,6 +17,9 @@ class VeyqUser : PanacheEntityBase {
     @Column(name = "id", length = 36)
     lateinit var id: String
 
+    @Column(name = "email", nullable = false, length = 254)
+    lateinit var email: String
+
     @Column(name = "display_name", nullable = false, length = 100)
     lateinit var displayName: String
 

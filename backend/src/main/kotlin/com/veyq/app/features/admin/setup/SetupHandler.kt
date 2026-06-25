@@ -7,6 +7,7 @@ data class SetupState(val setupRequired: Boolean, val suites: List<String>)
 
 /** The owner registration payload, mapped from the API request at the resource boundary. */
 data class OwnerRegistration(
+    val email: String,
     val displayName: String,
     val instanceName: String,
     val suiteId: String,

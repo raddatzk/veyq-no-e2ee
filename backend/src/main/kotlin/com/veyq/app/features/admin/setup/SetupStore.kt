@@ -19,6 +19,7 @@ class SetupStore {
 
         VeyqUser().apply {
             id = userId
+            email = registration.email
             displayName = registration.displayName
             serverRole = "SERVER_OWNER"
             suiteId = registration.suiteId

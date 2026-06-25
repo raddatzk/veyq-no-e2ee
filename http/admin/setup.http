@@ -20,7 +20,8 @@ POST {{host}}/api/setup/owner
 Content-Type: application/json
 
 {
-  "displayName": "   ",
+  "email": "kevin@example.com",
+  "displayName":"   ",
   "instanceName": "Our Family veyq",
   "suiteId": "v1",
   "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
@@ -41,7 +42,8 @@ POST {{host}}/api/setup/owner
 Content-Type: application/json
 
 {
-  "displayName": "Kevin",
+  "email": "kevin@example.com",
+  "displayName":"Kevin",
   "instanceName": "Our Family veyq",
   "suiteId": "v1",
   "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
@@ -61,7 +63,8 @@ POST {{host}}/api/setup/owner
 Content-Type: application/json
 
 {
-  "displayName": "  Kevin  ",
+  "email": "kevin@example.com",
+  "displayName":"  Kevin  ",
   "instanceName": "Our Family veyq",
   "suiteId": "v1",
   "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
@@ -94,7 +97,8 @@ POST {{host}}/api/setup/owner
 Content-Type: application/json
 
 {
-  "displayName": "Mallory",
+  "email": "kevin@example.com",
+  "displayName":"Mallory",
   "instanceName": "Our Family veyq",
   "suiteId": "v1",
   "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",

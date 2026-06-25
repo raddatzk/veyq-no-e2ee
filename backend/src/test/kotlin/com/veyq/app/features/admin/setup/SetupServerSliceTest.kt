@@ -15,10 +15,11 @@ import org.junit.jupiter.api.TestMethodOrder
 class SetupServerSliceTest {
 
     private fun ownerBody(
+        email: String = "kevin@example.com",
         displayName: String = "Kevin",
         authPublicKey: String = "ZWQyNTUxOS1hdXRoLXB1Yg==",
     ) = """
-        {"displayName":"$displayName","instanceName":"Our Family veyq","suiteId":"v1",
+        {"email":"$email","displayName":"$displayName","instanceName":"Our Family veyq","suiteId":"v1",
          "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
          "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
          "authPublicKey":"$authPublicKey",
@@ -75,5 +76,13 @@ class SetupServerSliceTest {
             .`when`().post("/api/setup/owner")
             .then().statusCode(409)
             .body("code", equalTo("setup_already_complete"))
+    }
+
+    @Test
+    @Order(7)
+    fun rejectsInvalidEmail() {
+        given().contentType(ContentType.JSON).body(ownerBody(email = "not-an-email"))
+            .`when`().post("/api/setup/owner")
+            .then().statusCode(400)
     }
 }
