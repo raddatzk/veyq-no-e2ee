@@ -35,7 +35,7 @@ to setup (login identifier + Model B `authSalt` source).
   stores it. Update slice/sanitization tests + `http/admin/setup.http`. **Done when:** `./gradlew check`
   green and the ijhttp run green.
 
-- [ ] **2 — crypto suite v1 adoption.** Port `legacy/frontend/src/shared/crypto/v1.ts` into the web
+- [x] **2 — crypto suite v1 adoption.** Port `legacy/frontend/src/shared/crypto/v1.ts` into the web
   client and bring its conformance vectors into `contracts/crypto/vectors/v1.json`; port the conformance
   test. **Done when:** the web conformance test passes against the vectors.
 
