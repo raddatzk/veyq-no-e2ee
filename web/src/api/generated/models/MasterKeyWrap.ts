@@ -32,7 +32,7 @@ export interface MasterKeyWrap {
      */
     wrappedKey: string;
     /**
-     * KDF parameters + salt needed to re-derive this method's unlock KEK at login (opaque base64; present for password/recovery methods, absent for device/passkey).
+     * KDF parameters + salt needed to re-derive this method's unlock KEK (opaque base64; present for password/recovery/device methods, absent for passkey which is PRF-derived).
      * 
      * @type {string}
      * @memberof MasterKeyWrap

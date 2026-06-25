@@ -65,8 +65,12 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   if IndexedDB already holds a `wrapId`, enrol first `DELETE`s it (then `POST`s the new one), so a device
   never accumulates duplicate wraps.
 - **Endpoints (scoped to DEVICE this CR).** `POST /api/account/wraps { method: DEVICE, wrappedKey, kdfParams
-  } → 201 { id }`; `DELETE /api/account/wraps/{id} → 204` (ownership-checked; **404** for someone else's or
-  unknown id; **refuses** a PASSWORD wrap). The endpoint can generalise to PASSKEY/RECOVERY later.
+  } → 201 { id }`; `DELETE /api/account/wraps/{id} → 204` — **idempotent like logout**: deletes only the
+  caller's own **non-PASSWORD** wrap; an unknown id, another account's wrap, or the floor is a silent no-op
+  (always 204 → no cross-account enumeration, floor unremovable). The endpoint can generalise to
+  PASSKEY/RECOVERY later. **Own tag `account-wraps`** so it generates a **separate `AccountWrapsApi`**
+  interface/resource (one path per tag avoids the greedy class-level `@Path("/api/account")` that would
+  otherwise force one fat resource and shadow `key-material`).
 - **Unlock precedence (client-side, ADR 0005 §7).** If a device key + matching DEVICE wrap exist, the unlock
   card defaults to **password-only**; **"unlock another way"** always falls back to the PASSWORD floor
   (password + Secret Key). On a device with no key, only the floor is offered. **Build it additively** — a
@@ -88,19 +92,21 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
 
 ## Phases
 
-- [ ] **1 — contracts.** Add to `account.openapi.yaml`: `POST /api/account/wraps` (authed; body `{ method,
-  wrappedKey, kdfParams }`, `method` restricted to `DEVICE`; → `201 { id }`; `400`/`401`) and
-  `DELETE /api/account/wraps/{id}` (authed; `204`; `401`; `404` for unknown/other-owner; refuses PASSWORD).
-  Reuse the `MasterKeyWrap`/`ErrorResponse` shapes. **Done when:** the spec lints and the backend/web
-  clients generate.
-- [ ] **2 — backend.** Extend the `account/keymaterial` slice (reusing `resolveUserId` + `bearerToken`):
-  `KeyMaterialStore.addWrap(userId, method, wrappedKey, kdfParams) → id` (append a new row) and
-  `deleteWrap(userId, id)` (delete only if the row is the caller's **and** not PASSWORD); a thin
-  `AccountWrapsResource` (`POST`/`DELETE`). No migration (`MasterKeyWrapEntity` already supports DEVICE +
-  has a UUID id). Slice tests: add a DEVICE wrap → it appears in `key-material` (+ returns an id); a second
-  DEVICE wrap coexists (multi-device); delete by id removes it; **another user's token can't delete this
-  user's wrap (404)**; deleting a **PASSWORD** wrap is refused; unauthenticated `POST`/`DELETE` → 401.
-  **Done when:** `./gradlew check` green.
+- [x] **1 — contracts.** Added to `account.openapi.yaml` under a new `account-wraps` tag: `POST
+  /api/account/wraps` (authed; `AddWrapRequest { method: DEVICE, wrappedKey, kdfParams }` → `201
+  AddWrapResult { id }`; `400`/`401`) and `DELETE /api/account/wraps/{id}` (authed; **idempotent 204**;
+  `401`). New `AddWrapRequest`/`AddWrapResult` schemas; reused `ErrorResponse`. Corrected the `MasterKeyWrap`
+  `kdfParams` description (DEVICE carries it) in both account + setup specs to keep them identical. **Done:**
+  both clients generate (web `AccountWrapsApi` + `AccountApi`; backend `AccountWrapsApi` interface, the
+  existing `AccountResource` unchanged so `compileKotlin` stays green), web typecheck green.
+- [ ] **2 — backend.** A thin `AccountWrapsResource` implementing the generated `AccountWrapsApi` (reusing
+  `resolveUserId` + `bearerToken`), delegating to store methods `addWrap(userId, method, wrappedKey,
+  kdfParams) → id` (append a new row) and `deleteWrap(userId, id)` (delete only if the row is the caller's
+  **and** not PASSWORD; otherwise a no-op). No migration (`MasterKeyWrapEntity` already supports DEVICE + has
+  a UUID id). Slice tests: add a DEVICE wrap → it appears in `key-material` (+ returns an id); a second
+  DEVICE wrap coexists (multi-device); delete by id removes it; **another user's token deleting this user's
+  wrap is a no-op (204) and the wrap survives**; deleting a **PASSWORD** wrap is a no-op (floor survives);
+  unauthenticated `POST`/`DELETE` → 401. **Done when:** `./gradlew check` green.
 - [ ] **3 — http.** Add `http/account/trust-device.http`: unauthenticated/bogus-bearer `POST` and `DELETE`
   → generic 401; a malformed `POST` body → 400. **Parity gap (slice-only):** the authed add/delete
   round-trip needs a signed session no `.http` handler can produce (same limit as cr-0003/0004) — covered

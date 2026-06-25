@@ -134,8 +134,8 @@ components:
         kdfParams:
           type: string
           description: >
-            KDF parameters + salt needed to re-derive this method's unlock KEK at login (opaque base64;
-            present for password/recovery methods, absent for device/passkey).
+            KDF parameters + salt needed to re-derive this method's unlock KEK (opaque base64; present for
+            password/recovery/device methods, absent for passkey which is PRF-derived).
           contentEncoding: base64
           maxLength: 256
           example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz

@@ -16,9 +16,17 @@ info:
     The endpoint is keyed off the bearer access token and returns **only the caller's own** material — never
     an email or id in the request — so it is no cross-account read and no enumeration vector. A stolen
     access token yields only ciphertext, which is useless without the password and Secret Key.
+
+    `POST /api/account/wraps` adds a device-local **DEVICE** wrap (trust this device — unlock with only the
+    password next time, ADR 0005); `DELETE /api/account/wraps/{id}` removes a wrap (untrust). Both act only
+    on the caller's own wraps and receive only ciphertext + KDF params — never a key, a password, or the
+    Secret Key. The PASSWORD floor wrap cannot be removed this way.
 tags:
   - name: account
     description: Authenticated account key material (for client-side unlock).
+  - name: account-wraps
+    description: Add / remove Master Key wraps (device trust). Separate tag so it generates its own resource
+      interface (one path per tag avoids the greedy class-level @Path that would otherwise shadow siblings).
 
 paths:
   /api/account/key-material:
@@ -39,6 +47,74 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AccountKeyMaterial" }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+
+  /api/account/wraps:
+    post:
+      tags: [account-wraps]
+      operationId: addAccountWrap
+      summary: Add a device-local DEVICE wrap of the Master Key (trust this device).
+      description: >
+        Stores a new DEVICE `MasterKeyWrap` for the authenticated caller — the Master Key wrapped under a
+        device-bound KEK (ADR 0005), produced entirely on-device. The server receives only ciphertext + the
+        opaque KDF params and returns the new wrap's id (for a later untrust). Scoped to the DEVICE method;
+        the PASSWORD floor and other methods are created elsewhere.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddWrapRequest" }
+      responses:
+        "201":
+          description: The wrap was stored; its opaque id is returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AddWrapResult" }
+        "400":
+          description: The request was malformed (missing/invalid fields, or a method other than DEVICE).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+
+  /api/account/wraps/{id}:
+    delete:
+      tags: [account-wraps]
+      operationId: deleteAccountWrap
+      summary: Remove a wrap by id (untrust this device).
+      description: >
+        Removes the caller's wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it
+        is the caller's own **and** not the PASSWORD floor; an unknown id, another account's wrap, or the
+        floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be
+        removed this way.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The opaque id of the wrap to remove (returned by the add-wrap call).
+          schema:
+            type: string
+            maxLength: 64
+            example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+            x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 64) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9-]+")'
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The wrap is gone (removed, or there was no removable wrap of yours with that id).
         "401":
           description: Generic authentication failure (missing, invalid, expired, or revoked access token).
           content:
@@ -76,11 +152,47 @@ components:
         kdfParams:
           type: string
           description: >
-            KDF parameters + salt needed to re-derive this method's unlock KEK at login (opaque base64;
-            present for password/recovery methods, absent for device/passkey).
+            KDF parameters + salt needed to re-derive this method's unlock KEK (opaque base64; present for
+            password/recovery/device methods, absent for passkey which is PRF-derived).
           contentEncoding: base64
           maxLength: 256
           example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
+
+    AddWrapRequest:
+      type: object
+      description: A new DEVICE wrap to store for the caller (trust this device).
+      required: [method, wrappedKey, kdfParams]
+      properties:
+        method:
+          type: string
+          description: The unlock method this wrap opens. Restricted to DEVICE on this endpoint.
+          enum: [DEVICE]
+          example: DEVICE
+        wrappedKey:
+          type: string
+          description: The Master Key wrapped to the device KEK (opaque base64 ciphertext).
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1tYXN0ZXIta2V5
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        kdfParams:
+          type: string
+          description: KDF parameters + salt to re-derive the device KEK (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    AddWrapResult:
+      type: object
+      description: The id of the stored wrap, used later to remove it (untrust).
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: Opaque id of the stored wrap.
+          maxLength: 64
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
 
     AccountKeyMaterial:
       type: object
