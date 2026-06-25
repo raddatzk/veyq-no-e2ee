@@ -96,13 +96,13 @@ wraps each open the *same* Master Key via their own wrap and are **separate, pla
   harmlessly). Wired the web `generate:api` third pass (→ `src/api/generated/account`); backend
   auto-discovers the spec. **Done:** both clients generate (`AccountApi.getAccountKeyMaterial`), web
   typecheck green, backend `compileKotlin` green.
-- [ ] **2 — backend.** Add `SessionService.resolveUserId(accessToken)` (hash lookup; reject missing /
-  expired / non-ACTIVE family) and an `account` feature slice (`AccountResource` → `AccountHandler` →
-  reuse the identity store) that serves the authenticated caller's wraps + `wrappedIdentityPrivateKey` +
-  the stored `suiteId` (**already a column on `veyq_user` — no migration**).
-  Slice tests: valid token → the caller's PASSWORD+RECOVERY wraps + identity blob; **another user's token
-  never returns this user's material**; missing / malformed / expired token → 401; a token from a
-  **revoked** family → 401. **Done when:** `./gradlew check` green.
+- [x] **2 — backend.** Added `SessionService.resolveUserId(accessToken)` (hash lookup; reject missing /
+  expired / non-ACTIVE family) — the reusable authenticated-read guard — and an `account/keymaterial`
+  slice (`AccountResource` implements the generated `AccountApi`; `KeyMaterialStore` reads `VeyqUser` +
+  its wraps) serving the caller's wraps + `wrappedIdentityPrivateKey` + stored `suiteId` (no migration).
+  6 slice tests green: valid token → caller's PASSWORD+RECOVERY wraps + identity blob; **A's token returns
+  only A's material, never B's**; missing / malformed / expired token → generic 401; revoked family → 401.
+  **Done:** `./gradlew check` green.
 - [ ] **3 — http.** Add `http/account/unlock.http`: `GET /api/account/key-material` with **no** bearer and
   with a **malformed** bearer → 401 (boundary + no-anonymous-read assertions). **Parity gap (slice-only):**
   the authenticated happy path needs a valid access token, which requires a signed login no `.http` handler

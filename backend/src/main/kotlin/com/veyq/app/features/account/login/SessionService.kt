@@ -64,6 +64,21 @@ class SessionService {
         return RotatedTokens(access, refresh)
     }
 
+    /**
+     * Resolve the user behind a bearer access token, or null if the token is unknown, expired, or its
+     * family is not ACTIVE. This is the **authenticated-read guard** every authed endpoint resolves its
+     * caller through — the counterpart to the write-side reuse-detection above. Only a token's hash is
+     * matched, so it cannot be forged from a database dump.
+     */
+    @Transactional
+    fun resolveUserId(accessToken: String): String? {
+        val row = AccessTokenEntity.find("tokenHash", Tokens.hash(accessToken)).firstResult() ?: return null
+        if (row.expiresAt.isBefore(Instant.now())) return null
+        val family = SessionFamilyEntity.findById(row.familyId) ?: return null
+        if (family.status != SessionFamilyEntity.ACTIVE) return null
+        return family.userId
+    }
+
     /** Revoke the family of the presented access token. Idempotent — a missing/invalid token is a no-op. */
     @Transactional
     fun revokeByAccessToken(accessToken: String) {
