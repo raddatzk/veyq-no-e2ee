@@ -1,7 +1,7 @@
 ---
 id: cr-0001
 title: First-run server setup (API-first)
-status: planned          # planned → in-progress → done (then delete the file)
+status: in-progress      # planned → in-progress → done (then delete the file)
 satisfies: [uc.admin.setup-server]
 adrs: [0001, 0002, 0003]
 invariants: [operator-blind]
@@ -34,7 +34,7 @@ Honour these (links, not copies):
 
 ## Phases
 
-- [ ] **1 — contracts.** `contracts/api/setup.openapi.yaml`:
+- [x] **1 — contracts.** `contracts/api/setup.openapi.yaml`:
   - `GET /api/setup` → `SetupStatus { setupRequired: bool, suites: [string] }`.
   - `POST /api/setup/owner` → `CreateServerOwnerRequest { displayName, instanceName, suiteId,
     identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps: [{method, wrappedKey}], authPublicKey,
