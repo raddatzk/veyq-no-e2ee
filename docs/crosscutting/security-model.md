@@ -1,0 +1,187 @@
+# Security & Encryption Model
+
+> The dominant cross-cutting concept. veyq is **end-to-end encrypted everywhere** — every scope
+> (personal, group, tenant). The **server is operator-blind**: it stores ciphertext, opaque
+> operational metadata and a blind job queue, and never holds a key that opens content. Every other
+> concept — processing, search, sharing, recovery, deletion — is designed around this.
+>
+> Plain-language companion for end users: [wiki: Is my data safe?](../../wiki/en/is-my-data-safe.md).
+> Sibling engineering docs: the [account & key model](account-key-model.md), the
+> [scopes & tenancy model](scopes-and-tenancy.md), and the crypto wire-format spec (refined separately).
+
+This document is the **target model**. What ships in the first build is tracked via the inbox and
+change-requests, not here.
+
+## The one guarantee
+
+A user's **unshared** content is confidential **even from the operator**. The server enforces
+*authorization* on opaque identifiers; the client enforces *confidentiality* with keys the server
+never sees. Confidentiality is therefore cryptographic, not a server-side access-control promise.
+
+## Threat model & trust boundaries
+
+| We protect against | How |
+|---|---|
+| Stolen disk / DB dump / subpoena of data at rest | All content E2E-encrypted; the server holds no content keys |
+| Passive operator reading the database | Cannot recover content — every blob and sensitive metadata field is encrypted |
+| Offline brute-force of a weak password → **content** | **Secret Key (2SKD)**: the content key derivation folds in a high-entropy Secret Key the server never stores, so a cracked password alone unlocks nothing |
+| Offline brute-force of a weak password → **server login** | Only a password-only Argon2id verifier is exposed; cracking it yields a session + operational metadata, **never content** |
+| Active operator doing key-substitution during key exchange | **Partly, and honestly limited** — see *Key-directory trust* below |
+
+We do **not** claim immunity to an *actively malicious* operator before key transparency exists; we
+state that gap plainly. In a **self-hosted** deployment the operator is the user, so that threat is moot.
+
+## What is encrypted vs. server-visible
+
+- **Encrypted (server-blind):** media bytes and all derivatives; journal text and embeds; sensitive
+  metadata — titles, captions, descriptions, places, people/faces, participant relationships, tags;
+  track and playlist details; GPS and capture time (sealed client-side, never read off the file).
+- **Server-visible (low-sensitivity operational metadata):** existence and IDs of memories, media and
+  shares; scope and membership (who belongs to which tenant/group); coarse timestamps for ordering;
+  sizes; MIME type; job-queue and op-log offsets; presence facts; per-parent blinded tokens.
+
+These operational fields are exactly what lets the server **sort, paginate, route, authorize and
+bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"
+mode is possible at the cost of those capabilities. The server never sees content — only structure.
+
+## Central axis: shared vs. unshared
+
+The deciding property for risk is **whether content is shared**, not which scope it lives in. A
+personal memory that is publicly shared becomes "shared" for these purposes.
+
+| State | Meaning |
+|---|---|
+| **Unshared** | Only the owner's keys. Maximum confidentiality; the one guarantee applies in full. |
+| **Shared** (group, tenant, public view, public uploader) | Content keys wrapped to other parties by the owner's explicit, informed action. Confidentiality from the *operator* still holds; from the *recipients* it is intentionally given up. |
+
+## Key hierarchy (envelope encryption)
+
+Content is protected by layered envelopes so grants are cheap and shares are least-privilege. The
+byte-level detail lives in the crypto wire-format spec; account-level detail (unlock methods, recovery)
+in the account/key model. The shape:
+
+```plantuml
+@startuml
+title Envelope encryption — key hierarchy
+skinparam shadowing false
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
+
+rectangle "Unlock methods\n(password + Secret Key, passkey PRF,\nrecovery code, trusted device)" as unlock
+rectangle "Master Key" as muk
+rectangle "Identity private key\n(you)" as idk
+rectangle "Identity private key\n(another member)" as idk2
+rectangle "Scope private key" as spk
+rectangle "Per-subtree content keys" as ck
+rectangle "Content\n(memories, media, journal, sensitive metadata)" as content
+rectangle "Public share\n(per-share key)" as share
+
+unlock --> muk : each wraps (one blob per method)
+muk  --> idk : unlocks
+idk  --> spk : unwraps
+idk2 --> spk : unwraps
+spk  --> ck : unwraps
+ck   --> content : encrypts
+ck   --> share : one subtree key wrapped to a\nper-share key (token-unlocked)
+
+note right of spk
+  The scope private key is wrapped once per member —
+  to each member's identity public key (one wrap =
+  the whole scope). Every member, you included,
+  unwraps it with their own identity private key.
+end note
+@enduml
+```
+
+- **Cheap grants, scoped shares.** Adding a member = one wrap of the scope private key. A public share
+  = one subtree content key wrapped to a per-share key. **Revoking a member = rotate the scope keypair**
+  and re-wrap to the remaining members; already-read content cannot be retroactively pulled back (a
+  documented limitation).
+- The identity private key is protected by the **Master Key**, itself wrapped **separately by each
+  unlock method**. Adding or removing a method changes one wrap, never the content.
+
+## Cryptographic stance
+
+- **Standard, well-reviewed primitives only** — no home-grown crypto. Symmetric content encryption is
+  already quantum-resistant (AES-256-GCM class); key wrapping is per-recipient (HPKE-style multi-recipient).
+- **Post-quantum from the start, by intent.** Memories live for decades, so harvest-now-decrypt-later is
+  a real threat. The target is a **hybrid KEM (X25519 + ML-KEM-768)** for key wrapping — secure if
+  either component holds — with signatures moving to hybrid (ML-DSA) later. **The concrete contents of
+  crypto suite `v1` are decided in the first crypto change-request**, not here.
+- **Crypto-agility is non-negotiable.** Every wrapped key and encrypted artifact carries a **versioned
+  suite id**. New artifacts use the current suite; old artifacts stay readable under their stored suite
+  id. This is what makes adopting (and later upgrading) post-quantum safe without breaking the model.
+
+## Names & blinded tokens
+
+Names (folders, memories, chapters) are encrypted, yet navigation uses human-readable permalinks. Two
+server-blind tokens make this work without the server ever seeing content:
+
+- **Slug token** — `HMAC(scopeKey, parentId ‖ slugify(name))`. The server enforces uniqueness per
+  parent (`UNIQUE(parentId, slugToken)`) without seeing names. A keyed MAC (not a plain hash), so the
+  operator — lacking the scope key — cannot reverse low-entropy slugs. It is a **consistency aid, not an
+  authenticity control**: the client computes it; the server cannot recompute it.
+- **Dedup token** — a per-scope blinded token over content, so identical bytes within a scope dedup on
+  the server without it seeing content or being able to compute tokens itself (no confirmation-of-file
+  attack).
+
+## Sharing & share-boundary Trust & Safety
+
+- A **public share** wraps the subtree's content keys to a per-share key. The **share secret lives in
+  the URL fragment (`#…`)** and never reaches the server. Anyone with the link decrypts client-side.
+- **Trust & Safety operates at the share boundary.** An abuse report includes the full share URL (and
+  thus the secret), so the operator **can decrypt a reported public share** to verify, quarantine,
+  preserve evidence and act. The same intake serves takedown requests.
+- **Consequently:** private (unshared) content is **unscannable** by design; public shares are
+  decryptable-on-report — notice-and-takedown works exactly where content is distributed.
+
+## Key-directory trust — the active-operator gap (stated honestly)
+
+Wrapping a content key to "Bob" needs Bob's public key from the server's key directory. A malicious
+server could serve an attacker's key instead (key-substitution / MITM) and read future wraps.
+
+- The building block is the **identity fingerprint / safety number** — a deterministic digest of a
+  contact's identity public key. Two users compare it out-of-band (read aloud / QR); a mismatch reveals
+  a substituted key. **This is manual**, so it protects only those who actually compare.
+- **Automatic key-pinning (TOFU)** — clients remember a contact's key and warn on change — and
+  **Key Transparency** — an append-only verifiable key log — are the target hardening. Until they exist
+  there is **no automatic warning** on a key change.
+- **The first-use gap:** even with TOFU, if the operator substitutes Bob's key *before* Alice ever saw
+  the real one — and re-wraps content to Bob's genuine key too — nothing looks wrong while the operator
+  silently holds a copy. Only Key Transparency (or manual out-of-band verification) makes that detectable.
+- **Trust anchors stay client-side:** a client verifies and signs against its own locally-held key,
+  never the server's copy.
+
+## Recovery — no escrow
+
+A memories product must not turn "forgot password" into permanent loss, yet there is **no escrow** — the
+same property that stops the operator reading data stops it rescuing data. Independent ways back in
+(detail in the account/key model):
+
+1. **Another enrolled device** still holds the keys.
+2. **Emergency Kit (Secret Key) + master password** on a fresh device.
+3. **Recovery code** — high-entropy, system-generated, single-use — independently unwraps the identity
+   private key (the only path that survives a forgotten password with no device).
+
+Losing **all** paths is the documented, accepted residual loss.
+
+## Revocation — two layers
+
+1. **Server-side access invalidation — instant, no keys.** The server stops honoring the revoked share
+   token / membership and serves no further blobs. This is access control, which the server is allowed
+   to do (it reads no content). Effective immediately, no client required.
+2. **Content-key rotation — eventual, by a key-holder.** A client rotates the (sub)content key and
+   re-wraps to the remaining parties — defense-in-depth against a revoked party who cached ciphertext.
+   May be queued until a key-holder is online; not a hole, because layer 1 already blocks new fetches.
+
+**Honest limit:** content the revoked party already downloaded and decrypted cannot be retracted —
+rotation protects only future content.
+
+## Deletion & erasure
+
+One mechanism serves both data-loss protection and erasure: **soft-delete → trash → retention window →
+scheduled hard-purge**, propagated to backups within a documented rotation window. Deletion is a
+**privilege** (not "anyone with access can delete"); blob-level purge handles erasure of an item across
+all references; a deletion audit records accountability without retaining the erased data.
