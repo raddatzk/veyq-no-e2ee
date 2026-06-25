@@ -8,5 +8,5 @@ technisches Vorwissen nötig.
 
 ## Start here / Hier starten
 
-- 🇬🇧 English — [Is my data safe?](en/is-my-data-safe.md) · [Account keys & recovery](en/account-keys-and-recovery.md)
-- 🇩🇪 Deutsch — [Sind meine Daten sicher?](de/sind-meine-daten-sicher.md) · [Konto-Schlüssel & Wiederherstellung](de/konto-schluessel-und-wiederherstellung.md)
+- 🇬🇧 English — [Is my data safe?](en/is-my-data-safe.md) · [Account keys & recovery](en/account-keys-and-recovery.md) · [Quantum computers & your photos](en/quantum-computers-and-your-photos.md)
+- 🇩🇪 Deutsch — [Sind meine Daten sicher?](de/sind-meine-daten-sicher.md) · [Konto-Schlüssel & Wiederherstellung](de/konto-schluessel-und-wiederherstellung.md) · [Quantencomputer & deine Fotos](de/quantencomputer-und-deine-fotos.md)

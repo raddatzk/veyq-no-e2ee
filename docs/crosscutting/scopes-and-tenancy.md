@@ -10,17 +10,35 @@ This is the **target model**; first-build scope is tracked via the inbox and cha
 
 ## Scope — the unit content is keyed on
 
-A **scope** is the unit business data is keyed on. It is addressed by an **opaque scope ID (UUID)**,
-never by name. Three kinds, one tree model:
+A **scope** is the unit business data is keyed on, addressed by an **opaque scope ID (UUID)**, never by
+name. A **tenant** is the top-level container and carries the domain; the other kinds live **within** a
+tenant:
 
-- **`PERSONAL`** — the owner's private space; maximum confidentiality, no other key-holder unless the
-  owner explicitly shares.
-- **`TENANT`** — a domain-scoped organization. One server hosts many tenants.
-- **`GROUP`** — a collaborative space, **no nesting**; all members have equal content rights, admins
-  manage membership and settings only.
+- **`TENANT`** — the tenant's shared root scope. One server hosts many tenants, each with its own domain.
+- **`GROUP`** — a collaborative space within a tenant, **no nesting**; all members have equal content
+  rights, admins manage membership and settings only.
+- **`PERSONAL`** — a member's private space **within a tenant** (one per member, per tenant), created
+  when the user joins that tenant. Maximum confidentiality; no other key-holder unless the member
+  explicitly shares.
 
-**Users are global to the server** and may belong to multiple tenants and groups. The same navigation
-and key rules apply to all three kinds — the kind changes *who holds keys*, not the model.
+**Users are global to the server** and may belong to multiple tenants; a user therefore has a **separate
+personal scope per tenant**. Because every scope lives within a tenant, it is reached under that
+tenant's host — so sharing a private memory yields a link on the **right** domain (a family memory
+shared from your personal scope appears under `family.example.com`, never `friends.example.com`). See
+[ADR 0002](../decisions/0002-personal-scope-per-tenant.md). The same navigation and key rules apply to
+all kinds — the kind changes *who holds keys*, not the model.
+
+## Tenant resolution — by Host
+
+A tenant carries a **domain**. The reverse proxy forwards the request (with its `Host`), and the
+backend resolves **which tenant** is meant from that `Host` (a host → tenant mapping). The tenant
+context therefore comes from the domain, not from a tenant id or name in the path; **business data
+within the resolved context is still addressed by opaque scope/node IDs**. Tenant↔domain is
+server-visible operational metadata, so this does not affect operator-blindness.
+
+Every scope — including personal and group — lives **within** a tenant, so there is no host-less scope:
+each is reached under its tenant's host like everything else. This is what keeps share links on the
+correct domain (see the scope kinds above and [ADR 0002](../decisions/0002-personal-scope-per-tenant.md)).
 
 ## How access works — keys, grants, shares
 
@@ -132,7 +150,8 @@ it can decrypt any names or metadata. The operator must not learn private names 
 
 ## Invariants
 
-- Addressed by **opaque IDs only** — never a tenant or scope name in the path.
+- Business data is addressed by **opaque scope/node IDs**; the **tenant context is resolved from the
+  request `Host`** (tenant↔domain). No tenant or scope *name* appears in the path.
 - **No cross-scope move** — moving across scopes is a copy + re-encrypt, not a tree move.
 - No cycles; **no folder inside a Memory**.
 - **Slug uniqueness per parent** across folders, Memories and chapters, via blinded slug tokens.

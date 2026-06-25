@@ -66,6 +66,8 @@ concern, because someone could copy encrypted data today and hope to crack it la
 a built-in goal, and the system is designed so the locks can be **upgraded over time without
 re-locking everything you already have.**
 
+More: [What happens to my photos when quantum computers arrive?](quantum-computers-and-your-photos.md)
+
 ## Making sure it's really *their* key — and an honest gap
 
 When you share with a friend, your app needs your friend's key, which it gets from our server. A

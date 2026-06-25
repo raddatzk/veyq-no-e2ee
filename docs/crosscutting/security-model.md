@@ -25,7 +25,7 @@ never sees. Confidentiality is therefore cryptographic, not a server-side access
 | Stolen disk / DB dump / subpoena of data at rest | All content E2E-encrypted; the server holds no content keys |
 | Passive operator reading the database | Cannot recover content — every blob and sensitive metadata field is encrypted |
 | Offline brute-force of a weak password → **content** | **Secret Key (2SKD)**: the content key derivation folds in a high-entropy Secret Key the server never stores, so a cracked password alone unlocks nothing |
-| Offline brute-force of a weak password → **server login** | Only a password-only Argon2id verifier is exposed; cracking it yields a session + operational metadata, **never content** |
+| Offline brute-force of a weak password → **server login** | The server stores only an Ed25519 **auth public key** (not a credential); the raw password never reaches the server. Forging a login means brute-forcing the password through Argon2id — yielding a session + operational metadata, **never content** (see [ADR 0003](../decisions/0003-operator-blind-password-auth.md)) |
 | Active operator doing key-substitution during key exchange | **Partly, and honestly limited** — see *Key-directory trust* below |
 
 We do **not** claim immunity to an *actively malicious* operator before key transparency exists; we
@@ -108,8 +108,10 @@ end note
   already quantum-resistant (AES-256-GCM class); key wrapping is per-recipient (HPKE-style multi-recipient).
 - **Post-quantum from the start, by intent.** Memories live for decades, so harvest-now-decrypt-later is
   a real threat. The target is a **hybrid KEM (X25519 + ML-KEM-768)** for key wrapping — secure if
-  either component holds — with signatures moving to hybrid (ML-DSA) later. **The concrete contents of
-  crypto suite `v1` are decided in the first crypto change-request**, not here.
+  either component holds. **Signatures** (login auth, key-directory, derivative-signing) are less
+  HNDL-urgent — there is no harvest-now-decrypt-later for a one-time verification — so PQ urgency is
+  **high for encryption (now)** and **low for signatures (Ed25519 now → hybrid ML-DSA later)**. **The
+  concrete contents of crypto suite `v1` are decided in the first crypto change-request**, not here.
 - **Crypto-agility is non-negotiable.** Every wrapped key and encrypted artifact carries a **versioned
   suite id**. New artifacts use the current suite; old artifacts stay readable under their stored suite
   id. This is what makes adopting (and later upgrading) post-quantum safe without breaking the model.

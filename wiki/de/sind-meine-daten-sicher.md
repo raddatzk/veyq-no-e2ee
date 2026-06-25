@@ -73,6 +73,8 @@ kopieren und hoffen, sie später zu knacken. Dieser Schutz ist ein eingebautes Z
 so entworfen, dass die Schlösser **mit der Zeit erneuert werden können, ohne alles neu zu verschließen,
 was du schon hast.**
 
+Mehr: [Was passiert mit meinen Fotos, wenn die Quantencomputer kommen?](quantencomputer-und-deine-fotos.md)
+
 ## Ist es wirklich *ihr* Schlüssel — und eine ehrliche Lücke
 
 Wenn du mit einem Freund teilst, braucht deine App seinen Schlüssel, den sie von unserem Server holt.

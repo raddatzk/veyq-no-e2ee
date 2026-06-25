@@ -16,7 +16,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 |----|-------|------|---------------|--------|
 | 1 | Security model (blind store, threat model) | security, crypto | `legacy/docs/wiki/crosscutting/security-model.md` | refined → `docs/crosscutting/security-model.md` + `wiki/{en,de}` safety page |
 | 2 | Crypto suite (hybrid PQ, suite versioning, vectors) | crypto | `legacy/docs/wiki/crosscutting/crypto-spec.md`, `legacy/docs/api/crypto-vectors/v1.json` | inbox |
-| 3 | Account & key model (master key, wraps, recovery) | crypto, keys, auth | `legacy/docs/wiki/crosscutting/account-key-model.md` | refined → `docs/crosscutting/account-key-model.md` + `wiki/{en,de}` account-keys page (scope/invite keys deferred to #4) |
+| 3 | Account & key model (master key, wraps, recovery) | crypto, keys, auth | `legacy/docs/wiki/crosscutting/account-key-model.md` | refined → `docs/crosscutting/account-key-model.md` + `wiki/{en,de}`; auth = Model B (ADR 0003); scope/invite keys deferred to #4 |
 | 4 | Spaces & scopes (personal/group/tenant, opaque IDs) | scopes, tenancy | `legacy/docs/wiki/crosscutting/space-navigation.md` | refined → `docs/crosscutting/scopes-and-tenancy.md` (end-user spaces page deferred to #14) |
 | 5 | Privacy & non-enumerability | privacy | `legacy/docs/wiki/crosscutting/privacy-in-plain-language.md` | inbox |
 | 6 | Live collaboration (blind CRDT relay) | journal, crdt | `legacy/docs/wiki/crosscutting/live-collaboration.md` | inbox |
@@ -31,7 +31,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | id | topic | tags | legacy source | status |
 |----|-------|------|---------------|--------|
 | 12 | Account & auth | feature, account | `legacy/docs/wiki/features/account/` | inbox |
-| 13 | Administration & operations | feature, admin | `legacy/docs/wiki/features/admin/` | inbox |
+| 13 | Administration & operations | feature, admin | `legacy/docs/wiki/features/admin/` | refining → `docs/features/admin/` + `uc.admin.setup-server` done; other admin use-cases pending |
 | 14 | Spaces (tenants/groups/personal) | feature, scopes | `legacy/docs/wiki/features/spaces/` | inbox |
 | 15 | Keys (grants, unlock wraps, rotation) | feature, crypto | `legacy/docs/wiki/features/keys/` | inbox |
 | 16 | Memory (tree, curation, map/tracks, playlists) | feature, memory | `legacy/docs/wiki/features/memory/` | inbox |
