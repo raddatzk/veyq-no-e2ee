@@ -1,0 +1,38 @@
+useCase: uc.admin.setup-server
+feature: admin
+title: First-run server setup
+acceptanceCriteria:
+  - id: status-required-when-fresh
+    text: A fresh instance reports setupRequired=true and advertises the supported suites.
+    tests:
+      - { area: backend, ref: "SetupServerSliceTest.setupRequiredInitially" }
+      - { area: http, ref: "http/admin/setup.http" }
+  - id: create-owner-and-complete
+    text: A valid request creates the Server Owner (201) and marks setup complete.
+    tests:
+      - { area: backend, ref: "SetupServerSliceTest.createsOwner" }
+      - { area: backend, ref: "SetupServerSliceTest.setupNoLongerRequired" }
+      - { area: http, ref: "http/admin/setup.http" }
+  - id: single-owner-lock
+    text: A second owner is rejected with 409 once setup is complete.
+    tests:
+      - { area: backend, ref: "SetupServerSliceTest.rejectsSecondOwner" }
+      - { area: http, ref: "http/admin/setup.http" }
+  - id: reject-blank-name
+    text: A blank/whitespace display name is rejected at the boundary (400).
+    tests:
+      - { area: backend, ref: "SetupServerSliceTest.rejectsBlankDisplayName" }
+      - { area: http, ref: "http/admin/setup.http" }
+  - id: reject-non-base64-key
+    text: Non-base64 key material is rejected (400).
+    tests:
+      - { area: backend, ref: "SetupServerSliceTest.rejectsNonBase64Key" }
+      - { area: http, ref: "http/admin/setup.http" }
+  - id: trim-name-fields
+    text: Display and instance names are trimmed before validation and storage.
+    tests:
+      - { area: backend, ref: "SetupRequestSanitizationTest.trimsNameFields" }
+gaps:
+  - { area: web, reason: "deferred to a follow-up CR (web client setup UI)" }
+  - { area: apple, reason: "deferred to a follow-up CR" }
+  - { area: android, reason: "deferred to a follow-up CR" }
