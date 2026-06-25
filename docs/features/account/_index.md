@@ -14,7 +14,7 @@ holds only **public** keys and ciphertext, never the password and never a conten
 ## Use-cases
 
 - ★ [Account login (password)](use-cases/uc.account.login.md) — **refined**
-- Unlock the Master Key — planned (client-side; password + Secret Key → Unlock KEK)
+- ★ [Unlock the Master Key (password + Secret Key)](use-cases/uc.account.unlock.md) — **refined**
 - Log in with a passkey — planned (alternate auth + PRF-derived unlock)
 - Trust this device — planned (DEVICE wrap, skip Secret Key re-entry)
 - Change password / Secret Key — planned (re-register auth key, re-wrap Master Key)
