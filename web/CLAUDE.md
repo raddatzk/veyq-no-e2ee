@@ -11,7 +11,8 @@ here; the server is blind.
 ## Conventions
 - **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from
   `legacy/frontend` (read-only) and rewire them to the contracts client + crypto. If a ported view lacks
-  a field the contract requires, add it **in-style** rather than hardcode a default.
+  a field the contract requires, add it **in-style** rather than hardcode a default. Visual rules +
+  tokens/classes: [web UI styleguide](../docs/crosscutting/ui-web-styleguide.md).
 - **Crypto:** `src/shared/crypto/v1.ts` is the **conformance-pinned** suite — keep it byte-identical to
   the vectors (`../contracts/crypto/vectors/v1.json`); the conformance test must stay green. The Model B
   auth derivation (`deriveAuthSalt` / `deriveAuthKeypair`, Ed25519 from Argon2id — ADR 0003) lives here.

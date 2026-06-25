@@ -75,7 +75,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | 34 | Memory product context (the vision) | product | `legacy/docs/product/memory-product-context.md` | inbox |
 | 35 | Journal markdown & embed syntax | journal, product | `legacy/docs/product/journal-markdown.md` | inbox |
 | 36 | Playlists & music references | product, music | `legacy/docs/product/playlists.md` | inbox |
-| 37 | UI styleguides (web + iOS) | ui | `legacy/docs/product/memory-ui-styleguide.md`, `legacy/docs/product/ios-ui-styleguide.md` | inbox |
+| 37 | UI styleguides (web + iOS) | ui | `legacy/docs/product/memory-ui-styleguide.md`, `legacy/docs/product/ios-ui-styleguide.md` | refining → web done: `docs/crosscutting/ui-web-styleguide.md`; iOS pending (refine with native UI) |
 | 38 | Hosting & operations strategy (SaaS) | strategy, saas | `legacy/docs/product/hosting-and-operations-strategy.md` | inbox |
 | 39 | Future work backlog | backlog | `legacy/docs/product/future-work.md` | inbox |
 | 40 | Legal (privacy, trademark, commercial boundary) | legal | `legacy/docs/legal/` | inbox |
