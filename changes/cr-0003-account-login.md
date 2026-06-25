@@ -68,17 +68,18 @@ phases 1–2 below.
 - [ ] **1 — contracts.** Add `instanceSalt` to the `SetupStatus` schema (`GET /api/setup`) and define the
   auth + session operations per [ADR 0004](../docs/decisions/0004-session-tokens.md):
   `POST /api/login/challenge { email } → { nonce, instanceSalt }` (always 200, non-enumerable);
-  `POST /api/login/verify { email, signature } → 200 { accessToken, refreshToken, family: { id, codename } } | 401
+  `POST /api/login/verify { email, signature } → 200 { accessToken, refreshToken, family: { id } } | 401
   generic`; `POST /api/token/refresh { refreshToken } → 200 { accessToken, refreshToken } | 401`; and
-  `POST /api/logout` (revoke the current family). **Done when:** the spec lints and the backend/web
-  clients generate from it.
+  `POST /api/logout` (revoke the current family). The family is **nameless** here — the E2EE session name
+  is unlock-gated and belongs to `uc.account.sessions`, not this CR. **Done when:** the spec lints and the
+  backend/web clients generate from it.
 - [ ] **2 — backend.** *Setup side:* generate `instanceSalt` once at first-run, persist it (migration),
   and return it from `GET /api/setup`; the existing owner-create path already stores the client-derived
   `authPublicKey`, so no owner-side change beyond the salt now flowing. *Login side:* nonce issuance
   (single-use, time-bounded, server-stored), Ed25519 signature verification against the stored
   `authPublicKey`. Adopt `authSalt = HKDF(instanceSalt, normalizedEmail)` consistently. *Session side
-  (ADR 0004):* on verify, create a **session family** (server-generated markant `adjective-noun`
-  codename) and issue opaque **access + refresh** tokens (stored as hashes); `refresh` **rotates** the
+  (ADR 0004):* on verify, create a **nameless session family** (opaque id) and issue opaque **access +
+  refresh** tokens (stored as hashes); `refresh` **rotates** the
   pair and bumps the generation; presenting a **superseded** refresh token whose secret verifies ⇒
   **revoke the family** (reuse detection); `logout` revokes the family. Slice tests: valid login → family
   + tokens; wrong password → generic 401; unknown account → byte-identical to wrong password; expired /
@@ -95,8 +96,9 @@ phases 1–2 below.
 - [ ] **4 — web.** *Setup side:* correct the cr-0002 stopgap — derive `authSalt` from the `instanceSalt`
   now in `SetupStatus` (`HKDF(instanceSalt, email)`), so setup and login derive **identically**. *Login
   side:* replace the login stub with the real flow — derive the auth keypair, request the challenge, sign
-  the nonce, verify, store the **access + refresh** tokens, surface the family **codename** to the user,
-  and wire **retry-on-`401`→refresh**. Post-auth lands in an **authenticated-but-locked** state
+  the nonce, verify, store the **access + refresh** tokens, and wire **retry-on-`401`→refresh**. (The
+  E2EE session name is unlock-gated → `uc.account.sessions`, not here.) Post-auth lands in an
+  **authenticated-but-locked** state
   (Master-Key unlock is a separate use-case — stub the unlock step). **Done when:** `npm run check` green
   and a preview smoke shows, on a fresh instance, setup → login round-trip (the same email/password logs
   in), a silent access-token refresh, **and** wrong-password → generic failure.
@@ -109,8 +111,8 @@ phases 1–2 below.
 ## Definition of done
 
 A web user logs in against the operator-blind backend via challenge-response and receives an opaque
-**access + refresh** session in a named **family**, with **non-enumerability**, **replay-resistance**,
+**access + refresh** session in a (nameless) **family**, with **non-enumerability**, **replay-resistance**,
 **refresh rotation** and **reuse-detection** (superseded refresh → family revoked) verified by tests; the
 web login stub is gone; coverage for `uc.account.login` is green and the parity matrix reflects it.
-Master-Key unlock, the session-management UI (`uc.account.sessions`), and native login remain separate,
-planned work. After merge, delete this file.
+Master-Key unlock, the **E2EE-named** session-management UI (`uc.account.sessions`), and native login
+remain separate, planned work. After merge, delete this file.
