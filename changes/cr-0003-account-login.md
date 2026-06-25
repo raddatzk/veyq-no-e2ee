@@ -95,7 +95,7 @@ phases 1–2 below.
   handler (no signer), so they are covered only by the backend slice (phase 2). Marked explicitly in the
   file header and recorded as a coverage gap. *(Correction: the positive token flows are NOT
   http-expressible after all — obtaining a valid refresh token requires a signed session.)*
-- [ ] **4 — web.** *Setup side:* correct the cr-0002 stopgap — derive `authSalt` from the `instanceSalt`
+- [x] **4 — web.** *Setup side:* correct the cr-0002 stopgap — derive `authSalt` from the `instanceSalt`
   now in `SetupStatus` (`HKDF(instanceSalt, email)`), so setup and login derive **identically**. *Login
   side:* replace the login stub with the real flow — derive the auth keypair, request the challenge, sign
   the nonce, verify, store the **access + refresh** tokens, and wire **retry-on-`401`→refresh**. (The
@@ -104,7 +104,11 @@ phases 1–2 below.
   [uc.account.unlock](../docs/features/account/use-cases/uc.account.unlock.md), stubbed here.
   **Done when:** `npm run check` green
   and a preview smoke shows, on a fresh instance, setup → login round-trip (the same email/password logs
-  in), a silent access-token refresh, **and** wrong-password → generic failure.
+  in), a silent access-token refresh, **and** wrong-password → generic failure. ✅ `npm run check` green
+  (36 tests). Preview smoke (live, fresh quarkusDev): web setup created the owner → `/login` round-trip
+  with the same email/password reached the authenticated-but-locked state; a wrong password returned the
+  generic failure (screenshots captured). The silent refresh is covered by the web unit test
+  (`login.test.ts` rotation) + the backend slice + http, since this CR has no UI affordance to trigger it.
 - [ ] **5 — verify + coverage.** Add `docs/coverage/features/account/use-cases/uc.account.login.yaml`
   mapping each acceptance criterion to the tests above (with explicit `gaps` for the http signed-path and
   for apple/android), and add the `uc.account.login` row to
