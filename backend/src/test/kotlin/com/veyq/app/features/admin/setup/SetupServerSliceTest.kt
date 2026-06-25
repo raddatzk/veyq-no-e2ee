@@ -23,7 +23,7 @@ class SetupServerSliceTest {
          "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
          "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
          "authPublicKey":"$authPublicKey",
-         "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5"}],
+         "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5","kdfParams":"AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz"}],
          "recoveryMasterKeyTag":"cmVjb3ZlcnktdGFn"}
     """.trimIndent()
 

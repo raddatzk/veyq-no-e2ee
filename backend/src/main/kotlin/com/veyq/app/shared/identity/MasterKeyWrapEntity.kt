@@ -25,5 +25,8 @@ class MasterKeyWrapEntity : PanacheEntityBase {
     @Column(name = "wrapped_key", nullable = false)
     lateinit var wrappedKey: String
 
+    @Column(name = "kdf_params")
+    var kdfParams: String? = null
+
     companion object : PanacheCompanionBase<MasterKeyWrapEntity, String>
 }

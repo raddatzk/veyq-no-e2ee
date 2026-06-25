@@ -36,6 +36,7 @@ class SetupStore {
                 this.userId = userId
                 method = wrap.method
                 wrappedKey = wrap.wrappedKey
+                kdfParams = wrap.kdfParams
             }.persist()
         }
 

@@ -18,7 +18,7 @@ data class OwnerRegistration(
     val wraps: List<WrapInput>,
 )
 
-data class WrapInput(val method: String, val wrappedKey: String)
+data class WrapInput(val method: String, val wrappedKey: String, val kdfParams: String? = null)
 
 /** Setup is already complete; a second owner cannot be bootstrapped. */
 class SetupAlreadyComplete : RuntimeException("setup_already_complete")
