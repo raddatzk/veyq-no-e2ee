@@ -11,6 +11,7 @@ import * as v1 from '../../../shared/crypto/v1'
 // Standard base64 (padded or not) — the encoding the operator-blind setup contract pins for its wire fields
 // (`[A-Za-z0-9+/]*={0,2}`). A base64url value (with `-`/`_`) would be rejected by the backend at the boundary.
 const STD_B64 = /^[A-Za-z0-9+/]*={0,2}$/
+const INSTANCE_SALT = new Uint8Array(16).fill(7)
 
 describe('setupServer — Model B request (uc.admin.setup-server)', () => {
   const { request, emergencyKit } = buildCreateServerOwnerRequest(
@@ -18,6 +19,7 @@ describe('setupServer — Model B request (uc.admin.setup-server)', () => {
     'Kevin',
     'correct horse battery',
     'Our Family veyq',
+    INSTANCE_SALT,
   )
 
   it('carries the contract metadata', () => {
@@ -58,13 +60,15 @@ describe('setupServer — Model B request (uc.admin.setup-server)', () => {
 
 describe('Model B auth derivation (ADR 0003)', () => {
   it('derives a deterministic salt + keypair from email+password', () => {
-    const salt = v1.deriveAuthSalt('user@example.com')
-    expect(v1.deriveAuthSalt('user@example.com')).toEqual(salt)
+    const salt = v1.deriveAuthSalt(INSTANCE_SALT, 'user@example.com')
+    expect(v1.deriveAuthSalt(INSTANCE_SALT, 'user@example.com')).toEqual(salt)
     // normalization: trim + lowercase
-    expect(v1.deriveAuthSalt(' User@Example.com ')).toEqual(salt)
+    expect(v1.deriveAuthSalt(INSTANCE_SALT, ' User@Example.com ')).toEqual(salt)
 
     // a different account (email) → different salt → different keypair (non-enumerable per-account)
-    expect(v1.deriveAuthSalt('other@example.com')).not.toEqual(salt)
+    expect(v1.deriveAuthSalt(INSTANCE_SALT, 'other@example.com')).not.toEqual(salt)
+    // a different instance (salt) → different salt, even for the same email (cross-instance separation)
+    expect(v1.deriveAuthSalt(new Uint8Array(16).fill(9), 'user@example.com')).not.toEqual(salt)
 
     const a = v1.deriveAuthKeypair('pw-abc', salt)
     const b = v1.deriveAuthKeypair('pw-abc', salt)
@@ -76,6 +80,7 @@ describe('Model B auth derivation (ADR 0003)', () => {
 describe('registerServerOwner — API error propagation', () => {
   it('rejects when the server rejects the registration (drives the setup-failed UX)', async () => {
     vi.mocked(setupApi).mockReturnValue({
+      getSetupStatus: () => Promise.resolve({ setupRequired: true, suites: ['v1'], instanceSalt: 'AAAAAAAAAAAAAAAAAAAAAA==' }),
       createServerOwner: () => Promise.reject(new Error('setup_already_complete')),
     } as unknown as ReturnType<typeof setupApi>)
     await expect(

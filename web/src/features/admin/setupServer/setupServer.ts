@@ -3,7 +3,7 @@
 // keys + low-sensitivity metadata. Unlike the legacy Model-A flow, the raw password is NEVER sent: the
 // client derives an Ed25519 auth keypair (ADR 0003) and registers only `authPublicKey`.
 import * as v1 from '../../../shared/crypto/v1'
-import { b64std } from '../../../shared/base64'
+import { b64std, fromB64std } from '../../../shared/base64'
 import { setupApi } from '../../../api/client'
 import {
   type CreateServerOwnerRequest,
@@ -23,6 +23,7 @@ export function buildCreateServerOwnerRequest(
   displayName: string,
   password: string,
   instanceName: string,
+  instanceSalt: Uint8Array,
 ): { request: CreateServerOwnerRequest; emergencyKit: EmergencyKit } {
   const id = v1.generateIdentity()
   const masterKey = v1.randomBytes(32)
@@ -44,7 +45,7 @@ export function buildCreateServerOwnerRequest(
 
   // Operator-blind auth (ADR 0003 / Model B): derive the Ed25519 auth keypair from password + per-account
   // salt; register only the PUBLIC key. The server never sees the password and stores no credential.
-  const authSalt = v1.deriveAuthSalt(email)
+  const authSalt = v1.deriveAuthSalt(instanceSalt, email)
   const auth = v1.deriveAuthKeypair(password, authSalt, ARGON)
 
   const request: CreateServerOwnerRequest = {
@@ -79,7 +80,10 @@ export async function registerServerOwner(
   password: string,
   instanceName: string,
 ): Promise<{ userId: string; emergencyKit: EmergencyKit }> {
-  const { request, emergencyKit } = buildCreateServerOwnerRequest(email, displayName, password, instanceName)
+  // The auth keypair is derived with the instance-wide salt the server serves on GET /api/setup, so setup
+  // and login derive identically (ADR 0003).
+  const instanceSalt = fromB64std((await setupApi().getSetupStatus()).instanceSalt)
+  const { request, emergencyKit } = buildCreateServerOwnerRequest(email, displayName, password, instanceName, instanceSalt)
   const result = await setupApi().createServerOwner({ createServerOwnerRequest: request })
   return { userId: result.userId, emergencyKit }
 }

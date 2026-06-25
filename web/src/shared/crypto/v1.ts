@@ -210,16 +210,15 @@ export const kekRecovery = (recoveryCode: Uint8Array, salt: Uint8Array, params: 
 // by its distinct, auth-only salt — they share no inputs and never collide.
 
 /**
- * Deterministic per-account auth salt for the password→keypair derivation.
+ * Deterministic per-account auth salt for the password→keypair derivation (ADR 0003):
+ * `authSalt = HKDF(ikm = normalizedEmail, salt = instanceSalt, info = "veyq/v1/auth-salt")`.
  *
- * ADR 0003's target is `authSalt = HKDF(instanceSalt, normalizedEmail)` so the server behaves identically
- * for existing and non-existing accounts (non-enumerable login). At *setup* there is no instanceSalt yet —
- * GET /api/setup carries only {setupRequired, suites}. Until the login CR distributes an instanceSalt, the
- * salt is derived client-side from the normalized email alone, domain-separated. The owner minted here is
- * write-only for auth in this CR (login is stubbed), so refining the salt source later is non-breaking.
+ * The `instanceSalt` is the instance-wide public constant served by GET /api/setup (registration) and the
+ * login challenge response — binding the salt to both the instance and the email. The SAME value must be
+ * used at registration and at login, or the derived keypairs diverge and no signature verifies.
  */
-export const deriveAuthSalt = (email: string): Uint8Array =>
-  hkdf(sha256, utf8(email.trim().toLowerCase()), new Uint8Array(0), utf8('veyq/v1/auth-salt'), 16)
+export const deriveAuthSalt = (instanceSalt: Uint8Array, email: string): Uint8Array =>
+  hkdf(sha256, utf8(email.trim().toLowerCase()), instanceSalt, utf8('veyq/v1/auth-salt'), 16)
 
 export type AuthKeypair = { publicKey: Uint8Array; privateKey: Uint8Array }
 
@@ -228,6 +227,13 @@ export function deriveAuthKeypair(password: string, authSalt: Uint8Array, params
   const seed = argon2id(utf8(password), authSalt, { ...params, dkLen: 32 })
   return { privateKey: seed, publicKey: ed25519.getPublicKey(seed) }
 }
+
+/** Sign a server login nonce with the auth private key (Ed25519) — proves possession at login (ADR 0003). */
+export const authSign = (privateKey: Uint8Array, message: Uint8Array): Uint8Array => ed25519.sign(message, privateKey)
+
+/** Verify an Ed25519 auth signature (the server's job; exposed for tests + future identity checks). */
+export const authVerify = (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean =>
+  ed25519.verify(signature, message, publicKey)
 
 // A password-protected share folds the password into the unwrap key: HKDF(shareKey, Argon2id(password,salt)).
 // The link's fragment shareKey alone can't decrypt — you also need the password. The server stays blind.
