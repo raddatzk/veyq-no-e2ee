@@ -114,25 +114,23 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
   runs **before** the in-handler auth check. **Parity gap (slice-only, in the header):** the authed add
   (201 + id) / untrust (204) round-trip needs a signed session no `.http` handler can produce (same limit as
   cr-0003/0004) — covered by the phase-2 slice + the phase-4 web round-trip.
-- [ ] **4 — web.** *Crypto:* add `v1.kekDevicePassword(deviceFactor, password, salt, params)` + its
-  conformance vector (suite stays green). *Device adapter* (`features/account/trustDevice/deviceKey.ts`, the
-  platform glue): generate/store/read a **non-extractable** HMAC `CryptoKey` in IndexedDB keyed per account,
-  compute `deviceFactor` via `subtle.sign`, and persist/read `{salt, wrapId}`. *Enrol* `trustThisDevice(
-  password, masterKey)` — invoked **at unlock time**, with the just-entered (known-correct) password and the
-  vault Master Key, before the password is cleared: if IndexedDB already holds a `wrapId`, `DELETE` it first
-  (re-trust replaces); generate the key, derive the KEK, `symWrap` the Master Key, `POST` it, store
-  `{deviceKey, salt, wrapId}`. *Untrust:* `DELETE` by id + clear IndexedDB. *Unlock:* extend `unlock.ts` to
-  resolve **available methods on this device** (a small list — today DEVICE if a key + matching DEVICE wrap
-  exist, else/and PASSWORD), pick a default, and derive via `kekDevicePassword` (password-only) or the floor;
-  structured so PASSKEY/RECOVERY are additive. *UI:* a **"Trust this device" checkbox on the unlock card**
-  (enrols right after a successful unlock), an **untrust** control in the unlocked state, and the unlock card
-  defaulting to password-only when trusted with **"unlock another way"** → Secret-Key path. Tests:
-  enrol→unlock-via-DEVICE round-trip (password only → Master Key recovered, using a mocked device adapter +
-  real `kekDevicePassword`); wrong password → generic failure; **E1** device key absent → no DEVICE unlock,
-  floor offered; re-trust replaces (no duplicate wrap); multi-device salt-match picks the right wrap. **Done
-  when:** `npm run check` green **and** a preview smoke shows, on a fresh instance: setup → unlock **with
-  "trust this device" ticked** → (reload / re-login) unlock with **only the password** → **untrust** → unlock
-  falls back to password + Secret Key.
+- [x] **4 — web.** *Crypto:* added `v1.kekDevicePassword(deviceFactor, password, salt, params)` +
+  `device_password_argon2id` conformance vector (suite green, 19 tests); added a worker `deviceKek` op so
+  the (frequent) trusted-device unlock runs off the main thread too. *Device adapter*
+  (`features/account/trustDevice/deviceKey.ts`): generate/store/read a **non-extractable** HMAC `CryptoKey`
+  in IndexedDB keyed per account, `deviceFactor` via `subtle.sign`, persist `{cryptoKey, kdfParams, wrapId}`.
+  *Orchestration* (`trustDevice.ts`): `trustThisDevice` (enrols at unlock time, **re-trust replaces** via a
+  prior `DELETE`), `untrustThisDevice`, `isTrusted`. *Unlock* (`unlock.ts`): `unlockWithDevice` finds the
+  device's own DEVICE wrap by the stored salt (`kdfParams`) and derives password-only; returns false (→
+  floor) when the key/wrap is absent, throws generically on a wrong password. *UI* (`LoginView.vue`):
+  device-mode card (password-only) ⇄ floor card (Secret Key + **"Trust this device" checkbox**), an
+  **untrust** control when unlocked, and **"use my Secret Key instead"**; method selection is a mode, not a
+  hardcoded `if`, so PASSKEY/RECOVERY are additive. 11 unit tests (device round-trip, wrong-password,
+  not-trusted, orphan-clears, enrol/re-trust/untrust). **Done:** `npm run check` green (56 tests). Preview
+  smoke on a fresh instance carried the **full lifecycle** end-to-end (real WebCrypto + IndexedDB, no
+  console errors): setup → floor unlock with "trust this device" ticked (a non-extractable key + a DEVICE
+  wrap landed, `deviceTrusted=true`) → sign out → re-login → **DEVICE mode, unlocked with only the
+  password** → untrust (server wrap + IndexedDB key removed) → re-login → back to the Secret-Key floor.
 - [ ] **5 — verify + coverage.** Fill `docs/coverage/features/account/use-cases/uc.account.trust-device.yaml`
   (criteria → the web round-trip + backend slice + http boundaries; `gaps` for apple/android and the http
   authed-path), and add the `uc.account.trust-device` row to

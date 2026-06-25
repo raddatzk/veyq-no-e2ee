@@ -7,6 +7,7 @@ import type { ArgonParams } from './v1'
 type Request =
   | { id: number; op: 'authKeypair'; password: string; salt: Uint8Array; params?: ArgonParams }
   | { id: number; op: 'unlockKek'; secretKey: Uint8Array; password: string; salt: Uint8Array; params?: ArgonParams }
+  | { id: number; op: 'deviceKek'; deviceFactor: Uint8Array; password: string; salt: Uint8Array; params?: ArgonParams }
 
 const ctx = self as unknown as { postMessage(message: unknown): void }
 
@@ -16,7 +17,9 @@ self.addEventListener('message', (event: MessageEvent<Request>) => {
     const result =
       msg.op === 'authKeypair'
         ? v1.deriveAuthKeypair(msg.password, msg.salt, msg.params)
-        : v1.kekPasswordSecret(msg.secretKey, msg.password, msg.salt, msg.params)
+        : msg.op === 'unlockKek'
+          ? v1.kekPasswordSecret(msg.secretKey, msg.password, msg.salt, msg.params)
+          : v1.kekDevicePassword(msg.deviceFactor, msg.password, msg.salt, msg.params)
     ctx.postMessage({ id: msg.id, ok: true, result })
   } catch (err) {
     ctx.postMessage({ id: msg.id, ok: false, error: String(err) })

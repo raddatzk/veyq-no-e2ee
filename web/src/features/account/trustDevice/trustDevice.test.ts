@@ -1,0 +1,89 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('../../../api/client', () => ({
+  accountWrapsApi: vi.fn(),
+  accountApi: vi.fn(),
+  loginApi: vi.fn(),
+  tokenApi: vi.fn(),
+  sessionApi: vi.fn(),
+}))
+vi.mock('./deviceKey', () => ({
+  loadTrust: vi.fn(),
+  saveTrust: vi.fn(),
+  clearTrust: vi.fn(),
+  generateDeviceKey: vi.fn(),
+  deviceFactor: vi.fn(),
+  isTrustSupported: () => true,
+}))
+
+import { trustThisDevice, untrustThisDevice } from './trustDevice'
+import * as device from './deviceKey'
+import { accountWrapsApi } from '../../../api/client'
+
+const EMAIL = 'user@example.com'
+
+function mockWrapsApi(add: ReturnType<typeof vi.fn>, del: ReturnType<typeof vi.fn>) {
+  vi.mocked(accountWrapsApi).mockReturnValue({
+    addAccountWrap: add,
+    deleteAccountWrap: del,
+  } as unknown as ReturnType<typeof accountWrapsApi>)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(device.generateDeviceKey).mockResolvedValue({} as CryptoKey)
+  vi.mocked(device.deviceFactor).mockResolvedValue(new Uint8Array(32).fill(7))
+})
+
+describe('trustThisDevice / untrustThisDevice', () => {
+  it('enrols a DEVICE wrap and saves the local trust record', async () => {
+    vi.mocked(device.loadTrust).mockResolvedValue(null)
+    const add = vi.fn().mockResolvedValue({ id: 'wrap-123' })
+    mockWrapsApi(add, vi.fn())
+
+    await trustThisDevice(EMAIL, 'pw', new Uint8Array(32).fill(1))
+
+    expect(add).toHaveBeenCalledOnce()
+    const req = add.mock.calls[0][0].addWrapRequest
+    expect(req.method).toBe('DEVICE')
+    expect(req.wrappedKey.length).toBeGreaterThan(0)
+    expect(req.kdfParams.length).toBeGreaterThan(0)
+    expect(device.saveTrust).toHaveBeenCalledWith(EMAIL, expect.objectContaining({ wrapId: 'wrap-123' }))
+  })
+
+  it('re-trust replaces: deletes the existing wrap before adding the new one', async () => {
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'x', wrapId: 'old-1' })
+    const del = vi.fn().mockResolvedValue(undefined)
+    const add = vi.fn().mockResolvedValue({ id: 'new-1' })
+    mockWrapsApi(add, del)
+
+    await trustThisDevice(EMAIL, 'pw', new Uint8Array(32).fill(1))
+
+    expect(del).toHaveBeenCalledWith({ id: 'old-1' })
+    expect(device.clearTrust).toHaveBeenCalledWith(EMAIL)
+    expect(add).toHaveBeenCalledOnce()
+    expect(device.saveTrust).toHaveBeenCalledWith(EMAIL, expect.objectContaining({ wrapId: 'new-1' }))
+  })
+
+  it('untrust removes the server wrap and the local key', async () => {
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'x', wrapId: 'w1' })
+    const del = vi.fn().mockResolvedValue(undefined)
+    mockWrapsApi(vi.fn(), del)
+
+    await untrustThisDevice(EMAIL)
+
+    expect(del).toHaveBeenCalledWith({ id: 'w1' })
+    expect(device.clearTrust).toHaveBeenCalledWith(EMAIL)
+  })
+
+  it('untrust is a no-op when the device is not trusted', async () => {
+    vi.mocked(device.loadTrust).mockResolvedValue(null)
+    const del = vi.fn()
+    mockWrapsApi(vi.fn(), del)
+
+    await untrustThisDevice(EMAIL)
+
+    expect(del).not.toHaveBeenCalled()
+    expect(device.clearTrust).not.toHaveBeenCalled()
+  })
+})

@@ -7,14 +7,14 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { login, logout } from '../features/account/login/login'
-import { unlockMasterKey } from '../features/account/unlock/unlock'
-import { vaultState } from '../app/vault'
+import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/unlock'
+import { trustThisDevice, untrustThisDevice, isTrusted, isTrustSupported } from '../features/account/trustDevice/trustDevice'
+import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
 
-// uc.account.login + uc.account.unlock (web). Login is challenge-response sign-in (auth only); a successful
-// sign-in lands authenticated-but-locked. Unlock then opens the Master Key on-device from the password
-// (still held here from the just-completed login) + the Secret Key pasted from the Emergency Kit. QR / file
-// import of the Secret Key and remembered-session unlock belong to deferred use-cases.
+// uc.account.login + unlock + trust-device (web). Login gates a session; unlock opens the Master Key. A
+// trusted device (a DEVICE wrap, ADR 0005) unlocks with only the password (carried from login); the floor
+// path adds the Secret Key. "Trust this device" enrols at unlock time, reusing the just-entered password.
 const { t } = useI18n()
 const email = ref('')
 const password = ref('')
@@ -22,10 +22,12 @@ const secretKey = ref('')
 const busy = ref(false)
 const error = ref('')
 const loggedIn = ref(false)
+const deviceTrusted = ref(false)
+const unlockMode = ref<'device' | 'password'>('password')
+const trustChecked = ref(false)
+const trustSupported = isTrustSupported()
 
-// A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds,
-// so it only enters the reactive form ref during the brief unlock step — never through the whole pre-login
-// phase. Plain string, not displayed and not in the reactive graph.
+// A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds.
 let pendingSecretKey = ''
 
 async function submit() {
@@ -34,7 +36,8 @@ async function submit() {
   try {
     await login(email.value, password.value)
     loggedIn.value = true
-    // Surface the setup-provided Secret Key only now that the unlock card is shown.
+    deviceTrusted.value = await isTrusted(email.value)
+    unlockMode.value = deviceTrusted.value ? 'device' : 'password'
     secretKey.value = pendingSecretKey
     pendingSecretKey = ''
   } catch {
@@ -49,17 +52,51 @@ async function unlock() {
   error.value = ''
   busy.value = true
   try {
-    // The password is reused from the just-completed login (held in `password`, never persisted).
+    if (unlockMode.value === 'device') {
+      // Trusted device: unlock with only the carried password.
+      const ok = await unlockWithDevice(email.value, password.value)
+      if (ok) {
+        password.value = ''
+      } else {
+        // the local key or the server wrap is gone — fall back to the Secret-Key floor
+        deviceTrusted.value = false
+        unlockMode.value = 'password'
+        error.value = t('unlock.deviceUnavailable')
+      }
+      return
+    }
+
+    // Floor: password (carried from login) + Secret Key.
     await unlockMasterKey(password.value, secretKey.value)
-    // Drop both inputs the moment the KEK is derived — the vault now holds the keys, in memory only.
+    if (trustChecked.value && trustSupported) {
+      // Enrol now, while the just-entered (known-correct) password is still in hand and the vault is open.
+      try {
+        await trustThisDevice(email.value, password.value, masterKey()!)
+        deviceTrusted.value = true
+      } catch {
+        /* enrolment is best-effort — the unlock itself succeeded */
+      }
+    }
     password.value = ''
     secretKey.value = ''
   } catch {
-    // Wrong password, wrong Secret Key, or no PASSWORD wrap all surface as one generic failure (E1/E2).
-    // Keep the inputs so the user can correct and retry — the Secret Key field is the active input, and a
-    // transient error (network/5xx) must not throw away a correct, possibly hard-to-re-paste key. Both are
-    // cleared on success and on sign-out.
+    // Wrong password / Secret Key (or no wrap) — one generic failure. Keep the inputs for a retry.
     error.value = t('unlock.failed')
+  } finally {
+    busy.value = false
+  }
+}
+
+function useSecretKeyInstead() {
+  unlockMode.value = 'password'
+  error.value = ''
+}
+
+async function untrust() {
+  busy.value = true
+  try {
+    await untrustThisDevice(email.value)
+    deviceTrusted.value = false
   } finally {
     busy.value = false
   }
@@ -71,14 +108,14 @@ async function signOut() {
   password.value = ''
   secretKey.value = ''
   pendingSecretKey = ''
+  trustChecked.value = false
+  unlockMode.value = 'password'
   error.value = ''
 }
 
 onMounted(() => {
-  // Right after first-run setup the owner has just seen their email + Secret Key, so setup hands both over
-  // (in memory, consumed once). The email pre-fills the sign-in field; the Secret Key is parked off the
-  // reactive ref (see `pendingSecretKey`) and surfaces only once login succeeds and the unlock card shows.
-  // A returning user has no prefill and pastes their Secret Key from the kit.
+  // Setup hands over email + Secret Key once. The email pre-fills sign-in; the Secret Key is parked off the
+  // reactive ref and surfaces only once login succeeds. A returning user has no prefill.
   const prefill = takeAuthPrefill()
   if (prefill) {
     email.value = prefill.email
@@ -91,6 +128,7 @@ onMounted(() => {
   <Card class="login-card">
     <template #title>{{ t('login.title') }}</template>
     <template #content>
+      <!-- Sign in -->
       <form v-if="!loggedIn" class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('common.email') }}
@@ -117,6 +155,36 @@ onMounted(() => {
         <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
       </form>
 
+      <!-- Unlock: trusted device (password only) -->
+      <form v-else-if="!vaultState.unlocked && unlockMode === 'device'" class="veyq-form" @submit.prevent="unlock">
+        <Message severity="info" :closable="false">{{ t('unlock.title') }}</Message>
+        <p class="veyq-form-copy">{{ t('unlock.deviceNote') }}</p>
+        <Button
+          type="submit"
+          :label="busy ? t('unlock.submitting') : t('unlock.submit')"
+          icon="pi pi-unlock"
+          :loading="busy"
+        />
+        <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
+        <Button
+          type="button"
+          :label="t('unlock.anotherWay')"
+          icon="pi pi-key"
+          severity="secondary"
+          text
+          @click="useSecretKeyInstead"
+        />
+        <Button
+          type="button"
+          :label="t('login.signOut')"
+          icon="pi pi-sign-out"
+          severity="secondary"
+          text
+          @click="signOut"
+        />
+      </form>
+
+      <!-- Unlock: Secret-Key floor -->
       <form v-else-if="!vaultState.unlocked" class="veyq-form" @submit.prevent="unlock">
         <Message severity="info" :closable="false">{{ t('unlock.title') }}</Message>
         <p class="veyq-form-copy">{{ t('unlock.note') }}</p>
@@ -131,6 +199,13 @@ onMounted(() => {
             toggle-mask
             fluid
           />
+        </label>
+        <label v-if="trustSupported && !deviceTrusted" class="checkbox-row">
+          <input v-model="trustChecked" type="checkbox" name="trust-device" />
+          <span>
+            {{ t('unlock.trustDevice') }}
+            <small class="field-hint">{{ t('unlock.trustDeviceHint') }}</small>
+          </span>
         </label>
         <Button
           type="submit"
@@ -149,9 +224,20 @@ onMounted(() => {
         />
       </form>
 
+      <!-- Unlocked -->
       <div v-else class="veyq-form">
         <Message severity="success" :closable="false">{{ t('unlock.unlockedTitle') }}</Message>
         <p class="veyq-form-copy">{{ t('unlock.unlockedNote') }}</p>
+        <Button
+          v-if="deviceTrusted"
+          type="button"
+          :label="t('unlock.untrust')"
+          icon="pi pi-shield"
+          severity="secondary"
+          text
+          :loading="busy"
+          @click="untrust"
+        />
         <Button
           type="button"
           :label="t('login.signOut')"

@@ -40,6 +40,11 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.kekRecovery(unhex(k.recovery_code), unhex(k.salt), k.params))).toBe(k.kek)
   })
 
+  it('device + password KEK (Argon2id)', () => {
+    const k = vectors.kek.device_password_argon2id
+    expect(hex(v1.kekDevicePassword(unhex(k.device_factor), k.password_utf8, unhex(k.salt), k.params))).toBe(k.kek)
+  })
+
   it('recovery KEK at PRODUCTION Argon2 params m=32 MiB (pins the invite-temp-key KEK)', () => {
     const k = vectors.kek.recovery_argon2id_m32768
     expect(hex(v1.kekRecovery(unhex(k.recovery_code), unhex(k.salt), k.params))).toBe(k.kek)

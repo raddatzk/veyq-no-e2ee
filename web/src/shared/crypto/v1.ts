@@ -203,6 +203,20 @@ export const kekPasswordSecret = (
 export const kekRecovery = (recoveryCode: Uint8Array, salt: Uint8Array, params: ArgonParams = ARGON): Uint8Array =>
   argon2id(recoveryCode, salt, params)
 
+/**
+ * DEVICE-wrap KEK (uc.account.trust-device): `Argon2id(deviceFactor + password)`. Same construction as
+ * kekPasswordSecret — factor first, password second — but the device-bound factor (the HMAC of a
+ * non-extractable WebCrypto key, computed by the platform glue) replaces the cold Secret Key, so a trusted
+ * device unlocks with only the password. v1 takes the already-derived `deviceFactor` bytes; it never sees
+ * the non-extractable key itself.
+ */
+export const kekDevicePassword = (
+  deviceFactor: Uint8Array,
+  password: string,
+  salt: Uint8Array,
+  params: ArgonParams = ARGON,
+): Uint8Array => argon2id(concat(lp(deviceFactor), lp(utf8(password))), salt, params)
+
 // ── Operator-blind password auth (ADR 0003 / Model B) ────────────────────────────────────────────────
 // The password is never sent to the server. Instead the client derives an Ed25519 *auth keypair* from the
 // password and registers only `authPublicKey`; login is challenge-response (the client signs a server nonce).

@@ -30,6 +30,19 @@
       "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
       "kek": "aea8086000d1cee65ee4521561e6489492f67bf220ebc35dcac5a43d40c03542"
     },
+    "device_password_argon2id": {
+      "note": "kekDevicePassword (uc.account.trust-device): Argon2id(lp(deviceFactor) || lp(utf8(password)), salt). Factor-first like password_secret_argon2id; the device-bound factor replaces the Secret Key.",
+      "params": {
+        "t": 3,
+        "m": 8192,
+        "p": 1,
+        "dkLen": 32
+      },
+      "device_factor": "4444444444444444444444444444444444444444444444444444444444444444",
+      "password_utf8": "correct horse battery staple",
+      "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "kek": "3ffdd454a02211587b8981b4dff2c6defc539712a2658f54bef452cd1e885cce"
+    },
     "recovery_argon2id": {
       "params": {
         "t": 3,

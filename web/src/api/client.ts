@@ -9,7 +9,7 @@ import {
   SessionApi,
   TokenApi,
 } from './generated/auth'
-import { AccountApi, Configuration as AccountConfiguration } from './generated/account'
+import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -35,4 +35,8 @@ export function sessionApi(): SessionApi {
 
 export function accountApi(): AccountApi {
   return new AccountApi(new AccountConfiguration(bearerParams()))
+}
+
+export function accountWrapsApi(): AccountWrapsApi {
+  return new AccountWrapsApi(new AccountConfiguration(bearerParams()))
 }

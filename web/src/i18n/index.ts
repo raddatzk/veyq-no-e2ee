@@ -47,6 +47,12 @@ const en = {
     failed: 'Unlock failed. Check your password and Secret Key.',
     unlockedTitle: 'Unlocked',
     unlockedNote: 'Your memories are unlocked on this device for this session.',
+    deviceNote: 'This device is trusted — unlock with just your password.',
+    anotherWay: 'Use my Secret Key instead',
+    deviceUnavailable: 'This device is no longer trusted. Enter your Secret Key.',
+    trustDevice: 'Trust this device',
+    trustDeviceHint: 'Next time, unlock on this device with just your password — your Secret Key stays in your kit.',
+    untrust: 'Untrust this device',
   },
 }
 
@@ -93,6 +99,12 @@ const de: typeof en = {
     failed: 'Entsperren fehlgeschlagen. Prüfe Passwort und Secret Key.',
     unlockedTitle: 'Entsperrt',
     unlockedNote: 'Deine Erinnerungen sind auf diesem Gerät für diese Sitzung entsperrt.',
+    deviceNote: 'Diesem Gerät wird vertraut — entsperre nur mit deinem Passwort.',
+    anotherWay: 'Stattdessen meinen Secret Key verwenden',
+    deviceUnavailable: 'Diesem Gerät wird nicht mehr vertraut. Gib deinen Secret Key ein.',
+    trustDevice: 'Diesem Gerät vertrauen',
+    trustDeviceHint: 'Beim nächsten Mal entsperrst du auf diesem Gerät nur mit deinem Passwort — dein Secret Key bleibt im Kit.',
+    untrust: 'Vertrauen aufheben',
   },
 }
 

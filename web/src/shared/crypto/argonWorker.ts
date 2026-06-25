@@ -96,3 +96,17 @@ export async function unlockKekAsync(
     v1.kekPasswordSecret(secretKey, password, salt, params),
   )
 }
+
+/** Derive the DEVICE-wrap Unlock KEK = Argon2id(deviceFactor + password) — off the main thread when possible. */
+export async function deviceKekAsync(
+  deviceFactor: Uint8Array,
+  password: string,
+  salt: Uint8Array,
+  params?: ArgonParams,
+): Promise<Uint8Array> {
+  const w = getWorker()
+  if (!w) return v1.kekDevicePassword(deviceFactor, password, salt, params)
+  return dispatch<Uint8Array>(w, { op: 'deviceKek', deviceFactor, password, salt, params }, () =>
+    v1.kekDevicePassword(deviceFactor, password, salt, params),
+  )
+}
