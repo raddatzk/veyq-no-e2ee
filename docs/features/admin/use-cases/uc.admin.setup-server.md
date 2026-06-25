@@ -18,8 +18,10 @@
 3. The client generates, **cold** (no invite, no temp-wrap — this is the root of the owner's own key
    tree): the **identity keypair**, the **Master Key** with one wrap per chosen unlock method, and the
    **Emergency Kit** (Secret Key + recovery code), then forces the owner to confirm they saved the kit.
-4. The client uploads the **public key + wrapped blobs + password-only auth verifier**; the server
-   stores ciphertext only and **marks setup complete** (single-owner lock).
+4. The client uploads the **identity public key + wrapped blobs + a password-derived auth *public* key**
+   (operator-blind password auth, [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md):
+   the server never sees the password and stores no credential/verifier — login is challenge-response);
+   the server stores ciphertext + the public key only and **marks setup complete** (single-owner lock).
 
 ```plantuml
 @startuml
@@ -35,7 +37,7 @@ O -> C : instance name, auth method, display name
 C -> C : generate cold —\nidentity keypair, Master Key + wraps,\nEmergency Kit (Secret Key + recovery code)
 C -> O : show Emergency Kit
 O -> C : confirm saved
-C -> S : POST setup/owner\n{ identityPublicKey, wrapped blobs,\nauthVerifier, suiteId, instanceName }
+C -> S : POST setup/owner\n{ identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId, instanceName }
 S -> S : store ciphertext only;\nmark setup complete (single-owner lock)
 S --> C : Server Owner created
 @enduml

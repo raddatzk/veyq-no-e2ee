@@ -3,16 +3,38 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:api": "openapi-generator-cli generate -g typescript-fetch -i ../contracts/api/setup.openapi.yaml -o src/api/generated --additional-properties=supportsES6=true,withInterfaces=true,useSingleRequestParameter=true,typescriptThreePlus=true --global-property=apiDocs=false,apiTests=false,modelDocs=false,modelTests=false",
+    "check": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@noble/ciphers": "^2.2.0",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
-    "@noble/post-quantum": "^0.6.1"
+    "@noble/post-quantum": "^0.6.1",
+    "@primeuix/themes": "^2.0.3",
+    "jspdf": "^4.2.1",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.35",
+    "vue-i18n": "^10.0.8",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.34.0",
+    "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.6",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/test-utils": "^2.4.10",
+    "happy-dom": "^20.9.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7",
+    "vue-tsc": "^3.3.2"
   }
 }

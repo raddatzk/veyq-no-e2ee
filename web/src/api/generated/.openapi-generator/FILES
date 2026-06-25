@@ -1,0 +1,11 @@
+.openapi-generator-ignore
+apis/SetupApi.ts
+apis/index.ts
+index.ts
+models/CreateServerOwnerRequest.ts
+models/ErrorResponse.ts
+models/MasterKeyWrap.ts
+models/SetupResult.ts
+models/SetupStatus.ts
+models/index.ts
+runtime.ts

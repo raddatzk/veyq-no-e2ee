@@ -6,6 +6,12 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/frontend && VITE_PORT=8088 VITE_PROXY_TARGET=http://localhost:8080 npm run dev"],
       "port": 8088
+    },
+    {
+      "name": "veyq-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && npm run dev -- --port 8089"],
+      "port": 8089
     }
   ]
 }

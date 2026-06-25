@@ -30,7 +30,8 @@ const u32be = (n: number): Uint8Array => {
 export const lp = (x: Uint8Array): Uint8Array => concat(u32be(x.length), x)
 
 export type ArgonParams = { t: number; m: number; p: number; dkLen: number }
-/** auth-path default: m in KiB = 32 MiB, matching the server verifier (vectors carry their own params) */
+/** auth-path default: m in KiB = 32 MiB. Model B has no server-side verifier (ADR 0003); these params are
+ * carried in each wrap's kdfParams so login can re-derive the same KEK/keypair (vectors carry their own params). */
 export const ARGON: ArgonParams = { t: 3, m: 32768, p: 1, dkLen: 32 }
 
 /**
@@ -201,6 +202,32 @@ export const kekPasswordSecret = (
 
 export const kekRecovery = (recoveryCode: Uint8Array, salt: Uint8Array, params: ArgonParams = ARGON): Uint8Array =>
   argon2id(recoveryCode, salt, params)
+
+// ── Operator-blind password auth (ADR 0003 / Model B) ────────────────────────────────────────────────
+// The password is never sent to the server. Instead the client derives an Ed25519 *auth keypair* from the
+// password and registers only `authPublicKey`; login is challenge-response (the client signs a server nonce).
+// `seed = Argon2id(password, authSalt)` is domain-separated from the unlock KEK (`Argon2id(secretKey+password)`)
+// by its distinct, auth-only salt — they share no inputs and never collide.
+
+/**
+ * Deterministic per-account auth salt for the password→keypair derivation.
+ *
+ * ADR 0003's target is `authSalt = HKDF(instanceSalt, normalizedEmail)` so the server behaves identically
+ * for existing and non-existing accounts (non-enumerable login). At *setup* there is no instanceSalt yet —
+ * GET /api/setup carries only {setupRequired, suites}. Until the login CR distributes an instanceSalt, the
+ * salt is derived client-side from the normalized email alone, domain-separated. The owner minted here is
+ * write-only for auth in this CR (login is stubbed), so refining the salt source later is non-breaking.
+ */
+export const deriveAuthSalt = (email: string): Uint8Array =>
+  hkdf(sha256, utf8(email.trim().toLowerCase()), new Uint8Array(0), utf8('veyq/v1/auth-salt'), 16)
+
+export type AuthKeypair = { publicKey: Uint8Array; privateKey: Uint8Array }
+
+/** Derive the Ed25519 auth keypair from the password + per-account auth salt (ADR 0003). */
+export function deriveAuthKeypair(password: string, authSalt: Uint8Array, params: ArgonParams = ARGON): AuthKeypair {
+  const seed = argon2id(utf8(password), authSalt, { ...params, dkLen: 32 })
+  return { privateKey: seed, publicKey: ed25519.getPublicKey(seed) }
+}
 
 // A password-protected share folds the password into the unwrap key: HKDF(shareKey, Argon2id(password,salt)).
 // The link's fragment shareKey alone can't decrypt — you also need the password. The server stays blind.

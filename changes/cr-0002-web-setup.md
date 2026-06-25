@@ -39,10 +39,24 @@ to setup (login identifier + Model B `authSalt` source).
   client and bring its conformance vectors into `contracts/crypto/vectors/v1.json`; port the conformance
   test. **Done when:** the web conformance test passes against the vectors.
 
-- [ ] **3 — web setup flow.** Scaffold `web/` (Vite + Vue 3 + PrimeVue), generate the TS client from
+- [x] **3 — web setup flow.** Scaffold `web/` (Vite + Vue 3 + PrimeVue), generate the TS client from
   `contracts/`, port `SetupView` + app shell + router + boot, and adapt the setup data layer to **Model
   B + our contract** (email, `authPublicKey`; reuse legacy content-crypto). Login route is a stub.
-  **Done when:** `npm run check` green.
+  **Done when:** `npm run check` green. ✅ `npm run check` (typecheck + test + build) green; setup view
+  verified rendering in the preview with no console errors.
+  - **New Model B primitive:** `deriveAuthSalt` + `deriveAuthKeypair` (Ed25519 from `Argon2id(password,
+    authSalt)`, ADR 0003) added to crypto v1 — the web client is the FIRST place this is implemented
+    (backend only stores the opaque `authPublicKey`; other stacks don't derive it yet).
+  - **authSalt deferral:** ADR's `authSalt = HKDF(instanceSalt, email)` needs an `instanceSalt` that
+    GET /api/setup doesn't carry. Until the login CR distributes it, `authSalt = HKDF(normalizedEmail)`
+    client-side. The owner minted here is write-only for auth in this CR (login stubbed), so refining the
+    salt source later is non-breaking.
+  - **Wire encoding fix:** the contract pins STANDARD base64 (`[A-Za-z0-9+/]*={0,2}`), not the app's
+    base64url — added `b64std`/`fromB64std`; the data layer encodes every opaque field with `b64std`
+    (base64url would be 400-rejected at the boundary).
+  - **`instanceName` field added:** the contract requires it but the reused setup UI had no such field, so
+    it was added in-style as the first setup field (per the "extend ported UI to fit the new data model"
+    rule) rather than hardcoding a default.
 
 - [ ] **4 — verify.** The setup flow runs web → backend on a fresh instance (Playwright e2e or a
   preview-driven smoke). **Done when:** the setup happy path is observed creating the owner via the API.
