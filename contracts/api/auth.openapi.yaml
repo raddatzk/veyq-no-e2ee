@@ -1,0 +1,265 @@
+openapi: 3.1.0
+info:
+  title: veyq Auth API
+  version: 0.1.0
+  description: >
+    Operator-blind account login and session management.
+
+    Login is challenge-response over a password-derived Ed25519 keypair (ADR 0003): the client requests a
+    single-use nonce, signs it with the private key it derives from the password, and the server verifies
+    against the stored `authPublicKey`. The password never reaches the server and nothing replayable is
+    transmitted; the stored public key is not a credential.
+
+    A successful login issues an opaque, rotating **access + refresh** token pair grouped into a **session
+    family** (ADR 0004). Refresh rotates the pair; presenting a superseded refresh token revokes the whole
+    family (reuse detection). This API gates only a **session** — it performs no content crypto and never
+    unlocks content (auth ≠ unlock).
+
+    Challenge issuance and every failure are deliberately **non-enumerable**: the server behaves
+    identically for existing and non-existing accounts.
+
+    Field validation and sanitization are declared here and enforced by the generated code via the
+    `x-field-extra-annotation` vendor extension, so malformed input is rejected at the boundary (400).
+tags:
+  - name: login
+    description: Challenge-response login (issue a session).
+  - name: token
+    description: Session token rotation.
+  - name: session
+    description: Session lifecycle (logout).
+
+paths:
+  /api/login/challenge:
+    post:
+      tags: [login]
+      operationId: requestLoginChallenge
+      summary: Issue a single-use login challenge (non-enumerable).
+      description: >
+        Returns a single-use, time-bounded nonce for the client to sign, plus the instance salt needed to
+        derive the auth keypair. The response is identical whether or not the account exists, so it never
+        reveals which emails have accounts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginChallengeRequest" }
+            example: { email: kevin@example.com }
+      responses:
+        "200":
+          description: A challenge to sign (issued whether or not the account exists).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginChallenge" }
+              example: { nonce: bm9uY2UtZXhhbXBsZS0zMmJ5dGVz, instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI= }
+        "400":
+          description: The request was malformed (missing/invalid email).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+
+  /api/login/verify:
+    post:
+      tags: [login]
+      operationId: verifyLogin
+      summary: Verify a signed challenge and issue a session.
+      description: >
+        Verifies the Ed25519 signature over the outstanding nonce against the stored `authPublicKey`. On
+        success it issues an opaque access + refresh token pair in a new session family. Any failure —
+        wrong signature, unknown account, or an expired/replayed nonce — returns a single generic 401,
+        identical in every case.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginVerifyRequest" }
+            example: { email: kevin@example.com, signature: c2lnbmF0dXJlLW92ZXItbm9uY2U= }
+      responses:
+        "200":
+          description: Authenticated; a new session family with its tokens.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionResponse" }
+        "400":
+          description: The request was malformed (missing/invalid fields).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (wrong signature, unknown account, or stale nonce).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+
+  /api/token/refresh:
+    post:
+      tags: [token]
+      operationId: refreshSession
+      summary: Rotate the session tokens.
+      description: >
+        Exchanges a valid refresh token for a fresh access + refresh pair and supersedes the old refresh
+        token. Presenting a superseded refresh token whose secret verifies is treated as a clone and
+        revokes the entire family (ADR 0004); an unverifiable, expired, or revoked token is a plain 401.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+            example: { refreshToken: cmVmcmVzaC10b2tlbi1vcGFxdWU }
+      responses:
+        "200":
+          description: A rotated access + refresh pair.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "400":
+          description: The request was malformed (missing token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: The refresh token is invalid, expired, or its family was revoked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: refresh_rejected }
+
+  /api/logout:
+    post:
+      tags: [session]
+      operationId: logout
+      summary: Revoke the current session family.
+      description: >
+        Revokes the session family of the presented access token. Idempotent — a missing or
+        already-invalid session still returns 204.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The session family is revoked (or was already gone).
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The opaque access token issued by login / refresh.
+
+  schemas:
+    LoginChallengeRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: The account's login email — identifier and source of the deterministic auth salt (ADR 0003).
+          maxLength: 254
+          example: kevin@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+
+    LoginChallenge:
+      type: object
+      required: [nonce, instanceSalt]
+      properties:
+        nonce:
+          type: string
+          description: Single-use, time-bounded challenge to sign with the auth private key (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: bm9uY2UtZXhhbXBsZS0zMmJ5dGVz
+        instanceSalt:
+          type: string
+          description: Instance-wide salt for deriving the auth salt (authSalt = HKDF(instanceSalt, normalizedEmail); ADR 0003).
+          contentEncoding: base64
+          maxLength: 256
+          example: aW5zdGFuY2Utc2FsdC0xNmI=
+
+    LoginVerifyRequest:
+      type: object
+      required: [email, signature]
+      properties:
+        email:
+          type: string
+          format: email
+          description: The account's login email (same value used for the challenge).
+          maxLength: 254
+          example: kevin@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+        signature:
+          type: string
+          description: Ed25519 signature over the issued nonce (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: c2lnbmF0dXJlLW92ZXItbm9uY2U=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: The opaque refresh token to rotate.
+          maxLength: 512
+          example: cmVmcmVzaC10b2tlbi1vcGFxdWU
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 512)'
+
+    SessionFamily:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Opaque id of the session family (one login / device). The E2EE name is attached later (uc.account.sessions).
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken:
+          type: string
+          description: Opaque bearer access token (short-lived); sent as an Authorization bearer header.
+          maxLength: 512
+          example: YWNjZXNzLXRva2Vu
+        refreshToken:
+          type: string
+          description: Opaque refresh token (long-lived); send only to /api/token/refresh.
+          maxLength: 512
+          example: cmVmcmVzaC10b2tlbg
+
+    SessionResponse:
+      type: object
+      required: [accessToken, refreshToken, family]
+      properties:
+        accessToken:
+          type: string
+          description: Opaque bearer access token (short-lived); sent as an Authorization bearer header.
+          maxLength: 512
+          example: YWNjZXNzLXRva2Vu
+        refreshToken:
+          type: string
+          description: Opaque refresh token (long-lived); send only to /api/token/refresh.
+          maxLength: 512
+          example: cmVmcmVzaC10b2tlbg
+        family: { $ref: "#/components/schemas/SessionFamily" }
+
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable, client-localizable error code.
+          maxLength: 64
+          example: authentication_failed
+        message:
+          type: [string, "null"]
+          description: Optional developer-facing detail; never contains secrets or content.
+          maxLength: 512
+          example: null

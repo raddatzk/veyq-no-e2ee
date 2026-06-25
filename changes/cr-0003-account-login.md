@@ -1,7 +1,7 @@
 ---
 id: cr-0003
 title: Account login (operator-blind password challenge-response)
-status: planned          # planned → in-progress → done (then delete the file)
+status: in-progress      # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.login]
 adrs: [0003, 0004]
 invariants: [operator-blind, non-enumerable]
@@ -65,7 +65,7 @@ phases 1–2 below.
 
 ## Phases
 
-- [ ] **1 — contracts.** Add `instanceSalt` to the `SetupStatus` schema (`GET /api/setup`) and define the
+- [x] **1 — contracts.** Add `instanceSalt` to the `SetupStatus` schema (`GET /api/setup`) and define the
   auth + session operations per [ADR 0004](../docs/decisions/0004-session-tokens.md):
   `POST /api/login/challenge { email } → { nonce, instanceSalt }` (always 200, non-enumerable);
   `POST /api/login/verify { email, signature } → 200 { accessToken, refreshToken, family: { id } } | 401

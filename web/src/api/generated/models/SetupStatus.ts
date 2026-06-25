@@ -31,6 +31,13 @@ export interface SetupStatus {
      * @memberof SetupStatus
      */
     suites: Array<string>;
+    /**
+     * Instance-wide salt for deriving each account's auth salt (authSalt = HKDF(instanceSalt, normalizedEmail); ADR 0003). Generated once at first run, stable for the life of the instance and identical for everyone — public, not a secret. The setup client needs it to derive the owner's auth keypair; login receives the same value in the challenge response.
+     * 
+     * @type {string}
+     * @memberof SetupStatus
+     */
+    instanceSalt: string;
 }
 
 /**
@@ -39,6 +46,7 @@ export interface SetupStatus {
 export function instanceOfSetupStatus(value: object): value is SetupStatus {
     if (!('setupRequired' in value) || value['setupRequired'] === undefined) return false;
     if (!('suites' in value) || value['suites'] === undefined) return false;
+    if (!('instanceSalt' in value) || value['instanceSalt'] === undefined) return false;
     return true;
 }
 
@@ -54,6 +62,7 @@ export function SetupStatusFromJSONTyped(json: any, ignoreDiscriminator: boolean
         
         'setupRequired': json['setupRequired'],
         'suites': json['suites'],
+        'instanceSalt': json['instanceSalt'],
     };
 }
 
@@ -70,6 +79,7 @@ export function SetupStatusToJSONTyped(value?: SetupStatus | null, ignoreDiscrim
         
         'setupRequired': value['setupRequired'],
         'suites': value['suites'],
+        'instanceSalt': value['instanceSalt'],
     };
 }
 

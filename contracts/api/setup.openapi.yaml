@@ -36,10 +36,10 @@ paths:
               examples:
                 fresh:
                   summary: A fresh instance
-                  value: { setupRequired: true, suites: ["v1"] }
+                  value: { setupRequired: true, suites: ["v1"], instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI= }
                 done:
                   summary: An instance that is already set up
-                  value: { setupRequired: false, suites: ["v1"] }
+                  value: { setupRequired: false, suites: ["v1"], instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI= }
 
   /api/setup/owner:
     post:
@@ -92,7 +92,7 @@ components:
   schemas:
     SetupStatus:
       type: object
-      required: [setupRequired, suites]
+      required: [setupRequired, suites, instanceSalt]
       properties:
         setupRequired:
           type: boolean
@@ -103,6 +103,16 @@ components:
           description: Crypto suite ids the server advertises (e.g. "v1").
           items: { type: string, maxLength: 16, example: v1 }
           example: [v1]
+        instanceSalt:
+          type: string
+          description: >
+            Instance-wide salt for deriving each account's auth salt (authSalt = HKDF(instanceSalt,
+            normalizedEmail); ADR 0003). Generated once at first run, stable for the life of the instance
+            and identical for everyone — public, not a secret. The setup client needs it to derive the
+            owner's auth keypair; login receives the same value in the challenge response.
+          contentEncoding: base64
+          maxLength: 256
+          example: aW5zdGFuY2Utc2FsdC0xNmI=
 
     MasterKeyWrap:
       type: object
