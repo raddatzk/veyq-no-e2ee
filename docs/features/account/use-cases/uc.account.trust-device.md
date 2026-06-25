@@ -9,10 +9,20 @@
 - **Preconditions:** An **authenticated session** exists; the device is **unlocked** (so the in-memory
   Master Key can be wrapped under a new KEK — see [uc.account.unlock](uc.account.unlock.md)); WebCrypto +
   IndexedDB are available.
-- **Postconditions (success):** A **DEVICE** wrap (ciphertext) exists server-side; a **non-extractable**
-  device key lives in this device's **IndexedDB**; subsequent unlocks on this device open the Master Key
-  from **password + device key** (2-factor, no Secret Key). The Secret Key was **never read or stored** —
-  enrolment uses the already-unlocked Master Key.
+- **Postconditions (success):** A **DEVICE** wrap (ciphertext) exists server-side; this device's IndexedDB
+  holds its **non-extractable** device key plus the wrap's **salt** and server **id**; subsequent unlocks on
+  this device open the Master Key from **password + device key** (2-factor, no Secret Key). The Secret Key
+  was **never read or stored** — enrolment uses the already-unlocked Master Key.
+
+## Many devices, one Master Key
+
+Device trust is **per device**: each trusted device enrols **its own** DEVICE wrap (its own non-extractable
+key, its own random salt) — trusting a phone *and* a laptop yields **two** DEVICE wraps on the same Master
+Key, not a single shared one. (So "one wrap per method" from
+[ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) §1 is the *floor* methods' rule;
+DEVICE/PASSKEY are inherently per-device and may appear more than once.) The server stores each as an
+independent ciphertext row; a device finds **its own** wrap in the fetched set by the **salt** it kept at
+enrolment (`kdfParams`), so the wrong device's wrap is never even attempted (one Argon2id, not one per row).
 
 ## Why this preserves 2SKD and operator-blindness
 
@@ -38,9 +48,11 @@ Secret Key or the raw Master Key in `localStorage`/`sessionStorage` is the **rej
 3. The client computes the device factor `df = HMAC(deviceKey, "veyq/v1/device-bind")`, picks a fresh
    `salt`, and derives `KEK = Argon2id(password + df, salt)`.
 4. The client wraps the **in-memory** Master Key: `DEVICE wrap = symWrap(KEK, masterKey, "master-key")`.
-5. The client uploads the DEVICE wrap (+ its `kdfParams` = Argon2id params ‖ salt) to the server
-   (add-a-wrap), discarding the KEK.
-6. **Trusted:** the server holds the DEVICE ciphertext; this device holds its non-extractable key.
+5. The client **adds** the DEVICE wrap (+ its `kdfParams` = Argon2id params ‖ salt) to the server, which
+   appends a new wrap row and returns its **id**. The client stores `{deviceKey, salt, wrapId}` in
+   IndexedDB and discards the KEK.
+6. **Trusted:** the server holds the DEVICE ciphertext; this device holds its non-extractable key + the salt
+   and id it needs to find and remove that wrap later.
 
 ```plantuml
 @startuml
@@ -64,15 +76,17 @@ C --> U : this device is trusted (password-only next time)
 ## Routine unlock on a trusted device (the DEVICE path of uc.account.unlock)
 
 The actual unlock is [uc.account.unlock](uc.account.unlock.md); trust-device adds the DEVICE method it can
-choose: with a DEVICE wrap present **and** the device key in IndexedDB, the client prompts for the
-**password only**, recomputes `df = HMAC(deviceKey, info)`, derives the same KEK, and `symUnwrap`s the Master
-Key — no Secret Key. **Method precedence is client-side** ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)):
+choose: with a device key in IndexedDB, the client finds **its own** DEVICE wrap in the fetched set by the
+stored salt, prompts for the **password only**, recomputes `df = HMAC(deviceKey, info)`, derives the same
+KEK, and `symUnwrap`s the Master Key — no Secret Key. **Method precedence is client-side** ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)):
 a trusted device defaults to password-only, and **"unlock another way"** always reaches the PASSWORD floor.
 
 ## Untrust ("forget this device")
 
-Delete the DEVICE wrap server-side **and** delete the IndexedDB device key. The account falls back to the
-PASSWORD floor on this device. Removing one method removes **one wrap**; content is never re-encrypted.
+Delete **this device's** DEVICE wrap server-side (by its stored id) **and** delete the IndexedDB entry. The
+account falls back to the PASSWORD floor on this device; other trusted devices keep their own wraps. Removing
+a trust removes **one wrap**; content is never re-encrypted. The server **refuses** to delete a PASSWORD wrap
+through this path, so the 2SKD floor can never be removed.
 
 ## Alternate / exception flows
 
