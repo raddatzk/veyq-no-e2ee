@@ -2,6 +2,7 @@
 // never leaves the device: the client derives the Ed25519 auth keypair (ADR 0003), signs the server nonce,
 // and stores only the opaque session tokens it gets back. Auth ≠ unlock — this gates a session, not content.
 import * as v1 from '../../../shared/crypto/v1'
+import { deriveAuthKeypairAsync } from '../../../shared/crypto/argonWorker'
 import { b64std, fromB64std } from '../../../shared/base64'
 import { loginApi, sessionApi, tokenApi } from '../../../api/client'
 import { clearTokens, session, setTokens } from '../../../app/session'
@@ -15,7 +16,7 @@ import { clearVault } from '../../../app/vault'
 export async function login(email: string, password: string): Promise<void> {
   const challenge = await loginApi().requestLoginChallenge({ loginChallengeRequest: { email } })
   const authSalt = v1.deriveAuthSalt(fromB64std(challenge.instanceSalt), email)
-  const auth = v1.deriveAuthKeypair(password, authSalt)
+  const auth = await deriveAuthKeypairAsync(password, authSalt)
   const signature = v1.authSign(auth.privateKey, fromB64std(challenge.nonce))
   const result = await loginApi().verifyLogin({
     loginVerifyRequest: { email, signature: b64std(signature) },

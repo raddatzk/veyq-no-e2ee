@@ -166,6 +166,12 @@ Second batch (robustness/cleanup), all applied:
 - **#10:** `KeyMaterialHandler.forAccessToken` is `@Transactional`, so the token resolve + material read
   share **one** transaction.
 
-Deferred (own change): **#9** moving Argon2id off the main thread — a Web Worker touches the
-conformance-pinned `v1.ts` and the test strategy, so it warrants a dedicated slice rather than a review
-fix.
+- **#9:** moved both Argon2id derivations (login keypair, unlock KEK) off the main thread into a Web
+  Worker (`shared/crypto/argon.worker.ts` + `argonWorker.ts` async wrappers). `v1.ts` is untouched and the
+  worker runs the SAME pinned suite; a synchronous fallback keeps non-Worker environments (vitest/node)
+  byte-identical, so the conformance + unit tests still drive v1 directly. Verified: 44 web tests green
+  (incl. fallback-equivalence), a separate `argon.worker` build chunk, and a preview smoke confirming the
+  real worker loads (`argon.worker.ts?worker_file`) and carries login + unlock end-to-end with no console
+  errors.
+
+All ten review findings are now resolved.

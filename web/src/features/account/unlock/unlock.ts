@@ -3,6 +3,7 @@
 // ciphertext, derives the Unlock KEK locally, and never sends the password, the Secret Key, the KEK, or any
 // unwrapped key. Auth ≠ unlock — this needs an authenticated session (the fetch carries the bearer token).
 import * as v1 from '../../../shared/crypto/v1'
+import { unlockKekAsync } from '../../../shared/crypto/argonWorker'
 import { fromB64std } from '../../../shared/base64'
 import { accountApi } from '../../../api/client'
 import { withRefresh } from '../login/login'
@@ -28,7 +29,7 @@ export async function unlockMasterKey(password: string, secretKeyB64: string): P
 
   const secretKey = fromB64std(secretKeyB64.trim())
   const { params, salt } = v1.decodeKdfParams(fromB64std(passwordWrap.kdfParams))
-  const kek = v1.kekPasswordSecret(secretKey, password, salt, params)
+  const kek = await unlockKekAsync(secretKey, password, salt, params)
 
   // E1 — a wrong password or Secret Key yields a wrong KEK, so this AEAD-unwrap throws (tag mismatch). Same
   // for the identity unwrap if the Master Key is wrong. Both bubble up as the generic unlock failure.
