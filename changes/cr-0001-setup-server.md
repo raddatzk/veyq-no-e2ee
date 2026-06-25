@@ -54,7 +54,7 @@ Honour these (links, not copies):
   negatives (second setup → `409`; blank `displayName` / malformed → `400`).
   - **Done when:** `cd backend && ./gradlew check` is green.
 
-- [ ] **3 — http.** `http/admin/setup.http` — runnable with response-handler **assertions**, using
+- [x] **3 — http.** `http/admin/setup.http` — runnable with response-handler **assertions**, using
   **fixture ciphertext** (the blind server only stores blobs): `GET /api/setup` (`setupRequired==true`)
   → `POST /api/setup/owner` (`200/201`) → `GET /api/setup` (`setupRequired==false`) → second `POST`
   (`409`); a blank `displayName` request (`400`).
