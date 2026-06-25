@@ -109,22 +109,20 @@ wraps each open the *same* Master Key via their own wrap and are **separate, pla
   boundaries). **Parity gap (slice-only, in the file header):** the authenticated happy path (200 with the
   caller's wraps) needs a valid access token, which requires a signed login no `.http` handler can produce
   (same limit as cr-0003) — covered by the phase-2 slice + phase-4 web test.
-- [ ] **4 — web.** Compose `unlockMasterKey(password, secretKey)` in an `account/unlock` feature: fetch
-  `key-material` **through the existing `withRefresh()` helper** (cr-0004 is its first real consumer — a
-  silent 401→refresh keeps unlock from failing after the 15-min access-token TTL), pick the PASSWORD wrap,
-  `decodeKdfParams` → `kekPasswordSecret(secretKey, password, salt, params)` →
-  `symUnwrap(kek, wrappedKey, 'master-key')` → `symUnwrap(masterKey, wrappedIdentityPrivateKey,
-  'identity-priv')` → `deserializeIdentityPrivate`; store Master Key + identity key in the new memory-only
-  store, **discard the KEK and the carried password**. Replace the locked card in `LoginView.vue` with an
-  **Unlock** card (password pre-filled from the just-completed login, Secret-Key paste field, an
-  **"Unlocking…" busy state** since the KEK is a *second* Argon2id right after login's); on success show the
-  unlocked state, on wrong password/Secret Key show a **generic** unlock failure (E1, server uninvolved);
-  if the account has **no PASSWORD wrap** (E2) surface the same generic "can't unlock — recover/re-login"
-  path rather than a distinct error. Unit test: setup-shaped wrap round-trip (build like `setupServer.ts` → unlock → assert the
-  Master Key and identity key are recovered); **wrong password and wrong Secret Key each → generic failure,
-  no Master Key in the store**. **Done when:** `npm run check` green **and** a preview smoke shows, on a
-  fresh instance, setup → login → unlock with the correct password+Secret Key reaching the unlocked state,
-  and a wrong Secret Key giving the generic failure.
+- [x] **4 — web.** Added `unlockMasterKey(password, secretKey)` (`features/account/unlock`): fetches
+  `key-material` **through `withRefresh()`** (its first real consumer), picks the PASSWORD wrap,
+  `decodeKdfParams` → `kekPasswordSecret` → `symUnwrap(…, 'master-key')` → `symUnwrap(masterKey, …,
+  'identity-priv')` → `deserializeIdentityPrivate`, stores Master Key + identity key in a new **memory-only
+  vault** (`app/vault.ts`, raw bytes kept out of Vue's reactive proxy; only an `unlocked` flag is reactive),
+  and clears the carried password + Secret Key the moment the KEK is derived. `LoginView.vue` now shows an
+  **Unlock** card after sign-in (password reused from login, Secret-Key paste, "Unlocking…" busy state); E1
+  wrong password/Secret Key and E2 no-PASSWORD-wrap both surface one **generic** failure. Also completed the
+  long-intended `authPrefill` wiring so first-run setup pre-fills the Secret Key (paste path unchanged for
+  returning users). 4 web unit tests (setup-shaped round-trip unlock; wrong password / wrong Secret Key /
+  no-PASSWORD-wrap each → generic failure, no key held). **Done:** `npm run check` green (40 tests). Preview
+  smoke on a fresh quarkusDev: setup → login → **Unlock** card → wrong Secret Key gave the generic failure
+  (vault stayed locked) → correct password+Secret Key reached the **Unlocked** state with
+  `vault.unlocked = true` and the password + Secret Key cleared to length 0.
 - [ ] **5 — verify + coverage.** Add
   `docs/coverage/features/account/use-cases/uc.account.unlock.yaml` mapping each acceptance criterion to the
   tests above (explicit `gaps` for the http authenticated-path and for apple/android), and add the

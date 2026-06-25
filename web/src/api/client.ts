@@ -1,7 +1,7 @@
 // Thin factory over the contracts-generated clients. The whole app is same-origin, so the basePath is the
 // in-memory `session.apiBase` ('' → relative `/api/...`). Keeping construction here means views/features
-// depend on our typed surface, never on the generator's runtime details. The setup and auth specs generate
-// into separate client packages (`./generated` and `./generated/auth`).
+// depend on our typed surface, never on the generator's runtime details. The setup, auth and account specs
+// generate into separate client packages (`./generated`, `./generated/auth`, `./generated/account`).
 import { Configuration, SetupApi } from './generated'
 import {
   Configuration as AuthConfiguration,
@@ -9,6 +9,7 @@ import {
   SessionApi,
   TokenApi,
 } from './generated/auth'
+import { AccountApi, Configuration as AccountConfiguration } from './generated/account'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -33,4 +34,11 @@ export function tokenApi(): TokenApi {
 
 export function sessionApi(): SessionApi {
   return new SessionApi(authConfig())
+}
+
+// The account client also sends the access token as the bearer credential (authed key-material read).
+export function accountApi(): AccountApi {
+  return new AccountApi(
+    new AccountConfiguration({ basePath: session.apiBase, accessToken: () => session.accessToken ?? '' }),
+  )
 }

@@ -38,6 +38,16 @@ const en = {
     lockedNote: 'Your session is active. Unlocking your encrypted memories with your Secret Key arrives in a later change.',
     signOut: 'Sign out',
   },
+  unlock: {
+    title: 'Unlock your memories',
+    note: 'Signed in. Enter your Secret Key from your Emergency Kit to open your encrypted memories on this device — it never leaves your device.',
+    secretKey: 'Secret Key',
+    submit: 'Unlock',
+    submitting: 'Unlocking…',
+    failed: 'Unlock failed. Check your password and Secret Key.',
+    unlockedTitle: 'Unlocked',
+    unlockedNote: 'Your memories are unlocked on this device for this session.',
+  },
 }
 
 const de: typeof en = {
@@ -73,6 +83,16 @@ const de: typeof en = {
     lockedTitle: 'Angemeldet',
     lockedNote: 'Deine Sitzung ist aktiv. Das Entsperren deiner verschlüsselten Erinnerungen mit deinem Secret Key kommt in einer späteren Änderung.',
     signOut: 'Abmelden',
+  },
+  unlock: {
+    title: 'Erinnerungen entsperren',
+    note: 'Angemeldet. Gib deinen Secret Key aus dem Notfall-Kit ein, um deine verschlüsselten Erinnerungen auf diesem Gerät zu öffnen — er verlässt dein Gerät nie.',
+    secretKey: 'Secret Key',
+    submit: 'Entsperren',
+    submitting: 'Wird entsperrt…',
+    failed: 'Entsperren fehlgeschlagen. Prüfe Passwort und Secret Key.',
+    unlockedTitle: 'Entsperrt',
+    unlockedNote: 'Deine Erinnerungen sind auf diesem Gerät für diese Sitzung entsperrt.',
   },
 }
 
