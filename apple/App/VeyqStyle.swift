@@ -124,6 +124,7 @@ struct VeyqField: View {
             Text(label).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
             field
                 .textFieldStyle(.plain)
+                .accessibilityIdentifier(label)
                 .autocorrectionDisabled()
                 .foregroundStyle(VeyqStyle.text)
                 .padding(.horizontal, 11).padding(.vertical, 10)
@@ -179,6 +180,7 @@ struct PrimaryButton: View {
                             in: RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(title)
         .disabled(busy || disabled)
     }
 }

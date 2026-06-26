@@ -34,8 +34,39 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: "YES"
+        # Partial plist (ATS local-networking exception); the generated keys merge into it.
+        INFOPLIST_FILE: App/Info.plist
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: veyq
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
-        # Simulator/local builds don't need signing.
-        CODE_SIGNING_ALLOWED: "NO"
+        # Ad-hoc sign locally ("Sign to Run Locally") so UI tests can inject into the host app; the iOS
+        # simulator ignores signing anyway.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+  # UI round-trip test (cr-0015): drives connect→sign-in→unlock against a live instance and writes the
+  # design-reference screenshots. Env-gated, so it no-ops in a plain run. macOS-only here (the desktop UI
+  # is the Windows/Linux reference).
+  VeyqUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [macOS, iOS]
+    sources:
+      - UITests
+    dependencies:
+      - target: Veyq
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.veyq.client.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        SWIFT_VERSION: "6.0"
+        # UI-test runners must be signed to inject into the host app; ad-hoc ("Sign to Run Locally").
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+schemes:
+  Veyq:
+    build:
+      targets:
+        Veyq: all
+        VeyqUITests: [test]
+    test:
+      targets:
+        - VeyqUITests

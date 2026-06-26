@@ -20,6 +20,10 @@ struct SignInView: View {
     }
 
     var body: some View {
+        content.onAppear(perform: prefillForUITestIfNeeded)
+    }
+
+    private var content: some View {
         AuthCard(title: "Sign in", subtitle: app.apiBase) {
             VStack(alignment: .leading, spacing: 14) {
                 VeyqField(label: "Email", text: $email, placeholder: "you@example.com", keyboard: .email)
@@ -32,6 +36,19 @@ struct SignInView: View {
                 if !error.isEmpty { MessageBox(text: error) }
             }
         }
+    }
+
+    /// DEBUG-only UI-test seam: SwiftUI `SecureField`s drop characters under XCUITest `typeText`, so the
+    /// round-trip UI test injects the credentials via launch environment instead of typing them. Compiled
+    /// out of release builds entirely, and inert unless the launch env carries `UITEST_EMAIL`.
+    private func prefillForUITestIfNeeded() {
+        #if DEBUG
+        let env = ProcessInfo.processInfo.environment
+        guard let e = env["UITEST_EMAIL"] else { return }
+        email = e
+        password = env["UITEST_PASSWORD"] ?? ""
+        secretKey = env["UITEST_SECRET"] ?? ""
+        #endif
     }
 
     private func submit() {

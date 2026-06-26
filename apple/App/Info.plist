@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Partial Info.plist: holds only custom keys; GENERATE_INFOPLIST_FILE merges the standard keys in.
+     NSAllowsLocalNetworking relaxes App Transport Security for localhost / *.local / link-local only —
+     so the app can reach a self-hosted instance on a LAN or a local dev backend over plain HTTP. Content
+     stays end-to-end encrypted regardless of transport; this does not permit insecure loads to the
+     public internet. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

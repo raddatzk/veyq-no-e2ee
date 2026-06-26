@@ -15,6 +15,16 @@ runs on-device; the server is blind.
   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
   ```
   `-skipPackagePluginValidation` is required (headless xcodebuild won't otherwise trust the build plugin).
+  The app + UI-test targets are **ad-hoc signed** (`CODE_SIGN_IDENTITY: "-"`) so the UI-test runner can
+  inject into the host; an unsigned runner is killed at launch.
+- **UI round-trip + screenshots** — `RoundTripUITests` (`UITests/`) drives **connect → sign-in → unlock**
+  against a **live instance** and writes the design-reference screenshots. Env-gated (no-ops in a plain
+  run); creds reach the in-simulator runner via `TEST_RUNNER_*` and the app via `launchEnvironment`. The
+  sign-in fields are prefilled through a `#if DEBUG` seam in `SignInView` because SwiftUI `SecureField`
+  drops characters under XCUITest `typeText`. Full how-to + the macOS-TCC caveat:
+  [`../docs/design/screenshots/apple/README.md`](../docs/design/screenshots/apple/README.md).
+- **Live data-layer round-trip** — `LiveRoundTripTests` (`Tests/VeyqKitTests/`) does login+unlock against a
+  real instance over URLSession; env-gated (`VEYQ_LIVE_BASE`/`EMAIL`/`PASSWORD`/`SECRET`), skipped by default.
 - **tvOS is libs-only** (no UI head this slice — TV sign-in is passkey/QR handoff, cr-0015 / ADR 0010). Keep
   the shared libraries building for it:
   ```sh

@@ -1,7 +1,7 @@
 ---
 id: cr-0015
 title: Apple universal client — login + unlock (macOS + iOS + iPadOS)
-status: planned          # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.login, uc.account.unlock]   # the Apple surface of these (web already has them)
 adrs: [0003, 0004, 0005, 0009, 0010]
 invariants: [operator-blind]
@@ -46,9 +46,10 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   is **in-memory only**, cleared on background/sign-out — the Apple analog of the web `vault.ts`.
 - **Verify:** macOS app builds + runs locally; iOS/iPad via the simulator (`xcrun simctl`). Screenshots come
   from the real running app.
-- **Parity ledger** (this is the first CR under ADR 0010's all-surfaces rule): web ✅ (already built) ·
-  **apple = this CR** (macOS/iOS/iPadOS heads + tvOS-ready libs; tvOS head pending) · android / windows /
-  linux = pending (login+unlock to follow per surface).
+- **Parity ledger** (this is the first CR under ADR 0010's all-surfaces rule): web ✅ · **apple ✅**
+  (macOS/iOS/iPadOS heads built; data layer + full UI round-trip green against a live instance; tvOS-ready
+  libs build, tvOS UI head pending; macOS desktop screenshots pending an Accessibility grant) · android /
+  windows / linux = pending (login+unlock to follow per surface).
 
 ## Phases
 
@@ -80,7 +81,7 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   material with the same V1 primitives and asserts unlock recovers the **exact** Master Key + identity bytes;
   wrong-Secret-Key → `.unlockFailed` + vault stays locked; DEVICE-only → `.unlockUnavailable`; key-material
   401 → refresh → retry unlocks; logout clears the vault.
-- [~] **4 — SwiftUI UI (adaptive, macOS/iOS/iPadOS).** ✅ *code built & rendering verified.* Ported the legacy
+- [x] **4 — SwiftUI UI (adaptive, macOS/iOS/iPadOS).** ✅ Ported the legacy
   native auth UI onto `VeyqKit`, made genuinely cross-platform (native macOS + iOS, **not** Catalyst — the
   legacy `UIColor`/`UIKeyboardType` bits replaced with `#if canImport(UIKit)/AppKit` equivalents):
   `VeyqStyle` (tokens + `AuthCard`/`VeyqField`/`PrimaryButton`/`MessageBox`), `AppModel` (connect → sign-in →
@@ -88,13 +89,19 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   password + Secret Key → `login` then `unlock`, secrets dropped after submit), `HomeView` (unlocked state +
   sign-out). One SwiftUI tree, adaptive (cards cap width, not stretched). **Verified:** `swift test` 19/19;
   `xcodebuild` **macOS** ✅ + **iOS 26 simulator** ✅; app **installs + launches on an iOS 26 sim** and renders
-  the Connect screen natively (screenshot). **Remaining (folds into phase 5):** the live login → unlock
-  round-trip against a running instance — needs a backend up, the same precondition the Sign-in/Home
-  screenshots require, so it is done there.
-- [ ] **5 — screenshots + docs.** Capture macOS (+ iOS/iPad) screenshots of the login + unlock screens →
-  commit under `docs/design/screenshots/apple/`; record the `uc.account.{login,unlock}` **apple** surface in
-  their coverage files; update the parity ledger. **Done when:** screenshots committed, coverage validator
-  green, ledger reflects apple ✅.
+  the Connect screen natively (screenshot). The live login → unlock round-trip is proven in phase 5 (the
+  data layer via `LiveRoundTripTests`, the full UI via `RoundTripUITests`).
+- [x] **5 — screenshots + docs + live round-trip.** ✅ Stood up a real instance (MariaDB + `quarkusDev`),
+  seeded a Server Owner with a known Secret Key (`web/scripts/seed-owner.mts`, reusing the cold-account-birth
+  crypto), and proved the round-trip **for real**: `LiveRoundTripTests` (data layer over URLSession against
+  the live backend) + `RoundTripUITests` (the full **connect → sign-in → unlock** UI, env-gated, ad-hoc
+  signed). Screenshots committed under `docs/design/screenshots/apple/` (`ios-01-connect` / `ios-02-signin` /
+  `ios-03-home`) with a reproducer README. Recorded the **apple** surface in the `uc.account.{login,unlock}`
+  coverage files (`validate_coverage.py` green). **Caveat:** the screenshots are from the **iOS 26 simulator**
+  — the macOS desktop captures the design reference ideally wants need a one-time **Accessibility** grant
+  (CLI-launched macOS UI-test runners are TCC-killed without it; same wall as computer-use). The design is
+  identical across heads (ADR 0010), so the iOS captures stand in until the grant is available; the README
+  documents the one-line re-run to add `macos-*`.
 
 ## Definition of done
 

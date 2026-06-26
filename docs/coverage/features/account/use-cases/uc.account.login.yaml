@@ -13,6 +13,9 @@ acceptanceCriteria:
       backend: { integration: [LoginSliceTest.validLoginIssuesSession] }
       http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/login/login.test.ts] }
+      apple:
+        unit: [apple/Tests/VeyqKitTests/LoginTests.swift]
+        e2e: [apple/Tests/VeyqKitTests/LiveRoundTripTests.swift, apple/UITests/RoundTripUITests.swift]
   - id: wrong-credentials-generic
     text: A wrong signature or an unknown account both fail with a single generic 401.
     coverage:
@@ -28,6 +31,7 @@ acceptanceCriteria:
       backend: { integration: [LoginSliceTest.refreshRotatesAndChains] }
       http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/login/login.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/LoginTests.swift] }
   - id: refresh-reuse-detection
     text: A replayed superseded refresh token revokes the whole family (reuse detection).
     coverage:
@@ -53,8 +57,10 @@ acceptanceCriteria:
       backend: { integration: [LoginSliceTest.setupStatusCarriesStableInstanceSalt] }
       http: { e2e: [http/account/login.http] }
 gaps:
-  apple: no native client yet — native login is deferred to a later CR
   android: no native client yet — native login is deferred to a later CR
+# Apple (macOS/iOS/iPadOS) native login landed in cr-0015: VeyqKit LoginTests (stubbed challenge→sign→
+# verify, refresh rotation, withRefresh) + LiveRoundTripTests (real instance) + RoundTripUITests (full UI
+# round-trip). wrong-credentials/nonce/reuse-detection stay backend+http-covered (server-side concerns).
 # Note: the signed happy-path, refresh rotation, and reuse→revoke ARE now on the http surface —
 # account/authed-flow.http signs the nonce in-client via _lib/ed25519.js (fresh-instance, cr-0013), in
 # addition to the backend slice and web unit round-trip. login.http still covers the signature-free paths.
