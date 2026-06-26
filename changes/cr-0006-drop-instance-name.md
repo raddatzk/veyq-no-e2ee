@@ -45,8 +45,9 @@ from a single-tenant mental model; setup should establish the **Server Owner** o
   `ServerSetup`, `OwnerRegistration`, the `SetupResource` mapping, and `SetupStore.persistOwner`; dropped
   `instanceName` from the `SetupServerSliceTest` bodies + the `SetupRequestSanitizationTest` body/assertion.
   **Done:** `./gradlew check` green (V6 applies on H2; setup tests 1 + 14, 0 failures).
-- [ ] **3 — http.** Drop `instanceName` from the request bodies in `http/admin/setup.http`. **Done when:**
-  ijhttp green against a live instance.
+- [x] **3 — http.** Dropped `instanceName` from the four `http/admin/setup.http` request bodies. **Done:**
+  ijhttp green (6/6) against a fresh instance — owner-create succeeds without the field (V6 applied on the
+  dev MariaDB, now at v6).
 - [ ] **4 — web.** Remove the instance-name input from `SetupView.vue`, the `instanceName` param from
   `setupServer.ts` (`registerServerOwner` / `buildCreateServerOwnerRequest`), the `setup.instanceName` i18n
   keys (en+de), and the assertion in `setupServer.test.ts`. **Done when:** `npm run check` green and a preview
