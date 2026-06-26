@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The Emergency-Kit QR scanner uses the camera, on-device only — the decoded Secret Key never leaves
+         the device. Requested at runtime when the user taps "Scan QR"; declining falls back to file upload. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:allowBackup="false"

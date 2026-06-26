@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.KitImportBar
+import com.veyq.app.ui.components.KitScanner
 import com.veyq.app.ui.components.MessageBox
 import com.veyq.app.ui.components.PrimaryButton
 import com.veyq.app.ui.components.VeyqField
@@ -43,6 +44,7 @@ fun SignInScreen(app: AppModel) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
+    var scanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -63,6 +65,11 @@ fun SignInScreen(app: AppModel) {
 
     val canSubmit = email.trim().isNotEmpty() && password.isNotEmpty()
 
+    if (scanning) {
+        KitScanner(onResult = { kit -> scanning = false; apply(kit) }, onCancel = { scanning = false })
+        return
+    }
+
     AuthCard(title = "Sign in", subtitle = app.apiBase) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             VeyqField(
@@ -76,6 +83,7 @@ fun SignInScreen(app: AppModel) {
             KitImportBar(
                 label = "Import your Emergency Kit (fills email + Secret Key)",
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
+                onScan = { scanning = true },
             )
             PrimaryButton(title = "Sign in", busy = busy, enabled = canSubmit) {
                 busy = true

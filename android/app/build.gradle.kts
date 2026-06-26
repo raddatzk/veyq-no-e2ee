@@ -61,7 +61,16 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.12.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0") // LocalLifecycleOwner for the camera scanner
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    // Live QR scan for the Emergency-Kit import — CameraX preview/analysis + bundled ML Kit barcode model
+    // (no Google Play Services / Code Scanner dependency). Camera runtime permission requested on demand.
+    implementation("androidx.camera:camera-core:1.5.3")
+    implementation("androidx.camera:camera-camera2:1.5.3")
+    implementation("androidx.camera:camera-lifecycle:1.5.3")
+    implementation("androidx.camera:camera-view:1.5.3")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     val composeBom = platform("androidx.compose:compose-bom:2025.12.01")
     implementation(composeBom)

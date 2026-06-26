@@ -57,7 +57,7 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
 
 ## Phases
 
-- [ ] **1 — two-step flow refactor.** `AppModel.Phase` gains `UNLOCK` between `SIGN_IN` and `HOME`; add a
+- [x] **1 — two-step flow refactor.** `AppModel.Phase` gains `UNLOCK` between `SIGN_IN` and `HOME`; add a
   transient `pendingSecretKey`; split `SignInScreen` into `SignInScreen` (email + password → `login()` →
   advance to `UNLOCK`) and a new `UnlockScreen` (Secret Key, password carried transiently in `AppModel` →
   `unlock()` → `HOME`, pre-filling from `pendingSecretKey`); `RootScreen` switches the new phase. Update
@@ -67,7 +67,7 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
   (email+password → `app.login`), new `UnlockScreen` (Secret Key → `app.unlock`, pre-fills from
   `pendingSecretKey`); `RootScreen` switches `UNLOCK`; `RoundTripUiTest` drives the two steps (4 screenshots).
   `:app:assembleDebug` green.
-- [ ] **2 — parseKit + file import (both steps).** Port `parseKit(text): KitData?` (+ `KitData(email,
+- [x] **2 — parseKit + file import (both steps).** Port `parseKit(text): KitData?` (+ `KitData(email,
   secretKey)`) into `:client`; add `importKitFromBytes`/text decode. In `:app`, wire a Storage Access
   Framework picker (`ActivityResultContracts.OpenDocument`, types `application/pdf` + `text/*`) behind an
   **upload** affordance on **both** the `SignInScreen` (import → fill email + park Secret Key) and the
@@ -77,13 +77,17 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
   **DONE** — `:client` `Kit.kt` (`parseKit` + `importKitFromBytes`, `Base64.getUrlDecoder`); `KitTest` 3/3.
   Shared `KitImportBar` (upload now, scan in phase 3); SAF `OpenDocument` picker → `importKitFromBytes`:
   SignInScreen fills email + parks SK (+ confirmation), UnlockScreen fills SK. `:app:assembleDebug` green.
-- [ ] **3 — live QR scan (ML Kit + CameraX).** A Compose camera overlay (CameraX preview +
+- [x] **3 — live QR scan (ML Kit + CameraX).** A Compose camera overlay (CameraX preview +
   `ImageAnalysis` → ML Kit `BarcodeScanning`, QR format) presented from a **scan** affordance on **both**
   steps; decoded string → `parseKit` → (login) email + parked Secret Key / (floor) Secret Key; `CAMERA`
   runtime permission request, cancel + denied / no camera fall back to upload/paste. **Done when:**
   `:app:assembleDebug` green; manual smoke on the emulator (the virtual-scene camera can present a QR) fills
   the email on the login screen / the Secret Key at the floor and unlocks — camera scan shares the `parseKit`
   path, so it's manual/best-effort where a camera exists; the automated round-trip covers the file path.
+  **DONE** — `KitScanner` (CameraX preview + `ImageAnalysis` → bundled ML Kit `BarcodeScanning` QR; runtime
+  `CAMERA` permission via `RequestPermission`, denied/no-camera → message); scan affordance on both screens,
+  foreign QRs ignored. CameraX 1.5.3 + ML Kit 17.3.0; `CAMERA` in the manifest; dexing the bundled model
+  needed `org.gradle.jvmargs=-Xmx4g` (new `gradle.properties`). `:app:assembleDebug` green.
 - [ ] **4 — live round-trip + screenshots + docs.** Update the instrumented round-trip for the two-step
   flow; re-capture screenshots (now `connect / signin / unlock-floor / home`, the **login + floor** both
   showing upload+scan) via TestStorage under `docs/design/screenshots/android/`; record the android ref on

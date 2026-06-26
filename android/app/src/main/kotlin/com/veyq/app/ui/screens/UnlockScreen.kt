@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.KitImportBar
+import com.veyq.app.ui.components.KitScanner
 import com.veyq.app.ui.components.MessageBox
 import com.veyq.app.ui.components.PrimaryButton
 import com.veyq.app.ui.components.VeyqField
@@ -42,6 +43,7 @@ fun UnlockScreen(app: AppModel) {
     var secretKey by remember { mutableStateOf(app.pendingSecretKey) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var scanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -50,6 +52,14 @@ fun UnlockScreen(app: AppModel) {
         val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
         val kit = bytes?.let { importKitFromBytes(it) }
         if (kit == null) error = "Couldn't read an Emergency Kit from that file." else { secretKey = kit.secretKey; error = "" }
+    }
+
+    if (scanning) {
+        KitScanner(
+            onResult = { kit -> scanning = false; secretKey = kit.secretKey; error = "" },
+            onCancel = { scanning = false },
+        )
+        return
     }
 
     AuthCard(title = "Unlock your vault", subtitle = app.email) {
@@ -64,6 +74,7 @@ fun UnlockScreen(app: AppModel) {
             KitImportBar(
                 label = "Import your Emergency Kit to fill the Secret Key",
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
+                onScan = { scanning = true },
             )
             PrimaryButton(title = "Unlock", busy = busy, enabled = secretKey.isNotEmpty()) {
                 busy = true
