@@ -48,10 +48,12 @@ from a single-tenant mental model; setup should establish the **Server Owner** o
 - [x] **3 — http.** Dropped `instanceName` from the four `http/admin/setup.http` request bodies. **Done:**
   ijhttp green (6/6) against a fresh instance — owner-create succeeds without the field (V6 applied on the
   dev MariaDB, now at v6).
-- [ ] **4 — web.** Remove the instance-name input from `SetupView.vue`, the `instanceName` param from
-  `setupServer.ts` (`registerServerOwner` / `buildCreateServerOwnerRequest`), the `setup.instanceName` i18n
-  keys (en+de), and the assertion in `setupServer.test.ts`. **Done when:** `npm run check` green and a preview
-  smoke shows setup → owner created with no instance-name field.
+- [x] **4 — web.** Removed the instance-name input from `SetupView.vue` (and moved `autofocus` to the new
+  first field, displayName), the `instanceName` param from `setupServer.ts`
+  (`registerServerOwner`/`buildCreateServerOwnerRequest`) + the request field, the `setup.instanceName` i18n
+  keys (en+de), and the `setupServer.test.ts` arg/assertion. **Done:** `npm run check` green (57). Preview
+  smoke on a fresh instance: the setup form shows only Name / Email / Password (no instance-name field) and
+  owner-create succeeds → kit screen, no console errors.
 - [ ] **5 — docs.** Update `uc.admin.setup-server.md` to drop the "instance display name" from the goal /
   main flow / sequence (setup establishes the Server Owner; tenant identity = domain, deferred to tenant
   creation). Re-run `python3 scripts/validate_coverage.py` (no acceptance criterion references the name, so

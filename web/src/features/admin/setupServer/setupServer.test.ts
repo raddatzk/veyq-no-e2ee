@@ -18,14 +18,12 @@ describe('setupServer — Model B request (uc.admin.setup-server)', () => {
     'Owner@Example.com ',
     'Kevin',
     'correct horse battery',
-    'Our Family veyq',
     INSTANCE_SALT,
   )
 
   it('carries the contract metadata', () => {
     expect(request.email).toBe('Owner@Example.com ')
     expect(request.displayName).toBe('Kevin')
-    expect(request.instanceName).toBe('Our Family veyq')
     expect(request.suiteId).toBe('v1')
   })
 
@@ -84,7 +82,7 @@ describe('registerServerOwner — API error propagation', () => {
       createServerOwner: () => Promise.reject(new Error('setup_already_complete')),
     } as unknown as ReturnType<typeof setupApi>)
     await expect(
-      registerServerOwner('owner@example.com', 'Kevin', 'correct horse battery', 'Our Family veyq'),
+      registerServerOwner('owner@example.com', 'Kevin', 'correct horse battery'),
     ).rejects.toThrow('setup_already_complete')
   })
 })

@@ -9,7 +9,6 @@ const en = {
   setup: {
     title: 'Set up this instance',
     sub: 'Create the first owner account. All keys are generated on this device — the server only ever sees ciphertext.',
-    instanceName: 'Instance name',
     displayName: 'Your name',
     submit: 'Create owner',
     submitting: 'Creating…',
@@ -62,7 +61,6 @@ const de: typeof en = {
   setup: {
     title: 'Diese Instanz einrichten',
     sub: 'Lege das erste Besitzer-Konto an. Alle Schlüssel entstehen auf diesem Gerät — der Server sieht nur Chiffretext.',
-    instanceName: 'Name der Instanz',
     displayName: 'Dein Name',
     submit: 'Besitzer anlegen',
     submitting: 'Wird angelegt…',

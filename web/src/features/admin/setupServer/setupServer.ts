@@ -22,7 +22,6 @@ export function buildCreateServerOwnerRequest(
   email: string,
   displayName: string,
   password: string,
-  instanceName: string,
   instanceSalt: Uint8Array,
 ): { request: CreateServerOwnerRequest; emergencyKit: EmergencyKit } {
   const id = v1.generateIdentity()
@@ -51,7 +50,6 @@ export function buildCreateServerOwnerRequest(
   const request: CreateServerOwnerRequest = {
     email,
     displayName,
-    instanceName,
     suiteId: CreateServerOwnerRequestSuiteIdEnum.V1,
     identityPublicKey: b64std(v1.serializeIdentityPublic(id.pub)),
     wrappedIdentityPrivateKey: b64std(wrappedPriv),
@@ -78,12 +76,11 @@ export async function registerServerOwner(
   email: string,
   displayName: string,
   password: string,
-  instanceName: string,
 ): Promise<{ userId: string; emergencyKit: EmergencyKit }> {
   // The auth keypair is derived with the instance-wide salt the server serves on GET /api/setup, so setup
   // and login derive identically (ADR 0003).
   const instanceSalt = fromB64std((await setupApi().getSetupStatus()).instanceSalt)
-  const { request, emergencyKit } = buildCreateServerOwnerRequest(email, displayName, password, instanceName, instanceSalt)
+  const { request, emergencyKit } = buildCreateServerOwnerRequest(email, displayName, password, instanceSalt)
   const result = await setupApi().createServerOwner({ createServerOwnerRequest: request })
   return { userId: result.userId, emergencyKit }
 }

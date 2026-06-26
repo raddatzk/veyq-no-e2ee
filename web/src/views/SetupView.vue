@@ -18,7 +18,6 @@ import { useServerState } from '../shared/state/useServerState'
 const router = useRouter()
 const { t } = useI18n()
 const { setSetupCompleted } = useServerState()
-const instanceName = ref('')
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
@@ -40,7 +39,6 @@ async function submit() {
       email.value,
       displayName.value,
       password.value,
-      instanceName.value,
     )
     kitEmail = email.value
     secretKey.value = emergencyKit.secretKey
@@ -84,12 +82,8 @@ async function downloadKit() {
         <p class="veyq-form-copy">{{ t('setup.sub') }}</p>
         <form class="veyq-form" @submit.prevent="submit">
           <label>
-            {{ t('setup.instanceName') }}
-            <InputText v-model="instanceName" type="text" required autofocus />
-          </label>
-          <label>
             {{ t('setup.displayName') }}
-            <InputText v-model="displayName" type="text" required />
+            <InputText v-model="displayName" type="text" required autofocus />
           </label>
           <label>
             {{ t('common.email') }}
