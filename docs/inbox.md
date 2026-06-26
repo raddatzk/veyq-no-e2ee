@@ -31,7 +31,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | id | topic | tags | legacy source | status |
 |----|-------|------|---------------|--------|
 | 12 | Account & auth | feature, account | `legacy/docs/wiki/features/account/` | refining → `docs/features/account/` + `uc.account.login` done (cr-0003) & `uc.account.unlock` done (cr-0004, PASSWORD wrap); ADR 0004 (sessions) + ADR 0005 (unlock methods/device trust) accepted; `uc.account.trust-device` done (cr-0005, DEVICE wrap = device key + password, web); passkey/onboard-device(QR·push)/recovery/sessions use-cases pending |
-| 13 | Administration & operations | feature, admin | `legacy/docs/wiki/features/admin/` | refining → `docs/features/admin/` + `uc.admin.setup-server` done; other admin use-cases pending |
+| 13 | Administration & operations | feature, admin | `legacy/docs/wiki/features/admin/` | refining → `docs/features/admin/` + `uc.admin.setup-server` done; cr-0006 (planned) drops the instance-name from setup (wrong altitude for multi-tenant — tenant identity = domain); other admin use-cases pending |
 | 14 | Spaces (tenants/groups/personal) | feature, scopes | `legacy/docs/wiki/features/spaces/` | inbox |
 | 15 | Keys (grants, unlock wraps, rotation) | feature, crypto | `legacy/docs/wiki/features/keys/` | inbox |
 | 16 | Memory (tree, curation, map/tracks, playlists) | feature, memory | `legacy/docs/wiki/features/memory/` | inbox |
