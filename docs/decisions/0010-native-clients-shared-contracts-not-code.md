@@ -25,6 +25,7 @@ implemented in its platform-idiomatic stack, independently. This generalises [AD
 | Surface | Stack | Notes |
 |---|---|---|
 | Apple — macOS = iOS = iPadOS | **Swift / SwiftUI** | one universal app |
+| Apple — tvOS | **Swift / SwiftUI** | shared SPM libs (crypto/client/logic) build for tvOS from day one; the tvOS UI head is a later increment — TV sign-in is **passkey / QR device-handoff**, not password + Secret Key on a remote |
 | Android | **Kotlin / Jetpack Compose** | `:crypto` is plain JVM (also the JVM agent) |
 | Windows | **C#/.NET + WinUI 3** | BouncyCastle.NET crypto; runtime self-contained (or NativeAOT later) |
 | Linux | **Rust + gtk4-rs/relm4 + libadwaita** | pure-Rust crypto crates; lean static binary, no runtime |
