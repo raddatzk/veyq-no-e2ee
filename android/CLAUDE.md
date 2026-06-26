@@ -3,15 +3,35 @@
 The Android universal client, built fresh in parallel to Apple. Loaded in addition to the root `CLAUDE.md`
 when working here. All content crypto runs on-device; the server is blind.
 
+## Modules
+- `:crypto` — pure Kotlin/JVM `v1` suite (cr-0014); the parity guarantee with web/Apple (ADR 0009).
+- `:client` — **pure Kotlin/JVM** data layer (cr-0016): the contracts-generated OpenAPI clients
+  (`setup/auth/account`, each in its own `com.veyq.api.*` package) + `Session`/`Vault`/`VeyqClient`
+  orchestration. No Android SDK → testable headless, reusable by a future JVM agent (ADR 0010).
+- `:app` — thin Android (Jetpack Compose) UI head over `:client`; requires the Android SDK.
+
 ## Prove your work
-- `./gradlew :crypto:test` from `android/` — runs the crypto **conformance vectors**
-  (`crypto/src/test`, which load `contracts/crypto/vectors/v1.json` by walking up to the repo root). A green
-  run is the parity guarantee with the web + Apple suites (ADR 0009).
-- `:crypto` is a **pure Kotlin/JVM module** (no Android SDK needed to test it). App/UI modules (Compose,
-  `com.android.application`, requiring the Android SDK in `~/Library/Android/sdk`) arrive with the
-  login/unlock + UI slices.
-- **Toolchain:** pin Kotlin to the backend's version (currently **2.3.21**) — older Kotlin crashes its
-  compiler on JDK 25. The repo Gradle is 9.5.1.
+- `./gradlew :crypto:test` — crypto **conformance vectors** (`contracts/crypto/vectors/v1.json`); green = parity (ADR 0009).
+- `./gradlew :client:test` — login + unlock **data-layer** tests (`LoginTest`/`UnlockTest`, MockWebServer,
+  hermetic). The env-gated `LiveRoundTripTest` runs only with `VEYQ_LIVE_BASE` set.
+- `./gradlew :app:assembleDebug` — builds the Compose UI head (AGP + SDK).
+- `./gradlew :app:connectedDebugAndroidTest` — the env-gated **live UI round-trip** + screenshot capture on
+  an emulator (pass `-Pandroid.testInstrumentationRunnerArguments.veyqBase=…` etc.; see
+  `docs/design/screenshots/android/README.md`).
+
+## Toolchain (bleeding-edge, pinned together)
+- Repo Gradle is **9.5.1** (JDK 25). That forces **AGP 9.2.1**, whose **built-in Kotlin is KGP 2.2.10** —
+  so **all modules pin Kotlin 2.2.10** (KGP 2.3.21 is incompatible with AGP 9: its legacy
+  `KotlinAndroidTarget` references the removed `BaseVariant`). `:crypto:test` is green on 2.2.10 / JDK 25.
+- **All plugins are declared once in the root `build.gradle.kts` (`apply false`)** so AGP + KGP share one
+  classloader; modules apply them by id without a version. Skipping this re-triggers the `BaseVariant`
+  NoClassDefFound. `:app` uses AGP built-in Kotlin (no `kotlin.android` plugin) + the Compose compiler
+  plugin; configure jvmTarget via the top-level `kotlin { compilerOptions { … } }`.
+- **compileSdk 36** + the late-2025 (36-wave) AndroidX: the 2026 wave needs an android-37 platform that is
+  not yet on the CLI SDK channel (only the API-37 emulator image is). Bump both when 37 ships.
+- The `:client` OpenAPI generator strips the backend-only `x-field-extra-annotation` from a sanitized spec
+  copy (no `jakarta` in the client) and produces a **blocking** API (suspend internally; the orchestration
+  and `:app` call it on `Dispatchers.IO`).
 
 ## Conventions
 - **`v1` crypto is implemented natively, gated by the shared vectors** ([ADR 0009](../docs/decisions/0009-native-crypto-per-platform-vectors.md)).

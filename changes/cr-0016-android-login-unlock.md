@@ -1,7 +1,7 @@
 ---
 id: cr-0016
 title: Android client — login + unlock (Kotlin / Jetpack Compose)
-status: in-progress      # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.login, uc.account.unlock]   # the Android surface (web ✅, apple ✅ via cr-0015)
 adrs: [0003, 0004, 0005, 0009, 0010]
 invariants: [operator-blind]
@@ -83,18 +83,27 @@ behavioural contract (`http/` acceptance + use-cases), implemented in the platfo
   `V1` primitives and asserts unlock recovers the **exact** Master Key + identity bytes; wrong-Secret-Key,
   no-PASSWORD-wrap, key-material-401→refresh→retry cases.
   **DONE** — `UnlockTest` 5/5 green (`Vault` zero-on-clear, copy-on-read).
-- [ ] **4 — Compose UI (connect → sign-in → home).** Port the cr-0015 screens to Compose: instance URL
+- [x] **4 — Compose UI (connect → sign-in → home).** Port the cr-0015 screens to Compose: instance URL
   (Connect + `setupRequired()` gate), email + password + Secret Key (Sign in → `login` then `unlock`, secrets
   dropped after submit), the unlocked Home (+ sign-out). One Compose tree, adaptive (phone/tablet), matching
   the shipped veyq design tokens/copy. **Done when:** `:app:assembleDebug` green and the app round-trips
   login → unlock on the emulator against a live instance.
-- [ ] **5 — live round-trip + screenshots + docs.** Prove it end-to-end against a real instance (MariaDB +
+  **DONE** — `VeyqTheme` (parity role tokens light+dark) + `AuthCard`/`VeyqField`/`PrimaryButton`/`MessageBox`
+  composables + `AppModel`/`RootScreen` + Connect/SignIn/Home screens; edge-to-edge, width-capped card.
+  `:app:assembleDebug` green; live emulator round-trip verified in phase 5.
+- [x] **5 — live round-trip + screenshots + docs.** Prove it end-to-end against a real instance (MariaDB +
   `quarkusDev`, owner seeded via `web/scripts/seed-owner.mts`): an env-gated `:client` live round-trip
   (OkHttp) **and** an instrumented Compose UI test (`:app:connectedDebugAndroidTest` on the `Pixel_10`
   emulator) driving connect → sign-in → unlock. Capture screenshots via **adb screencap** → commit under
   `docs/design/screenshots/android/`; record the `uc.account.{login,unlock}` **android** surface in the
   coverage files; update the parity ledger. **Done when:** round-trip green, screenshots committed,
   `validate_coverage.py` green, ledger reflects android ✅.
+  **DONE** — `LiveRoundTripTest` (data layer, OkHttp) + `RoundTripUiTest` (full Compose UI) both green
+  against a live instance on the API-37 emulator; `kevin@veyq.test` confirmed on the unlocked Home.
+  Screenshots committed (`android-01-connect` / `02-signin` / `03-home`) via the AndroidX **TestStorage**
+  service (AGP pulls them; adb screencap would be wiped by the post-run uninstall) with a reproducer README.
+  Coverage files record the android surface; `validate_coverage.py` green; platform-parity ledger = android ✅.
+  Test-lib note: espresso bumped to 3.7.0 — older reflects on `InputManager.getInstance()`, removed in API 37.
 
 ## Definition of done
 

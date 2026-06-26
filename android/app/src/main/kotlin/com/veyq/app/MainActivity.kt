@@ -4,28 +4,40 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.veyq.app.ui.RootScreen
+import com.veyq.app.ui.theme.VeyqTheme
+import com.veyq.app.ui.theme.veyqColors
 
-// Phase 1 (cr-0016) lands only the scaffold: the Compose head builds over `:client` / `:crypto`. The
-// real connect → sign-in → home flow (VeyqTheme + AuthCard/VeyqField/PrimaryButton) arrives in phase 4.
+/**
+ * The single activity hosting the Compose tree. Edge-to-edge: the veyq `bg` is drawn behind the system
+ * bars (the [Surface]) and content is padded with `safeDrawing` so the auth card isn't under the status /
+ * nav bars.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Placeholder()
+            VeyqApp()
         }
     }
 }
 
 @Composable
-private fun Placeholder() {
-    MaterialTheme {
-        Surface {
-            Text("veyq")
+private fun VeyqApp() {
+    VeyqTheme {
+        Surface(color = veyqColors.bg, modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+                RootScreen()
+            }
         }
     }
 }
