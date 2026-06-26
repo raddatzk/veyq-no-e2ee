@@ -37,14 +37,20 @@ final class RoundTripUITests: XCTestCase {
         shoot(app, shotDir, "02-connect-filled")
         app.buttons["Connect"].activate()
 
-        // 2 — Sign in (fields arrive prefilled via the seam; secrets stay masked)
+        // 2 — Sign in: email + password (prefilled via the seam; password stays masked)
         let emailField = app.textFields["Email"]
         XCTAssertTrue(emailField.waitForExistence(timeout: 20), "Sign-in screen should show after connect")
         XCTAssertEqual(emailField.value as? String, email, "email should be prefilled")
         shoot(app, shotDir, "03-signin")
-        app.buttons["Sign in & unlock"].activate()
+        app.buttons["Sign in"].activate()
 
-        // 3 — Home (unlocked)
+        // 3 — Unlock floor: Secret Key (prefilled via the seam)
+        let unlockButton = app.buttons["Unlock"]
+        XCTAssertTrue(unlockButton.waitForExistence(timeout: 25), "Unlock floor should show after login")
+        shoot(app, shotDir, "04-unlock")
+        unlockButton.activate()
+
+        // 4 — Home (unlocked)
         XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25), "Home should show after unlock")
         shoot(app, shotDir, "05-home")
     }

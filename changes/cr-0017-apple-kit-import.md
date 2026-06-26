@@ -1,7 +1,7 @@
 ---
 id: cr-0017
 title: Apple — two-step unlock floor + Emergency Kit import (upload + QR scan)
-status: planned          # planned → in-progress → done (then keep as a record)
+status: in-progress      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.unlock]
 adrs: [0005, 0010]
 invariants: [operator-blind]
@@ -59,12 +59,15 @@ for now), importing a QR from a *static image file* (live camera scan + kit-PDF/
 
 ## Phases
 
-- [ ] **1 — two-step flow refactor.** `AppModel.Phase` gains `.unlock` between `.signIn` and `.home`; add a
+- [x] **1 — two-step flow refactor.** `AppModel.Phase` gains `.unlock` between `.signIn` and `.home`; add a
   transient `pendingSecretKey`; split `SignInView` into `SignInView` (email + password → `login()` → advance
   to `.unlock`) and a new `UnlockView` (Secret Key, password carried in `AppModel` transiently → `unlock()`
   → `.home`, pre-filling its field from `pendingSecretKey`); `RootView` switches the new phase; "Use a
   different instance" still resets. Update `RoundTripUITests` to drive the two steps. **Done when:**
   `swift build` + `swift test` green; the env-gated UI round-trip still goes connect → login → unlock → home.
+  **DONE** — `AppModel` carries the password between steps; `SignInView` (email+password → `app.login`),
+  new `UnlockView` (Secret Key → `app.unlock`, pre-fills from `pendingSecretKey`); macOS + iOS builds green,
+  `swift test` 20/20, UITest drives connect → sign-in → unlock → home.
 - [ ] **2 — parseKit + file import (both steps).** Port `parseKit(_:) -> KitData?` to `VeyqKit` (+
   `KitData{email, secretKey}`); add `importKitFromFile` reading the picked file's bytes as UTF-8 text and
   `parseKit`-ing (kit PDF / token text). Wire a SwiftUI `.fileImporter` (allowed: `.pdf`, `.plainText`)
