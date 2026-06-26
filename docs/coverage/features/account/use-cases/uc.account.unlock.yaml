@@ -16,6 +16,7 @@ acceptanceCriteria:
     text: The Secret Key can be imported from the Emergency Kit (upload the kit file or scan its QR), decoded on-device via parseKit (cr-0007).
     coverage:
       web: { unit: [src/features/account/emergencyKit/emergencyKit.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/KitTests.swift] }
   - id: wrong-credentials-generic-failure
     text: A wrong password or wrong Secret Key fails with a generic unlock failure (AEAD tag mismatch) and holds no key material; the server is uninvolved (E1).
     coverage:
@@ -48,11 +49,13 @@ acceptanceCriteria:
 # Apple (macOS/iOS/iPadOS) native unlock landed in cr-0015: VeyqKit UnlockTests (key-material → KEK →
 # symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
 # LiveRoundTripTests (real instance) + RoundTripUITests (full UI round-trip). The authed-only / no-cross-
-# account boundaries stay backend+http concerns. secret-key-import-from-kit is a later apple increment.
+# account boundaries stay backend+http concerns. Apple secret-key-import-from-kit landed in cr-0017
+# (two-step floor + Emergency-Kit upload/scan): VeyqKit KitTests cover the parseKit path; the file/scan UI
+# wiring + AVFoundation camera are manual-smoke (the round-trip uses the prefill seam, not the import).
 # Android (phone/tablet, Jetpack Compose) native unlock landed in cr-0016: :client UnlockTest (key-material
 # → KEK → symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
 # LiveRoundTripTest (real instance) + :app RoundTripUiTest (full Compose UI round-trip on the emulator).
-# secret-key-import-from-kit is a later android increment too.
+# Android secret-key-import-from-kit is cr-0018.
 # Note: the authenticated happy path (200 returning the caller's wraps) IS now on the http surface —
 # account/authed-flow.http obtains a real session by signing the nonce in-client via _lib/ed25519.js
 # (fresh-instance, cr-0013), alongside the backend slice and the web unlock round-trip. unlock.http still

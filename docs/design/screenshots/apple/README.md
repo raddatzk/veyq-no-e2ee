@@ -8,8 +8,11 @@ look).
 | file | screen |
 |------|--------|
 | `ios-01-connect.png` | Connect — enter the instance URL |
-| `ios-02-signin.png`  | Sign in — email + password + Secret Key |
-| `ios-03-home.png`    | Unlocked — session held, vault open on-device |
+| `ios-02-signin.png`  | Sign in (step 1) — email + password, with **Upload kit / Scan QR** (fills email + parks Secret Key) |
+| `ios-03-unlock.png`  | Unlock floor (step 2) — Secret Key, with **Upload kit / Scan QR** (fills Secret Key) |
+| `ios-04-home.png`    | Unlocked — session held, vault open on-device |
+
+The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0017.
 
 ## How they're generated (reproducible)
 

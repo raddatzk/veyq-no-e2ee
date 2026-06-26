@@ -1,7 +1,7 @@
 ---
 id: cr-0017
 title: Apple — two-step unlock floor + Emergency Kit import (upload + QR scan)
-status: in-progress      # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.unlock]
 adrs: [0005, 0010]
 invariants: [operator-blind]
@@ -91,11 +91,15 @@ for now), importing a QR from a *static image file* (live camera scan + kit-PDF/
   `CameraScanController` requests access, wires a `.qr` metadata output, `nonisolated(unsafe)` session on a
   serial queue for Swift-6 concurrency); scan sheet on both screens, foreign QRs ignored, denied/no-camera
   → message. `NSCameraUsageDescription` added. macOS + iOS builds green.
-- [ ] **4 — live round-trip + screenshots + docs.** Update the live UI round-trip for the two-step flow;
+- [x] **4 — live round-trip + screenshots + docs.** Update the live UI round-trip for the two-step flow;
   re-capture screenshots (now `connect / signin / unlock-floor / home`, the **login + floor** both showing
   upload+scan) under `docs/design/screenshots/apple/`; record the apple ref on `secret-key-import-from-kit`
   in `uc.account.unlock` coverage; note the two-step floor + kit import (both steps) in the use-case if
   needed. **Done when:** round-trip green, screenshots committed, `validate_coverage.py` green.
+  **DONE** — `RoundTripUITests` (two-step) green on the iOS-26 simulator against the live instance;
+  screenshots committed (`ios-01-connect` / `ios-02-signin` / `ios-03-unlock` / `ios-04-home`, sign-in +
+  floor both showing Upload kit / Scan QR) + README updated; `secret-key-import-from-kit` apple ref recorded;
+  `validate_coverage.py` green.
 
 ## Definition of done
 
