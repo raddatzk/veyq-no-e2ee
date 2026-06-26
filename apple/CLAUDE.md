@@ -5,8 +5,29 @@ runs on-device; the server is blind.
 
 ## Prove your work
 - `swift test` from `apple/` — builds the SwiftPM package and runs the crypto **conformance vectors**
-  (`Tests/VeyqCryptoTests`, which load `../../contracts/crypto/vectors/v1.json`). A green run is the parity
-  guarantee with the web + Android suites (ADR 0009).
+  (`Tests/VeyqCryptoTests`, which load `../../contracts/crypto/vectors/v1.json`) plus the `VeyqKit` data-layer
+  tests. A green run is the parity guarantee with the web + Android suites (ADR 0009).
+- **The universal app** is generated from `project.yml` (xcodegen) — never a hand-edited pbxproj. The
+  `.xcodeproj` and the plugin's `Sources/*/GeneratedSources/` are gitignored. Regenerate + build:
+  ```sh
+  cd apple && xcodegen generate
+  xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=macOS' -skipPackagePluginValidation build
+  xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
+  ```
+  `-skipPackagePluginValidation` is required (headless xcodebuild won't otherwise trust the build plugin).
+- **tvOS is libs-only** (no UI head this slice — TV sign-in is passkey/QR handoff, cr-0015 / ADR 0010). Keep
+  the shared libraries building for it:
+  ```sh
+  xcodebuild -project Veyq.xcodeproj -scheme VeyqKit -destination 'generic/platform=tvOS Simulator' -skipPackagePluginValidation build
+  ```
+
+## API client
+- DTOs are **generated**, never hand-written (API-first). `SetupAPI` / `AuthAPI` / `AccountAPI` are one module
+  per `contracts/api/*.openapi.yaml` document (the specs are independent docs with colliding component names,
+  so they can't share a module). Each target's `openapi.yaml` is a **symlink** into `contracts/` — edit the
+  contract, not the symlink. swift-openapi-generator runs as a **build plugin** (regenerates each build);
+  `VeyqApi` re-exports the three so the app imports a single `VeyqApi`. Plugin-only targets carry a tiny
+  `Exports.swift` because SPM drops a target with no `.swift` source.
 
 ## Conventions
 - **`v1` crypto is implemented natively, gated by the shared vectors** ([ADR 0009](../docs/decisions/0009-native-crypto-per-platform-vectors.md)).
