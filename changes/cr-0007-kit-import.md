@@ -34,14 +34,15 @@ incl. from raw PDF bytes). This realizes the **"QR / file import of the Secret K
   `parseKit` (kit PDF / any token-carrying text), else for an **image** draw to a canvas and decode the QR
   with `jsqr` (lazy-imported, like jspdf/qrcode). 2 unit tests: a PDF-shaped blob → `KitData`; a non-kit file
   → null. **Done:** `npm run check` green (58).
-- [ ] **2 — web (UI + scanner).** Add two icon-buttons next to the Secret-Key field in `LoginView`'s floor
-  card — **upload** (`pi-upload`, hidden `<input type=file>`) and **scan** (`pi-qrcode`). Add a small
-  `KitScanner` overlay: `getUserMedia({video:{facingMode:'environment'}})`, a rAF loop decoding frames with
-  `jsqr`, cancel button, and clear handling of **permission denied / no camera**. On a successful import
-  (either path) fill `secretKey` from the parsed kit; a kit that doesn't parse shows a generic "couldn't read
-  the kit" message (never reveals why). i18n (en+de) for the button labels + errors. **Done when:**
-  `npm run check` green **and** a preview smoke shows **upload** of a kit PDF filling the Secret-Key field and
-  then unlocking (the camera scan is verified manually where a camera exists — jsdom/headless has none).
+- [x] **2 — web (UI + scanner).** Added two icon-buttons next to the Secret-Key field in `LoginView`'s floor
+  card — **upload** (`pi-upload`, hidden file input) and **scan** (`pi-qrcode`, shown only where
+  `navigator.mediaDevices.getUserMedia` exists). New `KitScanner.vue` overlay: `getUserMedia(facingMode
+  environment)`, a rAF loop decoding frames with `jsqr`, cancel, and graceful handling of permission-denied /
+  no-camera (falls back to upload/paste). On import (either path) `secretKey` fills from the parsed kit; an
+  unreadable kit shows a generic message. i18n (en+de). **Done:** `npm run check` green (58). Preview smoke
+  end-to-end: on a fresh instance, both buttons render; an uploaded kit PDF (real `veyqkit:` token) filled the
+  Secret-Key field exactly and **unlocked** — no console errors. (Camera scan shares the `parseKit` decode
+  path; manual-only where a camera exists.)
 - [ ] **3 — docs.** Update `uc.account.unlock.md` so QR / file import of the Secret Key is **available** (not
   deferred) for the floor path; re-run `python3 scripts/validate_coverage.py`. **Done when:** the validator
   is green and the doc no longer calls kit import deferred.

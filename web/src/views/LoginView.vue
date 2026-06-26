@@ -10,6 +10,8 @@ import Password from 'primevue/password'
 import { login, logout } from '../features/account/login/login'
 import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/unlock'
 import { trustThisDevice, untrustThisDevice, isTrusted, isTrustSupported } from '../features/account/trustDevice/trustDevice'
+import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
+import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
 
@@ -28,6 +30,9 @@ const trustFailed = ref(false)
 const unlockMode = ref<'device' | 'password'>('password')
 const trustChecked = ref(false)
 const trustSupported = isTrustSupported()
+const fileInput = ref<HTMLInputElement | null>(null)
+const scanOpen = ref(false)
+const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
 // A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds.
 let pendingSecretKey = ''
@@ -96,6 +101,28 @@ async function unlock() {
 
 function useSecretKeyInstead() {
   unlockMode.value = 'password'
+  error.value = ''
+}
+
+function triggerUpload() {
+  error.value = ''
+  fileInput.value?.click()
+}
+
+async function onUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // allow re-picking the same file
+  if (!file) return
+  const kit = await importKitFromFile(file)
+  // generic failure — never reveal why a kit couldn't be read
+  if (kit) secretKey.value = kit.secretKey
+  else error.value = t('unlock.kitUnreadable')
+}
+
+function onScanned(kit: { secretKey: string }) {
+  secretKey.value = kit.secretKey
+  scanOpen.value = false
   error.value = ''
 }
 
@@ -199,15 +226,44 @@ onMounted(() => {
         <p class="veyq-form-copy">{{ t('unlock.note') }}</p>
         <label>
           {{ t('unlock.secretKey') }}
-          <Password
-            v-model="secretKey"
-            input-id="unlock-secret-key"
-            :input-props="{ name: 'secret-key', autocomplete: 'off', spellcheck: false }"
-            required
-            :feedback="false"
-            toggle-mask
-            fluid
-          />
+          <div class="input-with-actions">
+            <Password
+              v-model="secretKey"
+              input-id="unlock-secret-key"
+              :input-props="{ name: 'secret-key', autocomplete: 'off', spellcheck: false }"
+              required
+              :feedback="false"
+              toggle-mask
+              fluid
+              class="grow"
+            />
+            <Button
+              type="button"
+              icon="pi pi-upload"
+              severity="secondary"
+              text
+              :aria-label="t('unlock.upload')"
+              :title="t('unlock.upload')"
+              @click="triggerUpload"
+            />
+            <Button
+              v-if="scanSupported"
+              type="button"
+              icon="pi pi-qrcode"
+              severity="secondary"
+              text
+              :aria-label="t('unlock.scan')"
+              :title="t('unlock.scan')"
+              @click="scanOpen = true"
+            />
+            <input
+              ref="fileInput"
+              type="file"
+              accept="application/pdf,image/*"
+              class="visually-hidden"
+              @change="onUpload"
+            />
+          </div>
         </label>
         <div v-if="trustSupported && !deviceTrusted" class="checkbox-row">
           <Checkbox v-model="trustChecked" input-id="trust-device" binary />
@@ -258,4 +314,5 @@ onMounted(() => {
       </div>
     </template>
   </Card>
+  <KitScanner v-if="scanOpen" @found="onScanned" @close="scanOpen = false" />
 </template>

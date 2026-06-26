@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 export type SupportedLocale = 'en' | 'de'
 
 const en = {
-  common: { email: 'Email', password: 'Password', unreachable: 'This instance can’t be reached right now. Please try again.' },
+  common: { email: 'Email', password: 'Password', cancel: 'Cancel', unreachable: 'This instance can’t be reached right now. Please try again.' },
   setup: {
     title: 'Set up this instance',
     sub: 'Create the first owner account. All keys are generated on this device — the server only ever sees ciphertext.',
@@ -41,6 +41,11 @@ const en = {
     title: 'Unlock your memories',
     note: 'Signed in. Enter your Secret Key from your Emergency Kit to open your encrypted memories on this device — it never leaves your device.',
     secretKey: 'Secret Key',
+    upload: 'Upload Emergency Kit',
+    scan: 'Scan QR code',
+    scanHint: 'Point your camera at the QR code in your Emergency Kit.',
+    scanError: 'Camera unavailable — upload your kit or paste your Secret Key.',
+    kitUnreadable: 'Couldn’t read that kit. Try another file or paste your Secret Key.',
     submit: 'Unlock',
     submitting: 'Unlocking…',
     failed: 'Unlock failed. Check your password and Secret Key.',
@@ -57,7 +62,7 @@ const en = {
 }
 
 const de: typeof en = {
-  common: { email: 'E-Mail', password: 'Passwort', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
+  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
   setup: {
     title: 'Diese Instanz einrichten',
     sub: 'Lege das erste Besitzer-Konto an. Alle Schlüssel entstehen auf diesem Gerät — der Server sieht nur Chiffretext.',
@@ -93,6 +98,11 @@ const de: typeof en = {
     title: 'Erinnerungen entsperren',
     note: 'Angemeldet. Gib deinen Secret Key aus dem Notfall-Kit ein, um deine verschlüsselten Erinnerungen auf diesem Gerät zu öffnen — er verlässt dein Gerät nie.',
     secretKey: 'Secret Key',
+    upload: 'Notfall-Kit hochladen',
+    scan: 'QR-Code scannen',
+    scanHint: 'Richte deine Kamera auf den QR-Code in deinem Notfall-Kit.',
+    scanError: 'Kamera nicht verfügbar — lade dein Kit hoch oder füge deinen Secret Key ein.',
+    kitUnreadable: 'Konnte das Kit nicht lesen. Versuche eine andere Datei oder füge deinen Secret Key ein.',
     submit: 'Entsperren',
     submitting: 'Wird entsperrt…',
     failed: 'Entsperren fehlgeschlagen. Prüfe Passwort und Secret Key.',
