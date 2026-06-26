@@ -6,9 +6,10 @@ explicitly** here. This is the one-glance overview of *which use-case is impleme
 
 This tracks **implementation status / intent** (is the behaviour built, or deliberately N/A on a
 surface). It is **not** the test-coverage chain — that lives in
-[`docs/coverage/`](../coverage/README.md), keyed per use-case under `gaps`. A surface can be implemented
-here yet still have an open coverage gap, or vice versa; the two are different axes and may legitimately
-disagree.
+[`docs/coverage/`](../coverage/README.md), keyed per use-case under `gaps` — and **not** the *visual*
+parity axis, which is [`ui-design-parity.md`](ui-design-parity.md) (one veyq design, native per surface).
+A surface can be implemented here yet still have an open coverage gap, or vice versa; the axes are
+independent and may legitimately disagree.
 
 ## Legend
 
@@ -21,8 +22,8 @@ disagree.
 | Use-case | backend | http | web | apple | android |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | [uc.admin.setup-server](../features/admin/use-cases/uc.admin.setup-server.md) — First-run server setup | ✅ | ✅ | ✅ | N/A | N/A |
-| [uc.account.login](../features/account/use-cases/uc.account.login.md) — Account login (password) | ✅ | ✅ | ✅ | ◻ | ◻ |
-| [uc.account.unlock](../features/account/use-cases/uc.account.unlock.md) — Account unlock (PASSWORD wrap) | ✅ | ✅ | ✅ | ◻ | ◻ |
+| [uc.account.login](../features/account/use-cases/uc.account.login.md) — Account login (password) | ✅ | ✅ | ✅ | ✅ | ◻ |
+| [uc.account.unlock](../features/account/use-cases/uc.account.unlock.md) — Account unlock (PASSWORD wrap) | ✅ | ✅ | ✅ | ✅ | ◻ |
 | [uc.account.trust-device](../features/account/use-cases/uc.account.trust-device.md) — Trust this device (DEVICE wrap) | ✅ | ✅ | ✅ | ◻ | ◻ |
 
 ### Intentional N/A

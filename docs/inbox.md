@@ -79,7 +79,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | 34 | Memory product context (the vision) | product | `legacy/docs/product/memory-product-context.md` | inbox |
 | 35 | Journal markdown & embed syntax | journal, product | `legacy/docs/product/journal-markdown.md` | inbox |
 | 36 | Playlists & music references | product, music | `legacy/docs/product/playlists.md` | inbox |
-| 37 | UI styleguides (web + iOS) | ui | `legacy/docs/product/memory-ui-styleguide.md`, `legacy/docs/product/ios-ui-styleguide.md` | refining → web done: `docs/crosscutting/ui-web-styleguide.md`; iOS pending (refine with native UI) |
+| 37 | UI styleguides (web + native) + cross-platform design parity | ui | `legacy/docs/product/memory-ui-styleguide.md`, `legacy/docs/product/ios-ui-styleguide.md` | refining → **design-parity umbrella** `docs/crosscutting/ui-design-parity.md` (one veyq design, native everywhere: canonical role tokens light+dark, shared component contract, size-class responsive rule, per-surface mapping); per-surface: web `ui-web-styleguide.md` ✅, apple `ui-apple-styleguide.md` ✅ (cr-0015), android `ui-android-styleguide.md` ✅ (governs cr-0016); windows/linux pending with their heads |
 | 38 | Hosting & operations strategy (SaaS) | strategy, saas | `legacy/docs/product/hosting-and-operations-strategy.md` | inbox |
 | 39 | Future work backlog | backlog | `legacy/docs/product/future-work.md` | inbox |
 | 40 | Legal (privacy, trademark, commercial boundary) | legal | `legacy/docs/legal/` | inbox |
