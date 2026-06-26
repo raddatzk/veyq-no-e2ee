@@ -32,7 +32,7 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [SetupServerSliceTest.rejectsInvalidEmail] }
   - id: trim-name-fields
-    text: Email, display and instance names are trimmed before validation and storage.
+    text: Email and display name are trimmed before validation and storage.
     coverage:
       backend: { unit: [SetupRequestSanitizationTest.trimsNameFields] }
 gaps:

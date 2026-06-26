@@ -16,7 +16,6 @@ Content-Type: application/json
 {
   "email": "kevin@example.com",
   "displayName": "Kevin",
-  "instanceName": "Our Family veyq",
   "suiteId": "v1",
   "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
   "wrappedIdentityPrivateKey": "d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",

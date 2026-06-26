@@ -6,15 +6,15 @@
   encrypted account and mark the instance set up.
 - **Preconditions:** A freshly installed instance with setup **not yet completed**.
 - **Postconditions (success):** The Server Owner account exists with its own identity keys, Master Key
-  wraps and a saved Emergency Kit; an instance display name is set; the instance is marked set up; the
-  operator holds **no** content keys.
+  wraps and a saved Emergency Kit; the instance is marked set up; the operator holds **no** content keys.
 
 ## Main flow
 
 1. On first run the client checks setup status; the setup flow is reachable **only** while setup is
    incomplete.
-2. The Server Owner enters base config — an **instance display name** — and chooses an auth method:
-   **password + Secret Key** (the mandatory floor) and optionally a **passkey**, plus a display name.
+2. The Server Owner chooses an auth method — **password + Secret Key** (the mandatory floor) and optionally
+   a **passkey** — and enters their **display name**. (No instance name is collected: the instance is
+   identified by its host, and tenant identity is a per-tenant concern — see Quality notes.)
 3. The client generates, **cold** (no invite, no temp-wrap — this is the root of the owner's own key
    tree): the **identity keypair**, the **Master Key** with one wrap per chosen unlock method, and the
    **Emergency Kit** (Secret Key + recovery code), then forces the owner to confirm they saved the kit.
@@ -33,11 +33,11 @@ participant "Server\n(blind)" as S
 
 C -> S : GET setup status
 S --> C : setupRequired = true
-O -> C : instance name, auth method, display name
+O -> C : auth method, display name
 C -> C : generate cold —\nidentity keypair, Master Key + wraps,\nEmergency Kit (Secret Key + recovery code)
 C -> O : show Emergency Kit
 O -> C : confirm saved
-C -> S : POST setup/owner\n{ identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId, instanceName }
+C -> S : POST setup/owner\n{ identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId, displayName }
 S -> S : store ciphertext only;\nmark setup complete (single-owner lock)
 S --> C : Server Owner created
 @enduml
@@ -73,8 +73,11 @@ SetupComplete --> [*]
 - **Tenant routing is Host-based.** The reverse proxy forwards the request and the backend resolves the
   active tenant from the `Host` (tenant↔domain) — see
   [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md). At first-run there is no tenant yet
-  (tenant creation is a separate use-case); setup establishes the Server Owner and the instance. The host
-  the instance is served on is visible from the request `Host`, so it need not be a separately typed field.
+  (tenant creation is a separate use-case); setup establishes the Server Owner only. **No instance name is
+  collected** — a single operator-set, cleartext, server-wide name is the wrong altitude when one server
+  hosts many tenants (each resolved by its `Host`/domain) added over time; the host already identifies the
+  instance, and any human label belongs to a **tenant** (keyed to its domain) or an E2EE space name, never
+  to server setup (cr-0006).
 - **Tenant creation is separate** — it is its own use-case, not part of bootstrap.
 - **No personal scope at first-run.** Personal scopes are **per-tenant**, created when a user joins a
   tenant (see [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)); at first-run no tenant

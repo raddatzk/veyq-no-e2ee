@@ -1,7 +1,7 @@
 ---
 id: cr-0006
 title: Drop the instance name from setup (wrong altitude for a multi-tenant instance)
-status: planned          # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.admin.setup-server]
 adrs: [0002]
 invariants: [operator-blind]
@@ -54,10 +54,12 @@ from a single-tenant mental model; setup should establish the **Server Owner** o
   keys (en+de), and the `setupServer.test.ts` arg/assertion. **Done:** `npm run check` green (57). Preview
   smoke on a fresh instance: the setup form shows only Name / Email / Password (no instance-name field) and
   owner-create succeeds → kit screen, no console errors.
-- [ ] **5 — docs.** Update `uc.admin.setup-server.md` to drop the "instance display name" from the goal /
-  main flow / sequence (setup establishes the Server Owner; tenant identity = domain, deferred to tenant
-  creation). Re-run `python3 scripts/validate_coverage.py` (no acceptance criterion references the name, so
-  coverage stays green). **Done when:** the validator is green and the doc no longer claims a name is set.
+- [x] **5 — docs.** Updated `uc.admin.setup-server.md` (postcondition, main-flow step 2, both sequence
+  lines) to drop the instance display name and made the Quality-notes host paragraph state explicitly that
+  **no instance name is collected** (with the multi-tenant rationale). Also swept two stragglers: the
+  `login.http` owner-seed body (dropped `instanceName`) and the `trim-name-fields` coverage criterion text
+  ("Email and display name…"). **Done:** `validate_coverage.py` green (4 use-cases); login.http re-run
+  green (11/11).
 
 ## Definition of done
 
