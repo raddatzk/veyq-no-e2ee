@@ -5,17 +5,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.veyq.app.ui.screens.ConnectScreen
 import com.veyq.app.ui.screens.HomeScreen
 import com.veyq.app.ui.screens.SignInScreen
+import com.veyq.app.ui.screens.UnlockScreen
 
 /**
  * Root of the universal app — the Android twin of Apple's `RootView`. Switches between the connect →
- * sign-in → home phases the [AppModel] drives. One Compose tree, adaptive across phone / tablet (the cards
- * cap their width rather than stretch).
+ * sign-in → unlock → home phases the [AppModel] drives. One Compose tree, adaptive across phone / tablet
+ * (the cards cap their width rather than stretch).
  */
 @Composable
 fun RootScreen(app: AppModel = viewModel()) {
     when (app.phase) {
         AppModel.Phase.CONNECT -> ConnectScreen(app)
         AppModel.Phase.SIGN_IN -> SignInScreen(app)
+        AppModel.Phase.UNLOCK -> UnlockScreen(app)
         AppModel.Phase.HOME -> HomeScreen(app)
     }
 }

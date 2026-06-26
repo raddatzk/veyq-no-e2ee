@@ -1,7 +1,7 @@
 ---
 id: cr-0018
 title: Android — two-step unlock floor + Emergency Kit import (upload + QR scan)
-status: planned          # planned → in-progress → done (then keep as a record)
+status: in-progress      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.unlock]
 adrs: [0005, 0010]
 invariants: [operator-blind]
@@ -63,6 +63,10 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
   `unlock()` → `HOME`, pre-filling from `pendingSecretKey`); `RootScreen` switches the new phase. Update
   `RoundTripUiTest` to drive the two steps. **Done when:** `:client:test` + `:app:assembleDebug` green; the
   env-gated UI round-trip goes connect → login → unlock → home on the emulator.
+  **DONE** — `AppModel` carries the password between steps + parks `pendingSecretKey`; `SignInScreen`
+  (email+password → `app.login`), new `UnlockScreen` (Secret Key → `app.unlock`, pre-fills from
+  `pendingSecretKey`); `RootScreen` switches `UNLOCK`; `RoundTripUiTest` drives the two steps (4 screenshots).
+  `:app:assembleDebug` green.
 - [ ] **2 — parseKit + file import (both steps).** Port `parseKit(text): KitData?` (+ `KitData(email,
   secretKey)`) into `:client`; add `importKitFromBytes`/text decode. In `:app`, wire a Storage Access
   Framework picker (`ActivityResultContracts.OpenDocument`, types `application/pdf` + `text/*`) behind an

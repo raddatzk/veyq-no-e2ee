@@ -63,12 +63,19 @@ class RoundTripUiTest {
             compose.onAllNodesWithTag("Email").fetchSemanticsNodes().size == 1
         }
 
-        // Sign-in screen → capture, fill credentials, submit (login + unlock).
+        // Sign-in screen (step 1) → capture, fill email + password, log in.
         capture("android-02-signin")
         compose.onNodeWithTag("Email").performTextInput(email)
         compose.onNodeWithTag("Password").performTextInput(password)
+        compose.onNodeWithTag("Sign in").performClick()
+
+        // Unlock floor (step 2) → wait for it, capture, fill the Secret Key, unlock.
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty()
+        }
+        capture("android-03-unlock")
         compose.onNodeWithTag("Secret Key").performTextInput(secret)
-        compose.onNodeWithTag("Sign in & unlock").performClick()
+        compose.onNodeWithTag("Unlock").performClick()
 
         // The home screen confirms the operator-blind result.
         compose.waitUntil(timeoutMillis = 20_000) {
@@ -76,7 +83,7 @@ class RoundTripUiTest {
         }
         compose.onNodeWithText("Unlocked").assertIsDisplayed()
         compose.onNodeWithText(email).assertIsDisplayed()
-        capture("android-03-home")
+        capture("android-04-home")
     }
 
     /**

@@ -12,30 +12,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Drives the connect → sign-in → home flow and owns the [VeyqClient] once an instance is chosen — the
- * Android twin of Apple's `AppModel`. Compose-state-backed so [com.veyq.app.ui.RootScreen] recomposes on
- * a phase change.
+ * Drives the connect → sign-in → unlock → home flow and owns the [VeyqClient] once an instance is chosen —
+ * the Android twin of Apple's `AppModel`. Compose-state-backed so [com.veyq.app.ui.RootScreen] recomposes
+ * on a phase change.
  *
- * Auth ≠ unlock: a successful sign-in does both a `login` (session) and an `unlock` (vault) — the two
- * distinct data-layer steps — behind one submit. The password + Secret Key are held only transiently in
- * the sign-in screen and never reach this model. The blocking `:client` calls run on [Dispatchers.IO];
- * state mutations happen back on the caller's (main) context.
+ * Auth ≠ unlock: sign-in is **two steps**, mirroring the web — `login` (email + password → session) on the
+ * sign-in screen, then `unlock` (password + Secret Key → vault) on the Secret-Key floor. The password is
+ * carried transiently here between the steps (never persisted, cleared on unlock / sign-out).
+ * [pendingSecretKey] parks a Secret Key handed over by a **login-screen kit import** until the floor
+ * consumes it. The blocking `:client` calls run on [Dispatchers.IO]; state mutations happen back on main.
  */
 class AppModel : ViewModel() {
-    enum class Phase { CONNECT, SIGN_IN, HOME }
+    enum class Phase { CONNECT, SIGN_IN, UNLOCK, HOME }
 
     var phase by mutableStateOf(Phase.CONNECT)
         private set
 
-    /** The chosen instance base URL (shown as the sign-in subtitle / on home). */
+    /** The chosen instance base URL (shown as the sign-in / floor subtitle). */
     var apiBase by mutableStateOf("")
         private set
 
-    /** The signed-in account email (shown on the home screen). */
+    /** The signed-in account email (shown on the floor + home). */
     var email by mutableStateOf("")
         private set
 
+    /** A Secret Key parked by a login-screen kit import, consumed (and cleared) by the unlock floor. */
+    var pendingSecretKey by mutableStateOf("")
+
     private var client: VeyqClient? = null
+
+    /** The password from the login step, carried to the unlock step. Transient — never persisted. */
+    private var carriedPassword: String = ""
 
     /** Outcome of a connect attempt. */
     sealed interface ConnectResult {
@@ -69,41 +76,59 @@ class AppModel : ViewModel() {
     }
 
     /**
-     * Run the two data-layer steps — `login` then `unlock` — behind one submit. Returns `null` on success
-     * (the flow advances to home) or a user-facing error string. Operator-blind: the password + Secret Key
-     * are used on-device only and dropped by the caller after this returns.
+     * Step 1 — log in (email + password → session). Returns `null` on success (the flow advances to the
+     * Secret-Key floor) or a user-facing error string. Operator-blind: the password is used on-device only.
      */
-    suspend fun signInAndUnlock(email: String, password: String, secretKey: String): String? {
+    suspend fun login(email: String, password: String): String? {
         val client = this.client ?: return "Not connected to an instance."
         return try {
-            withContext(Dispatchers.IO) {
-                client.login(email = email, password = password)
-                client.unlock(password = password, secretKey = secretKey)
-            }
+            withContext(Dispatchers.IO) { client.login(email = email, password = password) }
             this.email = email
+            this.carriedPassword = password
+            phase = Phase.UNLOCK
+            null
+        } catch (e: Exception) {
+            // Wrong password / unknown account both surface as one generic failure (non-enumerable).
+            "Sign-in failed. Check your email and password."
+        }
+    }
+
+    /**
+     * Step 2 — unlock (carried password + Secret Key → vault). Returns `null` on success (the flow advances
+     * to home) or a user-facing error string. The secrets are dropped on success.
+     */
+    suspend fun unlock(secretKey: String): String? {
+        val client = this.client ?: return "Not connected to an instance."
+        return try {
+            withContext(Dispatchers.IO) { client.unlock(password = carriedPassword, secretKey = secretKey) }
+            carriedPassword = ""
+            pendingSecretKey = ""
             phase = Phase.HOME
             null
         } catch (e: VeyqError.UnlockUnavailable) {
             "This account has no password unlock configured."
         } catch (e: Exception) {
-            // Wrong password / Secret Key / unknown account all surface as one generic failure
-            // (non-enumerable, operator-blind).
-            "Sign-in failed. Check your email, password, and Secret Key."
+            // Wrong password / Secret Key both surface as one generic failure (non-enumerable).
+            "Unlock failed. Check your Secret Key."
         }
     }
 
-    /** Sign out: revoke the session, re-lock the vault, and return to sign-in (same instance). */
+    /** Sign out: revoke the session, re-lock the vault, drop all transient secrets, and return to sign-in. */
     suspend fun signOut() {
         withContext(Dispatchers.IO) { client?.logout() }
         email = ""
+        carriedPassword = ""
+        pendingSecretKey = ""
         phase = Phase.SIGN_IN
     }
 
-    /** Pick a different instance — drop the client and return to connect. */
+    /** Pick a different instance — drop the client + secrets and return to connect. */
     fun changeInstance() {
         client = null
         apiBase = ""
         email = ""
+        carriedPassword = ""
+        pendingSecretKey = ""
         phase = Phase.CONNECT
     }
 }

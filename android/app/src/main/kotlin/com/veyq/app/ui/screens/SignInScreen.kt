@@ -24,21 +24,21 @@ import com.veyq.app.ui.theme.veyqColors
 import kotlinx.coroutines.launch
 
 /**
- * Sign in with email + password + Secret Key — the Android twin of Apple's `SignInView`. One submit runs
- * the two distinct data-layer steps (`login` → session, then `unlock` → in-memory vault). Operator-blind:
- * the password and Secret Key stay in this screen's transient state, are used on-device only, and are
- * dropped after a successful submit; the password is never sent and the Secret Key never leaves the device.
+ * Step 1 of sign-in: **email + password → `login()`** — the Android twin of Apple's `SignInView`. Mirrors
+ * the web two-step flow; the Secret-Key floor ([UnlockScreen]) is the second step. Operator-blind: the
+ * password stays in this screen's transient state, is used on-device only (the data layer signs a nonce
+ * with a password-derived key — the password itself is never sent), and is dropped after submit.
+ * (cr-0018 phase 2 adds the in-screen Emergency-Kit import: fill email + park the Secret Key.)
  */
 @Composable
 fun SignInScreen(app: AppModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var secretKey by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    val canSubmit = email.trim().isNotEmpty() && password.isNotEmpty() && secretKey.isNotEmpty()
+    val canSubmit = email.trim().isNotEmpty() && password.isNotEmpty()
 
     AuthCard(title = "Sign in", subtitle = app.apiBase) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -50,25 +50,16 @@ fun SignInScreen(app: AppModel) {
                 keyboard = VeyqKeyboard.EMAIL,
             )
             VeyqField(label = "Password", value = password, onValueChange = { password = it }, secure = true)
-            VeyqField(
-                label = "Secret Key",
-                value = secretKey,
-                onValueChange = { secretKey = it },
-                secure = true,
-                hint = "From your Emergency Kit. Used with your password to unlock — never sent.",
-            )
-            PrimaryButton(title = "Sign in & unlock", busy = busy, enabled = canSubmit) {
+            PrimaryButton(title = "Sign in", busy = busy, enabled = canSubmit) {
                 busy = true
                 error = ""
                 val e = email.trim()
                 val p = password
-                val s = secretKey
                 scope.launch {
-                    val err = app.signInAndUnlock(e, p, s)
+                    val err = app.login(e, p)
                     if (err == null) {
-                        // Drop the secrets from screen state the moment they're no longer needed.
+                        // Drop the password from screen state; the model carries it to the unlock step.
                         password = ""
-                        secretKey = ""
                     } else {
                         error = err
                     }
