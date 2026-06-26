@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
@@ -208,13 +209,13 @@ onMounted(() => {
             fluid
           />
         </label>
-        <label v-if="trustSupported && !deviceTrusted" class="checkbox-row">
-          <input v-model="trustChecked" type="checkbox" name="trust-device" />
-          <span>
+        <div v-if="trustSupported && !deviceTrusted" class="checkbox-row">
+          <Checkbox v-model="trustChecked" input-id="trust-device" binary />
+          <label for="trust-device">
             {{ t('unlock.trustDevice') }}
             <small class="field-hint">{{ t('unlock.trustDeviceHint') }}</small>
-          </span>
-        </label>
+          </label>
+        </div>
         <Button
           type="submit"
           :label="busy ? t('unlock.submitting') : t('unlock.submit')"
