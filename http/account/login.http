@@ -2,9 +2,9 @@
 # Runnable acceptance for the login/token/session API. Run against a FRESH instance; request 1 creates
 # the owner so an account exists, then the surface is exercised top-to-bottom (shared server state).
 #
-# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid session can be
-# obtained): the signed happy-path login, refresh ROTATION success, and reuse→family-revoke. Those are
-# covered by the backend slice (LoginSliceTest). This file covers what needs no signature: challenge
+# The SIGNED happy-path — login → token, refresh ROTATION, reuse→family-revoke — lives in
+# account/authed-flow.http (it signs the nonce in-client via ../_lib/ed25519.js; needs a fresh instance).
+# This file covers the no-signature boundary surface, runnable against ANY instance: challenge
 # non-enumerability, boundary 400s, the generic 401, the DoS-safe unknown-refresh path, idempotent logout.
 #
 # Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/login.http

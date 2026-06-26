@@ -8,7 +8,7 @@
     <node-interpreter value="project" />
     <!-- Dev server port (read by vite.config.ts). Change it here to run the web client on another port. -->
     <envs>
-      <env name="VITE_PORT" value="5173" />
+      <env name="VITE_PORT" value="8081" />
     </envs>
     <method v="2" />
   </configuration>

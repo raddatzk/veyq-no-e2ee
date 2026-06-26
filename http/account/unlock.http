@@ -3,11 +3,10 @@
 # Master Key on-device. Run against any running instance (no seed needed: these paths are all pre-auth
 # rejections). The server only ever serves ciphertext here, and never to an unauthenticated caller.
 #
-# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid access token can be
-# obtained): the authenticated happy path — a 200 returning the caller's wraps + wrappedIdentityPrivateKey.
-# That needs a signed session and is covered by the backend slice (AccountKeyMaterialSliceTest) and the web
-# unlock test (cr-0004 phase 4). This file covers what needs no signature: the no-anonymous-read and
-# bad-bearer boundaries, both a single generic 401.
+# The authenticated happy path — a 200 returning the caller's wraps + wrappedIdentityPrivateKey — lives in
+# account/authed-flow.http (signed login via ../_lib/ed25519.js; fresh instance), and in the backend slice
+# (AccountKeyMaterialSliceTest) + the web unlock test (cr-0004 phase 4). This file covers the no-signature
+# boundaries, runnable against ANY instance: the no-anonymous-read and bad-bearer cases, both a generic 401.
 #
 # Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/unlock.http
 

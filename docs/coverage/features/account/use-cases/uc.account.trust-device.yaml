@@ -6,6 +6,7 @@ acceptanceCriteria:
     text: Trusting a device enrols a DEVICE wrap (it appears in the caller's key material) backed by a non-extractable device key.
     coverage:
       backend: { integration: [AccountWrapsSliceTest.addDeviceWrapAppearsInKeyMaterialAndReturnsId] }
+      http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
   - id: device-unlock-password-only
     text: A trusted device opens the Master Key with only the password (its DEVICE wrap), no Secret Key.
@@ -31,6 +32,7 @@ acceptanceCriteria:
     text: Untrusting removes that device's wrap by id (and the local key); other devices keep theirs.
     coverage:
       backend: { integration: [AccountWrapsSliceTest.deleteByIdRemovesTheWrap] }
+      http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
   - id: multi-device
     text: Multiple devices each enrol their own DEVICE wrap on the same Master Key (they coexist).
@@ -48,7 +50,7 @@ acceptanceCriteria:
 gaps:
   apple: no native client yet — native device trust (Keychain) is deferred to a later CR
   android: no native client yet — native device trust (Keystore) is deferred to a later CR
-# Note: the authed add (201 + id) / untrust (204) round-trip is not expressible on the http surface — a
-# .http handler cannot produce the Ed25519-signed session needed for a valid access token — so it is
-# covered by the backend slice + the web round-trip (and the live preview smoke). http covers the
-# signature-free 401/400 boundaries above.
+# Note: the authed add (201 + id) / untrust (204) round-trip IS now on the http surface —
+# account/authed-flow.http obtains a real session by signing the nonce in-client via _lib/ed25519.js
+# (fresh-instance, cr-0013), alongside the backend slice and the web round-trip (and the live preview
+# smoke). trust-device.http still covers the signature-free 401/400 boundaries above.

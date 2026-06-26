@@ -1,0 +1,146 @@
+### Authenticated Server-Owner tenant administration — signed login → tenant CRUD (uc.admin.create-tenant)
+# The signed counterpart to tenant.http: it drives the Server-Owner happy-path that the boundary file defers
+# (create → list → resend → reassign → revoke), with a REAL Ed25519 signature produced in-client via the
+# vendored tweetnacl facade (../_lib/ed25519.js). The seeded owner has the SERVER_OWNER role, so it passes
+# the @RolesAllowed gate.
+#
+# PRECONDITION: a FRESH instance — request 1 self-seeds the owner and setup is single-owner-locked. Wipe
+# first: docker compose -f infra/docker-compose.yml down -v && up -d. SEED is a NON-SECRET test key.
+#
+# Run: ijhttp --env-file http/admin/http-client.env.json --env dev http/admin/tenant-authed.http
+
+### 1. Seed the Server Owner with the test key's public key
+< {%
+import {publicKeyB64} from '../_lib/ed25519.js';
+const SEED = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+request.variables.set("authPub", publicKeyB64(SEED));
+%}
+POST {{host}}/api/setup/owner
+Content-Type: application/json
+
+{
+  "email": "kevin@example.com",
+  "displayName": "Kevin",
+  "suiteId": "v1",
+  "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
+  "wrappedIdentityPrivateKey": "d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
+  "authPublicKey": "{{authPub}}",
+  "masterKeyWraps": [{ "method": "PASSWORD", "wrappedKey": "d3JhcHBlZC1tYXN0ZXIta2V5", "kdfParams": "AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz" }],
+  "recoveryMasterKeyTag": "cmVjb3ZlcnktdGFn"
+}
+
+> {%
+client.test("owner created", function () {
+    client.assert(response.status === 201, "expected 201, got " + response.status);
+});
+%}
+
+### 2. Login challenge → capture the nonce
+POST {{host}}/api/login/challenge
+Content-Type: application/json
+
+{ "email": "kevin@example.com" }
+
+> {%
+client.test("challenge returns a nonce", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+});
+client.global.set("nonce", response.body.nonce);
+%}
+
+### 3. Sign the nonce and verify → an owner session
+< {%
+import {signNonceB64} from '../_lib/ed25519.js';
+const SEED = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+request.variables.set("sig", signNonceB64(SEED, client.global.get("nonce")));
+%}
+POST {{host}}/api/login/verify
+Content-Type: application/json
+
+{ "email": "kevin@example.com", "signature": "{{sig}}" }
+
+> {%
+client.test("signed verify issues a session", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+});
+client.global.set("at", response.body.accessToken);
+%}
+
+### 4. Create a tenant → 201 PENDING (capture the id)
+POST {{host}}/api/tenants
+Authorization: Bearer {{at}}
+Content-Type: application/json
+
+{ "tenantName": "Familie", "domain": "fam-authed.example.com", "ownerEmail": "partner@example.com" }
+
+> {%
+client.test("tenant created PENDING", function () {
+    client.assert(response.status === 201, "expected 201, got " + response.status);
+    client.assert(response.body.status === "PENDING", "expected PENDING");
+    client.assert(response.body.tenantId, "expected a tenantId");
+    client.assert(response.body.inviteExpiresAt, "expected inviteExpiresAt");
+});
+client.global.set("tenantId", response.body.tenantId);
+%}
+
+### 5. List includes the new tenant with an ACTIVE invite
+GET {{host}}/api/tenants
+Authorization: Bearer {{at}}
+Accept: application/json
+
+> {%
+client.test("list shows the PENDING tenant with an ACTIVE invite", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    const t = response.body.find(x => x.tenantId === client.global.get("tenantId"));
+    client.assert(t, "created tenant not in the list");
+    client.assert(t.status === "PENDING", "expected PENDING");
+    client.assert(t.inviteStatus === "ACTIVE", "expected an ACTIVE invite");
+});
+%}
+
+### 6. Resend the invite → still one ACTIVE invite (the prior one is superseded server-side)
+POST {{host}}/api/tenants/{{tenantId}}/invite/resend
+Authorization: Bearer {{at}}
+
+> {%
+client.test("resend keeps an ACTIVE invite", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(response.body.inviteStatus === "ACTIVE", "expected an ACTIVE invite");
+});
+%}
+
+### 7. Reassign the invite to a new owner email → rebound + still ACTIVE
+POST {{host}}/api/tenants/{{tenantId}}/invite/reassign
+Authorization: Bearer {{at}}
+Content-Type: application/json
+
+{ "ownerEmail": "second@example.com" }
+
+> {%
+client.test("reassign rebinds the owner email", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(response.body.ownerEmail === "second@example.com", "expected the rebound email");
+    client.assert(response.body.inviteStatus === "ACTIVE", "expected an ACTIVE invite");
+});
+%}
+
+### 8. Revoke the pending tenant → 204
+DELETE {{host}}/api/tenants/{{tenantId}}
+Authorization: Bearer {{at}}
+
+> {%
+client.test("revoke deletes the pending tenant", function () {
+    client.assert(response.status === 204, "expected 204, got " + response.status);
+});
+%}
+
+### 9. The tenant is gone — a resend now 404s
+POST {{host}}/api/tenants/{{tenantId}}/invite/resend
+Authorization: Bearer {{at}}
+
+> {%
+client.test("revoked tenant is gone", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "tenant_not_found", "expected code tenant_not_found");
+});
+%}

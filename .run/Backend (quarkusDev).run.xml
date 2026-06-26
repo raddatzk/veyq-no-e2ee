@@ -15,10 +15,13 @@
       </option>
       <option name="vmOptions" />
     </ExternalSystemSettings>
-    <GradleScriptDebugEnabled>false</GradleScriptDebugEnabled>
-    <method v="2">
-      <!-- Start (and wait for) the dev MariaDB before the backend connects (dev profile). -->
-      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Dev deps (MariaDB)" run_configuration_type="ShConfigurationType" />
-    </method>
+    <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
+    <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+    <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+    <DebugAllEnabled>false</DebugAllEnabled>
+    <RunAsTest>false</RunAsTest>
+    <GradleProfilingDisabled>false</GradleProfilingDisabled>
+    <GradleCoverageDisabled>false</GradleCoverageDisabled>
+    <method v="2" />
   </configuration>
 </component>

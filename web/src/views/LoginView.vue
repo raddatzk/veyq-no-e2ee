@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Checkbox from 'primevue/checkbox'
@@ -19,6 +20,7 @@ import { takeAuthPrefill } from '../app/authPrefill'
 // trusted device (a DEVICE wrap, ADR 0005) unlocks with only the password (carried from login); the floor
 // path adds the Secret Key. "Trust this device" enrols at unlock time, reusing the just-entered password.
 const { t } = useI18n()
+const router = useRouter()
 const email = ref('')
 const password = ref('')
 const secretKey = ref('')
@@ -268,6 +270,12 @@ onMounted(() => {
         <Message severity="success" :closable="false">{{ t('unlock.unlockedTitle') }}</Message>
         <p class="veyq-form-copy">{{ t('unlock.unlockedNote') }}</p>
         <Message v-if="trustFailed" severity="warn" :closable="false" class="form-message">{{ t('unlock.trustFailed') }}</Message>
+        <Button
+          type="button"
+          :label="t('tenant.manageTitle')"
+          icon="pi pi-building"
+          @click="router.push({ name: 'tenants' })"
+        />
         <Button
           v-if="deviceTrusted"
           type="button"

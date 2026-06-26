@@ -130,6 +130,25 @@ class AccountWrapsSliceTest {
             .then().statusCode(400)
     }
 
+    // Boundary validation runs with a valid token (auth passes first, then @Valid → 400). The anonymous/bogus-
+    // token side now uniformly 401s before validation (cr-0012 eager security), so the malformed-body 400
+    // contract lives here, where a real session exists.
+    @Test
+    fun missingWrappedKeyIs400() {
+        given().header("Authorization", "Bearer ${issueToken(USER_A)}").contentType(ContentType.JSON)
+            .body("""{"method":"DEVICE","kdfParams":"$KDF"}""")
+            .`when`().post("/api/account/wraps")
+            .then().statusCode(400)
+    }
+
+    @Test
+    fun nonBase64WrappedKeyIs400() {
+        given().header("Authorization", "Bearer ${issueToken(USER_A)}").contentType(ContentType.JSON)
+            .body("""{"method":"DEVICE","wrappedKey":"not base64!!","kdfParams":"$KDF"}""")
+            .`when`().post("/api/account/wraps")
+            .then().statusCode(400)
+    }
+
     @Test
     fun unauthenticatedAddAndDeleteAre401() {
         given().contentType(ContentType.JSON)

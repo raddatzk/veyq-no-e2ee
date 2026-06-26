@@ -1,0 +1,426 @@
+openapi: 3.1.0
+info:
+  title: veyq Tenants API
+  version: 0.1.0
+  description: >
+    Server-Owner administration of tenants — the structural (key-free) half of tenant creation
+    (uc.admin.create-tenant, Slice A / cr-0009). A Server Owner creates a tenant by entering a name, a
+    domain and the owner's email; the server validates the domain is free, creates the tenant in PENDING,
+    and mints a single-use, time-limited invite token bound to the owner email (delivered out-of-band by
+    email). The Server Owner can list all tenants and, for PENDING ones, resend the invite, reassign the
+    owner email, or revoke the tenant.
+
+    Operator-blind is not at stake here: name, domain and owner-email are low-sensitivity operational
+    metadata (host routing needs the domain anyway), and the invite is a **bootstrap secret, not a key**
+    (ADR 0006) — the server stores only its hash and holds no content key. The cold TENANT-scope birth that
+    activates a tenant is Slice B (cr-0010), not part of this API.
+
+    The invite lifecycle mirrors the session refresh-token model (ADR 0004): each invite carries a status
+    (ACTIVE → SUPERSEDED on resend/reassign, → CONSUMED on acceptance, → EXPIRED past its TTL); transitions
+    are soft (never hard-deleted inline), so a replayed superseded/consumed token is recognised and
+    rejected. A scheduled purge removes terminal-state invites later.
+
+    Every operation requires the global **Server Owner** role (`veyq_user.server_role`), enforced by a
+    server-side guard: a non-owner caller receives 403 even with a valid session. Field validation is
+    declared here and enforced by the generated code via `x-field-extra-annotation` (bean-validation +
+    trimming deserializer), so malformed input is rejected at the boundary (400) before any handler runs.
+tags:
+  - name: tenants
+    description: >
+      Server-Owner tenant administration (create / list / invite resend·reassign / revoke). One tag = one
+      resource interface owning the whole `/api/tenants` subtree (avoids the greedy class-level @Path that
+      a second tag rooted at the same prefix would cause).
+
+paths:
+  /api/tenants:
+    post:
+      tags: [tenants]
+      operationId: createTenant
+      summary: Create a PENDING tenant and mint an owner invite.
+      description: >
+        Creates a tenant in PENDING with a domain↔tenant mapping and a single-use, time-limited invite
+        bound to the owner email. The tenant holds no content until its owner accepts and cold-births the
+        TENANT scope (Slice B). Server-Owner only.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTenantRequest" }
+            example:
+              tenantName: Familie Raddatz
+              domain: family.example.com
+              ownerEmail: kevin@example.com
+      responses:
+        "201":
+          description: The tenant was created in PENDING and an invite was minted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantCreated" }
+              example:
+                tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                status: PENDING
+                inviteExpiresAt: 2026-07-03T12:00:00Z
+        "400":
+          description: The request was malformed (missing/invalid name, domain or email).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_server_owner }
+        "409":
+          description: The domain is already mapped to a tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: domain_taken }
+    get:
+      tags: [tenants]
+      operationId: listTenants
+      summary: List all tenants (active and pending).
+      description: >
+        Returns every tenant with its operational metadata and the state of its current invite. Server-Owner
+        only. No content keys or member identities are exposed — the operator stays blind to tenant content.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All tenants on the instance.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TenantSummary" }
+              example:
+                - tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  name: Familie Raddatz
+                  domain: family.example.com
+                  ownerEmail: kevin@example.com
+                  status: PENDING
+                  inviteStatus: ACTIVE
+                  inviteExpiresAt: 2026-07-03T12:00:00Z
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_server_owner }
+
+  /api/tenants/{tenantId}/invite/resend:
+    post:
+      tags: [tenants]
+      operationId: resendTenantInvite
+      summary: Re-mint and resend the invite for a pending tenant.
+      description: >
+        Soft-supersedes the current ACTIVE invite (→ SUPERSEDED) and mints a fresh ACTIVE one with a new
+        TTL, then re-sends the invite email to the same owner address. PENDING tenants only. Server-Owner
+        only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: A fresh invite was minted and re-sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantInviteState" }
+              example:
+                ownerEmail: kevin@example.com
+                inviteStatus: ACTIVE
+                inviteExpiresAt: 2026-07-03T12:00:00Z
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_server_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The tenant is not PENDING (already active) — invites apply only before activation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_pending }
+
+  /api/tenants/{tenantId}/invite/reassign:
+    post:
+      tags: [tenants]
+      operationId: reassignTenantInvite
+      summary: Re-bind a pending tenant's invite to a different owner email.
+      description: >
+        Changes the intended owner email, soft-supersedes the current ACTIVE invite, mints a fresh ACTIVE
+        one bound to the new email, and sends it there. This is what keeps the strict email-binding painless
+        (an existing user with a different primary email is invited at the right address). PENDING tenants
+        only. Server-Owner only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReassignOwnerRequest" }
+            example: { ownerEmail: partner@example.com }
+      responses:
+        "200":
+          description: The invite was re-bound to the new email and re-sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantInviteState" }
+              example:
+                ownerEmail: partner@example.com
+                inviteStatus: ACTIVE
+                inviteExpiresAt: 2026-07-03T12:00:00Z
+        "400":
+          description: The request was malformed (missing/invalid email).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_server_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The tenant is not PENDING (already active).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_pending }
+
+  /api/tenants/{tenantId}:
+    delete:
+      tags: [tenants]
+      operationId: revokeTenant
+      summary: Revoke a pending tenant.
+      description: >
+        Deletes a PENDING tenant that was never accepted (reserved domain + outstanding invite). ACTIVE
+        tenants cannot be revoked this way — deactivating a live tenant is a separate future use-case.
+        Server-Owner only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "204":
+          description: The pending tenant was revoked.
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the Server Owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_server_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The tenant is ACTIVE and cannot be revoked here.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_pending }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The opaque access token issued by login / refresh. The caller must be the Server Owner.
+
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      description: Opaque id of the tenant.
+      schema:
+        type: string
+        format: uuid
+        example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+
+  schemas:
+    CreateTenantRequest:
+      type: object
+      required: [tenantName, domain, ownerEmail]
+      properties:
+        tenantName:
+          type: string
+          description: Human display name of the tenant (operational cleartext; trimmed on input).
+          maxLength: 100
+          example: Familie Raddatz
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
+        domain:
+          type: string
+          description: >
+            The tenant's domain (its Host) — the backend resolves the tenant from this. Operational
+            cleartext, unique across the instance. Lowercase hostname; trimmed on input.
+          maxLength: 253
+          example: family.example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 253) @field:jakarta.validation.constraints.Pattern(regexp = "^([a-z0-9](-?[a-z0-9])*\\.)+[a-z]{2,}$")'
+        ownerEmail:
+          type: string
+          format: email
+          description: Email of the person who will own the tenant; the invite is bound to it. Server-visible.
+          maxLength: 254
+          example: kevin@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+
+    ReassignOwnerRequest:
+      type: object
+      required: [ownerEmail]
+      properties:
+        ownerEmail:
+          type: string
+          format: email
+          description: The new owner email to re-bind the invite to. Server-visible.
+          maxLength: 254
+          example: partner@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+
+    TenantCreated:
+      type: object
+      required: [tenantId, status, inviteExpiresAt]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: Opaque id of the created tenant.
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        status:
+          $ref: "#/components/schemas/TenantStatus"
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          description: When the minted invite expires (UTC).
+          example: 2026-07-03T12:00:00Z
+
+    TenantSummary:
+      type: object
+      required: [tenantId, name, domain, ownerEmail, status]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        name:
+          type: string
+          maxLength: 100
+          example: Familie Raddatz
+        domain:
+          type: string
+          maxLength: 253
+          example: family.example.com
+        ownerEmail:
+          type: string
+          maxLength: 254
+          example: kevin@example.com
+        status:
+          $ref: "#/components/schemas/TenantStatus"
+        inviteStatus:
+          description: State of the tenant's current invite (absent once a tenant is ACTIVE).
+          oneOf:
+            - $ref: "#/components/schemas/InviteStatus"
+            - type: "null"
+        inviteExpiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the current invite expires (null once ACTIVE).
+          example: 2026-07-03T12:00:00Z
+
+    TenantInviteState:
+      type: object
+      required: [ownerEmail, inviteStatus, inviteExpiresAt]
+      properties:
+        ownerEmail:
+          type: string
+          maxLength: 254
+          example: kevin@example.com
+        inviteStatus:
+          $ref: "#/components/schemas/InviteStatus"
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          example: 2026-07-03T12:00:00Z
+
+    TenantStatus:
+      type: string
+      description: Lifecycle state of a tenant.
+      enum: [PENDING, ACTIVE]
+      example: PENDING
+
+    InviteStatus:
+      type: string
+      description: >
+        Lifecycle state of an invite (mirrors the session refresh-token model): ACTIVE until superseded by
+        a resend/reassign, consumed on acceptance, or expired past its TTL.
+      enum: [ACTIVE, SUPERSEDED, CONSUMED, EXPIRED]
+      example: ACTIVE
+
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable, client-localizable error code.
+          maxLength: 64
+          example: invalid_request
+        message:
+          type: [string, "null"]
+          description: Optional developer-facing detail; never contains secrets or content.
+          maxLength: 512
+          example: null

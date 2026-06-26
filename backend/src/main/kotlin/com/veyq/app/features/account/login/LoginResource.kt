@@ -7,13 +7,16 @@ import com.veyq.app.generated.model.LoginChallengeRequest
 import com.veyq.app.generated.model.LoginVerifyRequest
 import com.veyq.app.generated.model.SessionFamily
 import com.veyq.app.generated.model.SessionResponse
+import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.util.UUID
 
 /**
  * HTTP adapter for challenge-response login. Implements the generated [LoginApi]; thin — maps to/from the
- * generated models and delegates to [LoginHandler] (ADR 0001). Field validation runs at the boundary.
+ * generated models and delegates to [LoginHandler] (ADR 0001). Field validation runs at the boundary. Public
+ * (`@PermitAll`, cr-0012): login *establishes* the session, so it precedes authentication.
  */
+@PermitAll
 class LoginResource(private val handler: LoginHandler) : LoginApi {
 
     override fun requestLoginChallenge(loginChallengeRequest: LoginChallengeRequest): Response {

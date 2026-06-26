@@ -1,0 +1,63 @@
+useCase: uc.admin.create-tenant
+feature: admin
+title: Create a tenant & invite its owner
+# Slice A (cr-0009) — structural tenant creation + invite lifecycle + Server-Owner management. Activation
+# (cold TENANT-scope birth, → ACTIVE) is Slice B (cr-0010) and is not covered here yet.
+acceptanceCriteria:
+  - id: create-pending-tenant
+    text: A Server Owner creates a PENDING tenant (201) with an owner invite.
+    coverage:
+      backend: { integration: [TenantsSliceTest.createReturns201Pending] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+      web: { e2e: [browser-smoke cr-0009 phase 4 (setup→login→unlock→create, row renders PENDING)] }
+  - id: reject-duplicate-domain
+    text: A domain already mapped to a tenant is rejected (409 domain_taken).
+    coverage:
+      backend: { integration: [TenantsSliceTest.duplicateDomainIs409] }
+  - id: list-tenants
+    text: A Server Owner lists all tenants with each one's current invite status.
+    coverage:
+      backend: { integration: [TenantsSliceTest.listIncludesCreatedTenantWithActiveInvite] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+  - id: resend-supersedes-invite
+    text: Resend soft-supersedes the current ACTIVE invite and mints a fresh ACTIVE one (one ACTIVE kept).
+    coverage:
+      backend: { integration: [TenantsSliceTest.resendSupersedesOldInviteAndKeepsOneActive] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+  - id: reassign-rebinds-email
+    text: Reassign re-binds the owner email and supersedes the prior invite.
+    coverage:
+      backend: { integration: [TenantsSliceTest.reassignRebindsEmailAndSupersedes] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+  - id: revoke-pending-tenant
+    text: A pending tenant is revoked (204) and disappears; a follow-up action returns 404.
+    coverage:
+      backend: { integration: [TenantsSliceTest.revokePendingTenantDeletesIt] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+  - id: server-owner-only
+    text: A signed-in non-owner is refused (403 not_server_owner).
+    coverage:
+      backend: { integration: [TenantsSliceTest.nonOwnerIsForbidden] }
+  - id: authenticated-only
+    text: An unauthenticated caller is refused (401), and auth is checked before tenant lookup.
+    coverage:
+      backend: { integration: [TenantsSliceTest.unauthenticatedIs401] }
+      http: { e2e: [http/admin/tenant.http] }
+  - id: reject-invalid-domain
+    text: A malformed domain is rejected at the boundary (400).
+    coverage:
+      backend: { integration: [TenantsSliceTest.invalidDomainIs400] }
+      http: { e2e: [http/admin/tenant.http] }
+  - id: unknown-tenant-404
+    text: An action on an unknown tenant id returns 404 tenant_not_found.
+    coverage:
+      backend: { integration: [TenantsSliceTest.resendOnUnknownTenantIs404] }
+      http: { e2e: [http/admin/tenant-authed.http] }
+  - id: invite-purge
+    text: Overdue ACTIVE invites are expired and terminal-state invites are purged on a schedule.
+    coverage:
+      backend: { integration: [TenantsSliceTest.purgeExpiresActiveAndDeletesTerminalInvites] }
+gaps:
+  web: built (cr-0009 phase 4) — facade unit tests (tenants.test.ts) + interactive browser smoke; a web acceptance harness is not yet linked here
+  apple: not built yet — web-first slice; native parity is a later CR
+  android: not built yet — web-first slice; native parity is a later CR

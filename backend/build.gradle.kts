@@ -23,7 +23,9 @@ dependencies {
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-hibernate-validator")
+    implementation("io.quarkus:quarkus-security") // central auth: SecurityIdentity + @RolesAllowed (cr-0012)
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
+    implementation("io.quarkus:quarkus-scheduler") // @Scheduled cleanup jobs (first use: tenant-invite purge)
     implementation("io.quarkus:quarkus-jdbc-h2") // dev/test store (the default)
     implementation("io.quarkus:quarkus-jdbc-mariadb") // production store
     implementation("io.quarkus:quarkus-flyway")

@@ -31,11 +31,12 @@ acceptanceCriteria:
     text: The endpoint serves only ciphertext (wraps + wrapped identity private key) plus the public suite id; the server never derives a KEK or unwraps anything.
     coverage:
       backend: { integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial] }
+      http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
 gaps:
   apple: no native client yet — native unlock is deferred to a later CR
   android: no native client yet — native unlock is deferred to a later CR
-# Note: the authenticated happy path (200 returning the caller's wraps) is not expressible on the http
-# surface — a .http handler cannot produce the Ed25519-signed session needed for a valid access token — so
-# it is covered by the backend slice (validTokenReturnsCallersMaterial) and the web unlock round-trip. http
+# Note: the authenticated happy path (200 returning the caller's wraps) IS now on the http surface —
+# account/authed-flow.http obtains a real session by signing the nonce in-client via _lib/ed25519.js
+# (fresh-instance, cr-0013), alongside the backend slice and the web unlock round-trip. unlock.http still
 # covers the signature-free 401 boundaries above.

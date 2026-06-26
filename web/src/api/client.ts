@@ -10,6 +10,7 @@ import {
   TokenApi,
 } from './generated/auth'
 import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
+import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -39,4 +40,8 @@ export function accountApi(): AccountApi {
 
 export function accountWrapsApi(): AccountWrapsApi {
   return new AccountWrapsApi(new AccountConfiguration(bearerParams()))
+}
+
+export function tenantsApi(): TenantsApi {
+  return new TenantsApi(new TenantsConfiguration(bearerParams()))
 }

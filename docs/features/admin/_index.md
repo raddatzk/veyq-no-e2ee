@@ -11,7 +11,7 @@ handling of reported shares.
 ## Use-cases
 
 - ★ [First-run server setup](use-cases/uc.admin.setup-server.md) — **refined**
-- Create a tenant & invite its owner — planned (inbox #13)
+- ★ [Create a tenant & invite its owner](use-cases/uc.admin.create-tenant.md) — **refined**
 - Invite members, grant access & assign roles — planned
 - Manage server users & roles — planned
 - Set tenant branding & legal terms — planned

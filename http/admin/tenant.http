@@ -1,0 +1,138 @@
+### Create a tenant & manage pending tenants (uc.admin.create-tenant, Slice A / cr-0009)
+# Runnable acceptance for the Server-Owner tenant API. Run against any running instance — every path here
+# is a pre-auth rejection or boundary validation, so no seed is needed.
+#
+# The authed happy path (create 201 → list → resend → reassign → revoke) lives in admin/tenant-authed.http
+# (signed Server-Owner login via ../_lib/ed25519.js; fresh instance). The non-owner 403 still needs a
+# *member* session, which no http file can seed yet (setup only mints the owner), so it stays covered by the
+# backend slice (TenantsSliceTest) + the web round-trip (cr-0009 phase 4). This file covers what needs no
+# signature against ANY instance: that every endpoint rejects an
+# anonymous/bogus caller with a uniform 401. Since cr-0012 centralized auth behind @RolesAllowed (eager
+# security), auth is enforced BEFORE both body validation and tenant lookup — so even a malformed body or a
+# well-formed tenant id returns 401, never 400/404, and no validation detail leaks pre-auth. The boundary
+# 400s (invalid domain/name/email) are now asserted with an owner token by TenantsSliceTest.
+#
+# Run: ijhttp --env-file http/admin/http-client.env.json --env dev http/admin/tenant.http
+
+### 1. Create with no bearer → generic 401 (no anonymous tenant creation)
+POST {{host}}/api/tenants
+Content-Type: application/json
+
+{ "tenantName": "Familie", "domain": "family.example.com", "ownerEmail": "kevin@example.com" }
+
+> {%
+client.test("anonymous create is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 2. Create with a bogus bearer → the SAME generic 401
+POST {{host}}/api/tenants
+Content-Type: application/json
+Authorization: Bearer this-token-was-never-issued
+
+{ "tenantName": "Familie", "domain": "family.example.com", "ownerEmail": "kevin@example.com" }
+
+> {%
+client.test("bogus-bearer create is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 3. Create with an invalid domain but no bearer → 401 (auth precedes validation, no pre-auth leak)
+POST {{host}}/api/tenants
+Content-Type: application/json
+
+{ "tenantName": "Familie", "domain": "NOT a domain", "ownerEmail": "kevin@example.com" }
+
+> {%
+client.test("anonymous create with invalid domain is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 4. Create with a blank tenant name but no bearer → 401 (auth precedes validation)
+POST {{host}}/api/tenants
+Content-Type: application/json
+
+{ "tenantName": "   ", "domain": "family.example.com", "ownerEmail": "kevin@example.com" }
+
+> {%
+client.test("anonymous create with blank name is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 5. Create with a malformed owner email but no bearer → 401 (auth precedes validation)
+POST {{host}}/api/tenants
+Content-Type: application/json
+
+{ "tenantName": "Familie", "domain": "family.example.com", "ownerEmail": "not-an-email" }
+
+> {%
+client.test("anonymous create with malformed email is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 6. List with no bearer → generic 401
+GET {{host}}/api/tenants
+Accept: application/json
+
+> {%
+client.test("anonymous list is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 7. Resend on a well-formed tenant id with no bearer → 401 (auth precedes tenant lookup)
+POST {{host}}/api/tenants/11111111-1111-1111-1111-111111111111/invite/resend
+
+> {%
+client.test("anonymous resend is a generic 401 (not a 404)", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 8. Reassign with a valid body but no bearer → 401
+POST {{host}}/api/tenants/11111111-1111-1111-1111-111111111111/invite/reassign
+Content-Type: application/json
+
+{ "ownerEmail": "partner@example.com" }
+
+> {%
+client.test("anonymous reassign is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 9. Reassign with a malformed email but no bearer → 401 (auth precedes validation)
+POST {{host}}/api/tenants/11111111-1111-1111-1111-111111111111/invite/reassign
+Content-Type: application/json
+
+{ "ownerEmail": "not-an-email" }
+
+> {%
+client.test("anonymous reassign with malformed email is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 10. Revoke with no bearer → 401 (auth precedes tenant lookup)
+DELETE {{host}}/api/tenants/11111111-1111-1111-1111-111111111111
+
+> {%
+client.test("anonymous revoke is a generic 401 (not a 404)", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}

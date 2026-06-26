@@ -1,15 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useServerState } from './shared/state/useServerState'
+import { session } from './app/session'
 import SetupView from './views/SetupView.vue'
 import LoginView from './views/LoginView.vue'
+import TenantsView from './views/TenantsView.vue'
 
-// Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on the (stubbed) /login.
-// The auth-gated content routes from the legacy app arrive with the login CR.
+// Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /tenants is
+// the first authenticated content route (Server-Owner tenant administration, cr-0009) — it needs a session;
+// the backend enforces the Server-Owner role with a 403.
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/tenants', name: 'tenants', component: TenantsView },
     { path: '/:pathMatch(.*)*', redirect: { name: 'login' } },
   ],
 })
@@ -20,6 +24,8 @@ router.beforeEach((to) => {
   if (serverState.setupCompleted === null) return true
   if (!serverState.setupCompleted && to.name !== 'setup') return { name: 'setup' }
   if (serverState.setupCompleted && to.name === 'setup') return { name: 'login' }
+  // Authenticated routes need a live session (an access token).
+  if (to.name === 'tenants' && session.accessToken === null) return { name: 'login' }
   return true
 })
 

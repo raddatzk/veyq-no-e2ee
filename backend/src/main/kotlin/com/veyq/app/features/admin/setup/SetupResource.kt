@@ -5,14 +5,17 @@ import com.veyq.app.generated.model.CreateServerOwnerRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.SetupResult
 import com.veyq.app.generated.model.SetupStatus
+import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.util.UUID
 
 /**
  * HTTP adapter for first-run setup. Implements the generated [SetupApi]; thin — it maps to/from the
  * generated models and delegates to [SetupHandler] (ADR 0001). Field validation is enforced by @Valid
- * on the generated request model before this runs.
+ * on the generated request model before this runs. Public (`@PermitAll`, cr-0012): setup runs pre-auth,
+ * before any account exists.
  */
+@PermitAll
 class SetupResource(private val handler: SetupHandler) : SetupApi {
 
     override fun getSetupStatus(): Response {

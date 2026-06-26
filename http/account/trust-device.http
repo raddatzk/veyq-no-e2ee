@@ -3,10 +3,14 @@
 # all pre-auth rejections or boundary validation, so no seed is needed. The server only ever receives
 # ciphertext + KDF params here, and never from an unauthenticated caller.
 #
-# NOT covered here (the HTTP client cannot produce an Ed25519 signature, so no valid access token can be
-# obtained): the authed add (201 + id) and untrust (204) round-trip. Those need a signed session and are
-# covered by the backend slice (AccountWrapsSliceTest) + the web round-trip (cr-0005 phase 4). This file
-# covers what needs no signature: the no-anonymous-write 401s and the body/method 400s.
+# The authed add (201 + id) and untrust (204) round-trip lives in account/authed-flow.http (signed login via
+# ../_lib/ed25519.js; fresh instance), and in the backend slice (AccountWrapsSliceTest) + the web round-trip
+# (cr-0005 phase 4). This file covers the no-signature surface, runnable against ANY instance: that every
+# endpoint rejects an anonymous/bogus caller with a uniform 401.
+# Since cr-0012 centralized auth behind @Authenticated (eager security), auth is enforced BEFORE body
+# validation — so even a malformed body returns 401, never 400, and no validation detail leaks pre-auth. The
+# boundary 400s (missing/non-base64 wrappedKey, non-DEVICE method) are now asserted with a token by
+# AccountWrapsSliceTest.
 #
 # Run: ijhttp --env-file http/account/http-client.env.json --env dev http/account/trust-device.http
 
@@ -37,7 +41,7 @@ client.test("bogus-bearer add is a generic 401", function () {
 });
 %}
 
-### 3. Add with a missing field (no wrappedKey) → rejected at the boundary (400, before the handler)
+### 3. Add with a missing field but a bogus bearer → 401 (auth precedes validation, no pre-auth leak)
 POST {{host}}/api/account/wraps
 Content-Type: application/json
 Authorization: Bearer this-token-was-never-issued
@@ -45,12 +49,13 @@ Authorization: Bearer this-token-was-never-issued
 { "method": "DEVICE", "kdfParams": "a2RmLXBhcmFtcw==" }
 
 > {%
-client.test("missing wrappedKey is rejected", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
+client.test("bogus-bearer add with missing field is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
 });
 %}
 
-### 4. Add with a non-DEVICE method → rejected at the boundary (400; this endpoint only adds DEVICE wraps)
+### 4. Add with a non-DEVICE method but a bogus bearer → 401 (auth precedes validation)
 POST {{host}}/api/account/wraps
 Content-Type: application/json
 Authorization: Bearer this-token-was-never-issued
@@ -58,12 +63,13 @@ Authorization: Bearer this-token-was-never-issued
 { "method": "PASSWORD", "wrappedKey": "ZGV2aWNlLXdyYXA=", "kdfParams": "a2RmLXBhcmFtcw==" }
 
 > {%
-client.test("non-DEVICE method is rejected", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
+client.test("bogus-bearer add with non-DEVICE method is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
 });
 %}
 
-### 5. Add with a non-base64 wrappedKey → rejected at the boundary (400)
+### 5. Add with a non-base64 wrappedKey but a bogus bearer → 401 (auth precedes validation)
 POST {{host}}/api/account/wraps
 Content-Type: application/json
 Authorization: Bearer this-token-was-never-issued
@@ -71,8 +77,9 @@ Authorization: Bearer this-token-was-never-issued
 { "method": "DEVICE", "wrappedKey": "not base64!!", "kdfParams": "a2RmLXBhcmFtcw==" }
 
 > {%
-client.test("non-base64 wrappedKey is rejected", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
+client.test("bogus-bearer add with non-base64 wrappedKey is still a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
 });
 %}
 

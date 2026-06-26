@@ -91,6 +91,46 @@ This separation is the heart of the model:
 - **The client enforces *confidentiality*:** only the grant unwraps the scope key, so a member can read
   a scope **only** if they hold a grant for it. *Visibility is cryptographic*, not a server promise.
 
+## Membership — the user↔scope relation (role + grant)
+
+Membership is the **relation between a user and a scope**, and it carries **both** axes of the model in
+one row: a **management role** (server-enforced) and a **grant** (the scope private key wrapped to the
+member's identity public key — client-enforced confidentiality). The same shape repeats per scope kind:
+
+| Membership | Cardinality | Role values | Grant |
+|---|---|---|---|
+| **Server** | 1 per user (a user belongs to one server) | `OWNER` · `MEMBER` | optional — only if the operator domain is modelled as a server-scope (parked, see below) |
+| **Tenant** | n-m (user × tenant) | `OWNER` · `ADMIN` · `MEMBER` | grant to the `TENANT` scope key |
+| **Group** | n-m (user × group, within one tenant) | `ADMIN` · `MEMBER` | grant to the `GROUP` scope key |
+| **Personal** | the member alone | — | self-held; no other key-holder unless explicitly shared |
+
+- **Role gates *management*, grant gates *content*.** Promoting a member who already holds a grant is a
+  pure role change (no key moves); a role without a grant is a hollow title (can neither read nor invite —
+  inviting needs the scope key). See [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md).
+- **The first tenant membership is born at activation** — the invited owner's `OWNER` row + its grant come
+  into being when they cold-birth the `TENANT` scope (Slice B). Member invites extend the same relation
+  later via the invite-wrap.
+- **Server role is 1-1, not n-m** — a user has exactly one server role (today `veyq_user.server_role`).
+  Multiple `OWNER`s are allowed by the model; a flow to mint a second one is a later use-case.
+
+### Reaching a person — email for outsiders, username within the system
+
+Who you can address depends on whether they already exist on the server:
+
+- **Outsider (no account yet)** — reached by **email** (the only out-of-band channel). This is the tenant
+  **owner** invite: the operator types an email, the server sends an invite, the invitee registers. The
+  email is **operational metadata** the server must hold to send mail.
+- **Existing user (already on the server)** — invited by **username**, fully **in-app** via the
+  invite-wrap; no email needed. This is the member / group-invite path and keeps person lookup
+  **non-enumerable** (you resolve a username only within scopes you can already see).
+
+**Email visibility is a role rule, not crypto.** The owner email is server-visible operational metadata;
+the server returns it **only to roles that need it** (a `SERVER_OWNER`, or the tenant's own
+`OWNER`/`ADMIN`) and omits it for ordinary members. Encrypting such server-visible PII **at rest** (under
+an operator-held key, so a stolen DB dump leaks nothing) is a **separate** defense-in-depth concern — it
+is *not* operator-blindness (the server must still decrypt to send mail), and it must be decided
+crosscutting over **all** server-visible emails (including `veyq_user.email`), not per field.
+
 ## Onboarding a new member — the invite-wrap
 
 A new member has **no identity keypair yet**, so the scope key cannot be wrapped to them in advance.

@@ -41,8 +41,18 @@
   an operation serving N use-cases dispatches to N handlers (or a small dispatcher).
 - **Handler/Service = one responsibility,** describable in one sentence. Constructor dependencies are a
   refactoring signal: 6–9 → review the responsibility; 10+ → actively split out policies/resolvers/mappers/stores.
-- **Authorization through small guards,** not inline checks (e.g. a scope-access guard requiring a valid
-  grant + ACTIVE membership, a tenant-admin guard, a containment guard).
+- **Authentication & coarse authorization are central, declared at the resource boundary** — never read the
+  bearer token in a resource or handler ([ADR 0008](../decisions/0008-centralized-http-auth.md)). A custom
+  `HttpAuthenticationMechanism` + `IdentityProvider` resolve the token once into a `SecurityIdentity`; each
+  resource method declares `@PermitAll` / `@Authenticated` / `@RolesAllowed(SERVER_OWNER)`. **Default-deny**
+  (`deny-unannotated-endpoints=true`): an unannotated endpoint fails closed (401), so the annotation is the
+  single place the token-or-not decision is taken. The 401/403 body comes from two `ExceptionMapper`s, not a
+  per-resource `unauthorized()`. The one exception is the deliberately-lenient `logout`, which reads the token
+  manually so it stays a 204 no-op for any token.
+- **Fine-grained, content-level authorization stays a small domain guard** in the handler — a *different layer*
+  from the HTTP role gate above (e.g. a scope-access guard requiring a valid grant + ACTIVE membership, a
+  containment guard, tenant-admin over a *specific* tenant). These need DB/grant state and are never an HTTP
+  role; keep them small, named and fail-closed.
 - **Mappers produce the target model directly** from the richer source — no
   `domain.toSummary().toSomethingElse()` chains. Generated API models stay at the resource/mapper
   boundary; handlers, guards and stores work with domain types.
@@ -131,6 +141,13 @@ Keep **http / web / apple / android** (plus backend) behavior in parity; when a 
 differs, **mark it explicitly** in code and in the [parity matrix](platform-parity.md) (use-case ×
 surface, with reasons for intentional N/A). Crypto parity is enforced mechanically by the conformance
 vectors (§9).
+
+- **`http/` covers signed happy-paths, not just boundaries.** The ijhttp client signs the login nonce
+  in-client via a vendored Ed25519 facade (`http/_lib/ed25519.js`, pre-request handler), so the
+  authenticated journeys (signed login → token → authed calls) are real contract-level coverage in
+  `*-authed.http` files, not deferred to slice tests. Split by precondition: boundary files stay
+  zero-precondition (any instance); `*-authed.http` self-seed an owner and need a **fresh** instance
+  (documented in each header). See `http/_lib/README.md` (cr-0013).
 
 ## 12. Git & PR
 
