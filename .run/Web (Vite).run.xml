@@ -6,7 +6,10 @@
       <script value="dev" />
     </scripts>
     <node-interpreter value="project" />
-    <envs />
+    <!-- Dev server port (read by vite.config.ts). Change it here to run the web client on another port. -->
+    <envs>
+      <env name="VITE_PORT" value="5173" />
+    </envs>
     <method v="2" />
   </configuration>
 </component>
