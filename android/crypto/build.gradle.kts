@@ -2,7 +2,7 @@
 // runs without the Android SDK. BouncyCastle provides Argon2id + Ed25519 + HKDF; AES-GCM uses the JDK's JCE.
 // Byte-identical to the shared vectors (contracts/crypto/vectors/v1.json, ADR 0009).
 plugins {
-    kotlin("jvm") version "2.3.21" // match the backend — supports Gradle 9.5.1 + JDK 25
+    kotlin("jvm") // version pinned in the root build script (KGP 2.2.10, shared classloader)
 }
 
 dependencies {

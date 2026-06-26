@@ -1,7 +1,7 @@
 ---
 id: cr-0016
 title: Android client — login + unlock (Kotlin / Jetpack Compose)
-status: planned          # planned → in-progress → done (then keep as a record)
+status: in-progress      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.login, uc.account.unlock]   # the Android surface (web ✅, apple ✅ via cr-0015)
 adrs: [0003, 0004, 0005, 0009, 0010]
 invariants: [operator-blind]
@@ -54,25 +54,35 @@ behavioural contract (`http/` acceptance + use-cases), implemented in the platfo
 
 ## Phases
 
-- [ ] **1 — client + scaffold.** Add the `org.openapi.generator` plugin; generate `:client`'s setup/auth/
+- [x] **1 — client + scaffold.** Add the `org.openapi.generator` plugin; generate `:client`'s setup/auth/
   account Kotlin clients (separate packages) from the symlinked/contract specs; a thin facade
   (`VeyqApi`-equivalent) over an OkHttp client + base URL; `:client` as a pure-JVM Gradle module; `:app` as
   an Android/Compose module (`com.android.application`, Compose BOM, min/target SDK, the `Pixel_10`-class
   device). `settings.gradle.kts` includes `:client` + `:app`. **Done when:** `:crypto:test` still green,
   `:client` compiles + a trivial test passes, `:app:assembleDebug` builds (AGP + SDK).
-- [ ] **2 — login (data layer).** `:client` login mirrors web/Apple: `POST /api/login/challenge` (carries
+  **DONE.** Toolchain notes: AGP **9.2.1** + Gradle 9.5.1 force **built-in Kotlin (KGP 2.2.10)**; all
+  modules unified to KGP 2.2.10 (down from 2.3.21 — `:crypto:test` still green on JDK 25). Every plugin is
+  declared once in the root `build.gradle.kts` (`apply false`) so AGP + KGP share one classloader (else
+  `KotlinAndroidTarget` → removed `BaseVariant` NoClassDefFound). The generator's `x-field-extra-annotation`
+  (Quarkus bean-validation) is stripped into a sanitized spec copy so the client carries no `jakarta`. The
+  okhttp4 client is suspend-internally but exposes blocking convenience methods → blocking orchestration.
+  compileSdk pinned to **36** (android-37 platform not yet on the CLI channel) with the late-2025 36-wave
+  AndroidX.
+- [x] **2 — login (data layer).** `:client` login mirrors web/Apple: `POST /api/login/challenge` (carries
   the instanceSalt) → `deriveAuthSalt` → `deriveAuthKeypair` → `authSign(nonce)` → `POST /api/login/verify`
   → store opaque access+refresh in an in-memory `Session`; `refresh()` (drops tokens on rejection),
   `logout()`, a `withRefresh` rotate-on-401 helper (ADR 0004), and a bearer interceptor. **Done when:** a
   `:client:test` (MockWebServer) signs in and asserts the signature it sent **verifies** against the
   independently-derived keypair (operator-blind), plus refresh-rotation / no-session / withRefresh cases.
-- [ ] **3 — unlock (data layer).** `GET /api/account/key-material` (via `withRefresh`) → pick the PASSWORD
+  **DONE** — `LoginTest` 4/4 green (`VeyqClient`, `Session`, `BearerInterceptor`, `VeyqError`).
+- [x] **3 — unlock (data layer).** `GET /api/account/key-material` (via `withRefresh`) → pick the PASSWORD
   wrap → `decodeKdfParams` → `kekPasswordSecret(secretKey, password)` → `symUnwrap` Master Key (`master-key`)
   → `symUnwrap` identity private (`identity-priv`) into an in-memory **`Vault`** (cleared on background/
   sign-out; identity held as raw bytes — ML-KEM parsing deferred). Errors mirror Apple (`unlockUnavailable`
   / `invalidSecretKey` / `unlockFailed`). **Done when:** a `:client:test` builds key material with the same
   `V1` primitives and asserts unlock recovers the **exact** Master Key + identity bytes; wrong-Secret-Key,
   no-PASSWORD-wrap, key-material-401→refresh→retry cases.
+  **DONE** — `UnlockTest` 5/5 green (`Vault` zero-on-clear, copy-on-read).
 - [ ] **4 — Compose UI (connect → sign-in → home).** Port the cr-0015 screens to Compose: instance URL
   (Connect + `setupRequired()` gate), email + password + Secret Key (Sign in → `login` then `unlock`, secrets
   dropped after submit), the unlocked Home (+ sign-out). One Compose tree, adaptive (phone/tablet), matching
