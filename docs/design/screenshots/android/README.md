@@ -7,8 +7,11 @@ flow against a real local instance. Same design system, copy, and flow as the Ap
 | file | screen |
 |------|--------|
 | `android-01-connect.png` | Connect — enter the instance URL |
-| `android-02-signin.png`  | Sign in — email + password + Secret Key |
-| `android-03-home.png`    | Unlocked — session held, vault open on-device |
+| `android-02-signin.png`  | Sign in (step 1) — email + password, with **Upload kit / Scan QR** (fills email + parks Secret Key) |
+| `android-03-unlock.png`  | Unlock floor (step 2) — Secret Key, with **Upload kit / Scan QR** (fills Secret Key) |
+| `android-04-home.png`    | Unlocked — session held, vault open on-device |
+
+The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0018.
 
 Captured on the **API-37 emulator** (`Pixel_10` AVD). Unlike macOS UI-test runners, the Android emulator
 has no TCC/Accessibility wall, so these are produced headlessly from the CLI.

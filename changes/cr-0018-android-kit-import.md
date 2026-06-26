@@ -1,7 +1,7 @@
 ---
 id: cr-0018
 title: Android — two-step unlock floor + Emergency Kit import (upload + QR scan)
-status: in-progress      # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.unlock]
 adrs: [0005, 0010]
 invariants: [operator-blind]
@@ -88,11 +88,15 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
   `CAMERA` permission via `RequestPermission`, denied/no-camera → message); scan affordance on both screens,
   foreign QRs ignored. CameraX 1.5.3 + ML Kit 17.3.0; `CAMERA` in the manifest; dexing the bundled model
   needed `org.gradle.jvmargs=-Xmx4g` (new `gradle.properties`). `:app:assembleDebug` green.
-- [ ] **4 — live round-trip + screenshots + docs.** Update the instrumented round-trip for the two-step
+- [x] **4 — live round-trip + screenshots + docs.** Update the instrumented round-trip for the two-step
   flow; re-capture screenshots (now `connect / signin / unlock-floor / home`, the **login + floor** both
   showing upload+scan) via TestStorage under `docs/design/screenshots/android/`; record the android ref on
   `secret-key-import-from-kit` in `uc.account.unlock` coverage. **Done when:** round-trip green, screenshots
   committed, `validate_coverage.py` green.
+  **DONE** — `RoundTripUiTest` (two-step) green on the API-37 emulator against the live instance; screenshots
+  committed (`android-01-connect` / `02-signin` / `03-unlock` / `04-home`, sign-in + floor both showing
+  Upload kit / Scan QR) + README updated; `secret-key-import-from-kit` android ref recorded;
+  `validate_coverage.py` green.
 
 ## Definition of done
 

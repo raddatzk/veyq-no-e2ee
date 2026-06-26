@@ -17,6 +17,7 @@ acceptanceCriteria:
     coverage:
       web: { unit: [src/features/account/emergencyKit/emergencyKit.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/KitTests.swift] }
+      android: { unit: [android/client/src/test/kotlin/com/veyq/client/KitTest.kt] }
   - id: wrong-credentials-generic-failure
     text: A wrong password or wrong Secret Key fails with a generic unlock failure (AEAD tag mismatch) and holds no key material; the server is uninvolved (E1).
     coverage:
@@ -55,7 +56,9 @@ acceptanceCriteria:
 # Android (phone/tablet, Jetpack Compose) native unlock landed in cr-0016: :client UnlockTest (key-material
 # → KEK → symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
 # LiveRoundTripTest (real instance) + :app RoundTripUiTest (full Compose UI round-trip on the emulator).
-# Android secret-key-import-from-kit is cr-0018.
+# Android secret-key-import-from-kit landed in cr-0018 (two-step floor + Emergency-Kit upload/scan): :client
+# KitTest covers the parseKit path; the SAF file picker + CameraX/ML Kit camera UI are manual-smoke (the
+# round-trip uses typed input, not the import).
 # Note: the authenticated happy path (200 returning the caller's wraps) IS now on the http surface —
 # account/authed-flow.http obtains a real session by signing the nonce in-client via _lib/ed25519.js
 # (fresh-instance, cr-0013), alongside the backend slice and the web unlock round-trip. unlock.http still
