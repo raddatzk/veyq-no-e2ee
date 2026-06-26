@@ -80,13 +80,17 @@ for now), importing a QR from a *static image file* (live camera scan + kit-PDF/
   `KitTests` 3/3 (token round-trip, PDF-shaped bytes, non-kit/wrong-version → nil). Shared `KitImportBar`
   (upload now, scan in phase 3); SignInView import fills email + parks SK (+ confirmation), UnlockView import
   fills SK. macOS + iOS builds green.
-- [ ] **3 — live QR scan (AVFoundation, universal).** A `KitScanner` (UI/NSViewControllerRepresentable over
+- [x] **3 — live QR scan (AVFoundation, universal).** A `KitScanner` (UI/NSViewControllerRepresentable over
   `AVCaptureSession` + metadata `.qr`) presented from a **scan** affordance on **both** steps; decoded
   string → `parseKit` → (login) email + parked Secret Key / (floor) Secret Key; cancel + permission-denied /
   no-camera fall back to upload/paste. `NSCameraUsageDescription` added. **Done when:** `swift build` green
   on macOS + iOS; manual smoke: scanning a kit QR on the login screen fills the email and pre-fills the
   Secret Key at the floor, and unlocks (camera scan shares the `parseKit` path, so it's manual where a camera
   exists — the automated round-trip covers the file path).
+  **DONE** — `KitScanner` (universal `CameraPreview`: `UIView`/`NSView` over `AVCaptureVideoPreviewLayer`;
+  `CameraScanController` requests access, wires a `.qr` metadata output, `nonisolated(unsafe)` session on a
+  serial queue for Swift-6 concurrency); scan sheet on both screens, foreign QRs ignored, denied/no-camera
+  → message. `NSCameraUsageDescription` added. macOS + iOS builds green.
 - [ ] **4 — live round-trip + screenshots + docs.** Update the live UI round-trip for the two-step flow;
   re-capture screenshots (now `connect / signin / unlock-floor / home`, the **login + floor** both showing
   upload+scan) under `docs/design/screenshots/apple/`; record the apple ref on `secret-key-import-from-kit`

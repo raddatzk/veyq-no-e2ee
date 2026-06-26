@@ -12,5 +12,9 @@
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
+    <!-- The Emergency-Kit QR scanner uses the camera, on-device only — the decoded Secret Key never leaves
+         the device. Shown when the user taps "Scan QR"; declining falls back to file upload / typing. -->
+    <key>NSCameraUsageDescription</key>
+    <string>Scan the QR code on your Emergency Kit to fill in your Secret Key. The scan happens on your device.</string>
 </dict>
 </plist>

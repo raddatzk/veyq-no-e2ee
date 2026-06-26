@@ -15,6 +15,7 @@ struct UnlockView: View {
     @State private var busy = false
     @State private var error = ""
     @State private var importingKit = false
+    @State private var scanningKit = false
 
     private var canSubmit: Bool { !secretKey.isEmpty }
 
@@ -27,22 +28,26 @@ struct UnlockView: View {
             VStack(alignment: .leading, spacing: 14) {
                 VeyqField(label: "Secret Key", text: $secretKey, secure: true,
                           hint: "From your Emergency Kit. Used with your password to unlock — never sent.")
-                KitImportBar(label: "Import your Emergency Kit to fill the Secret Key") { importingKit = true }
+                KitImportBar(label: "Import your Emergency Kit to fill the Secret Key",
+                             onUpload: { importingKit = true }, onScan: { scanningKit = true })
                 PrimaryButton(title: "Unlock", busy: busy, disabled: !canSubmit) { submit() }
                 Button("Use a different instance") { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).buttonStyle(.plain)
                 if !error.isEmpty { MessageBox(text: error) }
             }
             .fileImporter(isPresented: $importingKit, allowedContentTypes: [.pdf, .plainText, .text]) { result in
-                handleImport(result)
+                if case .success(let url) = result { applyKit(fromFile: url) }
+            }
+            .sheet(isPresented: $scanningKit) {
+                KitScanner(onResult: { kit in scanningKit = false; secretKey = kit.secretKey },
+                           onCancel: { scanningKit = false })
             }
         }
     }
 
     /// Import a kit from an uploaded file: fill the Secret Key. On-device only — nothing is sent.
-    private func handleImport(_ result: Result<URL, Error>) {
+    private func applyKit(fromFile url: URL) {
         error = ""
-        guard case .success(let url) = result else { return }
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url), let kit = importKitFromData(data) else {

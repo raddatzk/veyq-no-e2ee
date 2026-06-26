@@ -17,6 +17,7 @@ struct SignInView: View {
     @State private var error = ""
     @State private var info = ""
     @State private var importingKit = false
+    @State private var scanningKit = false
 
     private var canSubmit: Bool {
         !email.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty
@@ -31,7 +32,8 @@ struct SignInView: View {
             VStack(alignment: .leading, spacing: 14) {
                 VeyqField(label: "Email", text: $email, placeholder: "you@example.com", keyboard: .email)
                 VeyqField(label: "Password", text: $password, secure: true)
-                KitImportBar(label: "Import your Emergency Kit (fills email + Secret Key)") { importingKit = true }
+                KitImportBar(label: "Import your Emergency Kit (fills email + Secret Key)",
+                             onUpload: { importingKit = true }, onScan: { scanningKit = true })
                 PrimaryButton(title: "Sign in", busy: busy, disabled: !canSubmit) { submit() }
                 Button("Use a different instance") { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).buttonStyle(.plain)
@@ -39,21 +41,29 @@ struct SignInView: View {
                 if !error.isEmpty { MessageBox(text: error) }
             }
             .fileImporter(isPresented: $importingKit, allowedContentTypes: [.pdf, .plainText, .text]) { result in
-                handleImport(result)
+                if case .success(let url) = result { applyKit(fromFile: url) }
+            }
+            .sheet(isPresented: $scanningKit) {
+                KitScanner(onResult: { kit in scanningKit = false; apply(kit) },
+                           onCancel: { scanningKit = false })
             }
         }
     }
 
-    /// Import a kit from an uploaded file: fill the email + park the Secret Key for the floor. On-device only.
-    private func handleImport(_ result: Result<URL, Error>) {
+    private func applyKit(fromFile url: URL) {
         error = ""; info = ""
-        guard case .success(let url) = result else { return }
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url), let kit = importKitFromData(data) else {
             error = "Couldn't read an Emergency Kit from that file."
             return
         }
+        apply(kit)
+    }
+
+    /// Apply an imported kit: fill the email + park the Secret Key for the floor. On-device only.
+    private func apply(_ kit: KitData) {
+        error = ""
         email = kit.email
         app.pendingSecretKey = kit.secretKey
         info = "Emergency Kit imported — your Secret Key is ready for unlock."
