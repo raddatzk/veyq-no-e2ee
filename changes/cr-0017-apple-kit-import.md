@@ -68,7 +68,7 @@ for now), importing a QR from a *static image file* (live camera scan + kit-PDF/
   **DONE** — `AppModel` carries the password between steps; `SignInView` (email+password → `app.login`),
   new `UnlockView` (Secret Key → `app.unlock`, pre-fills from `pendingSecretKey`); macOS + iOS builds green,
   `swift test` 20/20, UITest drives connect → sign-in → unlock → home.
-- [ ] **2 — parseKit + file import (both steps).** Port `parseKit(_:) -> KitData?` to `VeyqKit` (+
+- [x] **2 — parseKit + file import (both steps).** Port `parseKit(_:) -> KitData?` to `VeyqKit` (+
   `KitData{email, secretKey}`); add `importKitFromFile` reading the picked file's bytes as UTF-8 text and
   `parseKit`-ing (kit PDF / token text). Wire a SwiftUI `.fileImporter` (allowed: `.pdf`, `.plainText`)
   behind an **upload** affordance on **both** the `SignInView` (import → fill email + park Secret Key) and
@@ -76,6 +76,10 @@ for now), importing a QR from a *static image file* (live camera scan + kit-PDF/
   **Done when:** a `VeyqKitTests` case parses a known `veyqkit:` token + a PDF-shaped blob to the exact
   `KitData`, a non-kit blob → nil, and a login-screen import sets `email` + `pendingSecretKey`; `swift test`
   green.
+  **DONE** — `Sources/VeyqKit/Kit.swift` (`parseKit` + `importKitFromData`, base64url padding restored);
+  `KitTests` 3/3 (token round-trip, PDF-shaped bytes, non-kit/wrong-version → nil). Shared `KitImportBar`
+  (upload now, scan in phase 3); SignInView import fills email + parks SK (+ confirmation), UnlockView import
+  fills SK. macOS + iOS builds green.
 - [ ] **3 — live QR scan (AVFoundation, universal).** A `KitScanner` (UI/NSViewControllerRepresentable over
   `AVCaptureSession` + metadata `.qr`) presented from a **scan** affordance on **both** steps; decoded
   string → `parseKit` → (login) email + parked Secret Key / (floor) Secret Key; cancel + permission-denied /

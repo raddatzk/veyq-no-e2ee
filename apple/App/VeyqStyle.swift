@@ -199,3 +199,30 @@ struct MessageBox: View {
                         in: RoundedRectangle(cornerRadius: VeyqStyle.radiusSm, style: .continuous))
     }
 }
+
+/// The Emergency-Kit import affordances — **Upload** (a file) and (when wired) **Scan** (the camera) — the
+/// native analog of the web's in-field upload/scan icons. Shared by the sign-in screen and the unlock floor.
+struct KitImportBar: View {
+    var label: String? = nil
+    let onUpload: () -> Void
+    var onScan: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 16) {
+                Button(action: onUpload) { Label("Upload kit", systemImage: "doc.badge.arrow.up") }
+                    .accessibilityIdentifier("Upload kit")
+                if let onScan {
+                    Button(action: onScan) { Label("Scan QR", systemImage: "qrcode.viewfinder") }
+                        .accessibilityIdentifier("Scan QR")
+                }
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(VeyqStyle.accent)
+            .buttonStyle(.plain)
+            if let label {
+                Text(label).font(.system(size: 12)).foregroundStyle(VeyqStyle.muted)
+            }
+        }
+    }
+}
