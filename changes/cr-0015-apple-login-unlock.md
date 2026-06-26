@@ -60,10 +60,15 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   simulator** ✅ · libs **tvOS** ✅ (`xcodebuild -scheme VeyqKit -destination 'generic/platform=tvOS Simulator'`).
   Notes: plugin-only targets need ≥1 `.swift` file (else SPM drops them); headless `xcodebuild` needs
   `-skipPackagePluginValidation`; the generated `.xcodeproj` + plugin `GeneratedSources/` are gitignored.
-- [ ] **2 — login (data layer).** `VeyqKit` login: `GET /api/setup` (instanceSalt) → `deriveAuthKeypair` →
-  `POST /api/login/challenge` → `authSign(nonce)` → `POST /api/login/verify` → store opaque access+refresh in
-  an in-memory `Session`; a `withRefresh` 401-retry helper (ADR 0004). **Done when:** a test signs in against
-  a fresh instance (or a stubbed client) and holds a session.
+- [x] **2 — login (data layer).** ✅ `VeyqKit` login mirrors web `features/account/login`: `POST
+  /api/login/challenge` (the challenge carries the instanceSalt — no separate `GET /api/setup` needed) →
+  `deriveAuthSalt` → `deriveAuthKeypair` → `authSign(nonce)` → `POST /api/login/verify` → store opaque
+  access+refresh in an in-memory **`Session`** actor; `refresh()` rotates (drops tokens on rejection),
+  `logout()`, and a `withRefresh` rotate-on-`.sessionExpired`-and-retry helper (ADR 0004). `BearerMiddleware`
+  injects the access token per request. **Verified:** `swift test` 14/14 — the headline `LoginTests` drives
+  the full chain against a `StubTransport` (no server) and asserts the signature the client sent **verifies**
+  against the independently-derived keypair (operator-blind, ADR 0003), plus refresh-rotation / no-session /
+  withRefresh-retry cases.
 - [ ] **3 — unlock (data layer).** `GET /api/account/key-material` → `kekPasswordSecret(secretKey, password)`
   → `symUnwrap` the Master Key + identity private into an in-memory **`Vault`** (cleared on background/sign-out).
   **Done when:** a test unlocks (password + Secret Key → identity key in the vault).
