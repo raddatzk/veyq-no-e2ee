@@ -1,0 +1,25 @@
+# apple (Swift / SwiftUI)
+
+The Apple universal client. Loaded in addition to the root `CLAUDE.md` when working here. All content crypto
+runs on-device; the server is blind.
+
+## Prove your work
+- `swift test` from `apple/` — builds the SwiftPM package and runs the crypto **conformance vectors**
+  (`Tests/VeyqCryptoTests`, which load `../../contracts/crypto/vectors/v1.json`). A green run is the parity
+  guarantee with the web + Android suites (ADR 0009).
+
+## Conventions
+- **`v1` crypto is implemented natively, gated by the shared vectors** ([ADR 0009](../docs/decisions/0009-native-crypto-per-platform-vectors.md)).
+  `Sources/VeyqCrypto/V1.swift` mirrors `web/src/shared/crypto/v1.ts` byte-for-byte; pin a new primitive by
+  adding a vector to `v1.json`, then making this target green. Libs: **swift-crypto** (Ed25519 / HKDF /
+  AES-GCM / SHA-256) + **swift-sodium** (Argon2id, as in `legacy/apple`). **ML-KEM-768** (the hybrid KEM /
+  scope grants) is deferred to the first content/scope slice — native first does login + unlock, which is
+  classic crypto only.
+- **Reuse legacy UI/UX — never invent new UI.** Orient on `legacy/apple` (`VeyqCrypto`/`VeyqApiModels`
+  structure) and `legacy/iOS/Veyq` (the SwiftUI app), read-only. Port screens/flows; swap the data layer to
+  the contracts-generated client + this crypto. Note: `legacy/apple`'s `VeyqCrypto` predates the PQ pivot
+  (classic X25519, no ML-KEM) — its Argon/AEAD/auth patterns port directly, its KEM does not.
+- **Operator-blind:** seal/derive everything on-device; never send the password, plaintext or raw keys. The
+  data layer connects to an **already-bootstrapped** instance (first-run setup is browser-only).
+
+Stack: Swift 6, SwiftUI, SwiftPM. Working rules: [`../docs/ai/README.md`](../docs/ai/README.md).
