@@ -195,3 +195,40 @@ fun MessageBox(text: String, error: Boolean = true) {
             .semantics { contentDescription = text },
     )
 }
+
+/**
+ * The Emergency-Kit import affordances — **Upload kit** (a file) and (when wired) **Scan QR** (the camera) —
+ * the native analog of the web's in-field upload/scan icons, mirroring Apple's `KitImportBar`. Shared by the
+ * sign-in screen and the unlock floor.
+ */
+@Composable
+fun KitImportBar(
+    label: String? = null,
+    onUpload: () -> Unit,
+    onScan: (() -> Unit)? = null,
+) {
+    val c = veyqColors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text(
+                "Upload kit",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = c.accent,
+                modifier = Modifier.testTag("Upload kit").clickable(onClick = onUpload),
+            )
+            if (onScan != null) {
+                Text(
+                    "Scan QR",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = c.accent,
+                    modifier = Modifier.testTag("Scan QR").clickable(onClick = onScan),
+                )
+            }
+        }
+        if (label != null) {
+            Text(label, fontSize = 12.sp, color = c.muted)
+        }
+    }
+}

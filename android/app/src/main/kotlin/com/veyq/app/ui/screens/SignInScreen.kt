@@ -1,5 +1,7 @@
 package com.veyq.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,16 +13,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
+import com.veyq.app.ui.components.KitImportBar
 import com.veyq.app.ui.components.MessageBox
 import com.veyq.app.ui.components.PrimaryButton
 import com.veyq.app.ui.components.VeyqField
 import com.veyq.app.ui.components.VeyqKeyboard
 import com.veyq.app.ui.theme.veyqColors
+import com.veyq.client.KitData
+import com.veyq.client.importKitFromBytes
 import kotlinx.coroutines.launch
 
 /**
@@ -36,7 +42,24 @@ fun SignInScreen(app: AppModel) {
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var info by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Apply an imported kit: fill the email + park the Secret Key for the floor. On-device only.
+    fun apply(kit: KitData) {
+        error = ""
+        email = kit.email
+        app.pendingSecretKey = kit.secretKey
+        info = "Emergency Kit imported — your Secret Key is ready for unlock."
+    }
+
+    val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        val kit = bytes?.let { importKitFromBytes(it) }
+        if (kit == null) error = "Couldn't read an Emergency Kit from that file." else apply(kit)
+    }
 
     val canSubmit = email.trim().isNotEmpty() && password.isNotEmpty()
 
@@ -50,6 +73,10 @@ fun SignInScreen(app: AppModel) {
                 keyboard = VeyqKeyboard.EMAIL,
             )
             VeyqField(label = "Password", value = password, onValueChange = { password = it }, secure = true)
+            KitImportBar(
+                label = "Import your Emergency Kit (fills email + Secret Key)",
+                onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
+            )
             PrimaryButton(title = "Sign in", busy = busy, enabled = canSubmit) {
                 busy = true
                 error = ""
@@ -74,6 +101,7 @@ fun SignInScreen(app: AppModel) {
                     .testTag("Use a different instance")
                     .clickable { app.changeInstance() },
             )
+            if (info.isNotEmpty()) MessageBox(info, error = false)
             if (error.isNotEmpty()) MessageBox(error)
         }
     }

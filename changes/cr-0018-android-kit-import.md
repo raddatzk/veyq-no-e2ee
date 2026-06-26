@@ -74,6 +74,9 @@ file* (live camera scan + kit-PDF/token import only), ML-KEM.
   `UnlockScreen` Secret-Key field (import → fill Secret Key); read the stream as UTF-8 text → `parseKit`; an
   unreadable file shows a generic message. **Done when:** a `:client:test` parses a known `veyqkit:` token +
   a PDF-shaped byte blob to the exact `KitData`, and a non-kit blob → null; `:client:test` green.
+  **DONE** — `:client` `Kit.kt` (`parseKit` + `importKitFromBytes`, `Base64.getUrlDecoder`); `KitTest` 3/3.
+  Shared `KitImportBar` (upload now, scan in phase 3); SAF `OpenDocument` picker → `importKitFromBytes`:
+  SignInScreen fills email + parks SK (+ confirmation), UnlockScreen fills SK. `:app:assembleDebug` green.
 - [ ] **3 — live QR scan (ML Kit + CameraX).** A Compose camera overlay (CameraX preview +
   `ImageAnalysis` → ML Kit `BarcodeScanning`, QR format) presented from a **scan** affordance on **both**
   steps; decoded string → `parseKit` → (login) email + parked Secret Key / (floor) Secret Key; `CAMERA`

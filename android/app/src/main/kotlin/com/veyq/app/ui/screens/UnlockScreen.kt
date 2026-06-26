@@ -1,5 +1,7 @@
 package com.veyq.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,15 +13,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
+import com.veyq.app.ui.components.KitImportBar
 import com.veyq.app.ui.components.MessageBox
 import com.veyq.app.ui.components.PrimaryButton
 import com.veyq.app.ui.components.VeyqField
 import com.veyq.app.ui.theme.veyqColors
+import com.veyq.client.importKitFromBytes
 import kotlinx.coroutines.launch
 
 /**
@@ -38,6 +43,14 @@ fun UnlockScreen(app: AppModel) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        val kit = bytes?.let { importKitFromBytes(it) }
+        if (kit == null) error = "Couldn't read an Emergency Kit from that file." else { secretKey = kit.secretKey; error = "" }
+    }
 
     AuthCard(title = "Unlock your vault", subtitle = app.email) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -47,6 +60,10 @@ fun UnlockScreen(app: AppModel) {
                 onValueChange = { secretKey = it },
                 secure = true,
                 hint = "From your Emergency Kit. Used with your password to unlock — never sent.",
+            )
+            KitImportBar(
+                label = "Import your Emergency Kit to fill the Secret Key",
+                onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
             )
             PrimaryButton(title = "Unlock", busy = busy, enabled = secretKey.isNotEmpty()) {
                 busy = true
