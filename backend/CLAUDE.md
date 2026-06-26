@@ -3,7 +3,11 @@
 Operator-blind API service. Loaded in addition to the root `CLAUDE.md` when working here.
 
 ## Prove your work
-- `./gradlew check` (compile + slice tests). Runnable acceptance lives in `../http/` (ijhttp).
+- `./gradlew check` (compile + slice tests) — runs on **in-memory H2** (`%test`, hermetic + fast).
+  Runnable acceptance lives in `../http/` (ijhttp).
+- **Run the app (`quarkusDev`) on a persistent MariaDB** (`%dev`): `docker compose up -d` (from `backend/`,
+  see `docker-compose.yml`) starts it; data survives restarts (Flyway migrates once, then "up to date").
+  `docker compose down -v` wipes it for a fresh instance. The H2 fallback is only the test default now.
 
 ## Conventions (see [developer styleguide](../docs/crosscutting/developer-styleguide.md))
 - **API-first.** Edit the spec in `../contracts/api/*.openapi.yaml`; the Gradle build generates Kotlin

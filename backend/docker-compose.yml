@@ -1,0 +1,27 @@
+# Local dev database (uc.* slices). A persistent MariaDB so dev data survives a backend restart — closer to
+# prod than the in-memory H2, which the test suite keeps using. Start it before `./gradlew quarkusDev`:
+#   docker compose up -d        (from backend/)
+#   docker compose down         (stop; data is kept in the named volume)
+#   docker compose down -v      (stop AND wipe the data — fresh instance)
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: veyq-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: veyq
+      MARIADB_USER: veyq
+      MARIADB_PASSWORD: veyq
+      MARIADB_ROOT_PASSWORD: veyq-root
+    ports:
+      - "3306:3306"
+    volumes:
+      - veyq-mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  veyq-mariadb-data:
