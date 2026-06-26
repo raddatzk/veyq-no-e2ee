@@ -18,6 +18,7 @@
     "@noble/post-quantum": "^0.6.1",
     "@primeuix/themes": "^2.0.3",
     "jspdf": "^4.2.1",
+    "jsqr": "^1.4.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
     "qrcode": "^1.5.4",

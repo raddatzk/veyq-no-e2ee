@@ -30,11 +30,10 @@ incl. from raw PDF bytes). This realizes the **"QR / file import of the Secret K
 
 ## Phases
 
-- [ ] **1 — web (import logic).** Add the `jsqr` dependency and `importKitFromFile(file): Promise<KitData |
-  null>` in the emergencyKit feature: read the file as text and `parseKit` it (covers the kit **PDF** / any
-  text carrying the token); if that misses and the file is an **image**, draw it to a canvas and decode the
-  QR with `jsqr` → `parseKit`. Unit-test the text path (a `veyqkit:` blob → `KitData`; non-kit file → null).
-  **Done when:** `npm run check` green.
+- [x] **1 — web (import logic).** Added `jsqr` + `importKitFromFile(file)` in emergencyKit: text-parse via
+  `parseKit` (kit PDF / any token-carrying text), else for an **image** draw to a canvas and decode the QR
+  with `jsqr` (lazy-imported, like jspdf/qrcode). 2 unit tests: a PDF-shaped blob → `KitData`; a non-kit file
+  → null. **Done:** `npm run check` green (58).
 - [ ] **2 — web (UI + scanner).** Add two icon-buttons next to the Secret-Key field in `LoginView`'s floor
   card — **upload** (`pi-upload`, hidden `<input type=file>`) and **scan** (`pi-qrcode`). Add a small
   `KitScanner` overlay: `getUserMedia({video:{facingMode:'environment'}})`, a rAF loop decoding frames with

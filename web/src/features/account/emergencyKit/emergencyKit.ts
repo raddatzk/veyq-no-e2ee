@@ -40,6 +40,46 @@ export function parseKit(text: string): KitData | null {
   }
 }
 
+/** Decode the QR from an image file (a screenshot/photo of the kit) — draw it to a canvas and run jsQR. */
+async function decodeQrImage(file: File): Promise<string | null> {
+  const jsQR = (await import('jsqr')).default
+  const bitmap = await createImageBitmap(file)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0)
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    return jsQR(data, width, height)?.data ?? null
+  } finally {
+    bitmap.close()
+  }
+}
+
+/**
+ * Recover the kit from an uploaded file — the kit **PDF** (or any text carrying the `veyqkit:` token), or a
+ * QR **image** (screenshot/photo). Entirely client-side; returns the parsed kit or null if no kit is found.
+ */
+export async function importKitFromFile(file: File): Promise<KitData | null> {
+  try {
+    const fromText = parseKit(await file.text())
+    if (fromText) return fromText
+  } catch {
+    /* not text / unreadable — try the image path */
+  }
+  if (file.type.startsWith('image/')) {
+    try {
+      const token = await decodeQrImage(file)
+      if (token) return parseKit(token)
+    } catch {
+      /* unreadable image */
+    }
+  }
+  return null
+}
+
 /** Build + download the Emergency Kit PDF: human text + QR + an embedded payload (in the PDF metadata). */
 export async function downloadKitPdf(data: KitData, displayName: string): Promise<void> {
   const [{ jsPDF }, QRCode] = await Promise.all([import('jspdf'), import('qrcode').then((m) => m.default)])
