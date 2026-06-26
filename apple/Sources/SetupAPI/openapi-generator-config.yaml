@@ -1,0 +1,7 @@
+# swift-openapi-generator (build plugin). Source of truth is the symlinked
+# contracts/ spec — never hand-edit the generated types. Client + types only;
+# the server stubs are not needed on a client surface.
+generate:
+  - types
+  - client
+accessModifier: public

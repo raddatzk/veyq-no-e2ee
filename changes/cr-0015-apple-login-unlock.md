@@ -52,12 +52,14 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
 
 ## Phases
 
-- [ ] **1 — client + scaffold.** Generate the Swift client from the setup/auth/account specs
-  (swift-openapi-generator); structure `apple/` as SPM libraries (`VeyqCrypto` ✅, `VeyqApi` = generated
-  client, `VeyqKit` = session + vault + login/unlock orchestration) + a thin universal **app shell** via
-  xcodegen (`project.yml`). The SPM libraries declare macOS/iOS/iPadOS **and tvOS** platforms. **Done when:**
-  the empty app builds for macOS *and* an iOS simulator (`xcodebuild`/`swift build`), the SPM libraries also
-  `swift build` for tvOS, client types generate cleanly.
+- [x] **1 — client + scaffold.** ✅ swift-openapi-generator **build plugin** generates `SetupAPI` / `AuthAPI`
+  / `AccountAPI` from the specs (symlinked to `contracts/` → single source of truth, no committed generat);
+  `VeyqApi` facade re-exports them + a URLSession transport; `VeyqKit` holds the orchestration stub; xcodegen
+  `project.yml` builds the universal app (macOS+iOS+iPadOS). `Package.swift` declares macOS 13 / iOS 16 /
+  **tvOS 16**. **Verified:** `swift test` 10/10 (incl. crypto vectors) · app **macOS** ✅ · app **iOS
+  simulator** ✅ · libs **tvOS** ✅ (`xcodebuild -scheme VeyqKit -destination 'generic/platform=tvOS Simulator'`).
+  Notes: plugin-only targets need ≥1 `.swift` file (else SPM drops them); headless `xcodebuild` needs
+  `-skipPackagePluginValidation`; the generated `.xcodeproj` + plugin `GeneratedSources/` are gitignored.
 - [ ] **2 — login (data layer).** `VeyqKit` login: `GET /api/setup` (instanceSalt) → `deriveAuthKeypair` →
   `POST /api/login/challenge` → `authSign(nonce)` → `POST /api/login/verify` → store opaque access+refresh in
   an in-memory `Session`; a `withRefresh` 401-retry helper (ADR 0004). **Done when:** a test signs in against

@@ -1,0 +1,40 @@
+# veyq universal Apple app (cr-0015). The SwiftUI app is a thin head over the local `apple/` SwiftPM
+# package (VeyqKit/VeyqApi/VeyqCrypto). The Xcode project is generated from this spec — never a
+# hand-edited pbxproj:
+#   cd apple && xcodegen generate
+#   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=macOS' build
+#   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+#
+# One multi-platform target spans macOS + iOS + iPadOS (TARGETED_DEVICE_FAMILY 1,2). tvOS gets no UI
+# head in this CR (TV sign-in = passkey/QR handoff); its libs build via `swift build` (see Package.swift).
+name: Veyq
+options:
+  bundleIdPrefix: app.veyq
+  deploymentTarget:
+    macOS: "13.0"
+    iOS: "16.0"
+  createIntermediateGroups: true
+packages:
+  VeyqClient:
+    path: .
+targets:
+  Veyq:
+    type: application
+    supportedDestinations: [macOS, iOS]
+    sources:
+      - App
+    dependencies:
+      - package: VeyqClient
+        product: VeyqKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.veyq.client
+        MARKETING_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_CFBundleDisplayName: veyq
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        # Simulator/local builds don't need signing.
+        CODE_SIGNING_ALLOWED: "NO"

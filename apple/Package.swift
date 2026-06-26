@@ -1,19 +1,31 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// veyq Apple client. VeyqCrypto is the native `v1` suite (auth/unlock subset for now, cr-0014) — verified
-// against the shared conformance vectors (contracts/crypto/vectors/v1.json, ADR 0009). swift-crypto provides
-// Ed25519 / HKDF / AES-GCM / SHA-256; swift-sodium provides Argon2id (libsodium, as in legacy/apple).
-// ML-KEM-768 and the content-side primitives arrive with the first scope/content slice.
+// veyq Apple client (cr-0015). Shared, platform-agnostic SPM libraries for the universal
+// macOS/iOS/iPadOS app — and built for tvOS too (libs-only; the tvOS UI head is a later
+// increment, TV sign-in being passkey/QR handoff, see cr-0015 + ADR 0010).
+//
+// Layers (ADR 0010 — shared contracts, not shared code):
+//   VeyqCrypto                          native `v1` suite, vector-gated (cr-0014, ADR 0009).
+//   SetupAPI / AuthAPI / AccountAPI     generated from contracts/api/*.openapi.yaml via the
+//                                       swift-openapi-generator build plugin — never hand-written.
+//   VeyqApi                             thin facade: re-exports the generated clients + a
+//                                       URLSession transport.
+//   VeyqKit                             session + vault + login/unlock orchestration (phases 2–4).
 let package = Package(
-    name: "VeyqCrypto",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    name: "VeyqClient",
+    platforms: [.macOS(.v13), .iOS(.v16), .tvOS(.v16)],
     products: [
         .library(name: "VeyqCrypto", targets: ["VeyqCrypto"]),
+        .library(name: "VeyqApi", targets: ["VeyqApi"]),
+        .library(name: "VeyqKit", targets: ["VeyqKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/jedisct1/swift-sodium.git", from: "0.9.1"),
+        .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.0.2"),
     ],
     targets: [
         .target(
@@ -24,5 +36,41 @@ let package = Package(
             ],
         ),
         .testTarget(name: "VeyqCryptoTests", dependencies: ["VeyqCrypto"]),
+
+        // Generated clients — one module per contract document (the specs are independent
+        // documents with colliding component names, so they cannot share a module).
+        .target(
+            name: "SetupAPI",
+            dependencies: [
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")],
+        ),
+        .target(
+            name: "AuthAPI",
+            dependencies: [
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")],
+        ),
+        .target(
+            name: "AccountAPI",
+            dependencies: [
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")],
+        ),
+
+        .target(
+            name: "VeyqApi",
+            dependencies: [
+                "SetupAPI", "AuthAPI", "AccountAPI",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
+            ],
+        ),
+
+        .target(name: "VeyqKit", dependencies: ["VeyqCrypto", "VeyqApi"]),
+        .testTarget(name: "VeyqKitTests", dependencies: ["VeyqKit"]),
     ],
 )
