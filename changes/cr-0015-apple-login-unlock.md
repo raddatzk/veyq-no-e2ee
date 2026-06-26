@@ -80,11 +80,17 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   material with the same V1 primitives and asserts unlock recovers the **exact** Master Key + identity bytes;
   wrong-Secret-Key → `.unlockFailed` + vault stays locked; DEVICE-only → `.unlockUnavailable`; key-material
   401 → refresh → retry unlocks; logout clears the vault.
-- [ ] **4 — SwiftUI UI (adaptive, macOS/iOS/iPadOS).** Port the legacy login/unlock screens: instance URL (if
-  not same-origin), email + password (login), Secret Key (unlock), the signed-in/unlocked states. One SwiftUI
-  codebase, **adaptive** across iPhone / iPad / Mac (size classes — not a stretched phone layout). No tvOS
-  head. **Done when:** `npm run check`-equivalent green (`swift build` + `swift test`), and the app round-trips
-  login → unlock on macOS + an iOS simulator against a fresh instance.
+- [~] **4 — SwiftUI UI (adaptive, macOS/iOS/iPadOS).** ✅ *code built & rendering verified.* Ported the legacy
+  native auth UI onto `VeyqKit`, made genuinely cross-platform (native macOS + iOS, **not** Catalyst — the
+  legacy `UIColor`/`UIKeyboardType` bits replaced with `#if canImport(UIKit)/AppKit` equivalents):
+  `VeyqStyle` (tokens + `AuthCard`/`VeyqField`/`PrimaryButton`/`MessageBox`), `AppModel` (connect → sign-in →
+  home flow controller), `ConnectView` (instance URL + `setupRequired()` gate), `SignInView` (email +
+  password + Secret Key → `login` then `unlock`, secrets dropped after submit), `HomeView` (unlocked state +
+  sign-out). One SwiftUI tree, adaptive (cards cap width, not stretched). **Verified:** `swift test` 19/19;
+  `xcodebuild` **macOS** ✅ + **iOS 26 simulator** ✅; app **installs + launches on an iOS 26 sim** and renders
+  the Connect screen natively (screenshot). **Remaining (folds into phase 5):** the live login → unlock
+  round-trip against a running instance — needs a backend up, the same precondition the Sign-in/Home
+  screenshots require, so it is done there.
 - [ ] **5 — screenshots + docs.** Capture macOS (+ iOS/iPad) screenshots of the login + unlock screens →
   commit under `docs/design/screenshots/apple/`; record the `uc.account.{login,unlock}` **apple** surface in
   their coverage files; update the parity ledger. **Done when:** screenshots committed, coverage validator
