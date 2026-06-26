@@ -1,15 +1,25 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.generated.api.TenantsApi
+import com.veyq.app.generated.model.AcceptInviteRequest
+import com.veyq.app.generated.model.AcceptPreviewRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.InviteStatus
 import com.veyq.app.generated.model.ReassignOwnerRequest
+import com.veyq.app.generated.model.InvitePreview
+import com.veyq.app.generated.model.RegisterAndAcceptRequest
+import com.veyq.app.generated.model.TenantActivated
+import com.veyq.app.generated.model.TenantActivatedWithUser
 import com.veyq.app.generated.model.TenantCreated
 import com.veyq.app.generated.model.TenantInviteState
 import com.veyq.app.generated.model.TenantStatus
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
+import com.veyq.app.shared.identity.WrapData
+import io.quarkus.security.Authenticated
+import io.quarkus.security.identity.SecurityIdentity
+import jakarta.annotation.security.PermitAll
 import jakarta.annotation.security.RolesAllowed
 import jakarta.ws.rs.core.Response
 import java.time.Instant
@@ -25,7 +35,11 @@ import java.util.UUID
  * carries no `unauthorized()`/`forbidden()`, and only sees already-authorized calls.
  */
 @RolesAllowed(SERVER_OWNER)
-class TenantsResource(private val handler: TenantHandler) : TenantsApi {
+class TenantsResource(
+    private val handler: TenantHandler,
+    private val acceptHandler: TenantAcceptHandler,
+    private val identity: SecurityIdentity,
+) : TenantsApi {
 
     override fun createTenant(createTenantRequest: CreateTenantRequest): Response =
         when (val outcome = handler.create(
@@ -54,6 +68,71 @@ class TenantsResource(private val handler: TenantHandler) : TenantsApi {
             RevokeOutcome.NotFound -> notFound()
             RevokeOutcome.NotPending -> conflict("tenant_not_pending")
         }
+
+    // --- Slice B (cr-0010): invite acceptance / activation. Method-level annotations override the class
+    // @RolesAllowed: preview + register are @PermitAll (secret-gated), accept is @Authenticated (any user;
+    // the email-match is a domain check, not the Server-Owner role).
+    @PermitAll
+    override fun previewTenantInvite(acceptPreviewRequest: AcceptPreviewRequest): Response =
+        when (val outcome = acceptHandler.preview(acceptPreviewRequest.bootstrapSecret)) {
+            is PreviewOutcome.Found -> Response.ok(
+                InvitePreview(
+                    tenantId = UUID.fromString(outcome.tenantId),
+                    tenantName = outcome.tenantName,
+                    domain = outcome.domain,
+                    ownerEmail = outcome.ownerEmail,
+                    hasAccount = outcome.hasAccount,
+                ),
+            ).build()
+            PreviewOutcome.NotFound -> inviteNotFound()
+            PreviewOutcome.NoLongerValid -> inviteGone()
+        }
+
+    @Authenticated
+    override fun acceptTenantInvite(acceptInviteRequest: AcceptInviteRequest): Response =
+        when (val outcome = acceptHandler.accept(
+            identity.principal.name,
+            acceptInviteRequest.bootstrapSecret,
+            acceptInviteRequest.grant,
+        )) {
+            is AcceptOutcome.Activated ->
+                Response.ok(TenantActivated(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE)).build()
+            AcceptOutcome.NotFound -> inviteNotFound()
+            AcceptOutcome.NoLongerValid -> inviteGone()
+            AcceptOutcome.NotInvitedOwner -> Response.status(Response.Status.FORBIDDEN)
+                .entity(ErrorResponse(code = "not_invited_owner")).build()
+            AcceptOutcome.AlreadyActive -> conflict("tenant_not_pending")
+        }
+
+    @PermitAll
+    override fun registerAndAcceptTenantInvite(registerAndAcceptRequest: RegisterAndAcceptRequest): Response {
+        val a = registerAndAcceptRequest.account
+        val account = NewAccount(
+            displayName = a.displayName,
+            suiteId = a.suiteId.value,
+            identityPublicKey = a.identityPublicKey,
+            wrappedIdentityPrivateKey = a.wrappedIdentityPrivateKey,
+            authPublicKey = a.authPublicKey,
+            recoveryMasterKeyTag = a.recoveryMasterKeyTag,
+            wraps = a.masterKeyWraps.map { WrapData(it.method.value, it.wrappedKey, it.kdfParams) },
+        )
+        return when (val outcome = acceptHandler.registerAndAccept(
+            registerAndAcceptRequest.bootstrapSecret, account, registerAndAcceptRequest.grant,
+        )) {
+            is RegisterAcceptOutcome.Activated -> Response.status(Response.Status.CREATED)
+                .entity(TenantActivatedWithUser(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE, UUID.fromString(outcome.userId)))
+                .build()
+            RegisterAcceptOutcome.NotFound -> inviteNotFound()
+            RegisterAcceptOutcome.NoLongerValid -> inviteGone()
+            RegisterAcceptOutcome.EmailTaken -> conflict("email_taken")
+        }
+    }
+
+    private fun inviteNotFound() = Response.status(Response.Status.NOT_FOUND)
+        .entity(ErrorResponse(code = "invite_not_found")).build()
+
+    private fun inviteGone() = Response.status(Response.Status.GONE)
+        .entity(ErrorResponse(code = "invite_no_longer_valid")).build()
 
     private fun InviteOutcome.toResponse(): Response = when (this) {
         is InviteOutcome.Done -> Response.ok(

@@ -12,6 +12,13 @@
 # well-formed tenant id returns 401, never 400/404, and no validation detail leaks pre-auth. The boundary
 # 400s (invalid domain/name/email) are now asserted with an owner token by TenantsSliceTest.
 #
+# The Slice B (cr-0010) accept family has mixed auth: `accept` is @Authenticated (anonymous → 401, like the
+# admin endpoints), while `accept/preview` and `accept/register` are @PermitAll (gated only by the bootstrap
+# secret), so they REACH the handler with no session — an unknown secret is 404 and a malformed body is 400.
+# The signed happy path (a real bootstrap secret + a valid grant) is not http-expressible (the secret lives
+# only in the invite email and the grant needs ML-KEM), so it is covered by TenantAcceptSliceTest + the web
+# round-trip (cr-0010 phase 4).
+#
 # Run: ijhttp --env-file http/admin/http-client.env.json --env dev http/admin/tenant.http
 
 ### 1. Create with no bearer → generic 401 (no anonymous tenant creation)
@@ -134,5 +141,81 @@ DELETE {{host}}/api/tenants/11111111-1111-1111-1111-111111111111
 client.test("anonymous revoke is a generic 401 (not a 404)", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
     client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 11. Accept (existing-user path) with no bearer → 401 (@Authenticated, central auth)
+POST {{host}}/api/tenants/accept
+Content-Type: application/json
+
+{ "bootstrapSecret": "never-issued-token", "grant": "AQ==" }
+
+> {%
+client.test("anonymous accept is a generic 401", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected code authentication_failed");
+});
+%}
+
+### 12. Preview with an unknown bootstrap secret → 404 (public: reaches the handler, no session needed)
+POST {{host}}/api/tenants/accept/preview
+Content-Type: application/json
+
+{ "bootstrapSecret": "never-issued-token" }
+
+> {%
+client.test("preview of an unknown secret is 404 invite_not_found", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "invite_not_found", "expected code invite_not_found");
+});
+%}
+
+### 13. Preview with a blank bootstrap secret → 400 (public endpoint, boundary validation runs)
+POST {{host}}/api/tenants/accept/preview
+Content-Type: application/json
+
+{ "bootstrapSecret": "   " }
+
+> {%
+client.test("preview of a blank secret is rejected at the boundary", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+});
+%}
+
+### 14. Register-and-accept with an unknown secret (valid-shaped account) → 404 (public, reaches the handler)
+POST {{host}}/api/tenants/accept/register
+Content-Type: application/json
+
+{ "bootstrapSecret": "never-issued-token",
+  "account": { "displayName": "New Owner", "suiteId": "v1",
+    "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
+    "wrappedIdentityPrivateKey": "d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
+    "authPublicKey": "ZWQyNTUxOS1hdXRoLXB1Yg==",
+    "masterKeyWraps": [{ "method": "PASSWORD", "wrappedKey": "d3JhcHBlZC1tYXN0ZXIta2V5", "kdfParams": "a2RmLXBhcmFtcw==" }],
+    "recoveryMasterKeyTag": "cmVjb3ZlcnktdGFn" },
+  "grant": "AQ==" }
+
+> {%
+client.test("register with an unknown secret is 404 invite_not_found", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "invite_not_found", "expected code invite_not_found");
+});
+%}
+
+### 15. Register-and-accept with a malformed account (blank displayName) → 400 at the boundary
+POST {{host}}/api/tenants/accept/register
+Content-Type: application/json
+
+{ "bootstrapSecret": "never-issued-token",
+  "account": { "displayName": "   ", "suiteId": "v1",
+    "identityPublicKey": "aWRlbnRpdHktcHVibGljLWtleQ==",
+    "wrappedIdentityPrivateKey": "d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
+    "authPublicKey": "ZWQyNTUxOS1hdXRoLXB1Yg==",
+    "masterKeyWraps": [{ "method": "PASSWORD", "wrappedKey": "d3JhcHBlZC1tYXN0ZXIta2V5", "kdfParams": "a2RmLXBhcmFtcw==" }] },
+  "grant": "AQ==" }
+
+> {%
+client.test("register with a blank display name is rejected at the boundary", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
 });
 %}

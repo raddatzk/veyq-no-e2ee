@@ -4,6 +4,7 @@ import { session } from './app/session'
 import SetupView from './views/SetupView.vue'
 import LoginView from './views/LoginView.vue'
 import TenantsView from './views/TenantsView.vue'
+import TenantJoinView from './views/TenantJoinView.vue'
 
 // Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /tenants is
 // the first authenticated content route (Server-Owner tenant administration, cr-0009) — it needs a session;
@@ -14,6 +15,9 @@ const router = createRouter({
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/tenants', name: 'tenants', component: TenantsView },
+    // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
+    // preview/register are public and the existing-owner path signs in within the view (cr-0010).
+    { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },
     { path: '/:pathMatch(.*)*', redirect: { name: 'login' } },
   ],
 })

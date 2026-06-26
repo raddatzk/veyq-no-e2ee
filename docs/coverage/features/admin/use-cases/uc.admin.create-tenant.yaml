@@ -1,8 +1,9 @@
 useCase: uc.admin.create-tenant
 feature: admin
 title: Create a tenant & invite its owner
-# Slice A (cr-0009) — structural tenant creation + invite lifecycle + Server-Owner management. Activation
-# (cold TENANT-scope birth, → ACTIVE) is Slice B (cr-0010) and is not covered here yet.
+# Slice A (cr-0009) — structural tenant creation + invite lifecycle + Server-Owner management.
+# Slice B (cr-0010) — invite acceptance: cold TENANT-scope birth + first OWNER membership/grant → ACTIVE,
+# via register-and-accept (new owner) or sign-in accept (existing owner).
 acceptanceCriteria:
   - id: create-pending-tenant
     text: A Server Owner creates a PENDING tenant (201) with an owner invite.
@@ -57,6 +58,42 @@ acceptanceCriteria:
     text: Overdue ACTIVE invites are expired and terminal-state invites are purged on a schedule.
     coverage:
       backend: { integration: [TenantsSliceTest.purgeExpiresActiveAndDeletesTerminalInvites] }
+  # --- Slice B (cr-0010): invite acceptance / activation ---
+  - id: activate-by-register
+    text: A new owner registers cold and accepts — a MEMBER account is born, the OWNER membership + grant stored, the tenant ACTIVE, the invite CONSUMED.
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.registerAndAcceptActivatesTenant] }
+      web: { e2e: [browser-smoke cr-0010 phase 4 (invite different email → register → ACTIVE; DB-verified)] }
+  - id: activate-by-signin
+    text: An existing owner signs in and accepts, activating the tenant with the cold-born grant.
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.existingUserAcceptActivatesTenant] }
+  - id: preview-invite
+    text: Previewing a valid bootstrap secret returns the tenant + whether the invited email has an account.
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.previewReturnsTenantAndAccountFlag] }
+  - id: accept-reuse-detection
+    text: Replaying a consumed/superseded/expired invite is rejected (410), mirroring session reuse-detection.
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.replayOfConsumedSecretIs410, TenantAcceptSliceTest.expiredInviteIs410] }
+  - id: accept-only-invited-owner
+    text: A signed-in caller whose email differs from the invite is refused (403 not_invited_owner).
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.emailMismatchIsForbidden] }
+  - id: register-email-taken
+    text: Register-and-accept when the invited email already has an account is rejected (409 email_taken).
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.registerWhenEmailTakenIs409] }
+  - id: accept-unknown-invite
+    text: An unknown bootstrap secret returns 404 invite_not_found (public preview/register reach the handler).
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.unknownSecretIs404] }
+      http: { e2e: [http/admin/tenant.http] }
+  - id: accept-requires-auth
+    text: The existing-user accept endpoint requires a session (401 when anonymous).
+    coverage:
+      backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
+      http: { e2e: [http/admin/tenant.http] }
 gaps:
   web: built (cr-0009 phase 4) — facade unit tests (tenants.test.ts) + interactive browser smoke; a web acceptance harness is not yet linked here
   apple: not built yet — web-first slice; native parity is a later CR

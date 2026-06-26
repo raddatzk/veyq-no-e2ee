@@ -7,4 +7,7 @@ package com.veyq.app.shared.identity
  */
 object ServerRoles {
     const val SERVER_OWNER = "SERVER_OWNER"
+
+    /** An ordinary global user (no server-management powers). The default for invite-born accounts. */
+    const val MEMBER = "MEMBER"
 }

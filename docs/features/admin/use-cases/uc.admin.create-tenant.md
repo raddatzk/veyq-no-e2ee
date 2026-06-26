@@ -174,9 +174,11 @@ act is where the scope key work lands:
   invite + email + Server Owner management (list / resend / reassign / revoke). No client crypto.
   Delivered on contracts → backend → http → web (coverage:
   [uc.admin.create-tenant.yaml](../../../coverage/features/admin/use-cases/uc.admin.create-tenant.yaml)).
-- **Slice B — activation (`cr-0010`, pending):** invite acceptance, identity (login/register), **cold
-  `TENANT` scope birth + first grant**, flip to `ACTIVE`. The first appearance of scope keys / grants in
-  the codebase.
+- **Slice B — activation (`cr-0010`, ✅ built):** invite acceptance (register-and-accept for a new owner,
+  or sign-in accept for an existing one), **cold `TENANT` scope birth + first OWNER membership/grant**,
+  flip to `ACTIVE`, invite `CONSUMED` (with reuse-detection). The first scope-key / grant / membership +
+  the first invite-gated account registration in the codebase. Delivered on contracts → backend → http →
+  web (the `PENDING → ACTIVE` lifecycle is now real).
 
 ## What this means for you / Was das für dich bedeutet
 

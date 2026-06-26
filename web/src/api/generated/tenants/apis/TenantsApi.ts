@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * veyq Tenants API
- * Server-Owner administration of tenants — the structural (key-free) half of tenant creation (uc.admin.create-tenant, Slice A / cr-0009). A Server Owner creates a tenant by entering a name, a domain and the owner\'s email; the server validates the domain is free, creates the tenant in PENDING, and mints a single-use, time-limited invite token bound to the owner email (delivered out-of-band by email). The Server Owner can list all tenants and, for PENDING ones, resend the invite, reassign the owner email, or revoke the tenant. Operator-blind is not at stake here: name, domain and owner-email are low-sensitivity operational metadata (host routing needs the domain anyway), and the invite is a **bootstrap secret, not a key** (ADR 0006) — the server stores only its hash and holds no content key. The cold TENANT-scope birth that activates a tenant is Slice B (cr-0010), not part of this API. The invite lifecycle mirrors the session refresh-token model (ADR 0004): each invite carries a status (ACTIVE → SUPERSEDED on resend/reassign, → CONSUMED on acceptance, → EXPIRED past its TTL); transitions are soft (never hard-deleted inline), so a replayed superseded/consumed token is recognised and rejected. A scheduled purge removes terminal-state invites later. Every operation requires the global **Server Owner** role (`veyq_user.server_role`), enforced by a server-side guard: a non-owner caller receives 403 even with a valid session. Field validation is declared here and enforced by the generated code via `x-field-extra-annotation` (bean-validation + trimming deserializer), so malformed input is rejected at the boundary (400) before any handler runs. 
+ * Server-Owner administration of tenants — the structural (key-free) half of tenant creation (uc.admin.create-tenant, Slice A / cr-0009). A Server Owner creates a tenant by entering a name, a domain and the owner\'s email; the server validates the domain is free, creates the tenant in PENDING, and mints a single-use, time-limited invite token bound to the owner email (delivered out-of-band by email). The Server Owner can list all tenants and, for PENDING ones, resend the invite, reassign the owner email, or revoke the tenant. Operator-blind is not at stake here: name, domain and owner-email are low-sensitivity operational metadata (host routing needs the domain anyway), and the invite is a **bootstrap secret, not a key** (ADR 0006) — the server stores only its hash and holds no content key. **Activation** (Slice B, cr-0010) is the `accept` family below: the invited owner cold-births the TENANT scope and seals the first grant to their own identity; the server stores only the ciphertext grant + the OWNER membership and flips the tenant ACTIVE — still operator-blind (it never sees the scope key). The invite lifecycle mirrors the session refresh-token model (ADR 0004): each invite carries a status (ACTIVE → SUPERSEDED on resend/reassign, → CONSUMED on acceptance, → EXPIRED past its TTL); transitions are soft (never hard-deleted inline), so a replayed superseded/consumed token is recognised and rejected. A scheduled purge removes terminal-state invites later. The **admin** operations (create / list / resend / reassign / revoke) require the global **Server Owner** role; the **accept** family does not — `accept/preview` and `accept/register` are public (gated only by possession of the bootstrap secret), and `accept` needs any authenticated caller (being the invited owner is a domain check → 403 `not_invited_owner`, not a role). Authorization is enforced by code annotations, not this spec (ADR 0008). Field validation is declared here via `x-field-extra-annotation` (bean-validation + trimming deserializer), so malformed input is rejected at the boundary (400) before any handler runs. 
  *
  * The version of the OpenAPI document: 0.1.0
  * 
@@ -14,6 +14,16 @@
 
 import * as runtime from '../runtime';
 import {
+    type AcceptInviteRequest,
+    AcceptInviteRequestFromJSON,
+    AcceptInviteRequestToJSON,
+} from '../models/AcceptInviteRequest';
+import {
+    type AcceptPreviewRequest,
+    AcceptPreviewRequestFromJSON,
+    AcceptPreviewRequestToJSON,
+} from '../models/AcceptPreviewRequest';
+import {
     type CreateTenantRequest,
     CreateTenantRequestFromJSON,
     CreateTenantRequestToJSON,
@@ -24,10 +34,30 @@ import {
     ErrorResponseToJSON,
 } from '../models/ErrorResponse';
 import {
+    type InvitePreview,
+    InvitePreviewFromJSON,
+    InvitePreviewToJSON,
+} from '../models/InvitePreview';
+import {
     type ReassignOwnerRequest,
     ReassignOwnerRequestFromJSON,
     ReassignOwnerRequestToJSON,
 } from '../models/ReassignOwnerRequest';
+import {
+    type RegisterAndAcceptRequest,
+    RegisterAndAcceptRequestFromJSON,
+    RegisterAndAcceptRequestToJSON,
+} from '../models/RegisterAndAcceptRequest';
+import {
+    type TenantActivated,
+    TenantActivatedFromJSON,
+    TenantActivatedToJSON,
+} from '../models/TenantActivated';
+import {
+    type TenantActivatedWithUser,
+    TenantActivatedWithUserFromJSON,
+    TenantActivatedWithUserToJSON,
+} from '../models/TenantActivatedWithUser';
 import {
     type TenantCreated,
     TenantCreatedFromJSON,
@@ -44,13 +74,25 @@ import {
     TenantSummaryToJSON,
 } from '../models/TenantSummary';
 
+export interface AcceptTenantInviteRequest {
+    acceptInviteRequest: AcceptInviteRequest;
+}
+
 export interface CreateTenantOperationRequest {
     createTenantRequest: CreateTenantRequest;
+}
+
+export interface PreviewTenantInviteRequest {
+    acceptPreviewRequest: AcceptPreviewRequest;
 }
 
 export interface ReassignTenantInviteRequest {
     tenantId: string;
     reassignOwnerRequest: ReassignOwnerRequest;
+}
+
+export interface RegisterAndAcceptTenantInviteRequest {
+    registerAndAcceptRequest: RegisterAndAcceptRequest;
 }
 
 export interface ResendTenantInviteRequest {
@@ -68,6 +110,30 @@ export interface RevokeTenantRequest {
  * @interface TenantsApiInterface
  */
 export interface TenantsApiInterface {
+    /**
+     * Creates request options for acceptTenantInvite without sending the request
+     * @param {AcceptInviteRequest} acceptInviteRequest 
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    acceptTenantInviteRequestOpts(requestParameters: AcceptTenantInviteRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * The signed-in invitee accepts: the client has cold-born the TENANT scope and sealed the first grant to its own identity (opaque ciphertext to the server). The server stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite — atomically. Any authenticated caller may call this; the caller\'s email must equal the invited owner email, else 403 `not_invited_owner` (a domain check, not the Server-Owner role). 
+     * @summary Accept a tenant invite as an existing user (activate the tenant).
+     * @param {AcceptInviteRequest} acceptInviteRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    acceptTenantInviteRaw(requestParameters: AcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantActivated>>;
+
+    /**
+     * The signed-in invitee accepts: the client has cold-born the TENANT scope and sealed the first grant to its own identity (opaque ciphertext to the server). The server stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite — atomically. Any authenticated caller may call this; the caller\'s email must equal the invited owner email, else 403 `not_invited_owner` (a domain check, not the Server-Owner role). 
+     * Accept a tenant invite as an existing user (activate the tenant).
+     */
+    acceptTenantInvite(requestParameters: AcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantActivated>;
+
     /**
      * Creates request options for createTenant without sending the request
      * @param {CreateTenantRequest} createTenantRequest 
@@ -115,6 +181,30 @@ export interface TenantsApiInterface {
     listTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<TenantSummary>>;
 
     /**
+     * Creates request options for previewTenantInvite without sending the request
+     * @param {AcceptPreviewRequest} acceptPreviewRequest 
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    previewTenantInviteRequestOpts(requestParameters: PreviewTenantInviteRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns what the invitee is asked to accept (tenant name, domain, the invited owner email) and whether that email already has an account — so the client picks the sign-in vs. register path. Public: gated only by possession of the bootstrap secret (the URL-fragment token), which is matched by hash and never echoed back. A replayed superseded/consumed/expired secret is 410. 
+     * @summary Preview a tenant invite from its bootstrap secret.
+     * @param {AcceptPreviewRequest} acceptPreviewRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    previewTenantInviteRaw(requestParameters: PreviewTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InvitePreview>>;
+
+    /**
+     * Returns what the invitee is asked to accept (tenant name, domain, the invited owner email) and whether that email already has an account — so the client picks the sign-in vs. register path. Public: gated only by possession of the bootstrap secret (the URL-fragment token), which is matched by hash and never echoed back. A replayed superseded/consumed/expired secret is 410. 
+     * Preview a tenant invite from its bootstrap secret.
+     */
+    previewTenantInvite(requestParameters: PreviewTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InvitePreview>;
+
+    /**
      * Creates request options for reassignTenantInvite without sending the request
      * @param {string} tenantId Opaque id of the tenant.
      * @param {ReassignOwnerRequest} reassignOwnerRequest 
@@ -139,6 +229,30 @@ export interface TenantsApiInterface {
      * Re-bind a pending tenant\'s invite to a different owner email.
      */
     reassignTenantInvite(requestParameters: ReassignTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantInviteState>;
+
+    /**
+     * Creates request options for registerAndAcceptTenantInvite without sending the request
+     * @param {RegisterAndAcceptRequest} registerAndAcceptRequest 
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    registerAndAcceptTenantInviteRequestOpts(requestParameters: RegisterAndAcceptTenantInviteRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * The canonical email-invite path — the invitee has no account yet. A new MEMBER account is born on the device (operator-blind: the server receives only ciphertext + public keys), its **email taken from the invite** (not the body, which binds it). In one atomic step the server creates the account, stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite. Public: gated by the bootstrap secret. The new user logs in afterward (no session is issued here, mirroring setup). 
+     * @summary Register a new account and accept the invite (activate the tenant).
+     * @param {RegisterAndAcceptRequest} registerAndAcceptRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    registerAndAcceptTenantInviteRaw(requestParameters: RegisterAndAcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantActivatedWithUser>>;
+
+    /**
+     * The canonical email-invite path — the invitee has no account yet. A new MEMBER account is born on the device (operator-blind: the server receives only ciphertext + public keys), its **email taken from the invite** (not the body, which binds it). In one atomic step the server creates the account, stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite. Public: gated by the bootstrap secret. The new user logs in afterward (no session is issued here, mirroring setup). 
+     * Register a new account and accept the invite (activate the tenant).
+     */
+    registerAndAcceptTenantInvite(requestParameters: RegisterAndAcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantActivatedWithUser>;
 
     /**
      * Creates request options for resendTenantInvite without sending the request
@@ -194,6 +308,63 @@ export interface TenantsApiInterface {
  * 
  */
 export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
+
+    /**
+     * Creates request options for acceptTenantInvite without sending the request
+     */
+    async acceptTenantInviteRequestOpts(requestParameters: AcceptTenantInviteRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['acceptInviteRequest'] == null) {
+            throw new runtime.RequiredError(
+                'acceptInviteRequest',
+                'Required parameter "acceptInviteRequest" was null or undefined when calling acceptTenantInvite().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/api/tenants/accept`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AcceptInviteRequestToJSON(requestParameters['acceptInviteRequest']),
+        };
+    }
+
+    /**
+     * The signed-in invitee accepts: the client has cold-born the TENANT scope and sealed the first grant to its own identity (opaque ciphertext to the server). The server stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite — atomically. Any authenticated caller may call this; the caller\'s email must equal the invited owner email, else 403 `not_invited_owner` (a domain check, not the Server-Owner role). 
+     * Accept a tenant invite as an existing user (activate the tenant).
+     */
+    async acceptTenantInviteRaw(requestParameters: AcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantActivated>> {
+        const requestOptions = await this.acceptTenantInviteRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantActivatedFromJSON(jsonValue));
+    }
+
+    /**
+     * The signed-in invitee accepts: the client has cold-born the TENANT scope and sealed the first grant to its own identity (opaque ciphertext to the server). The server stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite — atomically. Any authenticated caller may call this; the caller\'s email must equal the invited owner email, else 403 `not_invited_owner` (a domain check, not the Server-Owner role). 
+     * Accept a tenant invite as an existing user (activate the tenant).
+     */
+    async acceptTenantInvite(requestParameters: AcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantActivated> {
+        const response = await this.acceptTenantInviteRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for createTenant without sending the request
@@ -300,6 +471,55 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
+     * Creates request options for previewTenantInvite without sending the request
+     */
+    async previewTenantInviteRequestOpts(requestParameters: PreviewTenantInviteRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['acceptPreviewRequest'] == null) {
+            throw new runtime.RequiredError(
+                'acceptPreviewRequest',
+                'Required parameter "acceptPreviewRequest" was null or undefined when calling previewTenantInvite().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/tenants/accept/preview`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AcceptPreviewRequestToJSON(requestParameters['acceptPreviewRequest']),
+        };
+    }
+
+    /**
+     * Returns what the invitee is asked to accept (tenant name, domain, the invited owner email) and whether that email already has an account — so the client picks the sign-in vs. register path. Public: gated only by possession of the bootstrap secret (the URL-fragment token), which is matched by hash and never echoed back. A replayed superseded/consumed/expired secret is 410. 
+     * Preview a tenant invite from its bootstrap secret.
+     */
+    async previewTenantInviteRaw(requestParameters: PreviewTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InvitePreview>> {
+        const requestOptions = await this.previewTenantInviteRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => InvitePreviewFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns what the invitee is asked to accept (tenant name, domain, the invited owner email) and whether that email already has an account — so the client picks the sign-in vs. register path. Public: gated only by possession of the bootstrap secret (the URL-fragment token), which is matched by hash and never echoed back. A replayed superseded/consumed/expired secret is 410. 
+     * Preview a tenant invite from its bootstrap secret.
+     */
+    async previewTenantInvite(requestParameters: PreviewTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InvitePreview> {
+        const response = await this.previewTenantInviteRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for reassignTenantInvite without sending the request
      */
     async reassignTenantInviteRequestOpts(requestParameters: ReassignTenantInviteRequest): Promise<runtime.RequestOpts> {
@@ -361,6 +581,55 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      */
     async reassignTenantInvite(requestParameters: ReassignTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantInviteState> {
         const response = await this.reassignTenantInviteRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for registerAndAcceptTenantInvite without sending the request
+     */
+    async registerAndAcceptTenantInviteRequestOpts(requestParameters: RegisterAndAcceptTenantInviteRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['registerAndAcceptRequest'] == null) {
+            throw new runtime.RequiredError(
+                'registerAndAcceptRequest',
+                'Required parameter "registerAndAcceptRequest" was null or undefined when calling registerAndAcceptTenantInvite().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/tenants/accept/register`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RegisterAndAcceptRequestToJSON(requestParameters['registerAndAcceptRequest']),
+        };
+    }
+
+    /**
+     * The canonical email-invite path — the invitee has no account yet. A new MEMBER account is born on the device (operator-blind: the server receives only ciphertext + public keys), its **email taken from the invite** (not the body, which binds it). In one atomic step the server creates the account, stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite. Public: gated by the bootstrap secret. The new user logs in afterward (no session is issued here, mirroring setup). 
+     * Register a new account and accept the invite (activate the tenant).
+     */
+    async registerAndAcceptTenantInviteRaw(requestParameters: RegisterAndAcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantActivatedWithUser>> {
+        const requestOptions = await this.registerAndAcceptTenantInviteRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantActivatedWithUserFromJSON(jsonValue));
+    }
+
+    /**
+     * The canonical email-invite path — the invitee has no account yet. A new MEMBER account is born on the device (operator-blind: the server receives only ciphertext + public keys), its **email taken from the invite** (not the body, which binds it). In one atomic step the server creates the account, stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite. Public: gated by the bootstrap secret. The new user logs in afterward (no session is issued here, mirroring setup). 
+     * Register a new account and accept the invite (activate the tenant).
+     */
+    async registerAndAcceptTenantInvite(requestParameters: RegisterAndAcceptTenantInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantActivatedWithUser> {
+        const response = await this.registerAndAcceptTenantInviteRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

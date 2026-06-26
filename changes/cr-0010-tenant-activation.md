@@ -1,9 +1,9 @@
 ---
 id: cr-0010
 title: Activate a tenant (Slice B) — invite acceptance (incl. invite-gated registration), cold TENANT-scope birth & the first membership/grant
-status: planned          # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.admin.create-tenant]   # Slice B (activation); Slice A structural was cr-0009
-adrs: [0006, 0007]
+adrs: [0006, 0007, 0008]
 invariants: [operator-blind]
 ---
 
@@ -38,7 +38,15 @@ path today to share it with.
 - Concepts: [Scopes & Tenancy](../docs/crosscutting/scopes-and-tenancy.md) (grants, membership = role +
   grant), [ADR 0006](../docs/decisions/0006-cold-tenant-scope-birth.md) (cold scope birth; the bootstrap
   secret is **not** a key), [ADR 0007](../docs/decisions/0007-membership-role-grant-relation.md) (the first
-  membership is born here).
+  membership is born here), [ADR 0008](../docs/decisions/0008-centralized-http-auth.md) (central
+  annotation-driven auth — this CR's new endpoints plug into it; see below).
+- **Auth is central + default-deny now (cr-0012 / ADR 0008).** `ServerOwnerGuard` is gone; the bearer is
+  resolved once into a `SecurityIdentity`, and every endpoint declares intent with an annotation. The new
+  endpoints carry **method-level** annotations that override `TenantsResource`'s class-level
+  `@RolesAllowed(SERVER_OWNER)`: `accept/preview` + `accept/register` → **`@PermitAll`** (secret-gated, no
+  session — the invitee may have none yet), `accept` → **`@Authenticated`** (*any* signed-in user; the
+  email-match is domain logic, not a role). The handler stays purely fachlich — the existing-user path gets
+  the caller's `userId` from `identity.principal.name`, never a raw token.
 - **The grant primitive already exists** — `v1.asymWrap` / `asymWrap` (hybrid X25519 + ML-KEM-768,
   conformance-pinned). The grant is `asymWrap(ownerIdentityPublicKey, scopeRootKey, "scope-grant", …)`; **no
   new crypto suite work, no new conformance vector.**
@@ -54,52 +62,70 @@ path today to share it with.
 
 ## Phases
 
-- [ ] **1 — contracts.** Extend `contracts/api/tenants.openapi.yaml` (all under the `tenants` tag; the
-  bootstrap secret is the gate, so preview/register are unauthenticated):
-  - `POST /api/tenants/accept/preview` → body `{ bootstrapSecret }` → `200 { tenantId, tenantName, domain, ownerEmail, hasAccount }` so the invitee sees what they're accepting **and** whether the invited email already has an account (→ which path the UI takes); `404` unknown, `410` expired/consumed/superseded (reuse-detected).
-  - `POST /api/tenants/accept` (**existing user**, bearer) → body `{ bootstrapSecret, grant }` → `200 { tenantId, status:"ACTIVE" }`; `401` unauth, `403` email mismatch (caller ≠ invited owner), `404`, `409` already active, `410`.
-  - `POST /api/tenants/accept/register` (**new user**, no bearer) → body `{ bootstrapSecret, account, grant }` where `account` is the cold-birth material (suiteId, identityPublicKey, wrappedIdentityPrivateKey, authPublicKey, masterKeyWraps[], recoveryMasterKeyTag — same shape as `CreateServerOwnerRequest`, email taken from the invite) → `201 { tenantId, status:"ACTIVE", userId }`; `404`, `409` email already has an account, `410`. The new user logs in afterward (no session issued here, mirroring setup).
+- [x] **1 — contracts.** Extend `contracts/api/tenants.openapi.yaml`, **all under the `tenants` tag** (one
+  `TenantsResource`, so the literal `accept` segment is preferred over the admin `/{tenantId}` template — no
+  greedy-`@Path` split). Authz is **declared in code, not the spec** (ADR 0008) — the spec documents auth in
+  prose; the resource methods carry the annotations above.
+  **Done:** added `preview`/`accept`/`accept/register` ops + schemas (`AcceptPreviewRequest`,
+  `InvitePreview`, `AcceptInviteRequest`, `TenantActivated`, `RegisterAndAcceptRequest`, `AccountRegistration`,
+  `TenantActivatedWithUser`, and a `MasterKeyWrap` duplicate **field-identical** to setup's — incl. `id` — so
+  the last-generated model doesn't strip a field the account code reads). Backend `openApiGenerateSpecs` emits
+  the 3 new `TenantsApi` methods + models; `TenantsResource` got **501 `not_implemented` stubs** with the
+  method-level `@PermitAll`/`@Authenticated` overrides (phase 2 fills them) → `./gradlew check` green (all
+  existing tests pass); web `generate:api` → new models, `npm run typecheck` green.
+  - `POST /api/tenants/accept/preview` (`@PermitAll`) → body `{ bootstrapSecret }` → `200 { tenantId, tenantName, domain, ownerEmail, hasAccount }` so the invitee sees what they're accepting **and** whether the invited email already has an account (→ which path the UI takes); `404` unknown, `410` expired/consumed/superseded (reuse-detected).
+  - `POST /api/tenants/accept` (`@Authenticated`) → body `{ bootstrapSecret, grant }`, caller from `SecurityIdentity` → `200 { tenantId, status:"ACTIVE" }`; `401` (central) unauth, `403` email mismatch (caller ≠ invited owner — a **tenant-specific code**, e.g. `not_invited_owner`, **not** `not_server_owner`), `404`, `409` already active, `410`.
+  - `POST /api/tenants/accept/register` (`@PermitAll`, **new user**, no session) → body `{ bootstrapSecret, account, grant }` where `account` is the cold-birth material (suiteId, identityPublicKey, wrappedIdentityPrivateKey, authPublicKey, masterKeyWraps[], recoveryMasterKeyTag — same shape as `CreateServerOwnerRequest`, email taken from the invite) → `201 { tenantId, status:"ACTIVE", userId }`; `404`, `409` email already has an account, `410`. The new user logs in afterward (no session issued here, mirroring setup).
   - **Done when:** both clients regenerate; generation + `compileKotlin` + web `typecheck` green.
-- [ ] **2 — backend.** `V8__membership.sql`: `veyq_membership { id PK, user_id FK, tenant_id FK, role,
+- [x] **2 — backend.** `V8__membership.sql`: `veyq_membership { id PK, user_id FK, tenant_id FK, role,
   wrapped_grant TEXT, created_at }` (the TENANT root scope is keyed by the tenant id for now; generalising
   to an explicit scope id is future). A shared **invite-acceptance core**: verify the bootstrap-secret
   **hash** → invite `ACTIVE`? (a non-`ACTIVE` hit is a **replay → reject + log**, mirroring session
   reuse-detection) → store the `OWNER` membership + grant, flip the tenant `ACTIVE`, mark the invite
   `CONSUMED` — **atomic** (one transaction). Two entry points:
-  - **existing-user accept:** resolve the caller (bearer), require `caller.email == invite.owner_email`
-    (else `403`), then run the core.
+  - **existing-user accept:** the Resource passes the caller's `userId` (`SecurityIdentity.principal.name`,
+    `@Authenticated`) to the handler; require `caller.email == invite.owner_email` (else a domain outcome →
+    `403 not_invited_owner`, mapped by the Resource — *not* the central `not_server_owner`), then run the core.
   - **register-and-accept:** the email has **no** account → create the user cold (`server_role = MEMBER`)
     from the `account` material, then run the core — all in one transaction (no half-registered account if
     anything fails). Reuse/extract the owner-registration persistence from `SetupStore` (generalise the
     `SERVER_OWNER`-hardcode to a role param); the single-owner setup lock is **not** touched.
   - Preview handler (no auth, secret-gated; returns `hasAccount`).
-  **Done when:** `./gradlew check` green — slice tests cover **both** paths to `ACTIVE` (existing-user accept
-  and register-and-accept → `OWNER` membership + grant stored, MEMBER user created), **replay of a
-  consumed/superseded secret → rejected**, email-mismatch `403`, email-already-registered `409` on the
-  register path, expired `410`, already-active `409`, and the preview happy/again paths.
-- [ ] **3 — http.** Extend `http/admin/tenant.http` (or a new `tenant-accept.http`) with the no-signature
-  surface: unauthenticated `accept` → `401`; unknown/expired/consumed bootstrap secret on `accept:preview`
-  → `404`/`410`. (The authed cold-birth round-trip needs a signed session + unlocked vault → covered by the
-  slice test + the web smoke.) **Done when:** ijhttp green.
-- [ ] **4 — web.** Port the legacy invitee view (`legacy/frontend/src/views/TenantJoinView.vue`) at route
-  `/tenant/accept`: read the `#fragment` bootstrap secret, call `accept/preview`, then branch on
-  `hasAccount`:
-  - **new user** → a registration form (reuse `setupServer.ts`'s cold key-birth — generalise
-    `buildCreateServerOwnerRequest` into a shared account-build that takes the email + role; the email is
-    fixed from the invite), show + confirm the **Emergency Kit**, then cold-birth the scope and
-    `POST accept/register`.
-  - **existing user** → prompt sign-in + **unlock** (identity key from the vault), then cold-birth the
-    scope and `POST accept`.
-  Cold-birth is shared: `scopeRootKey = randomBytes(32)`;
-  `grant = asymWrap(ownIdentityPublic, scopeRootKey, "scope-grant", …)`. Show success → the tenant is
-  active. i18n en+de. **Done when:** `npm run check` green + browser smoke for **both** paths — (a) the
-  new-user case: operator invites a **different** email → open link → register (Emergency Kit) → tenant
-  shows `ACTIVE`; (b) the existing-user case: operator invites their **own** email → open link → sign-in +
-  unlock → `ACTIVE`.
-- [ ] **5 — docs.** Add Slice B acceptance criteria to
-  [uc.admin.create-tenant.yaml](../docs/coverage/features/admin/use-cases/uc.admin.create-tenant.yaml);
-  tick **Slice B built** in the use-case (the `PENDING → ACTIVE` transition is now real); advance inbox
-  **#13**; run `validate_coverage.py`. **Done when:** validator green.
+  **Done:** `./gradlew check` green — new `MembershipEntity` (+ `V8`), `AccountStore` (extracted operator-blind
+  account creation; `SetupStore` now delegates to it — `SetupServerSliceTest` **14/14** unchanged),
+  `TenantAcceptHandler` (preview / accept / register-and-accept with `isLive` reuse-detection),
+  `TenantStore.activate` (atomic OWNER membership + ACTIVE + CONSUMED), and `TenantsResource` real impls
+  (`@PermitAll` preview+register, `@Authenticated` accept; caller from `SecurityIdentity`). **`TenantAcceptSliceTest`
+  9/9**: both paths to `ACTIVE` (register-and-accept → MEMBER account + OWNER membership; sign-in accept),
+  preview + `hasAccount`, replay of a consumed secret → `410`, email-mismatch → `403 not_invited_owner`,
+  email-already-registered → `409 email_taken`, unknown secret → `404`, expired → `410`, unauthenticated
+  accept → `401`. `TenantsSliceTest` 13/13 unaffected.
+- [x] **3 — http.** Boundary surface added to `http/admin/tenant.http` (zero-precondition): `accept` with no
+  session → **401** (central, cr-0012); the public `accept/preview` + `accept/register` reach the handler →
+  unknown secret **404 `invite_not_found`**, blank/malformed body **400**. The **happy-path is not
+  http-expressible** (the bootstrap secret lives only in the invite email / mailer log, never in an API
+  response — and the grant needs the ML-KEM `asymWrap` the vendored `http/_lib/` Ed25519 can't produce), so
+  the signed accept round-trip is covered by `TenantAcceptSliceTest` + the web smoke. **Done:** `ijhttp
+  15/15` green against a fresh backend (V8 applied on the dev MariaDB).
+- [x] **4 — web.** **Done:** extracted the shared cold account-birth into `features/account/register/accountBirth.ts`
+  (`buildAccount`); `setupServer.ts` now delegates to it (`setupServer.test.ts` green). Added `v1.hybridPublic`
+  (derive the identity public bundle from the vaulted private — for the existing-owner self-grant; pure, no
+  wire change). Facade `tenants.ts`: `previewInvite` / `acceptInvite` / `registerAndAccept` + `scopeGrant`
+  (`asymWrap` a fresh scope root key to the owner's identity). New **`TenantJoinView.vue`** at `/tenant/accept`
+  (reads the `#fragment` secret, previews, branches on `hasAccount`: register-with-kit OR sign-in+unlock,
+  shared cold scope-birth), i18n `tenant.join.*` en+de. `npm run check` green (typecheck + **65 tests** + build).
+  **Browser smoke (new-user path, end-to-end):** operator invites a *different* email → invitee opens the
+  link → preview shows "invited to own Reise 2026" + register branch → name+password → Emergency Kit shown +
+  confirmed → cold scope-birth → **"Reise 2026 ist jetzt aktiv und gehört dir"**. DB verified: tenant `ACTIVE`,
+  `invitee@example.com` born as `MEMBER`, `OWNER` membership with a stored wrapped grant, invite `CONSUMED`;
+  no console errors. The **existing-owner sign-in path** shares the whole view + `acceptInvite` and is covered
+  by `TenantAcceptSliceTest.existingUserAcceptActivatesTenant`; a browser smoke of it needs the owner's Secret
+  Key, which the setup→login auto-prefill never surfaces as a value, so it stays slice-covered.
+- [x] **5 — docs.** Added 9 Slice B acceptance criteria to
+  [uc.admin.create-tenant.yaml](../docs/coverage/features/admin/use-cases/uc.admin.create-tenant.yaml)
+  (activate-by-register / -by-signin, preview, reuse-detection, invited-owner-only, email-taken, unknown,
+  requires-auth → `TenantAcceptSliceTest` + `tenant.http`); ticked **Slice B ✅ built** in the use-case;
+  advanced inbox **#13** to done. **Done:** `validate_coverage.py` green (5 use-cases, all criteria covered).
 
 ## Definition of done
 

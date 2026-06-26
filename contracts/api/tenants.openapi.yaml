@@ -12,18 +12,23 @@ info:
 
     Operator-blind is not at stake here: name, domain and owner-email are low-sensitivity operational
     metadata (host routing needs the domain anyway), and the invite is a **bootstrap secret, not a key**
-    (ADR 0006) — the server stores only its hash and holds no content key. The cold TENANT-scope birth that
-    activates a tenant is Slice B (cr-0010), not part of this API.
+    (ADR 0006) — the server stores only its hash and holds no content key. **Activation** (Slice B, cr-0010)
+    is the `accept` family below: the invited owner cold-births the TENANT scope and seals the first grant
+    to their own identity; the server stores only the ciphertext grant + the OWNER membership and flips the
+    tenant ACTIVE — still operator-blind (it never sees the scope key).
 
     The invite lifecycle mirrors the session refresh-token model (ADR 0004): each invite carries a status
     (ACTIVE → SUPERSEDED on resend/reassign, → CONSUMED on acceptance, → EXPIRED past its TTL); transitions
     are soft (never hard-deleted inline), so a replayed superseded/consumed token is recognised and
     rejected. A scheduled purge removes terminal-state invites later.
 
-    Every operation requires the global **Server Owner** role (`veyq_user.server_role`), enforced by a
-    server-side guard: a non-owner caller receives 403 even with a valid session. Field validation is
-    declared here and enforced by the generated code via `x-field-extra-annotation` (bean-validation +
-    trimming deserializer), so malformed input is rejected at the boundary (400) before any handler runs.
+    The **admin** operations (create / list / resend / reassign / revoke) require the global **Server
+    Owner** role; the **accept** family does not — `accept/preview` and `accept/register` are public (gated
+    only by possession of the bootstrap secret), and `accept` needs any authenticated caller (being the
+    invited owner is a domain check → 403 `not_invited_owner`, not a role). Authorization is enforced by
+    code annotations, not this spec (ADR 0008). Field validation is declared here via
+    `x-field-extra-annotation` (bean-validation + trimming deserializer), so malformed input is rejected at
+    the boundary (400) before any handler runs.
 tags:
   - name: tenants
     description: >
@@ -274,12 +279,191 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_pending }
 
+  /api/tenants/accept/preview:
+    post:
+      tags: [tenants]
+      operationId: previewTenantInvite
+      summary: Preview a tenant invite from its bootstrap secret.
+      description: >
+        Returns what the invitee is asked to accept (tenant name, domain, the invited owner email) and
+        whether that email already has an account — so the client picks the sign-in vs. register path.
+        Public: gated only by possession of the bootstrap secret (the URL-fragment token), which is matched
+        by hash and never echoed back. A replayed superseded/consumed/expired secret is 410.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptPreviewRequest" }
+            example: { bootstrapSecret: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc }
+      responses:
+        "200":
+          description: The invite is valid; here is what would be accepted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitePreview" }
+              example:
+                tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                tenantName: Familie Raddatz
+                domain: family.example.com
+                ownerEmail: kevin@example.com
+                hasAccount: false
+        "400":
+          description: The request was malformed (missing/blank bootstrap secret).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "404":
+          description: No invite matches that secret.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_not_found }
+        "410":
+          description: The invite is no longer valid (superseded, consumed, or expired).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_no_longer_valid }
+
+  /api/tenants/accept:
+    post:
+      tags: [tenants]
+      operationId: acceptTenantInvite
+      summary: Accept a tenant invite as an existing user (activate the tenant).
+      description: >
+        The signed-in invitee accepts: the client has cold-born the TENANT scope and sealed the first grant
+        to its own identity (opaque ciphertext to the server). The server stores the OWNER membership +
+        grant, flips the tenant ACTIVE, and consumes the invite — atomically. Any authenticated caller may
+        call this; the caller's email must equal the invited owner email, else 403 `not_invited_owner`
+        (a domain check, not the Server-Owner role).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptInviteRequest" }
+            example:
+              bootstrapSecret: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+              grant: AQ==
+      responses:
+        "200":
+          description: The tenant is now active and the caller is its owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantActivated" }
+              example: { tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c, status: ACTIVE }
+        "400":
+          description: The request was malformed (missing secret or grant).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is authenticated but is not the invited owner.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_invited_owner }
+        "404":
+          description: No invite matches that secret.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_not_found }
+        "409":
+          description: The tenant is already active (the invite was already accepted).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_pending }
+        "410":
+          description: The invite is no longer valid (superseded, consumed, or expired).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_no_longer_valid }
+
+  /api/tenants/accept/register:
+    post:
+      tags: [tenants]
+      operationId: registerAndAcceptTenantInvite
+      summary: Register a new account and accept the invite (activate the tenant).
+      description: >
+        The canonical email-invite path — the invitee has no account yet. A new MEMBER account is born on
+        the device (operator-blind: the server receives only ciphertext + public keys), its **email taken
+        from the invite** (not the body, which binds it). In one atomic step the server creates the account,
+        stores the OWNER membership + grant, flips the tenant ACTIVE, and consumes the invite. Public: gated
+        by the bootstrap secret. The new user logs in afterward (no session is issued here, mirroring setup).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterAndAcceptRequest" }
+            example:
+              bootstrapSecret: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+              account:
+                displayName: Kevin
+                suiteId: v1
+                identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
+                wrappedIdentityPrivateKey: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+                authPublicKey: ZWQyNTUxOS1hdXRoLXB1Yg==
+                masterKeyWraps:
+                  - method: PASSWORD
+                    wrappedKey: d3JhcHBlZC1tYXN0ZXIta2V5
+                    kdfParams: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
+                recoveryMasterKeyTag: cmVjb3ZlcnktdGFn
+              grant: AQ==
+      responses:
+        "201":
+          description: The account was created, the tenant is active, and the caller owns it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantActivatedWithUser" }
+              example:
+                tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                status: ACTIVE
+                userId: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+        "400":
+          description: The request was malformed (missing secret/grant or invalid account material).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "404":
+          description: No invite matches that secret.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_not_found }
+        "409":
+          description: The invited email already has an account (use the sign-in accept instead).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: email_taken }
+        "410":
+          description: The invite is no longer valid (superseded, consumed, or expired).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_no_longer_valid }
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: The opaque access token issued by login / refresh. The caller must be the Server Owner.
+      description: >
+        The opaque access token issued by login / refresh. Admin operations additionally require the
+        Server-Owner role; `accept` requires only an authenticated caller (enforced by code, not this spec).
 
   parameters:
     TenantId:
@@ -424,3 +608,199 @@ components:
           description: Optional developer-facing detail; never contains secrets or content.
           maxLength: 512
           example: null
+
+    # --- Slice B (cr-0010): invite acceptance / activation ---
+
+    AcceptPreviewRequest:
+      type: object
+      required: [bootstrapSecret]
+      properties:
+        bootstrapSecret:
+          type: string
+          description: The invite's bootstrap secret (the URL-fragment token). Matched by hash; not a key.
+          maxLength: 128
+          example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
+
+    InvitePreview:
+      type: object
+      required: [tenantId, tenantName, domain, ownerEmail, hasAccount]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        tenantName:
+          type: string
+          maxLength: 100
+          example: Familie Raddatz
+        domain:
+          type: string
+          maxLength: 253
+          example: family.example.com
+        ownerEmail:
+          type: string
+          maxLength: 254
+          example: kevin@example.com
+        hasAccount:
+          type: boolean
+          description: True if the invited email already has an account (the client then uses the sign-in accept).
+          example: false
+
+    AcceptInviteRequest:
+      type: object
+      required: [bootstrapSecret, grant]
+      properties:
+        bootstrapSecret:
+          type: string
+          description: The invite's bootstrap secret (the URL-fragment token). Matched by hash; not a key.
+          maxLength: 128
+          example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
+        grant:
+          type: string
+          description: >
+            The TENANT scope root key sealed to the caller's own identity public key (the first grant) —
+            opaque base64 ciphertext the server stores verbatim and never interprets.
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    TenantActivated:
+      type: object
+      required: [tenantId, status]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        status:
+          $ref: "#/components/schemas/TenantStatus"
+
+    TenantActivatedWithUser:
+      type: object
+      required: [tenantId, status, userId]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        status:
+          $ref: "#/components/schemas/TenantStatus"
+        userId:
+          type: string
+          format: uuid
+          description: Opaque id of the freshly created owner account.
+          example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+
+    RegisterAndAcceptRequest:
+      type: object
+      required: [bootstrapSecret, account, grant]
+      properties:
+        bootstrapSecret:
+          type: string
+          description: The invite's bootstrap secret (the URL-fragment token). Matched by hash; not a key.
+          maxLength: 128
+          example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
+        account:
+          $ref: "#/components/schemas/AccountRegistration"
+          # @Valid cascades bean-validation into the cold-birth account material.
+          x-field-extra-annotation: '@field:jakarta.validation.Valid'
+        grant:
+          type: string
+          description: The TENANT scope root key sealed to the new account's identity public key (opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    AccountRegistration:
+      type: object
+      description: >
+        Cold-birth material for a new account (operator-blind, same shape as setup's owner registration minus
+        the email, which is taken from the invite). All key material is ciphertext or a public key.
+      required: [displayName, suiteId, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authPublicKey]
+      properties:
+        displayName:
+          type: string
+          description: The new owner's human display name (server-visible identity metadata). Trimmed on input.
+          maxLength: 100
+          example: Kevin
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
+        suiteId:
+          type: string
+          description: Crypto suite the client used to produce the wrapped material.
+          enum: [v1]
+          example: v1
+        identityPublicKey:
+          type: string
+          description: The new account's identity public key bundle (opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: aWRlbnRpdHktcHVibGljLWtleQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        wrappedIdentityPrivateKey:
+          type: string
+          description: The identity private key wrapped under the Master Key (opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        authPublicKey:
+          type: string
+          description: >
+            The Ed25519 auth public key derived from the password + the invited email's auth salt (ADR 0003).
+            Server-visible and NOT a credential — login proves possession of the matching private key.
+          contentEncoding: base64
+          maxLength: 8192
+          example: ZWQyNTUxOS1hdXRoLXB1Yg==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        masterKeyWraps:
+          type: array
+          description: One wrap per chosen unlock method; PASSWORD is the mandatory floor.
+          minItems: 1
+          items: { $ref: "#/components/schemas/MasterKeyWrap" }
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(min = 1) @field:jakarta.validation.Valid'
+        recoveryMasterKeyTag:
+          type: string
+          description: One-way tag proving recovery of the same Master Key during reset (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: cmVjb3ZlcnktdGFn
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    MasterKeyWrap:
+      type: object
+      description: One wrap of the Master Key, openable by a single unlock method.
+      required: [method, wrappedKey]
+      properties:
+        id:
+          type: string
+          description: >
+            Opaque id of this wrap. Present in responses (lets a client pin its own DEVICE wrap and untrust
+            it); ignored on input (setup assigns ids server-side).
+          maxLength: 64
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        method:
+          type: string
+          description: Which unlock method opens this wrap.
+          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE]
+          example: PASSWORD
+        wrappedKey:
+          type: string
+          description: The Master Key wrapped to this method's KEK (opaque base64 ciphertext).
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1tYXN0ZXIta2V5
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        kdfParams:
+          type: string
+          description: >
+            KDF parameters + salt to re-derive this method's unlock KEK (opaque base64; present for
+            password/recovery/device, absent for passkey).
+          contentEncoding: base64
+          maxLength: 256
+          example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'

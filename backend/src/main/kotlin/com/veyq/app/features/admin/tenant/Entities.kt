@@ -81,3 +81,38 @@ class TenantInviteEntity : PanacheEntityBase {
         val TERMINAL = listOf(SUPERSEDED, CONSUMED, EXPIRED)
     }
 }
+
+/**
+ * Membership — the (user, scope, role, grant) relation (ADR 0007). For now the scope is a tenant (its root
+ * scope is keyed by the tenant id). `wrappedGrant` is the scope root key sealed to the member's identity
+ * public key — opaque ciphertext the server stores but never opens. The first row is the owner's, born at
+ * tenant activation (cr-0010); members extend the relation later via the invite-wrap.
+ */
+@Entity
+@Table(name = "veyq_membership")
+class MembershipEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "id", length = 36)
+    lateinit var id: String
+
+    @Column(name = "user_id", nullable = false, length = 36)
+    lateinit var userId: String
+
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    lateinit var tenantId: String
+
+    @Column(name = "role", nullable = false, length = 16)
+    lateinit var role: String
+
+    @Column(name = "wrapped_grant", nullable = false)
+    lateinit var wrappedGrant: String
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    companion object : PanacheCompanionBase<MembershipEntity, String> {
+        const val OWNER = "OWNER"
+        const val ADMIN = "ADMIN"
+        const val MEMBER = "MEMBER"
+    }
+}

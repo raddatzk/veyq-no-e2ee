@@ -5,12 +5,19 @@
 import { tenantsApi } from '../../../api/client'
 import { ResponseError } from '../../../api/generated/tenants'
 import type {
+  InvitePreview,
+  TenantActivated,
+  TenantActivatedWithUser,
   TenantCreated,
   TenantInviteState,
   TenantSummary,
 } from '../../../api/generated/tenants'
+import * as v1 from '../../../shared/crypto/v1'
+import type { HybridPublic } from '../../../shared/crypto/v1'
+import { b64std } from '../../../shared/base64'
+import type { AccountMaterial } from '../../account/register/accountBirth'
 
-export type { TenantSummary, TenantInviteState, TenantCreated } from '../../../api/generated/tenants'
+export type { TenantSummary, TenantInviteState, TenantCreated, InvitePreview } from '../../../api/generated/tenants'
 
 /** Create a PENDING tenant and mint an owner invite. */
 export function createTenant(tenantName: string, domain: string, ownerEmail: string): Promise<TenantCreated> {
@@ -35,6 +42,51 @@ export function reassignInvite(tenantId: string, ownerEmail: string): Promise<Te
 /** Revoke a pending tenant. */
 export function revokeTenant(tenantId: string): Promise<void> {
   return tenantsApi().revokeTenant({ tenantId })
+}
+
+// --- Slice B (cr-0010): invite acceptance / activation ---
+
+/** Preview an invite from its bootstrap secret (public — no session). */
+export function previewInvite(bootstrapSecret: string): Promise<InvitePreview> {
+  return tenantsApi().previewTenantInvite({ acceptPreviewRequest: { bootstrapSecret } })
+}
+
+/** Accept as an existing (signed-in) user: activates the tenant with the cold-born grant. */
+export function acceptInvite(bootstrapSecret: string, grant: string): Promise<TenantActivated> {
+  return tenantsApi().acceptTenantInvite({ acceptInviteRequest: { bootstrapSecret, grant } })
+}
+
+/** Register a new owner account cold and accept in one step (public — the email comes from the invite). */
+export function registerAndAccept(
+  bootstrapSecret: string,
+  displayName: string,
+  material: AccountMaterial,
+  grant: string,
+): Promise<TenantActivatedWithUser> {
+  return tenantsApi().registerAndAcceptTenantInvite({
+    registerAndAcceptRequest: {
+      bootstrapSecret,
+      account: {
+        displayName,
+        suiteId: material.suiteId,
+        identityPublicKey: material.identityPublicKey,
+        wrappedIdentityPrivateKey: material.wrappedIdentityPrivateKey,
+        authPublicKey: material.authPublicKey,
+        masterKeyWraps: material.masterKeyWraps,
+        recoveryMasterKeyTag: material.recoveryMasterKeyTag,
+      },
+      grant,
+    },
+  })
+}
+
+/**
+ * Cold-birth the TENANT scope: a fresh scope root key sealed (asymWrap) to the owner's **own** identity
+ * public key — the first grant, opaque ciphertext to the server. The scope key itself never leaves the device.
+ */
+export function scopeGrant(identityPublic: HybridPublic): string {
+  const scopeRootKey = v1.randomBytes(32)
+  return b64std(v1.asymWrap(identityPublic, scopeRootKey, 'scope-grant', { nonce: v1.randomBytes(12) }))
 }
 
 /**

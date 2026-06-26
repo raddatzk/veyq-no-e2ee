@@ -275,6 +275,13 @@ export const hybridSecret = (priv: Identity['priv']): HybridSecret => ({
   m: ml_kem768.keygen(priv.mlkemSeed).secretKey,
 })
 
+/** The hybrid KEM PUBLIC bundle re-derived from a stored private bundle — for sealing (asymWrap) to one's
+ *  own identity (e.g. an owner's first scope grant). Pure derivation; mirrors [hybridSecret]. */
+export const hybridPublic = (priv: Identity['priv']): HybridPublic => ({
+  x: x25519.getPublicKey(priv.kemX),
+  m: ml_kem768.keygen(priv.mlkemSeed).publicKey,
+})
+
 export function generateIdentity(): Identity {
   const kemX = randomBytes(32)
   const mlkemSeed = randomBytes(64)

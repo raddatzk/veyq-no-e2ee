@@ -31,6 +31,28 @@ class TenantStore {
 
     fun findTenant(id: String): TenantEntity? = TenantEntity.findById(id)
 
+    /** Find an invite by its token hash (the accept lookup), or null if no invite ever had that token. */
+    fun findInviteByTokenHash(tokenHash: String): TenantInviteEntity? =
+        TenantInviteEntity.find("tokenHash", tokenHash).firstResult()
+
+    /**
+     * Activate a tenant on acceptance — **atomic**: record the owner's `OWNER` membership + grant, flip the
+     * tenant `ACTIVE`, and mark the invite `CONSUMED`. The grant is opaque ciphertext stored verbatim.
+     */
+    @Transactional
+    fun activate(tenantId: String, userId: String, wrappedGrant: String, inviteId: String) {
+        MembershipEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            this.tenantId = tenantId
+            role = MembershipEntity.OWNER
+            this.wrappedGrant = wrappedGrant
+            createdAt = Instant.now()
+        }.persist()
+        TenantEntity.update("status = ?1 where id = ?2", TenantEntity.ACTIVE, tenantId)
+        TenantInviteEntity.update("status = ?1 where id = ?2", TenantInviteEntity.CONSUMED, inviteId)
+    }
+
     /** Create a PENDING tenant with its first ACTIVE invite. Returns the new tenant id + invite expiry. */
     @Transactional
     fun createPendingTenant(
