@@ -3,16 +3,17 @@
 # hand-edited pbxproj:
 #   cd apple && xcodegen generate
 #   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=macOS' build
-#   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+#   xcodebuild -project Veyq.xcodeproj -scheme Veyq -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 #
 # One multi-platform target spans macOS + iOS + iPadOS (TARGETED_DEVICE_FAMILY 1,2). tvOS gets no UI
 # head in this CR (TV sign-in = passkey/QR handoff); its libs build via `swift build` (see Package.swift).
+# Minimum OS is macOS 26 / iOS 26 — a greenfield app targeting the current OS only.
 name: Veyq
 options:
   bundleIdPrefix: app.veyq
   deploymentTarget:
-    macOS: "13.0"
-    iOS: "16.0"
+    macOS: "26.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 packages:
   VeyqClient:

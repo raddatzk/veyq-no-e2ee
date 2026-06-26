@@ -14,7 +14,7 @@ import PackageDescription
 //   VeyqKit                             session + vault + login/unlock orchestration (phases 2–4).
 let package = Package(
     name: "VeyqClient",
-    platforms: [.macOS(.v13), .iOS(.v16), .tvOS(.v16)],
+    platforms: [.macOS("26.0"), .iOS("26.0"), .tvOS("26.0")],
     products: [
         .library(name: "VeyqCrypto", targets: ["VeyqCrypto"]),
         .library(name: "VeyqApi", targets: ["VeyqApi"]),

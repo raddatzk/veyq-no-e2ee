@@ -33,10 +33,10 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
 - **API-first:** the Swift client is **generated** from `contracts/api/{setup,auth,account}.openapi.yaml`
   (never hand-write DTOs). Generator decided in phase 1 — **swift-openapi-generator** (Apple, SPM plugin)
   is the default; `openapi-generator` swift5 is the fallback.
-- **Universal app, native everywhere** (ADR 0010): one SwiftUI target for macOS 13+ / iOS 16+ / iPadOS. The
+- **Universal app, native everywhere** (ADR 0010): one SwiftUI target for macOS 26+ / iOS 26+ / iPadOS. The
   app shell / `.xcodeproj` is generated from a committed source (**xcodegen `project.yml`**) so the project
   is reproducible, not a hand-edited pbxproj. Most logic lives in SPM library targets; the app is a thin head.
-- **tvOS libs only** (ADR 0010 matrix amended): `VeyqCrypto` / `VeyqApi` / `VeyqKit` declare `tvOS 16+` in
+- **tvOS libs only** (ADR 0010 matrix amended): `VeyqCrypto` / `VeyqApi` / `VeyqKit` declare `tvOS 26+` in
   `Package.swift` and stay buildable for it (a `swift build` / vector test for the tvOS-compatible subset is a
   phase-1 done-when). **No tvOS app head** in this CR — see Goal for why (TV login = passkey/QR handoff).
 - **Reuse legacy UI/UX — never invent** (ADR 0010 / `apple/CLAUDE.md`): orient on `legacy/iOS/Veyq`
@@ -55,8 +55,9 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
 - [x] **1 — client + scaffold.** ✅ swift-openapi-generator **build plugin** generates `SetupAPI` / `AuthAPI`
   / `AccountAPI` from the specs (symlinked to `contracts/` → single source of truth, no committed generat);
   `VeyqApi` facade re-exports them + a URLSession transport; `VeyqKit` holds the orchestration stub; xcodegen
-  `project.yml` builds the universal app (macOS+iOS+iPadOS). `Package.swift` declares macOS 13 / iOS 16 /
-  **tvOS 16**. **Verified:** `swift test` 10/10 (incl. crypto vectors) · app **macOS** ✅ · app **iOS
+  `project.yml` builds the universal app (macOS+iOS+iPadOS). `Package.swift` declares macOS 26 / iOS 26 /
+  **tvOS 26** (greenfield — current-OS only; bumped from 13/16 in phase 4). **Verified:** `swift test` 10/10
+  (incl. crypto vectors) · app **macOS** ✅ · app **iOS
   simulator** ✅ · libs **tvOS** ✅ (`xcodebuild -scheme VeyqKit -destination 'generic/platform=tvOS Simulator'`).
   Notes: plugin-only targets need ≥1 `.swift` file (else SPM drops them); headless `xcodebuild` needs
   `-skipPackagePluginValidation`; the generated `.xcodeproj` + plugin `GeneratedSources/` are gitignored.
