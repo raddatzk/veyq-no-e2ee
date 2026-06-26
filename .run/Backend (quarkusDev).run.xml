@@ -1,13 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Backend (quarkusDev)" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
-      <option name="env">
-        <map>
-          <!-- Use the dev MinIO (infra/docker-compose.dev.yml) so media upload/download works; endpoint + keys
-               default to localhost:9000 / veyqdev in application-dev.properties. Remove this to run memory-only. -->
-          <entry key="BLOB_STORE_BACKEND" value="s3" />
-        </map>
-      </option>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$/backend" />
       <option name="externalSystemIdString" value="GRADLE" />
@@ -24,8 +17,8 @@
     </ExternalSystemSettings>
     <GradleScriptDebugEnabled>false</GradleScriptDebugEnabled>
     <method v="2">
-      <!-- Start (and wait for) the DB + MinIO before the backend connects. -->
-      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Dev deps (DB + MinIO)" run_configuration_type="ShConfigurationType" />
+      <!-- Start (and wait for) the dev MariaDB before the backend connects (dev profile). -->
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Dev deps (MariaDB)" run_configuration_type="ShConfigurationType" />
     </method>
   </configuration>
 </component>

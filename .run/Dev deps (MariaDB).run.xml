@@ -1,6 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Dev deps (DB + MinIO)" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="docker compose -f infra/docker-compose.dev.yml up -d --wait" />
+  <configuration default="false" name="Dev deps (MariaDB)" type="ShConfigurationType">
+    <!-- Persistent local MariaDB for the dev profile (backend/docker-compose.yml). --wait blocks until the
+         container is healthy, so the backend connects to a ready DB. -->
+    <option name="SCRIPT_TEXT" value="docker compose -f backend/docker-compose.yml up -d --wait" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

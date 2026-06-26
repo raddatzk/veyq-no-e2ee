@@ -11,8 +11,9 @@ services:
     environment:
       MARIADB_DATABASE: veyq
       MARIADB_USER: veyq
-      MARIADB_PASSWORD: veyq
-      MARIADB_ROOT_PASSWORD: veyq-root
+      # Local throwaway only — matches application-dev.properties. Change both together for a non-default.
+      MARIADB_PASSWORD: change-me
+      MARIADB_ROOT_PASSWORD: change-me-root
     ports:
       - "3306:3306"
     volumes:
