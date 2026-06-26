@@ -20,6 +20,13 @@ import { mapValues } from '../runtime';
  */
 export interface MasterKeyWrap {
     /**
+     * Opaque id of this wrap. Present in responses (lets a client pin its own DEVICE wrap and untrust it); ignored on input (setup assigns ids server-side).
+     * 
+     * @type {string}
+     * @memberof MasterKeyWrap
+     */
+    id?: string;
+    /**
      * Which unlock method opens this wrap.
      * @type {MasterKeyWrapMethodEnum}
      * @memberof MasterKeyWrap
@@ -72,6 +79,7 @@ export function MasterKeyWrapFromJSONTyped(json: any, ignoreDiscriminator: boole
     }
     return {
         
+        'id': json['id'] == null ? undefined : json['id'],
         'method': json['method'],
         'wrappedKey': json['wrappedKey'],
         'kdfParams': json['kdfParams'] == null ? undefined : json['kdfParams'],
@@ -89,6 +97,7 @@ export function MasterKeyWrapToJSONTyped(value?: MasterKeyWrap | null, ignoreDis
 
     return {
         
+        'id': value['id'],
         'method': value['method'],
         'wrappedKey': value['wrappedKey'],
         'kdfParams': value['kdfParams'],

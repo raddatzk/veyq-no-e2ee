@@ -52,7 +52,7 @@ describe('trustThisDevice / untrustThisDevice', () => {
   })
 
   it('re-trust replaces: deletes the existing wrap before adding the new one', async () => {
-    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'x', wrapId: 'old-1' })
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, wrapId: 'old-1' })
     const del = vi.fn().mockResolvedValue(undefined)
     const add = vi.fn().mockResolvedValue({ id: 'new-1' })
     mockWrapsApi(add, del)
@@ -77,7 +77,7 @@ describe('trustThisDevice / untrustThisDevice', () => {
   })
 
   it('untrust removes the server wrap and the local key', async () => {
-    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'x', wrapId: 'w1' })
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, wrapId: 'w1' })
     const del = vi.fn().mockResolvedValue(undefined)
     mockWrapsApi(vi.fn(), del)
 

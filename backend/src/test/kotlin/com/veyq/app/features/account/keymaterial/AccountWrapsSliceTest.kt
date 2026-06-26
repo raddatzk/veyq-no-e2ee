@@ -13,6 +13,7 @@ import org.hamcrest.CoreMatchers.hasItems
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.util.UUID
 
 /**
  * Slice tests for adding/removing wraps (uc.account.trust-device, server side). A device enrols a DEVICE
@@ -98,6 +99,27 @@ class AccountWrapsSliceTest {
         val token = issueToken(USER_A)
         delete(token, recId).then().statusCode(204)
         keyMaterial(token).then().statusCode(200).body("wraps.method", hasItems("RECOVERY"))
+    }
+
+    @Test
+    fun addingBeyondTheDeviceCapIsRejected() {
+        // Fill the user to the DEVICE cap, then one more POST → 409 (re-trust replaces, so real use never
+        // approaches this; it caps a flooding client).
+        QuarkusTransaction.requiringNew().run {
+            repeat(KeyMaterialHandler.MAX_WRAPS_PER_METHOD.toInt()) {
+                MasterKeyWrapEntity().apply {
+                    id = UUID.randomUUID().toString()
+                    userId = USER_A
+                    method = "DEVICE"
+                    wrappedKey = "ZGV2aWNl"
+                    kdfParams = KDF
+                }.persist()
+            }
+        }
+        given().header("Authorization", "Bearer ${issueToken(USER_A)}").contentType(ContentType.JSON)
+            .body("""{"method":"DEVICE","wrappedKey":"b3Zlci10aGUtY2Fw","kdfParams":"$KDF"}""")
+            .`when`().post("/api/account/wraps")
+            .then().statusCode(409).body("code", equalTo("too_many_devices"))
     }
 
     @Test

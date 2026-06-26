@@ -169,7 +169,16 @@ fail at the AEAD tag, nothing secret crosses the wire) and surfaced robustness/h
   explicitly (no fallthrough). Re-verified by a live preview smoke (enrol → re-login DEVICE unlock) after
   the IndexedDB-timing change.
 
-Logged, not actioned (out of this batch): cap on DEVICE wraps per account (#4), matching the wrap by
-`wrapId` instead of `kdfParams` — needs the GET to expose the id (#6), folding `WrapsHandler` into
-`KeyMaterialHandler` (#8). By design (ADR 0005, not a defect): a stolen *unlocked* device / in-session XSS
-reduces to password strength — "wraps protect against key theft, not session misuse".
+Second batch (the remaining logged items), all applied:
+- **#4:** a per-account **cap** on DEVICE wraps (`MAX_WRAPS_PER_METHOD = 20`) — `addWrap` over the cap →
+  **409 `too_many_devices`** (re-trust replaces, so real use never approaches it; this caps a flooding
+  client). Slice test seeds the cap then asserts the 409.
+- **#6:** the `MasterKeyWrap` response now carries the wrap **`id`** (added to both specs), so the client
+  matches its own DEVICE wrap by the authoritative **`wrapId`** instead of guessing by `kdfParams` salt
+  equality — and the `TrustRecord` drops the now-redundant `kdfParams` (just `{cryptoKey, wrapId}`). Verified
+  by a live smoke (enrol → re-login → DEVICE unlock by id).
+- **#8:** folded `WrapsHandler` into `KeyMaterialHandler` (one handler over the one store, `forAccessToken` +
+  `addWrap` + `deleteWrap`) — removed the duplicated token-resolve plumbing.
+
+By design (ADR 0005, not a defect): a stolen *unlocked* device / in-session XSS reduces to password
+strength — "wraps protect against key theft, not session misuse".

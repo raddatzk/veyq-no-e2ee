@@ -7,10 +7,10 @@ const DB_NAME = 'veyq-trust'
 const STORE = 'devices'
 const DEVICE_BIND_INFO = 'veyq/v1/device-bind'
 
-/** A device's trust: its non-extractable key, the wrap's KDF params (to find + open its DEVICE wrap), and
- *  the server wrap id (to untrust). `cryptoKey` is stored as a structured-cloned CryptoKey — still
- *  non-extractable after a round-trip through IndexedDB. */
-export type TrustRecord = { cryptoKey: CryptoKey; kdfParams: string; wrapId: string }
+/** A device's trust: its non-extractable key and the server wrap id (the join key used to find its own
+ *  DEVICE wrap in key material, and to untrust). `cryptoKey` is stored as a structured-cloned CryptoKey —
+ *  still non-extractable after a round-trip through IndexedDB. */
+export type TrustRecord = { cryptoKey: CryptoKey; wrapId: string }
 
 export function isTrustSupported(): boolean {
   return typeof indexedDB !== 'undefined' && typeof crypto !== 'undefined' && !!crypto.subtle

@@ -7,7 +7,7 @@ import jakarta.transaction.Transactional
 import java.util.UUID
 
 /** One Master Key wrap as opaque ciphertext + its KDF params (server never opens it). */
-data class WrapMaterial(val method: String, val wrappedKey: String, val kdfParams: String?)
+data class WrapMaterial(val id: String, val method: String, val wrappedKey: String, val kdfParams: String?)
 
 /** A user's wrapped key material — everything the client needs to unlock the Master Key on-device. */
 data class KeyMaterial(
@@ -24,9 +24,14 @@ class KeyMaterialStore {
     fun find(userId: String): KeyMaterial? {
         val user = VeyqUser.findById(userId) ?: return null
         val wraps = MasterKeyWrapEntity.find("userId", userId).list()
-            .map { WrapMaterial(it.method, it.wrappedKey, it.kdfParams) }
+            .map { WrapMaterial(it.id, it.method, it.wrappedKey, it.kdfParams) }
         return KeyMaterial(user.suiteId, wraps, user.wrappedIdentityPrivateKey)
     }
+
+    /** How many wraps of a given method the user has (used to cap DEVICE enrolments per account). */
+    @Transactional
+    fun countWraps(userId: String, method: String): Long =
+        MasterKeyWrapEntity.count("userId = ?1 and method = ?2", userId, method)
 
     /** Append a new wrap for the user (each trusted device adds its own). Returns the new wrap's id. */
     @Transactional

@@ -77,7 +77,7 @@ export interface AccountWrapsApiInterface {
     deleteAccountWrapRequestOpts(requestParameters: DeleteAccountWrapRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **and** not the PASSWORD floor; an unknown id, another account\'s wrap, or the floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be removed this way. 
+     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **DEVICE** wrap (the only kind this untrust endpoint creates); an unknown id, another account\'s wrap, the PASSWORD floor, or any other method is a silent no-op. Always 204 — no cross-account enumeration, the 2SKD floor can never be removed, and the RECOVERY/PASSKEY methods are out of reach of this endpoint. 
      * @summary Remove a wrap by id (untrust this device).
      * @param {string} id The opaque id of the wrap to remove (returned by the add-wrap call).
      * @param {*} [options] Override http request option.
@@ -87,7 +87,7 @@ export interface AccountWrapsApiInterface {
     deleteAccountWrapRaw(requestParameters: DeleteAccountWrapRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **and** not the PASSWORD floor; an unknown id, another account\'s wrap, or the floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be removed this way. 
+     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **DEVICE** wrap (the only kind this untrust endpoint creates); an unknown id, another account\'s wrap, the PASSWORD floor, or any other method is a silent no-op. Always 204 — no cross-account enumeration, the 2SKD floor can never be removed, and the RECOVERY/PASSKEY methods are out of reach of this endpoint. 
      * Remove a wrap by id (untrust this device).
      */
     deleteAccountWrap(requestParameters: DeleteAccountWrapRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -192,7 +192,7 @@ export class AccountWrapsApi extends runtime.BaseAPI implements AccountWrapsApiI
     }
 
     /**
-     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **and** not the PASSWORD floor; an unknown id, another account\'s wrap, or the floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be removed this way. 
+     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **DEVICE** wrap (the only kind this untrust endpoint creates); an unknown id, another account\'s wrap, the PASSWORD floor, or any other method is a silent no-op. Always 204 — no cross-account enumeration, the 2SKD floor can never be removed, and the RECOVERY/PASSKEY methods are out of reach of this endpoint. 
      * Remove a wrap by id (untrust this device).
      */
     async deleteAccountWrapRaw(requestParameters: DeleteAccountWrapRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -203,7 +203,7 @@ export class AccountWrapsApi extends runtime.BaseAPI implements AccountWrapsApiI
     }
 
     /**
-     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **and** not the PASSWORD floor; an unknown id, another account\'s wrap, or the floor is a silent no-op. Always 204 — no cross-account enumeration, and the 2SKD floor can never be removed this way. 
+     * Removes the caller\'s wrap with this id. **Idempotent** (like logout): the wrap is deleted only if it is the caller\'s own **DEVICE** wrap (the only kind this untrust endpoint creates); an unknown id, another account\'s wrap, the PASSWORD floor, or any other method is a silent no-op. Always 204 — no cross-account enumeration, the 2SKD floor can never be removed, and the RECOVERY/PASSKEY methods are out of reach of this endpoint. 
      * Remove a wrap by id (untrust this device).
      */
     async deleteAccountWrap(requestParameters: DeleteAccountWrapRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

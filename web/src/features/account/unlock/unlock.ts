@@ -50,8 +50,10 @@ export async function unlockWithDevice(email: string, password: string): Promise
   const trust = await device.loadTrust(email)
   if (!trust) return false
   const material = await fetchKeyMaterial()
+  // Match this device's own wrap by its server **id** (now exposed in key material) — the authoritative,
+  // unique join, not a salt-equality guess.
   const wrap = material.wraps.find(
-    (w) => w.method === MasterKeyWrapMethodEnum.Device && w.kdfParams === trust.kdfParams,
+    (w) => w.method === MasterKeyWrapMethodEnum.Device && w.id === trust.wrapId,
   )
   // No matching wrap → fall back to the floor, but DON'T destroy the local key on a single server response:
   // the operator is blind but could withhold the wrap to force every trusted device to wipe its key. A stale

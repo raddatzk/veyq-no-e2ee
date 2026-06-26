@@ -16,23 +16,27 @@ import jakarta.ws.rs.core.Response
  * Both endpoints act only on the **caller's own** wraps (resolved from the access token, never an id in the
  * body); the PASSWORD floor can't be removed and delete is idempotent (always 204).
  */
-class AccountWrapsResource(private val handler: WrapsHandler) : AccountWrapsApi {
+class AccountWrapsResource(private val handler: KeyMaterialHandler) : AccountWrapsApi {
 
     @Context
     lateinit var headers: HttpHeaders
 
-    override fun addAccountWrap(addWrapRequest: AddWrapRequest): Response {
-        val id = handler.add(
+    override fun addAccountWrap(addWrapRequest: AddWrapRequest): Response =
+        when (val outcome = handler.addWrap(
             bearerToken(headers),
             addWrapRequest.method.value,
             addWrapRequest.wrappedKey,
             addWrapRequest.kdfParams,
-        ) ?: return unauthorized()
-        return Response.status(Response.Status.CREATED).entity(AddWrapResult(id = id)).build()
-    }
+        )) {
+            is AddWrapOutcome.Created ->
+                Response.status(Response.Status.CREATED).entity(AddWrapResult(id = outcome.id)).build()
+            AddWrapOutcome.Unauthenticated -> unauthorized()
+            AddWrapOutcome.LimitReached ->
+                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "too_many_devices")).build()
+        }
 
     override fun deleteAccountWrap(id: String): Response {
-        if (!handler.delete(bearerToken(headers), id)) return unauthorized()
+        if (!handler.deleteWrap(bearerToken(headers), id)) return unauthorized()
         return Response.noContent().build()
     }
 

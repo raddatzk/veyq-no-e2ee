@@ -26,8 +26,9 @@ import { b64std } from '../../../shared/base64'
 const PASSWORD = 'correct horse battery'
 const DEVICE_FACTOR = new Uint8Array(32).fill(0x44)
 const EMAIL = 'user@example.com'
+const WRAP_ID = 'device-wrap-id-1'
 
-/** Build server material with a DEVICE wrap whose KEK = kekDevicePassword(deviceFactor, password, salt). */
+/** Build server material with a DEVICE wrap (id = WRAP_ID) whose KEK = kekDevicePassword(factor, pw, salt). */
 function buildDeviceMaterial(password: string, deviceFactor: Uint8Array) {
   const id = v1.generateIdentity()
   const mk = v1.randomBytes(32)
@@ -38,10 +39,10 @@ function buildDeviceMaterial(password: string, deviceFactor: Uint8Array) {
   const kdfParams = b64std(v1.encodeKdfParams(v1.ARGON, salt))
   const material = {
     suiteId: 'v1',
-    wraps: [{ method: 'DEVICE', wrappedKey: b64std(deviceWrap), kdfParams }],
+    wraps: [{ id: WRAP_ID, method: 'DEVICE', wrappedKey: b64std(deviceWrap), kdfParams }],
     wrappedIdentityPrivateKey: b64std(wrappedPriv),
   }
-  return { material, mk, kdfParams }
+  return { material, mk }
 }
 
 function mockMaterial(material: unknown) {
@@ -57,9 +58,9 @@ beforeEach(() => {
 
 describe('unlockWithDevice (uc.account.trust-device)', () => {
   it('opens the Master Key with only the password on a trusted device', async () => {
-    const { material, mk, kdfParams } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
+    const { material, mk } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
     mockMaterial(material)
-    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams, wrapId: 'w1' })
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, wrapId: WRAP_ID })
     vi.mocked(device.deviceFactor).mockResolvedValue(DEVICE_FACTOR)
 
     const ok = await unlockWithDevice(EMAIL, PASSWORD)
@@ -78,8 +79,8 @@ describe('unlockWithDevice (uc.account.trust-device)', () => {
   it('falls back (returns false) without destroying the local key when no wrap matches (orphan)', async () => {
     const { material } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
     mockMaterial(material)
-    // a stored trust whose kdfParams matches no server wrap → orphan
-    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams: 'bm8tbWF0Y2g=', wrapId: 'w1' })
+    // a stored trust whose wrapId matches no server wrap → orphan
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, wrapId: 'no-such-id' })
     vi.mocked(device.deviceFactor).mockResolvedValue(DEVICE_FACTOR)
 
     expect(await unlockWithDevice(EMAIL, PASSWORD)).toBe(false)
@@ -89,9 +90,9 @@ describe('unlockWithDevice (uc.account.trust-device)', () => {
   })
 
   it('throws a generic failure on a wrong password — no key held', async () => {
-    const { material, kdfParams } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
+    const { material } = buildDeviceMaterial(PASSWORD, DEVICE_FACTOR)
     mockMaterial(material)
-    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, kdfParams, wrapId: 'w1' })
+    vi.mocked(device.loadTrust).mockResolvedValue({ cryptoKey: {} as CryptoKey, wrapId: WRAP_ID })
     vi.mocked(device.deviceFactor).mockResolvedValue(DEVICE_FACTOR)
 
     await expect(unlockWithDevice(EMAIL, 'wrong password')).rejects.toThrow()

@@ -44,7 +44,7 @@ class AccountResource(private val handler: KeyMaterialHandler) : AccountApi {
                 log.warnf("Skipping master-key wrap with unrecognised method '%s'", wrap.method)
                 null
             } else {
-                MasterKeyWrap(method = method, wrappedKey = wrap.wrappedKey, kdfParams = wrap.kdfParams)
+                MasterKeyWrap(id = wrap.id, method = method, wrappedKey = wrap.wrappedKey, kdfParams = wrap.kdfParams)
             }
         }
 
