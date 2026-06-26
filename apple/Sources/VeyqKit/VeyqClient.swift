@@ -12,6 +12,7 @@ public final class VeyqClient: Sendable {
     public let instance: VeyqInstance
     public let session: Session
     public let vault: Vault
+    private let setup: SetupAPI.Client
     private let auth: AuthAPI.Client
     private let account: AccountAPI.Client
 
@@ -27,8 +28,22 @@ public final class VeyqClient: Sendable {
         self.session = session
         self.vault = vault
         let middlewares: [any ClientMiddleware] = [BearerMiddleware(session: session)]
+        self.setup = SetupAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.account = AccountAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
+    }
+
+    /// Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
+    /// so the connect screen uses this to tell the user to finish setup in a browser rather than offering a
+    /// form. Unauthenticated — no session needed.
+    public func setupRequired() async throws -> Bool {
+        let out = try await setup.getSetupStatus(.init())
+        switch out {
+        case .ok(let ok):
+            return try ok.body.json.setupRequired
+        case .undocumented(let status, _):
+            throw VeyqError.unexpectedStatus(status)
+        }
     }
 
     /// Log in with email + password. Requests a challenge, derives the auth keypair with the instance

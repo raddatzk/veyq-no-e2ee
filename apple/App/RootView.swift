@@ -1,24 +1,19 @@
 import SwiftUI
-import VeyqKit
 
-/// Phase-1 placeholder root. Confirms the app links the shared libraries and adapts across
-/// iPhone / iPad / Mac. The connect → login → unlock flow (ported from `legacy/iOS/Veyq`) lands
-/// in phase 4.
+/// Root of the universal app: switches between the connect → sign-in → home phases the `AppModel` drives.
+/// One SwiftUI tree, adaptive across iPhone / iPad / Mac (the cards cap their width rather than stretch).
 struct RootView: View {
+    @StateObject private var app = AppModel()
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("veyq")
-                .font(.largeTitle.weight(.semibold))
-            Text("Operator-blind. Login + unlock coming next.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        Group {
+            switch app.phase {
+            case .connect: ConnectView()
+            case .signIn: SignInView()
+            case .home: HomeView()
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environmentObject(app)
     }
 }
 
