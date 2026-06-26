@@ -27,10 +27,10 @@ const error = ref('')
 const loggedIn = ref(false)
 const deviceTrusted = ref(false)
 const trustFailed = ref(false)
-const unlockMode = ref<'device' | 'password'>('password')
 const trustChecked = ref(false)
 const trustSupported = isTrustSupported()
 const fileInput = ref<HTMLInputElement | null>(null)
+const showSecret = ref(false)
 const scanOpen = ref(false)
 const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
@@ -42,12 +42,24 @@ async function submit() {
   busy.value = true
   try {
     await login(email.value, password.value)
-    loggedIn.value = true
-    // An IndexedDB hiccup must not break a successful login — default to the floor if the check fails.
-    deviceTrusted.value = await isTrusted(email.value).catch(() => false)
-    unlockMode.value = deviceTrusted.value ? 'device' : 'password'
+    // Stay on the (spinner-busy) sign-in card while we try a trusted-device unlock — so a trusted device
+    // jumps straight to "unlocked" and never flashes the Secret-Key floor as an intermediate step.
+    // (An IndexedDB hiccup must not break a successful login — default to the floor if the check fails.)
+    const trusted = await isTrusted(email.value).catch(() => false)
+    if (trusted && (await unlockWithDevice(email.value, password.value).catch(() => false))) {
+      // The Secret Key belongs to this same login: unlocked already, so go straight to the unlocked card.
+      deviceTrusted.value = true
+      loggedIn.value = true
+      password.value = ''
+      secretKey.value = ''
+      pendingSecretKey = ''
+      return
+    }
+    // Untrusted, or the device key/wrap is gone (E1) — show the password + Secret-Key floor.
+    deviceTrusted.value = false
     secretKey.value = pendingSecretKey
     pendingSecretKey = ''
+    loggedIn.value = true
   } catch {
     // wrong password and unknown account both surface as the same generic failure (non-enumerable)
     error.value = t('login.failed')
@@ -60,22 +72,8 @@ async function unlock() {
   error.value = ''
   busy.value = true
   try {
-    if (unlockMode.value === 'device') {
-      // Trusted device: unlock with only the carried password.
-      const ok = await unlockWithDevice(email.value, password.value)
-      if (ok) {
-        password.value = ''
-        secretKey.value = ''
-      } else {
-        // the local key or the server wrap is gone — fall back to the Secret-Key floor
-        deviceTrusted.value = false
-        unlockMode.value = 'password'
-        error.value = t('unlock.deviceUnavailable')
-      }
-      return
-    }
-
-    // Floor: password (carried from login) + Secret Key.
+    // Floor: password (carried from login) + Secret Key. (A trusted device never reaches here — it
+    // auto-unlocks at login; this card is the password + Secret-Key floor only.)
     await unlockMasterKey(password.value, secretKey.value)
     if (trustChecked.value && trustSupported) {
       // Enrol now, while the just-entered (known-correct) password is still in hand and the vault is open.
@@ -97,11 +95,6 @@ async function unlock() {
   } finally {
     busy.value = false
   }
-}
-
-function useSecretKeyInstead() {
-  unlockMode.value = 'password'
-  error.value = ''
 }
 
 function triggerUpload() {
@@ -145,7 +138,6 @@ async function signOut() {
   trustChecked.value = false
   deviceTrusted.value = false
   trustFailed.value = false
-  unlockMode.value = 'password'
   error.value = ''
 }
 
@@ -191,79 +183,61 @@ onMounted(() => {
         <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
       </form>
 
-      <!-- Unlock: trusted device (password only) -->
-      <form v-else-if="!vaultState.unlocked && unlockMode === 'device'" class="veyq-form" @submit.prevent="unlock">
-        <Message severity="info" :closable="false">{{ t('unlock.title') }}</Message>
-        <p class="veyq-form-copy">{{ t('unlock.deviceNote') }}</p>
-        <Button
-          type="submit"
-          :label="busy ? t('unlock.submitting') : t('unlock.submit')"
-          icon="pi pi-unlock"
-          :loading="busy"
-        />
-        <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
-        <Button
-          type="button"
-          :label="t('unlock.anotherWay')"
-          icon="pi pi-key"
-          severity="secondary"
-          text
-          @click="useSecretKeyInstead"
-        />
-        <Button
-          type="button"
-          :label="t('login.signOut')"
-          icon="pi pi-sign-out"
-          severity="secondary"
-          text
-          @click="signOut"
-        />
-      </form>
-
-      <!-- Unlock: Secret-Key floor -->
+      <!-- Unlock: Secret-Key floor (a trusted device auto-unlocks at login and never shows this) -->
       <form v-else-if="!vaultState.unlocked" class="veyq-form" @submit.prevent="unlock">
         <Message severity="info" :closable="false">{{ t('unlock.title') }}</Message>
         <p class="veyq-form-copy">{{ t('unlock.note') }}</p>
         <label>
           {{ t('unlock.secretKey') }}
-          <div class="input-with-actions">
-            <Password
+          <div class="secret-field" :style="{ '--secret-icons': scanSupported ? 3 : 2 }">
+            <InputText
               v-model="secretKey"
-              input-id="unlock-secret-key"
-              :input-props="{ name: 'secret-key', autocomplete: 'off', spellcheck: false }"
+              id="unlock-secret-key"
+              :type="showSecret ? 'text' : 'password'"
+              name="secret-key"
+              autocomplete="off"
+              :spellcheck="false"
               required
-              :feedback="false"
-              toggle-mask
               fluid
-              class="grow"
             />
-            <Button
-              type="button"
-              icon="pi pi-upload"
-              severity="secondary"
-              text
-              :aria-label="t('unlock.upload')"
-              :title="t('unlock.upload')"
-              @click="triggerUpload"
-            />
-            <Button
-              v-if="scanSupported"
-              type="button"
-              icon="pi pi-qrcode"
-              severity="secondary"
-              text
-              :aria-label="t('unlock.scan')"
-              :title="t('unlock.scan')"
-              @click="scanOpen = true"
-            />
-            <input
-              ref="fileInput"
-              type="file"
-              accept="application/pdf,image/*"
-              class="visually-hidden"
-              @change="onUpload"
-            />
+            <span class="secret-icons">
+              <button
+                type="button"
+                class="secret-icon"
+                :aria-label="t('unlock.upload')"
+                :title="t('unlock.upload')"
+                @click="triggerUpload"
+              >
+                <i class="pi pi-upload" aria-hidden="true" />
+              </button>
+              <button
+                v-if="scanSupported"
+                type="button"
+                class="secret-icon"
+                :aria-label="t('unlock.scan')"
+                :title="t('unlock.scan')"
+                @click="scanOpen = true"
+              >
+                <i class="pi pi-qrcode" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="secret-icon"
+                :aria-label="t(showSecret ? 'common.hide' : 'common.show')"
+                :title="t(showSecret ? 'common.hide' : 'common.show')"
+                @click="showSecret = !showSecret"
+              >
+                <i :class="showSecret ? 'pi pi-eye-slash' : 'pi pi-eye'" aria-hidden="true" />
+              </button>
+            </span>
           </div>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="application/pdf,image/*"
+            class="visually-hidden"
+            @change="onUpload"
+          />
         </label>
         <div v-if="trustSupported && !deviceTrusted" class="checkbox-row">
           <Checkbox v-model="trustChecked" input-id="trust-device" binary />

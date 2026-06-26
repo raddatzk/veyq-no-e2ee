@@ -85,9 +85,13 @@ C --> U : this device is trusted (password-only next time)
 
 The actual unlock is [uc.account.unlock](uc.account.unlock.md); trust-device adds the DEVICE method it can
 choose: with a device key in IndexedDB, the client finds **its own** DEVICE wrap in the fetched set by the
-stored salt, prompts for the **password only**, recomputes `df = HMAC(deviceKey, info)`, derives the same
-KEK, and `symUnwrap`s the Master Key — no Secret Key. **Method precedence is client-side** ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)):
-a trusted device defaults to password-only, and **"unlock another way"** always reaches the PASSWORD floor.
+stored salt, uses the **password only**, recomputes `df = HMAC(deviceKey, info)`, derives the same KEK, and
+`symUnwrap`s the Master Key — no Secret Key. The web client takes the password from the login that just
+happened, so on a trusted device the unlock **folds into login**: a successful sign-in unlocks
+**immediately**, with no separate "unlock" step (the redundant password re-prompt is dropped). **Method
+precedence is client-side** ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)): a
+trusted device defaults to password-only, and the PASSWORD floor stays always reachable — if the device key
+or its server wrap is unusable (E1), the client **falls back to the Secret-Key floor automatically**.
 
 ## Untrust ("forget this device")
 

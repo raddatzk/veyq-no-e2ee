@@ -97,18 +97,54 @@ body {
   font-weight: 400;
 }
 
-.form-message {
-  margin-top: 1rem;
+/* Secret-Key field: upload / scan / show-hide as in-field trailing icons, sitting inside the input next to
+   one another (like a password toggle). Right-padding reserves room so the masked value never runs under
+   them; --secret-icons (set inline) scales that room to the icon count (scan is camera-only). */
+.secret-field {
+  position: relative;
+  min-width: 0;
 }
 
-.input-with-actions {
+.secret-field .p-inputtext {
+  width: 100%;
+  padding-right: calc(var(--secret-icons, 2) * 2.25rem + 0.25rem);
+}
+
+.secret-icons {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 0.25rem;
 }
-.input-with-actions .grow {
-  flex: 1;
-  min-width: 0;
+
+.secret-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
+.secret-icon:hover {
+  color: var(--app-text);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.secret-icon:focus-visible {
+  outline: 2px solid var(--p-primary-color, #3b82f6);
+  outline-offset: -2px;
+}
+
+.form-message {
+  margin-top: 1rem;
 }
 
 .visually-hidden {

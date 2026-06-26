@@ -34,9 +34,13 @@ incl. from raw PDF bytes). This realizes the **"QR / file import of the Secret K
   `parseKit` (kit PDF / any token-carrying text), else for an **image** draw to a canvas and decode the QR
   with `jsqr` (lazy-imported, like jspdf/qrcode). 2 unit tests: a PDF-shaped blob → `KitData`; a non-kit file
   → null. **Done:** `npm run check` green (58).
-- [x] **2 — web (UI + scanner).** Added two icon-buttons next to the Secret-Key field in `LoginView`'s floor
-  card — **upload** (`pi-upload`, hidden file input) and **scan** (`pi-qrcode`, shown only where
-  `navigator.mediaDevices.getUserMedia` exists). New `KitScanner.vue` overlay: `getUserMedia(facingMode
+- [x] **2 — web (UI + scanner).** Added **in-field** trailing icons on the Secret-Key field in `LoginView`'s
+  floor card — **upload** (`pi-upload`, hidden file input) and **scan** (`pi-qrcode`, shown only where
+  `navigator.mediaDevices.getUserMedia` exists), sitting inside the input next to a **show/hide** toggle. To
+  host all three icons consistently the field uses `InputText` + a self-managed mask toggle (`showSecret`,
+  `type=password|text`) rather than PrimeVue `Password` (whose toggle can't be extended); `--secret-icons`
+  scales the input's right-padding to the icon count so the masked value never runs under them. New
+  `KitScanner.vue` overlay: `getUserMedia(facingMode
   environment)`, a rAF loop decoding frames with `jsqr`, cancel, and graceful handling of permission-denied /
   no-camera (falls back to upload/paste). On import (either path) `secretKey` fills from the parsed kit; an
   unreadable kit shows a generic message. i18n (en+de). **Done:** `npm run check` green (58). Preview smoke

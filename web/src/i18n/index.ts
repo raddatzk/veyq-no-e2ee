@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 export type SupportedLocale = 'en' | 'de'
 
 const en = {
-  common: { email: 'Email', password: 'Password', cancel: 'Cancel', unreachable: 'This instance can’t be reached right now. Please try again.' },
+  common: { email: 'Email', password: 'Password', cancel: 'Cancel', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
   setup: {
     title: 'Set up this instance',
     sub: 'Create the first owner account. All keys are generated on this device — the server only ever sees ciphertext.',
@@ -51,9 +51,6 @@ const en = {
     failed: 'Unlock failed. Check your password and Secret Key.',
     unlockedTitle: 'Unlocked',
     unlockedNote: 'Your memories are unlocked on this device for this session.',
-    deviceNote: 'This device is trusted — unlock with just your password.',
-    anotherWay: 'Use my Secret Key instead',
-    deviceUnavailable: 'This device is no longer trusted. Enter your Secret Key.',
     trustDevice: 'Trust this device',
     trustDeviceHint: 'Next time, unlock on this device with just your password — your Secret Key stays in your kit.',
     trustFailed: 'Couldn’t trust this device — you unlocked fine, but you’ll need your Secret Key next time.',
@@ -62,7 +59,7 @@ const en = {
 }
 
 const de: typeof en = {
-  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
+  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
   setup: {
     title: 'Diese Instanz einrichten',
     sub: 'Lege das erste Besitzer-Konto an. Alle Schlüssel entstehen auf diesem Gerät — der Server sieht nur Chiffretext.',
@@ -108,9 +105,6 @@ const de: typeof en = {
     failed: 'Entsperren fehlgeschlagen. Prüfe Passwort und Secret Key.',
     unlockedTitle: 'Entsperrt',
     unlockedNote: 'Deine Erinnerungen sind auf diesem Gerät für diese Sitzung entsperrt.',
-    deviceNote: 'Diesem Gerät wird vertraut — entsperre nur mit deinem Passwort.',
-    anotherWay: 'Stattdessen meinen Secret Key verwenden',
-    deviceUnavailable: 'Diesem Gerät wird nicht mehr vertraut. Gib deinen Secret Key ein.',
     trustDevice: 'Diesem Gerät vertrauen',
     trustDeviceHint: 'Beim nächsten Mal entsperrst du auf diesem Gerät nur mit deinem Passwort — dein Secret Key bleibt im Kit.',
     trustFailed: 'Konnte diesem Gerät nicht vertrauen — entsperrt hat es geklappt, aber beim nächsten Mal brauchst du deinen Secret Key.',
