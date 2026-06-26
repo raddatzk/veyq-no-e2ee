@@ -10,7 +10,6 @@ data class SetupState(val setupRequired: Boolean, val suites: List<String>, val 
 data class OwnerRegistration(
     val email: String,
     val displayName: String,
-    val instanceName: String,
     val suiteId: String,
     val identityPublicKey: String,
     val wrappedIdentityPrivateKey: String,

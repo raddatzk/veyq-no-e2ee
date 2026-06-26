@@ -42,7 +42,6 @@ class SetupStore {
 
         ServerSetup().apply {
             id = ServerSetup.SINGLETON_ID
-            instanceName = registration.instanceName
             completedAt = Instant.now()
         }.persist()
 

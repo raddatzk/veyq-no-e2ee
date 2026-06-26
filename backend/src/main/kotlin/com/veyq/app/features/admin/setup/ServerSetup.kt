@@ -16,9 +16,6 @@ class ServerSetup : PanacheEntityBase {
     @Column(name = "id")
     var id: Int = SINGLETON_ID
 
-    @Column(name = "instance_name", nullable = false, length = 100)
-    lateinit var instanceName: String
-
     @Column(name = "completed_at", nullable = false)
     lateinit var completedAt: Instant
 

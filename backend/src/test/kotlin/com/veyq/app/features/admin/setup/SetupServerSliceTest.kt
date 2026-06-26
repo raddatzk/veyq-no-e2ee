@@ -20,7 +20,7 @@ class SetupServerSliceTest {
         authPublicKey: String = "ZWQyNTUxOS1hdXRoLXB1Yg==",
         kdfParams: String = "AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz",
     ) = """
-        {"email":"$email","displayName":"$displayName","instanceName":"Our Family veyq","suiteId":"v1",
+        {"email":"$email","displayName":"$displayName","suiteId":"v1",
          "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
          "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
          "authPublicKey":"$authPublicKey",
@@ -147,7 +147,7 @@ class SetupServerSliceTest {
     @Order(14)
     fun rejectsMissingAuthPublicKey() {
         val body = """
-            {"email":"kevin@example.com","displayName":"Kevin","instanceName":"Our Family veyq","suiteId":"v1",
+            {"email":"kevin@example.com","displayName":"Kevin","suiteId":"v1",
              "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
              "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
              "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5"}]}

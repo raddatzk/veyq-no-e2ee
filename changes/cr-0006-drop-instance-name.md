@@ -41,12 +41,10 @@ from a single-tenant mental model; setup should establish the **Server Owner** o
   (required list, property, example). **Done:** both clients regenerate with zero `instanceName` references
   (`CreateServerOwnerRequest` web + backend models). Backend compile + web typecheck are restored in
   phases 2 / 4 (the hand-written setup code still references the field until then).
-- [ ] **2 — backend.** Append migration `V6__drop_instance_name.sql`
-  (`ALTER TABLE veyq_server_setup DROP COLUMN instance_name;`); drop the field from `ServerSetup`, the
-  `OwnerRegistration` (`SetupHandler`), the `SetupResource` mapping, and `SetupStore.persistOwner`; update
-  `SetupServerSliceTest` + `SetupRequestSanitizationTest` (no `instanceName` in the body / assertions).
-  **Done when:** `./gradlew check` green (runs against both H2 (test) and the migration applies on MariaDB
-  (dev)).
+- [x] **2 — backend.** Added `V6__drop_instance_name.sql` (DROP COLUMN); removed the field from
+  `ServerSetup`, `OwnerRegistration`, the `SetupResource` mapping, and `SetupStore.persistOwner`; dropped
+  `instanceName` from the `SetupServerSliceTest` bodies + the `SetupRequestSanitizationTest` body/assertion.
+  **Done:** `./gradlew check` green (V6 applies on H2; setup tests 1 + 14, 0 failures).
 - [ ] **3 — http.** Drop `instanceName` from the request bodies in `http/admin/setup.http`. **Done when:**
   ijhttp green against a live instance.
 - [ ] **4 — web.** Remove the instance-name input from `SetupView.vue`, the `instanceName` param from

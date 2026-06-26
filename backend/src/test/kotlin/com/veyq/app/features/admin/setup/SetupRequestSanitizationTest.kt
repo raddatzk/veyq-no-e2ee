@@ -18,7 +18,7 @@ class SetupRequestSanitizationTest {
     @Test
     fun trimsNameFields() {
         val json = """
-            {"email":"  kev@example.com  ","displayName":"  Kevin  ","instanceName":"\tOur Family veyq ","suiteId":"v1",
+            {"email":"  kev@example.com  ","displayName":"  Kevin  ","suiteId":"v1",
              "identityPublicKey":"YQ==","wrappedIdentityPrivateKey":"YQ==","authPublicKey":"YQ==",
              "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"YQ=="}]}
         """.trimIndent()
@@ -27,6 +27,5 @@ class SetupRequestSanitizationTest {
 
         assertEquals("kev@example.com", req.email)
         assertEquals("Kevin", req.displayName)
-        assertEquals("Our Family veyq", req.instanceName)
     }
 }
