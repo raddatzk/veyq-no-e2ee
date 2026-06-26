@@ -59,7 +59,6 @@ paths:
             example:
               email: kevin@example.com
               displayName: Kevin
-              instanceName: Our Family veyq
               suiteId: v1
               identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
               wrappedIdentityPrivateKey: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
@@ -153,7 +152,6 @@ components:
       required:
         - email
         - displayName
-        - instanceName
         - suiteId
         - identityPublicKey
         - wrappedIdentityPrivateKey
@@ -172,12 +170,6 @@ components:
           description: The owner's human display name (server-visible identity metadata). Trimmed on input.
           maxLength: 100
           example: Kevin
-          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
-        instanceName:
-          type: string
-          description: Display name of the instance (server-visible). Trimmed on input.
-          maxLength: 100
-          example: Our Family veyq
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
         suiteId:
           type: string

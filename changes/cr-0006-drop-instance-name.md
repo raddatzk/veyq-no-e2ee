@@ -37,9 +37,10 @@ from a single-tenant mental model; setup should establish the **Server Owner** o
 
 ## Phases
 
-- [ ] **1 — contracts.** Remove `instanceName` from `CreateServerOwnerRequest` in `setup.openapi.yaml` (the
-  `required` list, the property, the example). **Done when:** the spec lints and the backend/web clients
-  generate without it.
+- [x] **1 — contracts.** Removed `instanceName` from `CreateServerOwnerRequest` in `setup.openapi.yaml`
+  (required list, property, example). **Done:** both clients regenerate with zero `instanceName` references
+  (`CreateServerOwnerRequest` web + backend models). Backend compile + web typecheck are restored in
+  phases 2 / 4 (the hand-written setup code still references the field until then).
 - [ ] **2 — backend.** Append migration `V6__drop_instance_name.sql`
   (`ALTER TABLE veyq_server_setup DROP COLUMN instance_name;`); drop the field from `ServerSetup`, the
   `OwnerRegistration` (`SetupHandler`), the `SetupResource` mapping, and `SetupStore.persistOwner`; update

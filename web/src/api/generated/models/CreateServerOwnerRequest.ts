@@ -40,12 +40,6 @@ export interface CreateServerOwnerRequest {
      */
     displayName: string;
     /**
-     * Display name of the instance (server-visible). Trimmed on input.
-     * @type {string}
-     * @memberof CreateServerOwnerRequest
-     */
-    instanceName: string;
-    /**
      * Crypto suite the client used to produce the wrapped material.
      * @type {CreateServerOwnerRequestSuiteIdEnum}
      * @memberof CreateServerOwnerRequest
@@ -100,7 +94,6 @@ export type CreateServerOwnerRequestSuiteIdEnum = typeof CreateServerOwnerReques
 export function instanceOfCreateServerOwnerRequest(value: object): value is CreateServerOwnerRequest {
     if (!('email' in value) || value['email'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('instanceName' in value) || value['instanceName'] === undefined) return false;
     if (!('suiteId' in value) || value['suiteId'] === undefined) return false;
     if (value['suiteId'] !== 'v1') return false;
     
@@ -123,7 +116,6 @@ export function CreateServerOwnerRequestFromJSONTyped(json: any, ignoreDiscrimin
         
         'email': json['email'],
         'displayName': json['displayName'],
-        'instanceName': json['instanceName'],
         'suiteId': json['suiteId'],
         'identityPublicKey': json['identityPublicKey'],
         'wrappedIdentityPrivateKey': json['wrappedIdentityPrivateKey'],
@@ -146,7 +138,6 @@ export function CreateServerOwnerRequestToJSONTyped(value?: CreateServerOwnerReq
         
         'email': value['email'],
         'displayName': value['displayName'],
-        'instanceName': value['instanceName'],
         'suiteId': value['suiteId'],
         'identityPublicKey': value['identityPublicKey'],
         'wrappedIdentityPrivateKey': value['wrappedIdentityPrivateKey'],
