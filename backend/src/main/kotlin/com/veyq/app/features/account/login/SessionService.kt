@@ -86,6 +86,32 @@ class SessionService {
         SessionFamilyEntity.findById(row.familyId)?.let { it.status = SessionFamilyEntity.REVOKED }
     }
 
+    // --- scheduled purge (see SessionPurge, cr-0011) ---
+    // Physically remove rows that are no longer needed. Matching strictly by `expiresAt < now` preserves the
+    // reuse-detection window: a SUPERSEDED refresh token stays until it expires (a replay within the refresh
+    // TTL still revokes its family — SessionService.refresh checks SUPERSEDED before expiry); once expired, a
+    // replay is rejected anyway, so deleting it is safe defense-in-depth.
+
+    /** Delete expired access tokens. Returns how many. */
+    @Transactional
+    fun purgeExpiredAccessTokens(now: Instant): Long = AccessTokenEntity.delete("expiresAt < ?1", now)
+
+    /** Delete expired refresh tokens (both CURRENT and SUPERSEDED — the reuse window is the TTL). */
+    @Transactional
+    fun purgeExpiredRefreshTokens(now: Instant): Long = RefreshTokenEntity.delete("expiresAt < ?1", now)
+
+    /** Delete expired (or stale, single-use) login challenges. */
+    @Transactional
+    fun purgeExpiredChallenges(now: Instant): Long = LoginChallengeEntity.delete("expiresAt < ?1", now)
+
+    /** Delete session families with no remaining tokens — cleans REVOKED (logout / reuse-revoked) and
+     *  abandoned-but-ACTIVE families whose tokens have all been purged. Run AFTER the token purges (FK). */
+    @Transactional
+    fun purgeEmptyFamilies(): Long = SessionFamilyEntity.delete(
+        "id not in (select a.familyId from AccessTokenEntity a) " +
+            "and id not in (select r.familyId from RefreshTokenEntity r)",
+    )
+
     private fun mint(familyId: String, generation: Int, now: Instant): Pair<String, String> {
         val access = Tokens.random()
         AccessTokenEntity().apply {

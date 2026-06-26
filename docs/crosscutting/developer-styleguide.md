@@ -162,6 +162,12 @@ Architectural patterns that are **binding across the codebase** are recorded her
 they are stable decisions) — using the same litmus test as above. Local, self-evident pattern usage is
 not documented; the code is the source of truth for that.
 
+- **Scheduled cleanup → a `@Scheduled` purge bean.** Rows that are status/expiry-gated at read but never
+  needed again (invites, session tokens, …) are physically removed by a small `@Scheduled` bean that
+  delegates to store delete-methods, on a config-driven interval (`*.purge.every`). Purge strictly past
+  expiry/terminal-state so any reuse-detection window (e.g. a superseded refresh token, ADR 0004) is
+  preserved until it lapses; delete child rows before parents (FK order). First two: `TenantInvitePurge`
+  (cr-0009), `SessionPurge` (cr-0011).
 - *(to decide)* Cross-context communication — direct call vs. domain events — settled when bounded
   contexts are cut.
 

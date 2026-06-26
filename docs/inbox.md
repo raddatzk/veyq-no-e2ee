@@ -57,7 +57,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | 28 | Goals, stakeholders & quality | quality | `legacy/docs/wiki/overview/goals-stakeholders-quality.md` | inbox |
 | 29 | Risks | infra, risk | `legacy/docs/wiki/overview/risks.md` | inbox |
 | 30 | Operations runbook (install, backup, upgrade) | ops | `legacy/docs/operations.md` | inbox |
-| 42 | Scheduled purge of expired session tokens | infra, sessions, cleanup, NEW | new — extends the `@Scheduled` purge seam introduced by cr-0009 (tenant invites) to expired/terminal session tokens (`veyq_refresh_token`/`veyq_access_token`, ADR 0004); today they are status/expiry-gated but never physically deleted | planned → **cr-0011** (after cr-0009 + cr-0010) |
+| 42 | Scheduled purge of expired session tokens | infra, sessions, cleanup, NEW | new — extends the `@Scheduled` purge seam introduced by cr-0009 (tenant invites) to expired/terminal session tokens (`veyq_refresh_token`/`veyq_access_token`, ADR 0004); today they are status/expiry-gated but never physically deleted | **done — cr-0011** (`SessionPurge` deletes expired access/refresh tokens, stale challenges, token-less families; keeps unexpired SUPERSEDED refresh for reuse-detection) |
 
 ## Contracts
 
