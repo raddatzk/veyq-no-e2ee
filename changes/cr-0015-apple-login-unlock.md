@@ -69,9 +69,16 @@ in the deferred `trust-device` / passkey use-cases — so the tvOS head follows 
   the full chain against a `StubTransport` (no server) and asserts the signature the client sent **verifies**
   against the independently-derived keypair (operator-blind, ADR 0003), plus refresh-rotation / no-session /
   withRefresh-retry cases.
-- [ ] **3 — unlock (data layer).** `GET /api/account/key-material` → `kekPasswordSecret(secretKey, password)`
-  → `symUnwrap` the Master Key + identity private into an in-memory **`Vault`** (cleared on background/sign-out).
-  **Done when:** a test unlocks (password + Secret Key → identity key in the vault).
+- [x] **3 — unlock (data layer).** ✅ `VeyqKit` unlock mirrors web `features/account/unlock` (PASSWORD floor,
+  2SKD): `GET /api/account/key-material` (via `withRefresh`) → pick the PASSWORD wrap → `decodeKdfParams` →
+  `kekPasswordSecret(secretKey, password)` → `symUnwrap` the Master Key (`master-key`) → `symUnwrap` the
+  identity private (`identity-priv`) into an in-memory **`Vault`** actor (best-effort zeroed, cleared on
+  logout). Identity private is held as **raw unwrapped bytes** (ML-KEM parsing deferred — login+unlock only
+  need to hold it). Errors: `.unlockUnavailable` (no PASSWORD wrap), `.invalidSecretKey`, `.unlockFailed`
+  (AEAD tag mismatch — one generic failure). **Verified:** `swift test` 19/19 — `UnlockTests` builds key
+  material with the same V1 primitives and asserts unlock recovers the **exact** Master Key + identity bytes;
+  wrong-Secret-Key → `.unlockFailed` + vault stays locked; DEVICE-only → `.unlockUnavailable`; key-material
+  401 → refresh → retry unlocks; logout clears the vault.
 - [ ] **4 — SwiftUI UI (adaptive, macOS/iOS/iPadOS).** Port the legacy login/unlock screens: instance URL (if
   not same-origin), email + password (login), Secret Key (unlock), the signed-in/unlocked states. One SwiftUI
   codebase, **adaptive** across iPhone / iPad / Mac (size classes — not a stretched phone layout). No tvOS

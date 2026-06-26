@@ -14,6 +14,12 @@ public enum VeyqError: Error, Equatable {
     case refreshRejected
     /// An authed resource call hit a 401; `withRefresh` catches this to rotate-and-retry once.
     case sessionExpired
+    /// The account has no PASSWORD floor wrap to open — unlock is impossible on this path.
+    case unlockUnavailable
+    /// The Secret Key entered was not valid base64.
+    case invalidSecretKey
+    /// Unwrap failed (AEAD tag mismatch) — wrong password or Secret Key. One generic failure.
+    case unlockFailed
     /// The server answered with a status the contract does not document.
     case unexpectedStatus(Int)
 }

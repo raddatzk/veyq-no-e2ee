@@ -11,22 +11,24 @@ import VeyqCrypto
 public final class VeyqClient: Sendable {
     public let instance: VeyqInstance
     public let session: Session
+    public let vault: Vault
     private let auth: AuthAPI.Client
+    private let account: AccountAPI.Client
 
     /// Build a client against an already-bootstrapped instance. `transport` is injectable so tests can
     /// drive the orchestration against a stub without a live server (the default is URLSession).
     public init(
         instance: VeyqInstance,
         session: Session = Session(),
+        vault: Vault = Vault(),
         transport: any ClientTransport = VeyqTransport.make()
     ) {
         self.instance = instance
         self.session = session
-        self.auth = AuthAPI.Client(
-            serverURL: instance.baseURL,
-            transport: transport,
-            middlewares: [BearerMiddleware(session: session)]
-        )
+        self.vault = vault
+        let middlewares: [any ClientMiddleware] = [BearerMiddleware(session: session)]
+        self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
+        self.account = AccountAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
     }
 
     /// Log in with email + password. Requests a challenge, derives the auth keypair with the instance
@@ -84,6 +86,52 @@ public final class VeyqClient: Sendable {
     public func logout() async throws {
         _ = try? await auth.logout(.init())
         await session.clear()
+        await vault.clear()
+    }
+
+    /// Unlock with the password + Secret Key (PASSWORD floor, 2SKD). Fetches the caller's key material
+    /// (refreshing the session once on a 401), derives the Unlock KEK on-device, AEAD-unwraps the Master
+    /// Key, then the identity private key — both into the in-memory `Vault`. Operator-blind: only
+    /// ciphertext is fetched; the password, the Secret Key, the KEK and the unwrapped keys never leave the
+    /// device. Throws `.unlockFailed` on a wrong password / Secret Key (one generic failure), or
+    /// `.unlockUnavailable` when there is no PASSWORD wrap. Mirrors web `features/account/unlock`.
+    public func unlock(password: String, secretKey secretKeyB64: String) async throws {
+        let material = try await withRefresh { try await self.fetchKeyMaterial() }
+
+        guard let wrap = material.wraps.first(where: { $0.method == .PASSWORD }),
+              let kdfParams = wrap.kdfParams
+        else { throw VeyqError.unlockUnavailable }
+
+        let trimmed = secretKeyB64.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let secretKey = Data(base64Encoded: trimmed) else { throw VeyqError.invalidSecretKey }
+
+        let decoded = V1.decodeKdfParams(Data(kdfParams.data))
+        let kek = V1.kekPasswordSecret(
+            secretKey: secretKey, password: password, salt: decoded.salt, params: decoded.params
+        )
+        do {
+            let masterKey = try V1.symUnwrap(kek: kek, blob: Data(wrap.wrappedKey.data), context: "master-key")
+            let identityPrivate = try V1.symUnwrap(
+                kek: masterKey, blob: Data(material.wrappedIdentityPrivateKey.data), context: "identity-priv"
+            )
+            await vault.open(masterKey: masterKey, identityPrivate: identityPrivate)
+        } catch {
+            throw VeyqError.unlockFailed
+        }
+    }
+
+    /// Fetch the caller's wrapped key material. A 401 is surfaced as `.sessionExpired` so `withRefresh`
+    /// can rotate-and-retry (the resource analog of the web 401→refresh wiring).
+    private func fetchKeyMaterial() async throws -> AccountAPI.Components.Schemas.AccountKeyMaterial {
+        let out = try await account.getAccountKeyMaterial(.init())
+        switch out {
+        case .ok(let ok):
+            return try ok.body.json
+        case .unauthorized:
+            throw VeyqError.sessionExpired
+        case .undocumented(let status, _):
+            throw VeyqError.unexpectedStatus(status)
+        }
     }
 
     /// Run an authed call, transparently refreshing once on a `.sessionExpired` and retrying — the
