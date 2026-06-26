@@ -1,0 +1,80 @@
+---
+id: cr-0017
+title: Apple — two-step unlock floor + Emergency Kit import (upload + QR scan)
+status: planned          # planned → in-progress → done (then keep as a record)
+satisfies: [uc.account.unlock]
+adrs: [0005, 0010]
+invariants: [operator-blind]
+---
+
+## Goal
+
+Bring the Apple client to the web's **two-step** sign-in shape and add **Emergency Kit import** on the
+Secret-Key floor: split the current single sign-in card into **(1) login** (email + password →
+`login()`) and **(2) unlock floor** (Secret Key → `unlock()`), then let a returning user fill the Secret
+Key by **uploading** the kit (PDF / any `veyqkit:` token-carrying file) or **scanning** the QR with the
+camera. This is the Apple twin of the web flow ([cr-0007](cr-0007-kit-import.md)) and closes the
+`secret-key-import-from-kit` criterion of [uc.account.unlock](../docs/features/account/use-cases/uc.account.unlock.md)
+for the apple surface.
+
+**Scope:** the two-step flow refactor + kit import (file + live QR) on the unlock floor.
+**Deferred:** trusted-device auto-unlock (a later apple increment — the floor is the only post-login path
+for now), importing a QR from a *static image file* (live camera scan + kit-PDF/token import only), ML-KEM.
+
+## Context & constraints
+
+- **Web is two-step, native is one** (the gap this closes): web `LoginView` shows email+password first
+  (`login()`), then a Secret-Key **floor** card (`unlock()`) where upload + scan live. cr-0015 collapsed
+  that into one card ("mirroring the legacy single-form UX"); this restores parity and gives the kit import
+  its natural home (and the future trusted-device auto-unlock its docking point — login → maybe auto-unlock
+  → else floor).
+- **Kit format is already machine-readable** (do not reinvent): `kitPayload` writes
+  `veyqkit:<b64url(JSON{v:1,email,sk})>` as a QR **and** uncompressed in the PDF bytes; web `parseKit(text)`
+  regex-extracts it. Port `parseKit` to Swift (a ~6-line pure function: prefix match → base64url decode →
+  JSON `{v,email,sk}` validate). File import reads the bytes **as text** and runs `parseKit` — no PDF
+  library, exactly like web (`importKitFromFile`).
+- **Operator-blind:** import is purely on-device — the kit is read locally, the Secret Key fills the local
+  field, nothing is sent. No invariant at risk. Email is **not** prefilled: in the two-step flow the email
+  is already entered at login, so a kit fills **only** the Secret Key.
+- **QR scanning = AVFoundation** (settled with the user): `AVCaptureSession` + `AVCaptureMetadataOutput`
+  (`.qr`) wrapped for SwiftUI — **universal** so it works on the iOS/iPadOS **and** macOS camera (VisionKit
+  `DataScannerViewController` is iOS-only; AVFoundation keeps the universal app at parity). Camera needs
+  `NSCameraUsageDescription` in Info.plist; permission-denied / no-camera degrades gracefully to
+  upload/paste (mirrors web).
+- **Reuse the shipped components** (`VeyqStyle`, `AuthCard`/`VeyqField`/`PrimaryButton`/`MessageBox`) — the
+  floor card and the in-field upload/scan affordances stay in the one veyq look (parity doc).
+
+## Phases
+
+- [ ] **1 — two-step flow refactor.** `AppModel.Phase` gains `.unlock` between `.signIn` and `.home`; split
+  `SignInView` into `SignInView` (email + password → `login()` → advance to `.unlock`) and a new
+  `UnlockView` (Secret Key, password carried in `AppModel` transiently → `unlock()` → `.home`); `RootView`
+  switches the new phase; "Use a different instance" still resets. Update `RoundTripUITests` to drive the two
+  steps. **Done when:** `swift build` + `swift test` green; the env-gated UI round-trip still goes
+  connect → login → unlock → home.
+- [ ] **2 — parseKit + file import.** Port `parseKit(_:) -> KitData?` to `VeyqKit` (+ `KitData{email,
+  secretKey}`); add `importKitFromFile` reading the picked file's bytes as UTF-8 text and `parseKit`-ing
+  (kit PDF / token text). Wire a SwiftUI `.fileImporter` (allowed: `.pdf`, `.plainText`) behind an in-field
+  **upload** affordance on the `UnlockView` Secret-Key field; on success fill the Secret Key, on an
+  unreadable file show a generic message. **Done when:** a `VeyqKitTests` case parses a known `veyqkit:`
+  token + a PDF-shaped blob to the exact `KitData`, and a non-kit blob → nil; `swift test` green.
+- [ ] **3 — live QR scan (AVFoundation, universal).** A `KitScanner` (UI/NSViewControllerRepresentable over
+  `AVCaptureSession` + metadata `.qr`) presented from a **scan** affordance on the floor; decoded string →
+  `parseKit` → fill Secret Key; cancel + permission-denied / no-camera fall back to upload/paste.
+  `NSCameraUsageDescription` added. **Done when:** `swift build` green on macOS + iOS; manual smoke: scanning
+  a kit QR fills the Secret Key and unlocks (camera scan shares the `parseKit` path, so it's manual where a
+  camera exists — the automated round-trip covers the file path).
+- [ ] **4 — live round-trip + screenshots + docs.** Update the live UI round-trip for the two-step flow;
+  re-capture screenshots (now `connect / signin / unlock-floor / home`, the floor showing upload+scan) under
+  `docs/design/screenshots/apple/`; record the apple ref on `secret-key-import-from-kit` in
+  `uc.account.unlock` coverage; note the two-step floor + kit import in the use-case if needed.
+  **Done when:** round-trip green, screenshots committed, `validate_coverage.py` green.
+
+## Definition of done
+
+The Apple app signs in in two steps (email+password → login, then a Secret-Key **floor** → unlock) and, on
+the floor, a user can fill the Secret Key by **uploading** the Emergency Kit (PDF / token file) or
+**scanning** the QR with the camera (iOS/iPadOS/macOS via AVFoundation), both decoded **on-device** via the
+ported `parseKit`; an unreadable kit fails generically; typing/pasting still works; nothing leaves the
+device. Coverage records the apple `secret-key-import-from-kit`. Parity with the web two-step flow restored.
+Keep this file as a record after merge.
