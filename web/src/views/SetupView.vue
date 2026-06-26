@@ -11,7 +11,6 @@ import { registerServerOwner } from '../features/admin/setupServer/setupServer'
 import { downloadKitPdf } from '../features/account/emergencyKit/emergencyKit'
 import { usePwnedWarning } from '../features/account/passwordWarning'
 import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
-import { session } from '../app/session'
 import { setAuthPrefill } from '../app/authPrefill'
 import { useServerState } from '../shared/state/useServerState'
 
@@ -63,10 +62,7 @@ async function downloadKit() {
   if (!secretKey.value) return
   error.value = ''
   try {
-    await downloadKitPdf(
-      { instance: session.apiBase, email: kitEmail, secretKey: secretKey.value },
-      displayName.value,
-    )
+    await downloadKitPdf({ email: kitEmail, secretKey: secretKey.value }, displayName.value)
     kitDownloadTriggered.value = true
   } catch {
     error.value = t('kit.downloadFailed')

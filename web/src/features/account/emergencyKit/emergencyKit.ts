@@ -5,7 +5,7 @@
 // jspdf + qrcode are heavy and only needed when actually downloading a kit — they're imported lazily
 // inside downloadKitPdf so the parse/import path (the common one) stays cheap.
 
-export type KitData = { instance: string; email: string; secretKey: string }
+export type KitData = { email: string; secretKey: string }
 
 const PREFIX = 'veyqkit:'
 
@@ -23,7 +23,7 @@ function fromB64url(s: string): string {
 export function kitPayload(data: KitData): string {
   return (
     PREFIX +
-    b64url(JSON.stringify({ v: 1, instance: data.instance, email: data.email, sk: data.secretKey }))
+    b64url(JSON.stringify({ v: 1, email: data.email, sk: data.secretKey }))
   )
 }
 
@@ -34,7 +34,7 @@ export function parseKit(text: string): KitData | null {
   try {
     const o = JSON.parse(fromB64url(m[1]))
     if (o.v !== 1 || !o.email || !o.sk) return null
-    return { instance: o.instance ?? '', email: o.email, secretKey: o.sk }
+    return { email: o.email, secretKey: o.sk }
   } catch {
     return null
   }
@@ -59,7 +59,6 @@ export async function downloadKitPdf(data: KitData, displayName: string): Promis
   doc.setFontSize(12)
   const rows: [string, string][] = [
     ['Name', displayName],
-    ['Instance', data.instance || '(same as the website)'],
     ['Email', data.email],
   ]
   let y = 140
