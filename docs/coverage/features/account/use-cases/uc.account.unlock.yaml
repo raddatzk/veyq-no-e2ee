@@ -6,6 +6,10 @@ acceptanceCriteria:
     text: The correct password + Secret Key derive the Unlock KEK, open the Master Key, and unwrap the identity private key into memory.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
+  - id: secret-key-import-from-kit
+    text: The Secret Key can be imported from the Emergency Kit (upload the kit file or scan its QR), decoded on-device via parseKit (cr-0007).
+    coverage:
+      web: { unit: [src/features/account/emergencyKit/emergencyKit.test.ts] }
   - id: wrong-credentials-generic-failure
     text: A wrong password or wrong Secret Key fails with a generic unlock failure (AEAD tag mismatch) and holds no key material; the server is uninvolved (E1).
     coverage:

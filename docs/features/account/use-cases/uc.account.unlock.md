@@ -16,7 +16,9 @@
 
 1. From an **authenticated-but-locked** state, the client obtains the **password** (reused from a login
    that just happened, or re-prompted on a fresh app session) and the **Secret Key** (from the Emergency
-   Kit, or already held by an enrolled device).
+   Kit, or already held by an enrolled device). The Secret Key may be **typed/pasted** or **imported from the
+   Emergency Kit** — uploading the kit file or scanning its QR code, both decoded **on-device** (the kit's
+   machine-readable token never leaves the device).
 2. The client retrieves its **PASSWORD `MasterKeyWrap`** (the wrapped key + its KDF parameters/salt) from
    the server.
 3. The client derives the **Unlock KEK** `= Argon2id(password + Secret Key, wrap KDF params)` — **domain-

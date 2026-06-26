@@ -1,7 +1,7 @@
 ---
 id: cr-0007
 title: Import the Secret Key from the Emergency Kit (upload + QR scan)
-status: planned          # planned → in-progress → done (then delete the file)
+status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.unlock]
 adrs: [0005]
 invariants: [operator-blind]
@@ -43,9 +43,11 @@ incl. from raw PDF bytes). This realizes the **"QR / file import of the Secret K
   end-to-end: on a fresh instance, both buttons render; an uploaded kit PDF (real `veyqkit:` token) filled the
   Secret-Key field exactly and **unlocked** — no console errors. (Camera scan shares the `parseKit` decode
   path; manual-only where a camera exists.)
-- [ ] **3 — docs.** Update `uc.account.unlock.md` so QR / file import of the Secret Key is **available** (not
-  deferred) for the floor path; re-run `python3 scripts/validate_coverage.py`. **Done when:** the validator
-  is green and the doc no longer calls kit import deferred.
+- [x] **3 — docs.** Noted in `uc.account.unlock.md` main flow that the Secret Key may be typed/pasted **or
+  imported from the kit** (upload / scan QR), decoded on-device; added a `secret-key-import-from-kit`
+  coverage criterion (→ `emergencyKit.test.ts`). (The "deferred" note lived only in the old LoginView
+  comment, rewritten in cr-0005 — nothing stale remains.) **Done:** `validate_coverage.py` green (4
+  use-cases).
 
 ## Definition of done
 
