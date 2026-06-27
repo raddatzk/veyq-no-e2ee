@@ -145,9 +145,14 @@ class VeyqClient(
         try {
             val masterKey = V1.symUnwrap(kek, b64decode(wrap.wrappedKey), "master-key")
             val identityPrivate = V1.symUnwrap(masterKey, b64decode(material.wrappedIdentityPrivateKey), "identity-priv")
-            vault.open(masterKey, identityPrivate)
+            vault.open(masterKey, identityPrivate)   // vault now owns these buffers — do NOT zero them here
         } catch (e: Exception) {
             throw VeyqError.UnlockFailed
+        } finally {
+            // The derived KEK and the Secret-Key bytes are purely local; wipe them so they don't linger on
+            // the heap (the Master Key itself is zeroed by Vault.clear on lock/sign-out).
+            kek.fill(0)
+            secretKeyBytes.fill(0)
         }
     }
 
@@ -178,9 +183,12 @@ class VeyqClient(
         try {
             val masterKey = V1.symUnwrap(kek, b64decode(wrap.wrappedKey), "master-key")
             val identityPrivate = V1.symUnwrap(masterKey, b64decode(material.wrappedIdentityPrivateKey), "identity-priv")
-            vault.open(masterKey, identityPrivate)
+            vault.open(masterKey, identityPrivate)   // vault-owned now — do NOT zero
         } catch (e: Exception) {
             throw VeyqError.UnlockFailed
+        } finally {
+            kek.fill(0)   // local derived KEK (the deviceFactor is store-owned — the store may hand back its
+                          // own retained buffer, so we must not wipe it here)
         }
         return true
     }
@@ -204,6 +212,10 @@ class VeyqClient(
         val kek = V1.kekDevicePassword(deviceFactor, password, salt, V1.ARGON)
         val wrappedKey = V1.symWrap(kek, masterKey, "master-key", randomBytes(12))
         val kdfParams = V1.encodeKdfParams(V1.ARGON, salt)
+        // Done with the plaintext key material — wipe the local copies before the network round-trip. The
+        // deviceFactor is store-owned (the store may return its own retained buffer), so it is not wiped here.
+        masterKey.fill(0)   // a fresh copy from vault.masterKey(), not the vault's own buffer
+        kek.fill(0)
 
         val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode(kdfParams)) }
         try {
@@ -245,6 +257,7 @@ class VeyqClient(
         deviceSecurity.wrapId(email)?.let { priorId -> runCatching { withRefresh { deleteWrap(priorId) } } }
 
         val wrappedKey = V1.symWrap(k, masterKey, "master-key", randomBytes(12))
+        masterKey.fill(0)   // local copy from vault.masterKey(); K is caller-owned (:app stores it) — leave it
         val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode("v1/device-key".toByteArray())) }
         try {
             deviceSecurity.commitPasswordless(email, level, wrapId, refreshToken)

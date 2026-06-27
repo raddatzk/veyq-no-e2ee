@@ -7,6 +7,7 @@ import com.veyq.app.generated.model.LoginChallengeRequest
 import com.veyq.app.generated.model.LoginVerifyRequest
 import com.veyq.app.generated.model.SessionFamily
 import com.veyq.app.generated.model.SessionResponse
+import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.util.UUID
@@ -17,6 +18,7 @@ import java.util.UUID
  * (`@PermitAll`, cr-0012): login *establishes* the session, so it precedes authentication.
  */
 @PermitAll
+@RateLimited
 class LoginResource(private val handler: LoginHandler) : LoginApi {
 
     override fun requestLoginChallenge(loginChallengeRequest: LoginChallengeRequest): Response {

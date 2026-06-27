@@ -4,6 +4,7 @@ import com.veyq.app.generated.api.TokenApi
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.RefreshRequest
 import com.veyq.app.generated.model.TokenPair
+import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 
@@ -11,6 +12,7 @@ import jakarta.ws.rs.core.Response
  *  [SessionService] (rotation + reuse detection, ADR 0004). Public (`@PermitAll`, cr-0012): the refresh token
  *  in the body *is* the credential, carried outside the bearer access-token scheme. */
 @PermitAll
+@RateLimited
 class TokenResource(private val sessions: SessionService) : TokenApi {
 
     override fun refreshSession(refreshRequest: RefreshRequest): Response {
