@@ -8,10 +8,25 @@ flow against a real local instance. Same design system, copy, and flow as the Ap
 |------|--------|
 | `android-01-connect.png` | Connect — enter the instance URL |
 | `android-02-signin.png`  | Sign in (step 1) — email + password, with **Upload kit / Scan QR** (fills email + parks Secret Key) |
-| `android-03-unlock.png`  | Unlock floor (step 2) — Secret Key, with **Upload kit / Scan QR** (fills Secret Key) |
+| `android-03-unlock.png`  | Unlock floor (step 2) — Secret Key + the **device unlock-level chooser**, with **Upload kit / Scan QR** |
 | `android-04-home.png`    | Unlocked — session held, vault open on-device |
 
-The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0018.
+The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0018; the
+floor's **device unlock-level chooser** (`android-03-unlock.png`) landed in cr-0021.
+
+## Device trust (cr-0021, L1 — "only password")
+
+Driven by `RoundTripUiTest.trustDeviceLifecycle` through the **real UI + real Android Keystore** (a
+non-extractable Keystore-HMAC `deviceFactor`), against a fresh live instance: floor unlock at "Only my
+password" → trusted home → sign out → re-login **folds straight to home** (no floor) → untrust → re-login
+back to the floor.
+
+| file | screen |
+|------|--------|
+| `android-trust-01-floor-chooser.png`      | Floor with the level chooser — no default; L0/L1 active, L2/L3 "Coming soon" |
+| `android-trust-02-home-trusted.png`       | Unlocked home — trusted, with **Stop trusting this device** |
+| `android-trust-03-relogin-fold.png`       | After sign-out + re-login: unlocks straight to home (the DEVICE unlock folds into login) |
+| `android-trust-04-floor-after-untrust.png`| After untrust + re-login: back to the Secret-Key floor |
 
 Captured on the **API-37 emulator** (`Pixel_10` AVD). Unlike macOS UI-test runners, the Android emulator
 has no TCC/Accessibility wall, so these are produced headlessly from the CLI.

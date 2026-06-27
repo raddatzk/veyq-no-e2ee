@@ -1,7 +1,7 @@
 ---
 id: cr-0021
 title: Android — trust this device (DEVICE wrap, Keystore-HMAC) + login-fold unlock
-status: planned          # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.trust-device, uc.account.set-device-security, uc.account.unlock]
 adrs: [0005, 0003, 0010]
 invariants: [operator-blind]
@@ -106,13 +106,16 @@ choose). The passwordless levels **L2 (biometric)** and **L3 (no login)** are th
   `deviceTrusted`/`deviceTrustFailed` reset on sign-out / change-instance. `HomeScreen`: a **"Stop trusting
   this device"** control + a trusted note + the enrol-failure message. **Done:** `:app:assembleDebug`
   `BUILD SUCCESSFUL`.
-- [ ] **4 — live round-trip + screenshots + coverage/parity.** Live data-layer (`:client`
-  `LiveRoundTripTest`, in-memory store) + an in-app **emulator** UI round-trip (real Keystore) through the
-  trust lifecycle (floor "Only password" → trusted home → sign out → re-login **folds to home** → untrust →
-  re-login floor), with screenshots. Fill the apple-style apple/android coverage for `trust-device` (add
-  android refs, drop the android gap) + `set-device-security` (android); flip android ✅ for
-  **uc.account.trust-device** in [platform-parity.md](../docs/crosscutting/platform-parity.md). **Check:**
-  `:client:test` green; live + UI green; `validate_coverage.py` green.
+- [x] **4 — live round-trip + screenshots + coverage/parity.** In-app **emulator** UI round-trip
+  (`RoundTripUiTest.trustDeviceLifecycle`, Pixel_10 / real Android Keystore) through the full lifecycle:
+  floor "Only my password" → trusted home → sign out → re-login **folds straight to home (no floor)** →
+  untrust → re-login back to the floor — green against a fresh live instance; 4 trust screenshots +
+  refreshed `android-03-unlock`/`-04-home` (README updated). The existing `connectSignInUnlock` updated for
+  the chooser (`performScrollTo` — the chooser pushes Unlock below the fold). Coverage filled with android
+  unit+e2e refs for `trust-device` (android gap dropped) + `set-device-security` (android); android flipped
+  ✅ for both in [platform-parity.md](../docs/crosscutting/platform-parity.md) — `trust-device` is now
+  **web·apple·android**. **Done:** `:client:test` 36 (1 skip); the emulator UI round-trip 2/2;
+  `validate_coverage.py` green.
 
 ## Definition of done
 

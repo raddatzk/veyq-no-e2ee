@@ -6,14 +6,17 @@ acceptanceCriteria:
     text: After the first floor unlock the client presents the level chooser with nothing pre-selected; Unlock is disabled until a level is picked.
     coverage:
       apple: { e2e: [RoundTripUITests.testTrustDeviceLifecycle, RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
+      android: { e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: levels-mutually-exclusive
     text: A device carries exactly one convenience wrap at a time; switching level removes the old wrap before adding the new one.
     coverage:
       apple: { unit: [TrustDeviceTests.testLevelSwitchReplacesTheConvenienceWrap, TrustDeviceTests.testReTrustReplacesPriorWrap] }
+      android: { unit: [TrustDeviceTest.reTrustReplacesPriorWrap] }
   - id: change-level-any-direction
     text: From the unlocked app the user can raise or lower the level; lowering to the floor drops this device's wrap + key + persisted session; other devices untouched.
     coverage:
       apple: { unit: [TrustDeviceTests.testLevelSwitchReplacesTheConvenienceWrap], e2e: [RoundTripUITests.testTrustDeviceLifecycle] }
+      android: { e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: unsupported-levels-hidden
     text: A level whose hardware is absent is not offered (L2 shown disabled "Not available" with no biometric — LAContext-gated); no silent downgrade.
     coverage:
@@ -22,11 +25,11 @@ acceptanceCriteria:
     text: Every level falls back automatically to the PASSWORD floor when its key/session is unusable, and the floor can never be removed.
     coverage:
       apple: { unit: [TrustDeviceTests.testMissingServerWrapReturnsFalseAndKeepsRecord, TrustDeviceTests.testResumeSessionWithDeadTokenFallsBack], e2e: [RoundTripUITests.testTrustDeviceLifecycle] }
+      android: { unit: [TrustDeviceTest.missingServerWrapReturnsFalseAndKeepsRecord], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: operator-blind-level-not-sent
     text: The chosen level is never sent as a label; the server stores only ciphertext wraps + opaque metadata and cannot distinguish the levels.
     coverage:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance, LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance] }
 gaps:
-  android: no native chooser yet — the cr-0018 successor (planned).
   web: the unified slider is not yet built on web (web has the L1 trust-device flow today); planned.
   backend: no backend change — the slider is a client concern over the existing wraps endpoints (N/A as a distinct surface).

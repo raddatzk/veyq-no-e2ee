@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -75,7 +76,8 @@ class RoundTripUiTest {
         }
         capture("android-03-unlock")
         compose.onNodeWithTag("Secret Key").performTextInput(secret)
-        compose.onNodeWithTag("Unlock").performClick()
+        compose.onNodeWithTag("level.SECRET_KEY_EACH_TIME").performScrollTo().performClick()   // no default — pick a level
+        compose.onNodeWithTag("Unlock").performScrollTo().performClick()
 
         // The home screen confirms the operator-blind result.
         compose.waitUntil(timeoutMillis = 20_000) {
@@ -84,6 +86,80 @@ class RoundTripUiTest {
         compose.onNodeWithText("Unlocked").assertIsDisplayed()
         compose.onNodeWithText(email).assertIsDisplayed()
         capture("android-04-home")
+    }
+
+    /**
+     * cr-0021 — the device-trust lifecycle through the real UI + real Android Keystore: floor unlock at
+     * "Only my password" → home shows trusted → sign out → re-login **folds straight to home** (no floor)
+     * → untrust → re-login lands back on the floor. Writes the trust-* design references.
+     */
+    @Test
+    fun trustDeviceLifecycle() {
+        val base = args.getString("veyqBase")
+        assumeNotNull(base)
+        val email = requireNotNull(args.getString("veyqEmail")) { "veyqEmail arg required" }
+        val password = requireNotNull(args.getString("veyqPassword")) { "veyqPassword arg required" }
+        val secret = requireNotNull(args.getString("veyqSecret")) { "veyqSecret arg required" }
+
+        // Connect → sign in.
+        compose.onNodeWithTag("Instance URL").assertIsDisplayed()
+        compose.onNodeWithTag("Instance URL").performTextInput(base!!)
+        compose.onNodeWithTag("Connect").performClick()
+        signIn(email, password)
+
+        // Robustness: a prior run may have left this device trusted (Keystore persists). If sign-in folds
+        // straight to home, untrust + sign out + sign in again to reach a known untrusted floor.
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty()
+        }
+        if (compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("Stop trusting this device").performClick()
+            compose.waitUntil(timeoutMillis = 10_000) {
+                compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isEmpty()
+            }
+            compose.onNodeWithTag("Sign out").performClick()
+            signIn(email, password)
+        }
+
+        // 1 — floor with the chooser; pick "Only my password" and unlock.
+        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("Secret Key").performTextInput(secret)
+        compose.onNodeWithTag("level.ONLY_PASSWORD").performScrollTo().performClick()
+        capture("android-trust-01-floor-chooser")
+        compose.onNodeWithTag("Unlock").performScrollTo().performClick()
+
+        // 2 — home, now trusted (the untrust control is present).
+        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("Stop trusting this device").assertIsDisplayed()
+        capture("android-trust-02-home-trusted")
+
+        // 3 — sign out → sign in → folds straight to home (no floor).
+        compose.onNodeWithTag("Sign out").performClick()
+        signIn(email, password)
+        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("Stop trusting this device").assertIsDisplayed()
+        capture("android-trust-03-relogin-fold")
+
+        // 4 — untrust → sign out → sign in → back to the floor.
+        compose.onNodeWithTag("Stop trusting this device").performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("Sign out").performClick()
+        signIn(email, password)
+        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() }
+        capture("android-trust-04-floor-after-untrust")
+    }
+
+    /** Type email + password on the sign-in screen and tap Sign in (used across the lifecycle re-logins). */
+    private fun signIn(email: String, password: String) {
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithTag("Email").fetchSemanticsNodes().size == 1
+        }
+        compose.onNodeWithTag("Email").performTextInput(email)
+        compose.onNodeWithTag("Password").performTextInput(password)
+        compose.onNodeWithTag("Sign in").performClick()
     }
 
     /**
