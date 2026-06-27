@@ -1,6 +1,7 @@
 package com.veyq.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(app: AppModel) {
     var busy by remember { mutableStateOf(false) }
+    var untrusting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val c = veyqColors
 
@@ -70,6 +73,37 @@ fun HomeScreen(app: AppModel) {
                     "Your keys are open on this device only. The server holds ciphertext — your content stays end-to-end encrypted.",
                     error = false,
                 )
+            }
+
+            if (app.deviceTrustFailed) {
+                Box(modifier = Modifier.widthIn(max = 360.dp)) {
+                    MessageBox("Couldn’t trust this device — you’ll use your Secret Key next time.")
+                }
+            }
+
+            if (app.deviceTrusted) {
+                Column(
+                    modifier = Modifier.widthIn(max = 360.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MessageBox(
+                        "This device is trusted — next time you’ll unlock with just your password.",
+                        error = false,
+                    )
+                    Text(
+                        if (untrusting) "…" else "Stop trusting this device",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = c.danger,
+                        modifier = Modifier
+                            .testTag("Stop trusting this device")
+                            .clickable(enabled = !untrusting) {
+                                untrusting = true
+                                scope.launch { app.untrust(); untrusting = false }
+                            },
+                    )
+                }
             }
 
             Box(modifier = Modifier.widthIn(max = 220.dp)) {

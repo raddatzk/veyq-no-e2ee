@@ -1,9 +1,12 @@
 package com.veyq.app.ui
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import com.veyq.app.security.KeystoreDeviceTrustStore
+import com.veyq.app.ui.components.DeviceUnlockLevel
 import com.veyq.client.VeyqClient
 import com.veyq.client.VeyqError
 import com.veyq.client.VeyqInstance
@@ -22,11 +25,22 @@ import kotlinx.coroutines.withContext
  * [pendingSecretKey] parks a Secret Key handed over by a **login-screen kit import** until the floor
  * consumes it. The blocking `:client` calls run on [Dispatchers.IO]; state mutations happen back on main.
  */
-class AppModel : ViewModel() {
+class AppModel(application: Application) : AndroidViewModel(application) {
     enum class Phase { CONNECT, SIGN_IN, UNLOCK, HOME }
+
+    /** The Android Keystore-backed device-trust store, injected into the [VeyqClient] (cr-0021). */
+    private val deviceTrust = KeystoreDeviceTrustStore(application)
 
     var phase by mutableStateOf(Phase.CONNECT)
         private set
+
+    /** Whether this device is at the "only password" level (a DEVICE wrap is enrolled) — drives the
+     *  untrust control on home. */
+    var deviceTrusted by mutableStateOf(false)
+        private set
+
+    /** Set when enrolling device trust failed after a floor unlock — the unlock still succeeded. */
+    var deviceTrustFailed by mutableStateOf(false)
 
     /** The chosen instance base URL (shown as the sign-in / floor subtitle). */
     var apiBase by mutableStateOf("")
@@ -59,7 +73,7 @@ class AppModel : ViewModel() {
     suspend fun connect(rawUrl: String): ConnectResult {
         val baseUrl = normalizeBaseUrl(rawUrl)
             ?: return ConnectResult.Failed("That doesn't look like a valid address.")
-        val client = VeyqClient(VeyqInstance(baseUrl))
+        val client = VeyqClient(VeyqInstance(baseUrl), deviceTrust = deviceTrust)
         return try {
             val setupNeeded = withContext(Dispatchers.IO) { client.setupRequired() }
             if (setupNeeded) {
@@ -84,6 +98,20 @@ class AppModel : ViewModel() {
         return try {
             withContext(Dispatchers.IO) { client.login(email = email, password = password) }
             this.email = email
+            deviceTrustFailed = false
+            // Login-fold (cr-0008 parity): on a trusted device the DEVICE unlock runs here so the floor
+            // never shows. The login just proved this password, so a failure means a corrupt/foreign/missing
+            // wrap → fall through to the floor.
+            if (withContext(Dispatchers.IO) { client.isTrusted(email) }) {
+                val opened = runCatching { withContext(Dispatchers.IO) { client.unlockWithDevice(email, password) } }.getOrDefault(false)
+                if (opened) {
+                    carriedPassword = ""
+                    pendingSecretKey = ""
+                    deviceTrusted = true
+                    phase = Phase.HOME
+                    return null
+                }
+            }
             this.carriedPassword = password
             phase = Phase.UNLOCK
             null
@@ -94,13 +122,23 @@ class AppModel : ViewModel() {
     }
 
     /**
-     * Step 2 — unlock (carried password + Secret Key → vault). Returns `null` on success (the flow advances
-     * to home) or a user-facing error string. The secrets are dropped on success.
+     * Step 2 — unlock the floor (carried password + Secret Key → vault), then apply the chosen device
+     * [DeviceUnlockLevel] right after a successful unlock (reusing the known-correct password): L0 stores
+     * nothing; L1 enrols the DEVICE wrap. An enrol failure does not fail the unlock — it surfaces
+     * [deviceTrustFailed]. Returns `null` on success or a user-facing error string.
      */
-    suspend fun unlock(secretKey: String): String? {
+    suspend fun unlock(secretKey: String, level: DeviceUnlockLevel): String? {
         val client = this.client ?: return "Not connected to an instance."
         return try {
             withContext(Dispatchers.IO) { client.unlock(password = carriedPassword, secretKey = secretKey) }
+            if (level == DeviceUnlockLevel.ONLY_PASSWORD) {
+                try {
+                    withContext(Dispatchers.IO) { client.trustThisDevice(email, carriedPassword) }
+                    deviceTrusted = true
+                } catch (e: Exception) {
+                    deviceTrustFailed = true   // unlock stands; trust did not take
+                }
+            }
             carriedPassword = ""
             pendingSecretKey = ""
             phase = Phase.HOME
@@ -113,12 +151,22 @@ class AppModel : ViewModel() {
         }
     }
 
-    /** Sign out: revoke the session, re-lock the vault, drop all transient secrets, and return to sign-in. */
+    /** Untrust this device (back to "Secret Key each time"): remove the DEVICE wrap + local key. */
+    suspend fun untrust() {
+        val client = this.client ?: return
+        withContext(Dispatchers.IO) { runCatching { client.untrustThisDevice(email) } }
+        deviceTrusted = false
+    }
+
+    /** Sign out: revoke the session, re-lock the vault, drop all transient secrets, and return to sign-in.
+     *  Device trust (the server wrap + Keystore key) is NOT touched — that is what makes the next login fold. */
     suspend fun signOut() {
         withContext(Dispatchers.IO) { client?.logout() }
         email = ""
         carriedPassword = ""
         pendingSecretKey = ""
+        deviceTrusted = false
+        deviceTrustFailed = false
         phase = Phase.SIGN_IN
     }
 
@@ -129,6 +177,8 @@ class AppModel : ViewModel() {
         email = ""
         carriedPassword = ""
         pendingSecretKey = ""
+        deviceTrusted = false
+        deviceTrustFailed = false
         phase = Phase.CONNECT
     }
 }

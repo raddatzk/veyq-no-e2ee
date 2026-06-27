@@ -96,11 +96,16 @@ choose). The passwordless levels **L2 (biometric)** and **L3 (no login)** are th
   `UnlockFailed`; not-trusted/ missing-wrap → false **without** clearing the store; re-trust replaces;
   untrust; 409 → `TooManyDevices`; commit rollback; 401 → refresh → unlock). Full `:client:test` +
   `:crypto:test` 36 (1 live skip), 0 failures.
-- [ ] **3 — UI (chooser + untrust + login-fold).** A Compose **device-level chooser** on the floor
-  (`UnlockScreen`) — no pre-selection; L0/L1 active, passwordless rows disabled; picking "Only my password"
-  enrols. `HomeScreen`: an **untrust** control + a "couldn't trust this device" message on enrol failure.
-  `AppModel`: the login-fold + `deviceTrusted` state + reset on sign-out / change-instance. **Check:**
-  `:app:assembleDebug` green.
+- [x] **3 — UI (chooser + untrust + login-fold).** New `components/DeviceSecurityChooser.kt`
+  (`DeviceUnlockLevel` L0–L3 + a radio-style Compose chooser — no pre-selection; L0/L1 active, passwordless
+  rows disabled "Coming soon"). `UnlockScreen` shows it and **requires a level** (`enabled = secretKey
+  .isNotEmpty() && level != null`); submit passes the chosen level into `app.unlock(secretKey, level)`.
+  `AppModel` → **`AndroidViewModel`** holding a `KeystoreDeviceTrustStore(application)` injected into the
+  `VeyqClient`; the **login-fold** in `login()` (trusted → `unlockWithDevice` before flipping the phase),
+  enrol after a floor unlock (L1 → `trustThisDevice`; enrol failure → `deviceTrustFailed`), `untrust()`, and
+  `deviceTrusted`/`deviceTrustFailed` reset on sign-out / change-instance. `HomeScreen`: a **"Stop trusting
+  this device"** control + a trusted note + the enrol-failure message. **Done:** `:app:assembleDebug`
+  `BUILD SUCCESSFUL`.
 - [ ] **4 — live round-trip + screenshots + coverage/parity.** Live data-layer (`:client`
   `LiveRoundTripTest`, in-memory store) + an in-app **emulator** UI round-trip (real Keystore) through the
   trust lifecycle (floor "Only password" → trusted home → sign out → re-login **folds to home** → untrust →
