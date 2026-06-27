@@ -61,17 +61,17 @@ final class LiveRoundTripTests: XCTestCase {
         let email = try XCTUnwrap(env["VEYQ_EMAIL"])
         let password = try XCTUnwrap(env["VEYQ_PASSWORD"])
         let secret = try XCTUnwrap(env["VEYQ_SECRET"])
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
 
         // 1 — floor unlock, then trust this device (enrol a DEVICE wrap server-side).
-        let c1 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceTrust: store)
+        let c1 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
         try await c1.login(email: email, password: password)
         try await c1.unlock(password: password, secretKey: secret)
         try await c1.trustThisDevice(email: email, password: password)
-        XCTAssertTrue(store.isTrusted(email: email), "a DEVICE wrap + local record now exist")
+        XCTAssertTrue((store.currentLevel(email: email) == .onlyPassword), "a DEVICE wrap + local record now exist")
 
         // 2 — a fresh client (new vault), same store: unlock with ONLY the password (no Secret Key).
-        let c2 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceTrust: store)
+        let c2 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
         try await c2.login(email: email, password: password)
         let opened = try await c2.unlockWithDevice(email: email, password: password)
         XCTAssertTrue(opened, "the trusted device opens with only the password")
@@ -79,7 +79,7 @@ final class LiveRoundTripTests: XCTestCase {
         XCTAssertEqual(mk?.count, 32, "the Master Key opened from the DEVICE wrap")
 
         // 3 — wrong password on the trusted device fails generically (AEAD tag), vault stays locked.
-        let c3 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceTrust: store)
+        let c3 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
         try await c3.login(email: email, password: password)
         do {
             _ = try await c3.unlockWithDevice(email: email, password: "definitely wrong")
@@ -88,8 +88,8 @@ final class LiveRoundTripTests: XCTestCase {
 
         // 4 — untrust: delete the wrap server-side + drop the local record (cleanup, leaves the owner clean).
         try await c2.untrustThisDevice(email: email)
-        XCTAssertFalse(store.isTrusted(email: email))
-        let c4 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceTrust: store)
+        XCTAssertFalse((store.currentLevel(email: email) == .onlyPassword))
+        let c4 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
         try await c4.login(email: email, password: password)
         let openedAfterUntrust = try await c4.unlockWithDevice(email: email, password: password)
         XCTAssertFalse(openedAfterUntrust, "after untrust the device path is unavailable (no record)")

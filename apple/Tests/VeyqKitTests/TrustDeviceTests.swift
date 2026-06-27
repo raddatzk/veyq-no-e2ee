@@ -36,23 +36,23 @@ final class TrustDeviceTests: XCTestCase {
         return ([pw], wrappedIdentity.base64EncodedString())
     }
 
-    private func makeClient(store: any DeviceTrustStore, stub: TrustStub) async -> VeyqClient {
+    private func makeClient(store: any DeviceSecurityStore, stub: TrustStub) async -> VeyqClient {
         let session = Session()
         await session.set(access: "access-1", refresh: "refresh-1", familyId: "fam")
         return VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL),
-                          session: session, deviceTrust: store, transport: stub)
+                          session: session, deviceSecurity: store, transport: stub)
     }
 
     /// Floor-unlock + trust, then a fresh client (fresh vault, same store) unlocks with only the password.
     func testTrustThenDeviceUnlockRoundTrip() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
 
         let c1 = await makeClient(store: store, stub: stub)
         try await c1.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
         try await c1.trustThisDevice(email: Self.email, password: Self.password)
-        XCTAssertTrue(store.isTrusted(email: Self.email))
+        XCTAssertTrue((store.currentLevel(email: Self.email) == .onlyPassword))
         XCTAssertTrue(stub.hasWrap(method: "DEVICE"), "a DEVICE wrap was stored server-side")
 
         // Fresh client (new vault), same store + same server state — unlock with only the password.
@@ -68,7 +68,7 @@ final class TrustDeviceTests: XCTestCase {
     func testDeviceUnlockWrongPasswordThrowsAndLeavesVaultLocked() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
         let c1 = await makeClient(store: store, stub: stub)
         try await c1.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
         try await c1.trustThisDevice(email: Self.email, password: Self.password)
@@ -87,7 +87,7 @@ final class TrustDeviceTests: XCTestCase {
     func testNotTrustedReturnsFalse() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let c = await makeClient(store: InMemoryDeviceTrustStore(), stub: stub)
+        let c = await makeClient(store: InMemoryDeviceSecurityStore(), stub: stub)
 
         let opened = try await c.unlockWithDevice(email: Self.email, password: Self.password)
         XCTAssertFalse(opened, "no trust record → device path unavailable")
@@ -100,19 +100,19 @@ final class TrustDeviceTests: XCTestCase {
     func testMissingServerWrapReturnsFalseAndKeepsRecord() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
-        try store.save(TrustRecord(deviceFactor: makeDeviceFactor(), wrapId: "ghost"), email: Self.email)
+        let store = InMemoryDeviceSecurityStore()
+        try store.save(DeviceSecurityRecord(level: .onlyPassword, wrapId: "ghost", secret: makeDeviceFactor()), email: Self.email)
         let c = await makeClient(store: store, stub: stub)
 
         let opened = try await c.unlockWithDevice(email: Self.email, password: Self.password)
         XCTAssertFalse(opened)
-        XCTAssertTrue(store.isTrusted(email: Self.email), "the local key must survive a missing server wrap")
+        XCTAssertTrue((store.currentLevel(email: Self.email) == .onlyPassword), "the local key must survive a missing server wrap")
     }
 
     func testReTrustReplacesPriorWrap() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
         let c = await makeClient(store: store, stub: stub)
         try await c.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
 
@@ -130,13 +130,13 @@ final class TrustDeviceTests: XCTestCase {
     func testUntrustRemovesWrapAndRecord() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
         let c = await makeClient(store: store, stub: stub)
         try await c.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
         try await c.trustThisDevice(email: Self.email, password: Self.password)
 
         try await c.untrustThisDevice(email: Self.email)
-        XCTAssertFalse(store.isTrusted(email: Self.email))
+        XCTAssertFalse((store.currentLevel(email: Self.email) == .onlyPassword))
         XCTAssertFalse(stub.hasWrap(method: "DEVICE"), "the DEVICE wrap was removed server-side")
     }
 
@@ -144,7 +144,7 @@ final class TrustDeviceTests: XCTestCase {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         stub.conflictOnAdd = true
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
         let c = await makeClient(store: store, stub: stub)
         try await c.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
 
@@ -154,7 +154,7 @@ final class TrustDeviceTests: XCTestCase {
         } catch VeyqError.tooManyDevices {
             // expected
         }
-        XCTAssertFalse(store.isTrusted(email: Self.email), "no local record when the server rejected the wrap")
+        XCTAssertFalse((store.currentLevel(email: Self.email) == .onlyPassword), "no local record when the server rejected the wrap")
     }
 
     /// A local-save failure after the server wrap is created rolls the wrap back (no orphan) and throws.
@@ -177,7 +177,7 @@ final class TrustDeviceTests: XCTestCase {
     func testDeviceUnlock401RefreshesThenUnlocks() async throws {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
-        let store = InMemoryDeviceTrustStore()
+        let store = InMemoryDeviceSecurityStore()
         let c1 = await makeClient(store: store, stub: stub)
         try await c1.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
         try await c1.trustThisDevice(email: Self.email, password: Self.password)
@@ -191,11 +191,11 @@ final class TrustDeviceTests: XCTestCase {
     }
 }
 
-/// A `DeviceTrustStore` whose `save` always fails — to exercise the enrol rollback.
-private final class FailingSaveDeviceTrustStore: DeviceTrustStore, @unchecked Sendable {
-    func isTrusted(email: String) -> Bool { false }
-    func load(email: String) throws -> TrustRecord? { nil }
-    func save(_ record: TrustRecord, email: String) throws { throw DeviceTrustError.keychain(-1) }
+/// A `DeviceSecurityStore` whose `save` always fails — to exercise the enrol rollback.
+private final class FailingSaveDeviceTrustStore: DeviceSecurityStore, @unchecked Sendable {
+    func currentLevel(email: String) -> DeviceLevel? { nil }
+    func load(email: String) throws -> DeviceSecurityRecord? { nil }
+    func save(_ record: DeviceSecurityRecord, email: String) throws { throw DeviceSecurityError.keychain(-1) }
     func clear(email: String) throws {}
 }
 

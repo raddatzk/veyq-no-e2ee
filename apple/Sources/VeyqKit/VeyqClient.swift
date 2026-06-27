@@ -12,25 +12,25 @@ public final class VeyqClient: Sendable {
     public let instance: VeyqInstance
     public let session: Session
     public let vault: Vault
-    private let deviceTrust: any DeviceTrustStore
+    private let deviceSecurity: any DeviceSecurityStore
     private let setup: SetupAPI.Client
     private let auth: AuthAPI.Client
     private let account: AccountAPI.Client
 
     /// Build a client against an already-bootstrapped instance. `transport` is injectable so tests can
     /// drive the orchestration against a stub without a live server (the default is URLSession);
-    /// `deviceTrust` is injectable so tests use an in-memory double instead of the real Keychain.
+    /// `deviceSecurity` is injectable so tests use an in-memory double instead of the real Keychain.
     public init(
         instance: VeyqInstance,
         session: Session = Session(),
         vault: Vault = Vault(),
-        deviceTrust: any DeviceTrustStore = KeychainDeviceTrustStore(),
+        deviceSecurity: any DeviceSecurityStore = KeychainDeviceSecurityStore(),
         transport: any ClientTransport = VeyqTransport.make()
     ) {
         self.instance = instance
         self.session = session
         self.vault = vault
-        self.deviceTrust = deviceTrust
+        self.deviceSecurity = deviceSecurity
         let middlewares: [any ClientMiddleware] = [BearerMiddleware(session: session)]
         self.setup = SetupAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
@@ -141,8 +141,9 @@ public final class VeyqClient: Sendable {
 
     // MARK: - Device trust (cr-0019, L1 — "only password"; uc.account.trust-device)
 
-    /// Whether this device holds a trust record for the account (the DEVICE-wrap unlock is available here).
-    public func isTrusted(email: String) -> Bool { deviceTrust.isTrusted(email: email) }
+    /// Whether this device is at the "only password" level (an L1 DEVICE wrap is enrolled → the login-fold
+    /// can unlock with just the password).
+    public func isTrusted(email: String) -> Bool { deviceSecurity.currentLevel(email: email) == .onlyPassword }
 
     /// Routine unlock on a trusted device: open the Master Key from this device's DEVICE wrap with **only
     /// the password** (no Secret Key). Returns `false` when this path is unavailable — no trust record, or
@@ -154,7 +155,8 @@ public final class VeyqClient: Sendable {
     /// be able to withhold the wrap to force every trusted device to wipe its key. Explicit untrust /
     /// re-trust is the only path that clears it.
     public func unlockWithDevice(email: String, password: String) async throws -> Bool {
-        guard let record = (try? deviceTrust.load(email: email)) ?? nil else { return false }
+        guard let record = (try? deviceSecurity.load(email: email)) ?? nil,
+              record.level == .onlyPassword else { return false }
         let material = try await withRefresh { try await self.fetchKeyMaterial() }
         guard let wrap = material.wraps.first(where: { $0.id == record.wrapId && $0.method == .DEVICE }),
               let kdfParams = wrap.kdfParams
@@ -162,7 +164,7 @@ public final class VeyqClient: Sendable {
 
         let decoded = V1.decodeKdfParams(Data(kdfParams.data))
         let kek = V1.kekDevicePassword(
-            deviceFactor: record.deviceFactor, password: password, salt: decoded.salt, params: decoded.params
+            deviceFactor: record.secret, password: password, salt: decoded.salt, params: decoded.params
         )
         do {
             let masterKey = try V1.symUnwrap(kek: kek, blob: Data(wrap.wrappedKey.data), context: "master-key")
@@ -188,7 +190,7 @@ public final class VeyqClient: Sendable {
 
         // Re-trust replaces: drop any prior wrap for this device first (best-effort — a stale id is
         // harmless, and the new record overwrites the local one anyway).
-        if let prior = (try? deviceTrust.load(email: email)) ?? nil {
+        if let prior = (try? deviceSecurity.load(email: email)) ?? nil {
             try? await withRefresh { try await self.deleteWrap(id: prior.wrapId) }
         }
 
@@ -203,7 +205,9 @@ public final class VeyqClient: Sendable {
             try await self.addDeviceWrap(wrappedKey: wrappedKey, kdfParams: kdfParams)
         }
         do {
-            try deviceTrust.save(TrustRecord(deviceFactor: deviceFactor, wrapId: wrapId), email: email)
+            try deviceSecurity.save(
+                DeviceSecurityRecord(level: .onlyPassword, wrapId: wrapId, secret: deviceFactor), email: email
+            )
         } catch {
             try? await withRefresh { try await self.deleteWrap(id: wrapId) }   // rollback — no orphan
             throw VeyqError.trustFailed
@@ -213,10 +217,10 @@ public final class VeyqClient: Sendable {
     /// Untrust this device: delete this device's DEVICE wrap server-side (best-effort, idempotent) and
     /// drop the local record. Other devices keep their own wraps; the floor is never removable.
     public func untrustThisDevice(email: String) async throws {
-        if let record = (try? deviceTrust.load(email: email)) ?? nil {
+        if let record = (try? deviceSecurity.load(email: email)) ?? nil {
             try? await withRefresh { try await self.deleteWrap(id: record.wrapId) }
         }
-        try deviceTrust.clear(email: email)
+        try deviceSecurity.clear(email: email)
     }
 
     /// POST a DEVICE wrap; returns its server id. A 401 throws `.sessionExpired` (so `withRefresh` rotates
