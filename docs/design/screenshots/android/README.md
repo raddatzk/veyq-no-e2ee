@@ -28,6 +28,22 @@ back to the floor.
 | `android-trust-03-relogin-fold.png`       | After sign-out + re-login: unlocks straight to home (the DEVICE unlock folds into login) |
 | `android-trust-04-floor-after-untrust.png`| After untrust + re-login: back to the Secret-Key floor |
 
+## Passwordless levels (cr-0022, L2 biometric / L3 no-login)
+
+The floor's chooser now offers all four levels (cr-0022). On the emulator (no fingerprint enrolled),
+**Fingerprint / Face** correctly shows **"Not available"** (`BiometricGate.available` gate) and **Open
+straight in** (L3) is selectable. Driven by `NoLoginAutoRestoreUiTest.noLoginAutoRestore`, which enrols L3
+then **closes + relaunches the activity** (a fresh AppModel re-runs `bootstrap`):
+
+| file | screen |
+|------|--------|
+| `android-trust-l3-01-floor-no-login.png` | Floor — all four levels; L2 "Not available" (no emulator biometric), L3 "Open straight in" selected |
+| `android-trust-l3-02-home.png`           | Unlocked home after enrolling L3 |
+| `android-trust-l3-03-autorestore.png`    | After an activity **relaunch**: opens straight to home — no connect, no floor (auto-restore) |
+
+**L2 (fingerprint) is a manual smoke** — enrolling a fingerprint on the emulator (so `adb emu finger touch`
+works) isn't cleanly automatable; the L2 *data* path is unit-tested and the chooser gate is shown above.
+
 Captured on the **API-37 emulator** (`Pixel_10` AVD). Unlike macOS UI-test runners, the Android emulator
 has no TCC/Accessibility wall, so these are produced headlessly from the CLI.
 

@@ -6,36 +6,43 @@ acceptanceCriteria:
     text: L3 is only reached by an explicit choice (the user picks "Open straight in" on the floor — never pre-selected).
     coverage:
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
+      android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: enrol-ungated-key-and-token
     text: Picking L3 stores a random key K + the refresh token ungated and enrols a device-key wrap (method=DEVICE).
     coverage:
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip], e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
+      android: { unit: [TrustDeviceTest.noLoginEnrolResumeUnlockRoundTrip], e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: opens-straight-in
     text: On relaunch the app reads the ungated token + K and lands on home with no user interaction (no connect, no floor).
     coverage:
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle, LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
+      android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: same-wrap-as-l2-only-gate-differs
     text: The wrap + crypto are identical to L2; only the keystore gate (ungated vs biometric) differs, invisible to the server.
     coverage:
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip] }
+      android: { unit: [TrustDeviceTest.biometricEnrolResumeUnlockRoundTrip, TrustDeviceTest.noLoginEnrolResumeUnlockRoundTrip] }
   - id: no-password-or-secret-key-at-rest
     text: The wrapping key is a random device-bound key (not the password); an extracted key opens only this device's vault.
     coverage:
       apple: { unit: [DeviceSecurityStoreTests.testPasswordlessRecordCarriesKeyAndToken] }
+      android: { unit: [DeviceSecurityStoreTest.passwordlessCommitCarriesLevelWrapAndToken] }
   - id: key-or-token-gone-falls-back
     text: A missing key/wrap or an expired/rotated token degrades to the floor (no silent self-wipe on a single server response).
     coverage:
       apple: { unit: [TrustDeviceTests.testResumeSessionWithDeadTokenFallsBack, TrustDeviceTests.testResumeSessionWithNoRecordReturnsFalse] }
+      android: { unit: [TrustDeviceTest.resumeSessionWithDeadTokenFallsBack, TrustDeviceTest.resumeSessionWithNoRecordReturnsFalse] }
   - id: reversible-anytime
     text: From the unlocked app the user can drop L3 (untrust → delete wrap + key + token) or switch level; other devices untouched.
     coverage:
       apple: { unit: [TrustDeviceTests.testLevelSwitchReplacesTheConvenienceWrap], e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
+      android: { unit: [TrustDeviceTest.levelSwitchReplacesTheConvenienceWrap], e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: operator-blind-unchanged
     text: The relaxation is purely local; the server still holds only ciphertext wraps + an opaque token and cannot distinguish the levels.
     coverage:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
+      android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
 gaps:
-  android: no native passwordless level yet — Android Keystore + ungated session is a later CR (planned).
   web: planned — an equivalent "stay signed in" web level is not yet built.
 # A device-passcode-set check + an explicit L3 warning dialog (ADR 0005 §13) are a polish item on top of
 # the verified flow above (the floor subtitle already warns "relies only on your device's lock screen").

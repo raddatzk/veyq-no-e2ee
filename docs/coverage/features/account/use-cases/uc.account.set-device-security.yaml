@@ -21,6 +21,7 @@ acceptanceCriteria:
     text: A level whose hardware is absent is not offered (L2 shown disabled "Not available" with no biometric — LAContext-gated); no silent downgrade.
     coverage:
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
+      android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: floor-always-reachable
     text: Every level falls back automatically to the PASSWORD floor when its key/session is unusable, and the floor can never be removed.
     coverage:

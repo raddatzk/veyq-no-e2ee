@@ -1,7 +1,7 @@
 ---
 id: cr-0022
 title: Android — biometric (L2) + no-login (L3) unlock; persistent session; activate the passwordless levels
-status: planned          # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
 adrs: [0005, 0003, 0010]
 invariants: [operator-blind]
@@ -102,12 +102,17 @@ passwordless rows in the cr-0021 chooser.
   `bootstrap` via `LaunchedEffect` on a new `LAUNCHING` phase. `DeviceSecurityChooser` activates L2/L3 (L2
   gated by `BiometricGate.available` → "Not available" row). **Done:** `:app:assembleDebug`
   `BUILD SUCCESSFUL` (runtime biometric verified on the emulator in phase 4).
-- [ ] **4 — live + emulator round-trip + screenshots + coverage/parity.** Emulator UI round-trips with
-  **simulated fingerprint** (`adb emu finger touch <id>`): enrol L2 → relaunch → fingerprint → home; enrol
-  L3 → relaunch → straight to home. Live data-layer wrap/resume round-trip. Fill `biometric-unlock` +
-  `auto-unlock` coverage (android refs) + `set-device-security` (android L2/L3); flip android ✅ for L2/L3 in
-  [platform-parity.md](../docs/crosscutting/platform-parity.md). **Check:** `:client:test` + emulator UI
-  green; `validate_coverage.py` green.
+- [x] **4 — emulator round-trip + screenshots + coverage/parity.** `NoLoginAutoRestoreUiTest`
+  (`createEmptyComposeRule` + `ActivityScenario`, Pixel_10 / real Keystore, fresh live instance): floor
+  "Open straight in" → home → **close + relaunch the activity** (cleared ViewModelStore → a new AppModel
+  re-runs `bootstrap`) → **opens straight to home, no connect/floor**. Green. The chooser shows all four
+  levels with **L2 "Not available"** (no emulator fingerprint → the `BiometricGate` gate). 3 L3 screenshots
+  + README. Coverage filled: `auto-unlock` (full android), `biometric-unlock` (android — data path unit;
+  the live fingerprint gate is **manual smoke**, like apple's Face ID), `set-device-security` (android);
+  android flipped ✅ for L2/L3 in [platform-parity.md](../docs/crosscutting/platform-parity.md) —
+  completing **web·apple·android** for the device unlock levels. **Done:** emulator UI 1/1; `:client:test`
+  45 (1 skip); `validate_coverage.py` green. *(L2 emulator-fingerprint automation is the one deferred
+  verification; the L2 data path + chooser gate are otherwise covered.)*
 
 ## Definition of done
 

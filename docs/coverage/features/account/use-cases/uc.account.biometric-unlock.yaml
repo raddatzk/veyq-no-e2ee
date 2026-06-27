@@ -6,39 +6,50 @@ acceptanceCriteria:
     text: Picking L2 enrols a device-key wrap (symWrap(K, masterKey), method=DEVICE) with K held in a biometric-gated Keychain item; it appears in the caller's key material.
     coverage:
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip], e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
+      android: { unit: [TrustDeviceTest.biometricEnrolResumeUnlockRoundTrip] }
   - id: unlock-biometric-only
     text: On open a live biometric releases K (and the persisted session resumes) — the Master Key opens with no password, no Secret Key.
     coverage:
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip] }
+      android: { unit: [TrustDeviceTest.biometricEnrolResumeUnlockRoundTrip] }
   - id: passwordless-needs-persisted-session
     text: The refresh token is persisted (ungated meta, prompt-free rotation) so the session resumes without the password; token expiry falls back to the floor.
     coverage:
       apple: { unit: [TrustDeviceTests.testResumeRotatesAndPersistsTheNewToken, TrustDeviceTests.testResumeSessionWithDeadTokenFallsBack] }
+      android: { unit: [TrustDeviceTest.resumeRotatesAndPersistsTheNewToken, TrustDeviceTest.resumeSessionWithDeadTokenFallsBack] }
   - id: no-password-at-rest
     text: The wrapping key is a random device-bound key, never the account password — a biometric-passing local attacker gets only this device's vault.
     coverage:
       apple: { unit: [DeviceSecurityStoreTests.testPasswordlessRecordCarriesKeyAndToken] }
+      android: { unit: [DeviceSecurityStoreTest.passwordlessCommitCarriesLevelWrapAndToken] }
   - id: key-or-wrap-gone-no-self-wipe
     text: A missing local key or server wrap degrades to the floor without self-wiping the local key on a single server response.
     coverage:
       apple: { unit: [TrustDeviceTests.testResumeSessionWithNoRecordReturnsFalse] }
+      android: { unit: [TrustDeviceTest.resumeSessionWithNoRecordReturnsFalse] }
   - id: unsupported-hardware-not-offered
     text: With no biometric enrolled, L2 is not offered (shown disabled "Not available", gated by LAContext.canEvaluatePolicy).
     coverage:
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
+      android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: level-switch-replaces
     text: Switching to/from L2 swaps the single convenience wrap (mutually exclusive), never accumulating two.
     coverage:
       apple: { unit: [TrustDeviceTests.testLevelSwitchReplacesTheConvenienceWrap] }
+      android: { unit: [TrustDeviceTest.levelSwitchReplacesTheConvenienceWrap] }
   - id: operator-blind-indistinct-from-l3
     text: The server holds only the device-key ciphertext wrap; whether K is biometric-gated (L2) or ungated (L3) is local and never sent.
     coverage:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
+      android: { unit: [TrustDeviceTest.biometricEnrolResumeUnlockRoundTrip] }
 gaps:
-  android: no native biometric level yet — Android Keystore + BiometricPrompt is a later CR (planned).
   web: N/A on web — the web biometric path is WebAuthn passkey + PRF (the separate, planned PASSKEY use-case), not this native method.
 # Verification note: the data layer (enrol → resume → device-key unlock, with the .biometric level) is
-# unit- + live-tested; the live OS gate specifics — the actual Face ID prompt releasing K, and
-# .biometryCurrentSet invalidation on a biometric-set change — are MANUAL SMOKE (the iOS-sim biometric
-# automation, `simctl … BiometricKit_Sim.pearl.match`, is deferred). True non-extractable SE/ECIES backing
-# is a future hardening (the current gate is a .biometryCurrentSet Keychain item, SE-enforced).
+# unit-tested on both natives; the live OS gate is MANUAL SMOKE.
+#  - apple: the Face ID prompt releasing K + .biometryCurrentSet invalidation — the iOS-sim biometric
+#    automation (`simctl … BiometricKit_Sim.pearl.match`) is deferred; backing = a .biometryCurrentSet
+#    Keychain item (SE-enforced); true non-extractable SE/ECIES is a future hardening.
+#  - android: the BiometricPrompt releasing K via a CryptoObject — the L2 chooser row + the K-storage
+#    compile + the unit data path are covered; enrolling a fingerprint on the emulator (so
+#    `adb emu finger touch` works) isn't cleanly automatable, so the live prompt is manual smoke. Backing =
+#    a hardware Keystore-AES key, setUserAuthenticationRequired + AUTH_BIOMETRIC_STRONG (proper hardware gate).
