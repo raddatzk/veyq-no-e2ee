@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.veyq.app.security.BiometricGate
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.DeviceSecurityChooser
@@ -50,6 +52,8 @@ fun UnlockScreen(app: AppModel) {
     var level by remember { mutableStateOf<DeviceUnlockLevel?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    val biometricAvailable = activity != null && BiometricGate.available(activity)
 
     val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -80,14 +84,14 @@ fun UnlockScreen(app: AppModel) {
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
                 onScan = { scanning = true },
             )
-            DeviceSecurityChooser(selection = level, onSelect = { level = it })
+            DeviceSecurityChooser(selection = level, onSelect = { level = it }, biometricAvailable = biometricAvailable)
             PrimaryButton(title = "Unlock", busy = busy, enabled = secretKey.isNotEmpty() && level != null) {
                 val chosen = level ?: return@PrimaryButton
                 busy = true
                 error = ""
                 val s = secretKey
                 scope.launch {
-                    val err = app.unlock(s, chosen)
+                    val err = app.unlock(s, chosen, activity)
                     if (err == null) secretKey = "" else error = err
                     busy = false
                 }

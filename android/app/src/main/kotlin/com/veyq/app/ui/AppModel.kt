@@ -4,13 +4,17 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
+import com.veyq.app.security.BiometricGate
 import com.veyq.app.security.KeystoreDeviceSecurityStore
 import com.veyq.app.ui.components.DeviceUnlockLevel
+import com.veyq.client.DeviceLevel
 import com.veyq.client.VeyqClient
 import com.veyq.client.VeyqError
 import com.veyq.client.VeyqInstance
 import java.net.URI
+import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,12 +30,13 @@ import kotlinx.coroutines.withContext
  * consumes it. The blocking `:client` calls run on [Dispatchers.IO]; state mutations happen back on main.
  */
 class AppModel(application: Application) : AndroidViewModel(application) {
-    enum class Phase { CONNECT, SIGN_IN, UNLOCK, HOME }
+    enum class Phase { LAUNCHING, CONNECT, SIGN_IN, UNLOCK, HOME }
 
-    /** The Android Keystore-backed device-trust store, injected into the [VeyqClient] (cr-0021). */
+    /** The Android Keystore-backed device-security store, injected into the [VeyqClient] (cr-0021/cr-0022). */
     private val deviceSecurity = KeystoreDeviceSecurityStore(application)
+    private val launchPrefs = LaunchPrefs(application)
 
-    var phase by mutableStateOf(Phase.CONNECT)
+    var phase by mutableStateOf(Phase.LAUNCHING)
         private set
 
     /** Whether this device is at the "only password" level (a DEVICE wrap is enrolled) — drives the
@@ -127,18 +132,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
      * nothing; L1 enrols the DEVICE wrap. An enrol failure does not fail the unlock — it surfaces
      * [deviceTrustFailed]. Returns `null` on success or a user-facing error string.
      */
-    suspend fun unlock(secretKey: String, level: DeviceUnlockLevel): String? {
+    suspend fun unlock(secretKey: String, level: DeviceUnlockLevel, activity: FragmentActivity?): String? {
         val client = this.client ?: return "Not connected to an instance."
         return try {
             withContext(Dispatchers.IO) { client.unlock(password = carriedPassword, secretKey = secretKey) }
-            if (level == DeviceUnlockLevel.ONLY_PASSWORD) {
-                try {
-                    withContext(Dispatchers.IO) { client.trustThisDevice(email, carriedPassword) }
-                    deviceTrusted = true
-                } catch (e: Exception) {
-                    deviceTrustFailed = true   // unlock stands; trust did not take
-                }
-            }
+            runCatching { applyLevel(client, level, activity) }.onFailure { deviceTrustFailed = true }
             carriedPassword = ""
             pendingSecretKey = ""
             phase = Phase.HOME
@@ -151,12 +149,86 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Untrust this device (back to "Secret Key each time"): remove the DEVICE wrap + local key. */
+    /** Enrol the chosen device level right after a floor unlock (reusing the in-hand password / live
+     *  session). L0 stores nothing; L1 = DEVICE wrap; L2 = random-K wrap, K biometric-gated (a fingerprint
+     *  encrypts K); L3 = random-K wrap, K ungated. Throws on failure → the caller surfaces `deviceTrustFailed`. */
+    private suspend fun applyLevel(client: VeyqClient, level: DeviceUnlockLevel, activity: FragmentActivity?) {
+        when (level) {
+            DeviceUnlockLevel.SECRET_KEY_EACH_TIME -> Unit
+            DeviceUnlockLevel.ONLY_PASSWORD -> {
+                withContext(Dispatchers.IO) { client.trustThisDevice(email, carriedPassword) }
+                deviceTrusted = true
+            }
+            DeviceUnlockLevel.NO_LOGIN -> {
+                val k = randomKey()
+                withContext(Dispatchers.IO) { deviceSecurity.storeKeyUngated(email, k) }
+                withContext(Dispatchers.IO) { client.setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, k) }
+                launchPrefs.remember(apiBase, email)
+                deviceTrusted = true
+            }
+            DeviceUnlockLevel.BIOMETRIC -> {
+                val act = activity ?: error("no activity for the biometric prompt")
+                val k = randomKey()
+                val cipher = deviceSecurity.encryptCipherL2(email)
+                val authed = BiometricGate.authenticate(act, cipher, "Set up biometric unlock", email)
+                    ?: error("biometric cancelled")
+                deviceSecurity.finishStoreKeyL2(email, k, authed)
+                withContext(Dispatchers.IO) { client.setPasswordlessLevel(email, DeviceLevel.BIOMETRIC, k) }
+                launchPrefs.remember(apiBase, email)
+                deviceTrusted = true
+            }
+        }
+    }
+
+    /**
+     * App-launch auto-restore for a passwordless device (cr-0022 L2/L3): if this device last used L2/L3,
+     * resume the persisted session and open the vault — silently for L3, after a biometric for L2. Anything
+     * missing / failed falls back to connect / sign-in. Called once at launch.
+     */
+    suspend fun bootstrap(activity: FragmentActivity?) {
+        if (phase != Phase.LAUNCHING) return
+        val inst = launchPrefs.instance
+        val acct = launchPrefs.account
+        val baseUrl = inst?.let { normalizeBaseUrl(it) }
+        if (baseUrl == null || acct == null) { phase = Phase.CONNECT; return }
+
+        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity)
+        val level = withContext(Dispatchers.IO) { client.currentLevel(acct) }
+        if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) { phase = Phase.CONNECT; return }
+        this.client = client
+        this.apiBase = baseUrl
+        this.email = acct
+        this.deviceTrusted = true
+
+        try {
+            if (!withContext(Dispatchers.IO) { client.resumeSession(acct) }) { launchPrefs.clear(); phase = Phase.CONNECT; return }
+            val k: ByteArray? = when (level) {
+                DeviceLevel.NO_LOGIN -> withContext(Dispatchers.IO) { deviceSecurity.readKeyUngated(acct) }
+                DeviceLevel.BIOMETRIC -> {
+                    val act = activity ?: return  // re-run when the activity is available
+                    val cipher = deviceSecurity.decryptCipherL2(acct) ?: return run { phase = Phase.SIGN_IN }
+                    val authed = BiometricGate.authenticate(act, cipher, "Unlock veyq", acct) ?: return run { phase = Phase.SIGN_IN }
+                    deviceSecurity.finishReadKeyL2(acct, authed)
+                }
+                else -> null
+            }
+            if (k != null && withContext(Dispatchers.IO) { client.unlockWithKey(acct, k) }) phase = Phase.HOME
+            else phase = Phase.SIGN_IN
+        } catch (e: Exception) {
+            phase = Phase.SIGN_IN
+        }
+    }
+
+    /** Drop this device's convenience level back to "Secret Key each time": remove the wrap + key + any
+     *  persisted session, and forget it for auto-restore. */
     suspend fun untrust() {
         val client = this.client ?: return
         withContext(Dispatchers.IO) { runCatching { client.untrustThisDevice(email) } }
+        launchPrefs.clear()
         deviceTrusted = false
     }
+
+    private fun randomKey(): ByteArray = ByteArray(32).also { SecureRandom().nextBytes(it) }
 
     /** Sign out: revoke the session, re-lock the vault, drop all transient secrets, and return to sign-in.
      *  Device trust (the server wrap + Keystore key) is NOT touched — that is what makes the next login fold. */

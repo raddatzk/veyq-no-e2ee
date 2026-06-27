@@ -59,6 +59,7 @@ dependencies {
     // API-37 emulator. Revisit when the android-37 platform ships to the stable channel.
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.activity:activity-compose:1.12.4")
+    implementation("androidx.biometric:biometric:1.1.0") // BiometricPrompt + CryptoObject (cr-0022 L2)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0") // LocalLifecycleOwner for the camera scanner

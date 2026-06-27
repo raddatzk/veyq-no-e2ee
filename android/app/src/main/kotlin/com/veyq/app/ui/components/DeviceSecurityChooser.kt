@@ -28,20 +28,27 @@ import com.veyq.app.ui.theme.veyqColors
  * must actively decide. cr-0021 ships L0 + L1; the passwordless notches are previewed disabled ("Coming
  * soon", cr-0022) so the chooser extends rather than gets rewritten.
  */
-enum class DeviceUnlockLevel(val title: String, val subtitle: String, val available: Boolean) {
-    SECRET_KEY_EACH_TIME("Secret Key each time", "Most private — enter your password and Secret Key every time.", true),
-    ONLY_PASSWORD("Only my password", "Trust this device: next time just your password, no Secret Key.", true),
-    BIOMETRIC("Fingerprint / Face", "Unlock with a touch — no password.", false),
-    NO_LOGIN("Open straight in", "No prompt at all — relies only on your device’s lock screen.", false),
+enum class DeviceUnlockLevel(val title: String, val subtitle: String) {
+    SECRET_KEY_EACH_TIME("Secret Key each time", "Most private — enter your password and Secret Key every time."),
+    ONLY_PASSWORD("Only my password", "Trust this device: next time just your password, no Secret Key."),
+    BIOMETRIC("Fingerprint / Face", "Unlock with a touch — no password."),
+    NO_LOGIN("Open straight in", "No prompt at all — relies only on your device’s lock screen."),
 }
 
 @Composable
-fun DeviceSecurityChooser(selection: DeviceUnlockLevel?, onSelect: (DeviceUnlockLevel) -> Unit) {
+fun DeviceSecurityChooser(
+    selection: DeviceUnlockLevel?,
+    onSelect: (DeviceUnlockLevel) -> Unit,
+    biometricAvailable: Boolean = true,
+) {
     val c = veyqColors
+    // L2 needs an enrolled biometric; the rest are always offerable (L3 is an explicit, OS-lock-only choice).
+    fun available(level: DeviceUnlockLevel) = level != DeviceUnlockLevel.BIOMETRIC || biometricAvailable
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("How should this device unlock next time?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
         DeviceUnlockLevel.entries.forEach { level ->
             val selected = selection == level
+            val isAvailable = available(level)
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(VeyqTokens.radiusSm))
@@ -50,7 +57,7 @@ fun DeviceSecurityChooser(selection: DeviceUnlockLevel?, onSelect: (DeviceUnlock
                         BorderStroke(if (selected) 2.dp else 1.dp, if (selected) c.accent else c.line),
                         RoundedCornerShape(VeyqTokens.radiusSm),
                     )
-                    .clickable(enabled = level.available) { onSelect(level) }
+                    .clickable(enabled = isAvailable) { onSelect(level) }
                     .padding(11.dp)
                     .testTag("level.${level.name}"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -62,11 +69,11 @@ fun DeviceSecurityChooser(selection: DeviceUnlockLevel?, onSelect: (DeviceUnlock
                             level.title,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (level.available) c.text else c.muted,
+                            color = if (isAvailable) c.text else c.muted,
                         )
-                        if (!level.available) {
+                        if (!isAvailable) {
                             Text(
-                                "Coming soon",
+                                "Not available",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = c.muted,
@@ -79,7 +86,7 @@ fun DeviceSecurityChooser(selection: DeviceUnlockLevel?, onSelect: (DeviceUnlock
                     }
                     Text(level.subtitle, fontSize = 12.sp, color = c.muted)
                 }
-                RadioButton(selected = selected, onClick = { if (level.available) onSelect(level) }, enabled = level.available)
+                RadioButton(selected = selected, onClick = { if (isAvailable) onSelect(level) }, enabled = isAvailable)
             }
         }
     }

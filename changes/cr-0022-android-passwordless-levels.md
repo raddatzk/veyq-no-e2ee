@@ -91,10 +91,17 @@ passwordless rows in the cr-0021 chooser.
   `TrustDeviceTest` 16 (the 7 new L2/L3: biometric/no-login enrol → resume + device-key unlock; rotation
   persists; level switch swaps the one wrap; L1 rejected by the K-path; no-record/dead-token → false;
   commit rollback).
-- [ ] **3 — `:app` biometric + auto-restore + chooser.** `:app`: BiometricPrompt + CryptoObject K
-  decryption, the enrol wiring (L2/L3 from the floor chooser), app-launch auto-restore (L3 silent / L2
-  biometric), chooser L2/L3 activation (BiometricManager gate), untrust/level-switch. **Check:**
-  `:app:assembleDebug`.
+- [x] **3 — `:app` biometric + auto-restore + chooser.** Added `androidx.biometric`; `MainActivity` →
+  `FragmentActivity`. `KeystoreDeviceSecurityStore` gains the K storage: an **ungated** Keystore-AES key
+  (L3, synchronous) + a **biometric-gated** Keystore-AES key (L2, `setUserAuthenticationRequired` +
+  `AUTH_BIOMETRIC_STRONG`, API-30 guard) whose encrypt/decrypt run inside a `BiometricPrompt` via a
+  `CryptoObject` (K is AES-GCM-encrypted, the ciphertext in prefs). New `BiometricGate` (wraps the async,
+  Activity-bound prompt as a **suspend** fn). `AppModel`: `applyLevel` (L1 trust / L2 biometric-enrol / L3
+  ungated), `bootstrap(activity)` app-launch auto-restore (**L3 silent → home**, **L2 fingerprint → home**;
+  else connect/sign-in), `LaunchPrefs` (last instance+account), untrust clears it; `RootScreen` runs
+  `bootstrap` via `LaunchedEffect` on a new `LAUNCHING` phase. `DeviceSecurityChooser` activates L2/L3 (L2
+  gated by `BiometricGate.available` → "Not available" row). **Done:** `:app:assembleDebug`
+  `BUILD SUCCESSFUL` (runtime biometric verified on the emulator in phase 4).
 - [ ] **4 — live + emulator round-trip + screenshots + coverage/parity.** Emulator UI round-trips with
   **simulated fingerprint** (`adb emu finger touch <id>`): enrol L2 → relaunch → fingerprint → home; enrol
   L3 → relaunch → straight to home. Live data-layer wrap/resume round-trip. Fill `biometric-unlock` +
