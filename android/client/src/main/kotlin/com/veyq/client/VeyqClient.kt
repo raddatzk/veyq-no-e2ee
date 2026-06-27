@@ -95,14 +95,35 @@ class VeyqClient(
         }
     }
 
-    /** Keep the persisted refresh token in sync after a rotation for an L2/L3 device — so the next app
-     *  launch resumes with a live token. Prompt-free (the token is in the ungated meta). No-op for L0/L1. */
+    /** Keep the persisted refresh token in sync after a rotation for an L2/L3 device — so the next app launch
+     *  resumes with a live token. The token is **sealed under K** (cr-0023) so it is never stored in the
+     *  clear; sealing uses the in-memory K (held since resume/enrol), so this stays prompt-free. No-op for
+     *  L0/L1, or if K isn't held — we never write a plaintext token (a stale sealed token just falls back to
+     *  the floor on next launch, which is safe). */
     private fun persistRotatedTokenIfPasswordless() {
         val account = session.account ?: return
         val level = deviceSecurity.currentLevel(account)
-        if (level == DeviceLevel.BIOMETRIC || level == DeviceLevel.NO_LOGIN) {
-            deviceSecurity.updateRefreshToken(account, session.refreshToken)
+        if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) return
+        val token = session.refreshToken ?: return
+        val k = vault.deviceKey() ?: return
+        try {
+            deviceSecurity.updateRefreshToken(account, tokenSeal(token, k))
+        } finally {
+            k.fill(0)
         }
+    }
+
+    /** Seal a refresh token under the device wrap key K (cr-0023): base64(symWrap(K, utf8(token),
+     *  "session-token")). Stored where the plaintext token used to live. */
+    private fun tokenSeal(token: String, k: ByteArray): String =
+        b64encode(V1.symWrap(k, token.toByteArray(Charsets.UTF_8), "session-token", randomBytes(12)))
+
+    /** Open a sealed token, or null if it isn't a valid `session-token` blob — which is also how a legacy
+     *  plaintext token is detected (unseal fails → use the value as-is once, then the next rotation seals it). */
+    private fun tokenUnseal(stored: String, k: ByteArray): String? = try {
+        String(V1.symUnwrap(k, b64decode(stored), "session-token"), Charsets.UTF_8)
+    } catch (e: Exception) {
+        null
     }
 
     /**
@@ -260,25 +281,32 @@ class VeyqClient(
         masterKey.fill(0)   // local copy from vault.masterKey(); K is caller-owned (:app stores it) — leave it
         val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode("v1/device-key".toByteArray())) }
         try {
-            deviceSecurity.commitPasswordless(email, level, wrapId, refreshToken)
+            deviceSecurity.commitPasswordless(email, level, wrapId, tokenSeal(refreshToken, k))   // sealed, not clear
         } catch (e: Exception) {
             runCatching { withRefresh { deleteWrap(wrapId) } }   // rollback — no orphan
             throw VeyqError.TrustFailed
         }
+        vault.holdDeviceKey(k)   // retain K so this session's rotations re-seal the token prompt-free
     }
 
     /**
-     * Resume a persisted session for a passwordless device: read the stored refresh token (no biometric —
-     * it is in the ungated meta), install it, and rotate to a live session. Returns `false` when there is
-     * no persisted token, or `false` (not throw) when the token is dead — the caller falls back to the floor.
+     * Resume a persisted session for a passwordless device: read the stored refresh token, **unseal it with
+     * K** (cr-0023 — the token is stored sealed, never in the clear; a legacy plaintext token unseal-fails
+     * and is used as-is once, then re-sealed on rotation), install it, and rotate to a live session. `:app`
+     * supplies K (decrypted via BiometricPrompt for L2 / read ungated for L3), so the one biometric prompt
+     * already happened there. Returns `false` when there is no persisted token, or `false` (not throw) when
+     * the token is dead — the caller falls back to the floor.
      */
-    fun resumeSession(email: String): Boolean {
-        val token = deviceSecurity.refreshToken(email) ?: return false
+    fun resumeSession(email: String, k: ByteArray): Boolean {
+        val stored = deviceSecurity.refreshToken(email) ?: return false
+        val token = tokenUnseal(stored, k) ?: stored   // lazy migration: a legacy plaintext token unseal-fails
+        vault.holdDeviceKey(k)                          // so the rotation below re-seals prompt-free
         session.set("", token, account = email)
         return try {
-            refresh()   // rotates to live tokens + persists the new refresh token
+            refresh()   // rotates to live tokens + re-seals the new refresh token under K
             true
         } catch (e: Exception) {
+            vault.clear()
             false
         }
     }
@@ -293,6 +321,7 @@ class VeyqClient(
         val level = deviceSecurity.currentLevel(email)
         if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) return false
         val wrapId = deviceSecurity.wrapId(email) ?: return false
+        vault.holdDeviceKey(k)   // retain K for prompt-free rotation this session
         val material = withRefresh { fetchKeyMaterial() }
         val wrap = material.wraps.firstOrNull { it.id == wrapId && it.method == MasterKeyWrap.Method.DEVICE }
             ?: return false

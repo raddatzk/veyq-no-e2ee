@@ -199,6 +199,16 @@ final class TrustDeviceTests: XCTestCase {
         return c
     }
 
+    /// The persisted refresh token is sealed under K (cr-0023); unseal it the way the client does, to assert
+    /// the plaintext that was stored.
+    private func unsealPersistedToken(_ store: any DeviceSecurityStore) throws -> String? {
+        guard let rec = try store.load(email: Self.email), let stored = rec.refreshToken,
+              let blob = Data(base64Encoded: stored),
+              let bytes = try? V1.symUnwrap(kek: rec.secret, blob: blob, context: "session-token")
+        else { return nil }
+        return String(data: bytes, encoding: .utf8)
+    }
+
     func testPasswordlessEnrolResumeUnlockRoundTrip() async throws {
         for level in [DeviceLevel.biometric, .noLogin] {
             let floor = Self.floorWraps()
@@ -227,12 +237,50 @@ final class TrustDeviceTests: XCTestCase {
         let store = InMemoryDeviceSecurityStore()
         let c1 = try await unlockedClient(store: store, stub: stub)
         try await c1.setPasswordlessLevel(.noLogin, email: Self.email)
-        XCTAssertEqual(try store.load(email: Self.email)?.refreshToken, "refresh-1", "enrol persisted the live token")
+        XCTAssertNotEqual(try store.load(email: Self.email)?.refreshToken, "refresh-1",
+                          "the token is NOT stored in the clear (sealed under K)")
+        XCTAssertEqual(try unsealPersistedToken(store), "refresh-1", "enrol persisted the live token (sealed)")
 
         let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
         _ = try await c2.resumeSession(email: Self.email)
-        XCTAssertEqual(try store.load(email: Self.email)?.refreshToken, "refresh-2",
-                       "the rotated refresh token was persisted back (so the next launch stays valid)")
+        XCTAssertEqual(try unsealPersistedToken(store), "refresh-2",
+                       "the rotated refresh token was persisted back, still sealed (so the next launch stays valid)")
+    }
+
+    func testLegacyPlaintextTokenIsMigratedToSealedOnResume() async throws {
+        // Pre-cr-0023 devices persisted the refresh token in the clear. Resume must still work (lazy
+        // migration) and re-seal it afterwards.
+        let floor = Self.floorWraps()
+        let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
+        let store = InMemoryDeviceSecurityStore()
+        let c1 = try await unlockedClient(store: store, stub: stub)
+        try await c1.setPasswordlessLevel(.noLogin, email: Self.email)
+        try store.updateRefreshToken("refresh-1", email: Self.email)   // simulate a legacy PLAINTEXT token
+        XCTAssertEqual(try store.load(email: Self.email)?.refreshToken, "refresh-1", "precondition: stored in the clear")
+
+        let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
+        let resumed = try await c2.resumeSession(email: Self.email)
+        XCTAssertTrue(resumed, "a legacy plaintext token still resumes (lazy migration)")
+        XCTAssertNotEqual(try store.load(email: Self.email)?.refreshToken, "refresh-2", "now sealed, not clear")
+        XCTAssertEqual(try unsealPersistedToken(store), "refresh-2", "the rotated token was re-sealed under K")
+    }
+
+    func testAutoRestoreResumesAndOpensInOneLoad() async throws {
+        // The consolidated launch path (cr-0023): one device-key load resumes the session AND opens the vault.
+        for level in [DeviceLevel.biometric, .noLogin] {
+            let floor = Self.floorWraps()
+            let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
+            let store = InMemoryDeviceSecurityStore()
+            let c1 = try await unlockedClient(store: store, stub: stub)
+            try await c1.setPasswordlessLevel(level, email: Self.email)
+
+            let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
+            let restored = try await c2.autoRestore(email: Self.email)
+            XCTAssertTrue(restored, "autoRestore resumed + opened the vault (\(level))")
+            let mk = await c2.vault.masterKey()
+            XCTAssertEqual(mk, Self.masterKey, "the K-wrap recovered the Master Key (\(level))")
+            XCTAssertEqual(try unsealPersistedToken(store), "refresh-2", "rotated token re-sealed (\(level))")
+        }
     }
 
     func testLevelSwitchReplacesTheConvenienceWrap() async throws {

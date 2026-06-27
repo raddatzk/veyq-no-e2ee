@@ -12,6 +12,10 @@ public actor Vault {
     public private(set) var isUnlocked = false
     private var masterKeyBytes: Data?
     private var identityPrivateBytes: Data?
+    // The device wrap key K for a passwordless (L2/L3) session, held only while unlocked so mid-session
+    // refresh-token rotation can re-seal the persisted token under K **without** a biometric prompt
+    // (cr-0023). No new exposure: K only wraps the Master Key, which is already resident here.
+    private var deviceKeyBytes: Data?
 
     public init() {}
 
@@ -22,14 +26,22 @@ public actor Vault {
         isUnlocked = true
     }
 
+    /// Retain the device wrap key K for this passwordless session (cr-0023). Cleared on `clear()`.
+    func holdDeviceKey(_ k: Data) { deviceKeyBytes = k }
+
+    /// The held device wrap key K, or nil if none (not a passwordless session, or locked).
+    func deviceKey() -> Data? { deviceKeyBytes }
+
     /// Drop all key material (sign-out / re-lock). Best-effort zeroes the bytes before releasing them, so
     /// the keys don't linger in the heap until GC (Swift can't guarantee no copy was made, but it shortens
     /// the window for a heap snapshot to recover a key after sign-out).
     public func clear() {
         if masterKeyBytes != nil { masterKeyBytes!.resetBytes(in: masterKeyBytes!.startIndex ..< masterKeyBytes!.endIndex) }
         if identityPrivateBytes != nil { identityPrivateBytes!.resetBytes(in: identityPrivateBytes!.startIndex ..< identityPrivateBytes!.endIndex) }
+        if deviceKeyBytes != nil { deviceKeyBytes!.resetBytes(in: deviceKeyBytes!.startIndex ..< deviceKeyBytes!.endIndex) }
         masterKeyBytes = nil
         identityPrivateBytes = nil
+        deviceKeyBytes = nil
         isUnlocked = false
     }
 

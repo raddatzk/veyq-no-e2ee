@@ -113,6 +113,14 @@
       "nonce": "0a0b0c0d0e0f101112131415",
       "plaintext": "4444444444444444444444444444444444444444444444444444444444444444",
       "blob": "020a0b0c0d0e0f101112131415e099b49334619c29aa4be5cde8d07c3f386b4704ed053fa586fe6b88b148b6afc95b660bee6d39526d490ba090bc50d6"
+    },
+    "session_token": {
+      "note": "symWrap with the session-token context (cr-0023): the persisted L2/L3 refresh token is sealed under the device wrap key K so it is no longer stored in the clear. kek = sym_master_key.kek; plaintext = utf8(\"refresh-token-0123456789\").",
+      "kek": "aea8086000d1cee65ee4521561e6489492f67bf220ebc35dcac5a43d40c03542",
+      "context": "session-token",
+      "nonce": "0a0b0c0d0e0f101112131415",
+      "plaintext": "726566726573682d746f6b656e2d30313233343536373839",
+      "blob": "020a0b0c0d0e0f101112131415ebadf9d978e2a05283ca0170ca2e4dc7dc12e3f6e8931e45eeb0ab738cd239052c0fd3f4bb344bc7"
     }
   },
   "slug_token": {

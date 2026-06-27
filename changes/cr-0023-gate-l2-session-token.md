@@ -1,7 +1,7 @@
 ---
 id: cr-0023
 title: Gate the L2 persistent session token (encrypt the persisted refresh token under K)
-status: planned          # planned → in-progress → done (then keep as a record)
+status: in-progress      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock]
 adrs: [0005, 0004, 0003]
 invariants: [operator-blind]
@@ -70,19 +70,23 @@ the token-under-K opens silently exactly as today.
 
 ## Phases
 
-- [ ] **1 — crypto + vector.** Add the `"session-token"` context usage and a `wrap.session_token` vector to
-  `contracts/crypto/vectors/v1.json`; make `:crypto:test` / `swift test` / web conformance green on all
-  three stacks (it reuses `symWrap`/`symUnwrap`, so this is mostly the vector + a round-trip assert).
-  **Verify:** `./gradlew :crypto:test`; `cd apple && swift test`; `cd web && npm run check`.
-- [ ] **2 — Apple.** Keep K resident for the session; `persistRotatedTokenIfPasswordless` seals under K;
-  `resumeSession`/`autoRestore` unseals; `DeviceSecurity` stores the sealed token in the (still-ungated)
-  meta — the gated `secret` item is untouched. Add the lazy plaintext→sealed migration. Unit-test the
-  seal/rotate/unseal round-trip against the in-memory `DeviceSecurityStore` double.
-  **Verify:** `swift test` (round-trip incl. migration); iOS `xcodebuild` build.
-- [ ] **3 — Android.** Same in `:client` (`VeyqClient` holds K for the session, seals/unseals around the
-  store) — the plaintext token leaves `SharedPreferences` entirely (only ciphertext persists). `:app`
-  supplies K from the BiometricPrompt path as today.
-  **Verify:** `./gradlew :client:test` (round-trip + migration); `:app:assembleDebug`.
+- [x] **1 — crypto + vector.** Added the `wrap.session_token` vector to `contracts/crypto/vectors/v1.json`
+  (reuses `symWrap`/`symUnwrap` with context `"session-token"`) + a round-trip assert in all three
+  conformance suites. **Done:** web conformance 20/20; apple `testSymWrap` (sym_master_key + session_token);
+  android `:crypto:test` `BUILD SUCCESSFUL`.
+- [x] **2 — Apple.** `Vault` holds K for the session (`holdDeviceKey`/`deviceKey`, zeroed on `clear`);
+  `persistRotatedTokenIfPasswordless` seals under the held K (skips, never plaintext, if K absent);
+  `setPasswordlessLevel` stores the sealed token; `resumeSession` unseals (lazy plaintext→sealed migration);
+  new consolidated **`autoRestore`** loads K once and reuses it for resume + vault-open (one prompt);
+  `bootstrap` switched to it. **Done:** `swift test` 49 (3 live-skip), incl. new
+  `testLegacyPlaintextTokenIsMigratedToSealedOnResume` + `testAutoRestoreResumesAndOpensInOneLoad`; iOS
+  `xcodebuild` `BUILD SUCCEEDED`.
+- [x] **3 — Android.** Same in `:client` (`Vault` holds K; `VeyqClient` seals in `setPasswordlessLevel`,
+  unseals in `resumeSession(email, k)` — signature now takes K, re-seals on rotation) — the plaintext token
+  leaves `SharedPreferences` entirely. `:app` `bootstrap` reordered to obtain K **first** (the single
+  BiometricPrompt / ungated read), then `resumeSession(acct, k)` + `unlockWithKey(acct, k)`. **Done:**
+  `:client:test` (incl. new `legacyPlaintextTokenIsMigratedToSealedOnResume`) + `:app:assembleDebug`
+  `BUILD SUCCESSFUL`.
 - [ ] **4 — on-device auto-restore verification (the part unit tests can't cover).** Confirm on a real
   biometric device / emulator that L2 app-launch auto-restore shows **exactly one** biometric prompt and
   lands on home, mid-session rotation never prompts, and L3 still restores silently. Apple: the live

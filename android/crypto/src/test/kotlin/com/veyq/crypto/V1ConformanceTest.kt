@@ -59,10 +59,12 @@ class V1ConformanceTest {
     }
 
     @Test fun symWrap() {
-        val v = vectors.getJSONObject("wrap").getJSONObject("sym_master_key")
-        val blob = V1.symWrap(hex(v, "kek"), hex(v, "plaintext"), v.getString("context"), hex(v, "nonce"))
-        assertContentEquals(hex(v, "blob"), blob)
-        assertContentEquals(hex(v, "plaintext"), V1.symUnwrap(hex(v, "kek"), blob, v.getString("context")))
+        for (key in listOf("sym_master_key", "session_token")) {
+            val v = vectors.getJSONObject("wrap").getJSONObject(key)
+            val blob = V1.symWrap(hex(v, "kek"), hex(v, "plaintext"), v.getString("context"), hex(v, "nonce"))
+            assertContentEquals(hex(v, "blob"), blob, "symWrap vector $key")
+            assertContentEquals(hex(v, "plaintext"), V1.symUnwrap(hex(v, "kek"), blob, v.getString("context")), "symUnwrap vector $key")
+        }
     }
 
     @Test fun recoveryAuthTag() {

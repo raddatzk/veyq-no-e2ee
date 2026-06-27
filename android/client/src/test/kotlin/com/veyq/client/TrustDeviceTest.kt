@@ -167,6 +167,16 @@ class TrustDeviceTest {
 
     private val deviceK = ByteArray(32) { (0x70 + it).toByte() }
 
+    /** The persisted refresh token is sealed under K (cr-0023); unseal it to assert the plaintext stored. */
+    private fun unsealStoredToken(store: InMemoryDeviceSecurityStore): String? {
+        val stored = store.refreshToken(email) ?: return null
+        return try {
+            String(V1.symUnwrap(deviceK, Base64.getDecoder().decode(stored), "session-token"), Charsets.UTF_8)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun enrolResumeUnlock(level: DeviceLevel) {
         val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
         start(d)
@@ -177,7 +187,7 @@ class TrustDeviceTest {
         assertTrue(d.hasWrap("DEVICE"), "a K-wrap was stored ($level)")
 
         val c2 = makeClient(store)
-        assertTrue(c2.resumeSession(email), "the persisted token resumed the session ($level)")
+        assertTrue(c2.resumeSession(email, deviceK), "the persisted token resumed the session ($level)")
         assertTrue(c2.unlockWithKey(email, deviceK), "the device key opened the vault ($level)")
         assertContentEquals(masterKey, c2.vault.masterKey(), "the K-wrap recovered the Master Key ($level)")
     }
@@ -190,10 +200,25 @@ class TrustDeviceTest {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
         val store = InMemoryDeviceSecurityStore()
         floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
-        assertEquals("refresh-1", store.refreshToken(email), "enrol persisted the live token")
+        assertNotEquals("refresh-1", store.refreshToken(email), "the token is NOT stored in the clear (sealed under K)")
+        assertEquals("refresh-1", unsealStoredToken(store), "enrol persisted the live token (sealed)")
 
-        makeClient(store).resumeSession(email)
-        assertEquals("refresh-2", store.refreshToken(email), "the rotated refresh token was persisted back")
+        makeClient(store).resumeSession(email, deviceK)
+        assertEquals("refresh-2", unsealStoredToken(store), "the rotated refresh token was persisted back, still sealed")
+    }
+
+    @Test fun legacyPlaintextTokenIsMigratedToSealedOnResume() {
+        // Pre-cr-0023 devices persisted the refresh token in the clear. Resume must still work (lazy
+        // migration) and re-seal it afterwards.
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceSecurityStore()
+        floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
+        store.updateRefreshToken(email, "refresh-1")   // simulate a legacy PLAINTEXT token
+        assertEquals("refresh-1", store.refreshToken(email), "precondition: stored in the clear")
+
+        assertTrue(makeClient(store).resumeSession(email, deviceK), "a legacy plaintext token still resumes")
+        assertNotEquals("refresh-2", store.refreshToken(email), "now sealed, not clear")
+        assertEquals("refresh-2", unsealStoredToken(store), "the rotated token was re-sealed under K")
     }
 
     @Test fun levelSwitchReplacesTheConvenienceWrap() {
@@ -217,7 +242,7 @@ class TrustDeviceTest {
 
     @Test fun resumeSessionWithNoRecordReturnsFalse() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
-        assertFalse(makeClient(InMemoryDeviceSecurityStore()).resumeSession(email))
+        assertFalse(makeClient(InMemoryDeviceSecurityStore()).resumeSession(email, deviceK))
     }
 
     @Test fun resumeSessionWithDeadTokenFallsBack() {
@@ -226,7 +251,7 @@ class TrustDeviceTest {
         val store = InMemoryDeviceSecurityStore()
         floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
         d.failRefresh = true
-        assertFalse(makeClient(store).resumeSession(email), "a dead token resumes nothing → floor")
+        assertFalse(makeClient(store).resumeSession(email, deviceK), "a dead token resumes nothing → floor")
     }
 
     @Test fun passwordlessEnrolRollsBackOnCommitFailure() {

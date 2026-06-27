@@ -65,11 +65,13 @@ final class V1ConformanceTests: XCTestCase {
     }
 
     func testSymWrap() throws {
-        let v = sub(["wrap", "sym_master_key"])
-        let blob = V1.symWrap(kek: hex(v["kek"]), targetKey: hex(v["plaintext"]), context: v["context"] as! String, nonce: hex(v["nonce"]))
-        XCTAssertEqual(blob, hex(v["blob"]))
-        let opened = try V1.symUnwrap(kek: hex(v["kek"]), blob: blob, context: v["context"] as! String)
-        XCTAssertEqual(opened, hex(v["plaintext"]))
+        for key in ["sym_master_key", "session_token"] {
+            let v = sub(["wrap", key])
+            let blob = V1.symWrap(kek: hex(v["kek"]), targetKey: hex(v["plaintext"]), context: v["context"] as! String, nonce: hex(v["nonce"]))
+            XCTAssertEqual(blob, hex(v["blob"]), "symWrap vector \(key)")
+            let opened = try V1.symUnwrap(kek: hex(v["kek"]), blob: blob, context: v["context"] as! String)
+            XCTAssertEqual(opened, hex(v["plaintext"]), "symUnwrap vector \(key)")
+        }
     }
 
     func testRecoveryAuthTag() throws {

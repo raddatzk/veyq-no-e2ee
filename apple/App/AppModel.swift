@@ -57,12 +57,15 @@ final class AppModel: ObservableObject {
         self.email = acct
         self.deviceTrusted = true
         do {
-            guard try await client.resumeSession(email: acct) else { LaunchPrefs.clear(); phase = .connect; return }
-            // unlockWithDeviceKey reads the device key — biometric-gated for L2 (prompts Face ID), free for L3.
-            if try await client.unlockWithDeviceKey(email: acct) {
+            // autoRestore does it in a SINGLE gated read (cr-0023): resume the session + open the vault from
+            // one device-key load — biometric-gated for L2 (one Face ID prompt), free for L3. The persisted
+            // refresh token is sealed under that key, so an unlocked-device attacker can't reuse it.
+            if try await client.autoRestore(email: acct) {
                 phase = .home
             } else {
-                phase = .signIn   // key/wrap unusable → re-auth (the floor needs a password we don't hold)
+                // No usable session/wrap. If the device key itself is gone the record is dead → connect;
+                // otherwise the floor can re-auth (but it needs a password we don't hold) → sign-in.
+                phase = client.currentLevel(email: acct) == nil ? .connect : .signIn
             }
         } catch {
             phase = .signIn

@@ -17,6 +17,10 @@ class Vault {
 
     private var masterKeyBytes: ByteArray? = null
     private var identityPrivateBytes: ByteArray? = null
+    // The device wrap key K for a passwordless (L2/L3) session, held only while unlocked so mid-session
+    // refresh-token rotation can re-seal the persisted token under K **without** a biometric prompt
+    // (cr-0023). No new exposure: K only wraps the Master Key, which is already resident here.
+    private var deviceKeyBytes: ByteArray? = null
 
     /** Hold the freshly opened Master Key + identity private key for this working session. */
     @Synchronized
@@ -26,6 +30,15 @@ class Vault {
         isUnlocked = true
     }
 
+    /** Retain the device wrap key K for this passwordless session (cr-0023). A defensive copy; cleared on
+     *  [clear]. Callers pass a transient K — we keep our own copy so theirs can be zeroed independently. */
+    @Synchronized
+    fun holdDeviceKey(k: ByteArray) { deviceKeyBytes = k.copyOf() }
+
+    /** The held device wrap key K as a fresh copy, or null if none (not a passwordless session / locked). */
+    @Synchronized
+    fun deviceKey(): ByteArray? = deviceKeyBytes?.copyOf()
+
     /**
      * Drop all key material (sign-out / re-lock). Zero-fills the buffers before releasing them so the keys
      * don't linger on the heap until GC (shortens the window for a heap snapshot to recover a key).
@@ -34,8 +47,10 @@ class Vault {
     fun clear() {
         masterKeyBytes?.fill(0)
         identityPrivateBytes?.fill(0)
+        deviceKeyBytes?.fill(0)
         masterKeyBytes = null
         identityPrivateBytes = null
+        deviceKeyBytes = null
         isUnlocked = false
     }
 

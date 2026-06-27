@@ -201,19 +201,22 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         this.deviceTrusted = true
 
         try {
-            if (!withContext(Dispatchers.IO) { client.resumeSession(acct) }) { launchPrefs.clear(); phase = Phase.CONNECT; return }
-            val k: ByteArray? = when (level) {
-                DeviceLevel.NO_LOGIN -> withContext(Dispatchers.IO) { deviceSecurity.readKeyUngated(acct) }
+            // Obtain K FIRST (cr-0023): the persisted session token is now sealed under K, so resume needs
+            // it. The single biometric step (L2) / ungated read (L3) happens here, before the client is
+            // touched — so there is still exactly one biometric prompt at launch.
+            val k: ByteArray = when (level) {
+                DeviceLevel.NO_LOGIN ->
+                    withContext(Dispatchers.IO) { deviceSecurity.readKeyUngated(acct) } ?: return run { phase = Phase.SIGN_IN }
                 DeviceLevel.BIOMETRIC -> {
                     val act = activity ?: return  // re-run when the activity is available
                     val cipher = deviceSecurity.decryptCipherL2(acct) ?: return run { phase = Phase.SIGN_IN }
                     val authed = BiometricGate.authenticate(act, cipher, "Unlock veyq", acct) ?: return run { phase = Phase.SIGN_IN }
                     deviceSecurity.finishReadKeyL2(acct, authed)
                 }
-                else -> null
+                else -> return run { phase = Phase.SIGN_IN }
             }
-            if (k != null && withContext(Dispatchers.IO) { client.unlockWithKey(acct, k) }) phase = Phase.HOME
-            else phase = Phase.SIGN_IN
+            if (!withContext(Dispatchers.IO) { client.resumeSession(acct, k) }) { launchPrefs.clear(); phase = Phase.CONNECT; return }
+            phase = if (withContext(Dispatchers.IO) { client.unlockWithKey(acct, k) }) Phase.HOME else Phase.SIGN_IN
         } catch (e: Exception) {
             phase = Phase.SIGN_IN
         }
