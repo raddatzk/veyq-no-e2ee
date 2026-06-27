@@ -1,0 +1,225 @@
+package com.veyq.client
+
+import com.veyq.crypto.V1
+import java.util.Base64
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+
+/**
+ * cr-0021 phase 2 — uc.account.trust-device (android) data-layer tests, the twin of Apple's
+ * `TrustDeviceTests`. A stateful [WrapsDispatcher] **captures the DEVICE wrap a `trustThisDevice` POSTs and
+ * serves it back** in key material, so a later `unlockWithDevice` opens the vault end-to-end with the real
+ * V1 crypto (Argon2id(deviceFactor + password) → symUnwrap). Operator-blind: only ciphertext crosses.
+ */
+class TrustDeviceTest {
+    private val masterKey = ByteArray(32) { it.toByte() }
+    private val identityPriv = ByteArray(80) { (0x10 + it).toByte() }
+    private val secretKey = ByteArray(19) { (0x40 + it).toByte() }
+    private val password = "open sesame"
+    private val salt = ByteArray(16) { (0xE0 + it).toByte() }
+    private val params = V1.ArgonParams(t = 3, m = 64, p = 1, dkLen = 32)
+    private val email = "person@veyq.example"
+
+    private lateinit var server: MockWebServer
+
+    @BeforeTest fun setUp() { server = MockWebServer() }
+    @AfterTest fun tearDown() { server.shutdown() }
+    private fun baseUrl(): String = server.url("").toString().trimEnd('/')
+
+    /** The PASSWORD floor wrap + wrapped identity the dispatcher starts with (so the floor unlock can run). */
+    private fun floorWrapJson(): String {
+        val kek = V1.kekPasswordSecret(secretKey, password, salt, params)
+        val wrappedKey = V1.symWrap(kek, masterKey, "master-key", ByteArray(12) { (0x01 + it).toByte() })
+        val kdfParams = V1.encodeKdfParams(params, salt)
+        return """{"id":"pw","method":"PASSWORD","wrappedKey":"${b64(wrappedKey)}","kdfParams":"${b64(kdfParams)}"}"""
+    }
+
+    private fun wrappedIdentityB64(): String =
+        b64(V1.symWrap(masterKey, identityPriv, "identity-priv", ByteArray(12) { (0x20 + it).toByte() }))
+
+    private fun start(d: WrapsDispatcher) { server.dispatcher = d; server.start() }
+
+    private fun makeClient(store: DeviceTrustStore): VeyqClient {
+        val session = Session().apply { set("access-1", "refresh-1", "fam") }
+        return VeyqClient(VeyqInstance(baseUrl()), session = session, deviceTrust = store)
+    }
+
+    private fun floorUnlock(store: DeviceTrustStore): VeyqClient =
+        makeClient(store).also { it.unlock(password = password, secretKey = b64(secretKey)) }
+
+    @Test fun trustThenDeviceUnlockRoundTrip() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceTrustStore()
+
+        val c1 = floorUnlock(store)
+        c1.trustThisDevice(email, password)
+        assertTrue(store.isTrusted(email))
+        assertTrue(server.dispatcher.let { (it as WrapsDispatcher).hasWrap("DEVICE") }, "a DEVICE wrap was stored")
+
+        // Fresh client (new vault), same store + server: unlock with only the password.
+        val c2 = makeClient(store)
+        assertTrue(c2.unlockWithDevice(email, password))
+        assertContentEquals(masterKey, c2.vault.masterKey())
+        assertContentEquals(identityPriv, c2.vault.identityPrivateKey())
+    }
+
+    @Test fun deviceUnlockWrongPasswordThrowsAndLeavesVaultLocked() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceTrustStore()
+        floorUnlock(store).trustThisDevice(email, password)
+
+        val c2 = makeClient(store)
+        assertFailsWith<VeyqError.UnlockFailed> { c2.unlockWithDevice(email, "wrong password") }
+        assertFalse(c2.vault.isUnlocked)
+    }
+
+    @Test fun notTrustedReturnsFalse() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val c = makeClient(InMemoryDeviceTrustStore())
+        assertFalse(c.unlockWithDevice(email, password))
+        assertFalse(c.vault.isUnlocked)
+    }
+
+    @Test fun missingServerWrapReturnsFalseAndKeepsRecord() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceTrustStore()
+        store.beginEnrol(email); store.commitWrapId(email, "ghost")   // a record whose server wrap is absent
+        val c = makeClient(store)
+
+        assertFalse(c.unlockWithDevice(email, password))
+        assertTrue(store.isTrusted(email), "the local key must survive a missing server wrap (no self-wipe)")
+    }
+
+    @Test fun reTrustReplacesPriorWrap() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceTrustStore()
+        val c = floorUnlock(store)
+
+        c.trustThisDevice(email, password)
+        val firstId = store.load(email)!!.wrapId
+        c.trustThisDevice(email, password)
+        val secondId = store.load(email)!!.wrapId
+
+        assertNotEquals(firstId, secondId, "re-trust mints a new wrap id")
+        assertFalse(d.hasWrapId(firstId), "the prior DEVICE wrap was deleted")
+        assertTrue(d.hasWrapId(secondId))
+        assertEquals(1, d.wrapCount("DEVICE"), "no duplicate accumulation")
+    }
+
+    @Test fun untrustRemovesWrapAndRecord() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceTrustStore()
+        val c = floorUnlock(store)
+        c.trustThisDevice(email, password)
+
+        c.untrustThisDevice(email)
+        assertFalse(store.isTrusted(email))
+        assertFalse(d.hasWrap("DEVICE"), "the DEVICE wrap was removed server-side")
+    }
+
+    @Test fun trustOverCapThrowsTooManyDevices() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()).apply { conflictOnAdd = true }
+        start(d)
+        val store = InMemoryDeviceTrustStore()
+        val c = floorUnlock(store)
+
+        assertFailsWith<VeyqError.TooManyDevices> { c.trustThisDevice(email, password) }
+        assertFalse(store.isTrusted(email), "no local record when the server rejected the wrap")
+    }
+
+    @Test fun enrolRollsBackServerWrapOnCommitFailure() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val c = floorUnlock(FailingCommitStore())
+
+        assertFailsWith<VeyqError.TrustFailed> { c.trustThisDevice(email, password) }
+        assertFalse(d.hasWrap("DEVICE"), "the server wrap was rolled back — no orphan")
+    }
+
+    @Test fun deviceUnlock401RefreshesThenUnlocks() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceTrustStore()
+        floorUnlock(store).trustThisDevice(email, password)
+
+        d.failKeyMaterialOnce = true
+        val c2 = makeClient(store)
+        assertTrue(c2.unlockWithDevice(email, password), "the 401 was rotated and the retry unlocked")
+        assertEquals("access-2", c2.session.accessToken, "withRefresh rotated the session before the retry")
+    }
+
+    /** A store whose commit always fails — to exercise the enrol rollback. */
+    private class FailingCommitStore : DeviceTrustStore {
+        private val factor = ByteArray(32) { (it + 1).toByte() }
+        override fun isTrusted(email: String) = false
+        override fun load(email: String): TrustRecord? = null
+        override fun beginEnrol(email: String) = factor
+        override fun commitWrapId(email: String, wrapId: String) = throw RuntimeException("commit failed")
+        override fun clear(email: String) {}
+    }
+
+    /** Stateful dispatcher: serves key material from a mutable wrap list, captures POSTed DEVICE wraps and
+     *  serves them back, deletes by id; can simulate a 409 cap or a one-shot 401. */
+    private inner class WrapsDispatcher(floorWrap: String, private val identity: String) : Dispatcher() {
+        private val wraps = mutableListOf(floorWrap)
+        private var nextId = 1
+        private val keyMaterialCalls = AtomicInteger(0)
+        var conflictOnAdd = false
+        @Volatile var failKeyMaterialOnce = false
+
+        @Synchronized fun hasWrap(method: String) = wraps.any { """"method":"$method"""".toRegex().containsMatchIn(it) }
+        @Synchronized fun hasWrapId(id: String) = wraps.any { """"id":"$id"""".toRegex().containsMatchIn(it) }
+        @Synchronized fun wrapCount(method: String) = wraps.count { """"method":"$method"""".toRegex().containsMatchIn(it) }
+
+        override fun dispatch(request: RecordedRequest): MockResponse {
+            val path = request.path ?: ""
+            if (path == "/api/account/key-material" && request.method == "GET") {
+                if (failKeyMaterialOnce) { failKeyMaterialOnce = false; return json(401, """{"code":"authentication_failed"}""") }
+                val body = synchronized(this) { """{"suiteId":"v1","wraps":[${wraps.joinToString(",")}],"wrappedIdentityPrivateKey":"$identity"}""" }
+                return json(200, body)
+            }
+            if (path == "/api/account/wraps" && request.method == "POST") {
+                if (conflictOnAdd) return json(409, """{"code":"too_many_devices"}""")
+                val b = request.body.readUtf8()
+                val wrappedKey = field(b, "wrappedKey"); val kdfParams = field(b, "kdfParams")
+                val id = synchronized(this) {
+                    val id = "dev-${nextId++}"
+                    wraps.add("""{"id":"$id","method":"DEVICE","wrappedKey":"$wrappedKey","kdfParams":"$kdfParams"}""")
+                    id
+                }
+                return json(201, """{"id":"$id"}""")
+            }
+            if (path.startsWith("/api/account/wraps/") && request.method == "DELETE") {
+                val id = path.removePrefix("/api/account/wraps/")
+                synchronized(this) { wraps.removeAll { """"id":"$id"""".toRegex().containsMatchIn(it) } }
+                return MockResponse().setResponseCode(204)
+            }
+            if (path == "/api/token/refresh") return json(200, """{"accessToken":"access-2","refreshToken":"refresh-2"}""")
+            if (path == "/api/logout") return MockResponse().setResponseCode(204)
+            return MockResponse().setResponseCode(404)
+        }
+
+        private fun field(body: String, name: String): String =
+            """"$name":"([^"]*)"""".toRegex().find(body)?.groupValues?.get(1) ?: ""
+
+        private fun json(code: Int, body: String) =
+            MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)
+    }
+
+    private fun b64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
+}

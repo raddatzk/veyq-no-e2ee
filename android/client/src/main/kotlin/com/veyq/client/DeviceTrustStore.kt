@@ -42,3 +42,16 @@ interface DeviceTrustStore {
     /** Remove this account's wrap id + device-bound key (untrust). Idempotent. */
     fun clear(email: String)
 }
+
+/**
+ * A never-trusted no-op store — the default when no platform store is injected (e.g. a headless JVM agent,
+ * or login/unlock-only tests). `:app` injects the real `KeystoreDeviceTrustStore`; `beginEnrol` throws,
+ * since trusting a device requires a real device-bound key.
+ */
+object DisabledDeviceTrustStore : DeviceTrustStore {
+    override fun isTrusted(email: String): Boolean = false
+    override fun load(email: String): TrustRecord? = null
+    override fun beginEnrol(email: String): ByteArray = throw IllegalStateException("device trust not configured")
+    override fun commitWrapId(email: String, wrapId: String) {}
+    override fun clear(email: String) {}
+}

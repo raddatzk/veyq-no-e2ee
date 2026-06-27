@@ -84,13 +84,18 @@ choose). The passwordless levels **L2 (biometric)** and **L3 (no login)** are th
   `InMemoryDeviceTrustStore`. **Done:** `:client:test` `DeviceTrustStoreTest` **5/5**
   (enrol→commit→load→clear, stable factor, replace, per-account scoping, idempotent clear);
   `:app:assembleDebug` `BUILD SUCCESSFUL` (the Keystore impl compiles).
-- [ ] **2 — orchestration + unit tests.** `VeyqClient` (inject a `DeviceTrustStore`): `isTrusted(email)`,
-  `unlockWithDevice(email, password): Boolean`, `trustThisDevice(email, password)` (begin-enrol →
-  `kekDevicePassword` → `symWrap` → `addAccountWrap` → commit wrapId; re-trust replaces; rollback on
-  failure; `tooManyDevices` on 409), `untrustThisDevice(email)`. **Check:** `:client:test` —
-  device round-trip (enrol → re-unlock by wrapId on the in-memory double + a `MockWebServer` that captures
-  the posted wrap), wrong-password → generic failure, not-trusted/missing-wrap → false (no self-wipe),
-  re-trust/untrust, 409 → tooManyDevices, enrol rollback (mirrors `TrustDeviceTests`).
+- [x] **2 — orchestration + unit tests.** `VeyqClient` injects `deviceTrust: DeviceTrustStore`
+  (default `DisabledDeviceTrustStore` — never-trusted no-op for the headless/login-only path) + an
+  `AccountWrapsApi`; adds `isTrusted`, `unlockWithDevice(email, password): Boolean`, `trustThisDevice`
+  (`beginEnrol` → `kekDevicePassword` → `symWrap` → `addAccountWrap` → `commitWrapId`; re-trust deletes the
+  prior wrap first; **rollback-DELETE + `TrustFailed`** on commit failure; **`TooManyDevices`** on 409),
+  `untrustThisDevice`, + private `addDeviceWrap`/`deleteWrap` (401 → `SessionExpired` so `withRefresh`
+  retries). New `VeyqError.TrustFailed`/`TooManyDevices`; `SecureRandom` salt+nonce. **Done:**
+  `:client:test` `TrustDeviceTest` **9/9** against a stateful `MockWebServer` dispatcher that captures the
+  POSTed DEVICE wrap and serves it back (real-crypto enrol → re-unlock by `wrapId`; wrong-password →
+  `UnlockFailed`; not-trusted/ missing-wrap → false **without** clearing the store; re-trust replaces;
+  untrust; 409 → `TooManyDevices`; commit rollback; 401 → refresh → unlock). Full `:client:test` +
+  `:crypto:test` 36 (1 live skip), 0 failures.
 - [ ] **3 — UI (chooser + untrust + login-fold).** A Compose **device-level chooser** on the floor
   (`UnlockScreen`) — no pre-selection; L0/L1 active, passwordless rows disabled; picking "Only my password"
   enrols. `HomeScreen`: an **untrust** control + a "couldn't trust this device" message on enrol failure.

@@ -1,7 +1,9 @@
 package com.veyq.client
 
 import com.veyq.api.account.api.AccountApi
+import com.veyq.api.account.api.AccountWrapsApi
 import com.veyq.api.account.model.AccountKeyMaterial
+import com.veyq.api.account.model.AddWrapRequest
 import com.veyq.api.account.model.MasterKeyWrap
 import com.veyq.api.auth.api.LoginApi
 import com.veyq.api.auth.api.SessionApi
@@ -12,6 +14,7 @@ import com.veyq.api.auth.model.RefreshRequest
 import com.veyq.api.setup.api.SetupApi
 import com.veyq.crypto.V1
 import okhttp3.OkHttpClient
+import java.security.SecureRandom
 import java.util.Base64
 import com.veyq.api.account.infrastructure.ClientException as AccountClientException
 import com.veyq.api.auth.infrastructure.ClientException as AuthClientException
@@ -32,12 +35,14 @@ class VeyqClient(
     val session: Session = Session(),
     val vault: Vault = Vault(),
     client: OkHttpClient = defaultClient(session),
+    private val deviceTrust: DeviceTrustStore = DisabledDeviceTrustStore,
 ) {
     private val setup = SetupApi(instance.baseUrl, client)
     private val login = LoginApi(instance.baseUrl, client)
     private val token = TokenApi(instance.baseUrl, client)
     private val sessions = SessionApi(instance.baseUrl, client)
     private val account = AccountApi(instance.baseUrl, client)
+    private val accountWraps = AccountWrapsApi(instance.baseUrl, client)
 
     /**
      * Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -135,6 +140,100 @@ class VeyqClient(
         }
     }
 
+    // --- Device trust (cr-0021, L1 — "only password"; uc.account.trust-device) ---
+
+    /** Whether this device is at the "only password" level (an L1 DEVICE wrap is enrolled → the login-fold
+     *  can unlock with just the password). */
+    fun isTrusted(email: String): Boolean = deviceTrust.isTrusted(email)
+
+    /**
+     * Routine unlock on a trusted device: open the Master Key from this device's DEVICE wrap with **only
+     * the password** (no Secret Key). Returns `false` when unavailable — no trust record, or no matching
+     * server wrap — so the caller falls back to the floor; throws [VeyqError.UnlockFailed] on a wrong
+     * password (AEAD tag mismatch). Does **not** clear the local key on a missing server wrap (cr-0005 #2):
+     * a blind operator must not be able to withhold the wrap to force a wipe.
+     */
+    fun unlockWithDevice(email: String, password: String): Boolean {
+        val record = deviceTrust.load(email) ?: return false
+        val material = withRefresh { fetchKeyMaterial() }
+        val wrap = material.wraps.firstOrNull { it.id == record.wrapId && it.method == MasterKeyWrap.Method.DEVICE }
+            ?: return false
+        val kdfParams = wrap.kdfParams ?: return false
+
+        val (params, salt) = V1.decodeKdfParams(b64decode(kdfParams))
+        val kek = V1.kekDevicePassword(record.deviceFactor, password, salt, params)
+        try {
+            val masterKey = V1.symUnwrap(kek, b64decode(wrap.wrappedKey), "master-key")
+            val identityPrivate = V1.symUnwrap(masterKey, b64decode(material.wrappedIdentityPrivateKey), "identity-priv")
+            vault.open(masterKey, identityPrivate)
+        } catch (e: Exception) {
+            throw VeyqError.UnlockFailed
+        }
+        return true
+    }
+
+    /**
+     * Trust this device: enrol a DEVICE wrap of the **already-unlocked** Master Key under
+     * `KEK = Argon2id(deviceFactor + password)`. Runs at unlock time, reusing the known-correct password.
+     * **Re-trust replaces** (deletes any prior wrap first; the device-bound `deviceFactor` is stable). The
+     * **Secret Key is never read or stored**. On a commit failure the just-created server wrap is **rolled
+     * back** (no orphan) and [VeyqError.TrustFailed] is thrown; the preceding unlock still stands.
+     */
+    fun trustThisDevice(email: String, password: String) {
+        val masterKey = vault.masterKey() ?: throw VeyqError.UnlockUnavailable
+
+        deviceTrust.load(email)?.let { prior ->
+            runCatching { withRefresh { deleteWrap(prior.wrapId) } }   // re-trust replaces
+        }
+
+        val deviceFactor = deviceTrust.beginEnrol(email)
+        val salt = randomBytes(16)
+        val kek = V1.kekDevicePassword(deviceFactor, password, salt, V1.ARGON)
+        val wrappedKey = V1.symWrap(kek, masterKey, "master-key", randomBytes(12))
+        val kdfParams = V1.encodeKdfParams(V1.ARGON, salt)
+
+        val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode(kdfParams)) }
+        try {
+            deviceTrust.commitWrapId(email, wrapId)
+        } catch (e: Exception) {
+            runCatching { withRefresh { deleteWrap(wrapId) } }   // rollback — no orphan
+            throw VeyqError.TrustFailed
+        }
+    }
+
+    /**
+     * Untrust this device: delete this device's DEVICE wrap server-side (best-effort, idempotent) and drop
+     * the local key + wrap id. Other devices keep their own wraps; the floor is never removable.
+     */
+    fun untrustThisDevice(email: String) {
+        deviceTrust.load(email)?.let { runCatching { withRefresh { deleteWrap(it.wrapId) } } }
+        deviceTrust.clear(email)
+    }
+
+    /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates
+     *  and retries), 409 → [VeyqError.TooManyDevices], 400 → [VeyqError.InvalidRequest]. */
+    private fun addDeviceWrap(wrappedKey: String, kdfParams: String): String = try {
+        accountWraps.addAccountWrap(
+            AddWrapRequest(method = AddWrapRequest.Method.DEVICE, wrappedKey = wrappedKey, kdfParams = kdfParams)
+        ).id
+    } catch (e: AccountClientException) {
+        throw when (e.statusCode) {
+            409 -> VeyqError.TooManyDevices
+            401 -> VeyqError.SessionExpired
+            400 -> VeyqError.InvalidRequest(null)
+            else -> VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
+    /** DELETE a wrap by id (idempotent 204 server-side). 401 → [VeyqError.SessionExpired] for [withRefresh]. */
+    private fun deleteWrap(id: String) {
+        try {
+            accountWraps.deleteAccountWrap(id)
+        } catch (e: AccountClientException) {
+            throw if (e.statusCode == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
     /**
      * Fetch the caller's wrapped key material. A 401 is surfaced as [VeyqError.SessionExpired] so
      * [withRefresh] can rotate-and-retry (the resource analog of the web 401→refresh wiring).
@@ -167,5 +266,6 @@ class VeyqClient(
 
         private fun b64decode(s: String): ByteArray = Base64.getDecoder().decode(s)
         private fun b64encode(b: ByteArray): String = Base64.getEncoder().encodeToString(b)
+        private fun randomBytes(n: Int): ByteArray = ByteArray(n).also { SecureRandom().nextBytes(it) }
     }
 }
