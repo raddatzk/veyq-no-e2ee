@@ -24,7 +24,10 @@ independent and may legitimately disagree.
 | [uc.admin.setup-server](../features/admin/use-cases/uc.admin.setup-server.md) — First-run server setup | ✅ | ✅ | ✅ | N/A | N/A |
 | [uc.account.login](../features/account/use-cases/uc.account.login.md) — Account login (password) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [uc.account.unlock](../features/account/use-cases/uc.account.unlock.md) — Account unlock (PASSWORD wrap) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [uc.account.trust-device](../features/account/use-cases/uc.account.trust-device.md) — Trust this device (DEVICE wrap) | ✅ | ✅ | ✅ | ◻ | ◻ |
+| [uc.account.trust-device](../features/account/use-cases/uc.account.trust-device.md) — Trust this device (DEVICE wrap, L1) | ✅ | ✅ | ✅ | ✅ | ◻ |
+| [uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md) — Per-device unlock-level chooser | N/A | N/A | ◻ | ◻ | ◻ |
+| [uc.account.biometric-unlock](../features/account/use-cases/uc.account.biometric-unlock.md) — Biometric unlock (L2, secure element) | N/A | N/A | **N/A** | ◻ | ◻ |
+| [uc.account.auto-unlock](../features/account/use-cases/uc.account.auto-unlock.md) — Auto unlock (L3, no login) | N/A | N/A | ◻ | ◻ | ◻ |
 
 ### Intentional N/A
 
@@ -32,3 +35,10 @@ independent and may legitimately disagree.
   operator is at the machine installing the server — that is faster than a native app for a one-time
   bootstrap. The native clients only ever connect to an already-bootstrapped instance; they never
   bootstrap one. No native implementation is planned.
+- **uc.account.set-device-security / biometric-unlock / auto-unlock — backend, http:** these are
+  **client-only** levels over the existing wraps endpoints (no new backend behaviour or wire contract),
+  so the backend/http surfaces carry nothing distinct to test for them.
+- **uc.account.biometric-unlock — web:** the web biometric path is a **WebAuthn passkey + PRF** (the
+  separate, planned PASSKEY use-case), not this native Secure-Enclave/Keystore method; this use-case is
+  native-only by design. (L2's `web` is N/A; L3/`set-device-security` on web remain ◻ — a web "stay
+  signed in" level is conceivable later.)

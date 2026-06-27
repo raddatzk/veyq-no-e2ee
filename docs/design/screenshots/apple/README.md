@@ -9,10 +9,25 @@ look).
 |------|--------|
 | `ios-01-connect.png` | Connect — enter the instance URL |
 | `ios-02-signin.png`  | Sign in (step 1) — email + password, with **Upload kit / Scan QR** (fills email + parks Secret Key) |
-| `ios-03-unlock.png`  | Unlock floor (step 2) — Secret Key, with **Upload kit / Scan QR** (fills Secret Key) |
+| `ios-03-unlock.png`  | Unlock floor (step 2) — Secret Key + the **device unlock-level chooser**, with **Upload kit / Scan QR** |
 | `ios-04-home.png`    | Unlocked — session held, vault open on-device |
 
-The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0017.
+The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0017. The
+floor's **device unlock-level chooser** (`ios-03-unlock.png`) landed in cr-0019.
+
+## Device trust (cr-0019, L1 — "only password")
+
+Driven by `RoundTripUITests.testTrustDeviceLifecycle` through the **real Keychain in-app**, against a
+fresh live instance: floor unlock at "Only my password" → trusted home → sign out → re-login **folds
+straight to home** (no floor) → untrust → re-login back to the floor.
+
+| file | screen |
+|------|--------|
+| `ios-trust-01-floor-chooser.png`      | Floor with the level chooser — no default (Unlock disabled until a level is picked); L2/L3 "Coming soon" |
+| `ios-trust-02-floor-only-password.png`| "Only my password" selected (Unlock enabled) |
+| `ios-trust-03-home-trusted.png`       | Unlocked home — trusted, with **Stop trusting this device** |
+| `ios-trust-04-relogin-fold.png`       | After sign-out + re-login: unlocks straight to home (the DEVICE unlock folds into login) |
+| `ios-trust-05-floor-after-untrust.png`| After untrust + re-login: back to the Secret-Key floor |
 
 ## How they're generated (reproducible)
 

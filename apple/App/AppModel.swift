@@ -23,6 +23,13 @@ final class AppModel: ObservableObject {
     /// A Secret Key parked by a login-screen kit import, consumed (and cleared) by the unlock floor.
     @Published var pendingSecretKey: String = ""
 
+    /// Whether the current device is at the "only password" level (a DEVICE wrap is enrolled). Drives the
+    /// untrust control on the home screen (cr-0019 phase 3).
+    @Published private(set) var deviceTrusted: Bool = false
+    /// Set when enrolling device trust failed after a floor unlock — the unlock still succeeded, but the
+    /// UI surfaces "couldn't trust this device" (cr-0005 #3). Cleared on the next attempt / sign-out.
+    @Published var deviceTrustFailed: Bool = false
+
     /// The data-layer client for the chosen instance. Set on connect, dropped on change-instance.
     private(set) var client: VeyqClient?
 
@@ -37,32 +44,72 @@ final class AppModel: ObservableObject {
         phase = .signIn
     }
 
-    /// Step 1 — log in (email + password → session). On success the email + password are held and the flow
-    /// advances to the Secret-Key floor. Throws on failure (the view maps it to a generic message).
+    /// Step 1 — log in (email + password → session). On a **trusted device** the DEVICE unlock **folds
+    /// into login** (cr-0008 parity): the busy sign-in card stays up across the device unlock so it
+    /// transitions straight to home and never flashes the floor. If the device key/wrap is unusable (E1)
+    /// the flow falls through to the Secret-Key floor. Throws on a login failure (the view maps it to a
+    /// generic message).
     func login(email: String, password: String) async throws {
         guard let client else { return }
         try await client.login(email: email, password: password)
         self.email = email
+        deviceTrustFailed = false
+
+        if client.isTrusted(email: email) {
+            // The login just proved this password, so a DEVICE unlock with it can only fail on a corrupt /
+            // foreign / missing wrap — in which case fall through to the floor (never a hard error here).
+            if let unlocked = try? await client.unlockWithDevice(email: email, password: password), unlocked {
+                carriedPassword = ""
+                pendingSecretKey = ""
+                deviceTrusted = true
+                phase = .home
+                return
+            }
+        }
         self.carriedPassword = password
         phase = .unlock
     }
 
-    /// Step 2 — unlock (carried password + Secret Key → vault). On success the secrets are dropped and the
-    /// flow advances to home. Throws on failure (the floor view maps it to a generic message).
-    func unlock(secretKey: String) async throws {
+    /// Step 2 — unlock the floor (carried password + Secret Key → vault). When `trustThisDevice` is set
+    /// (the floor's "only password" choice), enrol the DEVICE wrap **right after** a successful unlock,
+    /// reusing the known-correct password before it is cleared. An enrol failure does not fail the unlock —
+    /// it surfaces `deviceTrustFailed`. Throws on an unlock failure (the floor view maps it generically).
+    func unlock(secretKey: String, trustThisDevice: Bool = false) async throws {
         guard let client else { return }
         try await client.unlock(password: carriedPassword, secretKey: secretKey)
+
+        if trustThisDevice {
+            do {
+                try await client.trustThisDevice(email: email, password: carriedPassword)
+                deviceTrusted = true
+            } catch {
+                deviceTrustFailed = true   // unlock stands; trust did not take
+            }
+        }
+
         carriedPassword = ""
         pendingSecretKey = ""
         phase = .home
     }
 
+    /// Untrust this device (back to "Secret Key each time"): remove the DEVICE wrap + local key. Safe to
+    /// call from the unlocked home screen.
+    func untrust() async {
+        guard let client else { return }
+        try? await client.untrustThisDevice(email: email)
+        deviceTrusted = false
+    }
+
     /// Sign out: revoke the session, re-lock the vault, drop all transient secrets, and return to sign-in.
+    /// Device trust (the server wrap + Keychain key) is **not** touched — that is what makes the next login
+    /// fold straight through; untrust is the explicit way to remove it.
     func signOut() async {
         try? await client?.logout()
         email = ""
         carriedPassword = ""
         pendingSecretKey = ""
+        deviceTrusted = false
+        deviceTrustFailed = false
         phase = .signIn
     }
 
@@ -73,6 +120,8 @@ final class AppModel: ObservableObject {
         email = ""
         carriedPassword = ""
         pendingSecretKey = ""
+        deviceTrusted = false
+        deviceTrustFailed = false
         phase = .connect
     }
 }

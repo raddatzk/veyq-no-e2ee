@@ -16,8 +16,10 @@ struct UnlockView: View {
     @State private var error = ""
     @State private var importingKit = false
     @State private var scanningKit = false
+    /// The device unlock level the user picks on this floor (no default — they must choose; ADR 0005 §10).
+    @State private var level: DeviceUnlockLevel? = nil
 
-    private var canSubmit: Bool { !secretKey.isEmpty }
+    private var canSubmit: Bool { !secretKey.isEmpty && level != nil }
 
     var body: some View {
         content.onAppear(perform: prefill)
@@ -30,6 +32,8 @@ struct UnlockView: View {
                           hint: "From your Emergency Kit. Used with your password to unlock — never sent.")
                 KitImportBar(label: "Import your Emergency Kit to fill the Secret Key",
                              onUpload: { importingKit = true }, onScan: { scanningKit = true })
+                Divider().overlay(VeyqStyle.line)
+                DeviceSecurityChooser(selection: $level)
                 PrimaryButton(title: "Unlock", busy: busy, disabled: !canSubmit) { submit() }
                 Button("Use a different instance") { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).buttonStyle(.plain)
@@ -72,10 +76,11 @@ struct UnlockView: View {
     private func submit() {
         busy = true; error = ""
         let secretKey = self.secretKey
+        let trust = level == .onlyPassword
         Task {
             defer { busy = false }
             do {
-                try await app.unlock(secretKey: secretKey)
+                try await app.unlock(secretKey: secretKey, trustThisDevice: trust)
                 self.secretKey = ""
             } catch VeyqError.unlockUnavailable {
                 error = "This account has no password unlock configured."

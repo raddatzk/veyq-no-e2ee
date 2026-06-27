@@ -76,6 +76,58 @@ session end**.
   key. **Rejected — periodic trusted-device expiry:** dropped per product choice. **Rejected —
   server-side method selection:** kept client-side for blindness + parity.
 
+## Decision — addendum 2026-06-27: device unlock levels (the per-device slider)
+
+§7 settled *automatic precedence among openable wraps*. This addendum settles the **product shape** the
+clients expose for it: a **per-device "unlock level"** the user picks themselves, after the first floor
+unlock, from an **ordered, mutually-exclusive** set — the *security of my own device is the user's call*,
+the *server is not*.
+
+8. **Four ordered levels; the user chooses one per device.**
+   - **L0 — Secret Key each time** (no convenience wrap; the bare floor). The default state of a fresh
+     device.
+   - **L1 — Only password** — the **DEVICE** wrap (`KEK = Argon2id(device-bound factor + password)`).
+     Type the password each sign-in; the Secret Key goes back in the kit.
+     ([uc.account.trust-device](../features/account/use-cases/uc.account.trust-device.md))
+   - **L2 — Biometric** — a **device-held random key** wrap, the key released only after a **live
+     biometric** (Secure Enclave / Keystore, FaceID / BiometricPrompt). No password typed; the biometric
+     gesture is the second factor. ([uc.account.biometric-unlock](../features/account/use-cases/uc.account.biometric-unlock.md))
+   - **L3 — No login** — the **same** device-held-key wrap, but held **ungated** + a persisted session;
+     the app opens straight to its content, gated only by the **OS lock screen**.
+     ([uc.account.auto-unlock](../features/account/use-cases/uc.account.auto-unlock.md))
+
+9. **Mutually exclusive per device — narrows §4's "combinable" for UX clarity.** A device carries **one**
+   convenience wrap at a time (plus the always-present floor). Switching level **removes** the old
+   convenience wrap and **adds** the new one — never re-encrypts content. (The crypto still permits
+   multiple wraps; the *level* abstraction deliberately exposes one, so the user has a single clear
+   "how does this device unlock" answer.)
+
+10. **No default — the user must choose.** After the first floor unlock the client **asks** which level to
+    apply, with **nothing pre-selected**; until the user chooses, the device stays at **L0** (the floor).
+    This refines §7: rather than silently applying a precedence order, the convenience level is an
+    **explicit, informed per-device choice**. The **floor stays always reachable** at every level
+    (automatic fallback when a KEK source or persisted session is unusable).
+
+11. **Passwordless levels (L2, L3) require a persisted session.** Without the password the client cannot
+    mint a fresh session (the password signs the login challenge, ADR 0003), so the **refresh token** is
+    persisted in the platform keystore — **gated** by the same biometric for L2, **ungated** for L3.
+    Token expiry / rotation-out falls back automatically to the floor (L0). L1 needs **no** persistence —
+    the password login mints a fresh session each time. This is the clean implementation seam between the
+    "L1 only" slice and the "L2 + L3" slice.
+
+12. **Operator-blindness is untouched at every level — including L3.** The level slider relaxes **only
+    local** device defense-in-depth, never server trust. Even at L3 the server holds only ciphertext wraps
+    + an opaque session token; it never gains the KEK, Master Key, Secret Key, or password. The
+    justification is the **threat-model asymmetry**: the *server* is an **unknown, global** adversary (why
+    operator-blind is non-negotiable), while the user's *own device* is a **smaller, known-circle** risk
+    ("handed over / left unlocked"), so trading local friction for convenience there is legitimately the
+    user's decision.
+
+13. **L3 trades away app-level defense-in-depth entirely — explicit opt-in, never a default.** At L3 the
+    only gate beyond the OS lock screen is gone; a found *unlocked* device opens the content. It is offered
+    only as a clearly-labelled choice (and presumes a device passcode/biometric is set at the OS level).
+    Considered and **declined** as any kind of default.
+
 ## Related / future
 
 - **Cross-device onboarding (QR / push):** a new device is onboarded by an existing **unlocked** device
@@ -83,3 +135,6 @@ session end**.
   (no secrets), the existing device encrypts the Master Key / a fresh wrap to it. Its own use-case + ADR;
   must carry the **E2E unlock-transfer**, **QR-login phishing** and **non-enumerability** (ADR 0003)
   constraints.
+- **Device unlock levels** (addendum above) — the user-facing flow of choosing/switching a level is
+  [uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md); the
+  per-level mechanics are the four level use-cases it links.

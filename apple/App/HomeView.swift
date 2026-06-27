@@ -7,6 +7,7 @@ import VeyqKit
 struct HomeView: View {
     @EnvironmentObject var app: AppModel
     @State private var busy = false
+    @State private var untrusting = false
 
     var body: some View {
         ZStack {
@@ -28,6 +29,25 @@ struct HomeView: View {
                            error: false)
                     .frame(maxWidth: 360)
 
+                if app.deviceTrustFailed {
+                    MessageBox(text: "Couldn’t trust this device — you’ll use your Secret Key next time.")
+                        .frame(maxWidth: 360)
+                }
+
+                if app.deviceTrusted {
+                    VStack(spacing: 8) {
+                        MessageBox(text: "This device is trusted — next time you’ll unlock with just your password.",
+                                   error: false)
+                        Button(untrusting ? "…" : "Stop trusting this device") { untrust() }
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(VeyqStyle.danger)
+                            .buttonStyle(.plain)
+                            .disabled(untrusting)
+                            .accessibilityIdentifier("Stop trusting this device")
+                    }
+                    .frame(maxWidth: 360)
+                }
+
                 PrimaryButton(title: "Sign out", busy: busy) { signOut() }
                     .frame(maxWidth: 220)
             }
@@ -41,6 +61,14 @@ struct HomeView: View {
         Task {
             await app.signOut()
             busy = false
+        }
+    }
+
+    private func untrust() {
+        untrusting = true
+        Task {
+            await app.untrust()
+            untrusting = false
         }
     }
 }

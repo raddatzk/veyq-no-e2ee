@@ -20,6 +20,12 @@ public enum VeyqError: Error, Equatable {
     case invalidSecretKey
     /// Unwrap failed (AEAD tag mismatch) — wrong password or Secret Key. One generic failure.
     case unlockFailed
+    /// Enrolling device trust failed after the server wrap was created — the wrap was rolled back so no
+    /// orphan remains (cr-0019 / cr-0005 #3); the unlock that preceded it still stands.
+    case trustFailed
+    /// The per-account DEVICE-wrap cap was hit (409) — this device cannot be trusted until another is
+    /// untrusted. Re-trust replaces, so real use never approaches it.
+    case tooManyDevices
     /// The server answered with a status the contract does not document.
     case unexpectedStatus(Int)
 }

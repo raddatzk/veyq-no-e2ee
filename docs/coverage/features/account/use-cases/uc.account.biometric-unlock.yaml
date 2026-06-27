@@ -1,0 +1,28 @@
+useCase: uc.account.biometric-unlock
+feature: account
+title: Biometric unlock (L2 — FaceID / fingerprint, no password)
+status: planned   # refined; native secure-element path lands in cr-0020 (apple) + its android successor
+acceptanceCriteria:
+  - id: enrol-secure-element-key
+    text: Picking L2 creates a non-extractable secure-element key with a biometry-current gate and enrols a device-key wrap (symWrap(K, masterKey)) that appears in the caller's key material.
+  - id: unlock-biometric-only
+    text: On open a single live biometric releases both the persisted session token (resume the session) and the KEK (open the Master Key) — no password, no Secret Key.
+  - id: passwordless-needs-persisted-session
+    text: The refresh token is persisted under the same biometric gate so the session resumes without the password; token expiry/rotation falls back to the floor.
+  - id: no-password-at-rest
+    text: The wrapping key is a random device-bound key, never the account password — a biometric-passing local attacker gets only this device's vault, not the ability to authenticate elsewhere.
+  - id: biometric-change-invalidates
+    text: Changing the enrolled biometric set invalidates the secure-element key (anti-coercion); the device-key wrap becomes unusable here and the device falls back to the floor.
+  - id: biometric-cancel-falls-back
+    text: A cancelled/failed/locked-out biometric releases no key; unlock does not proceed and the floor stays reachable (no silent bypass).
+  - id: key-or-wrap-gone-no-self-wipe
+    text: A missing local key or server wrap degrades to the floor without self-wiping the local key on a single server response.
+  - id: unsupported-hardware-not-offered
+    text: With no biometric enrolled or no secure element (e.g. simulator/older Mac) L2 is not offered; no software-only fallback that drops the hardware guarantee.
+  - id: operator-blind-indistinct-from-l3
+    text: The server holds only the device-key ciphertext wrap; whether the key/token are biometric-gated (L2) or ungated (L3) is local and never sent.
+gaps:
+  apple: cr-0020 — Secure Enclave key + persisted (gated) session not yet built.
+  android: cr-0020 successor — hardware Keystore + BiometricPrompt path not yet built.
+  web: N/A on web — the web biometric path is WebAuthn passkey + PRF (the separate PASSKEY use-case), not this native secure-element method.
+  backend: no backend change — reuses the existing wraps endpoints (N/A as a distinct surface).

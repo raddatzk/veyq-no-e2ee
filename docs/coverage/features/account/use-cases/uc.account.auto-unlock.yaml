@@ -1,0 +1,26 @@
+useCase: uc.account.auto-unlock
+feature: account
+title: Auto unlock (L3 — no login, opens straight in)
+status: planned   # refined; same device-key wrap as L2 but ungated — lands with cr-0020 (apple) + successor
+acceptanceCriteria:
+  - id: explicit-opt-in-warned
+    text: L3 is only reached by an explicit, warned choice (never pre-selected) and is blocked/strongly warned when the OS has no device passcode.
+  - id: enrol-ungated-key-and-token
+    text: Picking L3 stores a random key K and the refresh token ungated (WhenUnlockedThisDeviceOnly) and enrols a device-key wrap (symWrap(K, masterKey)).
+  - id: opens-straight-in
+    text: On next launch the client reads the ungated token (resume session) and the ungated K (open the Master Key) and lands on the content with no user interaction.
+  - id: same-wrap-as-l2-only-gate-differs
+    text: The wrap and crypto are identical to L2; only the keystore access policy (ungated vs biometric-gated) differs, and that difference is invisible to the server.
+  - id: no-password-or-secret-key-at-rest
+    text: Even at maximum convenience the wrapping key is random and device-bound (not the password); an extracted key opens only this device's vault.
+  - id: key-or-token-gone-falls-back
+    text: A missing key/wrap or an expired/rotated token degrades to the floor (no silent self-wipe on a single server response).
+  - id: reversible-anytime
+    text: From the unlocked app the user can lower L3 to any level (dropping K + the ungated token) or raise it to L2 (re-storing the material under a biometric gate); other devices are untouched.
+  - id: operator-blind-unchanged
+    text: The relaxation is purely local; the server still holds only ciphertext wraps + an opaque session token and cannot distinguish L3 from L2/L1 beyond a convenience-wrap count.
+gaps:
+  apple: cr-0020 — ungated device-key wrap + persisted (ungated) session not yet built.
+  android: cr-0020 successor — ungated Keystore key + session not yet built.
+  web: planned — an equivalent "stay signed in / open straight in" web level is not yet built.
+  backend: no backend change — reuses the existing wraps endpoints (N/A as a distinct surface).

@@ -77,6 +77,16 @@ for uc in usecases:
     if data.get("feature") != feature:
         errors.append(f"{where0}: feature '{data.get('feature')}' must equal '{feature}'")
 
+    # A use-case may be refined (its doc + acceptance criteria written) before any surface implements
+    # it. Such a file declares `status: planned` and carries no test refs yet — every surface it will
+    # ever target must instead appear under `gaps` with a reason. Once a CR lands real tests, drop the
+    # status and fill `coverage`. Omit `status` (or set anything but 'planned') = implemented, tests
+    # required per criterion.
+    status = data.get("status")
+    if status not in (None, "planned"):
+        errors.append(f"{where0}: unknown status '{status}' (omit for implemented, or 'planned')")
+    planned = status == "planned"
+
     for ac in data.get("acceptanceCriteria") or []:
         acid = ac.get("id", "?")
         where = f"{where0}: criterion '{acid}'"
@@ -97,10 +107,12 @@ for uc in usecases:
                 for ref in refs:
                     ref_count += 1
                     check_ref(area, ref, where)
-        if ref_count == 0:
+        if ref_count == 0 and not planned:
             errors.append(f"{where}: no tests (every criterion needs at least one)")
 
     gaps = data.get("gaps") or {}
+    if planned and not gaps:
+        errors.append(f"{where0}: status 'planned' must declare at least one gap (the surfaces not yet built)")
     for area, reason in gaps.items():
         if area not in KNOWN_AREAS:
             errors.append(f"{where0}: gap for unknown area '{area}'")

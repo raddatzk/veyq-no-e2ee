@@ -1,0 +1,22 @@
+useCase: uc.account.set-device-security
+feature: account
+title: Set this device's unlock level (the per-device security slider)
+status: planned   # refined; the chooser/transitions land per surface (apple L0/L1 first via cr-0019)
+acceptanceCriteria:
+  - id: chooser-no-default
+    text: After the first floor unlock the client presents the level chooser with nothing pre-selected; until the user picks, the device stays at L0 (the floor).
+  - id: levels-mutually-exclusive
+    text: A device carries exactly one convenience wrap at a time; switching level removes the old convenience wrap before adding the new one (never two at once, never re-encrypts content).
+  - id: change-level-any-direction
+    text: From the unlocked app the user can raise or lower the level; lowering to the floor drops this device's convenience wrap (and any persisted key/token); other devices are untouched.
+  - id: unsupported-levels-hidden
+    text: A level whose hardware/OS prerequisites are absent is not offered (L2 hidden with no biometric; L3 blocked/warned with no OS passcode) — no silent downgrade to a weaker-than-asked level.
+  - id: floor-always-reachable
+    text: Every level falls back automatically to the PASSWORD floor when its KEK source or persisted session is unusable, and the floor can never be removed.
+  - id: operator-blind-level-not-sent
+    text: The chosen level is never sent as a label; the server stores only ciphertext wraps + opaque metadata and cannot distinguish the levels (beyond a convenience-wrap count).
+gaps:
+  apple: cr-0019 ships the L0/L1 chooser (no default); L2/L3 notches added in cr-0020 — not yet built.
+  android: cr-0018 successor — native chooser not yet built.
+  web: the unified slider is not yet built on web (web has the L1 trust-device flow as a checkbox today); planned.
+  backend: no backend change — the slider is a client concern over the existing wraps endpoints (N/A as a distinct surface).
