@@ -112,10 +112,17 @@ no session. This CR also wires **app-launch auto-restore** and **activates L2/L3
   env-gated skips) — enrol L2/L3 → resume + device-key unlock round-trip; rotation persists the new token;
   level switch swaps the one wrap; L1 record rejected by the K-path; no-record/dead-token → false (floor);
   enrol rollback.
-- [ ] **3 — app-launch auto-restore + UI activation.** `AppModel`/`RootView`: an auto-restore on launch
-  (L3 silent → home; L2 Face ID → home; else connect/sign-in). `DeviceSecurityChooser`: flip L2/L3
-  `available` with the hardware gates (L2 hidden w/o biometric via `LAContext`; L3 confirm + passcode
-  check). Biometric prompt + L3 warning UX. **Check:** `xcodebuild` macOS + iOS-sim `BUILD SUCCEEDED`.
+- [x] **3 — app-launch auto-restore + UI activation.** New `App/LaunchPrefs.swift` (UserDefaults
+  `{lastInstance, lastAccount}` — non-secret; remembered on L2/L3 enrol, cleared on untrust). `AppModel`:
+  a `.launching` phase + `bootstrap()` (read prefs → if L2/L3, `resumeSession` then `unlockWithDeviceKey`
+  → **L3 silent → home**, **L2 Face ID → home**; missing → connect; unusable key → sign-in); `RootView`
+  shows a `LaunchView` and runs `bootstrap()` via `.task`. The floor unlock generalised:
+  `unlock(secretKey:, level:)` enrols per the chosen `DeviceUnlockLevel` (L1 → `trustThisDevice`; L2/L3 →
+  `setPasswordlessLevel` + `LaunchPrefs.remember`). `DeviceSecurityChooser`: L2/L3 **activated** — L2
+  offered only when `LAContext.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics)` (else a "Not
+  available" row); "Coming soon" dropped. `HomeView` message generalised across levels. **Done:**
+  `xcodebuild` macOS **and** iOS-sim `BUILD SUCCEEDED`; hermetic `swift test` 46/46. *(L3 enrol
+  confirmation dialog + a passcode-set check are a phase-4/polish item; the live lifecycle drives it.)*
 - [ ] **4 — live round-trip + screenshots + coverage/parity.** In-app UI round-trips on the iOS sim with
   **simulated Face ID** (`xcrun simctl spawn booted notifyutil -p com.apple.BiometricKit_Sim.pearl.match`
   to satisfy the L2 prompt): enrol L2 → relaunch → Face ID → home; enrol L3 → relaunch → straight to home;

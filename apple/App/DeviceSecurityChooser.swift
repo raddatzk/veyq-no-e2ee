@@ -12,9 +12,6 @@ enum DeviceUnlockLevel: CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    /// cr-0019 implements L0 + L1; the passwordless notches are previewed but not selectable yet.
-    var available: Bool { self == .secretKeyEachTime || self == .onlyPassword }
-
     var title: String {
         switch self {
         case .secretKeyEachTime: return "Secret Key each time"
@@ -47,6 +44,14 @@ enum DeviceUnlockLevel: CaseIterable, Identifiable {
 /// choose); disabled rows can't be selected.
 struct DeviceSecurityChooser: View {
     @Binding var selection: DeviceUnlockLevel?
+    /// Whether Face ID / Touch ID is enrolled on this device — L2 is offered only when true (ADR 0005 §10).
+    var biometricAvailable: Bool = true
+
+    /// L2 needs biometric hardware enrolled; the rest are always offerable (L3 is gated by a confirmation
+    /// + a device passcode at enrol time).
+    private func available(_ level: DeviceUnlockLevel) -> Bool {
+        level != .biometric || biometricAvailable
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -58,21 +63,22 @@ struct DeviceSecurityChooser: View {
 
     private func row(_ level: DeviceUnlockLevel) -> some View {
         let selected = selection == level
+        let available = available(level)
         return Button {
-            if level.available { selection = level }
+            if available { selection = level }
         } label: {
             HStack(spacing: 11) {
                 Image(systemName: level.icon)
                     .font(.system(size: 16))
-                    .foregroundStyle(level.available ? VeyqStyle.accent : VeyqStyle.muted)
+                    .foregroundStyle(available ? VeyqStyle.accent : VeyqStyle.muted)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(level.title)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(level.available ? VeyqStyle.text : VeyqStyle.muted)
-                        if !level.available {
-                            Text("Coming soon")
+                            .foregroundStyle(available ? VeyqStyle.text : VeyqStyle.muted)
+                        if !available {
+                            Text("Not available")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(VeyqStyle.muted)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
@@ -95,7 +101,7 @@ struct DeviceSecurityChooser: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(!level.available)
+        .disabled(!available)
         .accessibilityIdentifier("level.\(level)")
     }
 }

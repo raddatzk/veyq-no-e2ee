@@ -12,9 +12,9 @@ import VeyqKit
 /// until the floor consumes it (the analog of web's `pendingSecretKey`).
 @MainActor
 final class AppModel: ObservableObject {
-    enum Phase: Equatable { case connect, signIn, unlock, home }
+    enum Phase: Equatable { case launching, connect, signIn, unlock, home }
 
-    @Published var phase: Phase = .connect
+    @Published var phase: Phase = .launching
     /// The chosen instance base URL (shown as the sign-in / floor subtitle).
     @Published private(set) var apiBase: String = ""
     /// The signed-in account email (shown on the floor + home).
@@ -36,6 +36,37 @@ final class AppModel: ObservableObject {
     /// The password from the login step, carried to the unlock step. Transient — never persisted, cleared
     /// the moment the vault opens or the session ends.
     private var carriedPassword: String = ""
+
+    /// **App-launch auto-restore** for a passwordless device (cr-0020 L2/L3). If this device last used an
+    /// L2/L3 level, resume the persisted session and open the vault — silently for L3 ("no login"), after a
+    /// Face ID / Touch ID for L2 (reading the gated key prompts it). Anything missing/failed falls back to
+    /// the normal connect / sign-in flow. Called once at launch.
+    func bootstrap() async {
+        guard phase == .launching else { return }
+        guard let inst = LaunchPrefs.instance, let acct = LaunchPrefs.account,
+              let baseURL = normalizeBaseURL(inst)
+        else { phase = .connect; return }
+
+        let client = VeyqClient(instance: VeyqInstance(baseURL: baseURL))
+        guard let level = client.currentLevel(email: acct), level == .biometric || level == .noLogin else {
+            phase = .connect; return
+        }
+        self.client = client
+        self.apiBase = baseURL.absoluteString
+        self.email = acct
+        self.deviceTrusted = true
+        do {
+            guard try await client.resumeSession(email: acct) else { LaunchPrefs.clear(); phase = .connect; return }
+            // unlockWithDeviceKey reads the device key — biometric-gated for L2 (prompts Face ID), free for L3.
+            if try await client.unlockWithDeviceKey(email: acct) {
+                phase = .home
+            } else {
+                phase = .signIn   // key/wrap unusable → re-auth (the floor needs a password we don't hold)
+            }
+        } catch {
+            phase = .signIn
+        }
+    }
 
     /// Connected to an instance that is already set up — advance to sign-in.
     func connected(baseURL: URL, client: VeyqClient) {
@@ -70,21 +101,30 @@ final class AppModel: ObservableObject {
         phase = .unlock
     }
 
-    /// Step 2 — unlock the floor (carried password + Secret Key → vault). When `trustThisDevice` is set
-    /// (the floor's "only password" choice), enrol the DEVICE wrap **right after** a successful unlock,
-    /// reusing the known-correct password before it is cleared. An enrol failure does not fail the unlock —
-    /// it surfaces `deviceTrustFailed`. Throws on an unlock failure (the floor view maps it generically).
-    func unlock(secretKey: String, trustThisDevice: Bool = false) async throws {
+    /// Step 2 — unlock the floor (carried password + Secret Key → vault), then apply the chosen device
+    /// **unlock level** right after a successful unlock (reusing the known-correct password / the live
+    /// session before they are cleared): L0 stores nothing; L1 enrols the DEVICE wrap (password); L2/L3
+    /// enrol the random-K wrap + persist the session (biometric-gated / ungated) and remember this device
+    /// for app-launch auto-restore. An enrol failure does not fail the unlock — it surfaces
+    /// `deviceTrustFailed`. Throws on an unlock failure (the floor view maps it generically).
+    func unlock(secretKey: String, level: DeviceUnlockLevel) async throws {
         guard let client else { return }
         try await client.unlock(password: carriedPassword, secretKey: secretKey)
 
-        if trustThisDevice {
-            do {
+        do {
+            switch level {
+            case .secretKeyEachTime:
+                break
+            case .onlyPassword:
                 try await client.trustThisDevice(email: email, password: carriedPassword)
                 deviceTrusted = true
-            } catch {
-                deviceTrustFailed = true   // unlock stands; trust did not take
+            case .biometric, .noLogin:
+                try await client.setPasswordlessLevel(level == .biometric ? .biometric : .noLogin, email: email)
+                LaunchPrefs.remember(instance: apiBase, account: email)
+                deviceTrusted = true
             }
+        } catch {
+            deviceTrustFailed = true   // unlock stands; the level did not take
         }
 
         carriedPassword = ""
@@ -92,11 +132,12 @@ final class AppModel: ObservableObject {
         phase = .home
     }
 
-    /// Untrust this device (back to "Secret Key each time"): remove the DEVICE wrap + local key. Safe to
-    /// call from the unlocked home screen.
+    /// Drop this device's convenience level back to "Secret Key each time": remove the wrap + local key +
+    /// any persisted session, and forget it for auto-restore. Safe to call from the unlocked home screen.
     func untrust() async {
         guard let client else { return }
         try? await client.untrustThisDevice(email: email)
+        LaunchPrefs.clear()
         deviceTrusted = false
     }
 

@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import LocalAuthentication
 import VeyqKit
 
 /// Step 2 of sign-in — the **Secret-Key floor**: the carried password (from login) + the Secret Key →
@@ -21,6 +22,11 @@ struct UnlockView: View {
 
     private var canSubmit: Bool { !secretKey.isEmpty && level != nil }
 
+    /// Face ID / Touch ID enrolled on this device → the L2 row is offered.
+    private var biometricAvailable: Bool {
+        LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+    }
+
     var body: some View {
         content.onAppear(perform: prefill)
     }
@@ -33,7 +39,7 @@ struct UnlockView: View {
                 KitImportBar(label: "Import your Emergency Kit to fill the Secret Key",
                              onUpload: { importingKit = true }, onScan: { scanningKit = true })
                 Divider().overlay(VeyqStyle.line)
-                DeviceSecurityChooser(selection: $level)
+                DeviceSecurityChooser(selection: $level, biometricAvailable: biometricAvailable)
                 PrimaryButton(title: "Unlock", busy: busy, disabled: !canSubmit) { submit() }
                 Button("Use a different instance") { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).buttonStyle(.plain)
@@ -74,13 +80,13 @@ struct UnlockView: View {
     }
 
     private func submit() {
+        guard let level else { return }
         busy = true; error = ""
         let secretKey = self.secretKey
-        let trust = level == .onlyPassword
         Task {
             defer { busy = false }
             do {
-                try await app.unlock(secretKey: secretKey, trustThisDevice: trust)
+                try await app.unlock(secretKey: secretKey, level: level)
                 self.secretKey = ""
             } catch VeyqError.unlockUnavailable {
                 error = "This account has no password unlock configured."

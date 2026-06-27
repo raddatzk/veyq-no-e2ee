@@ -36,7 +36,7 @@ struct HomeView: View {
 
                 if app.deviceTrusted {
                     VStack(spacing: 8) {
-                        MessageBox(text: "This device is trusted — next time you’ll unlock with just your password.",
+                        MessageBox(text: "This device remembers how you unlock — next time you won’t need your Secret Key.",
                                    error: false)
                         Button(untrusting ? "…" : "Stop trusting this device") { untrust() }
                             .font(.system(size: 13, weight: .medium))
