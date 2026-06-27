@@ -10,18 +10,22 @@ public actor Session {
     public private(set) var refreshToken: String?
     /// Opaque id of the session family (one login / device); set at login, kept across refreshes.
     public private(set) var familyId: String?
+    /// The signed-in account email — set at login/resume, kept across refreshes. Lets `refresh()` persist
+    /// the rotated refresh token to the right account for a passwordless device (cr-0020).
+    public private(set) var account: String?
 
     public init() {}
 
     /// True once a login has stored an access token.
     public var isAuthenticated: Bool { accessToken != nil }
 
-    /// Store the tokens from a login or a rotation. `familyId` is set at login and preserved across
-    /// refreshes (a refresh call passes `nil`, mirroring the web data layer).
-    func set(access: String, refresh: String, familyId: String? = nil) {
+    /// Store the tokens from a login or a rotation. `familyId` + `account` are set at login/resume and
+    /// preserved across refreshes (a refresh call passes `nil` for both, mirroring the web data layer).
+    func set(access: String, refresh: String, familyId: String? = nil, account: String? = nil) {
         accessToken = access
         refreshToken = refresh
         if let familyId { self.familyId = familyId }
+        if let account { self.account = account }
     }
 
     /// Drop the session (logout / refresh rejected).
@@ -29,5 +33,6 @@ public actor Session {
         accessToken = nil
         refreshToken = nil
         familyId = nil
+        account = nil
     }
 }

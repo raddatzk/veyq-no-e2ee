@@ -101,12 +101,17 @@ no session. This CR also wires **app-launch auto-restore** and **activates L2/L3
   (`InMemoryDeviceSecurityStore`, `DeviceSecurityStoreTests`). **Done:** `swift test` 39/39 (2 env-gated
   skips) — store round-trip covers L1 + the L2/L3 record shape (key + token); `xcodebuild` macOS
   `BUILD SUCCEEDED`.
-- [ ] **2 — orchestration + unit tests.** `VeyqClient`: `setLevel(.biometric|.noLogin)` (random K →
-  `symWrap` → `POST` wrap → persist K + the current refresh token under the level's gate; replace any prior
-  convenience wrap), `unlockWithDeviceKey(email)` (read K → open the vault), `resumeSession(email)` (read
-  persisted refresh token → `refresh()` → live session), `currentLevel(email)`, and the L0–L3 transitions.
-  **Check:** `swift test` — round-trips on the in-memory double + stub transport (enrol L2/L3 → resume +
-  unlock; level switch swaps the wrap; token-expired → floor; missing K → floor without self-wipe).
+- [x] **2 — orchestration + unit tests.** Refined the storage split so token rotation works: the **refresh
+  token lives in the ungated meta** (updatable prompt-free) and only the KEK secret is gated — added
+  `DeviceSecurityStore.updateRefreshToken` + `Session.account`. `VeyqClient`:
+  `setPasswordlessLevel(.biometric|.noLogin, email)` (random K → `symWrap` → `POST` (method=DEVICE, marker
+  `kdfParams`) → persist `{K, current refresh token}`; replaces any prior convenience wrap; rollback on
+  save failure), `unlockWithDeviceKey(email)` (K *is* the KEK, used directly — no Argon2id), `resumeSession`
+  (read persisted token → `refresh()` → live session), `currentLevel`, and `refresh()` now **persists the
+  rotated token** for an L2/L3 device so the next launch stays valid. **Done:** `swift test` 46/46 (2
+  env-gated skips) — enrol L2/L3 → resume + device-key unlock round-trip; rotation persists the new token;
+  level switch swaps the one wrap; L1 record rejected by the K-path; no-record/dead-token → false (floor);
+  enrol rollback.
 - [ ] **3 — app-launch auto-restore + UI activation.** `AppModel`/`RootView`: an auto-restore on launch
   (L3 silent → home; L2 Face ID → home; else connect/sign-in). `DeviceSecurityChooser`: flip L2/L3
   `available` with the hardware gates (L2 hidden w/o biometric via `LAContext`; L3 confirm + passcode

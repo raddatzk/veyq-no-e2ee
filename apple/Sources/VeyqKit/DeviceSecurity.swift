@@ -6,9 +6,11 @@ import Security
 // cr-0019's L1-only `DeviceTrust` into the four-level model (cr-0020).
 //
 // **Two Keychain items per account** so the level is knowable *without* a biometric prompt:
-//   - a **meta** item `{level, wrapId}` — always ungated (read freely → the app knows the level + can
-//     decide whether to prompt / which UI to show);
-//   - a **secrets** item `{secret, refreshToken?}` — gated per level:
+//   - a **meta** item `{level, wrapId, refreshToken?}` — always ungated. The level is read freely (decide
+//     whether to prompt / which UI to show), and the persisted **refresh token** (L2/L3) lives here so it
+//     can be **updated on every rotation without a biometric prompt**. Security: an ungated session token
+//     alone only fetches ciphertext (operator-blind) — the *vault* key is the gated secret below.
+//   - a **secret** item `{secret}` — gated per level:
 //       L0/L1/L3 → `WhenUnlockedThisDeviceOnly` (ungated);  L2 → `.biometryCurrentSet` (a live Face ID /
 //       Touch ID releases it — the gate is Secure-Enclave-enforced even though the bytes then return).
 //
@@ -50,9 +52,12 @@ public protocol DeviceSecurityStore: Sendable {
     /// The full record incl. secrets. For an L2 device this read **prompts Face ID / Touch ID** (the
     /// secrets item is gated). Throws on an unexpected backing failure.
     func load(email: String) throws -> DeviceSecurityRecord?
-    /// Persist (replacing any existing) the record, gating the secrets per `record.level`.
+    /// Persist (replacing any existing) the record, gating the secret per `record.level`.
     func save(_ record: DeviceSecurityRecord, email: String) throws
-    /// Remove the account's meta + secrets (idempotent).
+    /// Update only the persisted refresh token (in the ungated meta) — a cheap, **prompt-free** write used
+    /// to track refresh-token rotation for L2/L3. No-op if no record exists.
+    func updateRefreshToken(_ token: String?, email: String) throws
+    /// Remove the account's meta + secret (idempotent).
     func clear(email: String) throws
 }
 
@@ -86,8 +91,8 @@ public struct KeychainDeviceSecurityStore: DeviceSecurityStore {
         self.secretService = service + ".secret"
     }
 
-    private struct Meta: Codable { let level: DeviceLevel; let wrapId: String }
-    private struct Secrets: Codable { let secret: Data; let refreshToken: String? }
+    private struct Meta: Codable { let level: DeviceLevel; let wrapId: String; let refreshToken: String? }
+    private struct Secrets: Codable { let secret: Data }
 
     private func base(_ service: String, _ email: String) -> [CFString: Any] {
         [
@@ -109,20 +114,30 @@ public struct KeychainDeviceSecurityStore: DeviceSecurityStore {
         guard let metaData = try read(metaService, email),
               let meta = try? JSONDecoder().decode(Meta.self, from: metaData)
         else { return nil }
-        // The secrets read prompts Face ID for an L2 device (the item is biometric-gated).
+        // The secret read prompts Face ID for an L2 device (the item is biometric-gated).
         guard let secretData = try read(secretService, email),
               let s = try? JSONDecoder().decode(Secrets.self, from: secretData)
         else { throw DeviceSecurityError.corruptRecord }
         return DeviceSecurityRecord(level: meta.level, wrapId: meta.wrapId,
-                                    secret: s.secret, refreshToken: s.refreshToken)
+                                    secret: s.secret, refreshToken: meta.refreshToken)
     }
 
     public func save(_ record: DeviceSecurityRecord, email: String) throws {
         try clear(email: email)
-        let metaValue = try JSONEncoder().encode(Meta(level: record.level, wrapId: record.wrapId))
-        let secretValue = try JSONEncoder().encode(Secrets(secret: record.secret, refreshToken: record.refreshToken))
+        let metaValue = try JSONEncoder().encode(
+            Meta(level: record.level, wrapId: record.wrapId, refreshToken: record.refreshToken)
+        )
+        let secretValue = try JSONEncoder().encode(Secrets(secret: record.secret))
         try add(metaService, email, metaValue, gated: false)
         try add(secretService, email, secretValue, gated: record.level == .biometric)
+    }
+
+    public func updateRefreshToken(_ token: String?, email: String) throws {
+        guard let metaData = try read(metaService, email),
+              let meta = try? JSONDecoder().decode(Meta.self, from: metaData) else { return }
+        let updated = try JSONEncoder().encode(Meta(level: meta.level, wrapId: meta.wrapId, refreshToken: token))
+        try delete(metaService, email)
+        try add(metaService, email, updated, gated: false)
     }
 
     public func clear(email: String) throws {

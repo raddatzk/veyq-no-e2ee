@@ -24,6 +24,13 @@ final class InMemoryDeviceSecurityStore: DeviceSecurityStore, @unchecked Sendabl
         lock.withLock { records[email] = record }
     }
 
+    func updateRefreshToken(_ token: String?, email: String) throws {
+        lock.withLock {
+            guard let r = records[email] else { return }
+            records[email] = DeviceSecurityRecord(level: r.level, wrapId: r.wrapId, secret: r.secret, refreshToken: token)
+        }
+    }
+
     func clear(email: String) throws {
         lock.withLock { _ = records.removeValue(forKey: email) }
     }
