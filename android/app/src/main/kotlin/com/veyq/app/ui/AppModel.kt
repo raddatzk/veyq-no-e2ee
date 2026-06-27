@@ -5,7 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
-import com.veyq.app.security.KeystoreDeviceTrustStore
+import com.veyq.app.security.KeystoreDeviceSecurityStore
 import com.veyq.app.ui.components.DeviceUnlockLevel
 import com.veyq.client.VeyqClient
 import com.veyq.client.VeyqError
@@ -29,7 +29,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     enum class Phase { CONNECT, SIGN_IN, UNLOCK, HOME }
 
     /** The Android Keystore-backed device-trust store, injected into the [VeyqClient] (cr-0021). */
-    private val deviceTrust = KeystoreDeviceTrustStore(application)
+    private val deviceSecurity = KeystoreDeviceSecurityStore(application)
 
     var phase by mutableStateOf(Phase.CONNECT)
         private set
@@ -73,7 +73,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     suspend fun connect(rawUrl: String): ConnectResult {
         val baseUrl = normalizeBaseUrl(rawUrl)
             ?: return ConnectResult.Failed("That doesn't look like a valid address.")
-        val client = VeyqClient(VeyqInstance(baseUrl), deviceTrust = deviceTrust)
+        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity)
         return try {
             val setupNeeded = withContext(Dispatchers.IO) { client.setupRequired() }
             if (setupNeeded) {

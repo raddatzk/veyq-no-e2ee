@@ -52,21 +52,21 @@ class TrustDeviceTest {
 
     private fun start(d: WrapsDispatcher) { server.dispatcher = d; server.start() }
 
-    private fun makeClient(store: DeviceTrustStore): VeyqClient {
+    private fun makeClient(store: DeviceSecurityStore): VeyqClient {
         val session = Session().apply { set("access-1", "refresh-1", "fam") }
-        return VeyqClient(VeyqInstance(baseUrl()), session = session, deviceTrust = store)
+        return VeyqClient(VeyqInstance(baseUrl()), session = session, deviceSecurity = store)
     }
 
-    private fun floorUnlock(store: DeviceTrustStore): VeyqClient =
+    private fun floorUnlock(store: DeviceSecurityStore): VeyqClient =
         makeClient(store).also { it.unlock(password = password, secretKey = b64(secretKey)) }
 
     @Test fun trustThenDeviceUnlockRoundTrip() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
 
         val c1 = floorUnlock(store)
         c1.trustThisDevice(email, password)
-        assertTrue(store.isTrusted(email))
+        assertTrue((store.currentLevel(email) == DeviceLevel.ONLY_PASSWORD))
         assertTrue(server.dispatcher.let { (it as WrapsDispatcher).hasWrap("DEVICE") }, "a DEVICE wrap was stored")
 
         // Fresh client (new vault), same store + server: unlock with only the password.
@@ -78,7 +78,7 @@ class TrustDeviceTest {
 
     @Test fun deviceUnlockWrongPasswordThrowsAndLeavesVaultLocked() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
         floorUnlock(store).trustThisDevice(email, password)
 
         val c2 = makeClient(store)
@@ -88,31 +88,31 @@ class TrustDeviceTest {
 
     @Test fun notTrustedReturnsFalse() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
-        val c = makeClient(InMemoryDeviceTrustStore())
+        val c = makeClient(InMemoryDeviceSecurityStore())
         assertFalse(c.unlockWithDevice(email, password))
         assertFalse(c.vault.isUnlocked)
     }
 
     @Test fun missingServerWrapReturnsFalseAndKeepsRecord() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
-        val store = InMemoryDeviceTrustStore()
-        store.beginEnrol(email); store.commitWrapId(email, "ghost")   // a record whose server wrap is absent
+        val store = InMemoryDeviceSecurityStore()
+        store.beginEnrol(email); store.commitOnlyPassword(email, "ghost")   // a record whose server wrap is absent
         val c = makeClient(store)
 
         assertFalse(c.unlockWithDevice(email, password))
-        assertTrue(store.isTrusted(email), "the local key must survive a missing server wrap (no self-wipe)")
+        assertTrue((store.currentLevel(email) == DeviceLevel.ONLY_PASSWORD), "the local key must survive a missing server wrap (no self-wipe)")
     }
 
     @Test fun reTrustReplacesPriorWrap() {
         val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
         start(d)
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
         val c = floorUnlock(store)
 
         c.trustThisDevice(email, password)
-        val firstId = store.load(email)!!.wrapId
+        val firstId = store.wrapId(email)!!
         c.trustThisDevice(email, password)
-        val secondId = store.load(email)!!.wrapId
+        val secondId = store.wrapId(email)!!
 
         assertNotEquals(firstId, secondId, "re-trust mints a new wrap id")
         assertFalse(d.hasWrapId(firstId), "the prior DEVICE wrap was deleted")
@@ -123,23 +123,23 @@ class TrustDeviceTest {
     @Test fun untrustRemovesWrapAndRecord() {
         val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
         start(d)
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
         val c = floorUnlock(store)
         c.trustThisDevice(email, password)
 
         c.untrustThisDevice(email)
-        assertFalse(store.isTrusted(email))
+        assertFalse((store.currentLevel(email) == DeviceLevel.ONLY_PASSWORD))
         assertFalse(d.hasWrap("DEVICE"), "the DEVICE wrap was removed server-side")
     }
 
     @Test fun trustOverCapThrowsTooManyDevices() {
         val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()).apply { conflictOnAdd = true }
         start(d)
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
         val c = floorUnlock(store)
 
         assertFailsWith<VeyqError.TooManyDevices> { c.trustThisDevice(email, password) }
-        assertFalse(store.isTrusted(email), "no local record when the server rejected the wrap")
+        assertFalse((store.currentLevel(email) == DeviceLevel.ONLY_PASSWORD), "no local record when the server rejected the wrap")
     }
 
     @Test fun enrolRollsBackServerWrapOnCommitFailure() {
@@ -154,7 +154,7 @@ class TrustDeviceTest {
     @Test fun deviceUnlock401RefreshesThenUnlocks() {
         val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
         start(d)
-        val store = InMemoryDeviceTrustStore()
+        val store = InMemoryDeviceSecurityStore()
         floorUnlock(store).trustThisDevice(email, password)
 
         d.failKeyMaterialOnce = true
@@ -164,12 +164,16 @@ class TrustDeviceTest {
     }
 
     /** A store whose commit always fails — to exercise the enrol rollback. */
-    private class FailingCommitStore : DeviceTrustStore {
+    private class FailingCommitStore : DeviceSecurityStore {
         private val factor = ByteArray(32) { (it + 1).toByte() }
-        override fun isTrusted(email: String) = false
-        override fun load(email: String): TrustRecord? = null
+        override fun currentLevel(email: String): DeviceLevel? = null
+        override fun wrapId(email: String): String? = null
+        override fun refreshToken(email: String): String? = null
+        override fun updateRefreshToken(email: String, token: String?) {}
         override fun beginEnrol(email: String) = factor
-        override fun commitWrapId(email: String, wrapId: String) = throw RuntimeException("commit failed")
+        override fun deviceFactor(email: String): ByteArray? = factor
+        override fun commitOnlyPassword(email: String, wrapId: String) = throw RuntimeException("commit failed")
+        override fun commitPasswordless(email: String, level: DeviceLevel, wrapId: String, refreshToken: String) {}
         override fun clear(email: String) {}
     }
 

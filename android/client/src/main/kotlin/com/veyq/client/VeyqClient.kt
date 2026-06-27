@@ -35,7 +35,7 @@ class VeyqClient(
     val session: Session = Session(),
     val vault: Vault = Vault(),
     client: OkHttpClient = defaultClient(session),
-    private val deviceTrust: DeviceTrustStore = DisabledDeviceTrustStore,
+    private val deviceSecurity: DeviceSecurityStore = DisabledDeviceSecurityStore,
 ) {
     private val setup = SetupApi(instance.baseUrl, client)
     private val login = LoginApi(instance.baseUrl, client)
@@ -144,7 +144,7 @@ class VeyqClient(
 
     /** Whether this device is at the "only password" level (an L1 DEVICE wrap is enrolled → the login-fold
      *  can unlock with just the password). */
-    fun isTrusted(email: String): Boolean = deviceTrust.isTrusted(email)
+    fun isTrusted(email: String): Boolean = deviceSecurity.currentLevel(email) == DeviceLevel.ONLY_PASSWORD
 
     /**
      * Routine unlock on a trusted device: open the Master Key from this device's DEVICE wrap with **only
@@ -154,14 +154,16 @@ class VeyqClient(
      * a blind operator must not be able to withhold the wrap to force a wipe.
      */
     fun unlockWithDevice(email: String, password: String): Boolean {
-        val record = deviceTrust.load(email) ?: return false
+        if (deviceSecurity.currentLevel(email) != DeviceLevel.ONLY_PASSWORD) return false
+        val wrapId = deviceSecurity.wrapId(email) ?: return false
+        val deviceFactor = deviceSecurity.deviceFactor(email) ?: return false
         val material = withRefresh { fetchKeyMaterial() }
-        val wrap = material.wraps.firstOrNull { it.id == record.wrapId && it.method == MasterKeyWrap.Method.DEVICE }
+        val wrap = material.wraps.firstOrNull { it.id == wrapId && it.method == MasterKeyWrap.Method.DEVICE }
             ?: return false
         val kdfParams = wrap.kdfParams ?: return false
 
         val (params, salt) = V1.decodeKdfParams(b64decode(kdfParams))
-        val kek = V1.kekDevicePassword(record.deviceFactor, password, salt, params)
+        val kek = V1.kekDevicePassword(deviceFactor, password, salt, params)
         try {
             val masterKey = V1.symUnwrap(kek, b64decode(wrap.wrappedKey), "master-key")
             val identityPrivate = V1.symUnwrap(masterKey, b64decode(material.wrappedIdentityPrivateKey), "identity-priv")
@@ -182,11 +184,11 @@ class VeyqClient(
     fun trustThisDevice(email: String, password: String) {
         val masterKey = vault.masterKey() ?: throw VeyqError.UnlockUnavailable
 
-        deviceTrust.load(email)?.let { prior ->
-            runCatching { withRefresh { deleteWrap(prior.wrapId) } }   // re-trust replaces
+        deviceSecurity.wrapId(email)?.let { priorId ->
+            runCatching { withRefresh { deleteWrap(priorId) } }   // re-trust replaces
         }
 
-        val deviceFactor = deviceTrust.beginEnrol(email)
+        val deviceFactor = deviceSecurity.beginEnrol(email)
         val salt = randomBytes(16)
         val kek = V1.kekDevicePassword(deviceFactor, password, salt, V1.ARGON)
         val wrappedKey = V1.symWrap(kek, masterKey, "master-key", randomBytes(12))
@@ -194,7 +196,7 @@ class VeyqClient(
 
         val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode(kdfParams)) }
         try {
-            deviceTrust.commitWrapId(email, wrapId)
+            deviceSecurity.commitOnlyPassword(email, wrapId)
         } catch (e: Exception) {
             runCatching { withRefresh { deleteWrap(wrapId) } }   // rollback — no orphan
             throw VeyqError.TrustFailed
@@ -206,8 +208,8 @@ class VeyqClient(
      * the local key + wrap id. Other devices keep their own wraps; the floor is never removable.
      */
     fun untrustThisDevice(email: String) {
-        deviceTrust.load(email)?.let { runCatching { withRefresh { deleteWrap(it.wrapId) } } }
-        deviceTrust.clear(email)
+        deviceSecurity.wrapId(email)?.let { id -> runCatching { withRefresh { deleteWrap(id) } } }
+        deviceSecurity.clear(email)
     }
 
     /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates
