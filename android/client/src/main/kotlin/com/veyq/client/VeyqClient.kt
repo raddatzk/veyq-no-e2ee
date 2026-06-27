@@ -335,6 +335,22 @@ class VeyqClient(
         return true
     }
 
+    /**
+     * App-launch auto-restore for a passwordless device (L2/L3) — the data-layer half of the single-prompt
+     * launch flow (ADR 0011, docs/decisions/0011-uniform-passwordless-unlock-orchestration.md).
+     * `:app` releases the device key [k] **once** (one biometric gesture for L2, an ungated read for L3) and
+     * hands the **same** bytes here; this resumes the persisted session and opens the vault, and **neither
+     * step prompts** — so the single prompt is an `:app` property, identical to Apple's `autoRestore`.
+     * Returns `false` (caller falls back to the floor) when there is no passwordless record, the token is
+     * dead, or the wrap is unusable.
+     */
+    fun autoRestore(email: String, k: ByteArray): Boolean {
+        val level = deviceSecurity.currentLevel(email)
+        if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) return false
+        if (!resumeSession(email, k)) return false
+        return unlockWithKey(email, k)
+    }
+
     /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates
      *  and retries), 409 → [VeyqError.TooManyDevices], 400 → [VeyqError.InvalidRequest]. */
     private fun addDeviceWrap(wrappedKey: String, kdfParams: String): String = try {

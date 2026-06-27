@@ -240,6 +240,34 @@ class TrustDeviceTest {
         assertFalse(c.unlockWithKey(email, deviceK), "the K-path must not open an L1 wrap")
     }
 
+    @Test fun autoRestoreResumesAndOpensFromSuppliedKey() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceSecurityStore()
+        floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.BIOMETRIC, deviceK)
+
+        // :app would release K once (one biometric) and hand it in; autoRestore resumes + opens, no prompt.
+        val c2 = makeClient(store)
+        assertTrue(c2.autoRestore(email, deviceK), "autoRestore resumed the session + opened the vault from the supplied K")
+        assertContentEquals(masterKey, c2.vault.masterKey(), "autoRestore recovered the Master Key")
+    }
+
+    @Test fun autoRestoreRejectsAnL1Record() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceSecurityStore()
+        val c = floorUnlock(store)
+        c.trustThisDevice(email, password)   // L1 — not a passwordless record
+        assertFalse(c.autoRestore(email, deviceK), "autoRestore must not run on an L1 record")
+    }
+
+    @Test fun autoRestoreWithDeadTokenReturnsFalse() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceSecurityStore()
+        floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
+        d.failRefresh = true
+        assertFalse(makeClient(store).autoRestore(email, deviceK), "a dead token resumes nothing → floor")
+    }
+
     @Test fun resumeSessionWithNoRecordReturnsFalse() {
         start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
         assertFalse(makeClient(InMemoryDeviceSecurityStore()).resumeSession(email, deviceK))

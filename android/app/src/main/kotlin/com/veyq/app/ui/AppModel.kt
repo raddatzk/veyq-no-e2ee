@@ -215,8 +215,16 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 }
                 else -> return run { phase = Phase.SIGN_IN }
             }
-            if (!withContext(Dispatchers.IO) { client.resumeSession(acct, k) }) { launchPrefs.clear(); phase = Phase.CONNECT; return }
-            phase = if (withContext(Dispatchers.IO) { client.unlockWithKey(acct, k) }) Phase.HOME else Phase.SIGN_IN
+            // autoRestore (cr-0024 / ADR 0011): resume the session + open the vault from the one K just
+            // released above — neither step prompts (the single biometric gesture already happened). Mirrors
+            // Apple's bootstrap. On failure: if the device record is gone → reconnect; otherwise the floor can
+            // re-auth (but needs a password we don't hold here) → sign-in.
+            val restored = withContext(Dispatchers.IO) { client.autoRestore(acct, k) }
+            phase = when {
+                restored -> Phase.HOME
+                withContext(Dispatchers.IO) { client.currentLevel(acct) } == null -> Phase.CONNECT
+                else -> Phase.SIGN_IN
+            }
         } catch (e: Exception) {
             phase = Phase.SIGN_IN
         }

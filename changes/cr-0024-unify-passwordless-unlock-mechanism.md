@@ -47,7 +47,7 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
 | backend / http | unchanged (client-only) | **N/A** |
 | web | data layer already prompt-free; no persisted session | **N/A** (conformant) |
 | apple | `K` released in `AppModel`; data layer prompt-free; `resumeSession`/`unlockWithDeviceKey`/`autoRestore` take `K` | ◻ |
-| android | add `autoRestore(email, K)` to `:client`; `bootstrap` calls it (already passes `K` in) | ◻ |
+| android | add `autoRestore(email, K)` to `:client`; `bootstrap` calls it (already passes `K` in) | ✅ (phase 2) |
 | windows / linux | implement against the concept doc | ◻ (no UI head yet) |
 
 ## Phases
@@ -57,12 +57,13 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
   [platform-parity](../docs/crosscutting/platform-parity.md), [account-key-model](../docs/crosscutting/account-key-model.md),
   and the L2/L3 + chooser use-cases. **Done:** docs exist, links resolve, the mechanism matches the agreed
   layering.
-- [ ] **2 — android (make the surface identical).** Add `autoRestore(email, k: ByteArray)` to `:client`
-  `VeyqClient` (consolidates `resumeSession(k)` + `unlockWithKey(k)`; same semantics as today's `bootstrap`
-  sequence, returns `false` → floor). Switch `:app` `AppModel.bootstrap` to call it after releasing `K`. Add
-  a `:client` unit test asserting `autoRestore` resumes + opens from a single supplied `K`. **Done when:**
-  `:crypto:test` + `:client:test` + `:app:assembleDebug` `BUILD SUCCESSFUL`; `bootstrap` no longer inlines
-  the resume+unlock pair.
+- [x] **2 — android (make the surface identical).** Added `autoRestore(email, k: ByteArray)` to `:client`
+  `VeyqClient` (level guard + `resumeSession(k)` + `unlockWithKey(k)`; returns `false` → floor). `:app`
+  `AppModel.bootstrap` now calls it after releasing `K`, with the same fallback as Apple (record gone →
+  connect; else → sign-in). Added 3 `:client` tests (`autoRestoreResumesAndOpensFromSuppliedKey`,
+  `autoRestoreRejectsAnL1Record`, `autoRestoreWithDeadTokenReturnsFalse`). **Done:** `:crypto:test` +
+  `:client:test` + `:app:assembleDebug` `BUILD SUCCESSFUL`; `bootstrap` no longer inlines the resume+unlock
+  pair.
 - [ ] **3 — apple (move the gate to the app layer).** Change `VeyqClient` so the data layer is **prompt-free**:
   `resumeSession`/`unlockWithDeviceKey`/`autoRestore` take `K: Data`; remove the gated-secret read from the
   data layer's responsibility (keep the **ungated** meta read for level/wrapId/sealed token). Move the
