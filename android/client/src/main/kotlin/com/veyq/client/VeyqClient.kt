@@ -76,7 +76,7 @@ class VeyqClient(
                 else -> VeyqError.UnexpectedStatus(e.statusCode)
             }
         }
-        session.set(issued.accessToken, issued.refreshToken, issued.family.id.toString())
+        session.set(issued.accessToken, issued.refreshToken, issued.family.id.toString(), account = email)
     }
 
     /**
@@ -88,9 +88,20 @@ class VeyqClient(
         try {
             val pair = token.refreshSession(RefreshRequest(refreshToken = refreshToken))
             session.set(pair.accessToken, pair.refreshToken)
+            persistRotatedTokenIfPasswordless()
         } catch (e: Exception) {
             session.clear()
             throw VeyqError.RefreshRejected
+        }
+    }
+
+    /** Keep the persisted refresh token in sync after a rotation for an L2/L3 device — so the next app
+     *  launch resumes with a live token. Prompt-free (the token is in the ungated meta). No-op for L0/L1. */
+    private fun persistRotatedTokenIfPasswordless() {
+        val account = session.account ?: return
+        val level = deviceSecurity.currentLevel(account)
+        if (level == DeviceLevel.BIOMETRIC || level == DeviceLevel.NO_LOGIN) {
+            deviceSecurity.updateRefreshToken(account, session.refreshToken)
         }
     }
 
@@ -210,6 +221,76 @@ class VeyqClient(
     fun untrustThisDevice(email: String) {
         deviceSecurity.wrapId(email)?.let { id -> runCatching { withRefresh { deleteWrap(id) } } }
         deviceSecurity.clear(email)
+    }
+
+    // --- Passwordless levels (cr-0022, L2 biometric / L3 no-login; uc.account.{biometric,auto}-unlock) ---
+    // The biometric flow + the random key K live in :app (BiometricPrompt is Activity-bound + async); these
+    // take/return K as plain bytes and never touch the platform gate.
+
+    /** The device's current unlock level (no biometric prompt — read from the meta). */
+    fun currentLevel(email: String): DeviceLevel? = deviceSecurity.currentLevel(email)
+
+    /**
+     * Set this device to a **passwordless** level (L2/L3): wrap the already-unlocked Master Key under a
+     * caller-supplied random key `K` (`symWrap(K, masterKey)`, stored method=DEVICE — no contract change),
+     * and persist `{level, wrapId, current refresh token}`. **Replaces** any prior convenience wrap. `:app`
+     * stores `K` itself (biometric-gated for L2, ungated for L3). Rolls back the server wrap on a commit
+     * failure. Needs an unlocked vault + a live session (the persisted token resumes it without a password).
+     */
+    fun setPasswordlessLevel(email: String, level: DeviceLevel, k: ByteArray) {
+        require(level == DeviceLevel.BIOMETRIC || level == DeviceLevel.NO_LOGIN) { "setPasswordlessLevel is L2/L3 only" }
+        val masterKey = vault.masterKey() ?: throw VeyqError.UnlockUnavailable
+        val refreshToken = session.refreshToken ?: throw VeyqError.NoSession
+
+        deviceSecurity.wrapId(email)?.let { priorId -> runCatching { withRefresh { deleteWrap(priorId) } } }
+
+        val wrappedKey = V1.symWrap(k, masterKey, "master-key", randomBytes(12))
+        val wrapId = withRefresh { addDeviceWrap(b64encode(wrappedKey), b64encode("v1/device-key".toByteArray())) }
+        try {
+            deviceSecurity.commitPasswordless(email, level, wrapId, refreshToken)
+        } catch (e: Exception) {
+            runCatching { withRefresh { deleteWrap(wrapId) } }   // rollback — no orphan
+            throw VeyqError.TrustFailed
+        }
+    }
+
+    /**
+     * Resume a persisted session for a passwordless device: read the stored refresh token (no biometric —
+     * it is in the ungated meta), install it, and rotate to a live session. Returns `false` when there is
+     * no persisted token, or `false` (not throw) when the token is dead — the caller falls back to the floor.
+     */
+    fun resumeSession(email: String): Boolean {
+        val token = deviceSecurity.refreshToken(email) ?: return false
+        session.set("", token, account = email)
+        return try {
+            refresh()   // rotates to live tokens + persists the new refresh token
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Open the Master Key from this device's **K-wrap** (L2/L3) — `K` *is* the KEK, used directly (no
+     * password, no Argon2id). `:app` supplies `k` (decrypted via BiometricPrompt for L2, read ungated for
+     * L3). Returns `false` when unavailable (no passwordless level / no matching wrap → floor, **without**
+     * self-wiping); throws [VeyqError.UnlockFailed] on an AEAD mismatch.
+     */
+    fun unlockWithKey(email: String, k: ByteArray): Boolean {
+        val level = deviceSecurity.currentLevel(email)
+        if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) return false
+        val wrapId = deviceSecurity.wrapId(email) ?: return false
+        val material = withRefresh { fetchKeyMaterial() }
+        val wrap = material.wraps.firstOrNull { it.id == wrapId && it.method == MasterKeyWrap.Method.DEVICE }
+            ?: return false
+        try {
+            val masterKey = V1.symUnwrap(k, b64decode(wrap.wrappedKey), "master-key")
+            val identityPrivate = V1.symUnwrap(masterKey, b64decode(material.wrappedIdentityPrivateKey), "identity-priv")
+            vault.open(masterKey, identityPrivate)
+        } catch (e: Exception) {
+            throw VeyqError.UnlockFailed
+        }
+        return true
     }
 
     /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates

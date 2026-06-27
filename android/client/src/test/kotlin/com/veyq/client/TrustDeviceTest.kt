@@ -163,6 +163,80 @@ class TrustDeviceTest {
         assertEquals("access-2", c2.session.accessToken, "withRefresh rotated the session before the retry")
     }
 
+    // --- cr-0022 L2/L3 (passwordless) orchestration ---
+
+    private val deviceK = ByteArray(32) { (0x70 + it).toByte() }
+
+    private fun enrolResumeUnlock(level: DeviceLevel) {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceSecurityStore()
+
+        floorUnlock(store).setPasswordlessLevel(email, level, deviceK)
+        assertEquals(level, store.currentLevel(email))
+        assertTrue(d.hasWrap("DEVICE"), "a K-wrap was stored ($level)")
+
+        val c2 = makeClient(store)
+        assertTrue(c2.resumeSession(email), "the persisted token resumed the session ($level)")
+        assertTrue(c2.unlockWithKey(email, deviceK), "the device key opened the vault ($level)")
+        assertContentEquals(masterKey, c2.vault.masterKey(), "the K-wrap recovered the Master Key ($level)")
+    }
+
+    @Test fun biometricEnrolResumeUnlockRoundTrip() = enrolResumeUnlock(DeviceLevel.BIOMETRIC)
+
+    @Test fun noLoginEnrolResumeUnlockRoundTrip() = enrolResumeUnlock(DeviceLevel.NO_LOGIN)
+
+    @Test fun resumeRotatesAndPersistsTheNewToken() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceSecurityStore()
+        floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
+        assertEquals("refresh-1", store.refreshToken(email), "enrol persisted the live token")
+
+        makeClient(store).resumeSession(email)
+        assertEquals("refresh-2", store.refreshToken(email), "the rotated refresh token was persisted back")
+    }
+
+    @Test fun levelSwitchReplacesTheConvenienceWrap() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceSecurityStore()
+        val c = floorUnlock(store)
+        c.setPasswordlessLevel(email, DeviceLevel.BIOMETRIC, deviceK)
+        c.setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
+        assertEquals(DeviceLevel.NO_LOGIN, store.currentLevel(email))
+        assertEquals(1, d.wrapCount("DEVICE"), "one convenience wrap at a time")
+    }
+
+    @Test fun unlockWithKeyRejectsAnL1Record() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        val store = InMemoryDeviceSecurityStore()
+        val c = floorUnlock(store)
+        c.trustThisDevice(email, password)   // L1
+        assertFalse(c.unlockWithKey(email, deviceK), "the K-path must not open an L1 wrap")
+    }
+
+    @Test fun resumeSessionWithNoRecordReturnsFalse() {
+        start(WrapsDispatcher(floorWrapJson(), wrappedIdentityB64()))
+        assertFalse(makeClient(InMemoryDeviceSecurityStore()).resumeSession(email))
+    }
+
+    @Test fun resumeSessionWithDeadTokenFallsBack() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val store = InMemoryDeviceSecurityStore()
+        floorUnlock(store).setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, deviceK)
+        d.failRefresh = true
+        assertFalse(makeClient(store).resumeSession(email), "a dead token resumes nothing → floor")
+    }
+
+    @Test fun passwordlessEnrolRollsBackOnCommitFailure() {
+        val d = WrapsDispatcher(floorWrapJson(), wrappedIdentityB64())
+        start(d)
+        val c = floorUnlock(FailingCommitStore())
+        assertFailsWith<VeyqError.TrustFailed> { c.setPasswordlessLevel(email, DeviceLevel.BIOMETRIC, deviceK) }
+        assertFalse(d.hasWrap("DEVICE"), "the server wrap was rolled back — no orphan")
+    }
+
     /** A store whose commit always fails — to exercise the enrol rollback. */
     private class FailingCommitStore : DeviceSecurityStore {
         private val factor = ByteArray(32) { (it + 1).toByte() }
@@ -173,7 +247,8 @@ class TrustDeviceTest {
         override fun beginEnrol(email: String) = factor
         override fun deviceFactor(email: String): ByteArray? = factor
         override fun commitOnlyPassword(email: String, wrapId: String) = throw RuntimeException("commit failed")
-        override fun commitPasswordless(email: String, level: DeviceLevel, wrapId: String, refreshToken: String) {}
+        override fun commitPasswordless(email: String, level: DeviceLevel, wrapId: String, refreshToken: String) =
+            throw RuntimeException("commit failed")
         override fun clear(email: String) {}
     }
 
@@ -185,6 +260,7 @@ class TrustDeviceTest {
         private val keyMaterialCalls = AtomicInteger(0)
         var conflictOnAdd = false
         @Volatile var failKeyMaterialOnce = false
+        @Volatile var failRefresh = false
 
         @Synchronized fun hasWrap(method: String) = wraps.any { """"method":"$method"""".toRegex().containsMatchIn(it) }
         @Synchronized fun hasWrapId(id: String) = wraps.any { """"id":"$id"""".toRegex().containsMatchIn(it) }
@@ -213,7 +289,10 @@ class TrustDeviceTest {
                 synchronized(this) { wraps.removeAll { """"id":"$id"""".toRegex().containsMatchIn(it) } }
                 return MockResponse().setResponseCode(204)
             }
-            if (path == "/api/token/refresh") return json(200, """{"accessToken":"access-2","refreshToken":"refresh-2"}""")
+            if (path == "/api/token/refresh") {
+                if (failRefresh) return json(401, """{"code":"refresh_rejected"}""")
+                return json(200, """{"accessToken":"access-2","refreshToken":"refresh-2"}""")
+            }
             if (path == "/api/logout") return MockResponse().setResponseCode(204)
             return MockResponse().setResponseCode(404)
         }

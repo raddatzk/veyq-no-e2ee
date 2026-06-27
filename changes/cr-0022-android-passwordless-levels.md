@@ -82,10 +82,15 @@ passwordless rows in the cr-0021 chooser.
   L2/L3 gated-K storage lands in phase 3). Test double + tests renamed. **Done:** `:client:test`
   `DeviceSecurityStoreTest` 6/6 + `TrustDeviceTest` 9/9 (37 total, 1 live skip); `:app:assembleDebug`
   `BUILD SUCCESSFUL`.
-- [ ] **2 — orchestration + unit tests.** `:client` `VeyqClient`: `unlockWithKey(email, k)`,
-  `resumeSession(email)` (+ rotation persist-back), `setPasswordlessWrap(email, masterKey, k): wrapId`,
-  `currentLevel`. **Check:** `:client:test` — enrol a K-wrap → resume + unlockWithKey round-trip (in-memory
-  store + MockWebServer); rotation persists; missing wrap → false; dead token → false.
+- [x] **2 — orchestration + unit tests.** `:client` `VeyqClient`: `currentLevel(email)`,
+  `setPasswordlessLevel(email, level, k)` (symWrap(k, masterKey) → POST method=DEVICE + marker kdfParams →
+  `commitPasswordless`; replaces any prior convenience wrap; rollback-DELETE + `TrustFailed` on commit
+  failure), `unlockWithKey(email, k)` (K is the KEK directly), `resumeSession(email)` (read persisted token
+  → `refresh()`), and `refresh()` now **persists the rotated token** for an L2/L3 device (added
+  `Session.account`). `:app` supplies/decrypts K (phase 3). **Done:** `:client:test` 45 (1 live skip) —
+  `TrustDeviceTest` 16 (the 7 new L2/L3: biometric/no-login enrol → resume + device-key unlock; rotation
+  persists; level switch swaps the one wrap; L1 rejected by the K-path; no-record/dead-token → false;
+  commit rollback).
 - [ ] **3 — `:app` biometric + auto-restore + chooser.** `:app`: BiometricPrompt + CryptoObject K
   decryption, the enrol wiring (L2/L3 from the floor chooser), app-launch auto-restore (L3 silent / L2
   biometric), chooser L2/L3 activation (BiometricManager gate), untrust/level-switch. **Check:**

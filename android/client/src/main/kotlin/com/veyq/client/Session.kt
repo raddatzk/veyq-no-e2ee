@@ -22,18 +22,25 @@ class Session {
     var familyId: String? = null
         private set
 
+    /** The signed-in account email — set at login/resume, kept across refreshes. Lets [VeyqClient.refresh]
+     *  persist the rotated refresh token to the right account for a passwordless device (cr-0022). */
+    @Volatile
+    var account: String? = null
+        private set
+
     /** True once a login has stored an access token. */
     val isAuthenticated: Boolean get() = accessToken != null
 
     /**
-     * Store the tokens from a login or a rotation. [familyId] is set at login and preserved across
-     * refreshes (a refresh call passes `null`, mirroring web/Apple).
+     * Store the tokens from a login or a rotation. [familyId] + [account] are set at login/resume and
+     * preserved across refreshes (a refresh call passes `null` for both, mirroring web/Apple).
      */
     @Synchronized
-    fun set(access: String, refresh: String, familyId: String? = null) {
+    fun set(access: String, refresh: String, familyId: String? = null, account: String? = null) {
         accessToken = access
         refreshToken = refresh
         if (familyId != null) this.familyId = familyId
+        if (account != null) this.account = account
     }
 
     /** Drop the session (logout / refresh rejected). */
@@ -42,5 +49,6 @@ class Session {
         accessToken = null
         refreshToken = null
         familyId = null
+        account = null
     }
 }
