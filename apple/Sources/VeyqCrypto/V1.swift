@@ -7,6 +7,10 @@ import Sodium
 /// (ML-KEM-768) and content-side primitives are deferred to the first scope/content slice.
 public enum V1 {
 
+    /// A wrapped blob / kdfParams from the (untrusted, operator-blind) server was too short to parse. Thrown
+    /// instead of trapping on an out-of-range slice, so a malicious/buggy operator can't crash the client.
+    public enum V1Error: Error { case malformed }
+
     public struct ArgonParams: Sendable {
         public let t: Int
         public let m: Int
@@ -58,6 +62,7 @@ public enum V1 {
 
     /// AES-256-GCM open of a ciphertext ‖ tag blob (tag = last 16 bytes).
     public static func aeadOpen(key: Data, nonce: Data, ciphertextAndTag: Data, aad: Data) throws -> Data {
+        guard ciphertextAndTag.count >= 16 else { throw V1Error.malformed }
         let ct = ciphertextAndTag.prefix(ciphertextAndTag.count - 16)
         let tag = ciphertextAndTag.suffix(16)
         let box = try AES.GCM.SealedBox(nonce: try AES.GCM.Nonce(data: nonce), ciphertext: ct, tag: tag)
@@ -85,7 +90,8 @@ public enum V1 {
         u32be(p.t) + u32be(p.m) + u32be(p.p) + u32be(p.dkLen) + salt
     }
 
-    public static func decodeKdfParams(_ b: Data) -> (params: ArgonParams, salt: Data) {
+    public static func decodeKdfParams(_ b: Data) throws -> (params: ArgonParams, salt: Data) {
+        guard b.count >= 16 else { throw V1Error.malformed }
         func be(_ off: Int) -> Int {
             let s = b.startIndex + off
             return (Int(b[s]) << 24) | (Int(b[s + 1]) << 16) | (Int(b[s + 2]) << 8) | Int(b[s + 3])
@@ -121,6 +127,8 @@ public enum V1 {
     }
 
     public static func symUnwrap(kek: Data, blob: Data, context: String) throws -> Data {
+        // 1 type byte + 12 nonce + at least a 16-byte tag; shorter is a malformed/hostile blob, not ours.
+        guard blob.count >= 1 + 12 + 16 else { throw V1Error.malformed }
         let nonce = blob.subdata(in: blob.startIndex + 1 ..< blob.startIndex + 13)
         let body = blob.suffix(from: blob.startIndex + 13)
         return try aeadOpen(key: kek, nonce: nonce, ciphertextAndTag: body, aad: wrapAad(symType, context))

@@ -46,11 +46,18 @@ struct DeviceSecurityChooser: View {
     @Binding var selection: DeviceUnlockLevel?
     /// Whether Face ID / Touch ID is enrolled on this device — L2 is offered only when true (ADR 0005 §10).
     var biometricAvailable: Bool = true
+    /// Whether a device passcode/lock screen is set — L3 stores K with no auth gate, so the lock screen is its
+    /// only barrier; without one, `WhenUnlockedThisDeviceOnly` degrades to always-readable, so L3 is hidden.
+    var passcodeSet: Bool = true
 
-    /// L2 needs biometric hardware enrolled; the rest are always offerable (L3 is gated by a confirmation
-    /// + a device passcode at enrol time).
+    /// L2 needs biometric hardware enrolled; L3 needs a device passcode (it has no other barrier); L0/L1 are
+    /// always offerable.
     private func available(_ level: DeviceUnlockLevel) -> Bool {
-        level != .biometric || biometricAvailable
+        switch level {
+        case .biometric: return biometricAvailable
+        case .noLogin: return passcodeSet
+        default: return true
+        }
     }
 
     var body: some View {

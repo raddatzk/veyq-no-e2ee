@@ -135,7 +135,7 @@ public final class VeyqClient: Sendable {
         let trimmed = secretKeyB64.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let secretKey = Data(base64Encoded: trimmed) else { throw VeyqError.invalidSecretKey }
 
-        let decoded = V1.decodeKdfParams(Data(kdfParams.data))
+        let decoded = try V1.decodeKdfParams(Data(kdfParams.data))
         let kek = V1.kekPasswordSecret(
             secretKey: secretKey, password: password, salt: decoded.salt, params: decoded.params
         )
@@ -173,7 +173,7 @@ public final class VeyqClient: Sendable {
               let kdfParams = wrap.kdfParams
         else { return false }
 
-        let decoded = V1.decodeKdfParams(Data(kdfParams.data))
+        let decoded = try V1.decodeKdfParams(Data(kdfParams.data))
         let kek = V1.kekDevicePassword(
             deviceFactor: record.secret, password: password, salt: decoded.salt, params: decoded.params
         )

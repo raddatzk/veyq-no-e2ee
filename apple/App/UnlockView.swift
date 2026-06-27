@@ -27,6 +27,12 @@ struct UnlockView: View {
         LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
     }
 
+    /// A device passcode / lock screen is set → the L3 ("open straight in") row is offered. `.deviceOwner`
+    /// authentication is available exactly when a passcode (or biometric) exists, which is what L3 relies on.
+    private var passcodeSet: Bool {
+        LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
+    }
+
     var body: some View {
         content.onAppear(perform: prefill)
     }
@@ -39,7 +45,7 @@ struct UnlockView: View {
                 KitImportBar(label: "Import your Emergency Kit to fill the Secret Key",
                              onUpload: { importingKit = true }, onScan: { scanningKit = true })
                 Divider().overlay(VeyqStyle.line)
-                DeviceSecurityChooser(selection: $level, biometricAvailable: biometricAvailable)
+                DeviceSecurityChooser(selection: $level, biometricAvailable: biometricAvailable, passcodeSet: passcodeSet)
                 PrimaryButton(title: "Unlock", busy: busy, disabled: !canSubmit) { submit() }
                 Button("Use a different instance") { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).buttonStyle(.plain)

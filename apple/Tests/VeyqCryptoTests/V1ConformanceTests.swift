@@ -59,7 +59,7 @@ final class V1ConformanceTests: XCTestCase {
         let p = params(v)
         let encoded = V1.encodeKdfParams(p, salt: hex(v["salt"]))
         XCTAssertEqual(encoded, hex(v["encoded"]))
-        let (dp, salt) = V1.decodeKdfParams(encoded)
+        let (dp, salt) = try V1.decodeKdfParams(encoded)
         XCTAssertEqual([dp.t, dp.m, dp.p, dp.dkLen], [p.t, p.m, p.p, p.dkLen])
         XCTAssertEqual(salt, hex(v["salt"]))
     }

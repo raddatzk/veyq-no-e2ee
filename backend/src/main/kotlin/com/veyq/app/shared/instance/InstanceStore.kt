@@ -23,7 +23,7 @@ class InstanceStore {
     @Transactional
     fun seedOnStartup(@Observes ev: StartupEvent) {
         if (VeyqInstance.findById(VeyqInstance.SINGLETON_ID) == null) {
-            val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+            val salt = ByteArray(32).also { SecureRandom().nextBytes(it) }
             VeyqInstance().apply {
                 id = VeyqInstance.SINGLETON_ID
                 instanceSalt = Base64.getEncoder().encodeToString(salt)

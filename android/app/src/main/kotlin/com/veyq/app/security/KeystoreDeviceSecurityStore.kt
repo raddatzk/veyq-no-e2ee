@@ -3,6 +3,7 @@ package com.veyq.app.security
 import android.content.Context
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import com.veyq.client.DeviceLevel
@@ -19,8 +20,9 @@ import javax.crypto.spec.GCMParameterSpec
  * Android Keystore-backed [DeviceSecurityStore] (cr-0021 L1; cr-0022 L2/L3). L1's `deviceFactor` is derived
  * from a **non-extractable AndroidKeyStore HMAC-SHA256 key** (StrongBox where available) signing a fixed
  * constant — the web-parity backing (the key bytes never enter the heap). Only the level / wrapId / refresh
- * token are persisted in private `SharedPreferences`; the L2/L3 random key `K` storage (biometric-gated
- * Keystore-AES for L2, EncryptedSharedPreferences for L3) is added in cr-0022 phase 3.
+ * token are persisted in private `SharedPreferences`; the L2/L3 random key `K` is stored as ciphertext
+ * (never in the clear) under a Keystore-AES key — biometric-gated for L2, ungated-but-`setUnlockedDeviceRequired`
+ * for L3 — added in cr-0022 phase 3. For L3 the screen-lock is the only barrier by design (see [storeKeyUngated]).
  */
 class KeystoreDeviceSecurityStore(context: Context) : DeviceSecurityStore {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -104,9 +106,17 @@ class KeystoreDeviceSecurityStore(context: Context) : DeviceSecurityStore {
     fun decryptCipherL2(email: String): Cipher? {
         val (iv, _) = readCt(email) ?: return null
         val key = existingAesKey(email, gated = true) ?: return null
-        return runCatching {
+        return try {
             Cipher.getInstance(AES_GCM).apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv)) }
-        }.getOrNull()
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            // Biometrics changed since enrolment → this gated key (and the K it protects) is dead. Drop the
+            // stale ciphertext + key so the caller falls back to the floor and a clean re-enrol can follow.
+            prefs.edit().remove(ctKey(email)).apply()
+            runCatching { keystore().deleteEntry(aesAlias(email, gated = true)) }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** L2 unlock — after the biometric authenticates the cipher, decrypt + return K. */
@@ -121,8 +131,16 @@ class KeystoreDeviceSecurityStore(context: Context) : DeviceSecurityStore {
         val b = KeyGenParameterSpec.Builder(aesAlias(email, gated), KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+        // Both keys require the device to be unlocked to decrypt K (API 28+). For L3 (ungated) this is the
+        // ONLY barrier — without it K would be recoverable from prefs on a locked or rooted device.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            b.setUnlockedDeviceRequired(true)
+        }
         if (gated) {
             b.setUserAuthenticationRequired(true)
+            // Adding a new fingerprint/face must invalidate the key, else a freshly enrolled biometric could
+            // unwrap K — defeating the live-owner guarantee the CryptoObject binding is meant to provide.
+            b.setInvalidatedByBiometricEnrollment(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 b.setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
             } else {

@@ -41,6 +41,9 @@ export const ARGON: ArgonParams = { t: 3, m: 32768, p: 1, dkLen: 32 }
 export const encodeKdfParams = (p: ArgonParams, salt: Uint8Array): Uint8Array =>
   concat(u32be(p.t), u32be(p.m), u32be(p.p), u32be(p.dkLen), salt)
 export const decodeKdfParams = (b: Uint8Array): { params: ArgonParams; salt: Uint8Array } => {
+  // The kdfParams come from the untrusted, operator-blind server; a short blob must fail cleanly rather
+  // than throw an opaque DataView RangeError (which a malicious operator could use to crash the client).
+  if (b.length < 16) throw new Error('malformed_kdf_params')
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength)
   return { params: { t: dv.getUint32(0), m: dv.getUint32(4), p: dv.getUint32(8), dkLen: dv.getUint32(12) }, salt: b.slice(16) }
 }

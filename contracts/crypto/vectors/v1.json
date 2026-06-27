@@ -1,6 +1,6 @@
 {
   "suite": "v1",
-  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Most Argon2 vectors use light params (m=8 MiB) for fast conformance; recovery_argon2id_m32768 + share_pw deliberately pin the PRODUCTION param (m=32 MiB) to drift-proof the password-derived KEKs; production uses 64 MiB (see crypto-spec.md). ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
+  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Most Argon2 vectors use light params (m=8 MiB) for fast conformance; recovery_argon2id_m32768 + share_pw deliberately pin the PRODUCTION param (m=32 MiB, t=3 — the value all clients ship in ARGON) to drift-proof the password-derived KEKs and stop the B1-class mismatch (m=65536 vs 32768) recurring. ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
   "primitives": {
     "hkdf_sha256_rfc5869_case1": {
       "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",

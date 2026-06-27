@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import SwiftUI
 import VeyqKit
 
@@ -119,6 +120,12 @@ final class AppModel: ObservableObject {
                 try await client.trustThisDevice(email: email, password: carriedPassword)
                 deviceTrusted = true
             case .biometric, .noLogin:
+                // L3 stores K with no auth gate, so a set passcode is its only at-rest barrier. Enforce it
+                // here too (not just in the chooser UI) so the ungated wrap is never written on a passcode-
+                // less device — where `WhenUnlockedThisDeviceOnly` would degrade to always-readable.
+                if level == .noLogin, !LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) {
+                    throw VeyqError.trustFailed
+                }
                 try await client.setPasswordlessLevel(level == .biometric ? .biometric : .noLogin, email: email)
                 LaunchPrefs.remember(instance: apiBase, account: email)
                 deviceTrusted = true
