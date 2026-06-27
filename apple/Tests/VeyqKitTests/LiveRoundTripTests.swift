@@ -94,4 +94,40 @@ final class LiveRoundTripTests: XCTestCase {
         let openedAfterUntrust = try await c4.unlockWithDevice(email: email, password: password)
         XCTAssertFalse(openedAfterUntrust, "after untrust the device path is unavailable (no record)")
     }
+
+    /// cr-0020 — the **passwordless** (L2/L3) round-trip against the live wraps endpoints. Uses an
+    /// in-memory store (the L2 biometric gate is exercised by the in-app UI round-trip). Validates that the
+    /// backend accepts the K-wrap's marker `kdfParams`, and that a fresh client **resumes the persisted
+    /// session** and opens the vault with **only the device key** (no password). Tested with `.noLogin`
+    /// (the data layer is identical to `.biometric` — only the local Keychain gate differs).
+    func testPasswordlessRoundTripAgainstLiveInstance() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let base = env["VEYQ_LIVE_BASE"], let baseURL = URL(string: base) else {
+            throw XCTSkip("set VEYQ_LIVE_BASE (+ VEYQ_EMAIL/PASSWORD/SECRET) to run the live round-trip")
+        }
+        let email = try XCTUnwrap(env["VEYQ_EMAIL"])
+        let password = try XCTUnwrap(env["VEYQ_PASSWORD"])
+        let secret = try XCTUnwrap(env["VEYQ_SECRET"])
+        let store = InMemoryDeviceSecurityStore()
+
+        // Floor unlock, then set this device to a passwordless level (enrols the K-wrap + persists session).
+        let c1 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
+        try await c1.login(email: email, password: password)
+        try await c1.unlock(password: password, secretKey: secret)
+        try await c1.setPasswordlessLevel(.noLogin, email: email)
+        XCTAssertEqual(store.currentLevel(email: email), .noLogin, "the live POST accepted the K-wrap")
+
+        // A fresh client (new vault + no live session): resume from the persisted token, open with the key.
+        let c2 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
+        let resumed = try await c2.resumeSession(email: email)
+        XCTAssertTrue(resumed, "the persisted refresh token resumed a live session")
+        let opened = try await c2.unlockWithDeviceKey(email: email)
+        XCTAssertTrue(opened, "the device key opened the vault with no password")
+        let mk = await c2.vault.masterKey()
+        XCTAssertEqual(mk?.count, 32)
+
+        // Cleanup — drop the level (delete the wrap, leaving the owner clean for re-runs).
+        try await c2.untrustThisDevice(email: email)
+        XCTAssertNil(store.currentLevel(email: email))
+    }
 }

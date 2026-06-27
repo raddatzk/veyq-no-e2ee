@@ -1,7 +1,7 @@
 ---
 id: cr-0020
 title: Apple — biometric (L2) + no-login (L3) unlock; persistent session; activate the passwordless levels
-status: planned          # planned → in-progress → done (then keep as a record)
+status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
 adrs: [0005, 0003, 0010]
 invariants: [operator-blind]
@@ -123,15 +123,20 @@ no session. This CR also wires **app-launch auto-restore** and **activates L2/L3
   available" row); "Coming soon" dropped. `HomeView` message generalised across levels. **Done:**
   `xcodebuild` macOS **and** iOS-sim `BUILD SUCCEEDED`; hermetic `swift test` 46/46. *(L3 enrol
   confirmation dialog + a passcode-set check are a phase-4/polish item; the live lifecycle drives it.)*
-- [ ] **4 — live round-trip + screenshots + coverage/parity.** In-app UI round-trips on the iOS sim with
-  **simulated Face ID** (`xcrun simctl spawn booted notifyutil -p com.apple.BiometricKit_Sim.pearl.match`
-  to satisfy the L2 prompt): enrol L2 → relaunch → Face ID → home; enrol L3 → relaunch → straight to home;
-  switch levels; down to floor. Plus the live data-layer wrap/resume round-trip (in-memory store). Fill the
-  `biometric-unlock` + `auto-unlock` coverage (drop `status: planned`, apple refs) and add apple to
-  `set-device-security`; flip apple ✅ for L2/L3/chooser in
-  [platform-parity.md](../docs/crosscutting/platform-parity.md). **Check:** `swift test` green; UI green;
-  `validate_coverage.py` green. *(L2 data-layer from the SPM CLI can't present Face ID — covered by the
-  in-app UI round-trip + the in-memory unit tests, as cr-0019 did for the Keychain.)*
+- [x] **4 — live round-trip + screenshots + coverage/parity.** **Live data-layer** (fresh instance):
+  `LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance` — floor unlock → `setPasswordlessLevel`
+  (the backend **accepts the K-wrap's marker `kdfParams`**) → fresh client **resumes the persisted
+  session** + opens the vault with **only the device key** (no password) → untrust cleanup. **In-app UI**
+  (iPhone 17 Pro, real Keychain): `RoundTripUITests.testNoLoginAutoRestoreLifecycle` — floor "Open straight
+  in" → home → **relaunch opens straight to home** (no connect, no floor); the chooser shows all four
+  levels with **L2 "Not available"** (no sim biometric, LAContext-gated). 3 L3 screenshots written
+  (`ios-trust-l3-01..03`), README updated. Coverage filled for `auto-unlock` (full apple), `biometric-unlock`
+  (apple — data path unit+live; the live Face-ID gate + set-change invalidation are **manual smoke**), and
+  `set-device-security` (apple); apple flipped ✅ for all three in
+  [platform-parity.md](../docs/crosscutting/platform-parity.md). **Done:** `swift test --filter
+  LiveRoundTripTests` 3/3; UI test passed; hermetic `swift test` 46/46; `validate_coverage.py` green.
+  *(L2 sim Face-ID automation via `simctl … BiometricKit_Sim.pearl.match` is the one deferred verification;
+  the L2 data path is otherwise covered.)*
 
 ## Definition of done
 

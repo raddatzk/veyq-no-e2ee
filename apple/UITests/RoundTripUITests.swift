@@ -127,6 +127,53 @@ final class RoundTripUITests: XCTestCase {
         shoot(app, shotDir, "trust-05-floor-after-untrust")
     }
 
+    /// cr-0020 — the **L3 "no login" auto-restore** through the real UI + real Keychain: floor unlock at
+    /// "Open straight in" → home → **relaunch opens straight to home** (no connect, no floor). The app must
+    /// be uninstalled before this runs (clean LaunchPrefs + Keychain). Face-ID-gated L2 is a manual smoke.
+    @MainActor
+    func testNoLoginAutoRestoreLifecycle() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let base = env["VEYQ_LIVE_BASE"], let email = env["VEYQ_EMAIL"],
+              let password = env["VEYQ_PASSWORD"], let secret = env["VEYQ_SECRET"],
+              let shotDir = env["VEYQ_SHOT_DIR"]
+        else { throw XCTSkip("set VEYQ_LIVE_BASE/EMAIL/PASSWORD/SECRET/SHOT_DIR to run the UI round-trip") }
+
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_EMAIL"] = email
+        app.launchEnvironment["UITEST_PASSWORD"] = password
+        app.launchEnvironment["UITEST_SECRET"] = secret
+        app.launch()
+
+        // Fresh (uninstalled) → connect → sign in → floor.
+        let url = app.textFields["Instance URL"]
+        XCTAssertTrue(url.waitForExistence(timeout: 15))
+        fill(url, base)
+        app.buttons["Connect"].activate()
+        XCTAssertTrue(app.textFields["Email"].waitForExistence(timeout: 20))
+        app.buttons["Sign in"].activate()
+
+        // Floor → pick "Open straight in" (L3) and unlock.
+        let unlock = app.buttons["Unlock"]
+        XCTAssertTrue(unlock.waitForExistence(timeout: 25), "untrusted device shows the floor")
+        app.buttons["level.noLogin"].activate()
+        shoot(app, shotDir, "trust-l3-01-floor-no-login")
+        unlock.activate()
+        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25))
+        shoot(app, shotDir, "trust-l3-02-home")
+
+        // Relaunch → auto-restore straight to home (no connect screen, no floor).
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25),
+                      "an L3 device opens straight to home on relaunch")
+        XCTAssertFalse(app.textFields["Instance URL"].exists, "no connect screen on auto-restore")
+        XCTAssertFalse(app.buttons["Unlock"].exists, "no Secret-Key floor on auto-restore")
+        shoot(app, shotDir, "trust-l3-03-autorestore")
+
+        // Cleanup so the owner + this device are left clean.
+        app.buttons["Stop trusting this device"].activate()
+    }
+
     /// Wait until an element no longer exists.
     private func waitForGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)

@@ -29,6 +29,21 @@ straight to home** (no floor) → untrust → re-login back to the floor.
 | `ios-trust-04-relogin-fold.png`       | After sign-out + re-login: unlocks straight to home (the DEVICE unlock folds into login) |
 | `ios-trust-05-floor-after-untrust.png`| After untrust + re-login: back to the Secret-Key floor |
 
+## Passwordless levels (cr-0020, L2 biometric / L3 no-login)
+
+The floor's chooser now offers all four levels (cr-0020). On the iOS simulator (no biometric enrolled),
+**Face ID / Touch ID** correctly shows as **"Not available"** (LAContext-gated) and **Open straight in**
+(L3) is selectable. Driven by `RoundTripUITests.testNoLoginAutoRestoreLifecycle`:
+
+| file | screen |
+|------|--------|
+| `ios-trust-l3-01-floor-no-login.png` | Floor — all four levels; L2 "Not available" (no sim biometric), L3 "Open straight in" selected |
+| `ios-trust-l3-02-home.png`           | Unlocked home after enrolling L3 |
+| `ios-trust-l3-03-autorestore.png`    | After app **relaunch**: opens straight to home — no connect, no floor (auto-restore) |
+
+**L2 (Face ID) is a manual smoke** — the live biometric prompt isn't automated on the sim yet
+(`simctl … BiometricKit_Sim.pearl.match`); the L2 *data* path is unit- + live-tested.
+
 ## How they're generated (reproducible)
 
 Captured by the `RoundTripUITests` UI test (`apple/UITests/`), which drives the **real app** against a
