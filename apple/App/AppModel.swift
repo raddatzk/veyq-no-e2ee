@@ -31,6 +31,11 @@ final class AppModel: ObservableObject {
     /// UI surfaces "couldn't trust this device" (cr-0005 #3). Cleared on the next attempt / sign-out.
     @Published var deviceTrustFailed: Bool = false
 
+    /// The Keychain-backed device-security store, **owned by the app layer** (ADR 0011): it holds the native
+    /// secure store + biometric gate, releases the device key `K`, and hands it to the prompt-free data
+    /// layer. Shared (via the same Keychain backing) by every `VeyqClient` this model builds.
+    let deviceSecurity = KeychainDeviceSecurityStore()
+
     /// The data-layer client for the chosen instance. Set on connect, dropped on change-instance.
     private(set) var client: VeyqClient?
 
@@ -48,7 +53,7 @@ final class AppModel: ObservableObject {
               let baseURL = normalizeBaseURL(inst)
         else { phase = .connect; return }
 
-        let client = VeyqClient(instance: VeyqInstance(baseURL: baseURL))
+        let client = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: deviceSecurity)
         guard let level = client.currentLevel(email: acct), level == .biometric || level == .noLogin else {
             phase = .connect; return
         }
@@ -57,14 +62,17 @@ final class AppModel: ObservableObject {
         self.email = acct
         self.deviceTrusted = true
         do {
-            // autoRestore does it in a SINGLE gated read (cr-0023): resume the session + open the vault from
-            // one device-key load — biometric-gated for L2 (one Face ID prompt), free for L3. The persisted
-            // refresh token is sealed under that key, so an unlocked-device attacker can't reuse it.
-            if try await client.autoRestore(email: acct) {
+            // ADR 0011: the **app layer** releases K — the single Face ID / Touch ID gesture for L2 (the
+            // gated Keychain read), free for L3 — then hands it to the prompt-free data layer. The persisted
+            // refresh token is sealed under K, so an unlocked-device attacker can't reuse it.
+            guard let k = try deviceSecurity.releasePasswordlessKey(email: acct) else {
+                phase = .signIn; return   // the gated key is gone → fall back to the floor
+            }
+            if try await client.autoRestore(email: acct, k: k) {
                 phase = .home
             } else {
-                // No usable session/wrap. If the device key itself is gone the record is dead → connect;
-                // otherwise the floor can re-auth (but it needs a password we don't hold) → sign-in.
+                // No usable session/wrap. If the device record is gone it's dead → connect; otherwise the
+                // floor can re-auth (but it needs a password we don't hold) → sign-in.
                 phase = client.currentLevel(email: acct) == nil ? .connect : .signIn
             }
         } catch {
@@ -129,7 +137,12 @@ final class AppModel: ObservableObject {
                 if level == .noLogin, !LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) {
                     throw VeyqError.trustFailed
                 }
-                try await client.setPasswordlessLevel(level == .biometric ? .biometric : .noLogin, email: email)
+                // ADR 0011: the app layer creates + stores K behind the native gate (biometric for L2,
+                // ungated for L3); the data layer only wraps the Master Key under the supplied K.
+                let lvl: DeviceLevel = level == .biometric ? .biometric : .noLogin
+                let k = secureRandomBytes(32)
+                try deviceSecurity.storePasswordlessKey(k, gated: lvl == .biometric, email: email)
+                try await client.setPasswordlessLevel(lvl, email: email, k: k)
                 LaunchPrefs.remember(instance: apiBase, account: email)
                 deviceTrusted = true
             }

@@ -1,42 +1,46 @@
 import Foundation
 @testable import VeyqKit
 
-/// Test double for `DeviceSecurityStore` — an in-memory map, no Keychain / no biometric gate. Used by the
-/// device-level unit tests and the orchestration tests: the real `KeychainDeviceSecurityStore` (and the L2
-/// biometric prompt) is entitlement-sensitive from the SPM CLI, so it is covered by the live in-app UI
-/// round-trip, not the unit suite.
+/// Test double for the data-layer `DeviceSecurityStore` — an in-memory map, no Keychain / no biometric gate
+/// (ADR 0011: the protocol is the **ungated** view; the gated L2 release lives in the app-layer concrete
+/// store and is exercised by the live in-app UI round-trip, not this suite). `beginEnrol` mints a **stable**
+/// random `deviceFactor` per account (a device-bound key never changes). The twin of Android's
+/// `InMemoryDeviceSecurityStore`.
 ///
 /// A `final class` with an `NSLock` (not an `actor`) so it satisfies the **synchronous** protocol —
-/// `@unchecked Sendable` because the lock guards all access to `records`.
+/// `@unchecked Sendable` because the lock guards all access.
 final class InMemoryDeviceSecurityStore: DeviceSecurityStore, @unchecked Sendable {
+    private final class Rec {
+        let factor: Data
+        var level: DeviceLevel?
+        var wrapId: String?
+        var token: String?
+        init(factor: Data) { self.factor = factor }
+    }
+
     private let lock = NSLock()
-    private var records: [String: DeviceSecurityRecord] = [:]
-    private var _loadCount = 0
+    private var recs: [String: Rec] = [:]
 
-    /// How many times `load` (the read that, in the real store, prompts the L2 biometric) has been called —
-    /// so a test can assert the single-load / single-prompt property of `autoRestore` (cr-0023).
-    var loadCount: Int { lock.withLock { _loadCount } }
-
-    func currentLevel(email: String) -> DeviceLevel? {
-        lock.withLock { records[email]?.level }
+    /// Get-or-create the record (a stable random factor on first touch). Caller holds `lock`.
+    private func rec(_ email: String) -> Rec {
+        if let r = recs[email] { return r }
+        let r = Rec(factor: makeDeviceFactor()); recs[email] = r; return r
     }
 
-    func load(email: String) throws -> DeviceSecurityRecord? {
-        lock.withLock { _loadCount += 1; return records[email] }
+    func currentLevel(email: String) -> DeviceLevel? { lock.withLock { recs[email]?.level } }
+    func wrapId(email: String) -> String? { lock.withLock { recs[email]?.wrapId } }
+    func refreshToken(email: String) -> String? { lock.withLock { recs[email]?.token } }
+    func updateRefreshToken(_ token: String?, email: String) throws { lock.withLock { recs[email]?.token = token } }
+    func beginEnrol(email: String) throws -> Data { lock.withLock { rec(email).factor } }
+    func deviceFactor(email: String) -> Data? { lock.withLock { recs[email]?.factor } }
+
+    func commitOnlyPassword(wrapId: String, email: String) throws {
+        lock.withLock { let r = rec(email); r.level = .onlyPassword; r.wrapId = wrapId; r.token = nil }
     }
 
-    func save(_ record: DeviceSecurityRecord, email: String) throws {
-        lock.withLock { records[email] = record }
+    func commitPasswordless(level: DeviceLevel, wrapId: String, refreshToken: String, email: String) throws {
+        lock.withLock { let r = rec(email); r.level = level; r.wrapId = wrapId; r.token = refreshToken }
     }
 
-    func updateRefreshToken(_ token: String?, email: String) throws {
-        lock.withLock {
-            guard let r = records[email] else { return }
-            records[email] = DeviceSecurityRecord(level: r.level, wrapId: r.wrapId, secret: r.secret, refreshToken: token)
-        }
-    }
-
-    func clear(email: String) throws {
-        lock.withLock { _ = records.removeValue(forKey: email) }
-    }
+    func clear(email: String) throws { lock.withLock { _ = recs.removeValue(forKey: email) } }
 }

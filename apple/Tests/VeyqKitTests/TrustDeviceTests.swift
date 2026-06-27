@@ -20,6 +20,8 @@ final class TrustDeviceTests: XCTestCase {
     private static let lightParams = V1.ArgonParams(t: 3, m: 64, p: 1, dkLen: 32)
     private static let baseURL = URL(string: "https://veyq.example")!
     private static let email = "person@veyq.example"
+    /// The device key K the app layer would release and hand in (ADR 0011) — fixed so tests can re-supply it.
+    private static let deviceK = Data((0..<32).map { UInt8(0x70 &+ $0) })
 
     /// The PASSWORD floor wrap + wrapped identity the stub starts with (so the floor unlock can run first).
     private static func floorWraps() -> (wraps: [[String: Any]], identity: String) {
@@ -101,7 +103,8 @@ final class TrustDeviceTests: XCTestCase {
         let floor = Self.floorWraps()
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let store = InMemoryDeviceSecurityStore()
-        try store.save(DeviceSecurityRecord(level: .onlyPassword, wrapId: "ghost", secret: makeDeviceFactor()), email: Self.email)
+        _ = try store.beginEnrol(email: Self.email)
+        try store.commitOnlyPassword(wrapId: "ghost", email: Self.email)   // a record whose server wrap is absent
         let c = await makeClient(store: store, stub: stub)
 
         let opened = try await c.unlockWithDevice(email: Self.email, password: Self.password)
@@ -117,9 +120,9 @@ final class TrustDeviceTests: XCTestCase {
         try await c.unlock(password: Self.password, secretKey: Self.secretKey.base64EncodedString())
 
         try await c.trustThisDevice(email: Self.email, password: Self.password)
-        let firstId = try XCTUnwrap((try store.load(email: Self.email))?.wrapId)
+        let firstId = try XCTUnwrap(store.wrapId(email: Self.email))
         try await c.trustThisDevice(email: Self.email, password: Self.password)
-        let secondId = try XCTUnwrap((try store.load(email: Self.email))?.wrapId)
+        let secondId = try XCTUnwrap(store.wrapId(email: Self.email))
 
         XCTAssertNotEqual(firstId, secondId, "re-trust mints a new wrap id")
         XCTAssertFalse(stub.hasWrap(id: firstId), "the prior DEVICE wrap was deleted")
@@ -202,9 +205,9 @@ final class TrustDeviceTests: XCTestCase {
     /// The persisted refresh token is sealed under K (cr-0023); unseal it the way the client does, to assert
     /// the plaintext that was stored.
     private func unsealPersistedToken(_ store: any DeviceSecurityStore) throws -> String? {
-        guard let rec = try store.load(email: Self.email), let stored = rec.refreshToken,
+        guard let stored = store.refreshToken(email: Self.email),
               let blob = Data(base64Encoded: stored),
-              let bytes = try? V1.symUnwrap(kek: rec.secret, blob: blob, context: "session-token")
+              let bytes = try? V1.symUnwrap(kek: Self.deviceK, blob: blob, context: "session-token")
         else { return nil }
         return String(data: bytes, encoding: .utf8)
     }
@@ -216,15 +219,15 @@ final class TrustDeviceTests: XCTestCase {
             let store = InMemoryDeviceSecurityStore()
 
             let c1 = try await unlockedClient(store: store, stub: stub)
-            try await c1.setPasswordlessLevel(level, email: Self.email)
+            try await c1.setPasswordlessLevel(level, email: Self.email, k: Self.deviceK)
             XCTAssertEqual(store.currentLevel(email: Self.email), level)
             XCTAssertTrue(stub.hasWrap(method: "DEVICE"), "a K-wrap was stored (\(level))")
 
             // Fresh client (new vault + session): resume the session, then open with the device key.
             let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
-            let resumed = try await c2.resumeSession(email: Self.email)
+            let resumed = try await c2.resumeSession(email: Self.email, k: Self.deviceK)
             XCTAssertTrue(resumed, "the persisted token resumed the session (\(level))")
-            let opened = try await c2.unlockWithDeviceKey(email: Self.email)
+            let opened = try await c2.unlockWithDeviceKey(email: Self.email, k: Self.deviceK)
             XCTAssertTrue(opened, "the device key opened the vault (\(level))")
             let mk = await c2.vault.masterKey()
             XCTAssertEqual(mk, Self.masterKey, "the K-wrap recovered the Master Key (\(level))")
@@ -236,13 +239,13 @@ final class TrustDeviceTests: XCTestCase {
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let store = InMemoryDeviceSecurityStore()
         let c1 = try await unlockedClient(store: store, stub: stub)
-        try await c1.setPasswordlessLevel(.noLogin, email: Self.email)
-        XCTAssertNotEqual(try store.load(email: Self.email)?.refreshToken, "refresh-1",
+        try await c1.setPasswordlessLevel(.noLogin, email: Self.email, k: Self.deviceK)
+        XCTAssertNotEqual(store.refreshToken(email: Self.email), "refresh-1",
                           "the token is NOT stored in the clear (sealed under K)")
         XCTAssertEqual(try unsealPersistedToken(store), "refresh-1", "enrol persisted the live token (sealed)")
 
         let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
-        _ = try await c2.resumeSession(email: Self.email)
+        _ = try await c2.resumeSession(email: Self.email, k: Self.deviceK)
         XCTAssertEqual(try unsealPersistedToken(store), "refresh-2",
                        "the rotated refresh token was persisted back, still sealed (so the next launch stays valid)")
     }
@@ -254,34 +257,31 @@ final class TrustDeviceTests: XCTestCase {
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let store = InMemoryDeviceSecurityStore()
         let c1 = try await unlockedClient(store: store, stub: stub)
-        try await c1.setPasswordlessLevel(.noLogin, email: Self.email)
+        try await c1.setPasswordlessLevel(.noLogin, email: Self.email, k: Self.deviceK)
         try store.updateRefreshToken("refresh-1", email: Self.email)   // simulate a legacy PLAINTEXT token
-        XCTAssertEqual(try store.load(email: Self.email)?.refreshToken, "refresh-1", "precondition: stored in the clear")
+        XCTAssertEqual(store.refreshToken(email: Self.email), "refresh-1", "precondition: stored in the clear")
 
         let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
-        let resumed = try await c2.resumeSession(email: Self.email)
+        let resumed = try await c2.resumeSession(email: Self.email, k: Self.deviceK)
         XCTAssertTrue(resumed, "a legacy plaintext token still resumes (lazy migration)")
-        XCTAssertNotEqual(try store.load(email: Self.email)?.refreshToken, "refresh-2", "now sealed, not clear")
+        XCTAssertNotEqual(store.refreshToken(email: Self.email), "refresh-2", "now sealed, not clear")
         XCTAssertEqual(try unsealPersistedToken(store), "refresh-2", "the rotated token was re-sealed under K")
     }
 
-    func testAutoRestoreResumesAndOpensInOneLoad() async throws {
-        // The consolidated launch path (cr-0023): one device-key load resumes the session AND opens the vault.
+    func testAutoRestoreResumesAndOpensFromSuppliedKey() async throws {
+        // ADR 0011: the app layer releases K once and hands it in; autoRestore resumes the session AND opens
+        // the vault from that single supplied key — neither step prompts (the one-gesture property is now an
+        // app-layer concern, mirroring Android's autoRestoreResumesAndOpensFromSuppliedKey).
         for level in [DeviceLevel.biometric, .noLogin] {
             let floor = Self.floorWraps()
             let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
             let store = InMemoryDeviceSecurityStore()
             let c1 = try await unlockedClient(store: store, stub: stub)
-            try await c1.setPasswordlessLevel(level, email: Self.email)
+            try await c1.setPasswordlessLevel(level, email: Self.email, k: Self.deviceK)
 
             let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
-            let loadsBefore = store.loadCount
-            let restored = try await c2.autoRestore(email: Self.email)
-            XCTAssertTrue(restored, "autoRestore resumed + opened the vault (\(level))")
-            // The whole launch must read the gated secret (the L2-prompting load) exactly ONCE — the unit
-            // proxy for "one biometric prompt at launch", vs the two loads resumeSession+unlockWithDeviceKey
-            // would cause.
-            XCTAssertEqual(store.loadCount - loadsBefore, 1, "autoRestore does a single gated load (\(level))")
+            let restored = try await c2.autoRestore(email: Self.email, k: Self.deviceK)
+            XCTAssertTrue(restored, "autoRestore resumed + opened the vault from the supplied K (\(level))")
             let mk = await c2.vault.masterKey()
             XCTAssertEqual(mk, Self.masterKey, "the K-wrap recovered the Master Key (\(level))")
             XCTAssertEqual(try unsealPersistedToken(store), "refresh-2", "rotated token re-sealed (\(level))")
@@ -294,8 +294,8 @@ final class TrustDeviceTests: XCTestCase {
         let store = InMemoryDeviceSecurityStore()
         let c = try await unlockedClient(store: store, stub: stub)
 
-        try await c.setPasswordlessLevel(.biometric, email: Self.email)
-        try await c.setPasswordlessLevel(.noLogin, email: Self.email)
+        try await c.setPasswordlessLevel(.biometric, email: Self.email, k: Self.deviceK)
+        try await c.setPasswordlessLevel(.noLogin, email: Self.email, k: Self.deviceK)
         XCTAssertEqual(store.currentLevel(email: Self.email), .noLogin)
         XCTAssertEqual(stub.wrapCount(method: "DEVICE"), 1, "one convenience wrap at a time (mutually exclusive)")
     }
@@ -307,7 +307,7 @@ final class TrustDeviceTests: XCTestCase {
         let c = try await unlockedClient(store: store, stub: stub)
         try await c.trustThisDevice(email: Self.email, password: Self.password)   // L1
 
-        let opened = try await c.unlockWithDeviceKey(email: Self.email)
+        let opened = try await c.unlockWithDeviceKey(email: Self.email, k: Self.deviceK)
         XCTAssertFalse(opened, "the K-wrap path must not open an Argon2id L1 wrap")
     }
 
@@ -316,7 +316,7 @@ final class TrustDeviceTests: XCTestCase {
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let c = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL),
                            deviceSecurity: InMemoryDeviceSecurityStore(), transport: stub)
-        let resumed = try await c.resumeSession(email: Self.email)
+        let resumed = try await c.resumeSession(email: Self.email, k: Self.deviceK)
         XCTAssertFalse(resumed)
     }
 
@@ -325,11 +325,11 @@ final class TrustDeviceTests: XCTestCase {
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let store = InMemoryDeviceSecurityStore()
         let c1 = try await unlockedClient(store: store, stub: stub)
-        try await c1.setPasswordlessLevel(.noLogin, email: Self.email)
+        try await c1.setPasswordlessLevel(.noLogin, email: Self.email, k: Self.deviceK)
 
         stub.failRefresh = true
         let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
-        let resumed = try await c2.resumeSession(email: Self.email)
+        let resumed = try await c2.resumeSession(email: Self.email, k: Self.deviceK)
         XCTAssertFalse(resumed, "a dead/expired token resumes nothing → caller falls back to the floor")
     }
 
@@ -338,7 +338,7 @@ final class TrustDeviceTests: XCTestCase {
         let stub = TrustStub(wraps: floor.wraps, identity: floor.identity)
         let c = try await unlockedClient(store: FailingSaveDeviceTrustStore(), stub: stub)
         do {
-            try await c.setPasswordlessLevel(.biometric, email: Self.email)
+            try await c.setPasswordlessLevel(.biometric, email: Self.email, k: Self.deviceK)
             XCTFail("expected trustFailed")
         } catch VeyqError.trustFailed { /* expected */ }
         XCTAssertFalse(stub.hasWrap(method: "DEVICE"), "the server wrap was rolled back — no orphan")
@@ -347,10 +347,15 @@ final class TrustDeviceTests: XCTestCase {
 
 /// A `DeviceSecurityStore` whose `save` always fails — to exercise the enrol rollback.
 private final class FailingSaveDeviceTrustStore: DeviceSecurityStore, @unchecked Sendable {
+    private let factor = Data((0..<32).map { UInt8($0 &+ 1) })
     func currentLevel(email: String) -> DeviceLevel? { nil }
-    func load(email: String) throws -> DeviceSecurityRecord? { nil }
-    func save(_ record: DeviceSecurityRecord, email: String) throws { throw DeviceSecurityError.keychain(-1) }
+    func wrapId(email: String) -> String? { nil }
+    func refreshToken(email: String) -> String? { nil }
     func updateRefreshToken(_ token: String?, email: String) throws {}
+    func beginEnrol(email: String) throws -> Data { factor }
+    func deviceFactor(email: String) -> Data? { factor }
+    func commitOnlyPassword(wrapId: String, email: String) throws { throw DeviceSecurityError.keychain(-1) }
+    func commitPasswordless(level: DeviceLevel, wrapId: String, refreshToken: String, email: String) throws { throw DeviceSecurityError.keychain(-1) }
     func clear(email: String) throws {}
 }
 

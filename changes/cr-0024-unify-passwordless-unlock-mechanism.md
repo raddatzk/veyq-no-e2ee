@@ -46,7 +46,7 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
 | docs (ADR 0011 + concept doc) | the one mechanism written down | ✅ (phase 1) |
 | backend / http | unchanged (client-only) | **N/A** |
 | web | data layer already prompt-free; no persisted session | **N/A** (conformant) |
-| apple | `K` released in `AppModel`; data layer prompt-free; `resumeSession`/`unlockWithDeviceKey`/`autoRestore` take `K` | ◻ |
+| apple | `K` released in `AppModel`; data layer prompt-free; `resumeSession`/`unlockWithDeviceKey`/`autoRestore` take `K` | ✅ (phase 3) |
 | android | add `autoRestore(email, K)` to `:client`; `bootstrap` calls it (already passes `K` in) | ✅ (phase 2) |
 | windows / linux | implement against the concept doc | ◻ (no UI head yet) |
 
@@ -64,14 +64,18 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
   `autoRestoreRejectsAnL1Record`, `autoRestoreWithDeadTokenReturnsFalse`). **Done:** `:crypto:test` +
   `:client:test` + `:app:assembleDebug` `BUILD SUCCESSFUL`; `bootstrap` no longer inlines the resume+unlock
   pair.
-- [ ] **3 — apple (move the gate to the app layer).** Change `VeyqClient` so the data layer is **prompt-free**:
-  `resumeSession`/`unlockWithDeviceKey`/`autoRestore` take `K: Data`; remove the gated-secret read from the
-  data layer's responsibility (keep the **ungated** meta read for level/wrapId/sealed token). Move the
-  Keychain biometric release of `K` into `AppModel` (read level ungated → release `K` → `autoRestore(email,
-  K)`). Adjust `KeychainDeviceSecurityStore` to expose an ungated meta read + an app-layer gated `K` release
-  (mirroring Android's `decrypt/finishRead`/`readUngated` split). Replace the now-obsolete `loadCount`
-  single-gated-load unit test with an **app-layer single-gesture** assertion. **Done when:** `swift test`
-  green; iOS `xcodebuild BUILD SUCCEEDED`; the data layer has no Keychain-prompting path.
+- [x] **3 — apple (move the gate to the app layer).** Reworked the `DeviceSecurityStore` protocol to the
+  ungated data-layer view (`currentLevel`/`wrapId`/`refreshToken`/`updateRefreshToken`/`beginEnrol`/
+  `deviceFactor`/`commitOnlyPassword`/`commitPasswordless`/`clear`) — the exact twin of Android's interface;
+  dropped `load`/`save`/`DeviceSecurityRecord`. `KeychainDeviceSecurityStore` gained the **app-layer-only**
+  `storePasswordlessKey` / `releasePasswordlessKey` (the single gated Keychain read). `VeyqClient`
+  `resumeSession`/`unlockWithDeviceKey`/`autoRestore`/`setPasswordlessLevel` now take `K: Data` and never
+  read the gated secret. `AppModel` owns the store, releases `K` in `bootstrap` (then `autoRestore(email,
+  K)`) and creates+stores `K` in `unlock` (then `setPasswordlessLevel(level, email, K)`); `ConnectView`
+  injects the same store. Replaced the obsolete `loadCount` test with `testAutoRestoreResumesAndOpensFrom`
+  `SuppliedKey` (the single-gesture property is now an app-layer concern, mirroring Android). **Done:**
+  `swift test` 51 (3 live-skip), 0 failures; macOS + iOS `xcodebuild BUILD SUCCEEDED`; the data layer has no
+  Keychain-prompting path.
 - [ ] **4 — parity check + on-device.** Reconcile the [parity matrix](../docs/crosscutting/platform-parity.md);
   confirm the L2/L3 coverage entries still hold. Re-run the on-device single-prompt round-trip (the item left
   open in [cr-0023](cr-0023-gate-l2-session-token.md) phase 4) on both platforms when hardware is available.

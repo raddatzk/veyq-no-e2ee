@@ -187,16 +187,17 @@ public final class VeyqClient: Sendable {
     /// be able to withhold the wrap to force every trusted device to wipe its key. Explicit untrust /
     /// re-trust is the only path that clears it.
     public func unlockWithDevice(email: String, password: String) async throws -> Bool {
-        guard let record = (try? deviceSecurity.load(email: email)) ?? nil,
-              record.level == .onlyPassword else { return false }
+        guard deviceSecurity.currentLevel(email: email) == .onlyPassword,
+              let wrapId = deviceSecurity.wrapId(email: email),
+              let deviceFactor = deviceSecurity.deviceFactor(email: email) else { return false }
         let material = try await withRefresh { try await self.fetchKeyMaterial() }
-        guard let wrap = material.wraps.first(where: { $0.id == record.wrapId && $0.method == .DEVICE }),
+        guard let wrap = material.wraps.first(where: { $0.id == wrapId && $0.method == .DEVICE }),
               let kdfParams = wrap.kdfParams
         else { return false }
 
         let decoded = try V1.decodeKdfParams(Data(kdfParams.data))
         let kek = V1.kekDevicePassword(
-            deviceFactor: record.secret, password: password, salt: decoded.salt, params: decoded.params
+            deviceFactor: deviceFactor, password: password, salt: decoded.salt, params: decoded.params
         )
         do {
             let masterKey = try V1.symUnwrap(kek: kek, blob: Data(wrap.wrappedKey.data), context: "master-key")
@@ -221,12 +222,12 @@ public final class VeyqClient: Sendable {
         guard let masterKey = await vault.masterKey() else { throw VeyqError.unlockUnavailable }
 
         // Re-trust replaces: drop any prior wrap for this device first (best-effort — a stale id is
-        // harmless, and the new record overwrites the local one anyway).
-        if let prior = (try? deviceSecurity.load(email: email)) ?? nil {
-            try? await withRefresh { try await self.deleteWrap(id: prior.wrapId) }
+        // harmless, and the new commit overwrites the local meta anyway).
+        if let priorId = deviceSecurity.wrapId(email: email) {
+            try? await withRefresh { try await self.deleteWrap(id: priorId) }
         }
 
-        let deviceFactor = makeDeviceFactor()
+        let deviceFactor = try deviceSecurity.beginEnrol(email: email)
         let salt = secureRandomBytes(16)
         let params = V1.argon
         let kek = V1.kekDevicePassword(deviceFactor: deviceFactor, password: password, salt: salt, params: params)
@@ -237,9 +238,7 @@ public final class VeyqClient: Sendable {
             try await self.addDeviceWrap(wrappedKey: wrappedKey, kdfParams: kdfParams)
         }
         do {
-            try deviceSecurity.save(
-                DeviceSecurityRecord(level: .onlyPassword, wrapId: wrapId, secret: deviceFactor), email: email
-            )
+            try deviceSecurity.commitOnlyPassword(wrapId: wrapId, email: email)
         } catch {
             try? await withRefresh { try await self.deleteWrap(id: wrapId) }   // rollback — no orphan
             throw VeyqError.trustFailed
@@ -249,8 +248,8 @@ public final class VeyqClient: Sendable {
     /// Untrust this device: delete this device's DEVICE wrap server-side (best-effort, idempotent) and
     /// drop the local record. Other devices keep their own wraps; the floor is never removable.
     public func untrustThisDevice(email: String) async throws {
-        if let record = (try? deviceSecurity.load(email: email)) ?? nil {
-            try? await withRefresh { try await self.deleteWrap(id: record.wrapId) }
+        if let wrapId = deviceSecurity.wrapId(email: email) {
+            try? await withRefresh { try await self.deleteWrap(id: wrapId) }
         }
         try deviceSecurity.clear(email: email)
     }
@@ -260,31 +259,30 @@ public final class VeyqClient: Sendable {
     /// The device's current unlock level (from the ungated meta — no biometric prompt). nil = L0/unset.
     public func currentLevel(email: String) -> DeviceLevel? { deviceSecurity.currentLevel(email: email) }
 
-    /// Set this device to a **passwordless** level (L2 biometric / L3 no-login). Wraps the already-unlocked
-    /// Master Key under a fresh **random key K** (`symWrap(K, masterKey)` — the K-wrap, stored server-side
-    /// as method=DEVICE), and persists `{K, current refresh token}` under the level's gate (K
-    /// biometric-gated for L2, ungated for L3; the token always in the ungated meta). **Replaces** any
-    /// prior convenience wrap (mutually exclusive). Needs an unlocked vault **and** a live session (the
-    /// persisted token is what resumes it without a password). Rolls back the server wrap on a save
-    /// failure. The `kdfParams` field is a marker — a K-wrap has no KDF (K is the KEK directly).
-    public func setPasswordlessLevel(_ level: DeviceLevel, email: String) async throws {
+    /// Set this device to a **passwordless** level (L2 biometric / L3 no-login). The **app layer** has
+    /// already created + stored the random key `K` behind the native gate (biometric for L2, ungated for L3)
+    /// and passes it in (ADR 0011). This wraps the already-unlocked Master Key under `K`
+    /// (`symWrap(K, masterKey)` — the K-wrap, stored server-side as method=DEVICE) and commits
+    /// `{level, wrapId, sealed refresh token}` to the ungated meta. **Replaces** any prior convenience wrap
+    /// (mutually exclusive). Needs an unlocked vault **and** a live session (the persisted token is what
+    /// resumes it without a password). Rolls back the server wrap on a commit failure. The `kdfParams` field
+    /// is a marker — a K-wrap has no KDF (K is the KEK directly).
+    public func setPasswordlessLevel(_ level: DeviceLevel, email: String, k: Data) async throws {
         precondition(level == .biometric || level == .noLogin, "setPasswordlessLevel is L2/L3 only")
         guard let masterKey = await vault.masterKey() else { throw VeyqError.unlockUnavailable }
         guard let refreshToken = await session.refreshToken else { throw VeyqError.noSession }
 
-        if let prior = (try? deviceSecurity.load(email: email)) ?? nil {
-            try? await withRefresh { try await self.deleteWrap(id: prior.wrapId) }
+        if let priorId = deviceSecurity.wrapId(email: email) {
+            try? await withRefresh { try await self.deleteWrap(id: priorId) }
         }
 
-        let k = secureRandomBytes(32)
         let wrappedKey = V1.symWrap(kek: k, targetKey: masterKey, context: "master-key", nonce: secureRandomBytes(12))
         let wrapId = try await withRefresh {
             try await self.addDeviceWrap(wrappedKey: wrappedKey, kdfParams: Data("v1/device-key".utf8))
         }
         do {
-            try deviceSecurity.save(
-                DeviceSecurityRecord(level: level, wrapId: wrapId, secret: k, refreshToken: tokenSeal(refreshToken, k: k)),
-                email: email
+            try deviceSecurity.commitPasswordless(
+                level: level, wrapId: wrapId, refreshToken: tokenSeal(refreshToken, k: k), email: email
             )
         } catch {
             try? await withRefresh { try await self.deleteWrap(id: wrapId) }   // rollback — no orphan
@@ -293,14 +291,12 @@ public final class VeyqClient: Sendable {
         await vault.holdDeviceKey(k)   // retain K so this session's rotations re-seal the token prompt-free
     }
 
-    /// Resume a persisted session for a passwordless device: read the stored refresh token (for L2 this is
-    /// in the ungated meta, so **no biometric prompt** here), install it, and rotate to a live session.
-    /// Returns `false` when there is no persisted token; `false` (not throw) when the token is dead — the
-    /// caller then falls back to the floor.
-    public func resumeSession(email: String) async throws -> Bool {
-        guard let record = (try? deviceSecurity.load(email: email)) ?? nil,
-              let stored = record.refreshToken else { return false }
-        let k = record.secret
+    /// Resume a persisted session for a passwordless device with the device key `K` the **app layer** has
+    /// already released (ADR 0011 — no prompt here): read the stored (sealed) refresh token from the ungated
+    /// meta, unseal it with `K`, install it, and rotate to a live session. Returns `false` when there is no
+    /// persisted token; `false` (not throw) when the token is dead — the caller then falls back to the floor.
+    public func resumeSession(email: String, k: Data) async throws -> Bool {
+        guard let stored = deviceSecurity.refreshToken(email: email) else { return false }
         let token = tokenUnseal(stored, k: k) ?? stored   // lazy migration: legacy plaintext unseal-fails
         await vault.holdDeviceKey(k)                       // so the rotation below re-seals prompt-free
         await session.set(access: "", refresh: token, account: email)
@@ -313,47 +309,36 @@ public final class VeyqClient: Sendable {
         return true
     }
 
-    /// **App-launch auto-restore** for a passwordless device, in a **single** gated read (cr-0023): load the
-    /// record once (the one Face ID / fingerprint prompt for L2; free for L3), unseal the token with K,
-    /// resume + rotate the session, then open the vault from the **same** K — so there is exactly one
-    /// biometric prompt at launch, not the two the separate `resumeSession` + `unlockWithDeviceKey` calls
-    /// would cause. Returns false (caller falls back to the floor) when there is no passwordless record, the
-    /// token is dead, or the wrap is unusable.
-    public func autoRestore(email: String) async throws -> Bool {
-        guard let record = (try? deviceSecurity.load(email: email)) ?? nil,
-              record.level == .biometric || record.level == .noLogin,
-              let stored = record.refreshToken else { return false }
-        let k = record.secret
-        let token = tokenUnseal(stored, k: k) ?? stored
-        await vault.holdDeviceKey(k)
-        await session.set(access: "", refresh: token, account: email)
-        do {
-            try await refresh()
-        } catch {
-            await vault.clear()
-            return false
-        }
-        return try await openVault(fromRecord: record, k: k)
+    /// **App-launch auto-restore** for a passwordless device (ADR 0011): the **app layer** releases `K`
+    /// **once** (the single Face ID / fingerprint gesture for L2; free for L3) and hands it in; this resumes
+    /// the session and opens the vault from that same `K`, **neither step prompting**. So the single prompt
+    /// is an app-layer property, identical to Android. Returns false (caller falls back to the floor) when
+    /// there is no passwordless record, the token is dead, or the wrap is unusable.
+    public func autoRestore(email: String, k: Data) async throws -> Bool {
+        let level = deviceSecurity.currentLevel(email: email)
+        guard level == .biometric || level == .noLogin else { return false }
+        guard try await resumeSession(email: email, k: k) else { return false }
+        return try await unlockWithDeviceKey(email: email, k: k)
     }
 
-    /// Open the Master Key from this device's **K-wrap** (L2/L3) — the random key K *is* the KEK, used
-    /// directly (no password, no Argon2id). For an L2 device, `load` prompts Face ID to release K. Returns
-    /// `false` when unavailable (no passwordless record, or no matching server wrap → fall back to the
-    /// floor, **without** self-wiping); throws `.unlockFailed` on an AEAD mismatch.
-    public func unlockWithDeviceKey(email: String) async throws -> Bool {
-        guard let record = (try? deviceSecurity.load(email: email)) ?? nil,
-              record.level == .biometric || record.level == .noLogin else { return false }
-        await vault.holdDeviceKey(record.secret)   // retain K for prompt-free rotation this session
-        return try await openVault(fromRecord: record, k: record.secret)
+    /// Open the Master Key from this device's **K-wrap** (L2/L3) with the device key `K` the **app layer**
+    /// released — `K` *is* the KEK, used directly (no password, no Argon2id), no prompt here (ADR 0011).
+    /// Returns `false` when unavailable (no passwordless record, or no matching server wrap → fall back to
+    /// the floor, **without** self-wiping); throws `.unlockFailed` on an AEAD mismatch.
+    public func unlockWithDeviceKey(email: String, k: Data) async throws -> Bool {
+        let level = deviceSecurity.currentLevel(email: email)
+        guard level == .biometric || level == .noLogin,
+              let wrapId = deviceSecurity.wrapId(email: email) else { return false }
+        await vault.holdDeviceKey(k)   // retain K for prompt-free rotation this session
+        return try await openVault(wrapId: wrapId, k: k)
     }
 
-    /// Fetch the key material and open the Master Key + identity from a passwordless record using K directly
-    /// (the K-wrap KEK). Shared by `unlockWithDeviceKey` and `autoRestore` so the latter reuses an
-    /// already-loaded record (no second gated read / prompt). Returns false when the matching server wrap is
-    /// missing (→ floor, without self-wiping); throws `.unlockFailed` on an AEAD mismatch.
-    private func openVault(fromRecord record: DeviceSecurityRecord, k: Data) async throws -> Bool {
+    /// Fetch the key material and open the Master Key + identity from this device's K-wrap using `K` directly
+    /// (the K-wrap KEK). Shared by `unlockWithDeviceKey` and `autoRestore`. Returns false when the matching
+    /// server wrap is missing (→ floor, without self-wiping); throws `.unlockFailed` on an AEAD mismatch.
+    private func openVault(wrapId: String, k: Data) async throws -> Bool {
         let material = try await withRefresh { try await self.fetchKeyMaterial() }
-        guard let wrap = material.wraps.first(where: { $0.id == record.wrapId && $0.method == .DEVICE })
+        guard let wrap = material.wraps.first(where: { $0.id == wrapId && $0.method == .DEVICE })
         else { return false }
         do {
             let masterKey = try V1.symUnwrap(kek: k, blob: Data(wrap.wrappedKey.data), context: "master-key")

@@ -2,52 +2,63 @@ import XCTest
 @testable import VeyqKit
 
 /// The device-security store round-trip, on the in-memory double (the real Keychain + biometric gate are
-/// covered by the live in-app UI round-trip). Covers L1 (cr-0019) and the L2/L3 record shape (cr-0020).
+/// covered by the live in-app UI round-trip). Covers the **data-layer view** (ADR 0011): ungated meta +
+/// the L1 factor; the L2/L3 random key `K` is app-layer and not on this protocol.
 final class DeviceSecurityStoreTests: XCTestCase {
     private let email = "person@veyq.example"
 
-    func testSaveLoadCurrentLevelClearRoundTrip() throws {
+    func testCommitL1CurrentLevelClearRoundTrip() throws {
         let store = InMemoryDeviceSecurityStore()
-        let record = DeviceSecurityRecord(level: .onlyPassword, wrapId: "wrap-123", secret: makeDeviceFactor())
-
         XCTAssertNil(store.currentLevel(email: email))
-        XCTAssertNil(try store.load(email: email))
+        XCTAssertNil(store.wrapId(email: email))
 
-        try store.save(record, email: email)
+        _ = try store.beginEnrol(email: email)
+        try store.commitOnlyPassword(wrapId: "wrap-123", email: email)
         XCTAssertEqual(store.currentLevel(email: email), .onlyPassword)
-        XCTAssertEqual(try store.load(email: email), record)
+        XCTAssertEqual(store.wrapId(email: email), "wrap-123")
+        XCTAssertNotNil(store.deviceFactor(email: email))
 
         try store.clear(email: email)
         XCTAssertNil(store.currentLevel(email: email))
-        XCTAssertNil(try store.load(email: email))
+        XCTAssertNil(store.wrapId(email: email))
     }
 
-    func testSaveReplacesExistingRecord() throws {
+    func testCommitReplacesExistingLevel() throws {
         let store = InMemoryDeviceSecurityStore()
-        let first = DeviceSecurityRecord(level: .onlyPassword, wrapId: "wrap-old", secret: makeDeviceFactor())
-        let second = DeviceSecurityRecord(level: .biometric, wrapId: "wrap-new", secret: secureRandomBytes(32),
-                                          refreshToken: "refresh-xyz")
-        try store.save(first, email: email)
-        try store.save(second, email: email)
-        XCTAssertEqual(try store.load(email: email), second)
+        _ = try store.beginEnrol(email: email)
+        try store.commitOnlyPassword(wrapId: "wrap-old", email: email)
+        try store.commitPasswordless(level: .biometric, wrapId: "wrap-new", refreshToken: "sealed-xyz", email: email)
         XCTAssertEqual(store.currentLevel(email: email), .biometric)
+        XCTAssertEqual(store.wrapId(email: email), "wrap-new")
+        XCTAssertEqual(store.refreshToken(email: email), "sealed-xyz")
     }
 
-    func testPasswordlessRecordCarriesKeyAndToken() throws {
+    func testPasswordlessCommitCarriesWrapAndToken() throws {
         let store = InMemoryDeviceSecurityStore()
-        let k = secureRandomBytes(32)
-        let record = DeviceSecurityRecord(level: .noLogin, wrapId: "w", secret: k, refreshToken: "rt")
-        try store.save(record, email: email)
-        let loaded = try XCTUnwrap(try store.load(email: email))
-        XCTAssertEqual(loaded.secret, k)
-        XCTAssertEqual(loaded.refreshToken, "rt")
-        XCTAssertEqual(loaded.level, .noLogin)
+        try store.commitPasswordless(level: .noLogin, wrapId: "w", refreshToken: "rt", email: email)
+        XCTAssertEqual(store.wrapId(email: email), "w")
+        XCTAssertEqual(store.refreshToken(email: email), "rt")
+        XCTAssertEqual(store.currentLevel(email: email), .noLogin)
+    }
+
+    func testUpdateRefreshTokenTracksRotation() throws {
+        let store = InMemoryDeviceSecurityStore()
+        try store.commitPasswordless(level: .noLogin, wrapId: "w", refreshToken: "rt-1", email: email)
+        try store.updateRefreshToken("rt-2", email: email)
+        XCTAssertEqual(store.refreshToken(email: email), "rt-2")
+    }
+
+    func testBeginEnrolReturnsAStableFactor() throws {
+        let store = InMemoryDeviceSecurityStore()
+        let first = try store.beginEnrol(email: email)
+        let second = try store.beginEnrol(email: email)
+        XCTAssertEqual(first, second, "a device-bound factor never changes")
+        XCTAssertEqual(store.deviceFactor(email: email), first)
     }
 
     func testRecordsAreScopedPerAccount() throws {
         let store = InMemoryDeviceSecurityStore()
-        try store.save(DeviceSecurityRecord(level: .onlyPassword, wrapId: "a", secret: makeDeviceFactor()),
-                       email: "a@veyq.example")
+        try store.commitOnlyPassword(wrapId: "a", email: "a@veyq.example")
         XCTAssertEqual(store.currentLevel(email: "a@veyq.example"), .onlyPassword)
         XCTAssertNil(store.currentLevel(email: "b@veyq.example"))
     }

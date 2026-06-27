@@ -36,7 +36,7 @@ struct ConnectView: View {
                 error = "That doesn't look like a valid address."
                 return
             }
-            let client = VeyqClient(instance: VeyqInstance(baseURL: baseURL))
+            let client = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: app.deviceSecurity)
             do {
                 if try await client.setupRequired() {
                     setupNeeded = true

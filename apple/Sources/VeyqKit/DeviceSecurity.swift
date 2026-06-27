@@ -3,20 +3,23 @@ import Security
 
 // Per-device unlock-level persistence (uc.account.set-device-security; ADR 0005 §8–13). A device sits at
 // exactly one level; this stores the level + the material to open the Master Key on it. Generalised from
-// cr-0019's L1-only `DeviceTrust` into the four-level model (cr-0020).
+// cr-0019's L1-only `DeviceTrust` into the four-level model (cr-0020); split per ADR 0011 (cr-0024) so the
+// **data layer never prompts** (the Android layering, now uniform).
 //
 // **Two Keychain items per account** so the level is knowable *without* a biometric prompt:
 //   - a **meta** item `{level, wrapId, refreshToken?}` — always ungated. The level is read freely (decide
 //     whether to prompt / which UI to show), and the persisted **refresh token** (L2/L3) lives here so it
-//     can be **updated on every rotation without a biometric prompt**. Security: an ungated session token
-//     alone only fetches ciphertext (operator-blind) — the *vault* key is the gated secret below.
-//   - a **secret** item `{secret}` — gated per level:
-//       L0/L1/L3 → `WhenUnlockedThisDeviceOnly` (ungated);  L2 → `.biometryCurrentSet` (a live Face ID /
-//       Touch ID releases it — the gate is Secure-Enclave-enforced even though the bytes then return).
+//     can be **updated on every rotation without a biometric prompt**. The token is sealed under K, so an
+//     ungated read yields only ciphertext.
+//   - a **secret** item — the per-level KEK source: L1 = the random `deviceFactor` (ungated); L2/L3 = the
+//     random key `K` that directly wraps the Master Key. L2's item is biometric-gated
+//     (`.biometryCurrentSet`); L1/L3's is ungated (`WhenUnlockedThisDeviceOnly`).
 //
-// `secret` is the per-level KEK source: L1 = the random `deviceFactor` fed into Argon2id(+password);
-// L2/L3 = the random key `K` that directly wraps the Master Key. The Master Key, password, and Secret Key
-// are never stored here. cr-0020 reuses cr-0019's `symWrap`/`symUnwrap`; this file is only storage.
+// **Layer split (ADR 0011).** The `DeviceSecurityStore` *protocol* — the part the data layer
+// (`VeyqClient`) sees — exposes **ungated meta + the L1 factor only**; it never reads the gated L2 secret,
+// so no data-layer call can trigger a prompt. The **app layer** drives the gated L2/L3 key through the
+// concrete `KeychainDeviceSecurityStore`'s `storePasswordlessKey` / `releasePasswordlessKey` (the latter is
+// the single Face ID prompt at launch) and hands the released `K` to the data layer as plain bytes.
 
 /// The unlock level a device is set to (the slider; ADR 0005 §8). Ordered most-private → most-convenient.
 public enum DeviceLevel: String, Codable, Sendable, CaseIterable {
@@ -26,37 +29,31 @@ public enum DeviceLevel: String, Codable, Sendable, CaseIterable {
     case noLogin             // L3 — random-K wrap, K ungated; session persisted (ungated)        [cr-0020]
 }
 
-/// What a device keeps for its level. `secret` = `deviceFactor` (L1) or the random key `K` (L2/L3);
-/// `wrapId` = the server wrap to open/remove; `refreshToken` = the persisted session for the passwordless
-/// levels (L2/L3), nil otherwise.
-public struct DeviceSecurityRecord: Equatable, Sendable, Codable {
-    public let level: DeviceLevel
-    public let wrapId: String
-    public let secret: Data
-    public let refreshToken: String?
-
-    public init(level: DeviceLevel, wrapId: String, secret: Data, refreshToken: String? = nil) {
-        self.level = level
-        self.wrapId = wrapId
-        self.secret = secret
-        self.refreshToken = refreshToken
-    }
-}
-
-/// Per-account persistence of the device level + its material. Behind a protocol so unit tests use an
+/// Per-account persistence of the device level + its material — the **data-layer view** (ADR 0011): ungated
+/// meta (level / wrapId / sealed refresh token) plus the L1 `deviceFactor` (also ungated). The L2/L3 random
+/// key `K` is **not** here — it is released by the app layer (`KeychainDeviceSecurityStore`) and passed into
+/// the data layer, so no method on this protocol can prompt. Behind a protocol so unit tests use an
 /// in-memory double (the real Keychain — and the L2 biometric gate — is exercised by the live in-app UI
 /// round-trip, not the SPM-CLI unit tests).
 public protocol DeviceSecurityStore: Sendable {
     /// The device's level from the **ungated meta** — never triggers a biometric prompt; nil if L0/unset.
     func currentLevel(email: String) -> DeviceLevel?
-    /// The full record incl. secrets. For an L2 device this read **prompts Face ID / Touch ID** (the
-    /// secrets item is gated). Throws on an unexpected backing failure.
-    func load(email: String) throws -> DeviceSecurityRecord?
-    /// Persist (replacing any existing) the record, gating the secret per `record.level`.
-    func save(_ record: DeviceSecurityRecord, email: String) throws
+    /// The server wrap id to open/remove, or nil if none (ungated).
+    func wrapId(email: String) -> String?
+    /// The persisted (sealed) refresh token for a passwordless device (L2/L3), or nil (ungated).
+    func refreshToken(email: String) -> String?
     /// Update only the persisted refresh token (in the ungated meta) — a cheap, **prompt-free** write used
     /// to track refresh-token rotation for L2/L3. No-op if no record exists.
     func updateRefreshToken(_ token: String?, email: String) throws
+    /// Ensure this device's L1 factor exists and return it (a fresh random `deviceFactor`, stored ungated).
+    func beginEnrol(email: String) throws -> Data
+    /// The existing L1 `deviceFactor` (for unlock), or nil if none. Ungated — never prompts.
+    func deviceFactor(email: String) -> Data?
+    /// Commit the L1 ("only password") level with its server `wrapId`.
+    func commitOnlyPassword(wrapId: String, email: String) throws
+    /// Commit a passwordless level (L2/L3) with its server `wrapId` + persisted (sealed) refresh token; the
+    /// random key `K` is stored separately by the app-layer concrete store.
+    func commitPasswordless(level: DeviceLevel, wrapId: String, refreshToken: String, email: String) throws
     /// Remove the account's meta + secret (idempotent).
     func clear(email: String) throws
 }
@@ -80,8 +77,10 @@ public enum DeviceSecurityError: Error, Equatable {
     case accessControl
 }
 
-/// Keychain-backed store: a `kSecClassGenericPassword` **meta** item (ungated) + **secrets** item (gated
-/// per level), one pair per account, JSON values, non-syncable + `ThisDeviceOnly`.
+/// Keychain-backed store: a `kSecClassGenericPassword` **meta** item (ungated) + **secret** item (gated per
+/// level), one pair per account, JSON values, non-syncable + `ThisDeviceOnly`. Implements the data-layer
+/// protocol (ungated) and adds the **app-layer-only** passwordless-key methods (ADR 0011) — the only place
+/// the gated L2 read (the Face ID prompt) happens.
 public struct KeychainDeviceSecurityStore: DeviceSecurityStore {
     private let metaService: String
     private let secretService: String
@@ -103,41 +102,31 @@ public struct KeychainDeviceSecurityStore: DeviceSecurityStore {
         ]
     }
 
-    public func currentLevel(email: String) -> DeviceLevel? {
-        guard let data = (try? read(metaService, email)) ?? nil,
-              let meta = try? JSONDecoder().decode(Meta.self, from: data)
-        else { return nil }
-        return meta.level
-    }
+    // MARK: - Data-layer view (ungated meta + L1 factor)
 
-    public func load(email: String) throws -> DeviceSecurityRecord? {
-        guard let metaData = try read(metaService, email),
-              let meta = try? JSONDecoder().decode(Meta.self, from: metaData)
-        else { return nil }
-        // The secret read prompts Face ID for an L2 device (the item is biometric-gated).
-        guard let secretData = try read(secretService, email),
-              let s = try? JSONDecoder().decode(Secrets.self, from: secretData)
-        else { throw DeviceSecurityError.corruptRecord }
-        return DeviceSecurityRecord(level: meta.level, wrapId: meta.wrapId,
-                                    secret: s.secret, refreshToken: meta.refreshToken)
-    }
-
-    public func save(_ record: DeviceSecurityRecord, email: String) throws {
-        try clear(email: email)
-        let metaValue = try JSONEncoder().encode(
-            Meta(level: record.level, wrapId: record.wrapId, refreshToken: record.refreshToken)
-        )
-        let secretValue = try JSONEncoder().encode(Secrets(secret: record.secret))
-        try add(metaService, email, metaValue, gated: false)
-        try add(secretService, email, secretValue, gated: record.level == .biometric)
-    }
+    public func currentLevel(email: String) -> DeviceLevel? { readMeta(email)?.level }
+    public func wrapId(email: String) -> String? { readMeta(email)?.wrapId }
+    public func refreshToken(email: String) -> String? { readMeta(email)?.refreshToken }
 
     public func updateRefreshToken(_ token: String?, email: String) throws {
-        guard let metaData = try read(metaService, email),
-              let meta = try? JSONDecoder().decode(Meta.self, from: metaData) else { return }
-        let updated = try JSONEncoder().encode(Meta(level: meta.level, wrapId: meta.wrapId, refreshToken: token))
-        try delete(metaService, email)
-        try add(metaService, email, updated, gated: false)
+        guard let meta = readMeta(email) else { return }
+        try writeMeta(Meta(level: meta.level, wrapId: meta.wrapId, refreshToken: token), email: email)
+    }
+
+    public func beginEnrol(email: String) throws -> Data {
+        let factor = makeDeviceFactor()
+        try writeSecret(factor, gated: false, email: email)
+        return factor
+    }
+
+    public func deviceFactor(email: String) -> Data? { (try? readSecret(email)) ?? nil }
+
+    public func commitOnlyPassword(wrapId: String, email: String) throws {
+        try writeMeta(Meta(level: .onlyPassword, wrapId: wrapId, refreshToken: nil), email: email)
+    }
+
+    public func commitPasswordless(level: DeviceLevel, wrapId: String, refreshToken: String, email: String) throws {
+        try writeMeta(Meta(level: level, wrapId: wrapId, refreshToken: refreshToken), email: email)
     }
 
     public func clear(email: String) throws {
@@ -145,7 +134,43 @@ public struct KeychainDeviceSecurityStore: DeviceSecurityStore {
         try delete(secretService, email)
     }
 
+    // MARK: - App-layer view (the gated L2/L3 key — the only prompting path; ADR 0011)
+
+    /// Store the passwordless random key `K` in the secret item: biometric-gated for L2 (`gated == true`),
+    /// ungated for L3. Writing a gated item does **not** prompt — only reading it does.
+    public func storePasswordlessKey(_ k: Data, gated: Bool, email: String) throws {
+        try writeSecret(k, gated: gated, email: email)
+    }
+
+    /// Release `K` for a passwordless device. For an **L2** device this read **prompts Face ID / Touch ID**
+    /// (the secret item is biometric-gated); for L3 it is free. Returns nil if absent. This is the single
+    /// gated read of the launch flow — the data layer never calls it.
+    public func releasePasswordlessKey(email: String) throws -> Data? { try readSecret(email) }
+
     // MARK: - Keychain primitives
+
+    private func readMeta(_ email: String) -> Meta? {
+        guard let data = (try? read(metaService, email)) ?? nil else { return nil }
+        return try? JSONDecoder().decode(Meta.self, from: data)
+    }
+
+    private func readSecret(_ email: String) throws -> Data? {
+        guard let data = try read(secretService, email),
+              let s = try? JSONDecoder().decode(Secrets.self, from: data) else { return nil }
+        return s.secret
+    }
+
+    private func writeMeta(_ meta: Meta, email: String) throws {
+        let value = try JSONEncoder().encode(meta)
+        try delete(metaService, email)
+        try add(metaService, email, value, gated: false)
+    }
+
+    private func writeSecret(_ secret: Data, gated: Bool, email: String) throws {
+        let value = try JSONEncoder().encode(Secrets(secret: secret))
+        try delete(secretService, email)
+        try add(secretService, email, value, gated: gated)
+    }
 
     private func read(_ service: String, _ email: String) throws -> Data? {
         var query = base(service, email)

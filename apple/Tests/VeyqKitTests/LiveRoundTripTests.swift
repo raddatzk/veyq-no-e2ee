@@ -111,17 +111,19 @@ final class LiveRoundTripTests: XCTestCase {
         let store = InMemoryDeviceSecurityStore()
 
         // Floor unlock, then set this device to a passwordless level (enrols the K-wrap + persists session).
+        // ADR 0011: the app layer owns K; here the test supplies it (an in-memory store, no Keychain gate).
+        let k = secureRandomBytes(32)
         let c1 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
         try await c1.login(email: email, password: password)
         try await c1.unlock(password: password, secretKey: secret)
-        try await c1.setPasswordlessLevel(.noLogin, email: email)
+        try await c1.setPasswordlessLevel(.noLogin, email: email, k: k)
         XCTAssertEqual(store.currentLevel(email: email), .noLogin, "the live POST accepted the K-wrap")
 
         // A fresh client (new vault + no live session): resume from the persisted token, open with the key.
         let c2 = VeyqClient(instance: VeyqInstance(baseURL: baseURL), deviceSecurity: store)
-        let resumed = try await c2.resumeSession(email: email)
+        let resumed = try await c2.resumeSession(email: email, k: k)
         XCTAssertTrue(resumed, "the persisted refresh token resumed a live session")
-        let opened = try await c2.unlockWithDeviceKey(email: email)
+        let opened = try await c2.unlockWithDeviceKey(email: email, k: k)
         XCTAssertTrue(opened, "the device key opened the vault with no password")
         let mk = await c2.vault.masterKey()
         XCTAssertEqual(mk?.count, 32)
