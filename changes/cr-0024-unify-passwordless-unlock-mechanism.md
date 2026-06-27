@@ -1,7 +1,7 @@
 ---
 id: cr-0024
 title: Unify the passwordless-unlock mechanism across platforms (prompt-free data layer, app layer releases K)
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: in-progress      # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
 adrs: [0011, 0010, 0005, 0009, 0003]
 invariants: [operator-blind]
@@ -76,11 +76,13 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
   `SuppliedKey` (the single-gesture property is now an app-layer concern, mirroring Android). **Done:**
   `swift test` 51 (3 live-skip), 0 failures; macOS + iOS `xcodebuild BUILD SUCCEEDED`; the data layer has no
   Keychain-prompting path.
-- [ ] **4 — parity check + on-device.** Reconcile the [parity matrix](../docs/crosscutting/platform-parity.md);
-  confirm the L2/L3 coverage entries still hold. Re-run the on-device single-prompt round-trip (the item left
-  open in [cr-0023](cr-0023-gate-l2-session-token.md) phase 4) on both platforms when hardware is available.
-  **Done when:** matrix updated; both platforms show exactly one prompt at L2, silent L3, prompt-free
-  rotation, floor fallback.
+- [~] **4 — parity check + on-device.** Parity reconciled: the
+  [matrix](../docs/crosscutting/platform-parity.md) L2/L3 entries (apple ✅ / android ✅) still hold — this CR
+  changed the *internal layering*, not which surface implements the behaviour, so no matrix status moved; the
+  surfaces now share one documented mechanism. **Still outstanding (shared with
+  [cr-0023](cr-0023-gate-l2-session-token.md) phase 4, needs hardware not available in CI here):** the
+  on-device single-prompt round-trip — exactly one prompt at L2, silent L3, prompt-free rotation, floor
+  fallback — on both platforms. Flip status → done after that run.
 
 ## Definition of done
 
