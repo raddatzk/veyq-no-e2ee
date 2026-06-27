@@ -11,13 +11,18 @@ import Foundation
 final class InMemoryDeviceSecurityStore: DeviceSecurityStore, @unchecked Sendable {
     private let lock = NSLock()
     private var records: [String: DeviceSecurityRecord] = [:]
+    private var _loadCount = 0
+
+    /// How many times `load` (the read that, in the real store, prompts the L2 biometric) has been called —
+    /// so a test can assert the single-load / single-prompt property of `autoRestore` (cr-0023).
+    var loadCount: Int { lock.withLock { _loadCount } }
 
     func currentLevel(email: String) -> DeviceLevel? {
         lock.withLock { records[email]?.level }
     }
 
     func load(email: String) throws -> DeviceSecurityRecord? {
-        lock.withLock { records[email] }
+        lock.withLock { _loadCount += 1; return records[email] }
     }
 
     func save(_ record: DeviceSecurityRecord, email: String) throws {

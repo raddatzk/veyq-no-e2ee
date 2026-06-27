@@ -87,10 +87,18 @@ the token-under-K opens silently exactly as today.
   BiometricPrompt / ungated read), then `resumeSession(acct, k)` + `unlockWithKey(acct, k)`. **Done:**
   `:client:test` (incl. new `legacyPlaintextTokenIsMigratedToSealedOnResume`) + `:app:assembleDebug`
   `BUILD SUCCESSFUL`.
-- [ ] **4 — on-device auto-restore verification (the part unit tests can't cover).** Confirm on a real
+- [~] **4 — on-device auto-restore verification (the part unit tests can't cover).** Confirm on a real
   biometric device / emulator that L2 app-launch auto-restore shows **exactly one** biometric prompt and
   lands on home, mid-session rotation never prompts, and L3 still restores silently. Apple: the live
   in-app `RoundTripUITests`; Android: `:app:connectedDebugAndroidTest` (`adb emu finger touch`).
+  **De-risked at the unit level (the real biometric run still needs hardware — not available in CI here):**
+  - Apple: the `InMemoryDeviceSecurityStore` now counts `load` calls (the read that prompts L2), and
+    `testAutoRestoreResumesAndOpensInOneLoad` asserts `autoRestore` does **exactly one** gated load — the
+    direct unit proxy for "one prompt" (vs. the two that `resumeSession` + `unlockWithDeviceKey` caused).
+  - Android: the single prompt is structural — `:app` `bootstrap` calls `BiometricGate.authenticate` once
+    and passes the resulting K to both `resumeSession(k)` and `unlockWithKey(k)`; `:client` does no gating.
+  **Still outstanding:** the actual Face ID / fingerprint round-trip on device (one prompt observed, silent
+  L3) — run when hardware is available, then flip status → done.
 
 ## Done when
 

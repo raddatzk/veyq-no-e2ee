@@ -275,8 +275,13 @@ final class TrustDeviceTests: XCTestCase {
             try await c1.setPasswordlessLevel(level, email: Self.email)
 
             let c2 = VeyqClient(instance: VeyqInstance(baseURL: Self.baseURL), deviceSecurity: store, transport: stub)
+            let loadsBefore = store.loadCount
             let restored = try await c2.autoRestore(email: Self.email)
             XCTAssertTrue(restored, "autoRestore resumed + opened the vault (\(level))")
+            // The whole launch must read the gated secret (the L2-prompting load) exactly ONCE — the unit
+            // proxy for "one biometric prompt at launch", vs the two loads resumeSession+unlockWithDeviceKey
+            // would cause.
+            XCTAssertEqual(store.loadCount - loadsBefore, 1, "autoRestore does a single gated load (\(level))")
             let mk = await c2.vault.masterKey()
             XCTAssertEqual(mk, Self.masterKey, "the K-wrap recovered the Master Key (\(level))")
             XCTAssertEqual(try unsealPersistedToken(store), "refresh-2", "rotated token re-sealed (\(level))")
