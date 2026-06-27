@@ -167,7 +167,8 @@ nicht klappt, geht immer der Weg über Passwort und Secret Key.
 
 - Feature: [Account & auth](../_index.md)
 - Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many wraps),
-  [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind)
+  [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind),
+  [Passwordless unlock mechanism](../../../crosscutting/passwordless-unlock-mechanism.md) (the cross-platform L2/L3 orchestration)
 - Decisions: [ADR 0005 §4, §8–13](../../../decisions/0005-unlock-methods-and-device-trust.md) (biometric =
   secure-element key used directly; device unlock levels), [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md)
   (auth vs. unlock — why passwordless needs a persisted session)

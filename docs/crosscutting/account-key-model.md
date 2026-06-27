@@ -2,6 +2,9 @@
 
 > The engineering sibling to the [Security Model](security-model.md). It covers a **single account's**
 > keys: identity, the Master Key, the unlock methods that open it, KEK derivation, and recovery.
+> The cross-platform **orchestration** of the passwordless (L2/L3) device-key unlock — how every platform
+> releases the device key and resumes the session uniformly — is the
+> [Passwordless unlock mechanism](passwordless-unlock-mechanism.md).
 >
 > Out of scope here, by design: **scope, content and share keys** and the **invite/onboarding key
 > transfer** (granting access to a space) live in the [scopes & tenancy model](scopes-and-tenancy.md);

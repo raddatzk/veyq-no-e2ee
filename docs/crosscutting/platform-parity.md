@@ -4,6 +4,9 @@ Per [developer styleguide §11](developer-styleguide.md), the surfaces **http / 
 (plus **backend**) are kept at parity; where a surface intentionally differs, it is **marked
 explicitly** here. This is the one-glance overview of *which use-case is implemented on which surface*.
 
+The cross-platform **mechanism** behind the passwordless levels (L2/L3) — one design, native APIs per
+surface — is documented in [Passwordless unlock mechanism](passwordless-unlock-mechanism.md).
+
 This tracks **implementation status / intent** (is the behaviour built, or deliberately N/A on a
 surface). It is **not** the test-coverage chain — that lives in
 [`docs/coverage/`](../coverage/README.md), keyed per use-case under `gaps` — and **not** the *visual*
