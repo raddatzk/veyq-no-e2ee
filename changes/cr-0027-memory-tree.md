@@ -35,12 +35,12 @@ the data layer + backend).
 
 ## Phases
 
-- [ ] **1 — contracts.** New `contracts/api/content.openapi.yaml`: nodes under a scope —
-  `POST /api/scopes/{scopeId}/nodes` (create: `{parentId?, kind, encryptedName, slugToken, orderIndex,
-  wrappedContentKey?}` → `{nodeId}`; 409 `slug_taken`; 422 `illegal_structure`), `GET /api/scopes/{scopeId}/nodes`
-  (the tree: opaque rows), `PATCH …/nodes/{nodeId}` (rename = new encryptedName+slugToken; move = new
-  parentId+slugToken; reorder = orderIndex), `DELETE …/nodes/{nodeId}`. Base64-validated opaque fields,
-  `@Authenticated`. **Done when:** spec valid, `$refs` resolve.
+- [x] **1 — contracts.** `contracts/api/content.openapi.yaml`: `createNode` / `listNodes` / `updateNode`
+  (rename/move/reorder) / `deleteNode` under `/api/scopes/{scopeId}/nodes` (a separate `content` tag — no
+  collision with the `/api/scopes` resource); `NodeKind` (FOLDER/MEMORY/CHAPTER); base64-validated
+  `encryptedName`/`slugToken`/`wrappedContentKey`; error codes `slug_taken` (409) / `illegal_structure` (422)
+  / `scope_not_found` / `node_not_found`. **Done:** YAML valid, all `$ref` resolve, operationIds unique;
+  auto-picked by the backend glob + added to the web/native generators in their phases.
 - [ ] **2 — native crypto.** Port **`slug_token`** to apple `VeyqCrypto` + android `:crypto` (vector-gated;
   `symWrap`/`symUnwrap` are already native). **Done when:** `swift test` + `:crypto:test` green incl. the
   `slug_token` vector on both.
@@ -63,7 +63,7 @@ the data layer + backend).
 
 | Surface | Memory tree: create/list/rename/move (operator-blind) | Status |
 |---|---|---|
-| contracts | `content.openapi.yaml` (nodes under a scope) | ◻ |
+| contracts | `content.openapi.yaml` (nodes under a scope) | ✅ (phase 1) |
 | crypto (native) | `slug_token` ported apple + android | ◻ |
 | backend | `veyq_node` + guards + structural rules | ◻ |
 | web | data layer (encrypt names + slug + `K_mem`) | ◻ |
