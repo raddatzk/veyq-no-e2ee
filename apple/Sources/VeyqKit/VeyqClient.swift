@@ -17,6 +17,7 @@ public final class VeyqClient: Sendable {
     private let auth: AuthAPI.Client
     private let account: AccountAPI.Client
     private let scopes: ScopesAPI.Client
+    private let content: ContentAPI.Client
 
     /// Build a client against an already-bootstrapped instance. `transport` is injectable so tests can
     /// drive the orchestration against a stub without a live server (the default is URLSession);
@@ -37,6 +38,7 @@ public final class VeyqClient: Sendable {
         self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.account = AccountAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.scopes = ScopesAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
+        self.content = ContentAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
     }
 
     /// Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -454,6 +456,156 @@ public final class VeyqClient: Sendable {
         case .conflict: throw VeyqError.personalScopeExists
         case .notFound: throw VeyqError.scopeTenantUnavailable
         case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    // MARK: - Memory tree (cr-0027, en.memory.tree)
+
+    /// A decrypted tree node for the UI. `name` is opened on-device under `K_SC`; the server never saw it.
+    /// `wrappedContentKey` is carried verbatim (still sealed) — open it with `openMemory` only when needed.
+    public struct TreeNode: Sendable, Equatable {
+        public let id: String
+        public let parentId: String?
+        public let kind: ContentAPI.Components.Schemas.NodeKind
+        public let orderIndex: Int
+        public let name: String
+        public let wrappedContentKey: Data?
+    }
+
+    /// List the scope's tree with names decrypted under `scopeKey` (K_SC).
+    public func listTree(scopeId: String, scopeKey: Data) async throws -> [TreeNode] {
+        let rows = try await withRefresh { try await self.fetchNodes(scopeId) }
+        return try rows.map { r in
+            TreeNode(
+                id: r.id,
+                parentId: r.parentId,
+                kind: r.kind,
+                orderIndex: Int(r.orderIndex),
+                name: try Self.openName(scopeKey, Data(r.encryptedName.data)),
+                wrappedContentKey: r.wrappedContentKey.map { Data($0.data) }
+            )
+        }
+    }
+
+    /// Create a FOLDER (organization only — no content key). Returns its node id.
+    @discardableResult
+    public func createFolder(scopeId: String, scopeKey: Data, name: String, parentId: String? = nil) async throws -> String {
+        try await createNode(scopeId: scopeId, scopeKey: scopeKey, name: name, parentId: parentId,
+                             kind: .FOLDER, wrappedContentKey: nil).0
+    }
+
+    /// Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC` (the share grain, ADR 0012).
+    /// Returns the node id + the in-memory `K_mem`.
+    public func createMemory(scopeId: String, scopeKey: Data, name: String, parentId: String? = nil) async throws -> (nodeId: String, memoryKey: Data) {
+        let memoryKey = secureRandomBytes(32)
+        let wrapped = V1.symWrap(kek: scopeKey, targetKey: memoryKey, context: Self.kmemCtx, nonce: secureRandomBytes(12))
+        let (nodeId, _) = try await createNode(scopeId: scopeId, scopeKey: scopeKey, name: name, parentId: parentId,
+                                               kind: .MEMORY, wrappedContentKey: wrapped)
+        return (nodeId, memoryKey)
+    }
+
+    /// Open a Memory's content key (`K_mem`) from its node, or nil if it carries none.
+    public func openMemory(scopeKey: Data, node: TreeNode) throws -> Data? {
+        guard let wrapped = node.wrappedContentKey else { return nil }
+        return try V1.symUnwrap(kek: scopeKey, blob: wrapped, context: Self.kmemCtx)
+    }
+
+    /// Rename a node — re-seal the name + recompute the slug for the (unchanged) parent.
+    public func renameNode(scopeId: String, scopeKey: Data, node: TreeNode, newName: String) async throws {
+        let parentSlot = node.parentId ?? scopeId
+        let body = ContentAPI.Components.Schemas.UpdateNodeRequest(
+            encryptedName: .init(Self.sealName(scopeKey, newName)),
+            slugToken: .init(V1.slugToken(contentKey: scopeKey, parentSlot: parentSlot, slug: Self.slugify(newName)))
+        )
+        try await withRefresh { try await self.patchNode(scopeId, node.id, body) }
+    }
+
+    /// Delete a node and its subtree.
+    public func deleteNode(scopeId: String, nodeId: String) async throws {
+        try await withRefresh { try await self.removeNode(scopeId, nodeId) }
+    }
+
+    // MARK: tree internals
+
+    private static let nameCtx = "node-name"
+    private static let kmemCtx = "content-key"
+
+    /// Minimal slug: NFC, lowercased, trimmed, whitespace → "-". Deterministic so the same name → same token.
+    static func slugify(_ name: String) -> String {
+        let collapsed = name.precomposedStringWithCanonicalMapping.lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace }).joined(separator: "-")
+        return collapsed
+    }
+
+    static func sealName(_ scopeKey: Data, _ name: String) -> Data {
+        V1.symWrap(kek: scopeKey, targetKey: Data(name.utf8), context: nameCtx, nonce: secureRandomBytes(12))
+    }
+    static func openName(_ scopeKey: Data, _ blob: Data) throws -> String {
+        String(decoding: try V1.symUnwrap(kek: scopeKey, blob: blob, context: nameCtx), as: UTF8.self)
+    }
+
+    /// Shared create path for FOLDER/MEMORY — seal the name under `K_SC`, blind the slug, POST only ciphertext.
+    private func createNode(
+        scopeId: String, scopeKey: Data, name: String, parentId: String?,
+        kind: ContentAPI.Components.Schemas.NodeKind, wrappedContentKey: Data?
+    ) async throws -> (String, Void) {
+        let parentSlot = parentId ?? scopeId
+        let body = ContentAPI.Components.Schemas.CreateNodeRequest(
+            parentId: parentId,
+            kind: kind,
+            encryptedName: .init(Self.sealName(scopeKey, name)),
+            slugToken: .init(V1.slugToken(contentKey: scopeKey, parentSlot: parentSlot, slug: Self.slugify(name))),
+            orderIndex: 0,
+            wrappedContentKey: wrappedContentKey.map { .init($0) }
+        )
+        let nodeId = try await withRefresh { try await self.postNode(scopeId, body) }
+        return (nodeId, ())
+    }
+
+    private func fetchNodes(_ scopeId: String) async throws -> [ContentAPI.Components.Schemas.NodeSummary] {
+        let out = try await content.listNodes(.init(path: .init(scopeId: scopeId)))
+        switch out {
+        case .ok(let ok): return try ok.body.json
+        case .notFound: throw VeyqError.scopeNotFound
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func postNode(_ scopeId: String, _ body: ContentAPI.Components.Schemas.CreateNodeRequest) async throws -> String {
+        let out = try await content.createNode(.init(path: .init(scopeId: scopeId), body: .json(body)))
+        switch out {
+        case .created(let created): return try created.body.json.nodeId
+        case .conflict: throw VeyqError.slugTaken
+        case .unprocessableContent: throw VeyqError.illegalStructure
+        case .notFound: throw VeyqError.scopeNotFound
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func patchNode(_ scopeId: String, _ nodeId: String, _ body: ContentAPI.Components.Schemas.UpdateNodeRequest) async throws {
+        let out = try await content.updateNode(.init(path: .init(scopeId: scopeId, nodeId: nodeId), body: .json(body)))
+        switch out {
+        case .noContent: return
+        case .conflict: throw VeyqError.slugTaken
+        case .unprocessableContent: throw VeyqError.illegalStructure
+        case .notFound: throw VeyqError.nodeNotFound
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func removeNode(_ scopeId: String, _ nodeId: String) async throws {
+        let out = try await content.deleteNode(.init(path: .init(scopeId: scopeId, nodeId: nodeId)))
+        switch out {
+        case .noContent: return
+        case .notFound: throw VeyqError.nodeNotFound
         case .unauthorized: throw VeyqError.sessionExpired
         case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
         }

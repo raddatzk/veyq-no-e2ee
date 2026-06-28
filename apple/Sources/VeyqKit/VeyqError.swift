@@ -32,4 +32,13 @@ public enum VeyqError: Error, Equatable {
     case scopeTenantUnavailable
     /// A personal scope already exists for this member in this tenant (one per tenant, cr-0026).
     case personalScopeExists
+    /// A sibling node already holds this blinded slug under the same parent (409, cr-0027).
+    case slugTaken
+    /// The node tree operation broke a structural rule — folder-in-Memory, chapter-at-root, or a move
+    /// cycle (422, cr-0027).
+    case illegalStructure
+    /// The addressed scope does not exist for the caller (404, cr-0027).
+    case scopeNotFound
+    /// The addressed node does not exist in this scope (404, cr-0027).
+    case nodeNotFound
 }

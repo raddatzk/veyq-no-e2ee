@@ -57,8 +57,11 @@ the data layer + backend).
   under `K_SC`) / `listTree` (decrypt names) / `openMemory` (unwrap `K_mem`) / `renameNode` / `deleteNode`.
   **Done:** `npm run check` green (73 tests; `tree.test.ts` round-trips name-seal + K_mem wrap/open + the slug
   token = `v1.slugToken(K_SC, scopeId, slug)` with real v1 crypto + mocked API).
-- [ ] **5 — apple.** The same in `VeyqClient` (+ generated `ContentAPI` module). **Done when:** `swift test`
-  green (create→list→decrypt round-trip) + iOS build.
+- [x] **5 — apple.** The same in `VeyqClient` (+ generated `ContentAPI` module): `listTree` / `createFolder`
+  / `createMemory` (births `K_mem` wrapped under `K_SC`) / `openMemory` / `renameNode` / `deleteNode`; names
+  sealed under `K_SC` (ctx `node-name`), blinded `slugToken`, `K_mem` (ctx `content-key`). **Done:** `swift
+  test` 62/0 (3 live-skipped) incl. `ContentTreeTests` (create→list→decrypt round-trip + K_mem open +
+  rename-recomputes-slug + delete; operator-blind: stub only ever saw ciphertext); iOS simulator build green.
 - [ ] **6 — android.** The same in `:client` (`"content"` added to the generator specs). **Done when:**
   `:client:test` green (same round-trip) + `:app:assembleDebug`.
 
@@ -70,7 +73,8 @@ the data layer + backend).
 | crypto (native) | `slug_token` ported apple + android | ✅ (phase 2) |
 | backend | `veyq_node` + guards + structural rules | ✅ (phase 3) |
 | web | data layer (encrypt names + slug + `K_mem`) | ✅ (phase 4) |
-| apple / android | data layer (+ generated content client) | ◻ |
+| apple | data layer (+ generated `ContentAPI` client) | ✅ (phase 5) |
+| android | data layer (+ generated content client) | ◻ |
 | UI (all) | the tree UI | ◻ **deferred to the shell** |
 | windows / linux | — | ◻ (when those clients exist) |
 
