@@ -46,7 +46,7 @@ function switchTenant(tenant: MyTenant) {
 
 <template>
   <aside class="tenant-sidebar">
-    <RouterLink :to="{ name: 'home' }" class="sidebar-brand" aria-label="veyq Home">
+    <RouterLink :to="{ name: 'home', hash: '#~me' }" class="sidebar-brand" aria-label="veyq Home">
       <img class="sidebar-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
       <span>veyq</span>
     </RouterLink>
@@ -86,7 +86,7 @@ function switchTenant(tenant: MyTenant) {
     </section>
 
     <nav class="sidebar-nav" :aria-label="t('shell.personal')">
-      <RouterLink :to="{ name: 'home' }" class="sidebar-nav-link sidebar-personal-link">
+      <RouterLink :to="{ name: 'home', hash: '#~me' }" class="sidebar-nav-link sidebar-personal-link">
         <span class="pi pi-user" />
         <span>{{ t('shell.personal') }}</span>
       </RouterLink>

@@ -15,12 +15,12 @@ const router = useRouter()
 
 const home = computed<MenuItem>(() => ({
   label: breadcrumb.trail[0]?.name,
-  command: () => void router.push({ name: 'home' }),
+  command: () => void router.push({ hash: breadcrumb.trail[0]?.hash ?? '#~me' }),
 }))
 const items = computed<MenuItem[]>(() =>
   breadcrumb.trail.slice(1).map((crumb) => ({
     label: crumb.name,
-    command: () => void router.push({ name: 'node', params: { nodeId: crumb.id as string } }),
+    command: () => void router.push({ hash: crumb.hash }),
   })),
 )
 </script>

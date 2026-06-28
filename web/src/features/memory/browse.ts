@@ -2,6 +2,7 @@
 // so the current level + the breadcrumb are derived here from the locally-decrypted tree (`listTree`).
 import type { TreeNode } from './tree'
 import type { Crumb } from '../../app/breadcrumb'
+import { hashForNode } from './location'
 import { NodeKind } from '../../api/generated/content'
 
 const byOrder = (a: TreeNode, b: TreeNode): number => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)
@@ -15,16 +16,17 @@ export function childrenOf(tree: TreeNode[], parentId: string | null): { folders
   }
 }
 
-/** The breadcrumb from the root down to `nodeId` (null = root): `[root, …ancestors, node]`. */
+/** The breadcrumb from the root down to `nodeId` (null = root): `[root, …ancestors, node]`, each crumb
+ *  carrying its `#fragment` so the topbar can link to it. */
 export function breadcrumbOf(tree: TreeNode[], nodeId: string | null, rootName: string): Crumb[] {
   const byId = new Map(tree.map((n) => [n.id, n]))
   const trail: Crumb[] = []
   let cur = nodeId ? byId.get(nodeId) ?? null : null
   while (cur) {
-    trail.unshift({ id: cur.id, name: cur.name })
+    trail.unshift({ id: cur.id, name: cur.name, hash: hashForNode(tree, cur.id) })
     cur = cur.parentId ? byId.get(cur.parentId) ?? null : null
   }
-  trail.unshift({ id: null, name: rootName })
+  trail.unshift({ id: null, name: rootName, hash: hashForNode(tree, null) })
   return trail
 }
 

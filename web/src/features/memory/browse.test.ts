@@ -32,16 +32,16 @@ describe('childrenOf', () => {
 })
 
 describe('breadcrumbOf', () => {
-  it('walks root → ancestors → node', () => {
+  it('walks root → ancestors → node, each crumb carrying its #fragment', () => {
     expect(breadcrumbOf(tree, '2025', 'Personal')).toEqual([
-      { id: null, name: 'Personal' },
-      { id: 'trips', name: 'Trips' },
-      { id: '2025', name: '2025' },
+      { id: null, name: 'Personal', hash: '#~me' },
+      { id: 'trips', name: 'Trips', hash: '#~me/trips' },
+      { id: '2025', name: '2025', hash: '#~me/trips/2025' },
     ])
   })
 
   it('is just the root at the top level', () => {
-    expect(breadcrumbOf(tree, null, 'Personal')).toEqual([{ id: null, name: 'Personal' }])
+    expect(breadcrumbOf(tree, null, 'Personal')).toEqual([{ id: null, name: 'Personal', hash: '#~me' }])
   })
 })
 

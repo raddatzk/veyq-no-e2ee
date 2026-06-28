@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// The personal-space browse (cr-0030, uc.memory.browse). Mounted at `/` (root) and `/n/:nodeId` (a folder).
-// Opens the space, loads the decrypted tree (once, via treeStore), renders the current level + a client-side
-// breadcrumb, and owns the create / rename / delete dialogs. Operator-blind: names + navigation on device.
+// The personal-space content host (cr-0030/0031, uc.memory.browse). Mounted at `/`; the current tree position
+// lives in the URL **#fragment** (`#~me/reisen-2026/rom`), resolved against the locally-decrypted tree — the
+// operator-blind server computes no navigation and never sees the path. Renders a folder/root level (browse)
+// or a Memory leaf (detail) by the resolved node's kind, and owns the create / rename / delete dialogs.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -9,9 +10,11 @@ import { activeSpace, activeScopeKey, enterPersonalSpace } from '../app/activeSp
 import { setBreadcrumb } from '../app/breadcrumb'
 import { treeStore, loadTree } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
+import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
 import { NodeKind } from '../api/generated/content'
 import type { TreeNode } from '../features/memory/tree'
 import MemoryBrowse from '../features/memory/components/MemoryBrowse.vue'
+import MemoryDetail from '../features/memory/components/MemoryDetail.vue'
 import NodeMutationDialog from '../features/memory/components/NodeMutationDialog.vue'
 import DeleteNodeDialog from '../features/memory/components/DeleteNodeDialog.vue'
 
@@ -19,15 +22,18 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-const currentNodeId = computed(() => (typeof route.params.nodeId === 'string' ? route.params.nodeId : null))
+// Position from the #fragment. A slug segment that doesn't resolve (`false`) collapses to the scope root.
+const segments = computed(() => parseHash(route.hash).segments)
+const resolved = computed(() => resolveSlugPath(treeStore.nodes, segments.value))
+const currentNodeId = computed(() => (typeof resolved.value === 'string' ? resolved.value : null))
+const currentNode = computed(() => nodeById(treeStore.nodes, currentNodeId.value))
+const isMemory = computed(() => currentNode.value?.kind === NodeKind.Memory)
+const currentFolder = computed(() =>
+  currentNode.value && currentNode.value.kind === NodeKind.Folder ? currentNode.value : null,
+)
 const level = computed(() => childrenOf(treeStore.nodes, currentNodeId.value))
 // Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
 const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
-// The folder we are currently inside (null at the root) — gives it a rename/delete header.
-const currentFolder = computed(() => {
-  const node = nodeById(treeStore.nodes, currentNodeId.value)
-  return node && node.kind === NodeKind.Folder ? node : null
-})
 
 type Mode = 'create-folder' | 'create-memory' | 'rename'
 const mutationVisible = ref(false)
@@ -37,7 +43,7 @@ const deleteVisible = ref(false)
 const deleteTarget = ref<TreeNode | null>(null)
 
 watch(
-  [currentNodeId, () => treeStore.nodes],
+  [() => route.hash, () => treeStore.nodes],
   () => setBreadcrumb(breadcrumbOf(treeStore.nodes, currentNodeId.value, t('shell.personal'))),
   { immediate: true },
 )
@@ -49,10 +55,10 @@ async function ready() {
 void ready()
 
 function openFolder(folder: TreeNode) {
-  void router.push({ name: 'node', params: { nodeId: folder.id } })
+  void router.push({ hash: hashForNode(treeStore.nodes, folder.id) })
 }
 function openMemory(memory: TreeNode) {
-  void router.push({ name: 'memory', params: { nodeId: memory.id } })
+  void router.push({ hash: hashForNode(treeStore.nodes, memory.id) })
 }
 function startCreate(mode: 'create-folder' | 'create-memory') {
   mutationMode.value = mode
@@ -74,7 +80,7 @@ async function onMutationDone() {
 async function onDeleteDone() {
   const parentId = deleteTarget.value?.parentId ?? null
   await loadTree()
-  void router.push(parentId ? { name: 'node', params: { nodeId: parentId } } : { name: 'home' })
+  void router.push({ hash: hashForNode(treeStore.nodes, parentId) })
 }
 </script>
 
@@ -90,18 +96,26 @@ async function onDeleteDone() {
     <div v-else-if="activeSpace.status === 'error' || treeStore.error" class="home-state">
       <p>{{ t('home.error') }}</p>
     </div>
-    <MemoryBrowse
-      v-else
-      :folder="currentFolder"
-      :folders="level.folders"
-      :memories="level.memories"
-      @open-folder="openFolder"
-      @open-memory="openMemory"
-      @create-folder="startCreate('create-folder')"
-      @create-memory="startCreate('create-memory')"
-      @rename-folder="currentFolder && startRename(currentFolder)"
-      @delete-folder="currentFolder && startDelete(currentFolder)"
-    />
+    <template v-else>
+      <MemoryDetail
+        v-if="isMemory && currentNode"
+        :node="currentNode"
+        @rename="currentNode && startRename(currentNode)"
+        @delete="currentNode && startDelete(currentNode)"
+      />
+      <MemoryBrowse
+        v-else
+        :folder="currentFolder"
+        :folders="level.folders"
+        :memories="level.memories"
+        @open-folder="openFolder"
+        @open-memory="openMemory"
+        @create-folder="startCreate('create-folder')"
+        @create-memory="startCreate('create-memory')"
+        @rename-folder="currentFolder && startRename(currentFolder)"
+        @delete-folder="currentFolder && startDelete(currentFolder)"
+      />
+    </template>
 
     <NodeMutationDialog
       v-if="mutationVisible && scopeKey && activeSpace.scopeId"

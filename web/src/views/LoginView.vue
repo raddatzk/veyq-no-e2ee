@@ -15,6 +15,7 @@ import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
+import { takeRoute } from '../app/pendingRoute'
 
 // uc.account.login + unlock + trust-device (web). Login gates a session; unlock opens the Master Key. A
 // trusted device (a DEVICE wrap, ADR 0005) unlocks with only the password (carried from login); the floor
@@ -55,7 +56,7 @@ async function submit() {
       password.value = ''
       secretKey.value = ''
       pendingSecretKey = ''
-      await router.push({ name: 'home' })
+      await router.push(takeRoute() ?? { name: 'home' })
       return
     }
     // Untrusted, or the device key/wrap is gone (E1) — show the password + Secret-Key floor.
@@ -92,7 +93,7 @@ async function unlock() {
     trustChecked.value = false
     password.value = ''
     secretKey.value = ''
-    await router.push({ name: 'home' })
+    await router.push(takeRoute() ?? { name: 'home' })
   } catch {
     // Wrong password / Secret Key (or no wrap) — one generic failure. Keep the inputs for a retry.
     error.value = t('unlock.failed')
