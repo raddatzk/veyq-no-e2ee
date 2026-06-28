@@ -31,6 +31,7 @@ independent and may legitimately disagree.
 | [uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md) — Per-device unlock-level chooser | N/A | N/A | ◻ | ✅ | ✅ |
 | [uc.account.biometric-unlock](../features/account/use-cases/uc.account.biometric-unlock.md) — Biometric unlock (L2, biometric-gated key) | N/A | N/A | **N/A** | ✅ | ✅ |
 | [uc.account.auto-unlock](../features/account/use-cases/uc.account.auto-unlock.md) — Auto unlock (L3, no login) | N/A | N/A | ◻ | ✅ | ✅ |
+| [uc.spaces.personal-scope](../features/spaces/use-cases/uc.spaces.personal-scope.md) — Personal scope (birth + open, per tenant) | ◻ | ◻ | ◻ | ◻ | ◻ |
 
 ### Intentional N/A
 

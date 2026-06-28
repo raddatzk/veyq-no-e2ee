@@ -1,7 +1,7 @@
 ---
 id: cr-0026
 title: Personal scope — generalise scope identity (scopeId + kind) and birth/open a per-tenant personal space
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: in-progress      # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.spaces.personal-scope]   # authored in phase 1
 adrs: [0002, 0007, 0009, 0010]
 invariants: [operator-blind]
@@ -52,10 +52,11 @@ and the content slice.
 
 ## Phases
 
-- [ ] **1 — state.** Author `uc.spaces.personal-scope` (new `docs/features/spaces/` feature + `_index`),
-  reconcile [scopes-and-tenancy](../docs/crosscutting/scopes-and-tenancy.md) + [account-key-model](../docs/crosscutting/account-key-model.md)
-  (scope identity now realised; personal scope client-birthed) + the [parity matrix](../docs/crosscutting/platform-parity.md).
-  **Done when:** docs exist, links resolve, design matches this CR.
+- [x] **1 — state.** Authored the `spaces` feature (`docs/features/spaces/_index.md` +
+  `use-cases/uc.spaces.personal-scope.md`, Cockburn-lite + PlantUML birth/open sequence + EN/DE), reconciled
+  [scopes-and-tenancy](../docs/crosscutting/scopes-and-tenancy.md) (scope identity + personal scope realised)
+  and added the [parity matrix](../docs/crosscutting/platform-parity.md) row. **Done:** docs exist, links
+  resolve, `plantuml -checkonly` OK, design matches this CR.
 - [ ] **2 — contracts.** New `contracts/api/scopes.openapi.yaml`: `POST /api/scopes` (create personal,
   `{wrappedGrant}` → `{scopeId,kind}`; 409 if one exists) + `GET /api/scopes` (list mine →
   `[{id,kind,tenantId,wrappedGrant}]`). **Done when:** spec lints; clients/backend generate.
