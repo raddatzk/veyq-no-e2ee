@@ -478,6 +478,16 @@ public final class VeyqClient: Sendable {
         public let orderIndex: Int
         public let name: String
         public let wrappedContentKey: Data?
+
+        public init(id: String, parentId: String?, kind: ContentAPI.Components.Schemas.NodeKind,
+                    orderIndex: Int, name: String, wrappedContentKey: Data?) {
+            self.id = id
+            self.parentId = parentId
+            self.kind = kind
+            self.orderIndex = orderIndex
+            self.name = name
+            self.wrappedContentKey = wrappedContentKey
+        }
     }
 
     /// List the scope's tree with names decrypted under `scopeKey` (K_SC).
