@@ -47,4 +47,35 @@ class LiveRoundTripTest {
         assertFalse(client.vault.isUnlocked)
         assertFalse(client.session.isAuthenticated)
     }
+
+    /**
+     * cr-0028 — the **media byte-transport** round-trip against the live store. Needs the instance running
+     * with a bundled MinIO (`directTransport: ok`). Validates the one path the mocked `MediaTest` cannot:
+     * real presigned PUT/GET over OkHttp. login → unlock → personal scope → create a Memory → addMedia (seal +
+     * direct-to-store upload) → listMedia → openMedia, asserting the bytes round-trip.
+     */
+    @Test
+    fun mediaRoundTripAgainstLiveInstance() {
+        val base = System.getenv("VEYQ_LIVE_BASE")
+        assumeTrue(base != null, "set VEYQ_LIVE_BASE (+ VEYQ_EMAIL/PASSWORD/SECRET) to run the live round-trip")
+        val email = assertNotNull(System.getenv("VEYQ_EMAIL"))
+        val password = assertNotNull(System.getenv("VEYQ_PASSWORD"))
+        val secret = assertNotNull(System.getenv("VEYQ_SECRET"))
+
+        val c = VeyqClient(VeyqInstance(base!!.trimEnd('/')))
+        c.login(email = email, password = password)
+        c.unlock(password = password, secretKey = secret)
+        c.ensurePersonalScope()
+        val scopeKey = assertNotNull(c.openPersonalScope(), "no personal scope")
+        val personal = assertNotNull(c.listMyScopes().firstOrNull { it.kind == com.veyq.api.scopes.model.ScopeKind.PERSONAL })
+
+        val (nodeId, memoryKey) = c.createMemory(personal.id.toString(), scopeKey, "E2E media ${System.nanoTime()}")
+
+        val data = ByteArray(300 * 1024) { ((it * 17 + 3) and 0xff).toByte() }
+        val (blobId, _) = c.addMedia(personal.id.toString(), nodeId, memoryKey, data)
+        assertTrue(blobId.isNotEmpty())
+
+        val item = assertNotNull(c.listMedia(personal.id.toString(), nodeId).firstOrNull())
+        assertEquals(data.toList(), c.openMedia(personal.id.toString(), memoryKey, item).toList())
+    }
 }

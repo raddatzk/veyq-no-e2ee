@@ -18,27 +18,33 @@ public final class VeyqClient: Sendable {
     private let account: AccountAPI.Client
     private let scopes: ScopesAPI.Client
     private let content: ContentAPI.Client
+    private let media: MediaAPI.Client
+    private let blobTransport: any BlobTransport
 
     /// Build a client against an already-bootstrapped instance. `transport` is injectable so tests can
     /// drive the orchestration against a stub without a live server (the default is URLSession);
-    /// `deviceSecurity` is injectable so tests use an in-memory double instead of the real Keychain.
+    /// `deviceSecurity` is injectable so tests use an in-memory double instead of the real Keychain;
+    /// `blobTransport` is the direct-to-store byte path (default URLSession), injectable for hermetic tests.
     public init(
         instance: VeyqInstance,
         session: Session = Session(),
         vault: Vault = Vault(),
         deviceSecurity: any DeviceSecurityStore = KeychainDeviceSecurityStore(),
-        transport: any ClientTransport = VeyqTransport.make()
+        transport: any ClientTransport = VeyqTransport.make(),
+        blobTransport: any BlobTransport = URLSessionBlobTransport()
     ) {
         self.instance = instance
         self.session = session
         self.vault = vault
         self.deviceSecurity = deviceSecurity
+        self.blobTransport = blobTransport
         let middlewares: [any ClientMiddleware] = [BearerMiddleware(session: session)]
         self.setup = SetupAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.account = AccountAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.scopes = ScopesAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.content = ContentAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
+        self.media = MediaAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
     }
 
     /// Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -606,6 +612,160 @@ public final class VeyqClient: Sendable {
         switch out {
         case .noContent: return
         case .notFound: throw VeyqError.nodeNotFound
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    // MARK: - Media blobs (cr-0028, en.memory.media)
+
+    private static let kblobCtx = "blob-key"
+    /// Plaintext bytes per chunk before sealing (each frame adds a 12-byte nonce + a 16-byte tag).
+    public static let chunkSize = 256 * 1024
+
+    /// A node's media for read-back: the blob id + the metadata needed to open it.
+    public struct MediaItem: Sendable, Equatable {
+        public let mediaId: String
+        public let blobId: String
+        public let chunkCount: Int
+        public let byteSize: Int
+        public let wrappedBlobKey: Data
+    }
+
+    /// Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`), upload the
+    /// ciphertext chunks direct-to-store via presigned PUTs, and attach the result to `nodeId` (a
+    /// MEMORY/CHAPTER). Returns the new ids. Operator-blind: bytes never touch the backend.
+    @discardableResult
+    public func addMedia(scopeId: String, nodeId: String, memoryKey: Data, data: Data) async throws -> (blobId: String, mediaId: String) {
+        let blobKey = secureRandomBytes(32)
+        let wrappedBlobKey = V1.symWrap(kek: memoryKey, targetKey: blobKey, context: Self.kblobCtx, nonce: secureRandomBytes(12))
+
+        let chunks = Self.chunkify(data)
+        let total = chunks.count
+        let frames = chunks.enumerated().map { i, chunk in
+            V1.sealFrame(contentKey: blobKey, index: i, total: total, plaintext: chunk, nonce: secureRandomBytes(12))
+        }
+        let byteSize = frames.reduce(0) { $0 + $1.count }
+
+        // start — reserve the session + presign one PUT per chunk
+        let started = try await withRefresh {
+            try await self.startUploads(scopeId, chunkCount: frames.count, byteSize: byteSize, wrappedBlobKey: wrappedBlobKey)
+        }
+        guard let up = started.first else { throw VeyqError.mediaItemFailed(nil) }
+        if let err = up.error { throw VeyqError.mediaItemFailed(err) }
+        guard let uploadId = up.uploadId, let puts = up.presignedPuts else { throw VeyqError.storeUnavailable }
+
+        // PUT each sealed frame straight to the store
+        for ref in puts.sorted(by: { $0.index < $1.index }) {
+            guard let url = URL(string: ref.url) else { throw VeyqError.blobTransferFailed }
+            try await blobTransport.put(url, frames[Int(ref.index)])
+        }
+
+        // complete — the backend stats the objects (declare-then-verify) and attaches the media
+        let done = try await withRefresh { try await self.completeMedia(scopeId, uploadId: uploadId, nodeId: nodeId) }
+        guard let m = done.first else { throw VeyqError.mediaItemFailed(nil) }
+        if let err = m.error { throw VeyqError.mediaItemFailed(err) }
+        guard let blobId = m.blobId, let mediaId = m.mediaId else { throw VeyqError.mediaItemFailed(nil) }
+        return (blobId, mediaId)
+    }
+
+    /// List a node's media (opaque metadata + the K_blob wrap).
+    public func listMedia(scopeId: String, nodeId: String) async throws -> [MediaItem] {
+        let rows = try await withRefresh { try await self.fetchNodeMedia(scopeId, nodeId) }
+        return rows.map {
+            MediaItem(mediaId: $0.mediaId, blobId: $0.blobId, chunkCount: Int($0.chunkCount),
+                      byteSize: Int($0.byteSize), wrappedBlobKey: Data($0.wrappedBlobKey.data))
+        }
+    }
+
+    /// Open a media blob: unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
+    /// direct-from-store, and `openFrame` them back to the original plaintext (the AAD position check applies).
+    public func openMedia(scopeId: String, memoryKey: Data, media item: MediaItem) async throws -> Data {
+        let blobKey = try V1.symUnwrap(kek: memoryKey, blob: item.wrappedBlobKey, context: Self.kblobCtx)
+
+        let gets = try await withRefresh { try await self.presignDownload(scopeId, blobId: item.blobId) }
+        guard let d = gets.first else { throw VeyqError.mediaItemFailed(nil) }
+        if let err = d.error { throw VeyqError.mediaItemFailed(err) }
+        guard let urls = d.presignedGets else { throw VeyqError.storeUnavailable }
+
+        let ordered = urls.sorted(by: { $0.index < $1.index })
+        var out = Data()
+        for (i, ref) in ordered.enumerated() {
+            guard let url = URL(string: ref.url) else { throw VeyqError.blobTransferFailed }
+            let frame = try await blobTransport.get(url)
+            out.append(try V1.openFrame(contentKey: blobKey, index: i, total: ordered.count, frame: frame))
+        }
+        return out
+    }
+
+    // MARK: media internals
+
+    /// Split plaintext into ≥1 chunks of at most `chunkSize` bytes (a 0-byte blob is a single empty chunk).
+    static func chunkify(_ data: Data) -> [Data] {
+        if data.isEmpty { return [Data()] }
+        var out: [Data] = []
+        var off = data.startIndex
+        while off < data.endIndex {
+            let end = data.index(off, offsetBy: chunkSize, limitedBy: data.endIndex) ?? data.endIndex
+            out.append(data.subdata(in: off ..< end))
+            off = end
+        }
+        return out
+    }
+
+    private func startUploads(_ scopeId: String, chunkCount: Int, byteSize: Int, wrappedBlobKey: Data)
+        async throws -> [MediaAPI.Components.Schemas.BlobUploadResultItem]
+    {
+        let item = MediaAPI.Components.Schemas.BlobUploadRequestItem(
+            chunkCount: Int32(chunkCount), byteSize: Int64(byteSize), wrappedBlobKey: .init(wrappedBlobKey)
+        )
+        let out = try await media.startBlobUploads(.init(path: .init(scopeId: scopeId), body: .json(.init(items: [item]))))
+        switch out {
+        case .ok(let ok): return try ok.body.json.results
+        case .notFound: throw VeyqError.scopeNotFound
+        case .serviceUnavailable: throw VeyqError.storeUnavailable
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func completeMedia(_ scopeId: String, uploadId: String, nodeId: String)
+        async throws -> [MediaAPI.Components.Schemas.MediaResultItem]
+    {
+        let item = MediaAPI.Components.Schemas.MediaRequestItem(uploadId: uploadId, nodeId: nodeId)
+        let out = try await media.completeMedia(.init(path: .init(scopeId: scopeId), body: .json(.init(items: [item]))))
+        switch out {
+        case .ok(let ok): return try ok.body.json.results
+        case .notFound: throw VeyqError.scopeNotFound
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func fetchNodeMedia(_ scopeId: String, _ nodeId: String)
+        async throws -> [MediaAPI.Components.Schemas.MediaSummary]
+    {
+        let out = try await media.listNodeMedia(.init(path: .init(scopeId: scopeId, nodeId: nodeId)))
+        switch out {
+        case .ok(let ok): return try ok.body.json
+        case .notFound: throw VeyqError.nodeNotFound
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    private func presignDownload(_ scopeId: String, blobId: String)
+        async throws -> [MediaAPI.Components.Schemas.BlobDownloadResultItem]
+    {
+        let item = MediaAPI.Components.Schemas.BlobDownloadRequestItem(blobId: blobId)
+        let out = try await media.presignBlobDownloads(.init(path: .init(scopeId: scopeId), body: .json(.init(items: [item]))))
+        switch out {
+        case .ok(let ok): return try ok.body.json.results
+        case .notFound: throw VeyqError.scopeNotFound
+        case .serviceUnavailable: throw VeyqError.storeUnavailable
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
         case .unauthorized: throw VeyqError.sessionExpired
         case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
         }

@@ -41,4 +41,11 @@ public enum VeyqError: Error, Equatable {
     case scopeNotFound
     /// The addressed node does not exist in this scope (404, cr-0027).
     case nodeNotFound
+    /// The object store cannot presign / has no transport path (the in-memory dev store, cr-0028).
+    case storeUnavailable
+    /// A media item failed in a batch (per-item error code carried, cr-0028): illegal_target,
+    /// budget_exceeded, upload_not_found, …
+    case mediaItemFailed(String?)
+    /// A direct-to-store PUT/GET to a presigned URL failed (non-2xx / transport error, cr-0028).
+    case blobTransferFailed
 }

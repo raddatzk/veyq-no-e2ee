@@ -340,4 +340,23 @@ public enum V1 {
         let mac = HMAC<SHA256>.authenticationCode(for: utf8(slug), using: SymmetricKey(data: slugKey))
         return Data(mac)
     }
+
+    // MARK: - chunked-AEAD frame (cr-0028)
+
+    /// Chunked-AEAD frame (resumable upload + segmented streaming): a large blob is split into independent,
+    /// self-contained frames so chunks resume individually and segments decrypt without the whole file. Each
+    /// frame = `nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad)` with `aad = u32be(index) || u32be(total)`,
+    /// binding the chunk's position so a dropped, reordered or appended frame fails to open (anti-truncation).
+    /// The media transport seals each chunk under a per-blob `K_blob`.
+    public static func sealFrame(contentKey: Data, index: Int, total: Int, plaintext: Data, nonce: Data) -> Data {
+        nonce + aeadSeal(key: contentKey, nonce: nonce, plaintext: plaintext, aad: u32be(index) + u32be(total))
+    }
+
+    public static func openFrame(contentKey: Data, index: Int, total: Int, frame: Data) throws -> Data {
+        // 12 nonce + at least a 16-byte tag; shorter is a malformed/hostile frame, not ours.
+        guard frame.count >= 12 + 16 else { throw V1Error.malformed }
+        let nonce = frame.subdata(in: frame.startIndex ..< frame.startIndex + 12)
+        let body = frame.suffix(from: frame.startIndex + 12)
+        return try aeadOpen(key: contentKey, nonce: nonce, ciphertextAndTag: body, aad: u32be(index) + u32be(total))
+    }
 }

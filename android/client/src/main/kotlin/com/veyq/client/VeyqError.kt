@@ -58,4 +58,13 @@ sealed class VeyqError(message: String? = null) : Exception(message) {
 
     /** The addressed node does not exist in this scope (404, cr-0027). */
     object NodeNotFound : VeyqError("node not found")
+
+    /** The object store cannot presign / has no transport path (the in-memory dev store, cr-0028). */
+    object StoreUnavailable : VeyqError("store unavailable")
+
+    /** A media item failed in a batch (per-item error: illegal_target, budget_exceeded, upload_not_found, …). */
+    data class MediaItemFailed(val code: String?) : VeyqError("media item failed: $code")
+
+    /** A direct-to-store PUT/GET to a presigned URL failed (non-2xx / transport error, cr-0028). */
+    object BlobTransferFailed : VeyqError("blob transfer failed")
 }

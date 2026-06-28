@@ -6,7 +6,7 @@ import XCTest
 /// Conformance of the Apple `v1` auth/unlock subset against the SHARED vectors
 /// (`contracts/crypto/vectors/v1.json`, ADR 0009) — the same file the web TS suite is pinned to, so a green
 /// run here proves cross-implementation byte-parity. Includes the hybrid KEM + asymWrap + identity/fingerprint
-/// (cr-0025); the remaining content-side vectors (journal/chunk/slug/dedup) are added with the content slice.
+/// (cr-0025), the slug token (cr-0027) and the chunked-AEAD frame (cr-0028); journal/dedup land with their slices.
 final class V1ConformanceTests: XCTestCase {
 
     private var vectors: [String: Any]!
@@ -147,6 +147,15 @@ final class V1ConformanceTests: XCTestCase {
         let v = sub(["slug_token"])
         let token = V1.slugToken(contentKey: hex(v["contentKey"]), parentSlot: v["parentSlot"] as! String, slug: v["slug"] as! String)
         XCTAssertEqual(token, hex(v["token"]))
+    }
+
+    func testChunkFrame() throws {
+        let v = sub(["chunk_frame"])
+        let frame = V1.sealFrame(contentKey: hex(v["contentKey"]), index: v["index"] as! Int, total: v["total"] as! Int,
+                                 plaintext: hex(v["plaintext"]), nonce: hex(v["nonce"]))
+        XCTAssertEqual(frame, hex(v["frame"]))
+        let opened = try V1.openFrame(contentKey: hex(v["contentKey"]), index: v["index"] as! Int, total: v["total"] as! Int, frame: frame)
+        XCTAssertEqual(opened, hex(v["plaintext"]))
     }
 
     // MARK: - helpers

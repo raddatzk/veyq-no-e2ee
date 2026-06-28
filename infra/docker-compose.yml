@@ -24,5 +24,49 @@ services:
       timeout: 5s
       retries: 10
 
+  # --- Bundled object store for media blobs (cr-0028/cr-0029, ADR 0013) — opt-in: `docker compose --profile s3
+  # up -d`, then once `./infra/garage-init.sh`. The backend never streams bytes; it presigns short-TTL URLs the
+  # client PUT/GETs directly. **Garage** (S3-compatible, AGPL, built for self-hosting — replaces the archived
+  # MinIO). Exposed on :19000 for the backend e2e (`VEYQ_S3_E2E=1`, BlobBatchE2ETest); Traefik path-routes the
+  # bucket so the web app reaches presigned URLs **same-origin** (no CORS, ADR 0013 §4). Throwaway creds only.
+  garage:
+    image: dxflrs/garage:v2.0.0
+    container_name: veyq-garage
+    profiles: ["s3"]
+    restart: unless-stopped
+    volumes:
+      - "./garage.toml:/etc/garage.toml:ro"
+      - veyq-garage-meta:/var/lib/garage/meta
+      - veyq-garage-data:/var/lib/garage/data
+    ports:
+      - "19000:3900"   # S3 API — VEYQ_S3_ENDPOINT for the backend e2e; also the internal endpoint the backend stats against
+      - "19003:3903"   # admin API (local only)
+    labels:
+      # Traefik path-route for same-origin web access: route the bucket path WITHOUT stripping the prefix and
+      # with the Host header preserved — SigV4 signs host+path+query, so a stripPrefix/host rewrite breaks it.
+      - "traefik.enable=true"
+      - "traefik.http.routers.veyq-blobs.rule=PathPrefix(`/veyq`)"
+      - "traefik.http.routers.veyq-blobs.entrypoints=web"
+      - "traefik.http.services.veyq-blobs.loadbalancer.server.port=3900"
+      - "traefik.http.services.veyq-blobs.loadbalancer.passHostHeader=true"
+
+  # Reverse proxy so the bundled store is reachable same-origin by the web app (ADR 0013 §4). Routes only the
+  # bucket path (see the garage labels); the backend + web are added behind it in a fuller deployment.
+  traefik:
+    image: traefik:v3.3
+    container_name: veyq-traefik
+    profiles: ["s3"]
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "18080:80"     # same-origin entry: presigned URLs signed for host:18080, path /veyq/<obj> → Garage
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
 volumes:
   veyq-mariadb-data:
+  veyq-garage-meta:
+  veyq-garage-data:

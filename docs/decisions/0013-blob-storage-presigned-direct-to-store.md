@@ -31,12 +31,15 @@ needs** and aligned with the [no-dedup decision](#5-no-content-dedup) below.
 
 ### 1. Storage is S3-only
 
-`BlobStore` has exactly one production implementation, `S3BlobStore`, speaking to any S3-compatible endpoint
-(AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, Garage, …) or the **bundled MinIO** an operator runs
-alongside the stack (`docker compose --profile s3`). An `InMemoryBlobStore` exists for **dev/test metadata
-only** — it **cannot presign**, so it has **no media-transport path** (transport is exercised by opt-in e2e
-against a real MinIO). Store credentials come from operator env, are never persisted to the DB, never logged,
-masked in any config dump, and never returned by any endpoint.
+`BlobStore` has exactly one production implementation, `S3BlobStore`, which speaks to any S3-compatible
+endpoint via the **vendor-neutral AWS SDK for Java v2** (not any single vendor's client) — AWS S3, Cloudflare
+R2, Backblaze B2, Wasabi, Garage, … — or the **bundled Garage** an operator runs alongside the stack
+(`docker compose --profile s3`; **Garage** is S3-compatible, AGPL, and built for self-hosting — it replaced
+MinIO when the latter's OSS server was archived in 2026 and its successor AIStor went commercial, cr-0029).
+An `InMemoryBlobStore` exists for **dev/test metadata only** — it **cannot presign**, so it has **no
+media-transport path** (transport is exercised by opt-in e2e against a real S3-compatible store). Store
+credentials come from operator env, are never persisted to the DB, never logged, masked in any config dump,
+and never returned by any endpoint.
 
 ### 2. Presigned direct-to-store is the only transport (no proxied fallback)
 
@@ -79,9 +82,9 @@ client**, which may differ from the backend's internal endpoint. Presigned URLs 
 publicly-reachable store); `S3BlobStore` keeps a second client purely for signing (local HMAC, never connects).
 
 **CORS is web-only** — native apps `PUT`/`GET` directly and are never subject to it. It is configured **on the
-store** (veyq cannot inject headers into a direct fetch): none needed for a bundled MinIO behind a Traefik
+store** (veyq cannot inject headers into a direct fetch): none needed for a bundled store behind a Traefik
 **path route** (same origin); otherwise a bucket/account CORS policy allowing `PUT`+`GET` from the web origin,
-exposing `ETag`. For MinIO behind Traefik, route the bucket path **without** stripping the prefix and with the
+exposing `ETag`. For the bundled store behind Traefik, route the bucket path **without** stripping the prefix and with the
 Host header preserved (SigV4 signs host+path+query). A startup **preflight** probes the public route and
 advertises `directTransport: ok|unavailable` on `/api/setup` — advisory, never blocks startup.
 
@@ -116,7 +119,7 @@ media path. Rationale (decided as a sparring trade-off):
   short. Credentials never reach the client; access control is enforced at URL issuance (the caller must hold
   a grant for the scope).
 - **Dev/test:** the in-memory store can't presign, so the byte transport is **opt-in e2e** (`VEYQ_S3_E2E=1`
-  against a real MinIO); slice tests stay hermetic (they test metadata + wraps + the declare/verify control
+  against a real S3-compatible store — the bundled Garage); slice tests stay hermetic (they test metadata + wraps + the declare/verify control
   plane, not the byte transfer).
 - **Cost of no-dedup:** duplicate media is stored once per blob. Accepted for operator-blindness.
 - **Deferred (their own later slices, not this ADR):**

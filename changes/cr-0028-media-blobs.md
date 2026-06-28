@@ -1,7 +1,7 @@
 ---
 id: cr-0028
 title: Media blobs — chunked-AEAD K_blob, direct-to-store presigned, batch-shaped control plane
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.memory.media]   # an enabler — the media data layer the Memory use-cases build on
 adrs: [0013, 0012, 0009, 0007, 0002]
 invariants: [operator-blind, self-hostable]
@@ -44,7 +44,7 @@ transport mirrors, and the gallery/curation UI (deferred to the shell — this C
 
 ## Phases
 
-- [ ] **1 — contracts.** `contracts/api/media.openapi.yaml` (separate `media` tag), all **batch-shaped** under
+- [x] **1 — contracts.** `contracts/api/media.openapi.yaml` (separate `media` tag), all **batch-shaped** under
   `/api/scopes/{scopeId}/…`:
   - `POST …/blob-uploads-batch` — start N blobs (each `chunkCount`, `byteSize`, base64 `wrappedBlobKey`) →
     per-item `{ uploadId, presignedPuts[] }` or per-item error.
@@ -57,11 +57,11 @@ transport mirrors, and the gallery/curation UI (deferred to the shell — this C
     FOLDER), `budget_exceeded` (422), `store_unavailable` (503, no presign). **Done:** YAML valid, all `$ref`
     resolve, operationIds unique; auto-picked by the backend glob + added to the web/native generators in
     their phases.
-- [ ] **2 — native crypto.** Port **`chunk_frame`** (`sealFrame`/`openFrame`) to apple `VeyqCrypto` + android
+- [x] **2 — native crypto.** Port **`chunk_frame`** (`sealFrame`/`openFrame`) to apple `VeyqCrypto` + android
   `:crypto` (`nonce(12) ‖ AEAD(K_blob, nonce, plaintext, aad = u32be(index) ‖ u32be(total))`; symWrap/symUnwrap
   already native). **Done:** apple `V1ConformanceTests` green incl. `testChunkFrame`; android `:crypto:test`
   green incl. `chunkFrame` — byte-identical to the vector on both. (`dedup_token` deliberately not ported.)
-- [ ] **3 — backend.** `BlobStore` port (`presignPut`/`presignGet`/`stat`, return null when unsupported) with
+- [x] **3 — backend.** `BlobStore` port (`presignPut`/`presignGet`/`stat`, return null when unsupported) with
   `S3BlobStore` (MinIO SDK, second client for signing against `s3-public-endpoint`) + `InMemoryBlobStore`
   (dev/test, no presign); `BlobStorePreflight` + `/api/setup` `directTransport` flag; `V11__media.sql`
   (`veyq_blob` + manifest, `veyq_media` blob→node, `veyq_upload_session` OPEN-state) ; `features/media`
@@ -73,16 +73,16 @@ transport mirrors, and the gallery/curation UI (deferred to the shell — this C
   operator-blind: stored ciphertext/wrap/manifest verbatim); the byte transport via `BlobBatchE2ETest`
   (`@EnabledIfEnvironmentVariable VEYQ_S3_E2E=1`, real MinIO on `:19000`) — default `gradle test` skips it
   cleanly.
-- [ ] **4 — web.** `features/memory/media.ts` (+ the `media` spec in `generate:api` + `mediaApi()`):
+- [x] **4 — web.** `features/memory/media.ts` (+ the `media` spec in `generate:api` + `mediaApi()`):
   `addMedia` (seal chunks under a random `K_blob`, wrap under `K_mem`, batch-start length-1, direct PUT,
   complete+attach) / `listMedia` / `openMedia` (batch-download + `openFrame` + unwrap `K_blob`). **Done:**
   `npm run check` green (`media.test.ts` round-trips chunk seal/open + `K_blob` wrap/open + the batch control
   plane with real v1 crypto + mocked API); the transport via an opt-in `media.e2e.test.ts` (`VEYQ_E2E=1`).
-- [ ] **5 — apple.** The same in `VeyqClient` (+ generated `MediaAPI` module). **Done when:** `swift test`
+- [x] **5 — apple.** The same in `VeyqClient` (+ generated `MediaAPI` module). **Done when:** `swift test`
   green (seal→start→complete→list→open round-trip, mocked transport) + iOS build; opt-in live e2e.
-- [ ] **6 — android.** The same in `:client` (`"media"` added to the generator specs). **Done when:**
+- [x] **6 — android.** The same in `:client` (`"media"` added to the generator specs). **Done when:**
   `:client:test` green (same round-trip) + `:app:assembleDebug`; opt-in `MediaE2ETest` (`VEYQ_S3_E2E`).
-- [ ] **infra.** `infra/docker-compose.yml` MinIO `--profile s3` + Traefik path-route (no stripPrefix,
+- [x] **infra.** `infra/docker-compose.yml` MinIO `--profile s3` + Traefik path-route (no stripPrefix,
   passHostHeader) so the bundled store is same-origin (no CORS) for the web app. **Done:** documented; the
   e2e suites run against it locally.
 
@@ -90,12 +90,12 @@ transport mirrors, and the gallery/curation UI (deferred to the shell — this C
 
 | Surface | Media blob: seal → direct-to-store → attach → open (operator-blind, batch-shaped) | Status |
 |---|---|---|
-| contracts | `media.openapi.yaml` (batch endpoints under a scope) | ◻ |
-| crypto (native) | `chunk_frame` (`sealFrame`/`openFrame`) ported apple + android | ◻ |
-| backend | `BlobStore` + `veyq_blob`/`veyq_media`/`veyq_upload_session` + guards | ◻ |
-| web | data layer (seal chunks + `K_blob` + direct transport) | ◻ |
-| apple / android | data layer (+ generated media client) | ◻ |
-| infra | bundled MinIO profile + Traefik route | ◻ |
+| contracts | `media.openapi.yaml` (batch endpoints under a scope) | ✅ |
+| crypto (native) | `chunk_frame` (`sealFrame`/`openFrame`) ported apple + android | ✅ |
+| backend | `BlobStore` + `veyq_blob`/`veyq_media`/`veyq_upload_session` + guards | ✅ |
+| web | data layer (seal chunks + `K_blob` + direct transport) | ✅ |
+| apple / android | data layer (+ generated media client) | ✅ |
+| infra | bundled MinIO profile + Traefik route | ✅ |
 | UI (all) | the gallery/curation UI | ◻ **deferred to the shell** |
 | windows / linux | — | ◻ (when those clients exist) |
 
@@ -105,6 +105,11 @@ A member can attach + read back encrypted media on a Memory/Chapter on web·appl
 chunked AEAD under a random `K_blob` wrapped under `K_mem`, bytes transferred **direct-to-store** via presigned
 URLs (never through the backend), recorded as blob + media, **batch-shaped** control plane (length-1 lists this
 slice), declare-then-verify budget + media-target + scope-access enforced server-side, **no content dedup**,
-operator-blind throughout, all hermetic suites green + the opt-in MinIO e2e green locally. **Resumable
+operator-blind throughout, all hermetic suites green + the opt-in store e2e green locally. **Resumable
 uploads, thumbnails, share mirrors and the gallery UI are follow-on slices.** Then the next Memory slice
 (journal under `K_mem`, or the gallery/curation UI on the shell).
+
+> **Follow-up — [cr-0029](cr-0029-vendor-neutral-blob-store.md):** the MinIO bits this CR introduced were
+> swapped for a **vendor-neutral** stack right after — the backend signs via the **AWS S3 SDK v2** (any
+> S3-compatible store) and the bundled dev/self-host store is **Garage**, because MinIO's OSS server was
+> archived in 2026 and its successor AIStor is commercial. No wire/crypto/client change.

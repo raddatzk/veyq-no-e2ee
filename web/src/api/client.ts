@@ -13,6 +13,7 @@ import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } fr
 import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
 import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
 import { ContentApi, Configuration as ContentConfiguration } from './generated/content'
+import { MediaApi, Configuration as MediaConfiguration } from './generated/media'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -54,4 +55,8 @@ export function scopesApi(): ScopesApi {
 
 export function contentApi(): ContentApi {
   return new ContentApi(new ContentConfiguration(bearerParams()))
+}
+
+export function mediaApi(): MediaApi {
+  return new MediaApi(new MediaConfiguration(bearerParams()))
 }

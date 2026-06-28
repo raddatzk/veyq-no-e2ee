@@ -131,6 +131,13 @@ class V1ConformanceTest {
         assertContentEquals(hex(v, "token"), V1.slugToken(hex(v, "contentKey"), v.getString("parentSlot"), v.getString("slug")))
     }
 
+    @Test fun chunkFrame() {
+        val v = vectors.getJSONObject("chunk_frame")
+        val frame = V1.sealFrame(hex(v, "contentKey"), v.getInt("index"), v.getInt("total"), hex(v, "plaintext"), hex(v, "nonce"))
+        assertContentEquals(hex(v, "frame"), frame)
+        assertContentEquals(hex(v, "plaintext"), V1.openFrame(hex(v, "contentKey"), v.getInt("index"), v.getInt("total"), frame))
+    }
+
     private fun params(v: JSONObject): V1.ArgonParams {
         val p = v.getJSONObject("params")
         return V1.ArgonParams(p.getInt("t"), p.getInt("m"), p.getInt("p"), p.getInt("dkLen"))

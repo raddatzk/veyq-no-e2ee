@@ -1,0 +1,429 @@
+openapi: 3.1.0
+info:
+  title: veyq Media API
+  version: 0.1.0
+  description: >
+    Encrypted media **blobs** attached to a Memory tree (en.memory.media, cr-0028). A blob is a fixed-size
+    sequence of **chunked-AEAD** ciphertext objects, sealed client-side under a fresh random **`K_blob`**
+    (wrapped under the target Memory's `K_mem`, [ADR 0012](../../docs/decisions/0012-content-key-hierarchy.md)),
+    transferred **direct-to-store** via short-TTL presigned URLs
+    ([ADR 0013](../../docs/decisions/0013-blob-storage-presigned-direct-to-store.md)) — bytes never flow through
+    the backend. The control plane is **batch-shaped** (lists + per-item results) from the start; the first
+    slice exercises **length-1 lists**.
+
+    **Operator-blind:** the server + object store hold only ciphertext chunks + opaque metadata
+    (`chunkCount`, `byteSize`, the per-chunk size `manifest`), the `K_blob` wrap, and the media→node link; never
+    a plaintext byte, a content key, or a filename in clear. Guards (enforced by code, ADR 0008): the caller
+    holds a grant for the scope; a media target must be a **MEMORY** or **CHAPTER** (a FOLDER owns no `K_mem`);
+    declare-then-verify on `complete` enforces the byte budget against the stored objects. **No content dedup**
+    ([ADR 0013 §5](../../docs/decisions/0013-blob-storage-presigned-direct-to-store.md#5-no-content-dedup)).
+tags:
+  - name: media
+    description: >
+      Encrypted media blobs under a scope: start uploads (presign PUT) → complete + attach to a node → list a
+      node's media → presign GET for download. One tag = one resource interface owning the media subtree under
+      `/api/scopes/{scopeId}` (distinct from the `content` nodes resource).
+
+paths:
+  /api/scopes/{scopeId}/blob-uploads-batch:
+    post:
+      tags: [media]
+      operationId: startBlobUploads
+      summary: Start N blob uploads — reserve sessions + presign one PUT per chunk.
+      description: >
+        For each requested blob the client declares its `chunkCount`, total `byteSize`, and the `wrappedBlobKey`
+        (`K_blob` under `K_mem`). The server opens an upload session and returns, per item, an `uploadId` plus
+        one short-TTL presigned **PUT** URL per chunk — or a per-item error. The caller then PUTs each
+        ciphertext chunk **directly to the object store** and calls `media-batch` to complete + attach. The
+        in-memory store cannot presign and answers `store_unavailable`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlobUploadsBatchRequest" }
+            example:
+              items:
+                - chunkCount: 2
+                  byteSize: 131072
+                  wrappedBlobKey: d3JhcHBlZC1rLWJsb2I=
+      responses:
+        "200":
+          description: Per-item upload results (success carries the presigned PUTs; failure carries a code).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlobUploadsBatchResponse" }
+        "400":
+          description: Malformed request (missing/invalid fields).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope, or the caller holds no grant for it.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
+        "503":
+          description: The configured object store cannot presign (e.g. the in-memory dev store).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: store_unavailable } }
+
+  /api/scopes/{scopeId}/media-batch:
+    post:
+      tags: [media]
+      operationId: completeMedia
+      summary: Complete N uploads + attach each as media to a node.
+      description: >
+        For each item the server verifies the upload session, **stats the stored chunk objects**
+        (declare-then-verify: count + total bytes must match what was declared, else the objects are purged and
+        the item fails `budget_exceeded`), records a `blob` (with the per-chunk size `manifest`) and a `media`
+        row linking the blob to `nodeId`, and returns `{ blobId, mediaId }` — or a per-item error. The target
+        node must be a **MEMORY** or **CHAPTER** (`illegal_target` on a FOLDER).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaBatchRequest" }
+            example:
+              items:
+                - uploadId: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+                  nodeId: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+      responses:
+        "200":
+          description: Per-item completion results (success carries blob+media ids; failure carries a code).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaBatchResponse" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope, or the caller holds no grant for it.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
+
+  /api/scopes/{scopeId}/nodes/{nodeId}/media:
+    get:
+      tags: [media]
+      operationId: listNodeMedia
+      summary: List a node's media (opaque metadata for read-back).
+      description: >
+        Returns each media attached to the node with its `mediaId`, `blobId`, `chunkCount`, total `byteSize`,
+        the per-chunk size `manifest`, and the `wrappedBlobKey`. The client unwraps `K_blob` under `K_mem`,
+        presigns the downloads (`blob-downloads-batch`), and opens the chunks with `openFrame`. The operator
+        sees only ciphertext sizes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      responses:
+        "200":
+          description: The node's media.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MediaSummary" }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+
+  /api/scopes/{scopeId}/blob-downloads-batch:
+    post:
+      tags: [media]
+      operationId: presignBlobDownloads
+      summary: Presign GET for N blobs — one URL per chunk.
+      description: >
+        For each requested `blobId` the server returns one short-TTL presigned **GET** URL per chunk (in chunk
+        order) — or a per-item error. The caller GETs each ciphertext chunk **directly from the object store**
+        and opens it with `openFrame`. The in-memory store answers `store_unavailable`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlobDownloadsBatchRequest" }
+            example:
+              items:
+                - blobId: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+      responses:
+        "200":
+          description: Per-item download results (success carries the presigned GETs; failure carries a code).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlobDownloadsBatchResponse" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope, or the caller holds no grant for it.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
+        "503":
+          description: The configured object store cannot presign (e.g. the in-memory dev store).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: store_unavailable } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The opaque access token issued by login / refresh. Any authenticated caller holding a grant for the scope (enforced by code).
+
+  parameters:
+    ScopeId:
+      name: scopeId
+      in: path
+      required: true
+      description: Opaque id of the scope the media lives in.
+      schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
+    NodeId:
+      name: nodeId
+      in: path
+      required: true
+      description: Opaque id of the node (MEMORY/CHAPTER) the media is attached to.
+      schema: { type: string, format: uuid, example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d }
+
+  schemas:
+    # --- start uploads -------------------------------------------------------
+    BlobUploadsBatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: "#/components/schemas/BlobUploadRequestItem" }
+
+    BlobUploadRequestItem:
+      type: object
+      required: [chunkCount, byteSize, wrappedBlobKey]
+      properties:
+        chunkCount:
+          type: integer
+          format: int32
+          description: Number of ciphertext chunks the blob is sealed into (≥ 1).
+          minimum: 1
+          maximum: 100000
+          example: 2
+        byteSize:
+          type: integer
+          format: int64
+          description: Total ciphertext byte size declared up front (verified against the stored objects on complete).
+          minimum: 0
+          example: 131072
+        wrappedBlobKey:
+          type: string
+          description: The blob's random `K_blob` wrapped under the Memory's `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: d3JhcHBlZC1rLWJsb2I=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    BlobUploadsBatchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/BlobUploadResultItem" }
+
+    BlobUploadResultItem:
+      type: object
+      description: One per request item, in order. Success carries `uploadId` + `presignedPuts`; failure carries `error`.
+      properties:
+        uploadId:
+          type: [string, "null"]
+          format: uuid
+          description: The opaque upload session id, on success.
+          example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+        presignedPuts:
+          type: [array, "null"]
+          description: One presigned PUT URL per chunk, in chunk order.
+          items: { $ref: "#/components/schemas/PresignedUrl" }
+        error:
+          type: [string, "null"]
+          description: Per-item error code (`budget_exceeded` = declared bytes/chunks over the cap, `store_unavailable`); null on success.
+          maxLength: 64
+          example: null
+
+    # --- complete + attach ---------------------------------------------------
+    MediaBatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: "#/components/schemas/MediaRequestItem" }
+
+    MediaRequestItem:
+      type: object
+      required: [uploadId, nodeId]
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+          description: The upload session opened by `startBlobUploads`.
+          example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+        nodeId:
+          type: string
+          format: uuid
+          description: The MEMORY/CHAPTER node to attach the media to.
+          example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+
+    MediaBatchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/MediaResultItem" }
+
+    MediaResultItem:
+      type: object
+      description: One per request item, in order. Success carries `blobId` + `mediaId`; failure carries `error`.
+      properties:
+        blobId:
+          type: [string, "null"]
+          format: uuid
+          example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+        mediaId:
+          type: [string, "null"]
+          format: uuid
+          example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e
+        error:
+          type: [string, "null"]
+          description: Per-item error code (`upload_not_found`, `node_not_found`, `illegal_target`, `budget_exceeded`); null on success.
+          maxLength: 64
+          example: null
+
+    # --- read-back -----------------------------------------------------------
+    MediaSummary:
+      type: object
+      required: [mediaId, blobId, chunkCount, byteSize, wrappedBlobKey]
+      properties:
+        mediaId: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
+        blobId: { type: string, format: uuid, example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a }
+        chunkCount:
+          type: integer
+          format: int32
+          example: 2
+        byteSize:
+          type: integer
+          format: int64
+          example: 131072
+        manifest:
+          type: [array, "null"]
+          description: Per-chunk ciphertext byte sizes in chunk order (server-recorded at complete; ciphertext sizes only).
+          items: { type: integer, format: int64, example: 65536 }
+        wrappedBlobKey:
+          type: string
+          description: The blob's `K_blob` wrapped under `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: d3JhcHBlZC1rLWJsb2I=
+
+    # --- presign downloads ---------------------------------------------------
+    BlobDownloadsBatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: "#/components/schemas/BlobDownloadRequestItem" }
+
+    BlobDownloadRequestItem:
+      type: object
+      required: [blobId]
+      properties:
+        blobId:
+          type: string
+          format: uuid
+          example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+
+    BlobDownloadsBatchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/BlobDownloadResultItem" }
+
+    BlobDownloadResultItem:
+      type: object
+      description: One per request item, in order. Success carries `presignedGets`; failure carries `error`.
+      properties:
+        presignedGets:
+          type: [array, "null"]
+          description: One presigned GET URL per chunk, in chunk order.
+          items: { $ref: "#/components/schemas/PresignedUrl" }
+        error:
+          type: [string, "null"]
+          description: Per-item error code (`upload_not_found` = unknown blob, `store_unavailable`); null on success.
+          maxLength: 64
+          example: null
+
+    # --- shared --------------------------------------------------------------
+    PresignedUrl:
+      type: object
+      required: [index, url]
+      properties:
+        index:
+          type: integer
+          format: int32
+          description: Chunk index (0-based, in chunk order).
+          example: 0
+        url:
+          type: string
+          description: A short-TTL, single-object, single-method presigned URL (PUT or GET) against the object store.
+          maxLength: 4096
+          example: https://store.example.com/veyq/9b1d4a6e/0?X-Amz-Signature=...
+
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable, client-localizable error code.
+          maxLength: 64
+          example: invalid_request
+        message:
+          type: [string, "null"]
+          description: Optional developer-facing detail; never contains secrets or content.
+          maxLength: 512
+          example: null

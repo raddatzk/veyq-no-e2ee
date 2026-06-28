@@ -1,0 +1,105 @@
+package com.veyq.app.features.media
+
+import com.veyq.app.generated.api.MediaApi
+import com.veyq.app.generated.model.BlobDownloadResultItem
+import com.veyq.app.generated.model.BlobDownloadsBatchRequest
+import com.veyq.app.generated.model.BlobDownloadsBatchResponse
+import com.veyq.app.generated.model.BlobUploadResultItem
+import com.veyq.app.generated.model.BlobUploadsBatchRequest
+import com.veyq.app.generated.model.BlobUploadsBatchResponse
+import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.generated.model.MediaBatchRequest
+import com.veyq.app.generated.model.MediaBatchResponse
+import com.veyq.app.generated.model.MediaResultItem
+import com.veyq.app.generated.model.MediaSummary
+import com.veyq.app.generated.model.PresignedUrl
+import io.quarkus.security.Authenticated
+import io.quarkus.security.identity.SecurityIdentity
+import jakarta.ws.rs.core.Response
+import java.util.UUID
+
+/**
+ * HTTP adapter for media blobs (en.memory.media, cr-0028). Implements the generated [MediaApi]; thin
+ * (ADR 0001) — delegates to [MediaHandler]. `@Authenticated`; the caller (from the `SecurityIdentity`
+ * principal) must hold a grant for the scope (a non-member gets 404). Operator-blind: only ciphertext wraps +
+ * opaque metadata + presigned URLs cross. Batch-shaped: 200 with per-item results (partial success); only
+ * access/auth failures are top-level.
+ */
+@Authenticated
+class MediaResource(
+    private val handler: MediaHandler,
+    private val identity: SecurityIdentity,
+) : MediaApi {
+
+    override fun startBlobUploads(scopeId: UUID, blobUploadsBatchRequest: BlobUploadsBatchRequest): Response {
+        val declares = blobUploadsBatchRequest.items.map {
+            UploadDeclare(it.chunkCount, it.byteSize, it.wrappedBlobKey)
+        }
+        return when (val o = handler.start(identity.principal.name, scopeId.toString(), declares)) {
+            is StartOutcome.Results -> Response.ok(
+                BlobUploadsBatchResponse(
+                    results = o.items.map {
+                        BlobUploadResultItem(
+                            uploadId = it.uploadId?.let(UUID::fromString),
+                            presignedPuts = it.presignedPuts?.map(::toPresigned),
+                            error = it.error,
+                        )
+                    },
+                ),
+            ).build()
+            StartOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+        }
+    }
+
+    override fun completeMedia(scopeId: UUID, mediaBatchRequest: MediaBatchRequest): Response {
+        val items = mediaBatchRequest.items.map { it.uploadId.toString() to it.nodeId.toString() }
+        return when (val o = handler.complete(identity.principal.name, scopeId.toString(), items)) {
+            is CompleteOutcome.Results -> Response.ok(
+                MediaBatchResponse(
+                    results = o.items.map {
+                        MediaResultItem(
+                            blobId = it.blobId?.let(UUID::fromString),
+                            mediaId = it.mediaId?.let(UUID::fromString),
+                            error = it.error,
+                        )
+                    },
+                ),
+            ).build()
+            CompleteOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+        }
+    }
+
+    override fun listNodeMedia(scopeId: UUID, nodeId: UUID): Response =
+        when (val o = handler.listMedia(identity.principal.name, scopeId.toString(), nodeId.toString())) {
+            is ListMediaOutcome.Rows -> Response.ok(o.rows.map(::toSummary)).build()
+            ListMediaOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+        }
+
+    override fun presignBlobDownloads(scopeId: UUID, blobDownloadsBatchRequest: BlobDownloadsBatchRequest): Response {
+        val blobIds = blobDownloadsBatchRequest.items.map { it.blobId.toString() }
+        return when (val o = handler.download(identity.principal.name, scopeId.toString(), blobIds)) {
+            is DownloadOutcome.Results -> Response.ok(
+                BlobDownloadsBatchResponse(
+                    results = o.items.map {
+                        BlobDownloadResultItem(presignedGets = it.presignedGets?.map(::toPresigned), error = it.error)
+                    },
+                ),
+            ).build()
+            DownloadOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+        }
+    }
+
+    private fun toPresigned(ref: PresignedRef) = PresignedUrl(index = ref.index, url = ref.url)
+
+    private fun toSummary(row: MediaRow) = MediaSummary(
+        mediaId = UUID.fromString(row.mediaId),
+        blobId = UUID.fromString(row.blobId),
+        chunkCount = row.chunkCount,
+        byteSize = row.byteSize,
+        wrappedBlobKey = row.wrappedBlobKey,
+        manifest = row.manifest,
+    )
+
+    private fun error(status: Response.Status, code: String): Response =
+        Response.status(status).entity(ErrorResponse(code = code)).build()
+}

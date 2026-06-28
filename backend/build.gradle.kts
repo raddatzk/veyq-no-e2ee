@@ -30,6 +30,7 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-mariadb") // production store
     implementation("io.quarkus:quarkus-flyway")
     implementation("org.flywaydb:flyway-mysql") // Flyway 12 keeps MariaDB/MySQL support out of flyway-core
+    implementation("software.amazon.awssdk:s3:2.31.78") // S3 blob store: vendor-neutral S3 client + presigner (ADR 0013)
 
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")

@@ -30,6 +30,13 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
   simpler alternatives — don't just agree. The hard invariants above are the only thing not up
   for debate.
 - Scripts and utilities in **Python** (bash only for thin CI/hook glue).
+- **No deprecated / unmaintained dependencies.** Never add — and don't keep — a dependency that is EOL,
+  archived, or abandoned by its maintainers, or whose only living successor is commercial/closed (that breaks
+  *self-hostable by default*). Prefer the **actively-maintained, vendor-neutral standard** over a single
+  vendor's client. When a dep we rely on becomes deprecated, replacing it is **in-scope now**, not someday.
+  (E.g. MinIO's OSS server was archived in 2026 and its successor AIStor is commercial — so the bundled store
+  stays a generic **S3-compatible OSS** one, and the backend signs via the vendor-neutral **AWS S3 SDK**,
+  never a MinIO-locked client.)
 - Durable engineering state lives in `docs/`; change-requests in `changes/` are **kept** as a record of
   each piece of work (no longer deleted when done).
 

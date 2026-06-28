@@ -178,6 +178,19 @@ object V1 {
         return mac.doFinal(utf8(slug))
     }
 
+    // --- Chunked-AEAD frame (resumable upload + segmented streaming, cr-0028) ---
+    //
+    // A large blob is split into independent, self-contained frames so chunks resume individually and segments
+    // decrypt without the whole file. Each frame = nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad)
+    // with aad = u32be(index) || u32be(total), binding the chunk's position so a dropped, reordered or appended
+    // frame fails to open (anti-truncation). The media transport seals each chunk under a per-blob K_blob.
+
+    fun sealFrame(contentKey: ByteArray, index: Int, total: Int, plaintext: ByteArray, nonce: ByteArray): ByteArray =
+        concat(nonce, aeadSeal(contentKey, nonce, plaintext, concat(u32be(index), u32be(total))))
+
+    fun openFrame(contentKey: ByteArray, index: Int, total: Int, frame: ByteArray): ByteArray =
+        aeadOpen(contentKey, frame.copyOfRange(0, 12), frame.copyOfRange(12, frame.size), concat(u32be(index), u32be(total)))
+
     // --- Hybrid KEM (X25519 + ML-KEM-768) — the scope-grant primitive (cr-0025) ---
     //
     // Mirrors web/Apple byte-for-byte, pinned by `kem_v1` / `wrap.asym_scope_grant`. `HybridSecret.m` is the

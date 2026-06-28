@@ -132,4 +132,39 @@ final class LiveRoundTripTests: XCTestCase {
         try await c2.untrustThisDevice(email: email)
         XCTAssertNil(store.currentLevel(email: email))
     }
+
+    /// cr-0028 — the **media byte-transport** round-trip against the live store. Needs the instance running
+    /// with a bundled MinIO (`directTransport: ok`). Validates the one path the mocked `MediaTests` cannot:
+    /// real presigned PUT/GET over URLSession. login → unlock → personal scope → create a Memory → addMedia
+    /// (seal + direct-to-store upload) → listMedia → openMedia, asserting the bytes round-trip.
+    func testMediaRoundTripAgainstLiveInstance() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let base = env["VEYQ_LIVE_BASE"], let baseURL = URL(string: base) else {
+            throw XCTSkip("set VEYQ_LIVE_BASE (+ VEYQ_EMAIL/PASSWORD/SECRET) to run the live round-trip")
+        }
+        let email = try XCTUnwrap(env["VEYQ_EMAIL"])
+        let password = try XCTUnwrap(env["VEYQ_PASSWORD"])
+        let secret = try XCTUnwrap(env["VEYQ_SECRET"])
+
+        let c = VeyqClient(instance: VeyqInstance(baseURL: baseURL))
+        try await c.login(email: email, password: password)
+        try await c.unlock(password: password, secretKey: secret)
+        _ = try await c.ensurePersonalScope()
+        let openedScope = try await c.openPersonalScope()
+        let scopeKey = try XCTUnwrap(openedScope, "no personal scope")
+        let scopes = try await c.listMyScopes()
+        let personal = try XCTUnwrap(scopes.first { $0.kind == .PERSONAL })
+
+        let (nodeId, memoryKey) = try await c.createMemory(scopeId: personal.id, scopeKey: scopeKey, name: "E2E media \(UUID().uuidString)")
+
+        var data = Data(count: 300 * 1024)
+        for i in 0 ..< data.count { data[i] = UInt8((i * 17 + 3) & 0xff) }
+        let (blobId, _) = try await c.addMedia(scopeId: personal.id, nodeId: nodeId, memoryKey: memoryKey, data: data)
+        XCTAssertFalse(blobId.isEmpty)
+
+        let items = try await c.listMedia(scopeId: personal.id, nodeId: nodeId)
+        let item = try XCTUnwrap(items.first)
+        let opened = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: item)
+        XCTAssertEqual(opened, data, "media bytes round-trip through real presigned upload + download")
+    }
 }

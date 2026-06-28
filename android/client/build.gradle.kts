@@ -17,7 +17,7 @@ plugins {
 
 // The contract specs live at the repo root (android/ is the Gradle root, so walk up one).
 val contractsDir = rootDir.parentFile.resolve("contracts/api")
-val specs = listOf("setup", "auth", "account", "scopes", "content")
+val specs = listOf("setup", "auth", "account", "scopes", "content", "media")
 val generatedRoot = layout.buildDirectory.dir("generated/openapi")
 val sanitizedSpecsDir = layout.buildDirectory.dir("sanitized-specs")
 

@@ -20,6 +20,13 @@ import com.veyq.api.content.model.CreateNodeRequest
 import com.veyq.api.content.model.NodeKind
 import com.veyq.api.content.model.NodeSummary
 import com.veyq.api.content.model.UpdateNodeRequest
+import com.veyq.api.media.api.MediaApi
+import com.veyq.api.media.model.BlobDownloadRequestItem
+import com.veyq.api.media.model.BlobDownloadsBatchRequest
+import com.veyq.api.media.model.BlobUploadRequestItem
+import com.veyq.api.media.model.BlobUploadsBatchRequest
+import com.veyq.api.media.model.MediaBatchRequest
+import com.veyq.api.media.model.MediaRequestItem
 import com.veyq.api.setup.api.SetupApi
 import com.veyq.crypto.V1
 import okhttp3.OkHttpClient
@@ -29,6 +36,7 @@ import com.veyq.api.account.infrastructure.ClientException as AccountClientExcep
 import com.veyq.api.auth.infrastructure.ClientException as AuthClientException
 import com.veyq.api.scopes.infrastructure.ClientException as ScopesClientException
 import com.veyq.api.content.infrastructure.ClientException as ContentClientException
+import com.veyq.api.media.infrastructure.ClientException as MediaClientException
 
 /**
  * The operator-blind login + unlock data layer — the Android twin of Apple's `VeyqClient` and the web
@@ -47,6 +55,7 @@ class VeyqClient(
     val vault: Vault = Vault(),
     client: OkHttpClient = defaultClient(session),
     private val deviceSecurity: DeviceSecurityStore = DisabledDeviceSecurityStore,
+    private val blobTransport: BlobTransport = OkHttpBlobTransport(),
 ) {
     private val setup = SetupApi(instance.baseUrl, client)
     private val login = LoginApi(instance.baseUrl, client)
@@ -56,6 +65,7 @@ class VeyqClient(
     private val accountWraps = AccountWrapsApi(instance.baseUrl, client)
     private val scopes = ScopesApi(instance.baseUrl, client)
     private val content = ContentApi(instance.baseUrl, client)
+    private val media = MediaApi(instance.baseUrl, client)
 
     /**
      * Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -465,6 +475,118 @@ class VeyqClient(
     /** Delete a node and its subtree. */
     fun deleteNode(scopeId: String, nodeId: String) = withRefresh { removeNode(scopeId, nodeId) }
 
+    // --- Media blobs (cr-0028, en.memory.media) ---
+
+    /** A node's media for read-back: the blob id + the metadata needed to open it. */
+    data class MediaItem(
+        val mediaId: String,
+        val blobId: String,
+        val chunkCount: Int,
+        val byteSize: Long,
+        val wrappedBlobKey: String,
+    )
+
+    /**
+     * Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`), upload the ciphertext
+     * chunks direct-to-store via presigned PUTs, and attach the result to `nodeId` (a MEMORY/CHAPTER). Returns
+     * the new (blobId, mediaId). Operator-blind: bytes never touch the backend.
+     */
+    fun addMedia(scopeId: String, nodeId: String, memoryKey: ByteArray, data: ByteArray): Pair<String, String> {
+        val blobKey = randomBytes(32)
+        val wrappedBlobKey = b64encode(V1.symWrap(memoryKey, blobKey, KBLOB_CTX, randomBytes(12)))
+
+        val chunks = chunkify(data)
+        val total = chunks.size
+        val frames = chunks.mapIndexed { i, chunk -> V1.sealFrame(blobKey, i, total, chunk, randomBytes(12)) }
+        val byteSize = frames.sumOf { it.size.toLong() }
+
+        // start — reserve the session + presign one PUT per chunk
+        val started = withRefresh { startUploads(scopeId, total, byteSize, wrappedBlobKey) }
+        val up = started.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
+        up.error?.let { throw VeyqError.MediaItemFailed(it) }
+        val uploadId = up.uploadId ?: throw VeyqError.MediaItemFailed(null)
+        val puts = up.presignedPuts ?: throw VeyqError.StoreUnavailable
+
+        // PUT each sealed frame straight to the store
+        puts.sortedBy { it.index }.forEach { ref -> blobTransport.put(ref.url, frames[ref.index]) }
+
+        // complete — the backend stats the objects (declare-then-verify) and attaches the media
+        val done = withRefresh { completeOne(scopeId, uploadId.toString(), nodeId) }
+        val m = done.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
+        m.error?.let { throw VeyqError.MediaItemFailed(it) }
+        val blobId = m.blobId ?: throw VeyqError.MediaItemFailed(null)
+        val mediaId = m.mediaId ?: throw VeyqError.MediaItemFailed(null)
+        return blobId.toString() to mediaId.toString()
+    }
+
+    /** List a node's media (opaque metadata + the K_blob wrap). */
+    fun listMedia(scopeId: String, nodeId: String): List<MediaItem> =
+        withRefresh { fetchNodeMedia(scopeId, nodeId) }.map { s ->
+            MediaItem(s.mediaId.toString(), s.blobId.toString(), s.chunkCount, s.byteSize, s.wrappedBlobKey)
+        }
+
+    /**
+     * Open a media blob: unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
+     * direct-from-store, and `openFrame` them back to the original plaintext (the AAD position check applies).
+     */
+    fun openMedia(scopeId: String, memoryKey: ByteArray, media: MediaItem): ByteArray {
+        val blobKey = V1.symUnwrap(memoryKey, b64decode(media.wrappedBlobKey), KBLOB_CTX)
+
+        val results = withRefresh { presignDownload(scopeId, media.blobId) }
+        val d = results.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
+        d.error?.let { throw VeyqError.MediaItemFailed(it) }
+        val gets = d.presignedGets ?: throw VeyqError.StoreUnavailable
+
+        val ordered = gets.sortedBy { it.index }
+        val out = java.io.ByteArrayOutputStream()
+        ordered.forEachIndexed { i, ref ->
+            val frame = blobTransport.get(ref.url)
+            out.write(V1.openFrame(blobKey, i, ordered.size, frame))
+        }
+        return out.toByteArray()
+    }
+
+    private fun startUploads(scopeId: String, chunkCount: Int, byteSize: Long, wrappedBlobKey: String) = try {
+        media.startBlobUploads(
+            java.util.UUID.fromString(scopeId),
+            BlobUploadsBatchRequest(items = listOf(BlobUploadRequestItem(chunkCount, byteSize, wrappedBlobKey))),
+        ).results
+    } catch (e: MediaClientException) {
+        throw mapMedia(e)
+    }
+
+    private fun completeOne(scopeId: String, uploadId: String, nodeId: String) = try {
+        media.completeMedia(
+            java.util.UUID.fromString(scopeId),
+            MediaBatchRequest(items = listOf(MediaRequestItem(java.util.UUID.fromString(uploadId), java.util.UUID.fromString(nodeId)))),
+        ).results
+    } catch (e: MediaClientException) {
+        throw mapMedia(e)
+    }
+
+    private fun fetchNodeMedia(scopeId: String, nodeId: String) = try {
+        media.listNodeMedia(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId))
+    } catch (e: MediaClientException) {
+        throw if (e.statusCode == 404) VeyqError.NodeNotFound else mapMedia(e)
+    }
+
+    private fun presignDownload(scopeId: String, blobId: String) = try {
+        media.presignBlobDownloads(
+            java.util.UUID.fromString(scopeId),
+            BlobDownloadsBatchRequest(items = listOf(BlobDownloadRequestItem(java.util.UUID.fromString(blobId)))),
+        ).results
+    } catch (e: MediaClientException) {
+        throw mapMedia(e)
+    }
+
+    private fun mapMedia(e: MediaClientException): VeyqError = when (e.statusCode) {
+        503 -> VeyqError.StoreUnavailable
+        404 -> VeyqError.ScopeNotFound
+        401 -> VeyqError.SessionExpired
+        400 -> VeyqError.InvalidRequest(null)
+        else -> VeyqError.UnexpectedStatus(e.statusCode)
+    }
+
     /** Shared create path for FOLDER/MEMORY — seal the name under `K_SC`, blind the slug, POST only ciphertext. */
     private fun createNode(
         scopeId: String, scopeKey: ByteArray, name: String, parentId: String?,
@@ -616,6 +738,23 @@ class VeyqClient(
 
         private const val NAME_CTX = "node-name"
         private const val KMEM_CTX = "content-key"
+        private const val KBLOB_CTX = "blob-key"
+
+        /** Plaintext bytes per chunk before sealing (each frame adds a 12-byte nonce + a 16-byte tag). */
+        const val CHUNK_SIZE = 256 * 1024
+
+        /** Split plaintext into ≥1 chunks of at most [CHUNK_SIZE] bytes (a 0-byte blob is a single empty chunk). */
+        internal fun chunkify(data: ByteArray): List<ByteArray> {
+            if (data.isEmpty()) return listOf(ByteArray(0))
+            val out = ArrayList<ByteArray>((data.size + CHUNK_SIZE - 1) / CHUNK_SIZE)
+            var off = 0
+            while (off < data.size) {
+                val end = minOf(off + CHUNK_SIZE, data.size)
+                out.add(data.copyOfRange(off, end))
+                off = end
+            }
+            return out
+        }
 
         /** Minimal slug: NFC, lowercased, trimmed, whitespace → "-". Deterministic so same name → same token. */
         internal fun slugify(name: String): String =

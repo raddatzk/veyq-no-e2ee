@@ -25,6 +25,7 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
                 setupRequired = state.setupRequired,
                 suites = state.suites,
                 instanceSalt = state.instanceSalt,
+                directTransport = state.directTransport,
             ),
         ).build()
     }

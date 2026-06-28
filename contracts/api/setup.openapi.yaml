@@ -97,6 +97,14 @@ components:
           type: boolean
           description: True while the instance has no owner yet.
           example: true
+        directTransport:
+          type: [boolean, "null"]
+          description: >
+            Advisory blob-transport capability from the startup preflight (ADR 0013 §4): true when the
+            configured object store can presign and its public route is reachable, false/absent when it cannot
+            (e.g. the in-memory dev store). Clients use it to decide whether direct-to-store media upload is
+            available; never blocks startup.
+          example: true
         suites:
           type: array
           description: Crypto suite ids the server advertises (e.g. "v1").
