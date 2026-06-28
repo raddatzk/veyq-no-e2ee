@@ -5,10 +5,13 @@ import App from './App.vue'
 import router from './router'
 import { i18n } from './i18n'
 import { boot } from './app/boot'
+import { initializeTheme } from './shared/state/useThemeState'
 import './style.css'
 import 'primeicons/primeicons.css'
 
 async function bootstrap() {
+  // Apply the stored theme before first paint (no flash of the wrong mode).
+  initializeTheme()
   // Discover the instance state (fresh → setup, set-up → login, unreachable → error banner) before mounting,
   // so the router lands on the right first screen.
   await boot()

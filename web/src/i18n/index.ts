@@ -110,6 +110,11 @@ const en = {
     personal: 'Personal',
     logout: 'Sign out',
     search: 'Search…',
+    language: 'Language',
+    theme: 'Appearance',
+    themeSystem: 'System',
+    themeLight: 'Light',
+    themeDark: 'Dark',
   },
   home: {
     loading: 'Opening your space…',
@@ -251,6 +256,11 @@ const de: typeof en = {
     personal: 'Persönlich',
     logout: 'Abmelden',
     search: 'Suchen…',
+    language: 'Sprache',
+    theme: 'Darstellung',
+    themeSystem: 'System',
+    themeLight: 'Hell',
+    themeDark: 'Dunkel',
   },
   home: {
     loading: 'Dein Bereich wird geöffnet…',
@@ -286,7 +296,23 @@ const de: typeof en = {
   },
 }
 
+export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'de']
+// Endonyms — a language is named in its own tongue regardless of the current UI locale.
+export const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'English', de: 'Deutsch' }
+
+const LOCALE_STORAGE_KEY = 'veyq:locale'
+
+function storage(): Storage | null {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage : null
+  } catch {
+    return null
+  }
+}
+
 function initialLocale(): SupportedLocale {
+  const stored = storage()?.getItem(LOCALE_STORAGE_KEY)
+  if (stored === 'en' || stored === 'de') return stored
   const nav = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en'
   return nav.startsWith('de') ? 'de' : 'en'
 }
@@ -297,3 +323,9 @@ export const i18n = createI18n({
   fallbackLocale: 'en',
   messages: { en, de },
 })
+
+/** Switch the active UI locale and remember it. */
+export function setLocale(locale: SupportedLocale): void {
+  i18n.global.locale.value = locale
+  storage()?.setItem(LOCALE_STORAGE_KEY, locale)
+}

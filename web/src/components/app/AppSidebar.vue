@@ -1,22 +1,25 @@
 <script setup lang="ts">
-// The shell's left rail (cr-0030). Markup + classes are the design source's TenantSidebar verbatim (brand,
-// the space switcher, the Personal-space nav, profile) so layout.css styles it identically; only the data is
-// ours — the tenants come from listMyTenants() (E2EE: the server only knows membership), switching is a full
-// navigation to that tenant's domain, and the bottom is a sign-out (the original's ProfileMenu, favorites +
-// groups are later slices).
-import { ref, onMounted } from 'vue'
+// The shell's left rail (cr-0030/0031). Markup + classes are the design source's TenantSidebar verbatim (brand,
+// the space switcher, the Personal-space nav, the ProfileMenu) so layout.css styles it identically; only the
+// data is ours — the tenants come from listMyTenants() (E2EE: the server only knows membership), switching is a
+// full navigation to that tenant's domain, and the bottom is the ProfileMenu (theme + language + sign-out).
+// Favorites + groups are later slices.
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
+import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
-import { logout } from '../../features/account/login/login'
 import { listMyTenants } from '../../features/spaces/scopes'
-import { clearVault } from '../../app/vault'
-import { activeSpace, clearActiveSpace } from '../../app/activeSpace'
+import { activeSpace } from '../../app/activeSpace'
+import { useThemeState } from '../../shared/state/useThemeState'
 import type { MyTenant } from '../../api/generated/scopes'
+import ProfileMenu from './ProfileMenu.vue'
 
 const { t } = useI18n()
-const router = useRouter()
+const { resolvedTheme } = useThemeState()
 const tenants = ref<MyTenant[]>([])
+
+const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
 
 onMounted(async () => {
   try {
@@ -39,22 +42,12 @@ function switchTenant(tenant: MyTenant) {
   // Each tenant is reached at its own domain (ADR 0002); switching is a full navigation there.
   window.location.assign(`https://${tenant.domain}`)
 }
-
-async function signOut() {
-  try {
-    await logout()
-  } finally {
-    clearVault()
-    clearActiveSpace()
-    await router.push({ name: 'login' })
-  }
-}
 </script>
 
 <template>
   <aside class="tenant-sidebar">
     <RouterLink :to="{ name: 'home' }" class="sidebar-brand" aria-label="veyq Home">
-      <img class="sidebar-brand-mark" :src="logoLightUrl" alt="" aria-hidden="true" />
+      <img class="sidebar-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
       <span>veyq</span>
     </RouterLink>
 
@@ -100,10 +93,7 @@ async function signOut() {
     </nav>
 
     <section class="sidebar-section sidebar-profile">
-      <button class="sidebar-nav-link" type="button" @click="signOut">
-        <span class="pi pi-sign-out" />
-        <span>{{ t('shell.logout') }}</span>
-      </button>
+      <ProfileMenu show-name />
     </section>
   </aside>
 </template>

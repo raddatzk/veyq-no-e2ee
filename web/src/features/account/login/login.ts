@@ -7,6 +7,7 @@ import { b64std, fromB64std } from '../../../shared/base64'
 import { loginApi, sessionApi, tokenApi } from '../../../api/client'
 import { clearTokens, session, setTokens } from '../../../app/session'
 import { clearVault } from '../../../app/vault'
+import { setAccount, clearAccount } from '../../../app/account'
 
 /**
  * Log in with email + password. Requests a challenge, derives the auth keypair with the instance salt the
@@ -22,6 +23,7 @@ export async function login(email: string, password: string): Promise<void> {
     loginVerifyRequest: { email, signature: b64std(signature) },
   })
   setTokens(result.accessToken, result.refreshToken, result.family.id)
+  setAccount(email)
 }
 
 /** Rotate the session tokens (silent refresh). Throws if the refresh is rejected — and on rejection drops
@@ -48,6 +50,7 @@ export async function logout(): Promise<void> {
   } finally {
     clearTokens()
     clearVault()
+    clearAccount()
   }
 }
 
