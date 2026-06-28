@@ -17,9 +17,11 @@ const { t } = useI18n()
       <h1 class="memory-detail-title">{{ node.name }}</h1>
       <Button
         type="button"
+        class="memory-detail-fav"
+        :class="{ 'is-favorite': favorite }"
         :label="favorite ? t('memory.unfavorite') : t('memory.favorite')"
-        :icon="favorite ? 'pi pi-star-fill' : 'pi pi-star'"
-        :severity="favorite ? 'warn' : 'secondary'"
+        :icon="favorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
+        severity="secondary"
         text
         @click="$emit('toggleFavorite')"
       />
@@ -57,5 +59,9 @@ const { t } = useI18n()
 }
 .memory-detail-note {
   color: var(--app-muted);
+}
+/* The active heart picks up the accent, matching the card pin. */
+.memory-detail-fav.is-favorite :deep(.p-button-icon) {
+  color: var(--app-accent);
 }
 </style>

@@ -32,7 +32,7 @@ const { t } = useI18n()
         :aria-label="favorite ? t('memory.unfavorite') : t('memory.favorite')"
         @click.stop="$emit('toggleFavorite', memory)"
       >
-        <span class="pi" :class="favorite ? 'pi-star-fill' : 'pi-star'" />
+        <span class="pi" :class="favorite ? 'pi-heart-fill' : 'pi-heart'" />
       </button>
     </template>
   </Card>
@@ -42,39 +42,44 @@ const { t } = useI18n()
 .memory-card :deep(.p-card-content) {
   position: relative;
 }
+/* The favorite pin reuses the design's icon-tile language: a soft rounded tile. Inactive = a Surface tile so
+   it stays legible over the (accent-tinted) cover; active = the accent-soft tile + filled accent heart, the
+   same purple tile the sidebar icons use. */
 .memory-card-pin {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
+  top: 0.55rem;
+  left: 0.55rem;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   width: 2rem;
   height: 2rem;
   padding: 0;
   border: 1px solid var(--app-line);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+  border-radius: 10px;
+  background: var(--app-surface);
   color: var(--app-muted);
   cursor: pointer;
-  backdrop-filter: blur(6px);
+  box-shadow: var(--app-shadow-sm);
   transition:
     color 0.15s ease,
+    background 0.15s ease,
     border-color 0.15s ease,
     transform 0.1s ease;
 }
 .memory-card-pin:hover {
-  color: var(--app-text);
+  color: var(--app-accent);
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-line));
 }
 .memory-card-pin:active {
   transform: scale(0.9);
 }
 .memory-card-pin.is-favorite {
-  color: #f59e0b;
-  border-color: color-mix(in srgb, #f59e0b 45%, var(--app-line));
+  background: var(--app-accent-soft);
+  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-line));
+  color: var(--app-accent);
 }
 .memory-card-pin .pi {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 </style>
