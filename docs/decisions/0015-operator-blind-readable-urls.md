@@ -1,0 +1,67 @@
+# ADR 0015 — Operator-blind readable URLs: the content path lives in the #fragment
+
+- Status: Accepted
+- Date: 2026-06-28
+
+## Context
+
+The web shell wants **readable, bookmarkable URLs** for navigation — the pre-E2EE design source used
+human-readable paths (`/~me/reisen-2026/rom`, `/@familie/…`) that mirror the breadcrumb. But that era was **not
+operator-blind**: its server *saw* the path and *computed* the navigation from it. Ours must not. The tension:
+
+- Node + scope names are **sealed** ([ADR 0012](0012-content-key-hierarchy.md)); the server must never learn a
+  name. A URL slug is **derived from a name** — so a plaintext slug anywhere the server can read it is a leak.
+- With HTML5 history routing, the browser sends the **full path** to the server on any **hard load / reload /
+  deep-link / bookmark** (the SPA fallback must return `index.html`). That request line lands in the operator's
+  access / reverse-proxy logs. So plaintext slugs in the **path** leak names to the operator — even though the
+  SPA "resolves" them client-side; the issue is the raw URL *bytes*, not who interprets them.
+
+Considered and rejected during refinement:
+
+- **Plaintext slugs in the history path** (`/~me/reisen-2026/rom`). Rejected — leaks names to access logs on
+  every hard load (above). A "cosmetic" slug is still a leak.
+- **Opaque ids only** (`/n/<uuid>`, `/m/<uuid>`). Operator-blind and simple, but **not readable** — no
+  bookmark tells you where it goes, and it doesn't match the design source's URLs.
+- **Full hash-mode for the whole app** (`/#/login`, `/#/~me/…`). Operator-blind, but uglifies the auth URLs
+  too and conflates auth routing with content routing.
+
+## Decision
+
+**The in-shell content path lives in the URL `#fragment`, resolved entirely client-side; top-level (auth)
+routes stay history-mode.**
+
+- The current Memory-tree position is encoded in `location.hash`: `#~me/reisen-2026/rom` (personal scope),
+  `#@familie/sommer` (a group scope). The browser **never transmits the fragment** in an HTTP request — so the
+  readable, name-derived slugs reach the operator **never**, while the path stays bookmarkable. `~me` is a
+  **constant** (zero leak); `@<group>` + the folder/Memory slugs live only in the fragment.
+- **Resolution is local.** The client walks its **decrypted** tree, re-slugifying each child's name to match a
+  segment — exactly the navigation the operator-blind server can't do. The server is never consulted to resolve
+  a path; it only serves the per-scope opaque node rows ([ADR 0012](0012-content-key-hierarchy.md)).
+- **One slug function, two uses.** `slugify(name)` is URL-safe (`[a-z0-9-]`, German folding + diacritic strip,
+  deterministic non-empty fallback). It **already feeds the blinded `slug_token`** the server enforces
+  uniqueness on (`UNIQUE(parentId, slug_token)`, [ADR 0012](0012-content-key-hierarchy.md)) — so the **same**
+  function resolves URL→node, and sibling slugs are **unique by construction** (no client disambiguation). Group
+  slugs are **not** server-enforced (no group slug token) — same-named groups resolve first-match, client-side
+  ([ADR 0014](0014-group-scopes-and-governance.md)).
+- **History-mode for the top level.** `/`, `/login`, `/setup`, … stay real paths; only the content position
+  rides the fragment. The shell renders **browse or detail by the resolved node's `kind`** — no per-node route.
+- **Deep links survive a cold start.** Because a fresh load drops the in-memory vault, a bookmarked
+  `#~me/…/rom` bounces to login; the route guard **remembers the intended fragment** and the login view
+  **restores it after unlock** — so the bookmark lands on the exact node, still without the slug ever reaching
+  the server.
+
+## Consequences
+
+- **Readable URLs *and* operator-blind.** The design source's URL feel (`~me`, `@group`, slugs) is reproduced
+  with **zero** name leakage — the fragment is the seam that makes both true at once.
+- **No server navigation, no server slug for the path.** The server keeps serving opaque per-scope node rows;
+  all path semantics are client-side. (The blinded `slug_token` it *does* store is for per-parent uniqueness,
+  not navigation.)
+- **`@group` is a routing seam for groups** ([ADR 0014](0014-group-scopes-and-governance.md)) — the parser
+  accepts it ahead of the group feature; only `~me` resolves until group scopes exist.
+- **Limitation:** slugs are lossy + name-derived; the displayed label always comes from the decrypted name, not
+  the slug. A name change changes the slug (old bookmarks to a renamed node may miss) — acceptable for a
+  client-side convenience path.
+
+> Shipped under cr-0031 (web). The slug hardening, the fragment parser/resolver, the single content host, and
+> the deep-link-through-login restore all live in the web client; backend unchanged.

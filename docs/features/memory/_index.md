@@ -29,6 +29,9 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   attached to a node; **no content dedup** — operator-blind trade-off;
   [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md),
   [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
+- ★ [en.memory.favorites](enablers/en.memory.favorites.md) — **built** (pin a Memory: the per-(user, scope)
+  pinned-id set sealed under `K_SC` as one opaque blob — operator-blind, no plaintext favorite flag;
+  [cr-0031](../../../changes/cr-0031-memory-shell-polish.md))
 
 ## Use-cases (planned, on the tree + media enablers)
 
