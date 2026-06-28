@@ -41,9 +41,10 @@ the data layer + backend).
   `encryptedName`/`slugToken`/`wrappedContentKey`; error codes `slug_taken` (409) / `illegal_structure` (422)
   / `scope_not_found` / `node_not_found`. **Done:** YAML valid, all `$ref` resolve, operationIds unique;
   auto-picked by the backend glob + added to the web/native generators in their phases.
-- [ ] **2 — native crypto.** Port **`slug_token`** to apple `VeyqCrypto` + android `:crypto` (vector-gated;
-  `symWrap`/`symUnwrap` are already native). **Done when:** `swift test` + `:crypto:test` green incl. the
-  `slug_token` vector on both.
+- [x] **2 — native crypto.** Ported **`slug_token`** to apple `VeyqCrypto` + android `:crypto`
+  (`HKDF(contentKey,"",​"veyq/v1/slug-token:"+parentSlot) → HMAC-SHA256(slugKey, NFC(slug))`; symWrap/symUnwrap
+  already native). **Done:** apple `V1ConformanceTests` 15/0 incl. `testSlugToken`; android `:crypto:test`
+  green incl. `slugToken` — byte-identical to the vector on both.
 - [ ] **3 — backend.** `V10` `veyq_node` (id, scope_id, parent_id?, kind, encrypted_name, slug_token,
   order_index, wrapped_content_key?, created_at) + `UNIQUE(parent_id, slug_token)`; `content/node`
   feature (Resource/Handler/Store) under a scope-access guard (caller has a membership for the scope);
@@ -64,7 +65,7 @@ the data layer + backend).
 | Surface | Memory tree: create/list/rename/move (operator-blind) | Status |
 |---|---|---|
 | contracts | `content.openapi.yaml` (nodes under a scope) | ✅ (phase 1) |
-| crypto (native) | `slug_token` ported apple + android | ◻ |
+| crypto (native) | `slug_token` ported apple + android | ✅ (phase 2) |
 | backend | `veyq_node` + guards + structural rules | ◻ |
 | web | data layer (encrypt names + slug + `K_mem`) | ◻ |
 | apple / android | data layer (+ generated content client) | ◻ |

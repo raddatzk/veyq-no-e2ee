@@ -4,6 +4,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.text.Normalizer
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import org.bouncycastle.crypto.agreement.X25519Agreement
@@ -164,6 +165,18 @@ object V1 {
 
     fun recoveryAuthTag(masterKey: ByteArray): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(concat(utf8("veyq/v1/recovery-auth"), masterKey))
+
+    // --- content tokens (cr-0027) ---
+
+    /** Blinded slug token (AD-26): slugKey = HKDF(contentKey, "", "veyq/v1/slug-token:"+parentSlot, 32);
+     *  token = HMAC-SHA256(slugKey, NFC(slug)). Per-parent keyed + one-way — the blind server enforces slug
+     *  uniqueness per parent without seeing the name. `parentSlot` = parent node id (or scope id at the root). */
+    fun slugToken(contentKey: ByteArray, parentSlot: String, slug: String): ByteArray {
+        val slugKey = hkdfSha256(contentKey, ByteArray(0), utf8("veyq/v1/slug-token:$parentSlot"), 32)
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(slugKey, "HmacSHA256"))
+        return mac.doFinal(utf8(slug))
+    }
 
     // --- Hybrid KEM (X25519 + ML-KEM-768) — the scope-grant primitive (cr-0025) ---
     //

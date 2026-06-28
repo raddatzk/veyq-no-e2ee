@@ -126,6 +126,11 @@ class V1ConformanceTest {
         assertEquals(f.getString("digits"), V1.fingerprint(pub))
     }
 
+    @Test fun slugToken() {
+        val v = vectors.getJSONObject("slug_token")
+        assertContentEquals(hex(v, "token"), V1.slugToken(hex(v, "contentKey"), v.getString("parentSlot"), v.getString("slug")))
+    }
+
     private fun params(v: JSONObject): V1.ArgonParams {
         val p = v.getJSONObject("params")
         return V1.ArgonParams(p.getInt("t"), p.getInt("m"), p.getInt("p"), p.getInt("dkLen"))

@@ -143,6 +143,12 @@ final class V1ConformanceTests: XCTestCase {
         XCTAssertEqual(V1.fingerprint(pub), f["digits"] as! String)
     }
 
+    func testSlugToken() throws {
+        let v = sub(["slug_token"])
+        let token = V1.slugToken(contentKey: hex(v["contentKey"]), parentSlot: v["parentSlot"] as! String, slug: v["slug"] as! String)
+        XCTAssertEqual(token, hex(v["token"]))
+    }
+
     // MARK: - helpers
 
     private func sub(_ path: [String]) -> [String: Any] {

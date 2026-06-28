@@ -328,4 +328,16 @@ public enum V1 {
         }
         return groups.joined(separator: " ")
     }
+
+    // MARK: - content tokens (cr-0027)
+
+    /// Blinded slug token (AD-26): `slugKey = HKDF(contentKey, "", "veyq/v1/slug-token:"+parentSlot, 32)`;
+    /// `token = HMAC-SHA256(slugKey, NFC(slug))`. Per-parent keyed + one-way, so the blind server enforces
+    /// slug uniqueness per parent without seeing the name. `parentSlot` = the parent node id (or the scope id
+    /// at the root).
+    public static func slugToken(contentKey: Data, parentSlot: String, slug: String) -> Data {
+        let slugKey = hkdfSha256(ikm: contentKey, salt: Data(), info: utf8("veyq/v1/slug-token:" + parentSlot), length: 32)
+        let mac = HMAC<SHA256>.authenticationCode(for: utf8(slug), using: SymmetricKey(data: slugKey))
+        return Data(mac)
+    }
 }
