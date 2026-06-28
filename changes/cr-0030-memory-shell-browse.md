@@ -39,25 +39,25 @@ tree shape are built **client-side** (the blind server computes no navigation).
 
 ## Phases
 
-- [ ] **1 — active-space state + scope open.** App state holding the **active space** (`scopeId` + `K_SC`),
+- [x] **1 — active-space state + scope open.** App state holding the **active space** (`scopeId` + `K_SC`),
   populated after unlock: `ensurePersonalScope()` (idempotent auto-birth) → `openPersonalScope()` → hold the
   scope id + `K_SC`. Graceful **NoTenant** state (empty/blocked, with the dev hint). **Done:** unit test for
   the state transitions (mocked `scopesApi`); a locked/no-tenant path renders the blocked state.
-- [ ] **2 — app shell + routing.** Port `AppShell.vue` (authenticated layout = sidebar + topbar + content
+- [x] **2 — app shell + routing.** Port `AppShell.vue` (authenticated layout = sidebar + topbar + content
   `RouterView`; public layout = bare `RouterView`), gated on **session + unlocked**. Add the `/` home route
   (+ a node route for folder drill-in, e.g. `/n/:nodeId`) redirecting to `/login` when not authed, to unlock
   when locked. Port a **simplified** `TenantSidebar` (Personal entry + `ProfileMenu`: logout / theme /
   language — defer space-switching, favorites, search) + `WorkspaceTopbar` (client-side breadcrumb + title).
   **Done:** `npm run check` green; the shell renders for an authed+unlocked session, the public layout for
   login.
-- [ ] **3 — browse view.** Port `MemoryFolderOverview.vue` + `MemoryCard.vue`: the current level's child
+- [x] **3 — browse view.** Port `MemoryFolderOverview.vue` + `MemoryCard.vue`: the current level's child
   **folders** + **Memories** as cards (icon + name) with *create* cards; wire to `listTree(scopeId, K_SC)` →
   filter children by `parentId`; build the **breadcrumb client-side** by walking `parentId` to the root.
   Folder click drills in (route); Memory click opens a **minimal placeholder** Memory view (title +
   breadcrumb + "gallery/journal coming" — the detail view is a later slice). **Done:** `npm run check` green;
   a component test round-trips a decrypted tree → rendered folders/Memories + breadcrumb (real v1 crypto +
   mocked `contentApi`).
-- [ ] **4 — create / rename / delete.** Port `CreateFolderDialog`, `CreateMemoryDialog`, `EditMemoryDialog`
+- [x] **4 — create / rename / delete.** Port `CreateFolderDialog`, `CreateMemoryDialog`, `EditMemoryDialog`
   (rename), `ConfirmationDialog` (delete-subtree); wire to `tree.ts` `createFolder` / `createMemory` /
   `renameNode` / `deleteNode`; refresh the level after a mutation; surface `slug_taken` / `illegal_structure`
   inline. **Done:** `npm run check` green; dialog tests assert the data-layer calls + the post-mutation
@@ -72,7 +72,7 @@ tree shape are built **client-side** (the blind server computes no navigation).
 
 | Surface | Memory shell: personal-space browse + organize | Status |
 |---|---|---|
-| web | shell + tree browse + create/rename/delete | ◻ |
+| web | shell + tree browse + create/rename/delete | 🟦 P1–P4 done; P5 (live smoke) pending |
 | apple / android | the native Memory shell | ◻ **deferred (web-first)** |
 | UI media | cover thumbnails in cards | ◻ **deferred (no derivatives yet)** |
 
