@@ -38,7 +38,7 @@ When a topic is refined, its ideas move into durable state under `docs/wiki/` (+
 | 14 | Spaces (tenants/groups/personal) | feature, scopes | `legacy/docs/wiki/features/spaces/` | inbox |
 | 15 | Keys (grants, unlock wraps, rotation) | feature, crypto | `legacy/docs/wiki/features/keys/` | inbox |
 | 16 | Memory (tree, curation, map/tracks, playlists) | feature, memory | `legacy/docs/wiki/features/memory/` | inbox |
-| 17 | Uploads (unified encrypted media path) | feature, media | `legacy/docs/wiki/features/uploads/` | inbox |
+| 17 | Uploads (unified encrypted media path) | feature, media | `legacy/docs/wiki/features/uploads/` | refining → enabler `en.memory.media` + **ADR 0013** (S3-only, presigned direct-to-store, **no content dedup** — operator-blind trade-off); media transport for `K_blob` + chunked AEAD. CR (`cr-0028`, first slice: **batch-shaped** control plane, clients send length-1 lists) planned. Resume/thumbnails/share-mirrors deferred (ADR 0013) |
 | 18 | Journal (markdown, embeds, live co-edit) | feature, journal | `legacy/docs/wiki/features/journal/` | inbox |
 | 19 | Sharing (public shares, roles, upload links) | feature, sharing | `legacy/docs/wiki/features/sharing/` | inbox |
 | 20 | People & participants | feature, people | `legacy/docs/wiki/features/people/` | inbox |

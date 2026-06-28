@@ -1,0 +1,126 @@
+# Enabler: Media blobs in a Memory (`K_blob` + chunked AEAD, direct-to-store)
+
+- **ID:** en.memory.media
+- **Type:** **Enabler** — structural foundation, no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
+- **Provides:** the **encrypted media data layer** for a Memory — a media **blob** sealed client-side as
+  **chunked AEAD** under a fresh random **`K_blob`** (wrapped under the Memory's `K_mem`), transferred
+  **direct-to-store** via presigned URLs ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)),
+  and **attached** to a node (a Memory or one of its Chapters). Bytes only — the *curation* of media into a
+  gallery (covers, ordering, captions, the UI) is the use-case on top.
+- **Serves (use-cases):** [add media to a Memory](../_index.md) (the value-bearing flow + UI), and later
+  *journal attachments* / *places & tracks* media. Storing one encrypted blob is not itself a user goal; it is
+  the substrate those carry.
+- **Depends on:** [en.memory.tree](en.memory.tree.md) (a **Memory** exists and owns a `K_mem`) → through it
+  [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) and `uc.account.unlock`
+  (identity → scope key → `K_SC` → `K_mem`).
+- **Preconditions:** an **unlocked** vault; an **open Memory** whose `K_mem` is unwrapped (the blob keys wrap
+  under it); a reachable object store (the instance advertises `directTransport: ok`, ADR 0013).
+- **Postconditions (success):** the blob's **ciphertext chunks** live in the object store; the server holds the
+  blob's **metadata + chunk manifest + the `K_blob` wrap** and a **media** record linking the blob to a node.
+  The server learned **no bytes of plaintext** and holds **no content key**.
+
+## Key & blob model (ADR 0012 + ADR 0013)
+
+- **`K_blob`** — a fresh **random 32-byte key per blob**, wrapped under the Memory's **`K_mem`**
+  (`symWrap(K_mem, K_blob)`). It encrypts that blob's chunk frames and nothing else. **No dedup** — identical
+  content yields a different `K_blob` and a different ciphertext ([ADR 0013 §5](../../../decisions/0013-blob-storage-presigned-direct-to-store.md#5-no-content-dedup);
+  operator-blind trade-off).
+- **`chunk_frame`** (vector-pinned, `v1.json`) — each chunk is `nonce(12) ‖ AEAD(K_blob, nonce, plaintext,
+  aad = u32be(index) ‖ u32be(total))`. The **AAD binds each frame to its position**, so the server cannot
+  reorder, drop, or splice chunks without detection on `openFrame`. Small media = one frame; large media =
+  many.
+- **blob** — the unit of stored bytes: an id, `chunkCount`, `byteSize`, the chunk manifest (per-chunk size),
+  and the `K_blob` wrap. Lives in a scope.
+- **media** — the link record attaching a blob to a **node** (a Memory or a Chapter), carrying any per-use
+  metadata (e.g. an encrypted original filename / capture time under `K_mem`, later slices). One blob can be
+  attached by more than one media record (e.g. cover + in-body) **within the owner circle** — that is a
+  metadata reference the members already see, not content dedup.
+
+## Main flow — add a media blob to a Memory (operator-blind)
+
+> The control-plane endpoints are **batch-shaped** (each takes a list + returns a per-item result, [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md));
+> this enabler describes a **single** blob for clarity, and the first slice sends length-1 lists. A
+> gallery later sends longer lists — same shape, no contract change.
+
+1. The client has the Memory open: `K_mem` is unwrapped (via `K_SC`, en.memory.tree).
+2. **Seal:** generate a random **`K_blob`**; split the plaintext into chunks; `sealFrame(K_blob, index, total,
+   chunk, nonce)` each. Wrap `K_blob` under `K_mem` (`symWrap(K_mem, K_blob)`).
+3. **Start:** POST a blob-start declaring `chunkCount` + `byteSize` (+ the `K_blob` wrap); the server opens an
+   upload session and returns a **presigned `PUT` URL per chunk**.
+4. **Transfer:** the client `PUT`s the **raw sealed frame bytes** straight to the object store (no base64) —
+   in parallel — bypassing the backend.
+5. **Complete + attach:** POST complete-and-attach `{ uploadId, nodeId }`; the server **stats** each object to
+   confirm presence + size, writes the chunk manifest, enforces the byte budget, promotes the staged objects
+   to a blob, and creates the **media** record linking it to the node. Returns the blob/media ids.
+6. **Read back:** to display, the client asks for **presigned `GET` URLs**, fetches the raw frames directly,
+   unwraps `K_blob` (via `K_mem`), and `openFrame`s each (the AAD position check verifies order/count).
+
+```plantuml
+@startuml
+title Add a media blob (direct-to-store, operator-blind)
+skinparam shadowing false
+actor "Member\n(Memory open, holds K_mem)" as U
+participant "Client" as C
+participant "Server\n(blind, control plane)" as S
+database "Object store\n(blind)" as O
+
+U -> C : add photo
+C -> C : K_blob = random(32)
+C -> C : frames = [ sealFrame(K_blob, i, n, chunk_i, nonce_i) ]
+C -> C : wrappedBlobKey = symWrap(K_mem, K_blob)
+C -> S : start blob { chunkCount:n, byteSize, wrappedBlobKey }
+S --> C : { uploadId, presignedPut[0..n-1] }
+C -> O : PUT raw frame bytes  (direct, parallel)
+C -> S : complete + attach { uploadId, nodeId }
+S -> O : stat each object (size/presence)
+S -> S : write manifest, enforce budget, create media record
+S --> C : { blobId, mediaId }
+note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno plaintext byte, no content key
+@enduml
+```
+
+## Alternate / exception flows
+
+- **E1 — store unreachable / can't presign** (`directTransport: unavailable`, e.g. the in-memory dev store):
+  there is no transport path; the action is unavailable. Exercised only by opt-in e2e against MinIO
+  ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)).
+- **E2 — declared budget exceeded** (or actual object sizes exceed it at complete): the server rejects and
+  **purges** the staged objects (declare-then-verify, ADR 0013 §3).
+- **E3 — abandoned upload:** an OPEN session never completed → reclaimed by GC (stale sessions + unreferenced
+  -blob sweep).
+- **E4 — vault locked / Memory not open:** without `K_mem` the client can neither key nor read a blob → the
+  action is unavailable until unlock + the Memory is opened.
+- **E5 — chunk tampered / reordered:** `openFrame` fails the AAD position check → the frame is rejected (the
+  server cannot forge a valid frame without `K_blob`).
+
+## Quality notes
+
+- **Operator-blind.** Server + object store only ever hold AEAD ciphertext chunks + opaque metadata (ids,
+  sizes, manifest, the `K_blob` wrap, the node link). Never a plaintext byte, never a content key, never a
+  filename in clear.
+- **No content dedup — by decision.** Duplicate media is stored once per blob; the operator never learns
+  blob-equality. The savings dedup would buy aren't worth the scope-internal equality leak on an operator-blind,
+  self-hostable app ([ADR 0013 §5](../../../decisions/0013-blob-storage-presigned-direct-to-store.md#5-no-content-dedup)).
+- **Backend is never a byte bottleneck.** It signs short-TTL, single-object, single-method capabilities; the
+  bytes go client↔store. Credentials never reach the client.
+- **Position-bound chunks.** The `chunk_frame` AAD (`index ‖ total`) makes reorder/drop/splice detectable —
+  integrity of a multi-chunk blob without trusting the store.
+- **Scope of this slice.** The **batch-shaped** control plane (start → direct PUT → complete+attach → direct
+  GET → open, all list-valued) with clients sending length-1 lists. **Resumable uploads, thumbnails/previews,
+  public-share mirrors, and the gallery/curation UI** are their own later slices
+  ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) defers them).
+
+> **No end-user section.** As an enabler this has no standalone "what this means for you" story — its end-user
+> value surfaces through the use-case it *serves* ([add media to a Memory](../_index.md)), whose bilingual
+> section carries the wiki text.
+
+## Related
+
+- Feature: [Memory](../_index.md)
+- Decisions: [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) (S3-only, presigned
+  direct-to-store, no dedup), [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_blob` under
+  `K_mem`), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (`chunk_frame` vector)
+- Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy),
+  [Account & Key Model](../../../crosscutting/account-key-model.md)
+- Related enabler: [en.memory.tree](en.memory.tree.md) (the Memory + `K_mem` this attaches media to)

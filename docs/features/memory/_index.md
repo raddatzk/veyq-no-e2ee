@@ -24,11 +24,17 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - ★ [en.memory.tree](enablers/en.memory.tree.md) — **refined** (the encrypted node tree: FOLDER/MEMORY/CHAPTER,
   encrypted names, blinded slugs, per-Memory `K_mem` birth/open — the substrate the use-cases below build on;
   [ADR 0012](../../decisions/0012-content-key-hierarchy.md), [cr-0027](../../../changes/cr-0027-memory-tree.md))
+- ★ [en.memory.media](enablers/en.memory.media.md) — **refined** (the encrypted media data layer: a blob sealed
+  as chunked AEAD under a random `K_blob` wrapped under `K_mem`, transferred direct-to-store via presigned URLs,
+  attached to a node; **no content dedup** — operator-blind trade-off;
+  [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md),
+  [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
 
-## Use-cases (planned, on the tree enabler)
+## Use-cases (planned, on the tree + media enablers)
 
 - Create & organize memories (folders, rename, move, cover) — the user-facing curation, with UI
-- Add media to a Memory — uploads / `K_blob` + chunked AEAD (the uploads concern)
+- Add media to a Memory — the value-bearing upload/gallery flow + UI on top of
+  [en.memory.media](enablers/en.memory.media.md) (`K_blob` + chunked AEAD, direct-to-store)
 - Memory journal — markdown sealed under `K_mem`
 - Places & tracks (map / GPX) — sealed location under `K_mem`
 - Share a Memory — wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012

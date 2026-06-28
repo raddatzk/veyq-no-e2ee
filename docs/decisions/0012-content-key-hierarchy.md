@@ -76,6 +76,10 @@ holds `K_SC`, `K_mem`, `K_blob`, or any name.
   shared Memory's *sub*tree (its chapters) shares the one `K_mem` (yes — a chapter is part of its Memory) and
   the share-record shape. Group/recipient key-directory trust is the active-operator gap already in the
   Security Model.
+- **Media dedup — decided in [ADR 0013](0013-blob-storage-presigned-direct-to-store.md): declined.** `K_blob`
+  stays **random** (so this ADR's wording holds) and the `dedup_token` vector stays unused: any storage-saving
+  dedup would leak the scope-internal blob-equality structure to the blind operator. Scope-wide convergent
+  dedup remains a possible *future* slice, not a default.
 
 ## Related
 
