@@ -1,0 +1,202 @@
+openapi: 3.1.0
+info:
+  title: veyq Scopes API
+  version: 0.1.0
+  description: >
+    A member's scopes within the active tenant — the structural layer "where content lives and who may
+    access it" (uc.spaces.personal-scope, cr-0026). A **scope** is the unit content is keyed on, addressed by
+    an opaque id and a `kind` (TENANT / GROUP / PERSONAL). The active tenant is resolved from the request
+    `Host` (ADR 0002); every scope lives within exactly one tenant.
+
+    **Operator-blind.** The server stores only the opaque scope row (id / kind / tenant), the **ciphertext
+    grant** (the scope key sealed to a member's identity public key — `asymWrap`, the hybrid KEM, ADR 0009),
+    and the membership. It never holds a scope key, so it **cannot** create a scope: birth is **client-driven**
+    — the client generates the scope key, seals it to its own identity, and hands the server only the grant
+    ciphertext. The server mints the scope id + the self-membership.
+
+    `POST /api/scopes` creates the caller's **personal** scope in the active tenant (one per member per
+    tenant); group creation is a later, separate operation. `GET /api/scopes` lists the caller's scopes in the
+    active tenant together with their own grant ciphertext, so the client can open them locally. Both require
+    an authenticated caller; authorization is enforced by code annotations, not this spec (ADR 0008). Field
+    validation is declared here via `x-field-extra-annotation` (bean-validation + a trimming deserializer), so
+    malformed input is rejected at the boundary (400) before any handler runs.
+tags:
+  - name: scopes
+    description: >
+      A member's scopes in the active tenant (create-personal / list-mine). One tag = one resource interface
+      owning the whole `/api/scopes` subtree.
+
+paths:
+  /api/scopes:
+    post:
+      tags: [scopes]
+      operationId: createPersonalScope
+      summary: Birth the caller's personal scope in the active tenant.
+      description: >
+        Creates a `kind=PERSONAL` scope for the authenticated caller in the tenant resolved from the `Host`,
+        plus the caller's self-membership. The client has generated the scope key and sealed it to its own
+        identity public key; the server stores only the opaque `wrappedGrant` ciphertext and never sees the
+        key. One personal scope per (member, tenant) — a second call is `409 personal_scope_exists`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePersonalScopeRequest" }
+            example:
+              wrappedGrant: AQ==
+      responses:
+        "201":
+          description: The personal scope was created and the caller holds its grant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScopeCreated" }
+              example:
+                scopeId: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+                kind: PERSONAL
+        "400":
+          description: The request was malformed (missing/invalid grant).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the request Host.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The caller already has a personal scope in this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: personal_scope_exists }
+    get:
+      tags: [scopes]
+      operationId: listMyScopes
+      summary: List the caller's scopes in the active tenant.
+      description: >
+        Returns every scope the authenticated caller holds in the tenant resolved from the `Host`, each with
+        its opaque id, kind, tenant id, and the caller's **own** grant ciphertext (so the client can
+        `asymUnwrap` it locally to open the scope). No other member's grant is ever returned; the operator
+        stays blind to scope keys.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's scopes in the active tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ScopeSummary" }
+              example:
+                - id: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  kind: TENANT
+                  tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  wrappedGrant: AQ==
+                - id: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+                  kind: PERSONAL
+                  tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  wrappedGrant: AQ==
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the request Host.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The opaque access token issued by login / refresh. Any authenticated caller (enforced by code, not this spec).
+
+  schemas:
+    ScopeKind:
+      type: string
+      description: The kind of a scope — the tenant root, a collaborative group, or a member's private space.
+      enum: [TENANT, GROUP, PERSONAL]
+      example: PERSONAL
+
+    CreatePersonalScopeRequest:
+      type: object
+      required: [wrappedGrant]
+      properties:
+        wrappedGrant:
+          type: string
+          description: >
+            The freshly generated personal scope key sealed to the caller's **own** identity public key
+            (`asymWrap(ownIdentityPub, scopeKey, "scope-grant")`) — opaque base64 ciphertext the server stores
+            verbatim and never interprets.
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    ScopeCreated:
+      type: object
+      required: [scopeId, kind]
+      properties:
+        scopeId:
+          type: string
+          format: uuid
+          description: Opaque id of the created scope.
+          example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+        kind:
+          $ref: "#/components/schemas/ScopeKind"
+
+    ScopeSummary:
+      type: object
+      required: [id, kind, tenantId, wrappedGrant]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Opaque id of the scope.
+          example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+        kind:
+          $ref: "#/components/schemas/ScopeKind"
+        tenantId:
+          type: string
+          format: uuid
+          description: The tenant this scope lives in (host-routing context).
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        wrappedGrant:
+          type: string
+          description: >
+            The caller's **own** grant — the scope key sealed to their identity public key (opaque base64).
+            The client `asymUnwrap`s it locally to open the scope; the server never interprets it.
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable, client-localizable error code.
+          maxLength: 64
+          example: invalid_request
+        message:
+          type: [string, "null"]
+          description: Optional developer-facing detail; never contains secrets or content.
+          maxLength: 512
+          example: null

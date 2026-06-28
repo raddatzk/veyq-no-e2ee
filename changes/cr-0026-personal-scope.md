@@ -57,9 +57,11 @@ and the content slice.
   [scopes-and-tenancy](../docs/crosscutting/scopes-and-tenancy.md) (scope identity + personal scope realised)
   and added the [parity matrix](../docs/crosscutting/platform-parity.md) row. **Done:** docs exist, links
   resolve, `plantuml -checkonly` OK, design matches this CR.
-- [ ] **2 — contracts.** New `contracts/api/scopes.openapi.yaml`: `POST /api/scopes` (create personal,
-  `{wrappedGrant}` → `{scopeId,kind}`; 409 if one exists) + `GET /api/scopes` (list mine →
-  `[{id,kind,tenantId,wrappedGrant}]`). **Done when:** spec lints; clients/backend generate.
+- [x] **2 — contracts.** New `contracts/api/scopes.openapi.yaml`: `POST /api/scopes` (`createPersonalScope`,
+  `{wrappedGrant}` → `{scopeId,kind}`; 409 `personal_scope_exists`; 404 `tenant_not_found`) + `GET /api/scopes`
+  (`listMyScopes` → `[{id,kind,tenantId,wrappedGrant}]`), `ScopeKind` enum, base64-validated grant — same
+  idioms as `tenants.openapi.yaml`. **Done:** YAML valid, all `$ref` resolve, operationIds unique; the
+  authoritative generator run lands with each surface (backend phase 3 registers it in `openApiGenerateSpecs`).
 - [ ] **3 — backend.** `veyq_scope` + `membership.scope_id` Flyway migration (+ TENANT backfill);
   `ScopesResource`/`Handler`/`Store`; create-personal + list-mine (tenant from Host, `@Authenticated`);
   reconcile the cr-0010 activation to write the TENANT scope row + `scope_id`/`kind`. **Done when:**
@@ -79,7 +81,7 @@ and the content slice.
 
 | Surface | personal scope: birth + list + open | Status |
 |---|---|---|
-| contracts | `POST`/`GET /api/scopes` | ◻ (phase 2) |
+| contracts | `POST`/`GET /api/scopes` | ✅ (phase 2) |
 | backend | scope identity + create/list + backfill | ◻ (phase 3) |
 | http | signed acceptance | ◻ (phase 4) |
 | web | data layer + auto-birth | ◻ (phase 5) |
