@@ -62,11 +62,15 @@ and the content slice.
   (`listMyScopes` → `[{id,kind,tenantId,wrappedGrant}]`), `ScopeKind` enum, base64-validated grant — same
   idioms as `tenants.openapi.yaml`. **Done:** YAML valid, all `$ref` resolve, operationIds unique; the
   authoritative generator run lands with each surface (backend phase 3 registers it in `openApiGenerateSpecs`).
-- [ ] **3 — backend.** `veyq_scope` + `membership.scope_id` Flyway migration (+ TENANT backfill);
-  `ScopesResource`/`Handler`/`Store`; create-personal + list-mine (tenant from Host, `@Authenticated`);
-  reconcile the cr-0010 activation to write the TENANT scope row + `scope_id`/`kind`. **Done when:**
-  `./gradlew check` green incl. a `ScopesSliceTest` (create→list, one-per-tenant, operator-blind: only
-  ciphertext stored).
+- [x] **3 — backend.** `V9__scopes.sql` (new `veyq_scope` table; `membership.scope_id` via a fresh-table
+  rebuild + `RENAME` — avoids the cross-DB `DROP INDEX` of the V8 `(user,tenant)` unique; TENANT backfill,
+  `id=tenant_id`); `ScopeEntity` + `membership.scopeId`; `ScopesStore`/`Handler`/`Resource`
+  (`createPersonalScope` + `listMyScopes`, `@Authenticated`, tenant from **Host** — a small resolver reading
+  `X-Forwarded-Host`/`Host` → domain → tenant, 404 if unknown, member-gated). Reconciled `TenantStore.activate`
+  to write the TENANT scope row + `scope_id`. **Done:** `./gradlew check` green; `ScopesSliceTest` 5/5
+  (create→list, one-per-tenant 409, operator-blind: stored grant == sent ciphertext, unknown-host 404,
+  non-member 404, unauth 401). *Note: Host→tenant is new here; dev-on-localhost needs a fallback later, a
+  follow-up for the web/dev phase.*
 - [ ] **4 — http.** `scopes-authed.http` acceptance (signed create + list happy-paths) with response-handler
   asserts. **Done when:** the suite passes against a fresh seeded instance.
 - [ ] **5 — web.** Data layer `createPersonalScope`/`listMyScopes`/`openScope` (asymUnwrap with the vaulted
@@ -82,7 +86,7 @@ and the content slice.
 | Surface | personal scope: birth + list + open | Status |
 |---|---|---|
 | contracts | `POST`/`GET /api/scopes` | ✅ (phase 2) |
-| backend | scope identity + create/list + backfill | ◻ (phase 3) |
+| backend | scope identity + create/list + backfill | ✅ (phase 3) |
 | http | signed acceptance | ◻ (phase 4) |
 | web | data layer + auto-birth | ◻ (phase 5) |
 | apple / android | data layer (open via cr-0025) | ◻ (phase 6) |

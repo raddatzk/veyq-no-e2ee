@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.features.spaces.scope.ScopeEntity
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -41,10 +42,18 @@ class TenantStore {
      */
     @Transactional
     fun activate(tenantId: String, userId: String, wrappedGrant: String, inviteId: String) {
+        // The TENANT root scope is born with the owner membership; keyed id == tenantId (cr-0026).
+        ScopeEntity().apply {
+            id = tenantId
+            this.tenantId = tenantId
+            kind = ScopeEntity.TENANT
+            createdAt = Instant.now()
+        }.persist()
         MembershipEntity().apply {
             id = UUID.randomUUID().toString()
             this.userId = userId
             this.tenantId = tenantId
+            scopeId = tenantId
             role = MembershipEntity.OWNER
             this.wrappedGrant = wrappedGrant
             createdAt = Instant.now()

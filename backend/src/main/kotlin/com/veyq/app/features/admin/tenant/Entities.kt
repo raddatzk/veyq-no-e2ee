@@ -83,10 +83,11 @@ class TenantInviteEntity : PanacheEntityBase {
 }
 
 /**
- * Membership — the (user, scope, role, grant) relation (ADR 0007). For now the scope is a tenant (its root
- * scope is keyed by the tenant id). `wrappedGrant` is the scope root key sealed to the member's identity
- * public key — opaque ciphertext the server stores but never opens. The first row is the owner's, born at
- * tenant activation (cr-0010); members extend the relation later via the invite-wrap.
+ * Membership — the (user, scope, role, grant) relation (ADR 0007). It references a `scopeId` (cr-0026); the
+ * TENANT root scope is keyed `scopeId == tenantId`, a PERSONAL/GROUP scope gets its own id. `wrappedGrant` is
+ * the scope key sealed to the member's identity public key — opaque ciphertext the server stores but never
+ * opens. The first row is the owner's, born at tenant activation (cr-0010); members extend the relation
+ * later via the invite-wrap, and each member births their own PERSONAL scope (uc.spaces.personal-scope).
  */
 @Entity
 @Table(name = "veyq_membership")
@@ -100,6 +101,10 @@ class MembershipEntity : PanacheEntityBase {
 
     @Column(name = "tenant_id", nullable = false, length = 36)
     lateinit var tenantId: String
+
+    /** The scope this membership grants (cr-0026). For the TENANT root scope this equals `tenantId`. */
+    @Column(name = "scope_id", nullable = false, length = 36)
+    lateinit var scopeId: String
 
     @Column(name = "role", nullable = false, length = 16)
     lateinit var role: String
