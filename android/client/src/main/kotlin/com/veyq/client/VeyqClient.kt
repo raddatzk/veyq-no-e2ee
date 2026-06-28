@@ -15,6 +15,11 @@ import com.veyq.api.scopes.api.ScopesApi
 import com.veyq.api.scopes.model.CreatePersonalScopeRequest
 import com.veyq.api.scopes.model.ScopeKind
 import com.veyq.api.scopes.model.ScopeSummary
+import com.veyq.api.content.api.ContentApi
+import com.veyq.api.content.model.CreateNodeRequest
+import com.veyq.api.content.model.NodeKind
+import com.veyq.api.content.model.NodeSummary
+import com.veyq.api.content.model.UpdateNodeRequest
 import com.veyq.api.setup.api.SetupApi
 import com.veyq.crypto.V1
 import okhttp3.OkHttpClient
@@ -23,6 +28,7 @@ import java.util.Base64
 import com.veyq.api.account.infrastructure.ClientException as AccountClientException
 import com.veyq.api.auth.infrastructure.ClientException as AuthClientException
 import com.veyq.api.scopes.infrastructure.ClientException as ScopesClientException
+import com.veyq.api.content.infrastructure.ClientException as ContentClientException
 
 /**
  * The operator-blind login + unlock data layer — the Android twin of Apple's `VeyqClient` and the web
@@ -49,6 +55,7 @@ class VeyqClient(
     private val account = AccountApi(instance.baseUrl, client)
     private val accountWraps = AccountWrapsApi(instance.baseUrl, client)
     private val scopes = ScopesApi(instance.baseUrl, client)
+    private val content = ContentApi(instance.baseUrl, client)
 
     /**
      * Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -396,6 +403,137 @@ class VeyqClient(
         }
     }
 
+    // --- Memory tree (cr-0027, en.memory.tree) ---
+
+    /**
+     * A decrypted tree node for the UI. `name` is opened on-device under `K_SC`; the server never saw it.
+     * `wrappedContentKey` is carried verbatim (still sealed) — open it with [openMemory] only when needed.
+     */
+    data class TreeNode(
+        val id: String,
+        val parentId: String?,
+        val kind: NodeKind,
+        val orderIndex: Int,
+        val name: String,
+        val wrappedContentKey: String?,
+    )
+
+    /** List the scope's tree with names decrypted under `scopeKey` (K_SC). */
+    fun listTree(scopeId: String, scopeKey: ByteArray): List<TreeNode> =
+        withRefresh { fetchNodes(scopeId) }.map { r ->
+            TreeNode(
+                id = r.id.toString(),
+                parentId = r.parentId?.toString(),
+                kind = r.kind,
+                orderIndex = r.orderIndex,
+                name = openName(scopeKey, r.encryptedName),
+                wrappedContentKey = r.wrappedContentKey,
+            )
+        }
+
+    /** Create a FOLDER (organization only — no content key). Returns its node id. */
+    fun createFolder(scopeId: String, scopeKey: ByteArray, name: String, parentId: String? = null): String =
+        createNode(scopeId, scopeKey, name, parentId, NodeKind.FOLDER, wrappedContentKey = null)
+
+    /**
+     * Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC` (the share grain, ADR 0012).
+     * Returns the node id + the in-memory `K_mem` (the caller owns it; not zeroed here).
+     */
+    fun createMemory(scopeId: String, scopeKey: ByteArray, name: String, parentId: String? = null): Pair<String, ByteArray> {
+        val memoryKey = randomBytes(32)
+        val wrapped = b64encode(V1.symWrap(scopeKey, memoryKey, KMEM_CTX, randomBytes(12)))
+        val nodeId = createNode(scopeId, scopeKey, name, parentId, NodeKind.MEMORY, wrappedContentKey = wrapped)
+        return nodeId to memoryKey
+    }
+
+    /** Open a Memory's content key (`K_mem`) from its node, or null if it carries none. */
+    fun openMemory(scopeKey: ByteArray, node: TreeNode): ByteArray? {
+        val wrapped = node.wrappedContentKey ?: return null
+        return V1.symUnwrap(scopeKey, b64decode(wrapped), KMEM_CTX)
+    }
+
+    /** Rename a node — re-seal the name + recompute the slug for the (unchanged) parent. */
+    fun renameNode(scopeId: String, scopeKey: ByteArray, node: TreeNode, newName: String) {
+        val parentSlot = node.parentId ?: scopeId
+        val body = UpdateNodeRequest(
+            encryptedName = sealName(scopeKey, newName),
+            slugToken = b64encode(V1.slugToken(scopeKey, parentSlot, slugify(newName))),
+        )
+        withRefresh { patchNode(scopeId, node.id, body) }
+    }
+
+    /** Delete a node and its subtree. */
+    fun deleteNode(scopeId: String, nodeId: String) = withRefresh { removeNode(scopeId, nodeId) }
+
+    /** Shared create path for FOLDER/MEMORY — seal the name under `K_SC`, blind the slug, POST only ciphertext. */
+    private fun createNode(
+        scopeId: String, scopeKey: ByteArray, name: String, parentId: String?,
+        kind: NodeKind, wrappedContentKey: String?,
+    ): String {
+        val parentSlot = parentId ?: scopeId
+        val body = CreateNodeRequest(
+            kind = kind,
+            encryptedName = sealName(scopeKey, name),
+            slugToken = b64encode(V1.slugToken(scopeKey, parentSlot, slugify(name))),
+            parentId = parentId?.let { java.util.UUID.fromString(it) },
+            orderIndex = 0,
+            wrappedContentKey = wrappedContentKey,
+        )
+        return withRefresh { postNode(scopeId, body) }
+    }
+
+    private fun sealName(scopeKey: ByteArray, name: String): String =
+        b64encode(V1.symWrap(scopeKey, name.toByteArray(Charsets.UTF_8), NAME_CTX, randomBytes(12)))
+
+    private fun openName(scopeKey: ByteArray, encryptedName: String): String =
+        String(V1.symUnwrap(scopeKey, b64decode(encryptedName), NAME_CTX), Charsets.UTF_8)
+
+    private fun fetchNodes(scopeId: String): List<NodeSummary> = try {
+        content.listNodes(java.util.UUID.fromString(scopeId))
+    } catch (e: ContentClientException) {
+        throw when (e.statusCode) {
+            404 -> VeyqError.ScopeNotFound
+            401 -> VeyqError.SessionExpired
+            else -> VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
+    private fun postNode(scopeId: String, body: CreateNodeRequest): String = try {
+        content.createNode(java.util.UUID.fromString(scopeId), body).nodeId.toString()
+    } catch (e: ContentClientException) {
+        throw when (e.statusCode) {
+            409 -> VeyqError.SlugTaken
+            422 -> VeyqError.IllegalStructure
+            404 -> VeyqError.ScopeNotFound
+            401 -> VeyqError.SessionExpired
+            400 -> VeyqError.InvalidRequest(null)
+            else -> VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
+    private fun patchNode(scopeId: String, nodeId: String, body: UpdateNodeRequest) = try {
+        content.updateNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId), body)
+    } catch (e: ContentClientException) {
+        throw when (e.statusCode) {
+            409 -> VeyqError.SlugTaken
+            422 -> VeyqError.IllegalStructure
+            404 -> VeyqError.NodeNotFound
+            401 -> VeyqError.SessionExpired
+            400 -> VeyqError.InvalidRequest(null)
+            else -> VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
+    private fun removeNode(scopeId: String, nodeId: String) = try {
+        content.deleteNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId))
+    } catch (e: ContentClientException) {
+        throw when (e.statusCode) {
+            404 -> VeyqError.NodeNotFound
+            401 -> VeyqError.SessionExpired
+            else -> VeyqError.UnexpectedStatus(e.statusCode)
+        }
+    }
+
     /** GET the caller's scopes. 401 → [VeyqError.SessionExpired] so [withRefresh] rotates-and-retries. */
     private fun fetchScopes(): List<ScopeSummary> = try {
         scopes.listMyScopes()
@@ -475,5 +613,13 @@ class VeyqClient(
         private fun b64decode(s: String): ByteArray = Base64.getDecoder().decode(s)
         private fun b64encode(b: ByteArray): String = Base64.getEncoder().encodeToString(b)
         private fun randomBytes(n: Int): ByteArray = ByteArray(n).also { SecureRandom().nextBytes(it) }
+
+        private const val NAME_CTX = "node-name"
+        private const val KMEM_CTX = "content-key"
+
+        /** Minimal slug: NFC, lowercased, trimmed, whitespace → "-". Deterministic so same name → same token. */
+        internal fun slugify(name: String): String =
+            java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFC)
+                .lowercase().trim().split(Regex("\\s+")).joinToString("-")
     }
 }

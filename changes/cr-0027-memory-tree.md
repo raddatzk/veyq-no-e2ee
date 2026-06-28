@@ -1,7 +1,7 @@
 ---
 id: cr-0027
 title: The Memory tree — encrypted folder/Memory nodes (names, blinded slugs, per-Memory K_mem)
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.memory.tree]   # an enabler — the foundation the Memory use-cases build on
 adrs: [0012, 0009, 0002, 0007]
 invariants: [operator-blind]
@@ -62,8 +62,12 @@ the data layer + backend).
   sealed under `K_SC` (ctx `node-name`), blinded `slugToken`, `K_mem` (ctx `content-key`). **Done:** `swift
   test` 62/0 (3 live-skipped) incl. `ContentTreeTests` (create→list→decrypt round-trip + K_mem open +
   rename-recomputes-slug + delete; operator-blind: stub only ever saw ciphertext); iOS simulator build green.
-- [ ] **6 — android.** The same in `:client` (`"content"` added to the generator specs). **Done when:**
-  `:client:test` green (same round-trip) + `:app:assembleDebug`.
+- [x] **6 — android.** The same in `:client` (`"content"` added to the generator specs): `listTree` /
+  `createFolder` / `createMemory` / `openMemory` / `renameNode` / `deleteNode`; names sealed under `K_SC`
+  (ctx `node-name`), blinded `slugToken`, `K_mem` (ctx `content-key`); `VeyqError` +`SlugTaken`/
+  `IllegalStructure`/`ScopeNotFound`/`NodeNotFound`. **Done:** `:client:test` green incl. `ContentTreeTest`
+  2/0 (create→list→decrypt round-trip + K_mem open + rename-recomputes-slug + delete; operator-blind:
+  MockWebServer only ever saw ciphertext); `:app:assembleDebug` green.
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
@@ -74,7 +78,7 @@ the data layer + backend).
 | backend | `veyq_node` + guards + structural rules | ✅ (phase 3) |
 | web | data layer (encrypt names + slug + `K_mem`) | ✅ (phase 4) |
 | apple | data layer (+ generated `ContentAPI` client) | ✅ (phase 5) |
-| android | data layer (+ generated content client) | ◻ |
+| android | data layer (+ generated `content` client) | ✅ (phase 6) |
 | UI (all) | the tree UI | ◻ **deferred to the shell** |
 | windows / linux | — | ◻ (when those clients exist) |
 

@@ -45,4 +45,17 @@ sealed class VeyqError(message: String? = null) : Exception(message) {
 
     /** A personal scope already exists for this member in this tenant (one per tenant, cr-0026). */
     object PersonalScopeExists : VeyqError("personal scope exists")
+
+    /** A sibling node already holds this blinded slug under the same parent (409, cr-0027). */
+    object SlugTaken : VeyqError("slug taken")
+
+    /** The node tree operation broke a structural rule — folder-in-Memory, chapter-at-root, or a move
+     *  cycle (422, cr-0027). */
+    object IllegalStructure : VeyqError("illegal structure")
+
+    /** The addressed scope does not exist for the caller (404, cr-0027). */
+    object ScopeNotFound : VeyqError("scope not found")
+
+    /** The addressed node does not exist in this scope (404, cr-0027). */
+    object NodeNotFound : VeyqError("node not found")
 }
