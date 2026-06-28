@@ -43,9 +43,9 @@ runs on-device; the server is blind.
 - **`v1` crypto is implemented natively, gated by the shared vectors** ([ADR 0009](../docs/decisions/0009-native-crypto-per-platform-vectors.md)).
   `Sources/VeyqCrypto/V1.swift` mirrors `web/src/shared/crypto/v1.ts` byte-for-byte; pin a new primitive by
   adding a vector to `v1.json`, then making this target green. Libs: **swift-crypto** (Ed25519 / HKDF /
-  AES-GCM / SHA-256) + **swift-sodium** (Argon2id, as in `legacy/apple`). **ML-KEM-768** (the hybrid KEM /
-  scope grants) is deferred to the first content/scope slice — native first does login + unlock, which is
-  classic crypto only.
+  AES-GCM / SHA-256, and **`MLKEM768`** for the hybrid KEM) + **swift-sodium** (Argon2id, as in
+  `legacy/apple`). The hybrid KEM (X25519 + ML-KEM-768), `asymWrap` (scope grants) and the identity bundle
+  are ported (cr-0025); the remaining content-side primitives land with the content slice.
 - **Reuse legacy UI/UX — never invent new UI.** Orient on `legacy/apple` (`VeyqCrypto`/`VeyqApiModels`
   structure) and `legacy/iOS/Veyq` (the SwiftUI app), read-only. Port screens/flows; swap the data layer to
   the contracts-generated client + this crypto. Note: `legacy/apple`'s `VeyqCrypto` predates the PQ pivot

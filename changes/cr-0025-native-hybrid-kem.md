@@ -1,7 +1,7 @@
 ---
 id: cr-0025
 title: Port the hybrid KEM (X25519 + ML-KEM-768) + asymWrap/identity bundle to the native crypto suites
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: []            # enabler — unblocks the scope/spaces use-cases (#14, to be refined); no UC yet
 adrs: [0009, 0010]
 invariants: [operator-blind]
@@ -65,13 +65,16 @@ suites **byte-identical** to those vectors. No contract, backend, or vector chan
   **`wrap.asym_scope_grant` unwrap**, identity-serialize, and the `fingerprint` vector. **Done:** `swift
   test` 56 (3 live-skip), 0 failures; macOS + iOS `xcodebuild BUILD SUCCEEDED`. (Note: the deployment target
   is macOS/iOS 26, so CryptoKit ML-KEM is available — the availability risk was moot.)
-- [ ] **2 — Android (`:crypto`).** The same in `V1.kt` (BouncyCastle `pqc.crypto.mlkem` + X25519,
-  ML-KEM key reconstructed from the 64-byte seed), with the matching `V1ConformanceTest` additions.
-  **Done when:** `./gradlew :crypto:test` `BUILD SUCCESSFUL` incl. all new vectors.
-- [ ] **3 — housekeeping.** Drop the "ML-KEM deferred / out of scope" notes in `apple/CLAUDE.md`,
-  `android/CLAUDE.md`, and the two native conformance-test headers; correct the stale
-  `[[fingerprint-tofu-deferred]]` memory (native fingerprint now exists). **Done when:** notes reflect the
-  shipped state.
+- [x] **2 — Android (`:crypto`).** The same in `V1.kt` (BouncyCastle `pqc.crypto.mlkem` + X25519, ML-KEM key
+  reconstructed from the 64-byte seed via a deterministic `SecureRandom` over the seed; `Long` for the
+  fingerprint's 40-bit chunks), with the matching `V1ConformanceTest` additions. **Bumped `bcprov-jdk18on`
+  1.78.1 → 1.81:** 1.78.1 shipped only the older **round-3 Kyber** (`crystals.kyber`), not FIPS-203 ML-KEM —
+  it would not match the vectors; FIPS-203 ML-KEM (`pqc.crypto.mlkem`) arrived in BC 1.79. **Done:**
+  `:crypto:test` 14/0 (the 5 new KEM/identity/fingerprint cases verified present + green), `:client:test` +
+  `:app:assembleDebug` `BUILD SUCCESSFUL` (BC bump safe downstream).
+- [x] **3 — housekeeping.** Dropped the "ML-KEM deferred / out of scope" notes in `apple/CLAUDE.md`,
+  `android/CLAUDE.md` and the native `V1`/conformance-test headers; corrected the stale
+  `[[fingerprint-tofu-deferred]]` memory (native fingerprint was only (re-)ported here, in cr-0025).
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
@@ -80,7 +83,7 @@ suites **byte-identical** to those vectors. No contract, backend, or vector chan
 | contracts (vectors) | `kem_v1` / `asym_scope_grant` / `fingerprint` | ✅ (pre-existing) |
 | web | full | ✅ (pre-existing, the reference) |
 | apple | full | ✅ (phase 1) |
-| android | full | ◻ (phase 2) |
+| android | full | ✅ (phase 2, needed bcprov 1.78.1 → 1.81 for FIPS-203 ML-KEM) |
 | windows / linux | full | ◻ (when those crypto ports land) |
 
 ## Risks / watch-items
@@ -89,9 +92,11 @@ suites **byte-identical** to those vectors. No contract, backend, or vector chan
   app's macOS 13 / iOS 16 target (it should, being pure-Swift, not the OS CryptoKit-gated symbol). Confirm
   the seed→key API (`MLKEM768.PrivateKey(seedRepresentation:)` or equiv.) and raw X25519 shared-secret
   extraction match noble byte-for-byte.
-- **Android — BouncyCastle ML-KEM seed reconstruction.** Verify BC 1.78.1 reconstructs an `ml-kem-768`
-  private key from the 64-byte `d‖z` seed and that decapsulation + the raw X25519 shared secret match the
-  vector. (Main implementation risk of the CR.)
+- **Android — BouncyCastle ML-KEM seed reconstruction. [RESOLVED]** BC **1.78.1 had no FIPS-203 ML-KEM**
+  (only round-3 `crystals.kyber`, incompatible) — bumped to **1.81**. Reconstruction from the 64-byte seed
+  via a deterministic `SecureRandom` works: the decap KAT + fixed `asym_scope_grant` unwrap match the vectors
+  byte-for-byte. (This was the predicted main risk; it materialised as a lib-version bump, caught instantly
+  by the KAT.)
 - **Determinism:** only **decap** is deterministic — the KAT + the fixed `asym_scope_grant` unwrap pin the
   bytes; encap is randomized, so it is covered only by an encap→decap round-trip (same as web).
 

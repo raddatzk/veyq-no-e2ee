@@ -37,8 +37,10 @@ when working here. All content crypto runs on-device; the server is blind.
 - **`v1` crypto is implemented natively, gated by the shared vectors** ([ADR 0009](../docs/decisions/0009-native-crypto-per-platform-vectors.md)).
   `crypto/src/main/kotlin/com/veyq/crypto/V1.kt` mirrors `web/src/shared/crypto/v1.ts` byte-for-byte;
   pin a new primitive by adding a vector, then making this module green. Libs: **BouncyCastle** (Argon2id /
-  HKDF / Ed25519; version constant `ARGON2_VERSION_13`) + the **JDK JCE** for AES-256-GCM. **ML-KEM-768** is
-  deferred to the first content/scope slice — login + unlock is classic crypto only.
+  HKDF / Ed25519 / X25519 / **ML-KEM-768**; version constant `ARGON2_VERSION_13`; **bcprov ≥ 1.79** for
+  FIPS-203 ML-KEM — 1.78.1 only had the older round-3 Kyber) + the **JDK JCE** for AES-256-GCM. The hybrid
+  KEM, `asymWrap` (scope grants) and the identity bundle are ported (cr-0025); remaining content-side
+  primitives land with the content slice.
 - **Reuse legacy UI/UX — never invent new UI.** Orient on `legacy/android` (read-only) and the Apple/iOS UI;
   port flows, swap the data layer to the contracts-generated client + this crypto.
 - **Operator-blind:** seal/derive everything on-device; never send the password, plaintext or raw keys. The

@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.json.JSONObject
@@ -11,8 +12,8 @@ import org.json.JSONObject
 /**
  * Conformance of the Android `v1` auth/unlock subset against the SHARED vectors
  * (`contracts/crypto/vectors/v1.json`, ADR 0009) — the same file the web TS and Apple Swift suites are
- * pinned to, so a green run here completes cross-implementation byte-parity. ML-KEM / content-side vectors
- * are out of this CR's scope.
+ * pinned to, so a green run here completes cross-implementation byte-parity. Includes the hybrid KEM +
+ * asymWrap + identity/fingerprint (cr-0025); remaining content-side vectors are added with the content slice.
  */
 class V1ConformanceTest {
 
@@ -81,6 +82,48 @@ class V1ConformanceTest {
         val sig = V1.authSign(kp.privateKey, msg)
         assertTrue(V1.authVerify(kp.publicKey, msg, sig))
         assertFalse(V1.authVerify(kp.publicKey, "other".toByteArray(), sig))
+    }
+
+    // --- hybrid KEM + asymWrap + identity (cr-0025) ---
+
+    @Test fun kemDecapKat() {
+        val d = vectors.getJSONObject("kem_v1").getJSONObject("decap_kat")
+        val sk = V1.HybridSecret(hex(d, "sk_x25519"), hex(d, "mlkem_seed"))
+        val pk = V1.HybridPublic(hex(d, "pk_x25519"), hex(d, "pk_mlkem"))
+        assertContentEquals(hex(d, "shared_secret"), V1.kemDecap(sk, pk, hex(d, "ct")))
+    }
+
+    @Test fun asymScopeGrantUnwrap() {
+        val a = vectors.getJSONObject("wrap").getJSONObject("asym_scope_grant")
+        val d = vectors.getJSONObject("kem_v1").getJSONObject("decap_kat")
+        val sk = V1.HybridSecret(hex(d, "sk_x25519"), hex(d, "mlkem_seed"))
+        val pk = V1.HybridPublic(hex(a, "pk_x25519"), hex(a, "pk_mlkem"))
+        assertContentEquals(hex(a, "plaintext"), V1.asymUnwrap(sk, pk, hex(a, "blob"), a.getString("context")))
+    }
+
+    @Test fun asymWrapRoundTrip() {
+        val id = V1.generateIdentity()
+        val pk = V1.hybridPublic(id.priv)
+        val sk = V1.hybridSecret(id.priv)
+        val pt = ByteArray(32) { it.toByte() }
+        val blob = V1.asymWrap(pk, pt, "scope-grant", ByteArray(12) { it.toByte() })
+        assertContentEquals(pt, V1.asymUnwrap(sk, pk, blob, "scope-grant"))
+        assertFailsWith<Exception> { V1.asymUnwrap(sk, pk, blob, "other") }
+    }
+
+    @Test fun identitySerializeRoundTrip() {
+        val id = V1.generateIdentity()
+        val priv = V1.deserializeIdentityPrivate(V1.serializeIdentityPrivate(id.priv))
+        assertContentEquals(id.priv.kemX, priv.kemX)
+        assertContentEquals(id.priv.mlkemSeed, priv.mlkemSeed)
+        assertContentEquals(id.priv.sign, priv.sign)
+        assertEquals((4 + 32) + (4 + 1184) + (4 + 32), V1.serializeIdentityPublic(id.pub).size)
+    }
+
+    @Test fun fingerprint() {
+        val f = vectors.getJSONObject("fingerprint")
+        val pub = V1.IdentityPublic(hex(f, "kem_x"), hex(f, "kem_m"), hex(f, "sign"))
+        assertEquals(f.getString("digits"), V1.fingerprint(pub))
     }
 
     private fun params(v: JSONObject): V1.ArgonParams {
