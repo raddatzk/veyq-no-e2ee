@@ -60,8 +60,8 @@ const { t } = useI18n()
 .memory-detail-note {
   color: var(--app-muted);
 }
-/* The active heart picks up the accent, matching the card pin. */
+/* The active heart is a heart-red blended with the brand accent, matching the card pin. */
 .memory-detail-fav.is-favorite :deep(.p-button-icon) {
-  color: var(--app-accent);
+  color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
 }
 </style>

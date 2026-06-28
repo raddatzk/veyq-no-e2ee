@@ -46,6 +46,8 @@ const { t } = useI18n()
    it stays legible over the (accent-tinted) cover; active = the accent-soft tile + filled accent heart, the
    same purple tile the sidebar icons use. */
 .memory-card-pin {
+  /* A heart-red that keeps a hint of the brand purple — a blend of the accent and a rosé red. */
+  --fav-heart: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
   position: absolute;
   top: 0.55rem;
   left: 0.55rem;
@@ -76,8 +78,8 @@ const { t } = useI18n()
 }
 .memory-card-pin.is-favorite {
   background: var(--app-accent-soft);
-  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-line));
-  color: var(--app-accent);
+  border-color: color-mix(in srgb, var(--fav-heart) 30%, var(--app-line));
+  color: var(--fav-heart);
 }
 .memory-card-pin .pi {
   font-size: 0.9rem;
