@@ -14,6 +14,11 @@ substitute for state docs.
   working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
   contracts → backend → web → apple → android.
 - **Genuinely independent work = separate CRs, not phases.**
+- **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
+  use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
+  entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
+  while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
+  coverage file that gaps every target surface.)
 
 ## Template
 
@@ -38,7 +43,11 @@ crosscutting concern(s), ADR(s), and the specific invariants at risk.
 - [ ] 1 contracts — <scope> · Done when: <verifiable checkpoint>
 - [ ] 2 backend  — <scope> · Done when: <verify command green>
 - [ ] 3 web      — <scope> · Done when: <verify command green>
+- [ ] N coverage — docs/coverage YAML(s) for each `satisfies:` use-case + any http/ acceptance ·
+      Done when: `python3 scripts/validate_coverage.py` green
 
 ## Definition of done
-Acceptance for the whole CR (coverage for `satisfies:` green across the listed platforms).
+Tests green across the listed platforms, AND `docs/coverage/` updated for each `satisfies:` use-case
+(every new acceptance criterion covered by a test or an explicit gap) with
+`python3 scripts/validate_coverage.py` green.
 ```

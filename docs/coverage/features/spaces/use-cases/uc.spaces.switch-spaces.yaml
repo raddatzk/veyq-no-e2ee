@@ -1,0 +1,30 @@
+useCase: uc.spaces.switch-spaces
+feature: spaces
+title: List & switch spaces
+acceptanceCriteria:
+  - id: list-tenants
+    text: The member's tenants are listed (name + domain + role); someone who belongs to none gets an empty list.
+    coverage:
+      backend: { integration: [ScopesSliceTest.listMyTenantsReturnsTheCallersTenants] }
+      http: { e2e: [http/spaces/scopes.http] }
+  - id: list-spaces
+    text: GET /api/scopes lists the member's scopes in the active tenant (the TENANT root + their PERSONAL scope).
+    coverage:
+      backend: { integration: [ScopesSliceTest.createPersonalScopeThenListReturnsBoth] }
+      web: { unit: [src/features/spaces/scopes.test.ts] }
+  - id: switch-space-by-fragment
+    text: A space's position is encoded in + resolved from the URL #fragment client-side (the blind server resolves no path).
+    coverage:
+      web: { unit: [src/features/memory/location.test.ts] }
+  - id: operator-blind-listing
+    text: The tenant list exposes only membership metadata (name/domain/role); group names stay sealed and are decrypted on device.
+    coverage:
+      backend: { integration: [ScopesSliceTest.listMyTenantsReturnsTheCallersTenants] }
+  - id: boundary-unauthenticated
+    text: The scope endpoints reject an unauthenticated caller with a generic 401.
+    coverage:
+      backend: { integration: [ScopesSliceTest.unauthenticatedIs401] }
+      http: { e2e: [http/spaces/scopes.http] }
+gaps:
+  apple: "Native space switcher UI not built — web-first shell (cr-0030/cr-0031)."
+  android: "Native space switcher UI not built — web-first shell (cr-0030/cr-0031)."

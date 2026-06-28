@@ -1,0 +1,40 @@
+### Scopes — list & switch boundary (uc.spaces.switch-spaces)
+# The unauthenticated boundary of the scope endpoints, runnable against ANY instance (no account/token
+# needed). The authenticated happy-path (list tenants/scopes, birth a personal scope) + the non-member
+# authz path are covered at the integration layer (ScopesSliceTest, which seeds a member+tenant in-tx) and
+# in the web client — those need the full operator-blind grant flow, not reproducible from a bare .http.
+#
+# Run: ijhttp --env-file http/spaces/http-client.env.json --env dev http/spaces/scopes.http
+
+### 1. GET /api/scopes/my-tenants without a bearer token → generic 401
+GET {{host}}/api/scopes/my-tenants
+
+> {%
+client.test("my-tenants requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 2. GET /api/scopes without a bearer token → 401
+GET {{host}}/api/scopes
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("list scopes requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 3. POST /api/scopes (birth personal) without a bearer token → 401 (auth is checked before the body)
+POST {{host}}/api/scopes
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "wrappedGrant": "AQ==" }
+
+> {%
+client.test("birth personal scope requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}

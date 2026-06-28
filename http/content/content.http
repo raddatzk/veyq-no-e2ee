@@ -1,0 +1,51 @@
+### Memory tree + favorites — authz boundary (uc.memory.browse)
+# The unauthenticated boundary of the content endpoints (the Memory tree + per-(user,scope) favorites),
+# runnable against ANY instance — no account/scope/membership needed. The authenticated happy-path + the
+# non-member 404 + slug/structure rules are covered at the integration layer (NodesSliceTest /
+# FavoritesSliceTest, which seed a member+scope in-tx) and in the web client; those need the operator-blind
+# scope-grant flow, not reproducible from a bare .http.
+#
+# Run: ijhttp --env-file http/content/http-client.env.json --env dev http/content/content.http
+
+### 1. List a scope's nodes without a bearer token → generic 401
+GET {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes
+
+> {%
+client.test("list nodes requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 2. Create a node without a bearer token → 401 (auth before validation)
+POST {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes
+Content-Type: application/json
+
+{ "kind": "FOLDER", "encryptedName": "ZW5j", "slugToken": "c2x1Zw==" }
+
+> {%
+client.test("create node requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 3. Read a scope's favorites blob without a bearer token → 401
+GET {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/favorites
+
+> {%
+client.test("get favorites requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 4. Write a scope's favorites blob without a bearer token → 401
+PUT {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/favorites
+Content-Type: application/json
+
+{ "ciphertext": "ZmF2" }
+
+> {%
+client.test("put favorites requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
