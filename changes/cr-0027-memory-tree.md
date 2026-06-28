@@ -45,12 +45,13 @@ the data layer + backend).
   (`HKDF(contentKey,"",​"veyq/v1/slug-token:"+parentSlot) → HMAC-SHA256(slugKey, NFC(slug))`; symWrap/symUnwrap
   already native). **Done:** apple `V1ConformanceTests` 15/0 incl. `testSlugToken`; android `:crypto:test`
   green incl. `slugToken` — byte-identical to the vector on both.
-- [ ] **3 — backend.** `V10` `veyq_node` (id, scope_id, parent_id?, kind, encrypted_name, slug_token,
-  order_index, wrapped_content_key?, created_at) + `UNIQUE(parent_id, slug_token)`; `content/node`
-  feature (Resource/Handler/Store) under a scope-access guard (caller has a membership for the scope);
-  structural rules (no folder-in-Memory, no cycle on move, no cross-scope move). **Done when:** `./gradlew
-  check` green incl. a `NodesSliceTest` (create→list, slug-collision 409, illegal-structure 422, rename/move
-  recompute slug, non-member 404, operator-blind: only ciphertext stored).
+- [x] **3 — backend.** `V10__nodes.sql` `veyq_node` (+ `UNIQUE(parent_id, slug_token)`; the **root's parent
+  slot is the scope id**, so the unique works at the root too); `features/content` (`NodeEntity` /
+  `NodesStore` / `NodesHandler` / `ContentResource` impl of the generated `ContentApi`) under a scope-access
+  guard (caller holds a membership for the scope → else 404); structural rules (FOLDER/MEMORY at root or
+  under a FOLDER, CHAPTER only inside a MEMORY, no cycle on move). **Done:** `./gradlew check` green;
+  `NodesSliceTest` 6/6 (create-tree→list, slug-collision 409, chapter-at-root 422, non-member 404, unauth
+  401, rename + delete-subtree; operator-blind: stored ciphertext/`wrappedContentKey` verbatim).
 - [ ] **4 — web.** Data layer in `features/memory/` (the generated content client + `tree.ts`): create folder/
   Memory (encrypt name + slug under `K_SC`; Memory births `K_mem` wrapped under `K_SC`), list+decrypt the
   tree, rename/move. **Done when:** `npm run check` green + a unit round-trip (create→list→decrypt name;
@@ -66,7 +67,7 @@ the data layer + backend).
 |---|---|---|
 | contracts | `content.openapi.yaml` (nodes under a scope) | ✅ (phase 1) |
 | crypto (native) | `slug_token` ported apple + android | ✅ (phase 2) |
-| backend | `veyq_node` + guards + structural rules | ◻ |
+| backend | `veyq_node` + guards + structural rules | ✅ (phase 3) |
 | web | data layer (encrypt names + slug + `K_mem`) | ◻ |
 | apple / android | data layer (+ generated content client) | ◻ |
 | UI (all) | the tree UI | ◻ **deferred to the shell** |

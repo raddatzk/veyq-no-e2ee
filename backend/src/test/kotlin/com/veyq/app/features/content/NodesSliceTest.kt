@@ -1,0 +1,148 @@
+package com.veyq.app.features.content
+
+import com.veyq.app.features.account.login.SessionService
+import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.features.admin.tenant.TenantEntity
+import com.veyq.app.features.spaces.scope.ScopeEntity
+import com.veyq.app.shared.identity.VeyqUser
+import io.quarkus.narayana.jta.QuarkusTransaction
+import io.quarkus.test.junit.QuarkusTest
+import io.restassured.RestAssured.given
+import io.restassured.http.ContentType
+import jakarta.inject.Inject
+import org.hamcrest.CoreMatchers.equalTo
+import org.hamcrest.CoreMatchers.hasItems
+import org.hamcrest.CoreMatchers.notNullValue
+import org.junit.jupiter.api.Test
+import java.time.Instant
+import java.util.UUID
+
+/**
+ * Slice tests for the Memory tree (en.memory.tree, cr-0027): create folder/Memory/chapter + list; slug
+ * uniqueness per parent (409); structural rules (422 — a chapter only lives in a Memory); scope-access
+ * (non-member 404); rename + delete-subtree; operator-blind (the server stores only the ciphertext the
+ * client sent). UUID-unique seeds so the JVM-lived H2 mem DB can't bleed across tests/classes.
+ */
+@QuarkusTest
+class NodesSliceTest {
+
+    @Inject
+    lateinit var sessions: SessionService
+
+    private fun token(userId: String) = "Bearer ${sessions.issue(userId).accessToken}"
+
+    @Test
+    fun createTreeThenList() {
+        val (userId, scopeId) = seedMemberScope()
+        val folder = createNode(userId, scopeId, """{"kind":"FOLDER","encryptedName":"Zm9sZGVy","slugToken":"Zm9sZGVyLXNsdWc=","orderIndex":0}""")
+        val memory = createNode(userId, scopeId, """{"parentId":"$folder","kind":"MEMORY","encryptedName":"bWVtb3J5","slugToken":"bWVtLXNsdWc=","orderIndex":0,"wrappedContentKey":"a21lbS13cmFw"}""")
+        createNode(userId, scopeId, """{"parentId":"$memory","kind":"CHAPTER","encryptedName":"Y2hhcHRlcg==","slugToken":"Y2hhcC1zbHVn","orderIndex":0}""")
+
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200)
+            .body("kind", hasItems("FOLDER", "MEMORY", "CHAPTER"))
+            // operator-blind: the Memory's wrapped K_mem comes back verbatim; the folder is at the root (parentId null).
+            .body("find { it.id == '$memory' }.wrappedContentKey", equalTo("a21lbS13cmFw"))
+            .body("find { it.id == '$folder' }.parentId", equalTo(null))
+    }
+
+    @Test
+    fun slugCollisionPerParentIs409() {
+        val (userId, scopeId) = seedMemberScope()
+        createNode(userId, scopeId, """{"kind":"FOLDER","encryptedName":"YQ==","slugToken":"ZHVwZQ==","orderIndex":0}""")
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"kind":"FOLDER","encryptedName":"Yg==","slugToken":"ZHVwZQ==","orderIndex":1}""")
+            .`when`().post("/api/scopes/$scopeId/nodes")
+            .then().statusCode(409).body("code", equalTo("slug_taken"))
+    }
+
+    @Test
+    fun chapterAtRootIs422() {
+        val (userId, scopeId) = seedMemberScope()
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"kind":"CHAPTER","encryptedName":"Yw==","slugToken":"Y2hhcA==","orderIndex":0}""")
+            .`when`().post("/api/scopes/$scopeId/nodes")
+            .then().statusCode(422).body("code", equalTo("illegal_structure"))
+    }
+
+    @Test
+    fun nonMemberIs404() {
+        val (_, scopeId) = seedMemberScope()
+        val outsider = seedUser()
+        given().header("Authorization", token(outsider)).contentType(ContentType.JSON)
+            .body("""{"kind":"FOLDER","encryptedName":"Yg==","slugToken":"b3V0","orderIndex":0}""")
+            .`when`().post("/api/scopes/$scopeId/nodes")
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
+    }
+
+    @Test
+    fun unauthenticatedIs401() {
+        given().contentType(ContentType.JSON)
+            .body("""{"kind":"FOLDER","encryptedName":"Yg==","slugToken":"cw==","orderIndex":0}""")
+            .`when`().post("/api/scopes/${UUID.randomUUID()}/nodes")
+            .then().statusCode(401).body("code", equalTo("authentication_failed"))
+    }
+
+    @Test
+    fun renameThenDeleteSubtree() {
+        val (userId, scopeId) = seedMemberScope()
+        val folder = createNode(userId, scopeId, """{"kind":"FOLDER","encryptedName":"b2xk","slugToken":"b2xkLXM=","orderIndex":0}""")
+        val memory = createNode(userId, scopeId, """{"parentId":"$folder","kind":"MEMORY","encryptedName":"bQ==","slugToken":"bS1z","orderIndex":0,"wrappedContentKey":"aw=="}""")
+
+        // rename the folder (new ciphertext name + recomputed slug)
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"encryptedName":"bmV3","slugToken":"bmV3LXM="}""")
+            .`when`().patch("/api/scopes/$scopeId/nodes/$folder")
+            .then().statusCode(204)
+        given().header("Authorization", token(userId)).`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200).body("find { it.id == '$folder' }.encryptedName", equalTo("bmV3"))
+
+        // delete the folder → its subtree (the memory) goes too
+        given().header("Authorization", token(userId)).`when`().delete("/api/scopes/$scopeId/nodes/$folder")
+            .then().statusCode(204)
+        given().header("Authorization", token(userId)).`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200).body("id", org.hamcrest.CoreMatchers.not(hasItems(folder, memory)))
+    }
+
+    // --- helpers ---
+
+    private fun createNode(userId: String, scopeId: String, body: String): String =
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON).body(body)
+            .`when`().post("/api/scopes/$scopeId/nodes")
+            .then().statusCode(201).body("nodeId", notNullValue())
+            .extract().path("nodeId")
+
+    /** Seed a user + an ACTIVE tenant + a PERSONAL scope the user is a member of. Returns (userId, scopeId). */
+    private fun seedMemberScope(): Pair<String, String> {
+        val userId = seedUser()
+        val tenantId = UUID.randomUUID().toString()
+        val scopeId = UUID.randomUUID().toString()
+        QuarkusTransaction.requiringNew().run {
+            TenantEntity().apply {
+                id = tenantId; name = "Fam"; domain = "t-$tenantId.example.com"
+                ownerEmail = "o-$tenantId@example.com"; status = TenantEntity.ACTIVE; createdAt = Instant.now()
+            }.persist()
+            ScopeEntity().apply {
+                id = scopeId; this.tenantId = tenantId; kind = ScopeEntity.PERSONAL; createdAt = Instant.now()
+            }.persist()
+            MembershipEntity().apply {
+                id = UUID.randomUUID().toString(); this.userId = userId; this.tenantId = tenantId
+                this.scopeId = scopeId; role = MembershipEntity.OWNER; wrappedGrant = "Z3JhbnQ="; createdAt = Instant.now()
+            }.persist()
+        }
+        return userId to scopeId
+    }
+
+    private fun seedUser(): String {
+        val userId = UUID.randomUUID().toString()
+        QuarkusTransaction.requiringNew().run {
+            VeyqUser().apply {
+                id = userId; email = "u-$userId@example.com"; displayName = "Nodes Test"; serverRole = "MEMBER"
+                suiteId = "v1"; identityPublicKey = "aWQ="; wrappedIdentityPrivateKey = "aXA="
+                authPublicKey = "YXA="; createdAt = Instant.now()
+            }.persist()
+        }
+        return userId
+    }
+}
