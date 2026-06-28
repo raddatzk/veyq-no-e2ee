@@ -6,6 +6,7 @@ import OpenAPIURLSession
 @_exported import SetupAPI
 @_exported import AuthAPI
 @_exported import AccountAPI
+@_exported import ScopesAPI
 
 /// Builds the URLSession transport every generated client shares.
 ///

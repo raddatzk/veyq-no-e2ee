@@ -60,11 +60,18 @@ let package = Package(
             ],
             plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")],
         ),
+        .target(
+            name: "ScopesAPI",
+            dependencies: [
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")],
+        ),
 
         .target(
             name: "VeyqApi",
             dependencies: [
-                "SetupAPI", "AuthAPI", "AccountAPI",
+                "SetupAPI", "AuthAPI", "AccountAPI", "ScopesAPI",
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
             ],

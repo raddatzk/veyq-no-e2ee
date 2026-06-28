@@ -28,4 +28,8 @@ public enum VeyqError: Error, Equatable {
     case tooManyDevices
     /// The server answered with a status the contract does not document.
     case unexpectedStatus(Int)
+    /// The active tenant could not be resolved (no Host match) — scope ops need a tenant context (cr-0026).
+    case scopeTenantUnavailable
+    /// A personal scope already exists for this member in this tenant (one per tenant, cr-0026).
+    case personalScopeExists
 }

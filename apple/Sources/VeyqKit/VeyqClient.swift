@@ -16,6 +16,7 @@ public final class VeyqClient: Sendable {
     private let setup: SetupAPI.Client
     private let auth: AuthAPI.Client
     private let account: AccountAPI.Client
+    private let scopes: ScopesAPI.Client
 
     /// Build a client against an already-bootstrapped instance. `transport` is injectable so tests can
     /// drive the orchestration against a stub without a live server (the default is URLSession);
@@ -35,6 +36,7 @@ public final class VeyqClient: Sendable {
         self.setup = SetupAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.auth = AuthAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
         self.account = AccountAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
+        self.scopes = ScopesAPI.Client(serverURL: instance.baseURL, transport: transport, middlewares: middlewares)
     }
 
     /// Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -397,6 +399,63 @@ public final class VeyqClient: Sendable {
             throw VeyqError.sessionExpired
         case .undocumented(let status, _):
             throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    // MARK: - Personal scope (cr-0026, uc.spaces.personal-scope)
+
+    /// The caller's scopes in the active tenant (each with the caller's own ciphertext grant).
+    public func listMyScopes() async throws -> [ScopesAPI.Components.Schemas.ScopeSummary] {
+        try await withRefresh { try await self.fetchScopes() }
+    }
+
+    /// Ensure this member has a PERSONAL scope in the active tenant — auto-birth, operator-blind: generate
+    /// the scope key, seal it to our **own** identity, and POST only the ciphertext grant. No-op if one
+    /// already exists. Returns whether a scope was created. Needs an unlocked vault (the identity bundle).
+    @discardableResult
+    public func ensurePersonalScope() async throws -> Bool {
+        if try await listMyScopes().contains(where: { $0.kind == .PERSONAL }) { return false }
+        guard let idBytes = await vault.identityPrivateKey() else { throw VeyqError.unlockUnavailable }
+        let priv = try V1.deserializeIdentityPrivate(idBytes)
+        let scopeKey = secureRandomBytes(32)
+        let grant = try V1.asymWrap(pk: V1.hybridPublic(priv), targetKey: scopeKey,
+                                    context: "scope-grant", nonce: secureRandomBytes(12))
+        try await withRefresh { try await self.postPersonalScope(grant) }
+        return true
+    }
+
+    /// Open the member's personal scope → the in-memory scope key (asymUnwrap our **own** grant with the
+    /// vaulted identity), or nil when there is none / the vault is locked.
+    public func openPersonalScope() async throws -> Data? {
+        guard let idBytes = await vault.identityPrivateKey() else { return nil }
+        let priv = try V1.deserializeIdentityPrivate(idBytes)
+        guard let personal = try await listMyScopes().first(where: { $0.kind == .PERSONAL }) else { return nil }
+        return try V1.asymUnwrap(sk: V1.hybridSecret(priv), pk: V1.hybridPublic(priv),
+                                 blob: Data(personal.wrappedGrant.data), context: "scope-grant")
+    }
+
+    /// GET the caller's scopes. A 401 surfaces as `.sessionExpired` so `withRefresh` rotates-and-retries.
+    private func fetchScopes() async throws -> [ScopesAPI.Components.Schemas.ScopeSummary] {
+        let out = try await scopes.listMyScopes(.init())
+        switch out {
+        case .ok(let ok): return try ok.body.json
+        case .notFound: throw VeyqError.scopeTenantUnavailable
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
+        }
+    }
+
+    /// POST the personal-scope grant (opaque ciphertext). 409 → already exists, 404 → no tenant context.
+    private func postPersonalScope(_ grant: Data) async throws {
+        let body = ScopesAPI.Components.Schemas.CreatePersonalScopeRequest(wrappedGrant: .init(grant))
+        let out = try await scopes.createPersonalScope(.init(body: .json(body)))
+        switch out {
+        case .created: return
+        case .conflict: throw VeyqError.personalScopeExists
+        case .notFound: throw VeyqError.scopeTenantUnavailable
+        case .badRequest(let bad): throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unauthorized: throw VeyqError.sessionExpired
+        case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
         }
     }
 
