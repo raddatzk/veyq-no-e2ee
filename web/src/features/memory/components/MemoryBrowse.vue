@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The current tree level (cr-0030, port of legacy MemoryFolderOverview): a Memories section + a Folders
-// section, each a card grid with a "create" card. Drill into a folder / open a Memory / create here via
-// events; the parent owns the create/rename/delete dialogs.
+// section, each a card grid with a "create" card. Styling reuses the design source's shared classes
+// (.veyq-section / .veyq-card / .memory-card-grid / .memory-folder-card / …) — see src/style.css.
 import { useI18n } from 'vue-i18n'
 import type { TreeNode } from '../tree'
 import MemoryCard from './MemoryCard.vue'
@@ -18,111 +18,44 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="memory-browse">
-    <section class="node-section">
-      <div class="node-section-header">
+  <div class="memory-route-surface">
+    <section class="veyq-section">
+      <div class="veyq-section-header">
         <h2>{{ t('memory.memories') }}</h2>
-        <span class="node-count">{{ memories.length }}</span>
+        <span>{{ memories.length }}</span>
       </div>
-      <div class="node-grid">
+      <div class="memory-card-grid memory-card-grid-memories">
         <MemoryCard v-for="memory in memories" :key="memory.id" :memory="memory" @open="$emit('openMemory', $event)" />
-        <button class="node-card node-create" type="button" @click="$emit('createMemory')">
-          <span class="pi pi-plus node-card-icon" aria-hidden="true" />
-          <strong class="node-card-name">{{ t('memory.create') }}</strong>
+        <button class="memory-create-card veyq-card veyq-card-interactive" type="button" @click="$emit('createMemory')">
+          <i class="pi pi-plus" aria-hidden="true" />
+          <strong>{{ t('memory.create') }}</strong>
         </button>
       </div>
-      <p v-if="!memories.length" class="node-empty">{{ t('memory.memoryEmpty') }}</p>
+      <p v-if="!memories.length" class="veyq-empty-inline">{{ t('memory.memoryEmpty') }}</p>
     </section>
 
-    <section class="node-section">
-      <div class="node-section-header">
+    <section class="veyq-section">
+      <div class="veyq-section-header">
         <h2>{{ t('memory.folders') }}</h2>
-        <span class="node-count">{{ folders.length }}</span>
+        <span>{{ folders.length }}</span>
       </div>
-      <div class="node-grid">
+      <div class="memory-card-grid">
         <button
           v-for="folder in folders"
           :key="folder.id"
-          class="node-card"
+          class="memory-folder-card veyq-card veyq-card-interactive"
           type="button"
           @click="$emit('openFolder', folder)"
         >
-          <span class="pi pi-folder node-card-icon" aria-hidden="true" />
-          <strong class="node-card-name">{{ folder.name }}</strong>
+          <i class="pi pi-folder" aria-hidden="true" />
+          <strong>{{ folder.name }}</strong>
         </button>
-        <button class="node-card node-create" type="button" @click="$emit('createFolder')">
-          <span class="pi pi-plus node-card-icon" aria-hidden="true" />
-          <strong class="node-card-name">{{ t('memory.folderCreate') }}</strong>
+        <button class="memory-create-card veyq-card veyq-card-interactive" type="button" @click="$emit('createFolder')">
+          <i class="pi pi-plus" aria-hidden="true" />
+          <strong>{{ t('memory.folderCreate') }}</strong>
         </button>
       </div>
-      <p v-if="!folders.length" class="node-empty">{{ t('memory.folderEmpty') }}</p>
+      <p v-if="!folders.length" class="veyq-empty-inline">{{ t('memory.folderEmpty') }}</p>
     </section>
   </div>
 </template>
-
-<style scoped>
-.memory-browse {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-.node-section-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.node-section-header h2 {
-  margin: 0;
-  font-size: 1.15rem;
-}
-.node-count {
-  color: var(--app-muted);
-  font-size: 0.9rem;
-}
-.node-empty {
-  color: var(--app-muted);
-  margin: 0;
-}
-.node-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
-}
-.node-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 16px;
-  min-height: 96px;
-  border: 1px solid var(--app-line);
-  border-radius: var(--app-radius-sm);
-  background: #fff;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  color: var(--app-text);
-}
-.node-card:hover {
-  border-color: var(--app-muted);
-  box-shadow: var(--app-shadow-md);
-}
-.node-card-icon {
-  font-size: 1.4rem;
-  color: var(--app-muted);
-}
-.node-card-name {
-  font-weight: 600;
-  word-break: break-word;
-}
-.node-create {
-  border-style: dashed;
-  color: var(--app-muted);
-  justify-content: center;
-  align-items: center;
-}
-.node-create:hover {
-  color: var(--app-text);
-}
-</style>

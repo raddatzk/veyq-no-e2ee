@@ -24,14 +24,17 @@ import { breadcrumb } from '../../app/breadcrumb'
 .app-topbar {
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  background: #fff;
+  height: var(--app-topbar-height);
+  padding: 0 1.4rem;
+  background: var(--app-overlay);
+  border-bottom: 1px solid var(--app-line);
+  backdrop-filter: blur(14px);
 }
 .app-crumbs {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  font-size: 1rem;
 }
 .app-crumb {
   color: var(--app-muted);
@@ -39,10 +42,10 @@ import { breadcrumb } from '../../app/breadcrumb'
 }
 .app-crumb:last-of-type {
   color: var(--app-text);
-  font-weight: 600;
+  font-weight: 700;
 }
-.app-crumb:hover {
-  text-decoration: underline;
+.app-crumb:not(:last-of-type):hover {
+  color: var(--app-accent);
 }
 .app-crumb-sep {
   color: var(--app-line);

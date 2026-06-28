@@ -33,21 +33,22 @@ const appLayout = computed(() => route.meta.layout === 'app')
 <style scoped>
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  grid-template-rows: 56px 1fr;
+  grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: var(--app-topbar-height) minmax(0, 1fr);
   height: 100vh;
+  background: var(--app-background-pattern-subtle);
 }
 .app-shell-sidebar {
   grid-row: 1 / -1;
 }
 .app-shell-topbar {
   grid-column: 2;
-  border-bottom: 1px solid var(--app-line);
 }
 .app-shell-content {
   grid-column: 2;
+  min-width: 0;
   overflow: auto;
-  padding: 24px;
+  padding: 1.05rem 1.4rem 1.6rem;
 }
 .veyq-shell-inner {
   width: min(460px, 100%);

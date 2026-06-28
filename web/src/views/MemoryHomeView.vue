@@ -144,7 +144,7 @@ async function onDeleteDone() {
 
 <style scoped>
 .memory-home {
-  max-width: 1100px;
+  max-width: 1180px;
 }
 .home-loading {
   color: var(--app-muted);
@@ -159,15 +159,23 @@ async function onDeleteDone() {
 .node-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 0.85rem;
+  margin-bottom: 1.6rem;
 }
 .node-header-icon {
-  color: var(--app-muted);
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 12px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+  font-size: 1.2rem;
 }
 .node-header-title {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 750;
   flex: 1;
 }
 </style>

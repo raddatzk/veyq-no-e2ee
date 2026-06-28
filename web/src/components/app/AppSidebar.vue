@@ -41,45 +41,68 @@ async function signOut() {
 .app-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 12px;
-  background: #fff;
-  border-right: 1px solid var(--app-line);
+  gap: 1rem;
   height: 100%;
+  padding: 1.05rem 1rem;
+  border-right: 1px solid var(--app-line);
+  background: var(--app-chrome-pattern);
+  box-shadow:
+    inset -1px 0 0 rgb(255 255 255 / 0.74),
+    10px 0 34px rgb(15 23 42 / 0.05);
+  backdrop-filter: blur(22px);
+  overflow: auto;
 }
 .app-brand {
-  font-weight: 700;
-  font-size: 1.1rem;
-  padding: 8px 12px;
+  padding: 0.2rem 0.35rem;
+  color: var(--app-text);
+  font-size: 1.35rem;
+  font-weight: 850;
 }
 .app-nav {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
 }
 .app-nav-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 0.55rem;
+  min-height: 2.45rem;
+  padding: 0.35rem;
+  border: 0;
   border-radius: var(--app-radius-sm);
-  color: var(--app-text);
+  background: transparent;
+  color: var(--app-control-text);
   text-decoration: none;
-  background: none;
-  border: none;
   font: inherit;
   cursor: pointer;
   text-align: left;
 }
-.app-nav-item:hover {
-  background: var(--app-bg);
+.app-nav-item:hover,
+.app-nav-item-active {
+  background: var(--app-hover);
 }
 .app-nav-item-active {
-  background: var(--app-bg);
+  color: var(--app-text);
   font-weight: 600;
 }
+.app-nav-item > .pi {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 10px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+  font-weight: 800;
+}
 .app-logout {
+  color: var(--app-muted);
+}
+.app-logout > .pi {
+  background: transparent;
   color: var(--app-muted);
 }
 </style>
