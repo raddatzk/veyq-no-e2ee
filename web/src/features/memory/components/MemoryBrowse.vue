@@ -1,13 +1,18 @@
 <script setup lang="ts">
 // The current tree level (cr-0030, port of legacy MemoryFolderOverview): a Memories section + a Folders
-// section, each a card grid. Drill into a folder / open a Memory via events. Create cards + the create/
-// rename/delete dialogs land in P4; this component is browse + navigate only.
+// section, each a card grid with a "create" card. Drill into a folder / open a Memory / create here via
+// events; the parent owns the create/rename/delete dialogs.
 import { useI18n } from 'vue-i18n'
 import type { TreeNode } from '../tree'
 import MemoryCard from './MemoryCard.vue'
 
 defineProps<{ folders: TreeNode[]; memories: TreeNode[] }>()
-defineEmits<{ openFolder: [folder: TreeNode]; openMemory: [memory: TreeNode] }>()
+defineEmits<{
+  openFolder: [folder: TreeNode]
+  openMemory: [memory: TreeNode]
+  createFolder: []
+  createMemory: []
+}>()
 
 const { t } = useI18n()
 </script>
@@ -19,10 +24,14 @@ const { t } = useI18n()
         <h2>{{ t('memory.memories') }}</h2>
         <span class="node-count">{{ memories.length }}</span>
       </div>
-      <p v-if="!memories.length" class="node-empty">{{ t('memory.memoryEmpty') }}</p>
-      <div v-else class="node-grid">
+      <div class="node-grid">
         <MemoryCard v-for="memory in memories" :key="memory.id" :memory="memory" @open="$emit('openMemory', $event)" />
+        <button class="node-card node-create" type="button" @click="$emit('createMemory')">
+          <span class="pi pi-plus node-card-icon" aria-hidden="true" />
+          <strong class="node-card-name">{{ t('memory.create') }}</strong>
+        </button>
       </div>
+      <p v-if="!memories.length" class="node-empty">{{ t('memory.memoryEmpty') }}</p>
     </section>
 
     <section class="node-section">
@@ -30,8 +39,7 @@ const { t } = useI18n()
         <h2>{{ t('memory.folders') }}</h2>
         <span class="node-count">{{ folders.length }}</span>
       </div>
-      <p v-if="!folders.length" class="node-empty">{{ t('memory.folderEmpty') }}</p>
-      <div v-else class="node-grid">
+      <div class="node-grid">
         <button
           v-for="folder in folders"
           :key="folder.id"
@@ -42,7 +50,12 @@ const { t } = useI18n()
           <span class="pi pi-folder node-card-icon" aria-hidden="true" />
           <strong class="node-card-name">{{ folder.name }}</strong>
         </button>
+        <button class="node-card node-create" type="button" @click="$emit('createFolder')">
+          <span class="pi pi-plus node-card-icon" aria-hidden="true" />
+          <strong class="node-card-name">{{ t('memory.folderCreate') }}</strong>
+        </button>
       </div>
+      <p v-if="!folders.length" class="node-empty">{{ t('memory.folderEmpty') }}</p>
     </section>
   </div>
 </template>
@@ -102,5 +115,14 @@ const { t } = useI18n()
 .node-card-name {
   font-weight: 600;
   word-break: break-word;
+}
+.node-create {
+  border-style: dashed;
+  color: var(--app-muted);
+  justify-content: center;
+  align-items: center;
+}
+.node-create:hover {
+  color: var(--app-text);
 }
 </style>
