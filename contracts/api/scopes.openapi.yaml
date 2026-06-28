@@ -120,6 +120,39 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_found }
 
+  /api/scopes/my-tenants:
+    get:
+      tags: [scopes]
+      operationId: listMyTenants
+      summary: List the tenants the caller belongs to (the space switcher).
+      description: >
+        Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the
+        `domain` it is reached at, and the caller's `role`. Independent of the request Host (it lists *all* the
+        caller's tenants, so the client can render a switcher and link to each tenant's domain). Tenant name +
+        domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content;
+        no key material is involved.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The tenants the caller belongs to.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MyTenant" }
+              example:
+                - tenantId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  name: Familie Raddatz
+                  domain: memories.raddatz.me
+                  role: OWNER
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -148,6 +181,31 @@ components:
           maxLength: 8192
           example: AQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    MyTenant:
+      type: object
+      required: [tenantId, name, domain, role]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: Opaque id of the tenant.
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        name:
+          type: string
+          description: The tenant's display name (server-visible operational metadata).
+          maxLength: 100
+          example: Familie Raddatz
+        domain:
+          type: string
+          description: The web address the tenant is reached at (tenant identity, ADR 0002).
+          maxLength: 253
+          example: memories.raddatz.me
+        role:
+          type: string
+          description: The caller's role in this tenant.
+          maxLength: 16
+          example: OWNER
 
     ScopeCreated:
       type: object

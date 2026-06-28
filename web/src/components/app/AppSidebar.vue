@@ -1,14 +1,44 @@
 <script setup lang="ts">
-// The shell's left rail (cr-0030, simplified port of legacy TenantSidebar): the app brand, the Personal-space
-// nav, and sign-out. Multi-space switching, favorites and search are later slices.
+// The shell's left rail (cr-0030). Markup + classes are the design source's TenantSidebar verbatim (brand,
+// the space switcher, the Personal-space nav, profile) so layout.css styles it identically; only the data is
+// ours — the tenants come from listMyTenants() (E2EE: the server only knows membership), switching is a full
+// navigation to that tenant's domain, and the bottom is a sign-out (the original's ProfileMenu, favorites +
+// groups are later slices).
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { logout } from '../../features/account/login/login'
+import { listMyTenants } from '../../features/spaces/scopes'
 import { clearVault } from '../../app/vault'
-import { clearActiveSpace } from '../../app/activeSpace'
+import { activeSpace, clearActiveSpace } from '../../app/activeSpace'
+import type { MyTenant } from '../../api/generated/scopes'
 
 const { t } = useI18n()
 const router = useRouter()
+const tenants = ref<MyTenant[]>([])
+
+onMounted(async () => {
+  try {
+    tenants.value = await listMyTenants()
+  } catch {
+    /* the sidebar tolerates an empty switcher */
+  }
+})
+
+function tenantInitial(value: string): string {
+  return value.trim().charAt(0).toUpperCase() || 'V'
+}
+
+function isActive(tenant: MyTenant): boolean {
+  return tenant.tenantId === activeSpace.tenantId
+}
+
+function switchTenant(tenant: MyTenant) {
+  if (isActive(tenant)) return
+  // Each tenant is reached at its own domain (ADR 0002); switching is a full navigation there.
+  window.location.assign(`https://${tenant.domain}`)
+}
 
 async function signOut() {
   try {
@@ -22,87 +52,58 @@ async function signOut() {
 </script>
 
 <template>
-  <aside class="app-sidebar">
-    <div class="app-brand">{{ t('shell.appName') }}</div>
-    <nav class="app-nav">
-      <RouterLink :to="{ name: 'home' }" class="app-nav-item" active-class="app-nav-item-active">
-        <i class="pi pi-images" aria-hidden="true" />
+  <aside class="tenant-sidebar">
+    <RouterLink :to="{ name: 'home' }" class="sidebar-brand" aria-label="veyq Home">
+      <img class="sidebar-brand-mark" :src="logoLightUrl" alt="" aria-hidden="true" />
+      <span>veyq</span>
+    </RouterLink>
+
+    <section class="sidebar-section sidebar-tenant-section">
+      <div class="sidebar-section-heading">
+        <p class="sidebar-section-label">{{ t('shell.spaces') }}</p>
+      </div>
+      <div class="sidebar-tenant-switcher">
+        <div v-for="tenant in tenants" :key="tenant.tenantId" class="sidebar-tenant-item">
+          <div
+            v-if="isActive(tenant)"
+            class="sidebar-tenant-link sidebar-tenant-link-active"
+            :title="tenant.name"
+          >
+            <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
+            <span class="sidebar-tenant-text">
+              <strong>{{ tenant.name }}</strong>
+              <small>{{ tenant.domain }}</small>
+            </span>
+          </div>
+          <button
+            v-else
+            class="sidebar-tenant-link"
+            :title="tenant.name"
+            type="button"
+            @click="switchTenant(tenant)"
+          >
+            <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
+            <span class="sidebar-tenant-text">
+              <strong>{{ tenant.name }}</strong>
+              <small>{{ tenant.domain }}</small>
+            </span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <nav class="sidebar-nav" :aria-label="t('shell.personal')">
+      <RouterLink :to="{ name: 'home' }" class="sidebar-nav-link sidebar-personal-link">
+        <span class="pi pi-user" />
         <span>{{ t('shell.personal') }}</span>
       </RouterLink>
     </nav>
-    <button class="app-nav-item app-logout" type="button" @click="signOut">
-      <i class="pi pi-sign-out" aria-hidden="true" />
-      <span>{{ t('shell.logout') }}</span>
-    </button>
+
+    <section class="sidebar-section sidebar-profile">
+      <button class="sidebar-nav-link" type="button" @click="signOut">
+        <span class="pi pi-sign-out" />
+        <span>{{ t('shell.logout') }}</span>
+      </button>
+    </section>
   </aside>
 </template>
-
-<style scoped>
-.app-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  height: 100%;
-  padding: 1.05rem 1rem;
-  border-right: 1px solid var(--app-line);
-  background: var(--app-chrome-pattern);
-  box-shadow:
-    inset -1px 0 0 rgb(255 255 255 / 0.74),
-    10px 0 34px rgb(15 23 42 / 0.05);
-  backdrop-filter: blur(22px);
-  overflow: auto;
-}
-.app-brand {
-  padding: 0.2rem 0.35rem;
-  color: var(--app-text);
-  font-size: 1.35rem;
-  font-weight: 850;
-}
-.app-nav {
-  flex: 1;
-  display: grid;
-  gap: 0.35rem;
-  align-content: start;
-}
-.app-nav-item {
-  display: grid;
-  grid-template-columns: 2.1rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 2.45rem;
-  padding: 0.35rem;
-  border: 0;
-  border-radius: var(--app-radius-sm);
-  background: transparent;
-  color: var(--app-control-text);
-  text-decoration: none;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-.app-nav-item:hover,
-.app-nav-item-active {
-  background: var(--app-hover);
-}
-.app-nav-item-active {
-  color: var(--app-text);
-  font-weight: 600;
-}
-.app-nav-item > .pi {
-  display: grid;
-  place-items: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 10px;
-  background: var(--app-accent-soft);
-  color: var(--app-accent);
-  font-weight: 800;
-}
-.app-logout {
-  color: var(--app-muted);
-}
-.app-logout > .pi {
-  background: transparent;
-  color: var(--app-muted);
-}
-</style>

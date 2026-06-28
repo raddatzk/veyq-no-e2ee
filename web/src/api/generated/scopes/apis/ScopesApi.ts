@@ -24,6 +24,11 @@ import {
     ErrorResponseToJSON,
 } from '../models/ErrorResponse';
 import {
+    type MyTenant,
+    MyTenantFromJSON,
+    MyTenantToJSON,
+} from '../models/MyTenant';
+import {
     type ScopeCreated,
     ScopeCreatedFromJSON,
     ScopeCreatedToJSON,
@@ -90,6 +95,28 @@ export interface ScopesApiInterface {
      * List the caller\'s scopes in the active tenant.
      */
     listMyScopes(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<ScopeSummary>>;
+
+    /**
+     * Creates request options for listMyTenants without sending the request
+     * @throws {RequiredError}
+     * @memberof ScopesApiInterface
+     */
+    listMyTenantsRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the `domain` it is reached at, and the caller\'s `role`. Independent of the request Host (it lists *all* the caller\'s tenants, so the client can render a switcher and link to each tenant\'s domain). Tenant name + domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content; no key material is involved. 
+     * @summary List the tenants the caller belongs to (the space switcher).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ScopesApiInterface
+     */
+    listMyTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MyTenant>>>;
+
+    /**
+     * Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the `domain` it is reached at, and the caller\'s `role`. Independent of the request Host (it lists *all* the caller\'s tenants, so the client can render a switcher and link to each tenant\'s domain). Tenant name + domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content; no key material is involved. 
+     * List the tenants the caller belongs to (the space switcher).
+     */
+    listMyTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MyTenant>>;
 
 }
 
@@ -199,6 +226,53 @@ export class ScopesApi extends runtime.BaseAPI implements ScopesApiInterface {
      */
     async listMyScopes(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<ScopeSummary>> {
         const response = await this.listMyScopesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listMyTenants without sending the request
+     */
+    async listMyTenantsRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/api/scopes/my-tenants`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the `domain` it is reached at, and the caller\'s `role`. Independent of the request Host (it lists *all* the caller\'s tenants, so the client can render a switcher and link to each tenant\'s domain). Tenant name + domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content; no key material is involved. 
+     * List the tenants the caller belongs to (the space switcher).
+     */
+    async listMyTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MyTenant>>> {
+        const requestOptions = await this.listMyTenantsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MyTenantFromJSON));
+    }
+
+    /**
+     * Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the `domain` it is reached at, and the caller\'s `role`. Independent of the request Host (it lists *all* the caller\'s tenants, so the client can render a switcher and link to each tenant\'s domain). Tenant name + domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content; no key material is involved. 
+     * List the tenants the caller belongs to (the space switcher).
+     */
+    async listMyTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MyTenant>> {
+        const response = await this.listMyTenantsRaw(initOverrides);
         return await response.value();
     }
 

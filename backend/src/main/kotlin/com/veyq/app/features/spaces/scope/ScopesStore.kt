@@ -10,6 +10,9 @@ import java.util.UUID
 /** A scope the caller holds, with their own grant ciphertext — the row behind a `ScopeSummary`. */
 data class ScopeRow(val id: String, val kind: String, val tenantId: String, val wrappedGrant: String)
 
+/** A tenant the caller belongs to — the row behind a `MyTenant` (the space switcher). */
+data class TenantRow(val tenantId: String, val name: String, val domain: String, val role: String)
+
 /**
  * Persistence for a member's scopes (cr-0026). Operator-blind: stores only the opaque scope row + the
  * ciphertext grant on the membership; never a scope key. The active tenant is resolved by domain (Host).
@@ -61,4 +64,13 @@ class ScopesStore {
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, m.wrappedGrant) }
         }
+
+    /** Every tenant the caller belongs to (one row per tenant, name+domain joined) — the space switcher. */
+    fun myTenants(userId: String): List<TenantRow> =
+        MembershipEntity.find("userId", userId).list()
+            .groupBy { it.tenantId }
+            .mapNotNull { (tenantId, memberships) ->
+                TenantEntity.findById(tenantId)?.let { t -> TenantRow(t.id, t.name, t.domain, memberships.first().role) }
+            }
+            .sortedBy { it.name }
 }

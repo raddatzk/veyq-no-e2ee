@@ -5,7 +5,6 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
 import { activeSpace, activeScopeKey, enterPersonalSpace } from '../app/activeSpace'
 import { setBreadcrumb } from '../app/breadcrumb'
 import { treeStore, loadTree } from '../features/memory/treeStore'
@@ -91,36 +90,18 @@ async function onDeleteDone() {
     <div v-else-if="activeSpace.status === 'error' || treeStore.error" class="home-state">
       <p>{{ t('home.error') }}</p>
     </div>
-    <template v-else>
-      <header v-if="currentFolder" class="node-header">
-        <span class="pi pi-folder node-header-icon" aria-hidden="true" />
-        <h1 class="node-header-title">{{ currentFolder.name }}</h1>
-        <Button
-          type="button"
-          :label="t('memory.rename')"
-          icon="pi pi-pencil"
-          severity="secondary"
-          text
-          @click="startRename(currentFolder)"
-        />
-        <Button
-          type="button"
-          :label="t('memory.delete')"
-          icon="pi pi-trash"
-          severity="danger"
-          text
-          @click="startDelete(currentFolder)"
-        />
-      </header>
-      <MemoryBrowse
-        :folders="level.folders"
-        :memories="level.memories"
-        @open-folder="openFolder"
-        @open-memory="openMemory"
-        @create-folder="startCreate('create-folder')"
-        @create-memory="startCreate('create-memory')"
-      />
-    </template>
+    <MemoryBrowse
+      v-else
+      :folder="currentFolder"
+      :folders="level.folders"
+      :memories="level.memories"
+      @open-folder="openFolder"
+      @open-memory="openMemory"
+      @create-folder="startCreate('create-folder')"
+      @create-memory="startCreate('create-memory')"
+      @rename-folder="currentFolder && startRename(currentFolder)"
+      @delete-folder="currentFolder && startDelete(currentFolder)"
+    />
 
     <NodeMutationDialog
       v-if="mutationVisible && scopeKey && activeSpace.scopeId"
@@ -155,27 +136,5 @@ async function onDeleteDone() {
 .home-state p {
   color: var(--app-muted);
   margin: 0;
-}
-.node-header {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  margin-bottom: 1.6rem;
-}
-.node-header-icon {
-  display: grid;
-  place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 12px;
-  background: var(--app-accent-soft);
-  color: var(--app-accent);
-  font-size: 1.2rem;
-}
-.node-header-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 750;
-  flex: 1;
 }
 </style>

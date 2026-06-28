@@ -3,6 +3,7 @@ package com.veyq.app.features.spaces.scope
 import com.veyq.app.generated.api.ScopesApi
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
 import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.generated.model.MyTenant
 import com.veyq.app.generated.model.ScopeCreated
 import com.veyq.app.generated.model.ScopeKind
 import com.veyq.app.generated.model.ScopeSummary
@@ -55,6 +56,13 @@ class ScopesResource(
             ListScopesOutcome.NoTenant ->
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
         }
+
+    override fun listMyTenants(): Response =
+        Response.ok(
+            handler.myTenants(identity.principal.name).map {
+                MyTenant(tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role)
+            },
+        ).build()
 
     /** The active tenant's host: the reverse-proxy `X-Forwarded-Host`, else `Host`; first value, port stripped. */
     private fun activeHost(): String? =

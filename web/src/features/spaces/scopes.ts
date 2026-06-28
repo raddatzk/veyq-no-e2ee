@@ -6,13 +6,18 @@ import { b64std, fromB64std } from '../../shared/base64'
 import { scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { identityPrivate } from '../../app/vault'
-import { ScopeKind, type ScopeSummary } from '../../api/generated/scopes'
+import { ScopeKind, type ScopeSummary, type MyTenant } from '../../api/generated/scopes'
 
 const SCOPE_GRANT = 'scope-grant'
 
 /** The caller's scopes in the active tenant (each with their own grant ciphertext). */
 export async function listMyScopes(): Promise<ScopeSummary[]> {
   return withRefresh(() => scopesApi().listMyScopes())
+}
+
+/** Every tenant the caller belongs to — the sidebar space switcher (Host-independent). */
+export async function listMyTenants(): Promise<MyTenant[]> {
+  return withRefresh(() => scopesApi().listMyTenants())
 }
 
 /**

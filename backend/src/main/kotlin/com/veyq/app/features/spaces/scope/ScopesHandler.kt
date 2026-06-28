@@ -34,4 +34,7 @@ class ScopesHandler(private val store: ScopesStore) {
         val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return ListScopesOutcome.NoTenant
         return ListScopesOutcome.Scopes(store.listMine(userId, tenantId))
     }
+
+    /** Every tenant the caller belongs to (Host-independent) — the space switcher. */
+    fun myTenants(userId: String): List<TenantRow> = store.myTenants(userId)
 }

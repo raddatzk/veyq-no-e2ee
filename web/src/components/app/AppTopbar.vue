@@ -1,53 +1,40 @@
 <script setup lang="ts">
-// The shell's top bar (cr-0030, simplified port of legacy WorkspaceTopbar): a CLIENT-SIDE breadcrumb built
-// from the local decrypted tree (the blind server computes none). Global search + upload status are later.
+// The shell's top bar (cr-0030). Markup + classes are the design source's WorkspaceTopbar verbatim (the
+// .workspace-topbar grid: breadcrumb + a search center + actions) so layout.css styles it identically. Ours
+// only differs in the data: the breadcrumb is built CLIENT-SIDE from the local decrypted tree (the blind
+// server computes none), and global search is a later slice, so the center renders in its disabled state.
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import Breadcrumb from 'primevue/breadcrumb'
+import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
+
+const { t } = useI18n()
+const router = useRouter()
+
+const home = computed<MenuItem>(() => ({
+  label: breadcrumb.trail[0]?.name,
+  command: () => void router.push({ name: 'home' }),
+}))
+const items = computed<MenuItem[]>(() =>
+  breadcrumb.trail.slice(1).map((crumb) => ({
+    label: crumb.name,
+    command: () => void router.push({ name: 'node', params: { nodeId: crumb.id as string } }),
+  })),
+)
 </script>
 
 <template>
-  <header class="app-topbar">
-    <nav class="app-crumbs" aria-label="breadcrumb">
-      <template v-for="(crumb, index) in breadcrumb.trail" :key="crumb.id ?? 'root'">
-        <RouterLink
-          class="app-crumb"
-          :to="crumb.id ? { name: 'node', params: { nodeId: crumb.id } } : { name: 'home' }"
-        >
-          {{ crumb.name }}
-        </RouterLink>
-        <span v-if="index < breadcrumb.trail.length - 1" class="app-crumb-sep" aria-hidden="true">/</span>
-      </template>
-    </nav>
+  <header class="workspace-topbar">
+    <Breadcrumb :model="items" :home="home" class="app-breadcrumb" />
+    <div class="workspace-search">
+      <label class="workspace-topbar-center workspace-topbar-center-disabled" :aria-label="t('shell.search')">
+        <span class="pi pi-search" />
+        <input type="search" disabled :placeholder="t('shell.search')" autocomplete="off" />
+        <kbd>⌘K</kbd>
+      </label>
+    </div>
+    <div class="workspace-topbar-actions" />
   </header>
 </template>
-
-<style scoped>
-.app-topbar {
-  display: flex;
-  align-items: center;
-  height: var(--app-topbar-height);
-  padding: 0 1.4rem;
-  background: var(--app-overlay);
-  border-bottom: 1px solid var(--app-line);
-  backdrop-filter: blur(14px);
-}
-.app-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-}
-.app-crumb {
-  color: var(--app-muted);
-  text-decoration: none;
-}
-.app-crumb:last-of-type {
-  color: var(--app-text);
-  font-weight: 700;
-}
-.app-crumb:not(:last-of-type):hover {
-  color: var(--app-accent);
-}
-.app-crumb-sep {
-  color: var(--app-line);
-}
-</style>

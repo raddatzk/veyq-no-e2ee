@@ -12,6 +12,7 @@ export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
 export const activeSpace = reactive({
   status: 'idle' as SpaceStatus,
   scopeId: null as string | null,
+  tenantId: null as string | null,
 })
 
 // K_SC is held outside the reactive proxy on purpose — key material must not flow through Vue reactivity.
@@ -38,6 +39,7 @@ export async function enterPersonalSpace(): Promise<void> {
       return
     }
     activeSpace.scopeId = personal.id
+    activeSpace.tenantId = personal.tenantId
     scopeKey = key
     activeSpace.status = 'ready'
   } catch (err) {
@@ -49,6 +51,7 @@ export async function enterPersonalSpace(): Promise<void> {
 export function clearActiveSpace(): void {
   activeSpace.status = 'idle'
   activeSpace.scopeId = null
+  activeSpace.tenantId = null
   scopeKey?.fill(0)
   scopeKey = null
 }

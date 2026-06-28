@@ -106,8 +106,10 @@ const en = {
   },
   shell: {
     appName: 'veyq',
+    spaces: 'Spaces',
     personal: 'Personal',
     logout: 'Sign out',
+    search: 'Search…',
   },
   home: {
     loading: 'Opening your space…',
@@ -245,8 +247,10 @@ const de: typeof en = {
   },
   shell: {
     appName: 'veyq',
+    spaces: 'Bereiche',
     personal: 'Persönlich',
     logout: 'Abmelden',
+    search: 'Suchen…',
   },
   home: {
     loading: 'Dein Bereich wird geöffnet…',

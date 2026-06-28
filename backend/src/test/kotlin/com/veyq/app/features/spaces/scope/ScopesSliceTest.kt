@@ -98,6 +98,25 @@ class ScopesSliceTest {
             .then().statusCode(401).body("code", equalTo("authentication_failed"))
     }
 
+    @Test
+    fun listMyTenantsReturnsTheCallersTenants() {
+        // Host-independent: lists every tenant the caller belongs to (name + domain + role), for the switcher.
+        val (userId, domain) = seedMember()
+        given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")
+            .`when`().get("/api/scopes/my-tenants")
+            .then().statusCode(200)
+            .body("size()", equalTo(1))
+            .body("[0].name", equalTo("Fam"))
+            .body("[0].domain", equalTo(domain))
+            .body("[0].role", equalTo("OWNER"))
+
+        // an outsider with no membership sees an empty list — only your own tenants (operator-blind).
+        val outsider = seedUser()
+        given().header("Authorization", "Bearer ${sessions.issue(outsider).accessToken}")
+            .`when`().get("/api/scopes/my-tenants")
+            .then().statusCode(200).body("size()", equalTo(0))
+    }
+
     // --- helpers ---
 
     /** Seed a user + an ACTIVE tenant (unique domain) + the user's TENANT membership (post-activation state).
