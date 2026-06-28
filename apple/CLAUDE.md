@@ -46,10 +46,15 @@ runs on-device; the server is blind.
   AES-GCM / SHA-256, and **`MLKEM768`** for the hybrid KEM) + **swift-sodium** (Argon2id, as in
   `legacy/apple`). The hybrid KEM (X25519 + ML-KEM-768), `asymWrap` (scope grants) and the identity bundle
   are ported (cr-0025); the remaining content-side primitives land with the content slice.
-- **Reuse legacy UI/UX — never invent new UI.** Orient on `legacy/apple` (`VeyqCrypto`/`VeyqApiModels`
-  structure) and `legacy/iOS/Veyq` (the SwiftUI app), read-only. Port screens/flows; swap the data layer to
-  the contracts-generated client + this crypto. Note: `legacy/apple`'s `VeyqCrypto` predates the PQ pivot
-  (classic X25519, no ML-KEM) — its Argon/AEAD/auth patterns port directly, its KEM does not.
+- **Reuse legacy UI **component-for-component** — never invent new UI.** Copy the SwiftUI views from
+  `legacy/iOS/Veyq` (the first iOS app, read-only) and swap **only the data layer** to the contracts-generated
+  client + this crypto — exactly the web approach (view + layout verbatim, E2EE data underneath). `legacy/apple`
+  is structure reference only; its `VeyqCrypto` predates the PQ pivot (classic X25519, no ML-KEM) — Argon/AEAD/
+  auth patterns port, the KEM does not.
+- **Responsive universal app (iPhone / iPad / macOS).** Lay out for **size classes**, not fixed widths: a
+  `NavigationSplitView` (sidebar + content + optional detail) that shows columns on **regular** width (iPad
+  landscape, Mac) and collapses to a stack/`NavigationStack` on **compact** (iPhone, iPad slide-over). Verify a
+  change on both an iPhone and an iPad/Mac destination before calling it done.
 - **Operator-blind:** seal/derive everything on-device; never send the password, plaintext or raw keys. The
   data layer connects to an **already-bootstrapped** instance (first-run setup is browser-only).
 

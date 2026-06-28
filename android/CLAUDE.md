@@ -41,8 +41,12 @@ when working here. All content crypto runs on-device; the server is blind.
   FIPS-203 ML-KEM — 1.78.1 only had the older round-3 Kyber) + the **JDK JCE** for AES-256-GCM. The hybrid
   KEM, `asymWrap` (scope grants) and the identity bundle are ported (cr-0025); remaining content-side
   primitives land with the content slice.
-- **Reuse legacy UI/UX — never invent new UI.** Orient on `legacy/android` (read-only) and the Apple/iOS UI;
-  port flows, swap the data layer to the contracts-generated client + this crypto.
+- **Reuse the UI/UX — never invent new UI.** Built **fresh in parallel to Apple** (there is no legacy Compose
+  UI to copy); match the **same screens** as the Apple iOS port (`legacy/iOS/Veyq`) + web — swap only the data
+  layer to the contracts-generated client + this crypto. `legacy/android` is read-only structure reference.
+- **Responsive (phone / tablet).** Lay out by **`WindowSizeClass`**, not fixed widths: a list/detail that is a
+  single pane on **Compact** width (phone) and a two-pane split (`ListDetailPaneScaffold`) on **Medium/Expanded**
+  (tablet, foldable, landscape). Verify a change on both a phone and a tablet/expanded window before done.
 - **Operator-blind:** seal/derive everything on-device; never send the password, plaintext or raw keys. The
   data layer connects to an **already-bootstrapped** instance (first-run setup is browser-only).
 

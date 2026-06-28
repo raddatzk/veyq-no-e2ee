@@ -59,8 +59,13 @@ a real contract-level verification surface, not docs that rot. CR phases follow 
   `legacy/frontend-noe2ee/`** (the pre-E2EE original, `0075f77c` — the clean product UX; see its
   `_PROVENANCE.md`). `legacy/frontend/` is the **E2EE-but-wrong-concept** descendant — consult it **only** as a
   reference for *how an operator-blind server forces a flow client-side* (breadcrumbs, name-decrypt,
-  thumbnail-less gallery), never for its scope/key concept. Native UI orients on the first iOS version. Apple
-  is the universal-app direction; Android is built fresh in parallel to Apple as a universal app.
+  thumbnail-less gallery), never for its scope/key concept. **Native reuses its own legacy UI the same way:**
+  Apple ports the **first iOS UI** (`legacy/ios/`) **component-for-component** — copy the SwiftUI views, swap
+  only the data layer to the E2EE client (exactly the web approach); Android is built **fresh in parallel** to
+  Apple (no legacy Compose UI to copy) matching the same screens. **Both native heads are responsive universal
+  apps:** Apple adapts across **iPhone / iPad / macOS** (size classes — compact ↔ regular, multi-column on
+  regular), Android across **phone / tablet** (WindowSizeClass). Design for the **size class**, not a fixed
+  width — the sidebar/detail split collapses to a stack on compact and expands to columns on regular.
 - **Start light.** Heavier machinery — validators, hooks, the wiki generator, the full `contracts/`
   tree, `.claude/` commands + subagents — is added when there is code/feature surface that justifies
   it, not up front.
