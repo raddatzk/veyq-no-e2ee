@@ -7,12 +7,14 @@
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
+import { isFavorite } from '../../../app/favoritesStore'
 import MemoryCard from './MemoryCard.vue'
 
 defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[] }>()
 defineEmits<{
   openFolder: [folder: TreeNode]
   openMemory: [memory: TreeNode]
+  toggleFavorite: [memory: TreeNode]
   createFolder: []
   createMemory: []
   renameFolder: []
@@ -68,7 +70,9 @@ const { t } = useI18n()
           v-for="memory in memories"
           :key="memory.id"
           :memory="memory"
+          :favorite="isFavorite(memory.id)"
           @open="$emit('openMemory', $event)"
+          @toggle-favorite="$emit('toggleFavorite', $event)"
         />
         <button
           class="veyq-card veyq-card-interactive memory-create-card memory-create-card-memory"

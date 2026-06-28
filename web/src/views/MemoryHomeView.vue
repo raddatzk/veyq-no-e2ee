@@ -122,6 +122,7 @@ async function onDeleteDone() {
         :memories="level.memories"
         @open-folder="openFolder"
         @open-memory="openMemory"
+        @toggle-favorite="onToggleFavorite"
         @create-folder="startCreate('create-folder')"
         @create-memory="startCreate('create-memory')"
         @rename-folder="currentFolder && startRename(currentFolder)"
