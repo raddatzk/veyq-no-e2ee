@@ -2,9 +2,10 @@ import Crypto
 import Foundation
 import Sodium
 
-/// The veyq `v1` crypto suite — Apple, auth/unlock subset (cr-0014). Byte-identical to
-/// `web/src/shared/crypto/v1.ts`, pinned by `contracts/crypto/vectors/v1.json` (ADR 0009). The hybrid KEM
-/// (ML-KEM-768) and content-side primitives are deferred to the first scope/content slice.
+/// The veyq `v1` crypto suite — Apple. Byte-identical to `web/src/shared/crypto/v1.ts`, pinned by
+/// `contracts/crypto/vectors/v1.json` (ADR 0009). Auth/unlock subset (cr-0014) + the hybrid KEM
+/// (X25519 + ML-KEM-768), asymWrap and identity bundle (cr-0025). Remaining content-side primitives
+/// (journal/chunk/slug/dedup) are added with the content slice.
 public enum V1 {
 
     /// A wrapped blob / kdfParams from the (untrusted, operator-blind) server was too short to parse. Thrown
@@ -166,5 +167,165 @@ public enum V1 {
     /// Password-reset recovery commitment: SHA-256("veyq/v1/recovery-auth" ‖ masterKey).
     public static func recoveryAuthTag(masterKey: Data) -> Data {
         Data(SHA256.hash(data: utf8("veyq/v1/recovery-auth") + masterKey))
+    }
+
+    // MARK: - Hybrid KEM (X25519 + ML-KEM-768) — the scope-grant primitive (cr-0025)
+    //
+    // Mirrors `web/src/shared/crypto/v1.ts` byte-for-byte, pinned by `kem_v1` / `wrap.asym_scope_grant`.
+    // `HybridSecret.m` is the **64-byte ML-KEM seed** (FIPS 203 keygen reconstructs the private key — the
+    // form CryptoKit/BouncyCastle want); `HybridPublic.m` is the 1184-byte ML-KEM public key.
+
+    public struct HybridPublic: Sendable {
+        public let x: Data   // X25519 public key (32)
+        public let m: Data   // ML-KEM-768 public key (1184)
+        public init(x: Data, m: Data) { self.x = x; self.m = m }
+    }
+    public struct HybridSecret: Sendable {
+        public let x: Data   // X25519 secret (32)
+        public let m: Data   // ML-KEM-768 seed (64) — the private key is reconstructed from it
+        public init(x: Data, m: Data) { self.x = x; self.m = m }
+    }
+
+    private static let asymType: UInt8 = 0x01
+
+    /// HKDF combiner binding both shared secrets + the transcript: ikm = lp(ssM)‖lp(ssX),
+    /// salt = SHA256(lp(ctM)‖lp(epkX)‖lp(pkM)‖lp(pkX)), info = "veyq/v1/kem".
+    private static func kemCombiner(ssM: Data, ssX: Data, ctM: Data, epkX: Data, pkM: Data, pkX: Data) -> Data {
+        let ikm = lp(ssM) + lp(ssX)
+        let salt = Data(SHA256.hash(data: lp(ctM) + lp(epkX) + lp(pkM) + lp(pkX)))
+        return hkdfSha256(ikm: ikm, salt: salt, info: utf8("veyq/v1/kem"), length: 32)
+    }
+
+    private static func rawBytes(_ b: some ContiguousBytes) -> Data { b.withUnsafeBytes { Data($0) } }
+
+    /// Encapsulate to a recipient's hybrid public key → (ct = epkX(32)‖mlkemCt(1088), shared secret(32)).
+    public static func kemEncap(_ pk: HybridPublic) throws -> (ct: Data, ss: Data) {
+        let esk = Curve25519.KeyAgreement.PrivateKey()
+        let epkX = esk.publicKey.rawRepresentation
+        let peerX = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: pk.x)
+        let ssX = rawBytes(try esk.sharedSecretFromKeyAgreement(with: peerX))
+        let mlPub = try MLKEM768.PublicKey(rawRepresentation: pk.m)
+        let enc = try mlPub.encapsulate()
+        let ssM = rawBytes(enc.sharedSecret)
+        let ctM = enc.encapsulated
+        let ss = kemCombiner(ssM: ssM, ssX: ssX, ctM: ctM, epkX: epkX, pkM: pk.m, pkX: pk.x)
+        return (epkX + ctM, ss)
+    }
+
+    /// Decapsulate: recover the shared secret from `ct` with the recipient's hybrid secret (+ its public,
+    /// which the combiner binds). The ML-KEM private key is reconstructed from the stored seed.
+    public static func kemDecap(_ sk: HybridSecret, _ pk: HybridPublic, ct: Data) throws -> Data {
+        let ctd = Data(ct)
+        guard ctd.count >= 32 else { throw V1Error.malformed }
+        let epkX = ctd.prefix(32)
+        let ctM = ctd.suffix(from: ctd.startIndex + 32)
+        let myX = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: sk.x)
+        let peerEpk = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: Data(epkX))
+        let ssX = rawBytes(try myX.sharedSecretFromKeyAgreement(with: peerEpk))
+        let mlSk = try MLKEM768.PrivateKey(seedRepresentation: sk.m, publicKey: nil)
+        let ssM = rawBytes(try mlSk.decapsulate(Data(ctM)))
+        return kemCombiner(ssM: ssM, ssX: ssX, ctM: Data(ctM), epkX: Data(epkX), pkM: pk.m, pkX: pk.x)
+    }
+
+    /// §5a asymmetric wrap: 0x01 ‖ ct(1120) ‖ nonce(12) ‖ aead. KEK = HKDF(ss, "", "veyq/v1/wrap"+context).
+    public static func asymWrap(pk: HybridPublic, targetKey: Data, context: String, nonce: Data) throws -> Data {
+        let enc = try kemEncap(pk)
+        let kek = hkdfSha256(ikm: enc.ss, salt: Data(), info: utf8("veyq/v1/wrap" + context), length: 32)
+        return Data([asymType]) + enc.ct + nonce
+            + aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: wrapAad(asymType, context))
+    }
+
+    public static func asymUnwrap(sk: HybridSecret, pk: HybridPublic, blob: Data, context: String) throws -> Data {
+        let b = Data(blob)
+        // 1 type + 1120 ct + 12 nonce + ≥16 tag; shorter is a malformed/hostile blob.
+        guard b.count >= 1 + 1120 + 12 + 16 else { throw V1Error.malformed }
+        let ct = b.subdata(in: 1 ..< 1 + 1120)
+        let nonce = b.subdata(in: 1 + 1120 ..< 1 + 1120 + 12)
+        let aead = b.suffix(from: 1 + 1120 + 12)
+        let ss = try kemDecap(sk, pk, ct: ct)
+        let kek = hkdfSha256(ikm: ss, salt: Data(), info: utf8("veyq/v1/wrap" + context), length: 32)
+        return try aeadOpen(key: kek, nonce: nonce, ciphertextAndTag: aead, aad: wrapAad(asymType, context))
+    }
+
+    // MARK: - Identity (hybrid KEM keypair + Ed25519 signing) — cr-0025
+
+    public struct IdentityPublic: Sendable {
+        public let kemX: Data; public let kemM: Data; public let sign: Data
+        public init(kemX: Data, kemM: Data, sign: Data) { self.kemX = kemX; self.kemM = kemM; self.sign = sign }
+    }
+    public struct IdentityPrivate: Sendable {
+        public let kemX: Data; public let mlkemSeed: Data; public let sign: Data
+        public init(kemX: Data, mlkemSeed: Data, sign: Data) { self.kemX = kemX; self.mlkemSeed = mlkemSeed; self.sign = sign }
+    }
+    public struct Identity: Sendable {
+        public let pub: IdentityPublic; public let priv: IdentityPrivate
+        public init(pub: IdentityPublic, priv: IdentityPrivate) { self.pub = pub; self.priv = priv }
+    }
+
+    /// HybridSecret for `kemDecap`/`asymUnwrap` from a stored private bundle (m = the 64-byte seed).
+    public static func hybridSecret(_ priv: IdentityPrivate) -> HybridSecret {
+        HybridSecret(x: priv.kemX, m: priv.mlkemSeed)
+    }
+
+    /// The hybrid PUBLIC bundle re-derived from a stored private bundle — for sealing to one's own identity.
+    public static func hybridPublic(_ priv: IdentityPrivate) throws -> HybridPublic {
+        let x = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: priv.kemX).publicKey.rawRepresentation
+        let m = try MLKEM768.PrivateKey(seedRepresentation: priv.mlkemSeed, publicKey: nil).publicKey.rawRepresentation
+        return HybridPublic(x: x, m: m)
+    }
+
+    /// Generate a fresh identity (hybrid KEM keypair + Ed25519 signing). Stored private form is the seeds.
+    public static func generateIdentity() -> Identity {
+        let kemXsk = Curve25519.KeyAgreement.PrivateKey()
+        let mlSk = try! MLKEM768.PrivateKey()
+        let signSk = Curve25519.Signing.PrivateKey()
+        return Identity(
+            pub: IdentityPublic(kemX: kemXsk.publicKey.rawRepresentation,
+                                kemM: mlSk.publicKey.rawRepresentation,
+                                sign: signSk.publicKey.rawRepresentation),
+            priv: IdentityPrivate(kemX: kemXsk.rawRepresentation,
+                                  mlkemSeed: mlSk.seedRepresentation,
+                                  sign: signSk.rawRepresentation)
+        )
+    }
+
+    /// Canonical identity PUBLIC serialization: lp(kemX) ‖ lp(kemM) ‖ lp(sign).
+    public static func serializeIdentityPublic(_ pub: IdentityPublic) -> Data {
+        lp(pub.kemX) + lp(pub.kemM) + lp(pub.sign)
+    }
+
+    /// Identity PRIVATE serialization (wrapped under the Master Key): lp(kemX) ‖ lp(mlkemSeed) ‖ lp(sign).
+    public static func serializeIdentityPrivate(_ priv: IdentityPrivate) -> Data {
+        lp(priv.kemX) + lp(priv.mlkemSeed) + lp(priv.sign)
+    }
+
+    /// Inverse of `serializeIdentityPrivate`: read three length-prefixed fields (guards untrusted bytes).
+    public static func deserializeIdentityPrivate(_ bytes: Data) throws -> IdentityPrivate {
+        let b = Data(bytes)
+        var o = 0
+        func next() throws -> Data {
+            guard o + 4 <= b.count else { throw V1Error.malformed }
+            let len = (Int(b[o]) << 24) | (Int(b[o + 1]) << 16) | (Int(b[o + 2]) << 8) | Int(b[o + 3])
+            o += 4
+            guard len >= 0, o + len <= b.count else { throw V1Error.malformed }
+            let v = b.subdata(in: o ..< o + len)
+            o += len
+            return v
+        }
+        let kemX = try next(); let seed = try next(); let sign = try next()
+        return IdentityPrivate(kemX: kemX, mlkemSeed: seed, sign: sign)
+    }
+
+    /// Identity fingerprint ("safety number"): SHA-256("veyq/v1/fingerprint" ‖ serializeIdentityPublic),
+    /// rendered as 6 groups of 5 decimal digits (40-bit big-endian chunks mod 100000). Verification only.
+    public static func fingerprint(_ pub: IdentityPublic) -> String {
+        let h = Data(SHA256.hash(data: utf8("veyq/v1/fingerprint") + serializeIdentityPublic(pub)))
+        var groups: [String] = []
+        for i in 0 ..< 6 {
+            var v = 0
+            for j in 0 ..< 5 { v = v * 256 + Int(h[i * 5 + j]) }
+            groups.append(String(format: "%05d", v % 100000))
+        }
+        return groups.joined(separator: " ")
     }
 }

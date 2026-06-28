@@ -5,7 +5,8 @@ import XCTest
 
 /// Conformance of the Apple `v1` auth/unlock subset against the SHARED vectors
 /// (`contracts/crypto/vectors/v1.json`, ADR 0009) — the same file the web TS suite is pinned to, so a green
-/// run here proves cross-implementation byte-parity. ML-KEM / content-side vectors are out of this CR's scope.
+/// run here proves cross-implementation byte-parity. Includes the hybrid KEM + asymWrap + identity/fingerprint
+/// (cr-0025); the remaining content-side vectors (journal/chunk/slug/dedup) are added with the content slice.
 final class V1ConformanceTests: XCTestCase {
 
     private var vectors: [String: Any]!
@@ -90,6 +91,56 @@ final class V1ConformanceTests: XCTestCase {
         let sig = V1.authSign(privateKey: kp.privateKey, message: msg)
         XCTAssertTrue(V1.authVerify(publicKey: kp.publicKey, message: msg, signature: sig))
         XCTAssertFalse(V1.authVerify(publicKey: kp.publicKey, message: Data("other".utf8), signature: sig))
+    }
+
+    // MARK: - hybrid KEM + asymWrap + identity (cr-0025)
+
+    /// Deterministic decapsulation KAT: reconstruct the secret from the 64-byte ML-KEM seed + X25519 secret
+    /// and recover the recorded shared secret.
+    func testKemDecapKat() throws {
+        let d = sub(["kem_v1", "decap_kat"])
+        let sk = V1.HybridSecret(x: hex(d["sk_x25519"]), m: hex(d["mlkem_seed"]))
+        let pk = V1.HybridPublic(x: hex(d["pk_x25519"]), m: hex(d["pk_mlkem"]))
+        let ss = try V1.kemDecap(sk, pk, ct: hex(d["ct"]))
+        XCTAssertEqual(ss, hex(d["shared_secret"]))
+    }
+
+    /// Unwrap the recorded `asym_scope_grant` blob (asym wrap is randomized via encap, but DECAP is
+    /// deterministic given the recorded ct — so the fixed blob round-trips with the kem_v1 secret).
+    func testAsymScopeGrantUnwrap() throws {
+        let a = sub(["wrap", "asym_scope_grant"])
+        let d = sub(["kem_v1", "decap_kat"])
+        let sk = V1.HybridSecret(x: hex(d["sk_x25519"]), m: hex(d["mlkem_seed"]))
+        let pk = V1.HybridPublic(x: hex(a["pk_x25519"]), m: hex(a["pk_mlkem"]))
+        let recovered = try V1.asymUnwrap(sk: sk, pk: pk, blob: hex(a["blob"]), context: a["context"] as! String)
+        XCTAssertEqual(recovered, hex(a["plaintext"]))
+    }
+
+    /// Locally generated identity: encap→decap round-trips, and a wrong context fails (AAD + HKDF binding).
+    func testAsymWrapRoundTrip() throws {
+        let id = V1.generateIdentity()
+        let pk = try V1.hybridPublic(id.priv)
+        let sk = V1.hybridSecret(id.priv)
+        let plaintext = Data((0 ..< 32).map { UInt8($0) })
+        let blob = try V1.asymWrap(pk: pk, targetKey: plaintext, context: "scope-grant",
+                                   nonce: Data((0 ..< 12).map { UInt8($0) }))
+        XCTAssertEqual(try V1.asymUnwrap(sk: sk, pk: pk, blob: blob, context: "scope-grant"), plaintext)
+        XCTAssertThrowsError(try V1.asymUnwrap(sk: sk, pk: pk, blob: blob, context: "other"))
+    }
+
+    func testIdentitySerializeRoundTrip() throws {
+        let id = V1.generateIdentity()
+        let priv = try V1.deserializeIdentityPrivate(V1.serializeIdentityPrivate(id.priv))
+        XCTAssertEqual(priv.kemX, id.priv.kemX)
+        XCTAssertEqual(priv.mlkemSeed, id.priv.mlkemSeed)
+        XCTAssertEqual(priv.sign, id.priv.sign)
+        XCTAssertEqual(V1.serializeIdentityPublic(id.pub).count, (4 + 32) + (4 + 1184) + (4 + 32))
+    }
+
+    func testFingerprint() throws {
+        let f = sub(["fingerprint"])
+        let pub = V1.IdentityPublic(kemX: hex(f["kem_x"]), kemM: hex(f["kem_m"]), sign: hex(f["sign"]))
+        XCTAssertEqual(V1.fingerprint(pub), f["digits"] as! String)
     }
 
     // MARK: - helpers

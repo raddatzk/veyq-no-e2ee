@@ -57,13 +57,14 @@ suites **byte-identical** to those vectors. No contract, backend, or vector chan
 
 ## Phases
 
-- [ ] **1 — Apple (`VeyqCrypto`).** Add the hybrid KEM (`kemEncap`/`kemDecap` via swift-crypto `MLKEM768`
-  + `Curve25519.KeyAgreement`, reconstructing the ML-KEM key from the 64-byte seed), `asymWrap`/`asymUnwrap`,
-  the identity bundle (keygen / serialize public / parse private → `HybridSecret` / derive `HybridPublic`)
-  and `fingerprint`. Extend `V1ConformanceTests` with: the **`kem_v1` decap KAT** (deterministic), an
-  **asym round-trip** (encap→decap), the **fixed `wrap.asym_scope_grant` unwrap** (decap is deterministic
-  given the vector `ct`, using the `kem_v1` secret), identity-serialize, and the `fingerprint` vector.
-  **Done when:** `swift test` green incl. all new vectors; macOS + iOS `xcodebuild BUILD SUCCEEDED`.
+- [x] **1 — Apple (`VeyqCrypto`).** Added the hybrid KEM (`kemEncap`/`kemDecap` via CryptoKit/swift-crypto
+  `MLKEM768` + `Curve25519.KeyAgreement`, ML-KEM key reconstructed from the 64-byte seed),
+  `asymWrap`/`asymUnwrap`, the identity bundle (`generateIdentity` / serialize public+private / parse private
+  → `HybridSecret` / derive `HybridPublic`) and `fingerprint`. `V1ConformanceTests` extended with the
+  `kem_v1` **decap KAT** (deterministic), an **asym round-trip** (+ wrong-context rejection), the fixed
+  **`wrap.asym_scope_grant` unwrap**, identity-serialize, and the `fingerprint` vector. **Done:** `swift
+  test` 56 (3 live-skip), 0 failures; macOS + iOS `xcodebuild BUILD SUCCEEDED`. (Note: the deployment target
+  is macOS/iOS 26, so CryptoKit ML-KEM is available — the availability risk was moot.)
 - [ ] **2 — Android (`:crypto`).** The same in `V1.kt` (BouncyCastle `pqc.crypto.mlkem` + X25519,
   ML-KEM key reconstructed from the 64-byte seed), with the matching `V1ConformanceTest` additions.
   **Done when:** `./gradlew :crypto:test` `BUILD SUCCESSFUL` incl. all new vectors.
@@ -78,7 +79,7 @@ suites **byte-identical** to those vectors. No contract, backend, or vector chan
 |---|---|---|
 | contracts (vectors) | `kem_v1` / `asym_scope_grant` / `fingerprint` | ✅ (pre-existing) |
 | web | full | ✅ (pre-existing, the reference) |
-| apple | full | ◻ (phase 1) |
+| apple | full | ✅ (phase 1) |
 | android | full | ◻ (phase 2) |
 | windows / linux | full | ◻ (when those crypto ports land) |
 
