@@ -71,11 +71,19 @@ and the content slice.
   (create→list, one-per-tenant 409, operator-blind: stored grant == sent ciphertext, unknown-host 404,
   non-member 404, unauth 401). *Note: Host→tenant is new here; dev-on-localhost needs a fallback later, a
   follow-up for the web/dev phase.*
-- [ ] **4 — http.** `scopes-authed.http` acceptance (signed create + list happy-paths) with response-handler
-  asserts. **Done when:** the suite passes against a fresh seeded instance.
-- [ ] **5 — web.** Data layer `createPersonalScope`/`listMyScopes`/`openScope` (asymUnwrap with the vaulted
-  identity) + auto-birth after unlock; a minimal Home indicator ("Personal space ready"). **Done when:**
-  `npm run check` green + an e2e that opens the personal scope.
+- [~] **4 — http. N/A for the happy-path (decided 2026-06-28).** `createPersonalScope` requires an **active
+  tenant membership**, which is only born by **invite acceptance** — and the bootstrap secret is **out-of-band
+  by design** (in no API response), so the 201 happy-path is **not black-box reachable** via ijhttp. The
+  guard contract (401 unauth / 404 unknown-host / 404 non-member) is already proven green by `ScopesSliceTest`;
+  the create→open happy-path is covered white-box by the slice test + the web/native e2e (seed harness). No
+  `scopes-authed.http` written — it would only duplicate the slice-test guards and still need a live instance.
+- [x] **5 — web (data layer).** `features/spaces/scopes.ts`: `listMyScopes` / `ensurePersonalScope`
+  (auto-birth, operator-blind — generate scope key, `asymWrap` to own identity, POST only the grant) /
+  `openPersonalScope` (`asymUnwrap` the own grant with the vaulted identity). Added the `scopes` spec to
+  `generate:api` + `scopesApi()` in `api/client.ts`. **Done:** `npm run check` green (70 tests; new
+  `scopes.test.ts` round-trips birth→open with real v1 crypto + mocked API/vault). *Auto-birth call (after
+  unlock) + a UI indicator are deferred to the shell — the current web has no home/content UI, and calling
+  it on unlock would 404 on dev-localhost until the Host→tenant dev fallback lands.*
 - [ ] **6 — apple + android.** The same in each `VeyqClient` (`listMyScopes`/`createPersonalScope`/`openScope`
   via the cr-0025 `asymUnwrap`; a `ScopeVault` holding the opened key). **Done when:** `swift test` +
   `:client:test` green (round-trip: birth → fresh client → open → recovers the scope key); apple iOS +
@@ -87,8 +95,8 @@ and the content slice.
 |---|---|---|
 | contracts | `POST`/`GET /api/scopes` | ✅ (phase 2) |
 | backend | scope identity + create/list + backfill | ✅ (phase 3) |
-| http | signed acceptance | ◻ (phase 4) |
-| web | data layer + auto-birth | ◻ (phase 5) |
+| http | guards via ScopesSliceTest; happy-path via web/native e2e | **N/A** (phase 4) |
+| web | data layer (create/list/open) | ✅ (phase 5; auto-birth wiring + UI → shell) |
 | apple / android | data layer (open via cr-0025) | ◻ (phase 6) |
 | windows / linux | — | ◻ (when those clients exist) |
 

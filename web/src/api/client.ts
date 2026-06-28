@@ -11,6 +11,7 @@ import {
 } from './generated/auth'
 import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
 import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
+import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -44,4 +45,8 @@ export function accountWrapsApi(): AccountWrapsApi {
 
 export function tenantsApi(): TenantsApi {
   return new TenantsApi(new TenantsConfiguration(bearerParams()))
+}
+
+export function scopesApi(): ScopesApi {
+  return new ScopesApi(new ScopesConfiguration(bearerParams()))
 }
