@@ -12,6 +12,8 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.createPersonalScopeThenListReturnsBoth] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/ScopesTests.swift] }
+      android: { unit: [android/client/src/test/kotlin/com/veyq/client/ScopesTest.kt] }
   - id: switch-space-by-fragment
     text: A space's position is encoded in + resolved from the URL #fragment client-side (the blind server resolves no path).
     coverage:
@@ -26,5 +28,5 @@ acceptanceCriteria:
       backend: { integration: [ScopesSliceTest.unauthenticatedIs401] }
       http: { e2e: [http/spaces/scopes.http] }
 gaps:
-  apple: "Native space switcher UI not built — web-first shell (cr-0030/cr-0031)."
-  android: "Native space switcher UI not built — web-first shell (cr-0030/cr-0031)."
+  apple: "Scope data layer covered (ScopesTests); the tenant switcher (my-tenants) + per-space UI switching are web-first (cr-0031) — not built natively."
+  android: "Scope data layer covered (ScopesTest); the tenant switcher (my-tenants) + per-space UI switching are web-first (cr-0031) — not built natively."
