@@ -98,7 +98,9 @@ end note
 - **Cheap grants, scoped shares.** Adding a member = one wrap of the scope private key. A public share
   = one subtree content key wrapped to a per-share key. **Revoking a member = rotate the scope keypair**
   and re-wrap to the remaining members; already-read content cannot be retroactively pulled back (a
-  documented limitation).
+  documented limitation). The concrete per-Memory key model — `K_SC` (scope), `K_mem` (per Memory, the
+  random, many-wrapped **share grain**), `K_blob` (per blob) — is pinned in
+  [ADR 0012](../decisions/0012-content-key-hierarchy.md).
 - The identity private key is protected by the **Master Key**, itself wrapped **separately by each
   unlock method**. Adding or removing a method changes one wrap, never the content.
 
