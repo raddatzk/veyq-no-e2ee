@@ -45,6 +45,9 @@ mostly scope plumbing + the space switcher. Web-only (ADR 0010); native parity i
   (vendored `.sidebar-groups-section`); a **create-group** dialog; `@group` fragment resolution (open the group
   `K_SC`, switch the content host). · Done when: `npm run check` green + live: create a named group → it appears
   in GRUPPEN → switch in (`#@<slug>`) → browse its empty tree; `pathname` stays `/`.
+- [ ] 4 coverage — extend `uc.spaces.switch-spaces.yaml` with the group create/list criteria (backend
+  `…SliceTest` group-create/list refs + the web group data-layer test) + the `http/spaces/scopes.http` group
+  boundary. · Done when: `python3 scripts/validate_coverage.py` green.
 
 ## Definition of done
 
