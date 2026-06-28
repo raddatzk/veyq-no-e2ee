@@ -55,6 +55,7 @@ async function submit() {
       password.value = ''
       secretKey.value = ''
       pendingSecretKey = ''
+      await router.push({ name: 'home' })
       return
     }
     // Untrusted, or the device key/wrap is gone (E1) — show the password + Secret-Key floor.
@@ -91,6 +92,7 @@ async function unlock() {
     trustChecked.value = false
     password.value = ''
     secretKey.value = ''
+    await router.push({ name: 'home' })
   } catch {
     // Wrong password / Secret Key (or no wrap) — one generic failure. Keep the inputs for a retry.
     error.value = t('unlock.failed')

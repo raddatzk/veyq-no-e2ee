@@ -104,6 +104,26 @@ const en = {
     trustFailed: 'Couldn’t trust this device — you unlocked fine, but you’ll need your Secret Key next time.',
     untrust: 'Untrust this device',
   },
+  shell: {
+    appName: 'veyq',
+    personal: 'Personal',
+    logout: 'Sign out',
+  },
+  home: {
+    loading: 'Opening your space…',
+    empty: 'Your space is empty',
+    emptyHint: 'Create a folder or a Memory to begin.',
+    noTenant: 'No space found',
+    noTenantHint: 'This account isn’t part of a space on this instance yet.',
+    error: 'Could not open your space. Please try again.',
+  },
+  memory: {
+    memories: 'Memories',
+    folders: 'Folders',
+    memoryEmpty: 'No Memories here yet.',
+    folderEmpty: 'No folders here yet.',
+    detailComing: 'Photos and journal for this Memory arrive in a later update.',
+  },
 }
 
 const de: typeof en = {
@@ -205,6 +225,26 @@ const de: typeof en = {
     trustDeviceHint: 'Beim nächsten Mal entsperrst du auf diesem Gerät nur mit deinem Passwort — dein Secret Key bleibt im Kit.',
     trustFailed: 'Konnte diesem Gerät nicht vertrauen — entsperrt hat es geklappt, aber beim nächsten Mal brauchst du deinen Secret Key.',
     untrust: 'Vertrauen aufheben',
+  },
+  shell: {
+    appName: 'veyq',
+    personal: 'Persönlich',
+    logout: 'Abmelden',
+  },
+  home: {
+    loading: 'Dein Bereich wird geöffnet…',
+    empty: 'Dein Bereich ist leer',
+    emptyHint: 'Lege einen Ordner oder eine Erinnerung an, um zu beginnen.',
+    noTenant: 'Kein Bereich gefunden',
+    noTenantHint: 'Dieses Konto gehört auf dieser Instanz noch zu keinem Bereich.',
+    error: 'Dein Bereich konnte nicht geöffnet werden. Bitte versuche es erneut.',
+  },
+  memory: {
+    memories: 'Erinnerungen',
+    folders: 'Ordner',
+    memoryEmpty: 'Hier gibt es noch keine Erinnerungen.',
+    folderEmpty: 'Hier gibt es noch keine Ordner.',
+    detailComing: 'Fotos und Journal für diese Erinnerung kommen in einem späteren Update.',
   },
 }
 
