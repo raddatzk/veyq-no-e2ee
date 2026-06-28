@@ -1,7 +1,7 @@
 ---
 id: cr-0030
 title: Memory shell — personal-space tree browse (web)
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.memory.browse]
 adrs: [0012, 0010]
 invariants: [operator-blind]
@@ -62,17 +62,21 @@ tree shape are built **client-side** (the blind server computes no navigation).
   `renameNode` / `deleteNode`; refresh the level after a mutation; surface `slug_taken` / `illegal_structure`
   inline. **Done:** `npm run check` green; dialog tests assert the data-layer calls + the post-mutation
   refresh.
-- [ ] **5 — verify (browser smoke).** Against a live instance (owner seeded, a tenant with `domain = 127.0.0.1`,
-  member): **login → unlock → personal space → create folder → create Memory → drill in → rename → delete**,
-  decrypted names throughout. **Done:** the round-trip works in the browser; a short note (+ screenshots) under
-  `docs/design/screenshots/web/` if that surface exists, else recorded here. Web README documents the dev
-  tenant-domain (`127.0.0.1`).
+- [x] **5 — verify (browser smoke). DONE.** Live stack (MariaDB + `quarkusDev` + `seed-owner.mts` + a dev
+  tenant seeded with `domain = 127.0.0.1` + an OWNER membership + Vite): drove the full round-trip in the
+  browser — **login → unlock (personal scope auto-births) → browse → create folder + create Memory → drill in
+  → rename (persisted across reload) → delete (→ navigate to parent)**, all names decrypted on device, server
+  blind. Dev tenant-domain documented in [web/CLAUDE.md](../web/CLAUDE.md). **Bug found + fixed in the smoke:**
+  the create/rename/delete dialogs would not close — `defineModel('visible')` passed straight into PrimeVue
+  `Dialog`'s `v-model:visible` under a parent `v-if` didn't propagate the close; rewrote the dialogs to be
+  **mounted via `v-if` and closed by the parent on a `close` event** (no two-way `visible`), `npm run check`
+  green (90 tests).
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
 | Surface | Memory shell: personal-space browse + organize | Status |
 |---|---|---|
-| web | shell + tree browse + create/rename/delete | 🟦 P1–P4 done; P5 (live smoke) pending |
+| web | shell + tree browse + create/rename/delete | ✅ (P1–P5; live browser smoke green) |
 | apple / android | the native Memory shell | ◻ **deferred (web-first)** |
 | UI media | cover thumbnails in cards | ◻ **deferred (no derivatives yet)** |
 

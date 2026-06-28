@@ -2,7 +2,7 @@
 // Create a folder / create a Memory / rename a node (cr-0030 P4). Ported dialog shape; wired to the E2EE
 // tree data layer (names sealed under K_SC client-side). One dialog, three modes. Inline slug_taken (409) /
 // illegal_structure (422) errors.
-import { ref, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -12,7 +12,7 @@ import { createFolder, createMemory, renameNode, type TreeNode } from '../tree'
 
 type Mode = 'create-folder' | 'create-memory' | 'rename'
 
-const visible = defineModel<boolean>('visible', { required: true })
+// Mounted via v-if while open; closing = the parent unmounting it on `close` (robust — no two-way `visible`).
 const props = defineProps<{
   mode: Mode
   scopeId: string
@@ -20,10 +20,10 @@ const props = defineProps<{
   parentId?: string | null // create: the parent (null = root)
   node?: TreeNode | null // rename: the node being renamed
 }>()
-const emit = defineEmits<{ done: [] }>()
+const emit = defineEmits<{ done: []; close: [] }>()
 const { t } = useI18n()
 
-const name = ref('')
+const name = ref(props.mode === 'rename' ? (props.node?.name ?? '') : '')
 const error = ref('')
 const loading = ref(false)
 
@@ -36,17 +36,6 @@ const header = computed(() =>
 )
 const confirmLabel = computed(() => (props.mode === 'rename' ? t('memory.save') : t('common.create')))
 const canSubmit = computed(() => name.value.trim().length > 0 && !loading.value)
-
-watch(
-  visible,
-  (open) => {
-    if (open) {
-      error.value = ''
-      name.value = props.mode === 'rename' ? (props.node?.name ?? '') : ''
-    }
-  },
-  { immediate: true },
-)
 
 async function submit() {
   if (!canSubmit.value) return
@@ -61,8 +50,8 @@ async function submit() {
     } else if (props.node) {
       await renameNode(props.scopeId, props.scopeKey, { id: props.node.id, parentId: props.node.parentId }, trimmed)
     }
-    visible.value = false
     emit('done')
+    emit('close')
   } catch (e) {
     const status = (e as { response?: { status?: number } }).response?.status
     error.value = status === 409 ? t('memory.slugTaken') : status === 422 ? t('memory.illegalStructure') : t('memory.saveFailed')
@@ -73,7 +62,7 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="header" modal>
+  <Dialog :visible="true" :header="header" modal @update:visible="emit('close')">
     <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('memory.nameLabel') }}
@@ -81,7 +70,7 @@ async function submit() {
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="dialog-actions">
-        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="visible = false" />
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
         <Button type="submit" :label="confirmLabel" icon="pi pi-check" :loading="loading" :disabled="!canSubmit" />
       </div>
     </form>

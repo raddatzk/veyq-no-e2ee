@@ -22,7 +22,8 @@ const { t } = useI18n()
 
 const currentNodeId = computed(() => (typeof route.params.nodeId === 'string' ? route.params.nodeId : null))
 const level = computed(() => childrenOf(treeStore.nodes, currentNodeId.value))
-const scopeKey = computed(() => activeScopeKey())
+// Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
+const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
 // The folder we are currently inside (null at the root) — gives it a rename/delete header.
 const currentFolder = computed(() => {
   const node = nodeById(treeStore.nodes, currentNodeId.value)
@@ -122,21 +123,21 @@ async function onDeleteDone() {
     </template>
 
     <NodeMutationDialog
-      v-if="scopeKey && activeSpace.scopeId"
-      v-model:visible="mutationVisible"
+      v-if="mutationVisible && scopeKey && activeSpace.scopeId"
       :mode="mutationMode"
       :scope-id="activeSpace.scopeId"
       :scope-key="scopeKey"
       :parent-id="currentNodeId"
       :node="mutationNode"
       @done="onMutationDone"
+      @close="mutationVisible = false"
     />
     <DeleteNodeDialog
-      v-if="scopeKey && activeSpace.scopeId && deleteTarget"
-      v-model:visible="deleteVisible"
+      v-if="deleteVisible && scopeKey && activeSpace.scopeId && deleteTarget"
       :scope-id="activeSpace.scopeId"
       :node="deleteTarget"
       @done="onDeleteDone"
+      @close="deleteVisible = false"
     />
   </div>
 </template>

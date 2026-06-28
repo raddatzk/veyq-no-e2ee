@@ -41,7 +41,7 @@ const KEY = new Uint8Array(32).fill(7)
 
 function mountDialog(props: Record<string, unknown>) {
   return mount(NodeMutationDialog, {
-    props: { visible: true, scopeId: SCOPE, scopeKey: KEY, ...props } as never,
+    props: { scopeId: SCOPE, scopeKey: KEY, ...props } as never,
     global: { plugins: [i18n], stubs },
   })
 }
@@ -57,7 +57,7 @@ describe('NodeMutationDialog', () => {
 
     expect(createFolder).toHaveBeenCalledWith(SCOPE, KEY, 'Trips', 'parent-1')
     expect(wrapper.emitted('done')).toBeTruthy()
-    expect(wrapper.emitted('update:visible')?.at(-1)).toEqual([false])
+    expect(wrapper.emitted('close')).toBeTruthy()
   })
 
   it('create-memory at the root passes parentId null', async () => {

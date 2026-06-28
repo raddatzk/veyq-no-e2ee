@@ -7,6 +7,11 @@ here; the server is blind.
 - `npm run check` (typecheck + test + build).
 - API client is **generated**: `npm run generate:api` from `../contracts/api/*.openapi.yaml`. Never
   hand-write the client.
+- **Run the Memory shell locally (cr-0030):** `npm run dev` (Vite proxies `/api` → `127.0.0.1:8080` with
+  `changeOrigin`, so the backend sees `Host: 127.0.0.1`, port stripped). The shell needs the signed-in user to
+  belong to a tenant whose **`domain` is `127.0.0.1`** (the active tenant is resolved from the Host) — create
+  one with that domain, or seed it in dev. Then login → unlock auto-births the personal scope and the browse
+  renders. If no tenant claims the Host you get the *“no space”* state (expected).
 
 ## Conventions
 - **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from

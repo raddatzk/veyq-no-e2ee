@@ -18,7 +18,8 @@ const { t } = useI18n()
 
 const nodeId = computed(() => (typeof route.params.nodeId === 'string' ? route.params.nodeId : null))
 const memory = computed(() => nodeById(treeStore.nodes, nodeId.value))
-const scopeKey = computed(() => activeScopeKey())
+// Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
+const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
 
 const renameVisible = ref(false)
 const deleteVisible = ref(false)
@@ -67,20 +68,20 @@ async function onDeleted() {
     <p class="memory-view-note">{{ t('memory.detailComing') }}</p>
 
     <NodeMutationDialog
-      v-if="scopeKey && activeSpace.scopeId && memory"
-      v-model:visible="renameVisible"
+      v-if="renameVisible && scopeKey && activeSpace.scopeId && memory"
       mode="rename"
       :scope-id="activeSpace.scopeId"
       :scope-key="scopeKey"
       :node="memory"
       @done="onRenamed"
+      @close="renameVisible = false"
     />
     <DeleteNodeDialog
-      v-if="scopeKey && activeSpace.scopeId && memory"
-      v-model:visible="deleteVisible"
+      v-if="deleteVisible && scopeKey && activeSpace.scopeId && memory"
       :scope-id="activeSpace.scopeId"
       :node="memory"
       @done="onDeleted"
+      @close="deleteVisible = false"
     />
   </div>
 </template>
