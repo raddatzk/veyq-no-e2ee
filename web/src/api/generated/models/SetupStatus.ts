@@ -26,6 +26,13 @@ export interface SetupStatus {
      */
     setupRequired: boolean;
     /**
+     * Advisory blob-transport capability from the startup preflight (ADR 0013 §4): true when the configured object store can presign and its public route is reachable, false/absent when it cannot (e.g. the in-memory dev store). Clients use it to decide whether direct-to-store media upload is available; never blocks startup.
+     * 
+     * @type {boolean}
+     * @memberof SetupStatus
+     */
+    directTransport?: boolean | null;
+    /**
      * Crypto suite ids the server advertises (e.g. "v1").
      * @type {Array<string>}
      * @memberof SetupStatus
@@ -61,6 +68,7 @@ export function SetupStatusFromJSONTyped(json: any, ignoreDiscriminator: boolean
     return {
         
         'setupRequired': json['setupRequired'],
+        'directTransport': json['directTransport'] == null ? undefined : json['directTransport'],
         'suites': json['suites'],
         'instanceSalt': json['instanceSalt'],
     };
@@ -78,6 +86,7 @@ export function SetupStatusToJSONTyped(value?: SetupStatus | null, ignoreDiscrim
     return {
         
         'setupRequired': value['setupRequired'],
+        'directTransport': value['directTransport'],
         'suites': value['suites'],
         'instanceSalt': value['instanceSalt'],
     };

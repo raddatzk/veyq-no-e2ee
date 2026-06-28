@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
 
-defineProps<{ node: TreeNode }>()
-defineEmits<{ rename: []; delete: [] }>()
+defineProps<{ node: TreeNode; favorite?: boolean }>()
+defineEmits<{ toggleFavorite: []; rename: []; delete: [] }>()
 
 const { t } = useI18n()
 </script>
@@ -15,6 +15,14 @@ const { t } = useI18n()
   <div class="memory-route-surface memory-detail">
     <header class="memory-detail-header">
       <h1 class="memory-detail-title">{{ node.name }}</h1>
+      <Button
+        type="button"
+        :label="favorite ? t('memory.unfavorite') : t('memory.favorite')"
+        :icon="favorite ? 'pi pi-star-fill' : 'pi pi-star'"
+        :severity="favorite ? 'warn' : 'secondary'"
+        text
+        @click="$emit('toggleFavorite')"
+      />
       <Button
         type="button"
         :label="t('memory.rename')"

@@ -11,7 +11,13 @@ import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { listMyTenants } from '../../features/spaces/scopes'
 import { activeSpace } from '../../app/activeSpace'
+import { favoritesStore } from '../../app/favoritesStore'
 import { useThemeState } from '../../shared/state/useThemeState'
+import { treeStore } from '../../features/memory/treeStore'
+import { nodeById } from '../../features/memory/browse'
+import { hashForNode } from '../../features/memory/location'
+import { NodeKind } from '../../api/generated/content'
+import type { TreeNode } from '../../features/memory/tree'
 import type { MyTenant } from '../../api/generated/scopes'
 import ProfileMenu from './ProfileMenu.vue'
 
@@ -20,6 +26,14 @@ const { resolvedTheme } = useThemeState()
 const tenants = ref<MyTenant[]>([])
 
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
+
+// The pinned Memories, resolved against the local decrypted tree (a favorite whose node is gone just drops).
+const favoriteMemories = computed(() =>
+  [...favoritesStore.ids]
+    .map((id) => nodeById(treeStore.nodes, id))
+    .filter((n): n is TreeNode => !!n && n.kind === NodeKind.Memory)
+    .map((n) => ({ id: n.id, name: n.name, hash: hashForNode(treeStore.nodes, n.id) })),
+)
 
 onMounted(async () => {
   try {
@@ -91,6 +105,21 @@ function switchTenant(tenant: MyTenant) {
         <span>{{ t('shell.personal') }}</span>
       </RouterLink>
     </nav>
+
+    <section v-if="favoriteMemories.length" class="sidebar-section sidebar-favorites-section">
+      <div class="sidebar-section-heading">
+        <p class="sidebar-section-label">{{ t('shell.favorites') }}</p>
+      </div>
+      <RouterLink
+        v-for="memory in favoriteMemories"
+        :key="memory.id"
+        :to="{ name: 'home', hash: memory.hash }"
+        class="sidebar-scope-link sidebar-favorite-link"
+      >
+        <span class="sidebar-favorite-cover"><span class="pi pi-images" /></span>
+        <span><strong>{{ memory.name }}</strong></span>
+      </RouterLink>
+    </section>
 
     <section class="sidebar-section sidebar-profile">
       <ProfileMenu show-name />

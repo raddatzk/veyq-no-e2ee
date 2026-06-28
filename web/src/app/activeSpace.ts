@@ -5,6 +5,7 @@
 import { reactive } from 'vue'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../features/spaces/scopes'
 import { ScopeKind } from '../api/generated/scopes'
+import { clearFavorites } from './favoritesStore'
 
 export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
 
@@ -54,6 +55,7 @@ export function clearActiveSpace(): void {
   activeSpace.tenantId = null
   scopeKey?.fill(0)
   scopeKey = null
+  clearFavorites()
 }
 
 /** A 404 from the scope endpoints means no tenant claims this Host (`tenant_not_found`). */

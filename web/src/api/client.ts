@@ -12,7 +12,7 @@ import {
 import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
 import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
 import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
-import { ContentApi, Configuration as ContentConfiguration } from './generated/content'
+import { ContentApi, FavoritesApi, Configuration as ContentConfiguration } from './generated/content'
 import { MediaApi, Configuration as MediaConfiguration } from './generated/media'
 import { session } from '../app/session'
 
@@ -55,6 +55,10 @@ export function scopesApi(): ScopesApi {
 
 export function contentApi(): ContentApi {
   return new ContentApi(new ContentConfiguration(bearerParams()))
+}
+
+export function favoritesApi(): FavoritesApi {
+  return new FavoritesApi(new ContentConfiguration(bearerParams()))
 }
 
 export function mediaApi(): MediaApi {

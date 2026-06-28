@@ -20,6 +20,12 @@ tags:
     description: >
       The Memory tree under a scope (create / list / update / delete nodes). One tag = one resource interface
       owning the `/api/scopes/{scopeId}/nodes` subtree (distinct from the `/api/scopes` scopes resource).
+  - name: favorites
+    description: >
+      The caller's **per-(user, scope) favorites** — the set of pinned Memory ids, sealed client-side under
+      `K_SC` and stored as a single opaque blob (en.memory.favorites, cr-0031). Operator-blind: a favorite is a
+      personal preference, NOT in the sanctioned metadata set, so the server never sees *which* nodes are
+      pinned — only an opaque ciphertext + its size. Own resource interface (one path).
 
 paths:
   /api/scopes/{scopeId}/nodes:
@@ -170,6 +176,67 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
 
+  /api/scopes/{scopeId}/favorites:
+    get:
+      tags: [favorites]
+      operationId: getFavorites
+      summary: Get the caller's sealed favorites blob for the scope.
+      description: >
+        Returns the caller's own favorites ciphertext for the scope (the sealed set of pinned Memory ids), or a
+        null ciphertext if none was ever stored. The client decrypts it with `K_SC`; the operator sees only an
+        opaque blob.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+      responses:
+        "200":
+          description: The caller's favorites blob (ciphertext null when unset).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Favorites" }
+              example: { ciphertext: ZmF2b3JpdGVzLWNpcGhlcnRleHQ= }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope, or the caller holds no grant for it.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
+    put:
+      tags: [favorites]
+      operationId: putFavorites
+      summary: Replace the caller's sealed favorites blob for the scope.
+      description: >
+        Upserts the caller's favorites ciphertext for the scope (last-write-wins). The client seals the whole
+        pinned set under `K_SC` and PUTs the opaque result; the server stores it verbatim.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PutFavoritesRequest" }
+            example: { ciphertext: ZmF2b3JpdGVzLWNpcGhlcnRleHQ= }
+      responses:
+        "204":
+          description: The favorites blob was stored.
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope, or the caller holds no grant for it.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -303,6 +370,29 @@ components:
           maxLength: 256
           description: A MEMORY's `K_mem` wrapped under `K_SC`; null for folders.
           example: d3JhcHBlZC1rLW1lbQ==
+
+    Favorites:
+      type: object
+      required: [ciphertext]
+      properties:
+        ciphertext:
+          type: [string, "null"]
+          description: The caller's pinned-Memory set, AEAD-sealed under `K_SC` (opaque base64); null when unset.
+          contentEncoding: base64
+          maxLength: 65536
+          example: ZmF2b3JpdGVzLWNpcGhlcnRleHQ=
+
+    PutFavoritesRequest:
+      type: object
+      required: [ciphertext]
+      properties:
+        ciphertext:
+          type: string
+          description: The pinned-Memory set, AEAD-sealed under `K_SC` (opaque base64).
+          contentEncoding: base64
+          maxLength: 65536
+          example: ZmF2b3JpdGVzLWNpcGhlcnRleHQ=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 65536) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     ErrorResponse:
       type: object

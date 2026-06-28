@@ -1,12 +1,14 @@
-.openapi-generator-ignore
 apis/ContentApi.ts
+apis/FavoritesApi.ts
 apis/index.ts
 index.ts
 models/CreateNodeRequest.ts
 models/ErrorResponse.ts
+models/Favorites.ts
 models/NodeCreated.ts
 models/NodeKind.ts
 models/NodeSummary.ts
+models/PutFavoritesRequest.ts
 models/UpdateNodeRequest.ts
 models/index.ts
 runtime.ts

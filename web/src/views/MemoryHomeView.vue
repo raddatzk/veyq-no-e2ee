@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { activeSpace, activeScopeKey, enterPersonalSpace } from '../app/activeSpace'
 import { setBreadcrumb } from '../app/breadcrumb'
+import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
 import { treeStore, loadTree } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
@@ -51,8 +52,17 @@ watch(
 async function ready() {
   if (activeSpace.status !== 'ready') await enterPersonalSpace()
   if (activeSpace.status === 'ready' && !treeStore.loaded) await loadTree()
+  const key = activeScopeKey()
+  if (activeSpace.status === 'ready' && activeSpace.scopeId && key && !favoritesStore.loaded) {
+    await loadFavoritesFor(activeSpace.scopeId, key)
+  }
 }
 void ready()
+
+function onToggleFavorite(node: TreeNode) {
+  const key = activeScopeKey()
+  if (activeSpace.scopeId && key) void toggleFavorite(node.id, activeSpace.scopeId, key)
+}
 
 function openFolder(folder: TreeNode) {
   void router.push({ hash: hashForNode(treeStore.nodes, folder.id) })
@@ -100,6 +110,8 @@ async function onDeleteDone() {
       <MemoryDetail
         v-if="isMemory && currentNode"
         :node="currentNode"
+        :favorite="isFavorite(currentNode.id)"
+        @toggle-favorite="currentNode && onToggleFavorite(currentNode)"
         @rename="currentNode && startRename(currentNode)"
         @delete="currentNode && startDelete(currentNode)"
       />
