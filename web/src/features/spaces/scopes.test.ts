@@ -9,7 +9,7 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope } from './scopes'
+import { ensurePersonalScope, openPersonalScope, listMyTenants } from './scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
 import * as v1 from '../../shared/crypto/v1'
@@ -76,5 +76,15 @@ describe('openPersonalScope', () => {
   it('returns null when there is no personal scope', async () => {
     mockScopes(vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
     expect(await openPersonalScope()).toBeNull()
+  })
+})
+
+describe('listMyTenants', () => {
+  it('returns the caller’s tenants (membership metadata only) for the switcher', async () => {
+    const tenants = [{ tenantId: 't1', name: 'Fam', domain: '127.0.0.1', role: 'OWNER' }]
+    vi.mocked(scopesApi).mockReturnValue({
+      listMyTenants: vi.fn().mockResolvedValue(tenants),
+    } as unknown as ReturnType<typeof scopesApi>)
+    expect(await listMyTenants()).toEqual(tenants)
   })
 })

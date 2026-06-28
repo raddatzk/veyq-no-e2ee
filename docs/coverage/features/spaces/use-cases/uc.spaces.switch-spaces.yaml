@@ -6,6 +6,7 @@ acceptanceCriteria:
     text: The member's tenants are listed (name + domain + role); someone who belongs to none gets an empty list.
     coverage:
       backend: { integration: [ScopesSliceTest.listMyTenantsReturnsTheCallersTenants] }
+      web: { unit: [src/features/spaces/scopes.test.ts] }
       http: { e2e: [http/spaces/scopes.http] }
   - id: list-spaces
     text: GET /api/scopes lists the member's scopes in the active tenant (the TENANT root + their PERSONAL scope).
