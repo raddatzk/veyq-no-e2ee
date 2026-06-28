@@ -52,10 +52,11 @@ the data layer + backend).
   under a FOLDER, CHAPTER only inside a MEMORY, no cycle on move). **Done:** `./gradlew check` green;
   `NodesSliceTest` 6/6 (create-tree→list, slug-collision 409, chapter-at-root 422, non-member 404, unauth
   401, rename + delete-subtree; operator-blind: stored ciphertext/`wrappedContentKey` verbatim).
-- [ ] **4 — web.** Data layer in `features/memory/` (the generated content client + `tree.ts`): create folder/
-  Memory (encrypt name + slug under `K_SC`; Memory births `K_mem` wrapped under `K_SC`), list+decrypt the
-  tree, rename/move. **Done when:** `npm run check` green + a unit round-trip (create→list→decrypt name;
-  Memory `K_mem` wraps/opens) with real v1 crypto + mocked API.
+- [x] **4 — web.** `features/memory/tree.ts` (+ the `content` spec in `generate:api` + `contentApi()`):
+  `createFolder` / `createMemory` (seal name under `K_SC`, blinded `slugToken`, Memory births `K_mem` wrapped
+  under `K_SC`) / `listTree` (decrypt names) / `openMemory` (unwrap `K_mem`) / `renameNode` / `deleteNode`.
+  **Done:** `npm run check` green (73 tests; `tree.test.ts` round-trips name-seal + K_mem wrap/open + the slug
+  token = `v1.slugToken(K_SC, scopeId, slug)` with real v1 crypto + mocked API).
 - [ ] **5 — apple.** The same in `VeyqClient` (+ generated `ContentAPI` module). **Done when:** `swift test`
   green (create→list→decrypt round-trip) + iOS build.
 - [ ] **6 — android.** The same in `:client` (`"content"` added to the generator specs). **Done when:**
@@ -68,7 +69,7 @@ the data layer + backend).
 | contracts | `content.openapi.yaml` (nodes under a scope) | ✅ (phase 1) |
 | crypto (native) | `slug_token` ported apple + android | ✅ (phase 2) |
 | backend | `veyq_node` + guards + structural rules | ✅ (phase 3) |
-| web | data layer (encrypt names + slug + `K_mem`) | ◻ |
+| web | data layer (encrypt names + slug + `K_mem`) | ✅ (phase 4) |
 | apple / android | data layer (+ generated content client) | ◻ |
 | UI (all) | the tree UI | ◻ **deferred to the shell** |
 | windows / linux | — | ◻ (when those clients exist) |
