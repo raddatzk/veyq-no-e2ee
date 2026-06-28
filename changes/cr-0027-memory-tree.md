@@ -2,7 +2,7 @@
 id: cr-0027
 title: The Memory tree — encrypted folder/Memory nodes (names, blinded slugs, per-Memory K_mem)
 status: planned          # planned → in-progress → done (the file is kept as a record)
-satisfies: [uc.memory.tree]
+satisfies: [en.memory.tree]   # an enabler — the foundation the Memory use-cases build on
 adrs: [0012, 0009, 0002, 0007]
 invariants: [operator-blind]
 ---
@@ -19,7 +19,7 @@ the data layer + backend).
 
 ## Context & constraints
 
-- Use-case: [uc.memory.tree](../docs/features/memory/use-cases/uc.memory.tree.md); decision:
+- Enabler: [en.memory.tree](../docs/features/memory/enablers/en.memory.tree.md); decision:
   [ADR 0012](../docs/decisions/0012-content-key-hierarchy.md) (`K_SC` → `K_mem` (random, many-wrapped) →
   `K_blob`; folders keyless). Navigation contract: [scopes-and-tenancy](../docs/crosscutting/scopes-and-tenancy.md).
 - **`K_SC` already exists** — it is the **scope key from [cr-0026](cr-0026-personal-scope.md)** (a random

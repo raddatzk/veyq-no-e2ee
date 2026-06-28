@@ -19,13 +19,16 @@ tokens; it never sees a name or a content key.
 `scope key (grant) → K_SC` (per scope: names + slug + dedup) `→ K_mem` (per Memory, random: chapter/journal/
 media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). Folders carry no key.
 
-## Use-cases
+## Enablers
 
-- ★ [The Memory tree (create & organize folders and Memories)](use-cases/uc.memory.tree.md) — **refined**
-  (the first content slice: nodes, encrypted names, blinded slugs, per-Memory `K_mem` birth/open;
-  [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
-- Add media to a Memory — planned (uploads / `K_blob` + chunked AEAD; the uploads concern)
-- Memory journal — planned (markdown sealed under `K_mem`)
-- Places & tracks (map / GPX) — planned (sealed location under `K_mem`)
-- Share a Memory — planned (wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012)
-- Curate (rename / move / reorder / cover) — folded into the tree use-case for now; richer curation later
+- ★ [en.memory.tree](enablers/en.memory.tree.md) — **refined** (the encrypted node tree: FOLDER/MEMORY/CHAPTER,
+  encrypted names, blinded slugs, per-Memory `K_mem` birth/open — the substrate the use-cases below build on;
+  [ADR 0012](../../decisions/0012-content-key-hierarchy.md), [cr-0027](../../../changes/cr-0027-memory-tree.md))
+
+## Use-cases (planned, on the tree enabler)
+
+- Create & organize memories (folders, rename, move, cover) — the user-facing curation, with UI
+- Add media to a Memory — uploads / `K_blob` + chunked AEAD (the uploads concern)
+- Memory journal — markdown sealed under `K_mem`
+- Places & tracks (map / GPX) — sealed location under `K_mem`
+- Share a Memory — wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012

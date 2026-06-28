@@ -2,7 +2,7 @@
 id: cr-0026
 title: Personal scope — generalise scope identity (scopeId + kind) and birth/open a per-tenant personal space
 status: done             # planned → in-progress → done (the file is kept as a record)
-satisfies: [uc.spaces.personal-scope]   # authored in phase 1
+satisfies: [en.spaces.personal-scope]   # an enabler (reclassified 2026-06-28) — foundation for the Memory use-cases
 adrs: [0002, 0007, 0009, 0010]
 invariants: [operator-blind]
 ---
@@ -53,7 +53,7 @@ and the content slice.
 ## Phases
 
 - [x] **1 — state.** Authored the `spaces` feature (`docs/features/spaces/_index.md` +
-  `use-cases/uc.spaces.personal-scope.md`, Cockburn-lite + PlantUML birth/open sequence + EN/DE), reconciled
+  `enablers/en.spaces.personal-scope.md` — now an **enabler**, Cockburn-lite + PlantUML birth/open sequence), reconciled
   [scopes-and-tenancy](../docs/crosscutting/scopes-and-tenancy.md) (scope identity + personal scope realised)
   and added the [parity matrix](../docs/crosscutting/platform-parity.md) row. **Done:** docs exist, links
   resolve, `plantuml -checkonly` OK, design matches this CR.

@@ -1,14 +1,18 @@
-# UC: The Memory tree (create & organize folders and Memories)
+# Enabler: The Memory tree (encrypted folder/Memory nodes)
 
-- **ID:** uc.memory.tree
-- **Primary actor:** Account holder, **authenticated, unlocked, and holding a scope** (a grant → the scope
-  key → `K_SC`)
-- **Goal:** Create and organize the **encrypted tree** inside a scope — **folders** (organization only) and
-  **Memories** (the content unit, nested **Chapters**) — with **encrypted names**, **blinded slug tokens**
-  for permalinks, and a **per-Memory content key `K_mem`** born on creation. This first content slice covers
-  the **tree + names + keys only**; media (`K_blob`), journal and places are later slices.
+- **ID:** en.memory.tree
+- **Type:** **Enabler** — structural foundation, no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
+- **Provides:** the **encrypted node tree** inside a scope — **folders** (organization only) and **Memories**
+  (the content unit, nested **Chapters**) — with **encrypted names**, **blinded slug tokens** for permalinks,
+  and a **per-Memory content key `K_mem`** born on creation. Tree + names + keys only.
+- **Serves (use-cases):** the value-bearing [Memory](../_index.md) flows build on this — *add media*,
+  *journal*, *organize/curate*, *share a Memory* (all planned). Creating an empty named node is not itself a
+  user goal; it is the substrate those carry.
+- **Depends on:** [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (content lives
+  in a scope) → and through it `uc.account.unlock` (the identity + scope key).
 - **Preconditions:** An **unlocked** vault (identity → scope key → `K_SC` available for the active scope); a
-  scope to write in (e.g. the [personal scope](../../spaces/use-cases/uc.spaces.personal-scope.md)).
+  scope to write in (e.g. the [personal scope](../../spaces/enablers/en.spaces.personal-scope.md)).
 - **Postconditions (success):** The node exists server-side as opaque ciphertext (encrypted name, `parentId`,
   `kind`, ordering, `slugToken`); a **Memory** additionally has a fresh random **`K_mem`** wrapped under
   `K_SC`. The server learned **no name** and holds **no content key**.
@@ -86,18 +90,9 @@ note right of S : stores ciphertext + opaque tokens only — no name, no K_mem
 - **Scope of this slice.** Tree + names + `K_mem` only. **Media (`K_blob` + chunked AEAD), journal, places &
   tracks, sharing, and rich curation** are their own slices on top of this.
 
-## What this means for you / Was das für dich bedeutet
-
-**EN —** You organize your memories in folders and "Memories" (each can have chapters), just like albums and
-sub-albums — but the names and contents are encrypted on your device before they ever reach the server. The
-server only knows there *is* a tree of some shape; it can't read a single title. Each Memory gets its own key
-so that, later, you can share **one** memory with someone without handing over everything else.
-
-**DE —** Du organisierst deine Erinnerungen in Ordnern und „Memories" (jede kann Kapitel haben) — wie Alben
-und Unteralben, nur dass Namen und Inhalte schon auf deinem Gerät verschlüsselt werden, bevor sie je den
-Server erreichen. Der Server weiß nur, *dass* es einen Baum gibt; keinen einzigen Titel kann er lesen. Jede
-Memory bekommt einen eigenen Schlüssel, damit du später **eine** Erinnerung mit jemandem teilen kannst, ohne
-alles andere herzugeben.
+> **No end-user section.** As an enabler this has no standalone "what this means for you" story — its
+> end-user value surfaces through the use-cases it *serves* (add media / journal / organize / share), whose
+> bilingual sections carry the wiki text.
 
 ## Related
 
@@ -107,5 +102,6 @@ alles andere herzugeben.
   [Account & Key Model](../../../crosscutting/account-key-model.md)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`/`K_mem`/`K_blob`),
   [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned content crypto)
-- Related use-cases: [personal-scope](../../spaces/use-cases/uc.spaces.personal-scope.md) (where the first
-  tree lives), and the planned add-media / journal / share-a-Memory slices ([Memory feature](../_index.md))
+- Related: [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (the enabler this
+  builds on — where the first tree lives), and the planned add-media / journal / share-a-Memory use-cases
+  ([Memory feature](../_index.md)) this serves

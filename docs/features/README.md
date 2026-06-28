@@ -1,13 +1,38 @@
 # Features
 
-Product capabilities. Each feature is a folder with an overview (`_index.md`) and its **use-cases**
-underneath. The use-case is the unit of the trust chain *and* the single source for the end-user wiki.
+Product capabilities. Each feature is a folder with an overview (`_index.md`), its **use-cases**, and its
+**enablers**. A use-case is the unit of the trust chain *and* the single source for the end-user wiki; an
+enabler is shared foundation that several use-cases build on.
 
 ```
 features/<feature>/
-  _index.md                         # feature overview, scope, cross-cutting links
-  use-cases/uc.<feature>.<goal>.md  # one concrete flow each
+  _index.md                          # feature overview, scope, cross-cutting links
+  use-cases/uc.<feature>.<goal>.md   # one concrete user-facing flow each
+  enablers/en.<feature>.<name>.md    # shared foundation (no standalone end-user goal)
 ```
+
+## Use-case vs enabler vs ADR vs change-request
+
+Four different kinds of record — keep them distinct:
+
+| | **Use-case (`uc.`)** | **Enabler (`en.`)** | **ADR (`docs/decisions/`)** | **Change-request (`changes/`)** |
+|---|---|---|---|---|
+| Answers | *What can a user **do**?* | *What foundation makes use-cases possible?* | *Why did we **decide** it this way?* | *How/when do we **build** it?* |
+| Nature | end-user-visible goal (perceived value) | structural/infra; value only **through** the use-cases it serves | a settled choice + its rejected alternatives | a phased **work order** + acceptance |
+| Durable state? | yes (durable truth) | yes (durable truth) | yes (durable truth) | **a record** of work, not state — links to the truth, never copies it |
+| Wiki source? | **yes** (the bilingual section) | **no** end-user section | no | no |
+| Test/trust-chain unit? | yes | yes (still verified) | no (a rationale, not a flow) | no — it *produces* the tested `uc.`/`en.` |
+| Example | log in, set device security, share a Memory | `en.spaces.personal-scope`, `en.memory.tree` | unlock methods (ADR 0005), content-key hierarchy (ADR 0012) | cr-0026 (builds `en.spaces.personal-scope`), cr-0027 (builds `en.memory.tree`) |
+
+**Litmus for UC vs enabler:** does the user have a conscious goal with perceived value from *this* step
+alone (UC), or is it the substrate another flow needs (enabler)? An empty per-tenant scope or an empty named
+folder is an enabler; "log in" or "share this Memory" is a use-case. When in doubt it is an enabler — promote
+it to a use-case only when it stands on its own for a user.
+
+**How they connect:** an **enabler** lists **Serves (use-cases)**; a **use-case** (or enabler) lists
+**Depends on** the enablers it builds on; a **change-request** `satisfies:` a `uc.` *or* an `en.` and lists
+the `adrs:` it touches; an **ADR** is referenced by the CRs and the uc/en it shapes. The durable truth lives
+in uc/en + ADRs; the CR is the kept work-order trail beside it (see [`changes/README`](../../changes/README.md)).
 
 ## Use-case format (Cockburn-lite)
 
@@ -39,6 +64,14 @@ Actors, cross-cutting concepts, decisions (ADRs), related use-cases.
 
 The bilingual section is the **single source** behind `wiki/` (a Python generator assembles the wiki
 from it later — deferred under start-light; author the section now so it's free then).
+
+## Enabler format
+
+Like the use-case format, but: **`# Enabler: <Title>`**, **`ID: en.<feature>.<name>`**, a **Type: Enabler**
+line, **Provides** (what foundation it gives) + **Serves (use-cases)** + **Depends on** (the enablers/UCs it
+builds on) instead of a single Goal, the same Main-flow / exceptions / quality notes — and **no
+"What this means for you" section** (an enabler has no standalone end-user story; its value surfaces through
+the use-cases it serves). Keep a short note saying so where that section would be.
 
 **Diagrams.** Illustrate flows with inline PlantUML where it clarifies — typically a **sequence
 diagram** for the main flow and a **state machine** for lifecycle/state, as diagrams-as-code (see

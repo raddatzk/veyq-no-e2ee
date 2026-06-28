@@ -1,10 +1,17 @@
-# UC: Personal scope (your private space, per tenant)
+# Enabler: Personal scope (your private space, per tenant)
 
-- **ID:** uc.spaces.personal-scope
-- **Primary actor:** Account holder, **authenticated and unlocked**, in a tenant context
-- **Goal:** Have a **per-tenant personal space** — a PERSONAL scope that **exists and can be opened on this
-  device**, with **no other key-holder** ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)).
-  No content (folders / memories) yet — this use-case is only the scope itself.
+- **ID:** en.spaces.personal-scope
+- **Type:** **Enabler** — structural foundation, no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)). It is
+  auto-born and opens silently; "your private space" only delivers value once content lives in it.
+- **Provides:** a **per-tenant PERSONAL scope** that **exists and can be opened on this device**, with **no
+  other key-holder** ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)) — the keyed container
+  the content flows fill. No content (folders / memories) here — only the scope itself.
+- **Serves (use-cases/enablers):** [en.memory.tree](../../memory/enablers/en.memory.tree.md) and the planned
+  [Memory](../../memory/_index.md) use-cases (add media / journal / **share a Memory**) — all need a scope to
+  live in. Generalising scope identity (scopeId + kind) here also unblocks **groups**.
+- **Depends on:** `uc.account.unlock` (the identity that seals/opens the grant) +
+  [uc.admin.create-tenant](../../admin/use-cases/uc.admin.create-tenant.md) (the tenant it lives within).
 - **Preconditions:** An **authenticated, unlocked** session (the identity **private** bundle is in the
   in-memory vault, so the client can seal/open a grant); a tenant resolved from the request `Host`.
 - **Postconditions (success):** A `kind=PERSONAL` scope exists for this `(user, tenant)` with the member's
@@ -90,21 +97,10 @@ note right of C : server only ever saw ciphertext + the scope row
 - **Auth ≠ content.** Holding a session does not open the scope; only the identity-unwrapped grant yields the
   scope key (client-enforced confidentiality, [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md)).
 
-## What this means for you / Was das für dich bedeutet
-
-**EN —** Inside each space you belong to (e.g. a family server), you automatically get your **own private
-area** that only you can open — your personal space. The key to it is created on your device and locked to
-your identity; the server only ever stores a scrambled, locked copy it can't open. Nobody else — not other
-members, not the server operator — can see into it unless you choose to share. You get a separate private
-area per server you join, so a private memory you later share always stays on the right server's address.
-
-**DE —** In jedem Bereich, zu dem du gehörst (z. B. ein Familien-Server), bekommst du automatisch deinen
-**eigenen privaten Bereich**, den nur du öffnen kannst — deinen persönlichen Space. Der Schlüssel dazu wird
-auf deinem Gerät erzeugt und an deine Identität gebunden; der Server speichert nur eine verschlüsselte,
-verschlossene Kopie, die er nicht öffnen kann. Niemand sonst — weder andere Mitglieder noch der
-Server-Betreiber — kann hineinsehen, solange du nicht teilst. Du bekommst pro Server, dem du beitrittst,
-einen eigenen privaten Bereich, damit eine später geteilte private Erinnerung immer unter der richtigen
-Server-Adresse bleibt.
+> **No end-user section.** As an enabler this has no standalone "what this means for you" story — the
+> private-space promise reaches the user through the [Memory](../../memory/_index.md) use-cases it serves
+> (their bilingual sections carry the wiki text). The plain-language "your data is safe" angle lives in the
+> [security wiki](../../../../wiki) safety pages.
 
 ## Related
 

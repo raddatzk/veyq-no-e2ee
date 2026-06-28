@@ -31,8 +31,8 @@ independent and may legitimately disagree.
 | [uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md) — Per-device unlock-level chooser | N/A | N/A | ◻ | ✅ | ✅ |
 | [uc.account.biometric-unlock](../features/account/use-cases/uc.account.biometric-unlock.md) — Biometric unlock (L2, biometric-gated key) | N/A | N/A | **N/A** | ✅ | ✅ |
 | [uc.account.auto-unlock](../features/account/use-cases/uc.account.auto-unlock.md) — Auto unlock (L3, no login) | N/A | N/A | ◻ | ✅ | ✅ |
-| [uc.spaces.personal-scope](../features/spaces/use-cases/uc.spaces.personal-scope.md) — Personal scope (birth + open, per tenant) | ✅ | **N/A** | ✅ | ✅ | ✅ |
-| [uc.memory.tree](../features/memory/use-cases/uc.memory.tree.md) — The Memory tree (folders/Memories, encrypted names, per-Memory key) | ◻ | ◻ | ◻ | ◻ | ◻ |
+| [en.spaces.personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md) — *(enabler)* Personal scope (birth + open, per tenant) | ✅ | **N/A** | ✅ | ✅ | ✅ |
+| [en.memory.tree](../features/memory/enablers/en.memory.tree.md) — *(enabler)* The Memory tree (folders/Memories, encrypted names, per-Memory key) | ◻ | ◻ | ◻ | ◻ | ◻ |
 
 ### Intentional N/A
 

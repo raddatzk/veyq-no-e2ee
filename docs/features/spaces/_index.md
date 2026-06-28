@@ -17,10 +17,14 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   ([cr-0010](../../../changes/cr-0010-tenant-activation.md)); this feature adds the **personal** scope and the
   general scope-identity model.
 
-## Use-cases
+## Enablers
 
-- ★ [Personal scope (your private space, per tenant)](use-cases/uc.spaces.personal-scope.md) — **refined**
-  (PERSONAL scope born + opened, client-driven & operator-blind; [cr-0026](../../../changes/cr-0026-personal-scope.md))
+- ★ [en.spaces.personal-scope](enablers/en.spaces.personal-scope.md) — **built** (the per-tenant PERSONAL
+  scope born + opened, client-driven & operator-blind; the keyed container the content flows fill;
+  [cr-0026](../../../changes/cr-0026-personal-scope.md))
+
+## Use-cases (planned)
+
 - Create / join a group — planned (GROUP scope; invite-wrap onboarding)
 - List & switch spaces — planned (the shell's space switcher over `GET /api/scopes`)
 - Public share of a subtree — planned (per-share key; least-privilege; the sharing feature)

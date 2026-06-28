@@ -85,5 +85,5 @@ holds `K_SC`, `K_mem`, `K_blob`, or any name.
 - [ADR 0002](0002-personal-scope-per-tenant.md), [ADR 0005](0005-unlock-methods-and-device-trust.md)
   (one-key-many-wraps), [ADR 0009](0009-native-crypto-per-platform-vectors.md) (vectors are the byte
   contract).
-- Feature: [Memory](../features/memory/_index.md); first use-case
-  [uc.memory.tree](../features/memory/use-cases/uc.memory.tree.md). Implementation: a later content CR.
+- Feature: [Memory](../features/memory/_index.md); the foundation enabler
+  [en.memory.tree](../features/memory/enablers/en.memory.tree.md). Implementation: [cr-0027](../../changes/cr-0027-memory-tree.md).
