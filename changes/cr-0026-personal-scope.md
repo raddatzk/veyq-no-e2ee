@@ -1,7 +1,7 @@
 ---
 id: cr-0026
 title: Personal scope — generalise scope identity (scopeId + kind) and birth/open a per-tenant personal space
-status: in-progress      # planned → in-progress → done (the file is kept as a record)
+status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.spaces.personal-scope]   # authored in phase 1
 adrs: [0002, 0007, 0009, 0010]
 invariants: [operator-blind]
@@ -84,10 +84,13 @@ and the content slice.
   `scopes.test.ts` round-trips birth→open with real v1 crypto + mocked API/vault). *Auto-birth call (after
   unlock) + a UI indicator are deferred to the shell — the current web has no home/content UI, and calling
   it on unlock would 404 on dev-localhost until the Host→tenant dev fallback lands.*
-- [ ] **6 — apple + android.** The same in each `VeyqClient` (`listMyScopes`/`createPersonalScope`/`openScope`
-  via the cr-0025 `asymUnwrap`; a `ScopeVault` holding the opened key). **Done when:** `swift test` +
-  `:client:test` green (round-trip: birth → fresh client → open → recovers the scope key); apple iOS +
-  android `:app` build.
+- [x] **6 — apple + android.** Each `VeyqClient` gains `listMyScopes` / `ensurePersonalScope` (auto-birth,
+  operator-blind) / `openPersonalScope` (open via the cr-0025 `asymUnwrap` from the vaulted identity bundle).
+  Apple: new `ScopesAPI` SPM module (target + symlinked spec + re-export). Android: `"scopes"` added to the
+  `:client` generator `specs`. **Done:** `swift test` 59 (3 live-skip) + `:client:test` green — both with a
+  birth→open round-trip recovering the exact scope key with the real hybrid KEM; iOS `xcodebuild` +
+  android `:app:assembleDebug` BUILD SUCCEEDED. *(Returns the opened key to the caller — no `ScopeVault`
+  yet, matching web; holding it is the shell's job.)*
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
@@ -97,13 +100,19 @@ and the content slice.
 | backend | scope identity + create/list + backfill | ✅ (phase 3) |
 | http | guards via ScopesSliceTest; happy-path via web/native e2e | **N/A** (phase 4) |
 | web | data layer (create/list/open) | ✅ (phase 5; auto-birth wiring + UI → shell) |
-| apple / android | data layer (open via cr-0025) | ◻ (phase 6) |
+| apple / android | data layer (open via cr-0025) | ✅ (phase 6) |
 | windows / linux | — | ◻ (when those clients exist) |
 
 ## Definition of done
 
 Every member can have a per-tenant personal scope: scope identity is generalised (`scopeId` + `kind`), the
 client births it operator-blind (server stores only the ciphertext grant + scope row) and opens it on
-web·apple·android, `GET /api/scopes` lists it, the existing owner is covered by auto-birth, and all suites
-are green. Content (folders/memories) inside it is the next slice. Then refine whether the first content
-lands in the personal or tenant scope.
+web·apple·android (`GET /api/scopes` lists it), and all suites are green — backend `./gradlew check`, web
+`npm run check`, apple `swift test` + iOS build, android `:client:test` + `:app` build; each native suite
+round-trips birth→open recovering the exact scope key with the real hybrid KEM.
+
+**Done as the scope *layer*.** Follow-ups, owned by the shell/UI work (not this CR): wiring the auto-birth
+**call** after unlock + a UI indicator (no home/content UI exists yet), the **Host→tenant dev-localhost
+fallback** (so auto-birth doesn't 404 in dev), and a `ScopeVault` to hold the opened key. Content
+(folders/memories) inside the scope is the next slice — then refine whether the first content lands in the
+personal or tenant scope.

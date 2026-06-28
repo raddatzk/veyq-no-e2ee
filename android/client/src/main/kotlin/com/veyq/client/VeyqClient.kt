@@ -11,6 +11,10 @@ import com.veyq.api.auth.api.TokenApi
 import com.veyq.api.auth.model.LoginChallengeRequest
 import com.veyq.api.auth.model.LoginVerifyRequest
 import com.veyq.api.auth.model.RefreshRequest
+import com.veyq.api.scopes.api.ScopesApi
+import com.veyq.api.scopes.model.CreatePersonalScopeRequest
+import com.veyq.api.scopes.model.ScopeKind
+import com.veyq.api.scopes.model.ScopeSummary
 import com.veyq.api.setup.api.SetupApi
 import com.veyq.crypto.V1
 import okhttp3.OkHttpClient
@@ -18,6 +22,7 @@ import java.security.SecureRandom
 import java.util.Base64
 import com.veyq.api.account.infrastructure.ClientException as AccountClientException
 import com.veyq.api.auth.infrastructure.ClientException as AuthClientException
+import com.veyq.api.scopes.infrastructure.ClientException as ScopesClientException
 
 /**
  * The operator-blind login + unlock data layer — the Android twin of Apple's `VeyqClient` and the web
@@ -43,6 +48,7 @@ class VeyqClient(
     private val sessions = SessionApi(instance.baseUrl, client)
     private val account = AccountApi(instance.baseUrl, client)
     private val accountWraps = AccountWrapsApi(instance.baseUrl, client)
+    private val scopes = ScopesApi(instance.baseUrl, client)
 
     /**
      * Whether this instance still needs first-run setup. Native never bootstraps (setup is browser-only),
@@ -349,6 +355,67 @@ class VeyqClient(
         if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) return false
         if (!resumeSession(email, k)) return false
         return unlockWithKey(email, k)
+    }
+
+    // --- Personal scope (cr-0026, uc.spaces.personal-scope) ---
+
+    /** The caller's scopes in the active tenant (each with the caller's own ciphertext grant). */
+    fun listMyScopes(): List<ScopeSummary> = withRefresh { fetchScopes() }
+
+    /**
+     * Ensure this member has a PERSONAL scope in the active tenant — auto-birth, operator-blind: generate the
+     * scope key, seal it to our **own** identity, and POST only the ciphertext grant. No-op if one already
+     * exists. Returns whether a scope was created. Needs an unlocked vault (the identity bundle).
+     */
+    fun ensurePersonalScope(): Boolean {
+        if (listMyScopes().any { it.kind == ScopeKind.PERSONAL }) return false
+        val idBytes = vault.identityPrivateKey() ?: throw VeyqError.UnlockUnavailable
+        val priv = V1.deserializeIdentityPrivate(idBytes)
+        val scopeKey = randomBytes(32)
+        try {
+            val grant = b64encode(V1.asymWrap(V1.hybridPublic(priv), scopeKey, "scope-grant", randomBytes(12)))
+            withRefresh { postPersonalScope(grant) }
+            return true
+        } finally {
+            scopeKey.fill(0); priv.kemX.fill(0); priv.mlkemSeed.fill(0); priv.sign.fill(0)
+        }
+    }
+
+    /**
+     * Open the member's personal scope → the in-memory scope key (asymUnwrap our **own** grant with the
+     * vaulted identity), or null when there is none / the vault is locked.
+     */
+    fun openPersonalScope(): ByteArray? {
+        val idBytes = vault.identityPrivateKey() ?: return null
+        val priv = V1.deserializeIdentityPrivate(idBytes)
+        try {
+            val personal = listMyScopes().firstOrNull { it.kind == ScopeKind.PERSONAL } ?: return null
+            return V1.asymUnwrap(V1.hybridSecret(priv), V1.hybridPublic(priv), b64decode(personal.wrappedGrant), "scope-grant")
+        } finally {
+            priv.kemX.fill(0); priv.mlkemSeed.fill(0); priv.sign.fill(0)
+        }
+    }
+
+    /** GET the caller's scopes. 401 → [VeyqError.SessionExpired] so [withRefresh] rotates-and-retries. */
+    private fun fetchScopes(): List<ScopeSummary> = try {
+        scopes.listMyScopes()
+    } catch (e: ScopesClientException) {
+        throw if (e.statusCode == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(e.statusCode)
+    }
+
+    /** POST the personal-scope grant (opaque ciphertext). 409 → already exists, 404 → no tenant context. */
+    private fun postPersonalScope(grant: String) {
+        try {
+            scopes.createPersonalScope(CreatePersonalScopeRequest(wrappedGrant = grant))
+        } catch (e: ScopesClientException) {
+            throw when (e.statusCode) {
+                409 -> VeyqError.PersonalScopeExists
+                404 -> VeyqError.ScopeTenantUnavailable
+                401 -> VeyqError.SessionExpired
+                400 -> VeyqError.InvalidRequest(null)
+                else -> VeyqError.UnexpectedStatus(e.statusCode)
+            }
+        }
     }
 
     /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates

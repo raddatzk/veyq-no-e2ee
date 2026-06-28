@@ -39,4 +39,10 @@ sealed class VeyqError(message: String? = null) : Exception(message) {
 
     /** The server answered with a status the contract does not document. */
     data class UnexpectedStatus(val status: Int) : VeyqError("unexpected status $status")
+
+    /** The active tenant could not be resolved (no Host match) — scope ops need a tenant context (cr-0026). */
+    object ScopeTenantUnavailable : VeyqError("scope tenant unavailable")
+
+    /** A personal scope already exists for this member in this tenant (one per tenant, cr-0026). */
+    object PersonalScopeExists : VeyqError("personal scope exists")
 }
