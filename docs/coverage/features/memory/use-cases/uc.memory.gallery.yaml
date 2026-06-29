@@ -3,25 +3,29 @@ feature: memory
 title: Open a Memory & browse its gallery
 status: planned
 # The gallery UI is not built on any surface yet, so this stays `planned`. But the three-tier data layer it
-# rides on — en.memory.derivatives (cr-0045): on-device thumbnail/preview generation + role-tagged read-back —
-# now has real web + backend tests, so the data-path criteria carry coverage while the UI render stays a gap
-# (the same shape uc.memory.browse uses: logic covered, the live UI round-trip still pending).
+# rides on — en.memory.derivatives (cr-0045 web, cr-0047 apple): on-device thumbnail/preview generation +
+# role-tagged read-back — now has real web + apple + backend tests, so the data-path criteria carry coverage
+# while the UI render stays a gap (the same shape uc.memory.browse uses: logic covered, the live UI round-trip
+# still pending). Android stays a gap until its slice (cr-0048).
 acceptanceCriteria:
   - id: thumbnail-grid
     text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem).
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
       web: { unit: [src/features/memory/media.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
   - id: lightbox-preview
     text: Opening an item shows its preview (not the multi-MB original) full-view, with prev/next paging the grid order.
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
       web: { unit: [src/features/memory/media.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
   - id: download-original
     text: An explicit download fetches the pristine, full-resolution original (the only byte-identical copy).
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip], e2e: [BlobBatchE2ETest.uploadThenDownloadRoundTripsBytes] }
       web: { unit: [src/features/memory/media.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
   - id: favorite-toggle
     text: The header toggle pins/unpins the Memory (operator-blind, via en.memory.favorites).
   - id: operator-blind-fetch
@@ -29,7 +33,8 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
       web: { unit: [src/features/memory/media.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
 gaps:
   web: "Data layer covered (cr-0045): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested with a stubbed deriver, plus a manual live Canvas/<video> round-trip. The remaining gap is the gallery grid/lightbox UI itself (uc.memory.gallery render) — its own CR."
-  apple: "Planned — native derivatives + detail-view parity after web (their own CRs); the shell open-hook exists (cr-0034), neither the deriver nor the detail view does."
+  apple: "Data layer covered (cr-0047): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) via the native ImageIO/AVFoundation deriver + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested with a stubbed deriver, plus a manual live ImageIO/AVFoundation round-trip. The remaining gap is the gallery grid/lightbox detail UI itself (cr-0034 shell open-hook exists; the detail view is its own CR)."
   android: "Planned — native derivatives + detail-view parity after web (their own CRs); the shell open-hook exists (cr-0039), neither the deriver nor the detail view does."

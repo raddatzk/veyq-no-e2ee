@@ -633,67 +633,130 @@ public final class VeyqClient: Sendable {
     /// Plaintext bytes per chunk before sealing (each frame adds a 12-byte nonce + a 16-byte tag).
     public static let chunkSize = 256 * 1024
 
-    /// A node's media for read-back: the blob id + the metadata needed to open it.
-    public struct MediaItem: Sendable, Equatable {
-        public let mediaId: String
+    /// Everything needed to open one blob: its id + the metadata + the `K_blob` wrap (under `K_mem`).
+    public struct BlobRef: Sendable, Equatable {
         public let blobId: String
         public let chunkCount: Int
         public let byteSize: Int
         public let wrappedBlobKey: Data
     }
 
-    /// Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`), upload the
-    /// ciphertext chunks direct-to-store via presigned PUTs, and attach the result to `nodeId` (a
-    /// MEMORY/CHAPTER). Returns the new ids. Operator-blind: bytes never touch the backend.
+    /// One role-tagged derivative tier (THUMBNAIL/PREVIEW) of a media — its own blob with its own wrap.
+    public struct MediaDerivative: Sendable, Equatable {
+        public let kind: MediaAPI.Components.Schemas.MediaDerivativeKind
+        public let ref: BlobRef
+    }
+
+    /// Which tier of a media to fetch — grid (thumbnail), lightbox (preview), or the pristine original.
+    public enum MediaTier: Sendable { case grid, lightbox, original }
+
+    /// A node's media for read-back: the **original** blob ref + its role-tagged derivative tiers. A gallery
+    /// fetches `grid` (thumbnail) for the grid, `lightbox` (preview) for the lightbox, and `original` only on
+    /// download — never pulling the full original to render a grid (en.memory.derivatives).
+    public struct MediaItem: Sendable, Equatable {
+        public let mediaId: String
+        public let original: BlobRef
+        public let derivatives: [MediaDerivative]
+
+        /// Grid tier (small): the thumbnail derivative, or the original when a media has none.
+        public var gridRef: BlobRef { derivatives.first { $0.kind == .THUMBNAIL }?.ref ?? original }
+        /// Lightbox tier (medium): the preview derivative, or the original when a media has none.
+        public var lightboxRef: BlobRef { derivatives.first { $0.kind == .PREVIEW }?.ref ?? original }
+        /// Download tier: always the pristine original.
+        public var downloadRef: BlobRef { original }
+
+        func ref(for tier: MediaTier) -> BlobRef {
+            switch tier {
+            case .grid: return gridRef
+            case .lightbox: return lightboxRef
+            case .original: return downloadRef
+            }
+        }
+    }
+
+    /// A blob sealed and ready to upload: the wrap + the ciphertext frames + the declared shape.
+    struct SealedBlob {
+        let wrappedBlobKey: Data
+        let frames: [Data]
+        var chunkCount: Int { frames.count }
+        var byteSize: Int { frames.reduce(0) { $0 + $1.count } }
+    }
+
+    /// Generate the original + its role-tagged derivatives, seal **each under its own** fresh random `K_blob`
+    /// (wrapped under `K_mem`), upload all ciphertext chunks direct-to-store in **one batch**, and attach the
+    /// result to `nodeId` (a MEMORY/CHAPTER) as one role-tagged media. For an image the deriver produces a
+    /// thumbnail + preview downscale; for a video, one first-frame poster reused for both tiers; any other
+    /// type attaches the original only (the gallery falls back to an icon). `deriver` is injectable
+    /// (defaulting to the native ImageIO/AVFoundation one) so the wiring is unit-testable. Returns the
+    /// **original**'s ids. Operator-blind: bytes never touch the backend.
     @discardableResult
-    public func addMedia(scopeId: String, nodeId: String, memoryKey: Data, data: Data) async throws -> (blobId: String, mediaId: String) {
-        let blobKey = secureRandomBytes(32)
-        let wrappedBlobKey = V1.symWrap(kek: memoryKey, targetKey: blobKey, context: Self.kblobCtx, nonce: secureRandomBytes(12))
+    public func addMedia(
+        scopeId: String, nodeId: String, memoryKey: Data, data: Data, mediaType: String,
+        deriver: any MediaDeriver = NativeMediaDeriver()
+    ) async throws -> (blobId: String, mediaId: String) {
+        let tiers = try await Self.deriveTiers(data: data, mediaType: mediaType, deriver: deriver)
+        // index 0 = original; the rest are the role-tagged derivatives, in order
+        let sealedTiers = tiers.map { (kind: $0.kind, sealed: Self.sealBlob(memoryKey: memoryKey, data: $0.bytes)) }
+        let sealedAll = [Self.sealBlob(memoryKey: memoryKey, data: data)] + sealedTiers.map { $0.sealed }
 
-        let chunks = Self.chunkify(data)
-        let total = chunks.count
-        let frames = chunks.enumerated().map { i, chunk in
-            V1.sealFrame(contentKey: blobKey, index: i, total: total, plaintext: chunk, nonce: secureRandomBytes(12))
+        // start — reserve one upload session + presign one PUT per chunk, per blob
+        let started = try await withRefresh { try await self.startUploads(scopeId, blobs: sealedAll) }
+        guard started.count == sealedAll.count else { throw VeyqError.mediaItemFailed(nil) }
+
+        var uploadIds: [String] = []
+        for (i, result) in started.enumerated() {
+            if let err = result.error { throw VeyqError.mediaItemFailed(err) }
+            guard let uploadId = result.uploadId, let puts = result.presignedPuts else { throw VeyqError.storeUnavailable }
+            uploadIds.append(uploadId)
+            // PUT each sealed frame of this blob straight to the store
+            for ref in puts.sorted(by: { $0.index < $1.index }) {
+                guard let url = URL(string: ref.url) else { throw VeyqError.blobTransferFailed }
+                try await blobTransport.put(url, sealedAll[i].frames[Int(ref.index)])
+            }
         }
-        let byteSize = frames.reduce(0) { $0 + $1.count }
 
-        // start — reserve the session + presign one PUT per chunk
-        let started = try await withRefresh {
-            try await self.startUploads(scopeId, chunkCount: frames.count, byteSize: byteSize, wrappedBlobKey: wrappedBlobKey)
+        // complete — one logical media: the original upload + its role-tagged derivative uploads. The backend
+        // stats every blob's objects (declare-then-verify) and attaches the media atomically.
+        let originalUploadId = uploadIds[0]
+        let derivatives = zip(sealedTiers, uploadIds.dropFirst()).map { (kind: $0.0.kind, uploadId: $0.1) }
+        let done = try await withRefresh {
+            try await self.completeMedia(scopeId, originalUploadId: originalUploadId, nodeId: nodeId, derivatives: derivatives)
         }
-        guard let up = started.first else { throw VeyqError.mediaItemFailed(nil) }
-        if let err = up.error { throw VeyqError.mediaItemFailed(err) }
-        guard let uploadId = up.uploadId, let puts = up.presignedPuts else { throw VeyqError.storeUnavailable }
-
-        // PUT each sealed frame straight to the store
-        for ref in puts.sorted(by: { $0.index < $1.index }) {
-            guard let url = URL(string: ref.url) else { throw VeyqError.blobTransferFailed }
-            try await blobTransport.put(url, frames[Int(ref.index)])
-        }
-
-        // complete — the backend stats the objects (declare-then-verify) and attaches the media
-        let done = try await withRefresh { try await self.completeMedia(scopeId, uploadId: uploadId, nodeId: nodeId) }
         guard let m = done.first else { throw VeyqError.mediaItemFailed(nil) }
         if let err = m.error { throw VeyqError.mediaItemFailed(err) }
         guard let blobId = m.blobId, let mediaId = m.mediaId else { throw VeyqError.mediaItemFailed(nil) }
         return (blobId, mediaId)
     }
 
-    /// List a node's media (opaque metadata + the K_blob wrap).
+    /// List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier).
     public func listMedia(scopeId: String, nodeId: String) async throws -> [MediaItem] {
         let rows = try await withRefresh { try await self.fetchNodeMedia(scopeId, nodeId) }
-        return rows.map {
-            MediaItem(mediaId: $0.mediaId, blobId: $0.blobId, chunkCount: Int($0.chunkCount),
-                      byteSize: Int($0.byteSize), wrappedBlobKey: Data($0.wrappedBlobKey.data))
+        return rows.map { s in
+            MediaItem(
+                mediaId: s.mediaId,
+                original: BlobRef(blobId: s.blobId, chunkCount: Int(s.chunkCount),
+                                  byteSize: Int(s.byteSize), wrappedBlobKey: Data(s.wrappedBlobKey.data)),
+                derivatives: (s.derivatives ?? []).map { d in
+                    MediaDerivative(kind: d.kind,
+                                    ref: BlobRef(blobId: d.blobId, chunkCount: Int(d.chunkCount),
+                                                 byteSize: Int(d.byteSize), wrappedBlobKey: Data(d.wrappedBlobKey.data)))
+                }
+            )
         }
     }
 
-    /// Open a media blob: unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
-    /// direct-from-store, and `openFrame` them back to the original plaintext (the AAD position check applies).
-    public func openMedia(scopeId: String, memoryKey: Data, media item: MediaItem) async throws -> Data {
-        let blobKey = try V1.symUnwrap(kek: memoryKey, blob: item.wrappedBlobKey, context: Self.kblobCtx)
+    /// Open one tier of a media: pick the blob ref (grid=thumbnail / lightbox=preview / original), unwrap its
+    /// `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames direct-from-store, and
+    /// `openFrame` them back to plaintext (the AAD position check applies). Defaults to the original.
+    public func openMedia(scopeId: String, memoryKey: Data, media item: MediaItem, tier: MediaTier = .original) async throws -> Data {
+        try await openBlob(scopeId: scopeId, memoryKey: memoryKey, ref: item.ref(for: tier))
+    }
 
-        let gets = try await withRefresh { try await self.presignDownload(scopeId, blobId: item.blobId) }
+    /// Open a single blob ref (any tier): unwrap `K_blob`, presign the chunk GETs, fetch + `openFrame` them.
+    public func openBlob(scopeId: String, memoryKey: Data, ref: BlobRef) async throws -> Data {
+        let blobKey = try V1.symUnwrap(kek: memoryKey, blob: ref.wrappedBlobKey, context: Self.kblobCtx)
+
+        let gets = try await withRefresh { try await self.presignDownload(scopeId, blobId: ref.blobId) }
         guard let d = gets.first else { throw VeyqError.mediaItemFailed(nil) }
         if let err = d.error { throw VeyqError.mediaItemFailed(err) }
         guard let urls = d.presignedGets else { throw VeyqError.storeUnavailable }
@@ -710,6 +773,35 @@ public final class VeyqClient: Sendable {
 
     // MARK: media internals
 
+    /// Generate the role-tagged derivatives for a source (image: two downscales; video: one poster reused for
+    /// both; other: none). The pixel stage is injectable so the role/batch wiring is unit-testable.
+    static func deriveTiers(data: Data, mediaType: String, deriver: any MediaDeriver)
+        async throws -> [(kind: MediaAPI.Components.Schemas.MediaDerivativeKind, bytes: Data)]
+    {
+        if mediaType.hasPrefix("image/") {
+            let thumbnail = try await deriver.deriveImage(data, maxEdge: DerivativeSpec.thumbnail.maxEdge, quality: DerivativeSpec.thumbnail.quality)
+            let preview = try await deriver.deriveImage(data, maxEdge: DerivativeSpec.preview.maxEdge, quality: DerivativeSpec.preview.quality)
+            return [(.THUMBNAIL, thumbnail), (.PREVIEW, preview)]
+        }
+        if mediaType.hasPrefix("video/") {
+            let poster = try await deriver.deriveVideoPoster(data)   // one poster serves both tiers
+            return [(.THUMBNAIL, poster), (.PREVIEW, poster)]
+        }
+        return []   // no derivable frame → original only (the gallery falls back to an icon)
+    }
+
+    /// Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`).
+    static func sealBlob(memoryKey: Data, data: Data) -> SealedBlob {
+        let blobKey = secureRandomBytes(32)
+        let wrappedBlobKey = V1.symWrap(kek: memoryKey, targetKey: blobKey, context: kblobCtx, nonce: secureRandomBytes(12))
+        let chunks = chunkify(data)
+        let total = chunks.count
+        let frames = chunks.enumerated().map { i, chunk in
+            V1.sealFrame(contentKey: blobKey, index: i, total: total, plaintext: chunk, nonce: secureRandomBytes(12))
+        }
+        return SealedBlob(wrappedBlobKey: wrappedBlobKey, frames: frames)
+    }
+
     /// Split plaintext into ≥1 chunks of at most `chunkSize` bytes (a 0-byte blob is a single empty chunk).
     static func chunkify(_ data: Data) -> [Data] {
         if data.isEmpty { return [Data()] }
@@ -723,13 +815,15 @@ public final class VeyqClient: Sendable {
         return out
     }
 
-    private func startUploads(_ scopeId: String, chunkCount: Int, byteSize: Int, wrappedBlobKey: Data)
+    private func startUploads(_ scopeId: String, blobs: [SealedBlob])
         async throws -> [MediaAPI.Components.Schemas.BlobUploadResultItem]
     {
-        let item = MediaAPI.Components.Schemas.BlobUploadRequestItem(
-            chunkCount: Int32(chunkCount), byteSize: Int64(byteSize), wrappedBlobKey: .init(wrappedBlobKey)
-        )
-        let out = try await media.startBlobUploads(.init(path: .init(scopeId: scopeId), body: .json(.init(items: [item]))))
+        let items = blobs.map {
+            MediaAPI.Components.Schemas.BlobUploadRequestItem(
+                chunkCount: Int32($0.chunkCount), byteSize: Int64($0.byteSize), wrappedBlobKey: .init($0.wrappedBlobKey)
+            )
+        }
+        let out = try await media.startBlobUploads(.init(path: .init(scopeId: scopeId), body: .json(.init(items: items))))
         switch out {
         case .ok(let ok): return try ok.body.json.results
         case .notFound: throw VeyqError.scopeNotFound
@@ -740,10 +834,16 @@ public final class VeyqClient: Sendable {
         }
     }
 
-    private func completeMedia(_ scopeId: String, uploadId: String, nodeId: String)
-        async throws -> [MediaAPI.Components.Schemas.MediaResultItem]
-    {
-        let item = MediaAPI.Components.Schemas.MediaRequestItem(uploadId: uploadId, nodeId: nodeId)
+    private func completeMedia(
+        _ scopeId: String, originalUploadId: String, nodeId: String,
+        derivatives: [(kind: MediaAPI.Components.Schemas.MediaDerivativeKind, uploadId: String)]
+    ) async throws -> [MediaAPI.Components.Schemas.MediaResultItem] {
+        let derivativeUploads = derivatives.map {
+            MediaAPI.Components.Schemas.MediaDerivativeUpload(kind: $0.kind, uploadId: $0.uploadId)
+        }
+        let item = MediaAPI.Components.Schemas.MediaRequestItem(
+            originalUploadId: originalUploadId, nodeId: nodeId, derivatives: derivativeUploads
+        )
         let out = try await media.completeMedia(.init(path: .init(scopeId: scopeId), body: .json(.init(items: [item]))))
         switch out {
         case .ok(let ok): return try ok.body.json.results

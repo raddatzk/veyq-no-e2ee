@@ -159,12 +159,93 @@ final class LiveRoundTripTests: XCTestCase {
 
         var data = Data(count: 300 * 1024)
         for i in 0 ..< data.count { data[i] = UInt8((i * 17 + 3) & 0xff) }
-        let (blobId, _) = try await c.addMedia(scopeId: personal.id, nodeId: nodeId, memoryKey: memoryKey, data: data)
+        // octet-stream → no derivable frame, so this stays the original-only byte-transport round-trip the
+        // derivatives pipeline (cr-0047) leaves untouched; the live image+video tier round-trip is the manual gate.
+        let (blobId, _) = try await c.addMedia(scopeId: personal.id, nodeId: nodeId, memoryKey: memoryKey,
+                                               data: data, mediaType: "application/octet-stream")
         XCTAssertFalse(blobId.isEmpty)
 
         let items = try await c.listMedia(scopeId: personal.id, nodeId: nodeId)
         let item = try XCTUnwrap(items.first)
         let opened = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: item)
         XCTAssertEqual(opened, data, "media bytes round-trip through real presigned upload + download")
+    }
+
+    /// cr-0047 — the **derivative tiers** round-trip against the live store, exercising the one path the
+    /// stubbed `MediaTests` cannot: the real `NativeMediaDeriver` (ImageIO image downscale + AVFoundation
+    /// first-frame poster). A real PNG and a real MP4 go through decode→downscale/poster→seal→upload→list→
+    /// fetch-tier→decode; each fetched tier is asserted **decodable** with its **longest edge within the tier
+    /// cap** (parity by property, not bytes). Decoded tiers are written to `VEYQ_ARTIFACT_DIR` (when set) as
+    /// the visual proof. Operator-blind: only ciphertext travels; the pixel work is on-device.
+    func testDerivativeTiersRoundTripAgainstLiveInstance() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let base = env["VEYQ_LIVE_BASE"], let baseURL = URL(string: base) else {
+            throw XCTSkip("set VEYQ_LIVE_BASE (+ VEYQ_EMAIL/PASSWORD/SECRET) to run the live round-trip")
+        }
+        let email = try XCTUnwrap(env["VEYQ_EMAIL"])
+        let password = try XCTUnwrap(env["VEYQ_PASSWORD"])
+        let secret = try XCTUnwrap(env["VEYQ_SECRET"])
+
+        let c = VeyqClient(instance: VeyqInstance(baseURL: baseURL))
+        try await c.login(email: email, password: password)
+        try await c.unlock(password: password, secretKey: secret)
+        _ = try await c.ensurePersonalScope()
+        let openedScope = try await c.openPersonalScope()
+        let scopeKey = try XCTUnwrap(openedScope, "no personal scope")
+        let myScopes = try await c.listMyScopes()
+        let personal = try XCTUnwrap(myScopes.first { $0.kind == .PERSONAL })
+        let (nodeId, memoryKey) = try await c.createMemory(scopeId: personal.id, scopeKey: scopeKey,
+                                                           name: "E2E derivatives \(UUID().uuidString)")
+
+        // --- a real image: 1600×900 PNG → the ImageIO deriver downscales it to thumbnail + preview JPEGs ---
+        let png = try MediaFixtures.png(width: 1600, height: 900)
+        let (imageBlobId, imageMediaId) = try await c.addMedia(scopeId: personal.id, nodeId: nodeId,
+                                                               memoryKey: memoryKey, data: png, mediaType: "image/png")
+        XCTAssertFalse(imageBlobId.isEmpty)
+
+        // --- a real video: a 1280×720 MP4 → the AVFoundation deriver makes one first-frame poster for both ---
+        let mp4 = try await MediaFixtures.mp4(width: 1280, height: 720, frameCount: 6)
+        let (_, videoMediaId) = try await c.addMedia(scopeId: personal.id, nodeId: nodeId,
+                                                     memoryKey: memoryKey, data: mp4, mediaType: "video/mp4")
+
+        let items = try await c.listMedia(scopeId: personal.id, nodeId: nodeId)
+        let image = try XCTUnwrap(items.first { $0.mediaId == imageMediaId })
+        let video = try XCTUnwrap(items.first { $0.mediaId == videoMediaId })
+
+        let artifactDir = env["VEYQ_ARTIFACT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        try artifactDir.map { try FileManager.default.createDirectory(at: $0, withIntermediateDirectories: true) }
+
+        // image: thumbnail and preview are distinct blobs, each a decodable JPEG within its tier's cap
+        XCTAssertEqual(image.derivatives.count, 2)
+        XCTAssertNotEqual(image.gridRef.blobId, image.lightboxRef.blobId)
+        let imgThumb = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: image, tier: .grid)
+        let imgPreview = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: image, tier: .lightbox)
+        let (tw, th) = try MediaFixtures.jpegDimensions(imgThumb)
+        let (pw, ph) = try MediaFixtures.jpegDimensions(imgPreview)
+        XCTAssertLessThanOrEqual(max(tw, th), 400, "thumbnail longest edge ≤ 400")
+        XCTAssertLessThanOrEqual(max(pw, ph), 2048, "preview longest edge ≤ 2048")
+        XCTAssertEqual(Double(tw) / Double(th), 1600.0 / 900.0, accuracy: 0.02, "thumbnail keeps the aspect ratio")
+        try Self.write(imgThumb, to: artifactDir, named: "image-thumbnail-\(tw)x\(th).jpg")
+        try Self.write(imgPreview, to: artifactDir, named: "image-preview-\(pw)x\(ph).jpg")
+
+        // video: one poster reused for both tiers — distinct blobs, identical decoded bytes, decodable JPEG
+        XCTAssertEqual(video.derivatives.count, 2)
+        let vidThumb = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: video, tier: .grid)
+        let vidPreview = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: video, tier: .lightbox)
+        XCTAssertEqual(vidThumb, vidPreview, "the video poster is reused verbatim for both tiers")
+        let (vw, vh) = try MediaFixtures.jpegDimensions(vidThumb)
+        XCTAssertLessThanOrEqual(max(vw, vh), 2048, "poster longest edge ≤ 2048 (preview cap)")
+        try Self.write(vidThumb, to: artifactDir, named: "video-poster-\(vw)x\(vh).jpg")
+
+        // the original stays pristine: the PNG byte-round-trips through its own blob
+        let openedOriginal = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: image, tier: .original)
+        XCTAssertEqual(openedOriginal, png, "the original is byte-pristine")
+    }
+
+    // MARK: - live-test artifact helper (the PNG/MP4 fixtures + JPEG-dim reader live in `MediaFixtures`)
+
+    private static func write(_ data: Data, to dir: URL?, named: String) throws {
+        guard let dir else { return }
+        try data.write(to: dir.appendingPathComponent(named))
     }
 }

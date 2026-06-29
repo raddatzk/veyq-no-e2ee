@@ -48,4 +48,8 @@ public enum VeyqError: Error, Equatable {
     case mediaItemFailed(String?)
     /// A direct-to-store PUT/GET to a presigned URL failed (non-2xx / transport error, cr-0028).
     case blobTransferFailed
+    /// The native pixel stage failed to generate a derivative — undecodable source, or a JPEG
+    /// encode/first-frame failure (cr-0047, en.memory.derivatives). Generation is best-effort on the
+    /// client; the original is never affected.
+    case mediaDeriveFailed
 }

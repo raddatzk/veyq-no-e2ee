@@ -5,11 +5,15 @@ import OpenAPIRuntime
 import VeyqCrypto
 @testable import VeyqKit
 
-// cr-0028 phase 5 — en.memory.media (apple) data-layer tests. A stateful `MediaStub` serves the batch
-// control plane (start / complete / list / presign-download) with `mem://…` presigned URLs, and an in-memory
+// cr-0028 + cr-0047 — en.memory.media + en.memory.derivatives (apple) data-layer tests. A stateful `MediaStub`
+// serves the batch control plane (start / complete / list / presign-download) with `mem://…` presigned URLs,
+// now **derivative-aware** (several blobs per media, role-tagged read-back), and an in-memory
 // `FakeBlobTransport` stores PUT bodies + replays them on GET — so addMedia → openMedia round-trips the real
-// native v1 chunk seal/open + the K_blob wrap (under K_mem) without a network or MinIO. Operator-blind: the
-// "store" only ever holds ciphertext frames; the backend stub only ciphertext wraps + opaque metadata.
+// native v1 chunk seal/open + the per-blob K_blob wrap (under K_mem) without a network or MinIO. The lossy
+// pixel stage is behind an injectable `StubDeriver` (parity by property, not bytes), so the wiring (dimension
+// math, role/batch assembly, per-blob wraps, tier selection) is unit-tested here; the real ImageIO/AVFoundation
+// decode is a manual live round-trip. Operator-blind: the "store" only ever holds ciphertext frames; the
+// backend stub only ciphertext wraps + opaque metadata + the role tags.
 final class MediaTests: XCTestCase {
 
     private static let baseURL = URL(string: "https://fam.example.com")!
@@ -24,19 +28,128 @@ final class MediaTests: XCTestCase {
                           transport: stub, blobTransport: blobs)
     }
 
-    func testAddThenOpenRoundTripsBytes() async throws {
+    // MARK: longest-edge target math (pure)
+
+    func testScaleToMaxEdgeCapsLongestEdgePreservingAspect() {
+        XCTAssertEqual(scaleToMaxEdge(width: 4000, height: 2000, maxEdge: 400).width, 400) // landscape
+        XCTAssertEqual(scaleToMaxEdge(width: 4000, height: 2000, maxEdge: 400).height, 200)
+        XCTAssertEqual(scaleToMaxEdge(width: 2000, height: 4000, maxEdge: 400).width, 200) // portrait
+        XCTAssertEqual(scaleToMaxEdge(width: 2000, height: 4000, maxEdge: 400).height, 400)
+        XCTAssertEqual(scaleToMaxEdge(width: 1000, height: 1000, maxEdge: 400).width, 400) // square
+    }
+
+    func testScaleToMaxEdgeNeverUpscalesAndKeepsEachSideAtLeastOnePx() {
+        XCTAssertEqual(scaleToMaxEdge(width: 300, height: 150, maxEdge: 400).width, 300)   // already within cap
+        XCTAssertEqual(scaleToMaxEdge(width: 400, height: 400, maxEdge: 400).height, 400)  // exactly at cap
+        XCTAssertEqual(scaleToMaxEdge(width: 2048, height: 3, maxEdge: 400).height, 1)     // rounds to ≥ 1px
+        XCTAssertEqual(scaleToMaxEdge(width: 0, height: 0, maxEdge: 400).width, 0)         // degenerate
+    }
+
+    func testTierSpecsArePinnedFromLegacy() {
+        XCTAssertEqual(DerivativeSpec.thumbnail, DerivativeSpec(maxEdge: 400, quality: 0.80))
+        XCTAssertEqual(DerivativeSpec.preview, DerivativeSpec(maxEdge: 2048, quality: 0.85))
+    }
+
+    // MARK: add-media — derivative generation + role/batch assembly
+
+    func testImageUploadsOriginalThumbnailPreviewInOneBatchRoleTagged() async throws {
+        let stub = MediaStub()
+        let blobs = FakeBlobTransport()
+        let c = await client(stub, blobs)
+        let memoryKey = Data(repeating: 7, count: 32)
+        let data = Data(repeating: 5, count: 64)
+
+        let (blobId, mediaId) = try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId,
+                                                     memoryKey: memoryKey, data: data, mediaType: "image/png", deriver: stub.derivers)
+        XCTAssertFalse(blobId.isEmpty)
+        XCTAssertFalse(mediaId.isEmpty)
+
+        // three blobs declared in one start batch (original + 2 derivatives)
+        XCTAssertEqual(stub.startItemCount, 3)
+        // the deriver produced two downscales at the pinned tier specs; no video poster
+        XCTAssertEqual(stub.derivers.imageCalls.map { $0.maxEdge }, [400, 2048])
+        XCTAssertEqual(stub.derivers.imageCalls.map { $0.quality }, [0.80, 0.85])
+        XCTAssertEqual(stub.derivers.posterCalls, 0)
+        // complete carried the role tags in order
+        XCTAssertEqual(stub.lastCompleteDerivativeKinds, ["THUMBNAIL", "PREVIEW"])
+
+        // read-back exposes the original + both tiers, each its own blob + wrap
+        let items = try await c.listMedia(scopeId: Self.scopeId, nodeId: Self.nodeId)
+        XCTAssertEqual(items.count, 1)
+        let item = items[0]
+        XCTAssertEqual(item.derivatives.map { $0.kind }, [.THUMBNAIL, .PREVIEW])
+        XCTAssertNotEqual(item.gridRef.blobId, item.original.blobId)   // grid never the original
+        XCTAssertNotEqual(item.gridRef.blobId, item.lightboxRef.blobId)
+    }
+
+    func testVideoDerivesOnePosterReusedForBothTiers() async throws {
+        let stub = MediaStub()
+        let blobs = FakeBlobTransport()
+        let c = await client(stub, blobs)
+        let memoryKey = Data(repeating: 9, count: 32)
+
+        try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: memoryKey,
+                             data: Data(repeating: 3, count: 40), mediaType: "video/mp4", deriver: stub.derivers)
+
+        XCTAssertEqual(stub.derivers.posterCalls, 1)        // decoded once
+        XCTAssertTrue(stub.derivers.imageCalls.isEmpty)
+        XCTAssertEqual(stub.startItemCount, 3)              // original + thumbnail + preview (same poster bytes)
+        XCTAssertEqual(stub.lastCompleteDerivativeKinds, ["THUMBNAIL", "PREVIEW"])
+
+        // both the grid and lightbox tier decode back to the one poster
+        let items = try await c.listMedia(scopeId: Self.scopeId, nodeId: Self.nodeId)
+        let item = try XCTUnwrap(items.first)
+        let grid = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .grid)
+        let lightbox = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .lightbox)
+        XCTAssertEqual(grid, StubDeriver.posterBytes)
+        XCTAssertEqual(lightbox, StubDeriver.posterBytes)
+    }
+
+    func testNonImageNonVideoAttachesOriginalOnly() async throws {
+        let stub = MediaStub()
+        let c = await client(stub, FakeBlobTransport())
+
+        try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: Data(repeating: 1, count: 32),
+                             data: Data([1, 2, 3]), mediaType: "application/pdf", deriver: stub.derivers)
+
+        XCTAssertEqual(stub.derivers.imageCalls.count + stub.derivers.posterCalls, 0)
+        XCTAssertEqual(stub.startItemCount, 1)               // original only
+        XCTAssertEqual(stub.lastCompleteDerivativeKinds, []) // no role tags
+        let items = try await c.listMedia(scopeId: Self.scopeId, nodeId: Self.nodeId)
+        let item = try XCTUnwrap(items.first)
+        XCTAssertTrue(item.derivatives.isEmpty)
+        // tier accessors fall back to the original when there are no derivatives
+        XCTAssertEqual(item.gridRef.blobId, item.original.blobId)
+        XCTAssertEqual(item.lightboxRef.blobId, item.original.blobId)
+    }
+
+    func testStoreUnavailableWhenNoPresign() async throws {
+        let stub = MediaStub()
+        stub.presign = false   // dev store: opens the session but returns no presigned PUTs
+        let c = await client(stub, FakeBlobTransport())
+        do {
+            _ = try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: Data(repeating: 1, count: 32),
+                                     data: Data(repeating: 9, count: 10), mediaType: "application/octet-stream", deriver: stub.derivers)
+            XCTFail("expected storeUnavailable")
+        } catch VeyqError.storeUnavailable {
+            // expected
+        }
+    }
+
+    // MARK: read-back — operator-blind round-trip + per-blob wraps + tier selection
+
+    func testOriginalRoundTripsThroughChunkedAEADUnderItsOwnKBlob() async throws {
         let stub = MediaStub()
         let blobs = FakeBlobTransport()
         let c = await client(stub, blobs)
         let memoryKey = Data(repeating: 7, count: 32)
 
-        // 600 KiB ⇒ 3 chunks at chunkSize = 256 KiB
+        // 600 KiB ⇒ 3 chunks at chunkSize = 256 KiB (original-only: octet-stream)
         var data = Data(count: 600 * 1024)
         for i in 0 ..< data.count { data[i] = UInt8((i * 31 + 7) & 0xff) }
 
-        let (blobId, mediaId) = try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: memoryKey, data: data)
-        XCTAssertFalse(blobId.isEmpty)
-        XCTAssertFalse(mediaId.isEmpty)
+        try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: memoryKey,
+                             data: data, mediaType: "application/octet-stream", deriver: stub.derivers)
 
         // control plane: declared 3 chunks; the store holds 3 ciphertext frames (each = chunk + nonce + tag)
         XCTAssertEqual(stub.lastChunkCount, 3)
@@ -51,22 +164,56 @@ final class MediaTests: XCTestCase {
 
         // read-back round-trips to the original plaintext
         let items = try await c.listMedia(scopeId: Self.scopeId, nodeId: Self.nodeId)
-        XCTAssertEqual(items.count, 1)
-        let opened = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: items[0])
+        let item = try XCTUnwrap(items.first)
+        let opened = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item)
         XCTAssertEqual(opened, data)
     }
 
-    func testStoreUnavailableWhenNoPresign() async throws {
+    func testEachTierIsSealedUnderItsOwnKBlobAndPicksTheRightBytes() async throws {
         let stub = MediaStub()
-        stub.presign = false   // dev store: opens the session but returns no presigned PUTs
-        let c = await client(stub, FakeBlobTransport())
-        do {
-            _ = try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId,
-                                     memoryKey: Data(repeating: 1, count: 32), data: Data(repeating: 9, count: 10))
-            XCTFail("expected storeUnavailable")
-        } catch VeyqError.storeUnavailable {
-            // expected
-        }
+        let blobs = FakeBlobTransport()
+        let c = await client(stub, blobs)
+        let memoryKey = Data(repeating: 4, count: 32)
+        let original = Data(repeating: 8, count: 70)
+
+        try await c.addMedia(scopeId: Self.scopeId, nodeId: Self.nodeId, memoryKey: memoryKey,
+                             data: original, mediaType: "image/jpeg", deriver: stub.derivers)
+
+        let items = try await c.listMedia(scopeId: Self.scopeId, nodeId: Self.nodeId)
+        let item = try XCTUnwrap(items.first)
+
+        // every tier keeps its OWN K_blob — the three wraps are distinct (per-blob keys, enabler decision 1)
+        let wraps = [item.original.wrappedBlobKey, item.gridRef.wrappedBlobKey, item.lightboxRef.wrappedBlobKey]
+        XCTAssertEqual(Set(wraps).count, 3)
+
+        // grid = thumbnail bytes, lightbox = preview bytes, original = the pristine bytes
+        let grid = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .grid)
+        let lightbox = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .lightbox)
+        let download = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .original)
+        XCTAssertEqual(grid, StubDeriver.imageBytes(maxEdge: 400))
+        XCTAssertEqual(lightbox, StubDeriver.imageBytes(maxEdge: 2048))
+        XCTAssertEqual(download, original)
+    }
+}
+
+/// A stub deriver: returns tiny distinct "JPEG" bytes tagged by the requested longest edge (and a fixed poster
+/// marker), and counts calls — so the wiring (which tiers, batch shape, role tags, tier selection) is tested
+/// without a real pixel decode. Parity here is by property, not bytes (en.memory.derivatives → Quality notes).
+private final class StubDeriver: MediaDeriver, @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var imageCalls: [(maxEdge: Int, quality: Double)] = []
+    private(set) var posterCalls = 0
+
+    static func imageBytes(maxEdge: Int) -> Data { Data("img:\(maxEdge)".utf8) }
+    static let posterBytes = Data("poster".utf8)
+
+    func deriveImage(_ data: Data, maxEdge: Int, quality: Double) async throws -> Data {
+        lock.withLock { imageCalls.append((maxEdge, quality)) }
+        return Self.imageBytes(maxEdge: maxEdge)
+    }
+    func deriveVideoPoster(_ data: Data) async throws -> Data {
+        lock.withLock { posterCalls += 1 }
+        return Self.posterBytes
     }
 }
 
@@ -82,17 +229,24 @@ private final class FakeBlobTransport: BlobTransport, @unchecked Sendable {
     }
 }
 
-/// A stateful `ClientTransport` for the media batch control plane. `mem://<storageKey>/<i>` presigned URLs key
-/// the FakeBlobTransport; stores only ciphertext wraps + opaque metadata (operator-blind).
+/// A stateful, **derivative-aware** `ClientTransport` for the media batch control plane. `mem://<storageKey>/<i>`
+/// presigned URLs key the FakeBlobTransport; the stub stores only ciphertext wraps + opaque metadata + the role
+/// tags (operator-blind), and uses a real `StubDeriver` injected into `addMedia` so the tests can assert which
+/// tiers were generated. One media = an original blob plus a derivative blob per role tag.
 private final class MediaStub: ClientTransport, @unchecked Sendable {
+    let derivers = StubDeriver()
     private let lock = NSLock()
     private var seq = 0
-    private var sessions: [String: (storageKey: String, chunkCount: Int, byteSize: Int, wrap: String)] = [:]
-    private var blobs: [String: (storageKey: String, chunkCount: Int, byteSize: Int, wrap: String)] = [:]
-    private var mediaByNode: [String: [(mediaId: String, blobId: String)]] = [:]
+    private struct Blob { let storageKey: String; let chunkCount: Int; let byteSize: Int; let wrap: String }
+    private struct Media { let mediaId: String; let blobId: String; let derivatives: [(kind: String, blobId: String)] }
+    private var sessions: [String: Blob] = [:]   // uploadId → staged blob
+    private var blobs: [String: Blob] = [:]       // blobId → blob
+    private var mediaByNode: [String: [Media]] = [:]
     var presign = true
+    private(set) var startItemCount = 0
     private(set) var lastChunkCount = 0
     private(set) var lastWrap: Data?
+    private(set) var lastCompleteDerivativeKinds: [String] = []
 
     func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String)
         async throws -> (HTTPResponse, HTTPBody?)
@@ -105,7 +259,8 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
         switch operationID {
         case "startBlobUploads":
             let results: [[String: Any]] = lock.withLock {
-                items.map { item in
+                startItemCount = items.count
+                return items.map { item in
                     seq += 1
                     let storageKey = "sk\(seq)"
                     let uploadId = "up\(seq)"
@@ -113,7 +268,8 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
                     let wrap = item["wrappedBlobKey"] as? String ?? ""
                     lastChunkCount = chunkCount
                     lastWrap = Data(base64Encoded: wrap)
-                    sessions[uploadId] = (storageKey, chunkCount, item["byteSize"] as? Int ?? 0, wrap)
+                    sessions[uploadId] = Blob(storageKey: storageKey, chunkCount: chunkCount,
+                                              byteSize: item["byteSize"] as? Int ?? 0, wrap: wrap)
                     var r: [String: Any] = ["uploadId": uploadId]
                     if presign {
                         r["presignedPuts"] = (0 ..< chunkCount).map { ["index": $0, "url": "mem://\(storageKey)/\($0)"] }
@@ -126,14 +282,26 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
         case "completeMedia":
             let results: [[String: Any]] = lock.withLock {
                 items.map { item in
-                    seq += 1
-                    let uploadId = item["uploadId"] as? String ?? ""
+                    let originalUploadId = item["originalUploadId"] as? String ?? ""
                     let nodeId = item["nodeId"] as? String ?? ""
-                    guard let s = sessions[uploadId] else { return ["error": "upload_not_found"] }
+                    let derivativeItems = item["derivatives"] as? [[String: Any]] ?? []
+                    lastCompleteDerivativeKinds = derivativeItems.compactMap { $0["kind"] as? String }
+                    guard let original = sessions[originalUploadId] else { return ["error": "upload_not_found"] }
+                    seq += 1
                     let blobId = "blob\(seq)"
+                    blobs[blobId] = original
+                    var derivativeBlobs: [(kind: String, blobId: String)] = []
+                    for d in derivativeItems {
+                        guard let kind = d["kind"] as? String, let upload = d["uploadId"] as? String,
+                              let s = sessions[upload] else { return ["error": "upload_not_found"] }
+                        seq += 1
+                        let dBlobId = "blob\(seq)"
+                        blobs[dBlobId] = s
+                        derivativeBlobs.append((kind, dBlobId))
+                    }
+                    seq += 1
                     let mediaId = "media\(seq)"
-                    blobs[blobId] = s
-                    mediaByNode[nodeId, default: []].append((mediaId, blobId))
+                    mediaByNode[nodeId, default: []].append(Media(mediaId: mediaId, blobId: blobId, derivatives: derivativeBlobs))
                     return ["blobId": blobId, "mediaId": mediaId]
                 }
             }
@@ -145,8 +313,15 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
             let summaries: [[String: Any]] = lock.withLock {
                 (mediaByNode[nodeId] ?? []).compactMap { m in
                     guard let b = blobs[m.blobId] else { return nil }
-                    return ["mediaId": m.mediaId, "blobId": m.blobId, "chunkCount": b.chunkCount,
-                            "byteSize": b.byteSize, "wrappedBlobKey": b.wrap]
+                    var summary: [String: Any] = ["mediaId": m.mediaId, "blobId": m.blobId,
+                                                  "chunkCount": b.chunkCount, "byteSize": b.byteSize, "wrappedBlobKey": b.wrap]
+                    let derivatives: [[String: Any]] = m.derivatives.compactMap { d in
+                        guard let db = blobs[d.blobId] else { return nil }
+                        return ["kind": d.kind, "blobId": d.blobId, "chunkCount": db.chunkCount,
+                                "byteSize": db.byteSize, "wrappedBlobKey": db.wrap]
+                    }
+                    if !derivatives.isEmpty { summary["derivatives"] = derivatives }
+                    return summary
                 }
             }
             return Self.json(200, summaries)
