@@ -1,14 +1,16 @@
 import SwiftUI
 import VeyqKit
 
-/// The Memory shell (cr-0034) — the Apple parity of the web browse shell, reusing the first iOS layout
+/// The Memory shell (cr-0034/0035) — the Apple parity of the web browse shell, reusing the first iOS layout
 /// (`legacy/iOS/Veyq/Home/MemoryHomeView.swift`) over the E2EE `VeyqClient` data layer. **Responsive universal
 /// app:** a `NavigationSplitView` (spaces sidebar + content) shows columns on regular width (iPad landscape,
 /// macOS) and collapses to a stack with a drawer on compact (iPhone). Operator-blind: names are decrypted on
-/// device; the level + breadcrumb are derived client-side ([HomeModel]). Favorites / settings / the space
-/// switcher are later Apple slices.
+/// device; the level + breadcrumb are derived client-side ([HomeModel]). Strings go through the shared `L10n`
+/// (cr-0035); the profile bar opens Settings (theme + language + sign-out). Favorites / the space switcher are
+/// later Apple slices.
 struct HomeView: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var l10n: L10n
     @StateObject private var model = HomeModel()
 
     @State private var showCreate = false
@@ -17,6 +19,7 @@ struct HomeView: View {
     @State private var renameTarget: VeyqClient.TreeNode?
     @State private var renameName = ""
     @State private var deleteTarget: VeyqClient.TreeNode?
+    @State private var showSettings = false
     /// On compact width (iPhone) open straight to the browse (the content), with the spaces sidebar as a
     /// drawer — on regular width (iPad / macOS) both columns show side by side.
     @State private var preferredColumn: NavigationSplitViewColumn = .detail
@@ -29,30 +32,31 @@ struct HomeView: View {
         }
         .tint(VeyqStyle.accent)
         .task { await model.start(client: app.client) }
-        .alert(createIsFolder ? "New folder" : "New Memory", isPresented: $showCreate) {
-            TextField("Name", text: $newName)
-            Button("Create") {
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .alert(createIsFolder ? l10n.t("home.createFolder") : l10n.t("home.createMemory"), isPresented: $showCreate) {
+            TextField(l10n.t("common.name"), text: $newName)
+            Button(l10n.t("common.create")) {
                 let n = newName
                 Task { createIsFolder ? await model.createFolder(n) : await model.createMemory(n) }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(l10n.t("common.cancel"), role: .cancel) {}
         }
-        .alert("Rename", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
-            TextField("Name", text: $renameName)
-            Button("Rename") {
+        .alert(l10n.t("common.rename"), isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
+            TextField(l10n.t("common.name"), text: $renameName)
+            Button(l10n.t("common.rename")) {
                 if let t = renameTarget { let n = renameName; renameTarget = nil; Task { await model.rename(t, to: n) } }
             }
-            Button("Cancel", role: .cancel) { renameTarget = nil }
+            Button(l10n.t("common.cancel"), role: .cancel) { renameTarget = nil }
         }
         .confirmationDialog(
-            "Delete “\(deleteTarget?.name ?? "")”? This can’t be undone.",
+            l10n.t("memory.deleteConfirm", deleteTarget?.name ?? ""),
             isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
+            Button(l10n.t("common.delete"), role: .destructive) {
                 if let t = deleteTarget { deleteTarget = nil; Task { await model.delete(t) } }
             }
-            Button("Cancel", role: .cancel) { deleteTarget = nil }
+            Button(l10n.t("common.cancel"), role: .cancel) { deleteTarget = nil }
         }
     }
 
@@ -60,8 +64,8 @@ struct HomeView: View {
 
     private var sidebar: some View {
         List {
-            Section("Spaces") {
-                Label("Personal", systemImage: "person.crop.circle.fill")
+            Section(l10n.t("home.spaces")) {
+                Label(l10n.t("home.personal"), systemImage: "person.crop.circle.fill")
                     .foregroundStyle(VeyqStyle.text)
             }
         }
@@ -69,20 +73,22 @@ struct HomeView: View {
         .safeAreaInset(edge: .bottom) { profileBar }
     }
 
+    /// The profile bar — like the web ProfileMenu, tapping it opens Settings (theme / language / sign-out).
     private var profileBar: some View {
         VStack(spacing: 0) {
             Divider()
-            HStack(spacing: 10) {
-                Image(systemName: "person.crop.circle").foregroundStyle(VeyqStyle.muted)
-                Text(app.email).font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).lineLimit(1)
-                Spacer()
-                Button { Task { await app.signOut() } } label: {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
+            Button { showSettings = true } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle").foregroundStyle(VeyqStyle.muted)
+                    Text(app.email).font(.system(size: 13)).foregroundStyle(VeyqStyle.muted).lineLimit(1)
+                    Spacer()
+                    Image(systemName: "gearshape").foregroundStyle(VeyqStyle.muted)
                 }
-                .buttonStyle(.plain).foregroundStyle(VeyqStyle.muted)
-                .accessibilityIdentifier("Sign out")
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 14).padding(.vertical, 10)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("Settings")
         }
     }
 
@@ -95,18 +101,18 @@ struct HomeView: View {
                 if model.loading { ProgressView().padding(.vertical, 8) }
                 if model.crumbs.count > 1 { breadcrumb }
 
-                sectionHeader("Memories", model.level.memories.count)
+                sectionHeader(l10n.t("home.memories"), model.level.memories.count)
                 if model.level.memories.isEmpty {
-                    emptyText("No Memories here yet.")
+                    emptyText(l10n.t("home.noMemories"))
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                         ForEach(model.level.memories, id: \.id) { memoryCard($0) }
                     }
                 }
 
-                sectionHeader("Folders", model.level.folders.count)
+                sectionHeader(l10n.t("home.folders"), model.level.folders.count)
                 if model.level.folders.isEmpty {
-                    emptyText("No folders here yet.")
+                    emptyText(l10n.t("home.noFolders"))
                 } else {
                     ForEach(model.level.folders, id: \.id) { folderRow($0) }
                 }
@@ -115,12 +121,12 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(VeyqStyle.bg)
-        .navigationTitle(model.crumbs.last?.name ?? "Personal")
+        .navigationTitle(model.path.isEmpty ? l10n.t("home.personal") : (model.path.last?.name ?? ""))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("New Memory") { createIsFolder = false; newName = ""; showCreate = true }
-                    Button("New folder") { createIsFolder = true; newName = ""; showCreate = true }
+                    Button(l10n.t("home.createMemory")) { createIsFolder = false; newName = ""; showCreate = true }
+                    Button(l10n.t("home.createFolder")) { createIsFolder = true; newName = ""; showCreate = true }
                 } label: { Image(systemName: "plus") }
                 .accessibilityIdentifier("Create")
             }
@@ -131,7 +137,7 @@ struct HomeView: View {
         HStack(spacing: 4) {
             ForEach(Array(model.crumbs.enumerated()), id: \.element.id) { idx, crumb in
                 if idx > 0 { Text("/").foregroundStyle(VeyqStyle.muted) }
-                Button(crumb.name) { model.goto(crumb) }
+                Button(crumb.nodeId == nil ? l10n.t("home.personal") : crumb.name) { model.goto(crumb) }
                     .buttonStyle(.plain)
                     .font(.system(size: 14, weight: idx == model.crumbs.count - 1 ? .semibold : .regular))
                     .foregroundStyle(idx == model.crumbs.count - 1 ? VeyqStyle.text : VeyqStyle.muted)
@@ -184,7 +190,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder private func nodeMenu(_ node: VeyqClient.TreeNode) -> some View {
-        Button("Rename") { renameTarget = node; renameName = node.name }
-        Button("Delete", role: .destructive) { deleteTarget = node }
+        Button(l10n.t("common.rename")) { renameTarget = node; renameName = node.name }
+        Button(l10n.t("common.delete"), role: .destructive) { deleteTarget = node }
     }
 }

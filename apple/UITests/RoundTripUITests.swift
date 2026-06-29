@@ -27,6 +27,9 @@ final class RoundTripUITests: XCTestCase {
         app.launchEnvironment["UITEST_EMAIL"] = email
         app.launchEnvironment["UITEST_PASSWORD"] = password
         app.launchEnvironment["UITEST_SECRET"] = secret
+        // Optional: force the appearance/language for a capture (NSUserDefaults reads `-key value` launch args).
+        if let theme = env["VEYQ_THEME"] { app.launchArguments += ["-veyq.theme", theme] }
+        if let locale = env["VEYQ_LOCALE"] { app.launchArguments += ["-veyq.locale", locale] }
         app.launch()
 
         // 1 — Connect
@@ -51,11 +54,11 @@ final class RoundTripUITests: XCTestCase {
         app.buttons["level.secretKeyEachTime"].activate()   // no default — pick a level to enable Unlock
         unlockButton.activate()
 
-        // 4 — Home (unlocked): the Memory shell — its browse (the "Memories" section) or, on a compact
-        // split-view that opens to the sidebar, the spaces rail (the "Sign out" control).
-        let memories = app.staticTexts["Memories"]
-        let signOut = app.buttons["Sign out"]
-        XCTAssertTrue(memories.waitForExistence(timeout: 25) || signOut.waitForExistence(timeout: 5),
+        // 4 — Home (unlocked): the Memory shell. Wait on the locale-independent "Create" toolbar button (the
+        // visible browse strings are localized; the spaces sidebar is a drawer on compact).
+        let create = app.buttons["Create"]
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(create.waitForExistence(timeout: 25) || settings.waitForExistence(timeout: 5),
                       "Home shell should show after unlock")
         shoot(app, shotDir, "05-home")
     }

@@ -5,6 +5,10 @@ import SwiftUI
 /// stretch).
 struct RootView: View {
     @StateObject private var app = AppModel()
+    @StateObject private var l10n = L10n()
+    /// Appearance override (cr-0035): "system" follows the OS; "light"/"dark" force the scheme. `VeyqStyle`
+    /// colours are adaptive, so flipping the scheme flips the whole palette.
+    @AppStorage("veyq.theme") private var theme = "system"
 
     var body: some View {
         Group {
@@ -17,7 +21,17 @@ struct RootView: View {
             }
         }
         .environmentObject(app)
+        .environmentObject(l10n)
+        .preferredColorScheme(colorScheme(theme))
         .task { await app.bootstrap() }
+    }
+
+    private func colorScheme(_ theme: String) -> ColorScheme? {
+        switch theme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil // system
+        }
     }
 }
 
