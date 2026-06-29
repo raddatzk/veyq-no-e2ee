@@ -302,9 +302,15 @@ const de: typeof en = {
   },
 }
 
+import { ref, type Ref } from 'vue'
+
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'de']
 // Endonyms — a language is named in its own tongue regardless of the current UI locale.
 export const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'English', de: 'Deutsch' }
+
+/** The user's language choice: a concrete language, or "system" — follow the OS (the default). */
+export type LocalePreference = 'system' | SupportedLocale
+export const LOCALE_PREFERENCES: LocalePreference[] = ['system', 'en', 'de']
 
 const LOCALE_STORAGE_KEY = 'veyq:locale'
 
@@ -316,22 +322,46 @@ function storage(): Storage | null {
   }
 }
 
-function initialLocale(): SupportedLocale {
-  const stored = storage()?.getItem(LOCALE_STORAGE_KEY)
-  if (stored === 'en' || stored === 'de') return stored
+/** The OS language mapped onto a supported locale (anything not German → English). */
+function systemLocale(): SupportedLocale {
   const nav = typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en'
   return nav.startsWith('de') ? 'de' : 'en'
 }
 
+function storedPreference(): LocalePreference {
+  const stored = storage()?.getItem(LOCALE_STORAGE_KEY)
+  return stored === 'en' || stored === 'de' || stored === 'system' ? stored : 'system'
+}
+
+/** The active locale for a preference — "system" resolves to the OS language. */
+export function effectiveLocale(pref: LocalePreference): SupportedLocale {
+  return pref === 'system' ? systemLocale() : pref
+}
+
+// The reactive language preference (mirrors `useThemeState`'s `themePreference`) — default "system".
+const localePref = ref<LocalePreference>(storedPreference())
+/** The reactive language preference ("system" | "en" | "de"). */
+export function localePreference(): Ref<LocalePreference> {
+  return localePref
+}
+
 export const i18n = createI18n({
   legacy: false,
-  locale: initialLocale(),
+  locale: effectiveLocale(localePref.value),
   fallbackLocale: 'en',
   messages: { en, de },
 })
 
-/** Switch the active UI locale and remember it. */
-export function setLocale(locale: SupportedLocale): void {
-  i18n.global.locale.value = locale
-  storage()?.setItem(LOCALE_STORAGE_KEY, locale)
+/** Set the language preference (a concrete language, or "system") and remember it. */
+export function setLocalePreference(pref: LocalePreference): void {
+  localePref.value = pref
+  storage()?.setItem(LOCALE_STORAGE_KEY, pref)
+  i18n.global.locale.value = effectiveLocale(pref)
+}
+
+// Live-follow the OS language while on "system" — the browser fires `languagechange` when it changes.
+if (typeof window !== 'undefined') {
+  window.addEventListener('languagechange', () => {
+    if (localePref.value === 'system') i18n.global.locale.value = systemLocale()
+  })
 }

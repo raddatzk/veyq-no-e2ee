@@ -3,7 +3,7 @@
 - ID: uc.settings.appearance-language
 - Primary actor: Any signed-in user (on their device)
 - Goal: Choose how the app **looks** (theme: system / light / dark) and what **language** it speaks
-  (English / Deutsch), applied immediately and remembered on this device.
+  (system / English / Deutsch), applied immediately and remembered on this device.
 - Preconditions: The app is running (no account or unlock needed — these are device-local preferences).
 - Postconditions (success): The chosen theme + language are applied to the whole UI at once and persisted
   locally; they survive a relaunch. Nothing is sent to the server.
@@ -14,16 +14,17 @@
    Settings sheet).
 2. **Theme** — picking *system / light / dark* flips the whole palette live (web toggles `.veyq-dark` on
    `<html>`; Apple applies `.preferredColorScheme`). The adaptive design tokens recolour everything.
-3. **Language** — picking *English / Deutsch* re-renders every visible string live (web `vue-i18n`; Apple the
-   reactive `L10n`), **without** reloading content (the open Memory tree stays put).
+3. **Language** — picking *system / English / Deutsch* re-renders every visible string live (web `vue-i18n`;
+   Apple the reactive `L10n`), **without** reloading content (the open Memory tree stays put).
 4. Both choices are written to local storage and re-read on the next launch.
 
 ## Alternate / exception flows
 
-- A1 — **system theme:** "system" follows the OS appearance (no override); switching the OS dark/light updates
-  the app.
-- A2 — **first run:** with no stored preference, theme defaults to *system* and language to the **OS
-  language** (Deutsch if the device is German, else English).
+- A1 — **"system" (both axes, the default):** theme follows the OS appearance and language follows the OS
+  language **live** — no override. The app ships only en + de, so any non-German OS language resolves to
+  English. Switching the OS dark/light or language updates the app while it runs.
+- A2 — **first run:** with no stored preference, **both default to *system*** — the app adopts the OS
+  appearance + language until the user picks a concrete value.
 
 ## Quality notes
 

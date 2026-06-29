@@ -11,14 +11,15 @@ import type { MenuItem } from 'primevue/menuitem'
 import { account } from '../../app/account'
 import { logout } from '../../features/account/login/login'
 import { clearActiveSpace } from '../../app/activeSpace'
-import { setLocale, SUPPORTED_LOCALES, LOCALE_LABELS, type SupportedLocale } from '../../i18n'
+import { setLocalePreference, localePreference, LOCALE_PREFERENCES, LOCALE_LABELS } from '../../i18n'
 import { useThemeState, setThemePreference, type ThemePreference } from '../../shared/state/useThemeState'
 
 defineProps<{ showName?: boolean }>()
 
 const router = useRouter()
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const { themePreference } = useThemeState()
+const localePref = localePreference()
 
 const userLabel = computed(() => account.email || 'veyq')
 const profileLabel = computed(() => userLabel.value.charAt(0).toUpperCase() || 'V')
@@ -26,10 +27,10 @@ const profileLabel = computed(() => userLabel.value.charAt(0).toUpperCase() || '
 const userMenu = ref<InstanceType<typeof TieredMenu> | null>(null)
 
 const languageMenuItems = computed<MenuItem[]>(() =>
-  SUPPORTED_LOCALES.map((next) => ({
-    label: LOCALE_LABELS[next],
-    icon: locale.value === next ? 'pi pi-check' : 'pi pi-circle',
-    command: () => setLocale(next as SupportedLocale),
+  LOCALE_PREFERENCES.map((pref) => ({
+    label: pref === 'system' ? t('shell.themeSystem') : LOCALE_LABELS[pref],
+    icon: localePref.value === pref ? 'pi pi-check' : 'pi pi-circle',
+    command: () => setLocalePreference(pref),
   })),
 )
 const themeMenuItems = computed<MenuItem[]>(() =>

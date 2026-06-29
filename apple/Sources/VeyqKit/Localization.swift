@@ -8,6 +8,13 @@ public enum Localization {
         strings[locale]?[key] ?? strings["en"]?[key] ?? key
     }
 
+    /// Resolve a language preference ("system" / "en" / "de") to a concrete locale. "system" follows the OS:
+    /// German if the system language is German, otherwise English (we ship en + de).
+    public static func resolve(preference: String, systemLanguageCode: String?) -> String {
+        if preference == "en" || preference == "de" { return preference }
+        return systemLanguageCode == "de" ? "de" : "en"
+    }
+
     public static let strings: [String: [String: String]] = [
         "en": [
             "home.spaces": "Spaces", "home.personal": "Personal",

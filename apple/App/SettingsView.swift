@@ -19,7 +19,8 @@ struct SettingsView: View {
                         Text(l10n.t("settings.light")).tag("light")
                         Text(l10n.t("settings.dark")).tag("dark")
                     }
-                    Picker(l10n.t("settings.language"), selection: $l10n.locale) {
+                    Picker(l10n.t("settings.language"), selection: $l10n.preference) {
+                        Text(l10n.t("settings.system")).tag("system")
                         Text("English").tag("en")
                         Text("Deutsch").tag("de")
                     }
