@@ -1,7 +1,7 @@
 ---
 id: cr-0035
 title: Apple settings — theme + language (parity of the web ProfileMenu)
-status: planned
+status: done
 satisfies: []
 adrs: []
 invariants: []

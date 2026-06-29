@@ -1,7 +1,7 @@
 ---
 id: cr-0034
 title: Apple Memory shell + browse (native parity of cr-0030)
-status: planned
+status: done
 satisfies: [uc.memory.browse]
 adrs: [0012]
 invariants: [operator-blind-e2ee]
