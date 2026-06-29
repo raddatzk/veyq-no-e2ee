@@ -53,6 +53,13 @@ switcher are **later slices** (their data layer — favorites, my-tenants — is
 The Apple app, after unlock, shows the personal space's Memory tree (folders + Memories) and supports
 drill-in + create/rename/delete — reusing the legacy iOS layout, operator-blind (names on device).
 Responsive: verified on an iPhone **and** an iPad/macOS destination. `swift test` + both `xcodebuild`
-destinations green; coverage updated. **Out of scope (later Apple slices):** favorites, theme/language
+destinations green; coverage updated.
+
+**Live-verified (2026-06-29):** the env-gated `RoundTripUITests.testConnectSignInUnlock` drove
+connect→sign-in→unlock→shell against the real dev backend (`127.0.0.1:8080`) on **iPhone 17 Pro (iOS 26)**
+and **iPad Pro 11" (iOS 26)** — both `TEST SUCCEEDED`. The shell renders the real decrypted tree (the
+web-created "Italien 2027" Memory + "Reisen 2026" folder), proving the native client opens the same
+operator-blind scope: **compact** opens to the browse with the spaces sidebar as a drawer
+(`preferredCompactColumn = .detail`); **regular** shows the sidebar + content columns side by side. **Out of scope (later Apple slices):** favorites, theme/language
 settings, the tenant/space switcher (need the favorites + my-tenants data layer ported first); the Memory
 detail/gallery.

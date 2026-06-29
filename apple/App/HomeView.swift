@@ -17,9 +17,12 @@ struct HomeView: View {
     @State private var renameTarget: VeyqClient.TreeNode?
     @State private var renameName = ""
     @State private var deleteTarget: VeyqClient.TreeNode?
+    /// On compact width (iPhone) open straight to the browse (the content), with the spaces sidebar as a
+    /// drawer — on regular width (iPad / macOS) both columns show side by side.
+    @State private var preferredColumn: NavigationSplitViewColumn = .detail
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
             sidebar
         } detail: {
             browse

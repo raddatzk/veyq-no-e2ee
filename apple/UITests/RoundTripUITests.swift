@@ -51,8 +51,12 @@ final class RoundTripUITests: XCTestCase {
         app.buttons["level.secretKeyEachTime"].activate()   // no default — pick a level to enable Unlock
         unlockButton.activate()
 
-        // 4 — Home (unlocked)
-        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25), "Home should show after unlock")
+        // 4 — Home (unlocked): the Memory shell — its browse (the "Memories" section) or, on a compact
+        // split-view that opens to the sidebar, the spaces rail (the "Sign out" control).
+        let memories = app.staticTexts["Memories"]
+        let signOut = app.buttons["Sign out"]
+        XCTAssertTrue(memories.waitForExistence(timeout: 25) || signOut.waitForExistence(timeout: 5),
+                      "Home shell should show after unlock")
         shoot(app, shotDir, "05-home")
     }
 
