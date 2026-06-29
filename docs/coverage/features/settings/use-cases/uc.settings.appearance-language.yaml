@@ -1,0 +1,20 @@
+useCase: uc.settings.appearance-language
+feature: settings
+title: Set appearance & language
+acceptanceCriteria:
+  - id: theme-switch-persists
+    text: Choosing a theme (system/light/dark) flips the whole palette live and is persisted on the device.
+    coverage:
+      web: { unit: [src/shared/state/useThemeState.test.ts] }
+      apple: { e2e: [apple/UITests/RoundTripUITests.swift] }
+  - id: language-switch-live
+    text: Choosing a language (en/de) re-renders every visible string live (no content reload) and is persisted.
+    coverage:
+      web: { unit: [src/i18n/setLocale.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/LocalizationTests.swift], e2e: [apple/UITests/RoundTripUITests.swift] }
+  - id: resolution-fallback
+    text: An unknown locale falls back to English; an unknown key resolves to itself; every key has both translations.
+    coverage:
+      apple: { unit: [apple/Tests/VeyqKitTests/LocalizationTests.swift] }
+gaps:
+  android: "Not built — web + Apple first (no Android UI head for the shell/settings yet)."
