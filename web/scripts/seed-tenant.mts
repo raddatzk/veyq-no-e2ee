@@ -5,21 +5,24 @@
 //
 // Flow (Server-Owner must already exist — run seed-owner.mts first):
 //   1. log in as the Server Owner (challenge-response, Model B auth) to get an admin session,
-//   2. POST /api/tenants → a PENDING tenant for `domain`, inviting `ownerEmail` (the dev mailer LOGS the
-//      bootstrap-secret invite link — we read it back from the backend log),
+//   2. POST /api/tenants → a PENDING tenant for `domain`, inviting `ownerEmail` (the dev mailer appends the
+//      bootstrap secret to veyq.tenant.invite.dev-file — we read it back from there, cr-0046),
 //   3. cold-birth the tenant-owner account + seal the first scope grant to its own identity, and
 //      POST /api/tenants/accept/register → activates the tenant (ACTIVE) with the OWNER membership.
 //
-//   cd web && VEYQ_LOG=/tmp/veyq-cr0042.log npx tsx scripts/seed-tenant.mts
+// Persists the result (creds + raw key material) into web/scripts/.seed/dev-seed.json (cr-0046).
+//
+//   cd web && npx tsx scripts/seed-tenant.mts   # backend must run with veyq.tenant.invite.dev-file set
 //
 // Env: VEYQ_BASE (http://localhost:8080), VEYQ_OWNER_EMAIL/PASSWORD (the Server Owner, default the
 // seed-owner values), VEYQ_DOMAIN (127.0.0.1 — must be a dotted hostname; `localhost` is rejected by the
-// backend's mailer hostname guard), VEYQ_TENANT_OWNER_EMAIL/PASSWORD/NAME (the new tenant owner), VEYQ_LOG
-// (the backend log file carrying the invite link).
-import { readFileSync } from 'node:fs'
+// backend's mailer hostname guard), VEYQ_TENANT_OWNER_EMAIL/PASSWORD/NAME (the new tenant owner),
+// VEYQ_INVITE_FILE (the mailer's dev-invite file; default ../backend/build/dev-invites.jsonl).
+import { fileURLToPath } from 'node:url'
 import { fromB64std, b64std } from '../src/shared/base64'
 import { buildAccount } from '../src/features/account/register/accountBirth'
 import * as v1 from '../src/shared/crypto/v1'
+import { writeTenant, materializeKeys, awaitInvite } from './devSeed.mts'
 
 const BASE = process.env.VEYQ_BASE ?? 'http://localhost:8080'
 const ownerEmail = process.env.VEYQ_OWNER_EMAIL ?? 'kevin@veyq.test'
@@ -29,7 +32,8 @@ const tenantOwnerEmail = process.env.VEYQ_TENANT_OWNER_EMAIL ?? 'owner@veyq.test
 const tenantOwnerPassword = process.env.VEYQ_TENANT_OWNER_PASSWORD ?? 'correct horse battery staple'
 const tenantOwnerName = process.env.VEYQ_TENANT_OWNER_NAME ?? 'Tenant Owner'
 const tenantName = process.env.VEYQ_TENANT_NAME ?? 'local'
-const logFile = process.env.VEYQ_LOG ?? '/tmp/veyq-cr0042.log'
+// The mailer's dev-invite file (veyq.tenant.invite.dev-file), default the backend's build/ path (cr-0046).
+const inviteFile = process.env.VEYQ_INVITE_FILE ?? fileURLToPath(new URL('../../backend/build/dev-invites.jsonl', import.meta.url))
 
 const json = (r: Response) => r.json() as Promise<any>
 const post = (path: string, body: unknown, token?: string) =>
@@ -53,13 +57,9 @@ const created = await post('/api/tenants', { tenantName, domain, ownerEmail: ten
 if (!created.ok) { console.error('createTenant failed', created.status, await created.text()); process.exit(1) }
 const { tenantId } = await json(created)
 
-// Read the bootstrap secret back from the dev mailer's log line (the invite link's URL fragment). Strip
-// ANSI colour codes first — quarkusDev colourises the console even under --console=plain.
-// eslint-disable-next-line no-control-regex
-const log = readFileSync(logFile, 'utf8').replace(/\x1b\[[0-9;]*m/g, '')
-const matches = [...log.matchAll(/Tenant invite for [^\s]+ \(expires [^)]+\): https?:\/\/[^/]+\/tenant\/accept#(\S+)/g)]
-const bootstrapSecret = matches.at(-1)?.[1]
-if (!bootstrapSecret) { console.error(`no invite link found in ${logFile} — is the backend logging to it?`); process.exit(1) }
+// Read the bootstrap secret from the dev-invite file the mailer appends to (veyq.tenant.invite.dev-file) —
+// deterministic, no console-log scrape / ANSI / flush race (cr-0046). Polls until the line appears.
+const bootstrapSecret = await awaitInvite(inviteFile, tenantOwnerEmail)
 
 // 3 — cold-birth the tenant owner + seal the first scope grant to its own identity, then accept (public).
 const built = buildAccount(tenantOwnerEmail, tenantOwnerPassword, instanceSalt)
@@ -81,7 +81,13 @@ const accepted = await post('/api/tenants/accept/register', {
 })
 if (!accepted.ok) { console.error('accept/register failed', accepted.status, await accepted.text()); process.exit(1) }
 
+// Persist the seed (creds + raw keys) so a harness can reuse this tenant owner without re-seeding (cr-0046).
+writeTenant(BASE, domain, {
+  email: tenantOwnerEmail, password: tenantOwnerPassword, secretKey: built.emergencyKit.secretKey,
+  ...materializeKeys(built, tenantOwnerPassword), tenantId, domain,
+})
+
 console.log(JSON.stringify({
-  ok: true, tenantId, domain, base: BASE,
+  ok: true, tenantId, domain, base: BASE, seedFile: true,
   email: tenantOwnerEmail, password: tenantOwnerPassword, secretKey: built.emergencyKit.secretKey,
 }, null, 2))

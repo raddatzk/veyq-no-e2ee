@@ -5,13 +5,23 @@ here; the server is blind.
 
 ## Prove your work
 - `npm run check` (typecheck + test + build).
-- API client is **generated**: `npm run generate:api` from `../contracts/api/*.openapi.yaml`. Never
-  hand-write the client.
+- API client is **generated** and **not tracked** (gitignored, mirrors the backend) — `npm run generate:api`
+  from `../contracts/api/*.openapi.yaml` produces it (and runs automatically on install via `prepare`). Never
+  hand-write the client. Regenerate after a contract change.
+- **Seed a reproducible local instance (cr-0046):** against a **fresh** instance —
+  `docker compose -f infra/docker-compose.yml down -v && up -d`, start the backend with the dev-invite file
+  (`VEYQ_TENANT_INVITE_DEV_FILE=$PWD/backend/build/dev-invites.jsonl ./gradlew -p backend quarkusDev`), then
+  `cd web && npm run seed:dev`. It mints a Server Owner + a `127.0.0.1` tenant owner (with personal scope) and
+  writes **`web/scripts/.seed/dev-seed.json`** (gitignored) with credentials **and** raw key material. A node
+  harness loads it via `scripts/devSeed.mts` → `loadDevSeed()` / `vaultFromSeed()` (login+unlock **or** direct
+  vault inject); `media.e2e.test.ts` reads it automatically when `VEYQ_EMAIL` etc. are unset. (`POST /api/tenants`
+  rejects a numeric domain, so `seed:dev` creates the tenant under a hostname and remaps the domain to
+  `127.0.0.1` in the dev DB.)
 - **Run the Memory shell locally (cr-0030):** `npm run dev` (Vite proxies `/api` → `127.0.0.1:8080` with
   `changeOrigin`, so the backend sees `Host: 127.0.0.1`, port stripped). The shell needs the signed-in user to
-  belong to a tenant whose **`domain` is `127.0.0.1`** (the active tenant is resolved from the Host) — create
-  one with that domain, or seed it in dev. Then login → unlock auto-births the personal scope and the browse
-  renders. If no tenant claims the Host you get the *“no space”* state (expected).
+  belong to a tenant whose **`domain` is `127.0.0.1`** (the active tenant is resolved from the Host) — `npm run
+  seed:dev` sets this up. Then login → unlock auto-births the personal scope and the browse renders. If no
+  tenant claims the Host you get the *“no space”* state (expected).
 
 ## Conventions
 - **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from

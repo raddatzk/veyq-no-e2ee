@@ -2,8 +2,13 @@ package com.veyq.app.features.admin.tenant
 
 import io.quarkus.runtime.LaunchMode
 import jakarta.enterprise.context.ApplicationScoped
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.jboss.logging.Logger
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.time.Instant
+import java.util.Optional
 
 /**
  * Delivers a tenant-owner invite. A **port**: the structural slice (cr-0009) only needs the link minted and
@@ -24,9 +29,17 @@ interface TenantInviteMailer {
  *    invite secret never lands in server logs;
  *  - the owner-supplied `domain` is validated as a bare hostname before it is interpolated into the link,
  *    so it can't inject a different scheme/host/path (phishing / link-injection) once a real mailer ships.
+ *
+ * Dev-only invite **file** (cr-0046): when `veyq.tenant.invite.dev-file` is set, each invite is also appended
+ * as one JSON line `{ownerEmail, token, expiresAt}` so the local seed orchestrator can read the bootstrap
+ * secret back deterministically (no console-log scraping / ANSI / flush race). The append sits **after** the
+ * production early-return, so a `LaunchMode.NORMAL` runtime never writes the secret; the default is empty
+ * (no file). Best-effort: a file error is logged and never breaks invite delivery.
  */
 @ApplicationScoped
-class LoggingTenantInviteMailer : TenantInviteMailer {
+class LoggingTenantInviteMailer(
+    @param:ConfigProperty(name = "veyq.tenant.invite.dev-file") private val devFile: Optional<String>,
+) : TenantInviteMailer {
     private val log = Logger.getLogger(LoggingTenantInviteMailer::class.java)
 
     override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant) {
@@ -41,11 +54,26 @@ class LoggingTenantInviteMailer : TenantInviteMailer {
         }
         val link = "https://$domain/tenant/accept#$token"
         log.infof("Tenant invite for %s (expires %s): %s", ownerEmail, expiresAt, link)
+        appendDevFile(ownerEmail, token, expiresAt)
+    }
+
+    /** Dev-only: append the invite as one JSON line so the seed orchestrator can read the bootstrap secret. */
+    private fun appendDevFile(ownerEmail: String, token: String, expiresAt: Instant) {
+        val target = devFile.orElse("").ifBlank { return }
+        val line = """{"ownerEmail":${jsonStr(ownerEmail)},"token":${jsonStr(token)},"expiresAt":${jsonStr(expiresAt.toString())}}""" + "\n"
+        runCatching {
+            val path = Path.of(target)
+            path.parent?.let { Files.createDirectories(it) }
+            Files.writeString(path, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+        }.onFailure { log.warnf("Could not write dev-invite file %s: %s", target, it.message) }
     }
 
     private companion object {
         /** A bare DNS hostname (labels of letters/digits/hyphens, dot-separated) — no scheme, port, path or
          *  userinfo, so the interpolated link can only ever point at the host the Server-Owner registered. */
         val HOSTNAME = Regex("^(?=.{1,253}$)([A-Za-z0-9](-?[A-Za-z0-9])*)(\\.[A-Za-z0-9](-?[A-Za-z0-9])*)+$")
+
+        /** Minimal JSON string encoder (escapes the two chars that can break a one-line JSON value). */
+        fun jsonStr(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
     }
 }

@@ -47,3 +47,21 @@ stripPrefix or host rewrite would break the signature). Entry is `http://localho
 for that public endpoint via `veyq.blob-store.public-endpoint=http://localhost:18080` (CORS-free, ADR 0013 §4).
 Native apps PUT/GET directly and are never subject to CORS. (The backend + web are added behind Traefik in a
 fuller deployment; this profile routes only the bucket path.)
+
+## Seeding a reproducible dev instance (cr-0046)
+
+Bring up a known `{Server Owner + 127.0.0.1 tenant owner + personal scope}` in one command and persist it
+(credentials **and** raw key material) to a gitignored `web/scripts/.seed/dev-seed.json` a harness can load:
+
+```sh
+docker compose -f infra/docker-compose.yml down -v && docker compose -f infra/docker-compose.yml up -d
+# start the backend writing the dev-invite file (so the seeder reads the bootstrap secret deterministically):
+VEYQ_TENANT_INVITE_DEV_FILE=$PWD/backend/build/dev-invites.jsonl ./gradlew -p backend quarkusDev
+cd web && npm run seed:dev
+```
+
+`veyq.tenant.invite.dev-file` (dev/test only, never written in production) is the second sink of the invite
+line the logging mailer already emits — no console-log scraping. `seed:dev` creates the tenant under a hostname
+(`POST /api/tenants` rejects a numeric domain) and remaps the domain to `127.0.0.1` in the dev DB so the web
+dev server (which presents `Host: 127.0.0.1`) resolves it. Load it from a harness via `web/scripts/devSeed.mts`
+(`loadDevSeed()` / `vaultFromSeed()`).

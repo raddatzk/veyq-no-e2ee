@@ -8,6 +8,7 @@
 // Override via env: VEYQ_BASE / VEYQ_EMAIL / VEYQ_NAME / VEYQ_PASSWORD. Requires a not-yet-set-up instance.
 import { fromB64std } from '../src/shared/base64'
 import { buildAccount } from '../src/features/account/register/accountBirth'
+import { writeOwner, materializeKeys } from './devSeed.mts'
 
 const BASE = process.env.VEYQ_BASE ?? 'http://localhost:8080'
 const email = process.env.VEYQ_EMAIL ?? 'kevin@veyq.test'
@@ -21,7 +22,8 @@ if (!status.setupRequired) {
 }
 const instanceSalt = fromB64std(status.instanceSalt)
 
-const { material, emergencyKit } = buildAccount(email, password, instanceSalt)
+const built = buildAccount(email, password, instanceSalt)
+const { material, emergencyKit } = built
 const body = {
   email,
   displayName,
@@ -43,4 +45,6 @@ if (!res.ok) {
   process.exit(1)
 }
 const result = await res.json()
-console.log(JSON.stringify({ ok: true, userId: result.userId, email, password, secretKey: emergencyKit.secretKey, base: BASE }, null, 2))
+// Persist the seed (creds + raw keys) so a harness can reuse this owner without re-seeding (cr-0046).
+writeOwner(BASE, { email, password, secretKey: emergencyKit.secretKey, ...materializeKeys(built, password), userId: result.userId })
+console.log(JSON.stringify({ ok: true, userId: result.userId, email, password, secretKey: emergencyKit.secretKey, base: BASE, seedFile: true }, null, 2))
