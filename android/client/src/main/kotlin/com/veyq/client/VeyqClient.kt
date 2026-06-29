@@ -26,6 +26,8 @@ import com.veyq.api.media.model.BlobDownloadsBatchRequest
 import com.veyq.api.media.model.BlobUploadRequestItem
 import com.veyq.api.media.model.BlobUploadsBatchRequest
 import com.veyq.api.media.model.MediaBatchRequest
+import com.veyq.api.media.model.MediaDerivativeKind
+import com.veyq.api.media.model.MediaDerivativeUpload
 import com.veyq.api.media.model.MediaRequestItem
 import com.veyq.api.setup.api.SetupApi
 import com.veyq.crypto.V1
@@ -56,6 +58,7 @@ class VeyqClient(
     client: OkHttpClient = defaultClient(session),
     private val deviceSecurity: DeviceSecurityStore = DisabledDeviceSecurityStore,
     private val blobTransport: BlobTransport = OkHttpBlobTransport(),
+    private val mediaDeriver: MediaDeriver = NoOpMediaDeriver,
 ) {
     private val setup = SetupApi(instance.baseUrl, client)
     private val login = LoginApi(instance.baseUrl, client)
@@ -477,41 +480,83 @@ class VeyqClient(
 
     // --- Media blobs (cr-0028, en.memory.media) ---
 
-    /** A node's media for read-back: the blob id + the metadata needed to open it. */
-    data class MediaItem(
-        val mediaId: String,
+    /** Everything needed to open one blob: its id + the metadata + the `K_blob` wrap (under `K_mem`). */
+    data class BlobRef(
         val blobId: String,
         val chunkCount: Int,
         val byteSize: Long,
         val wrappedBlobKey: String,
     )
 
+    /** One role-tagged derivative tier (THUMBNAIL/PREVIEW) of a media — its own blob with its own wrap. */
+    data class MediaDerivative(val kind: MediaDerivativeKind, val ref: BlobRef)
+
+    /** Which tier of a media to fetch — grid (thumbnail), lightbox (preview), or the pristine original. */
+    enum class MediaTier { GRID, LIGHTBOX, ORIGINAL }
+
     /**
-     * Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`), upload the ciphertext
-     * chunks direct-to-store via presigned PUTs, and attach the result to `nodeId` (a MEMORY/CHAPTER). Returns
-     * the new (blobId, mediaId). Operator-blind: bytes never touch the backend.
+     * A node's media for read-back: the **original** blob ref + its role-tagged derivative tiers. A gallery
+     * fetches [gridRef] (thumbnail) for the grid, [lightboxRef] (preview) for the lightbox, and the original
+     * only on download — never pulling the full original to render a grid (en.memory.derivatives).
      */
-    fun addMedia(scopeId: String, nodeId: String, memoryKey: ByteArray, data: ByteArray): Pair<String, String> {
-        val blobKey = randomBytes(32)
-        val wrappedBlobKey = b64encode(V1.symWrap(memoryKey, blobKey, KBLOB_CTX, randomBytes(12)))
+    data class MediaItem(
+        val mediaId: String,
+        val original: BlobRef,
+        val derivatives: List<MediaDerivative>,
+    ) {
+        /** Grid tier (small): the thumbnail derivative, or the original when a media has none. */
+        val gridRef: BlobRef get() = derivatives.firstOrNull { it.kind == MediaDerivativeKind.THUMBNAIL }?.ref ?: original
+        /** Lightbox tier (medium): the preview derivative, or the original when a media has none. */
+        val lightboxRef: BlobRef get() = derivatives.firstOrNull { it.kind == MediaDerivativeKind.PREVIEW }?.ref ?: original
+        /** Download tier: always the pristine original. */
+        val downloadRef: BlobRef get() = original
 
-        val chunks = chunkify(data)
-        val total = chunks.size
-        val frames = chunks.mapIndexed { i, chunk -> V1.sealFrame(blobKey, i, total, chunk, randomBytes(12)) }
-        val byteSize = frames.sumOf { it.size.toLong() }
+        fun ref(tier: MediaTier): BlobRef = when (tier) {
+            MediaTier.GRID -> gridRef
+            MediaTier.LIGHTBOX -> lightboxRef
+            MediaTier.ORIGINAL -> downloadRef
+        }
+    }
 
-        // start — reserve the session + presign one PUT per chunk
-        val started = withRefresh { startUploads(scopeId, total, byteSize, wrappedBlobKey) }
-        val up = started.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
-        up.error?.let { throw VeyqError.MediaItemFailed(it) }
-        val uploadId = up.uploadId ?: throw VeyqError.MediaItemFailed(null)
-        val puts = up.presignedPuts ?: throw VeyqError.StoreUnavailable
+    /** A blob sealed and ready to upload: the wrap + the ciphertext frames + the declared shape. */
+    private class SealedBlob(val wrappedBlobKey: String, val frames: List<ByteArray>) {
+        val chunkCount get() = frames.size
+        val byteSize get() = frames.sumOf { it.size.toLong() }
+    }
 
-        // PUT each sealed frame straight to the store
-        puts.sortedBy { it.index }.forEach { ref -> blobTransport.put(ref.url, frames[ref.index]) }
+    /**
+     * Generate the original + its role-tagged derivatives, seal **each under its own** fresh random `K_blob`
+     * (wrapped under `K_mem`), upload all ciphertext chunks direct-to-store in **one batch**, and attach the
+     * result to `nodeId` (a MEMORY/CHAPTER) as one role-tagged media. For an image the deriver produces a
+     * thumbnail + preview downscale; for a video, one first-frame poster reused for both tiers; any other type
+     * attaches the original only (the gallery falls back to an icon). Returns the **original**'s
+     * (blobId, mediaId). Operator-blind: bytes never touch the backend.
+     */
+    fun addMedia(scopeId: String, nodeId: String, memoryKey: ByteArray, data: ByteArray, mediaType: String): Pair<String, String> {
+        val tiers = deriveTiers(data, mediaType)
+        // index 0 = original; the rest are the role-tagged derivatives, in order
+        val sealedTiers = tiers.map { (kind, bytes) -> kind to sealBlob(memoryKey, bytes) }
+        val sealedAll = listOf(sealBlob(memoryKey, data)) + sealedTiers.map { it.second }
 
-        // complete — the backend stats the objects (declare-then-verify) and attaches the media
-        val done = withRefresh { completeOne(scopeId, uploadId.toString(), nodeId) }
+        // start — reserve one upload session + presign one PUT per chunk, per blob
+        val started = withRefresh { startUploads(scopeId, sealedAll) }
+        if (started.size != sealedAll.size) throw VeyqError.MediaItemFailed(null)
+
+        val uploadIds = started.mapIndexed { i, result ->
+            result.error?.let { throw VeyqError.MediaItemFailed(it) }
+            val uploadId = result.uploadId ?: throw VeyqError.MediaItemFailed(null)
+            val puts = result.presignedPuts ?: throw VeyqError.StoreUnavailable
+            // PUT each sealed frame of this blob straight to the store
+            puts.sortedBy { it.index }.forEach { ref -> blobTransport.put(ref.url, sealedAll[i].frames[ref.index]) }
+            uploadId.toString()
+        }
+
+        // complete — one logical media: the original upload + its role-tagged derivative uploads. The backend
+        // stats every blob's objects (declare-then-verify) and attaches the media atomically.
+        val derivatives = sealedTiers.mapIndexed { i, (kind, _) ->
+            MediaDerivativeUpload(kind, java.util.UUID.fromString(uploadIds[i + 1]))
+        }
+        val done = withRefresh { completeMedia(scopeId, uploadIds[0], nodeId, derivatives) }
         val m = done.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
         m.error?.let { throw VeyqError.MediaItemFailed(it) }
         val blobId = m.blobId ?: throw VeyqError.MediaItemFailed(null)
@@ -519,46 +564,83 @@ class VeyqClient(
         return blobId.toString() to mediaId.toString()
     }
 
-    /** List a node's media (opaque metadata + the K_blob wrap). */
+    /** List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier). */
     fun listMedia(scopeId: String, nodeId: String): List<MediaItem> =
         withRefresh { fetchNodeMedia(scopeId, nodeId) }.map { s ->
-            MediaItem(s.mediaId.toString(), s.blobId.toString(), s.chunkCount, s.byteSize, s.wrappedBlobKey)
+            MediaItem(
+                mediaId = s.mediaId.toString(),
+                original = BlobRef(s.blobId.toString(), s.chunkCount, s.byteSize, s.wrappedBlobKey),
+                derivatives = (s.derivatives ?: emptyList()).map { d ->
+                    MediaDerivative(d.kind, BlobRef(d.blobId.toString(), d.chunkCount, d.byteSize, d.wrappedBlobKey))
+                },
+            )
         }
 
     /**
-     * Open a media blob: unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
-     * direct-from-store, and `openFrame` them back to the original plaintext (the AAD position check applies).
+     * Open one tier of a media: pick the blob ref (grid=thumbnail / lightbox=preview / original) and open it.
+     * Defaults to the original.
      */
-    fun openMedia(scopeId: String, memoryKey: ByteArray, media: MediaItem): ByteArray {
-        val blobKey = V1.symUnwrap(memoryKey, b64decode(media.wrappedBlobKey), KBLOB_CTX)
+    fun openMedia(scopeId: String, memoryKey: ByteArray, media: MediaItem, tier: MediaTier = MediaTier.ORIGINAL): ByteArray =
+        openBlob(scopeId, memoryKey, media.ref(tier))
 
-        val results = withRefresh { presignDownload(scopeId, media.blobId) }
+    /**
+     * Open a single blob ref (any tier): unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the
+     * ciphertext frames direct-from-store, and `openFrame` them back to plaintext (the AAD position check applies).
+     */
+    fun openBlob(scopeId: String, memoryKey: ByteArray, ref: BlobRef): ByteArray {
+        val blobKey = V1.symUnwrap(memoryKey, b64decode(ref.wrappedBlobKey), KBLOB_CTX)
+
+        val results = withRefresh { presignDownload(scopeId, ref.blobId) }
         val d = results.firstOrNull() ?: throw VeyqError.MediaItemFailed(null)
         d.error?.let { throw VeyqError.MediaItemFailed(it) }
         val gets = d.presignedGets ?: throw VeyqError.StoreUnavailable
 
         val ordered = gets.sortedBy { it.index }
         val out = java.io.ByteArrayOutputStream()
-        ordered.forEachIndexed { i, ref ->
-            val frame = blobTransport.get(ref.url)
+        ordered.forEachIndexed { i, get ->
+            val frame = blobTransport.get(get.url)
             out.write(V1.openFrame(blobKey, i, ordered.size, frame))
         }
         return out.toByteArray()
     }
 
-    private fun startUploads(scopeId: String, chunkCount: Int, byteSize: Long, wrappedBlobKey: String) = try {
+    /** Generate the role-tagged derivatives for a source (image: two downscales; video: one poster reused for
+     *  both; other: none). The pixel stage is the injected [mediaDeriver] (a stub in `:client` unit tests). */
+    private fun deriveTiers(data: ByteArray, mediaType: String): List<Pair<MediaDerivativeKind, ByteArray>> = when {
+        mediaType.startsWith("image/") -> listOf(
+            MediaDerivativeKind.THUMBNAIL to mediaDeriver.deriveImage(data, DerivativeSpec.THUMBNAIL.maxEdge, DerivativeSpec.THUMBNAIL.quality),
+            MediaDerivativeKind.PREVIEW to mediaDeriver.deriveImage(data, DerivativeSpec.PREVIEW.maxEdge, DerivativeSpec.PREVIEW.quality),
+        )
+        mediaType.startsWith("video/") -> {
+            val poster = mediaDeriver.deriveVideoPoster(data, DerivativeSpec.PREVIEW.quality)   // one poster serves both tiers
+            listOf(MediaDerivativeKind.THUMBNAIL to poster, MediaDerivativeKind.PREVIEW to poster)
+        }
+        else -> emptyList()   // no derivable frame → original only (the gallery falls back to an icon)
+    }
+
+    /** Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`). */
+    private fun sealBlob(memoryKey: ByteArray, data: ByteArray): SealedBlob {
+        val blobKey = randomBytes(32)
+        val wrappedBlobKey = b64encode(V1.symWrap(memoryKey, blobKey, KBLOB_CTX, randomBytes(12)))
+        val chunks = chunkify(data)
+        val total = chunks.size
+        val frames = chunks.mapIndexed { i, chunk -> V1.sealFrame(blobKey, i, total, chunk, randomBytes(12)) }
+        return SealedBlob(wrappedBlobKey, frames)
+    }
+
+    private fun startUploads(scopeId: String, blobs: List<SealedBlob>) = try {
         media.startBlobUploads(
             java.util.UUID.fromString(scopeId),
-            BlobUploadsBatchRequest(items = listOf(BlobUploadRequestItem(chunkCount, byteSize, wrappedBlobKey))),
+            BlobUploadsBatchRequest(items = blobs.map { BlobUploadRequestItem(it.chunkCount, it.byteSize, it.wrappedBlobKey) }),
         ).results
     } catch (e: MediaClientException) {
         throw mapMedia(e)
     }
 
-    private fun completeOne(scopeId: String, uploadId: String, nodeId: String) = try {
+    private fun completeMedia(scopeId: String, originalUploadId: String, nodeId: String, derivatives: List<MediaDerivativeUpload>) = try {
         media.completeMedia(
             java.util.UUID.fromString(scopeId),
-            MediaBatchRequest(items = listOf(MediaRequestItem(java.util.UUID.fromString(uploadId), java.util.UUID.fromString(nodeId)))),
+            MediaBatchRequest(items = listOf(MediaRequestItem(java.util.UUID.fromString(originalUploadId), java.util.UUID.fromString(nodeId), derivatives))),
         ).results
     } catch (e: MediaClientException) {
         throw mapMedia(e)

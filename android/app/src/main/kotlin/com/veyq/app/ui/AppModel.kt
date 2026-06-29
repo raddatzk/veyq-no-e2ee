@@ -1,5 +1,6 @@
 package com.veyq.app.ui
 
+import com.veyq.app.media.AndroidMediaDeriver
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +83,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     suspend fun connect(rawUrl: String): ConnectResult {
         val baseUrl = normalizeBaseUrl(rawUrl)
             ?: return ConnectResult.Failed("That doesn't look like a valid address.")
-        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity)
+        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity, mediaDeriver = AndroidMediaDeriver())
         return try {
             val setupNeeded = withContext(Dispatchers.IO) { client.setupRequired() }
             if (setupNeeded) {
@@ -196,7 +197,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         val baseUrl = inst?.let { normalizeBaseUrl(it) }
         if (baseUrl == null || acct == null) { phase = Phase.CONNECT; return }
 
-        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity)
+        val client = VeyqClient(VeyqInstance(baseUrl), deviceSecurity = deviceSecurity, mediaDeriver = AndroidMediaDeriver())
         val level = withContext(Dispatchers.IO) { client.currentLevel(acct) }
         if (level != DeviceLevel.BIOMETRIC && level != DeviceLevel.NO_LOGIN) { phase = Phase.CONNECT; return }
         this.client = client

@@ -72,7 +72,9 @@ class LiveRoundTripTest {
         val (nodeId, memoryKey) = c.createMemory(personal.id.toString(), scopeKey, "E2E media ${System.nanoTime()}")
 
         val data = ByteArray(300 * 1024) { ((it * 17 + 3) and 0xff).toByte() }
-        val (blobId, _) = c.addMedia(personal.id.toString(), nodeId, memoryKey, data)
+        // octet-stream → no derivable frame, so this stays the original-only byte-transport round-trip the
+        // derivatives pipeline (cr-0048) leaves untouched; the live image+video tier round-trip is the manual gate.
+        val (blobId, _) = c.addMedia(personal.id.toString(), nodeId, memoryKey, data, "application/octet-stream")
         assertTrue(blobId.isNotEmpty())
 
         val item = assertNotNull(c.listMedia(personal.id.toString(), nodeId).firstOrNull())

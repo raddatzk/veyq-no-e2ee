@@ -67,4 +67,9 @@ sealed class VeyqError(message: String? = null) : Exception(message) {
 
     /** A direct-to-store PUT/GET to a presigned URL failed (non-2xx / transport error, cr-0028). */
     object BlobTransferFailed : VeyqError("blob transfer failed")
+
+    /** The pixel stage failed to generate a derivative — undecodable source, a JPEG encode/first-frame
+     * failure, or no [MediaDeriver] configured (cr-0048). Generation is best-effort; the original is never
+     * affected. */
+    object MediaDeriveFailed : VeyqError("media derive failed")
 }
