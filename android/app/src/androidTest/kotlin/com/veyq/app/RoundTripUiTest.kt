@@ -22,14 +22,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The full connect → sign-in → unlock UI round-trip against a REAL instance, on the emulator (cr-0016
- * phase 5) — the Android twin of Apple's `RoundTripUITests`. Env-gated: skipped unless a `veyqBase` is
- * passed as an instrumentation argument, so a hermetic `connectedAndroidTest` doesn't require a backend.
- * Unlike XCUITest's `SecureField`, Compose accepts `performTextInput` into masked fields, so the
- * credentials are typed for real — no prefill seam needed.
+ * The full connect → sign-in → unlock → **Memory shell** UI round-trip against a REAL instance, on the
+ * emulator (cr-0016 phase 5, shell since cr-0039) — the Android twin of Apple's `RoundTripUITests`. Env-gated:
+ * skipped unless a `veyqBase` is passed as an instrumentation argument, so a hermetic `connectedAndroidTest`
+ * doesn't require a backend. Unlike XCUITest's `SecureField`, Compose accepts `performTextInput` into masked
+ * fields, so the credentials are typed for real — no prefill seam needed.
  *
  * It doubles as the screenshot capture: the rendered window is saved at each phase
- * (connect / sign-in / home) into the app's external files dir for `adb pull`.
+ * (connect / sign-in / unlock / home) into the test storage for `adb pull`.
  *
  *   ./gradlew :app:connectedDebugAndroidTest \
  *     -Pandroid.testInstrumentationRunnerArguments.veyqBase=http://10.0.2.2:8080 \
@@ -44,6 +44,23 @@ class RoundTripUiTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     private val args = InstrumentationRegistry.getArguments()
+
+    /** The Memory shell's stable marker: the "Create" toolbar action is always present once browse renders. */
+    private fun homeShown() = compose.onAllNodesWithTag("Create").fetchSemanticsNodes().isNotEmpty()
+
+    /** On compact width the rail is a modal drawer; open it to reach the profile controls (sign-out /
+     *  untrust). On expanded width the rail is permanent so "Sign out" is already present and this no-ops. */
+    private fun openRail() {
+        if (compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isEmpty()) {
+            compose.onNodeWithTag("Spaces").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isNotEmpty() }
+        }
+    }
+
+    private fun signOut() {
+        openRail()
+        compose.onNodeWithTag("Sign out").performClick()
+    }
 
     @Test
     fun connectSignInUnlock() {
@@ -79,19 +96,52 @@ class RoundTripUiTest {
         compose.onNodeWithTag("level.SECRET_KEY_EACH_TIME").performScrollTo().performClick()   // no default — pick a level
         compose.onNodeWithTag("Unlock").performScrollTo().performClick()
 
-        // The home screen confirms the operator-blind result.
-        compose.waitUntil(timeoutMillis = 20_000) {
-            compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("Unlocked").assertIsDisplayed()
-        compose.onNodeWithText(email).assertIsDisplayed()
+        // The Memory shell confirms the operator-blind result: the personal space opens + decrypts on-device.
+        compose.waitUntil(timeoutMillis = 20_000) { homeShown() }
+        compose.onNodeWithTag("Create").assertIsDisplayed()
+
+        // Create a folder + a Memory (sealed on-device, only ciphertext crosses the wire), then drill into the
+        // folder and back via the breadcrumb — proving browse + create + client-side navigation end-to-end.
+        // Names carry a per-run suffix so re-runs / running on both the phone + tablet don't hit the
+        // per-parent slug-uniqueness (409) on the shared dev instance.
+        val tag = (System.currentTimeMillis() % 100000).toString()
+        val folder = "Reisen $tag"
+        val memory = "Italien $tag"
+        createNode("New folder", folder)
+        createNode("New memory", memory)
         capture("android-04-home")
+
+        // Drill into the folder: the Memory lives at the root, so it is NOT visible inside the folder.
+        compose.onNodeWithTag("folder.$folder").performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText(memory).fetchSemanticsNodes().isEmpty()
+        }
+        capture("android-05-folder")
+        // Back to the root: the Memory is visible again.
+        compose.onNodeWithTag("Back").performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText(memory).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /** Open the create menu, pick [menuText] ("New folder" / "New memory"), type [name], confirm, and wait
+     *  for the node to appear in the level. */
+    private fun createNode(menuText: String, name: String) {
+        compose.onNodeWithTag("Create").performClick()
+        compose.onNodeWithText(menuText).performClick()
+        compose.onNodeWithTag("name.field").performTextInput(name)
+        compose.onNodeWithText("Create").performClick()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /**
      * cr-0021 — the device-trust lifecycle through the real UI + real Android Keystore: floor unlock at
      * "Only my password" → home shows trusted → sign out → re-login **folds straight to home** (no floor)
-     * → untrust → re-login lands back on the floor. Writes the trust-* design references.
+     * → untrust → re-login lands back on the floor. The trust status + untrust control live in the shell's
+     * spaces rail (cr-0039); on compact the rail is a modal drawer, so [openRail] opens it first. Writes the
+     * trust-* design references.
      */
     @Test
     fun trustDeviceLifecycle() {
@@ -110,13 +160,15 @@ class RoundTripUiTest {
         // Robustness: a prior run may have left this device trusted (Keystore persists). If sign-in folds
         // straight to home, untrust + sign out + sign in again to reach a known untrusted floor.
         compose.waitUntil(timeoutMillis = 20_000) {
-            compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() || homeShown()
         }
-        if (compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isNotEmpty()) {
-            compose.onNodeWithTag("Stop trusting this device").performClick()
-            compose.waitUntil(timeoutMillis = 10_000) {
-                compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isEmpty()
+        if (homeShown()) {
+            openRail()
+            if (compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isNotEmpty()) {
+                compose.onNodeWithTag("Stop trusting this device").performClick()
+                compose.waitUntil(10_000) {
+                    compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isEmpty()
+                }
             }
             compose.onNodeWithTag("Sign out").performClick()
             signIn(email, password)
@@ -129,15 +181,17 @@ class RoundTripUiTest {
         capture("android-trust-01-floor-chooser")
         compose.onNodeWithTag("Unlock").performScrollTo().performClick()
 
-        // 2 — home, now trusted (the untrust control is present).
-        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() }
+        // 2 — home, now trusted (the untrust control is present in the rail).
+        compose.waitUntil(timeoutMillis = 20_000) { homeShown() }
+        openRail()
         compose.onNodeWithTag("Stop trusting this device").assertIsDisplayed()
         capture("android-trust-02-home-trusted")
 
         // 3 — sign out → sign in → folds straight to home (no floor).
         compose.onNodeWithTag("Sign out").performClick()
         signIn(email, password)
-        compose.waitUntil(timeoutMillis = 20_000) { compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis = 20_000) { homeShown() }
+        openRail()
         compose.onNodeWithTag("Stop trusting this device").assertIsDisplayed()
         capture("android-trust-03-relogin-fold")
 

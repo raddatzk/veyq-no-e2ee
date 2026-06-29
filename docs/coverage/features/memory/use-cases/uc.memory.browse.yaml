@@ -21,6 +21,7 @@ acceptanceCriteria:
     coverage:
       web: { unit: [src/features/memory/browse.test.ts, src/features/memory/location.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MemoryBrowseTests.swift] }
+      android: { unit: [android/client/src/test/kotlin/com/veyq/client/MemoryBrowseTest.kt] }
   - id: create-folder-and-memory
     text: Creating a folder/Memory seals the name + blinded slug under K_SC and POSTs only ciphertext (a Memory births its random K_mem).
     coverage:
@@ -51,4 +52,4 @@ acceptanceCriteria:
       http: { e2e: [http/content/content.http] }
 gaps:
   apple: "Shell UI built (cr-0034, compiles on iOS + macOS) over the covered data layer; browse logic is unit-covered (MemoryBrowseTests — level + breadcrumb derivation AND the drill path-stack navigation: navigate-to-crumb + step-back-on-delete, cr-0038). The remaining gap is a live UITest round-trip exercising the shell UI end-to-end; favorites/settings/switcher are later slices."
-  android: "Native data layer covered (ContentTreeTest/ScopesTest); the shell UI (breadcrumb, cards, dialogs) is web-first (cr-0030) — not built natively yet."
+  android: "Shell UI built (cr-0039, `:app:assembleDebug` green) over the covered data layer; browse logic is unit-covered (MemoryBrowseTest). A live UITest round-trip + favorites/settings/switcher are pending."

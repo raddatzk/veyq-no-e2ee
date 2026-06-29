@@ -60,6 +60,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     private var client: VeyqClient? = null
 
+    /** The data-layer client once an instance is connected — read-only for the Memory shell ([HomeModel]).
+     *  The twin of Apple's `app.client`. */
+    val activeClient: VeyqClient? get() = client
+
     /** The password from the login step, carried to the unlock step. Transient — never persisted. */
     private var carriedPassword: String = ""
 

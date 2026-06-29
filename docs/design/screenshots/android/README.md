@@ -57,6 +57,11 @@ Captured by the `RoundTripUiTest` instrumented test (`android/app/src/androidTes
    `cd backend && ./gradlew quarkusDev`.
 2. Seed an owner with a known Secret Key: `cd web && npx tsx scripts/seed-owner.mts` (prints
    email / password / secretKey).
+   - **For the Memory-shell captures (cr-0039)** the owner also needs a **tenant whose domain matches the
+     emulator's Host** — the personal scope is tenant-scoped by Host (resolved as `10.0.2.2`, port-stripped).
+     `seed-owner` mints only the owner, so create the tenant + the owner's membership first (the web admin
+     create-tenant + accept flow for domain `10.0.2.2`). Without it the shell correctly shows
+     "Couldn't open your space" (no tenant → no scope).
 3. Boot the emulator and run the UI round-trip (the emulator reaches the host instance at `10.0.2.2`):
    ```sh
    ~/Library/Android/sdk/emulator/emulator -avd Pixel_10 -no-snapshot &

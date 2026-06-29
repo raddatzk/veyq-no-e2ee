@@ -22,10 +22,11 @@ import org.junit.runner.RunWith
 
 /**
  * cr-0022 — the **L3 "no login" auto-restore** through the real UI + real Android Keystore: floor unlock at
- * "Open straight in" → home → a fresh activity launch (cleared ViewModelStore → a new AppModel re-runs
- * `bootstrap`) **opens straight to home** (no connect, no floor). Uses `createEmptyComposeRule` +
- * `ActivityScenario` so the activity can be closed + relaunched mid-test. Env-gated. (L2 biometric needs an
- * enrolled fingerprint on the emulator — a manual smoke, like Apple's Face ID.)
+ * "Open straight in" → the Memory shell → a fresh activity launch (cleared ViewModelStore → a new AppModel
+ * re-runs `bootstrap`) **opens straight to the shell** (no connect, no floor). Uses `createEmptyComposeRule` +
+ * `ActivityScenario` so the activity can be closed + relaunched mid-test. The shell + untrust control are
+ * cr-0039; on compact the rail is a modal drawer, so [openRail] opens it for the cleanup untrust. Env-gated.
+ * (L2 biometric needs an enrolled fingerprint on the emulator — a manual smoke, like Apple's Face ID.)
  */
 @RunWith(AndroidJUnit4::class)
 class NoLoginAutoRestoreUiTest {
@@ -35,6 +36,17 @@ class NoLoginAutoRestoreUiTest {
 
     private val args = InstrumentationRegistry.getArguments()
 
+    /** The Memory shell's stable marker: the "Create" toolbar action is present once browse renders. */
+    private fun homeShown() = compose.onAllNodesWithTag("Create").fetchSemanticsNodes().isNotEmpty()
+
+    /** On compact width the rail is a modal drawer; open it to reach the untrust / sign-out controls. */
+    private fun openRail() {
+        if (compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isEmpty()) {
+            compose.onNodeWithTag("Spaces").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isNotEmpty() }
+        }
+    }
+
     @Test
     fun noLoginAutoRestore() {
         val base = args.getString("veyqBase")
@@ -42,7 +54,6 @@ class NoLoginAutoRestoreUiTest {
         val email = requireNotNull(args.getString("veyqEmail")) { "veyqEmail arg required" }
         val password = requireNotNull(args.getString("veyqPassword")) { "veyqPassword arg required" }
         val secret = requireNotNull(args.getString("veyqSecret")) { "veyqSecret arg required" }
-        val shotDir = args.getString("veyqShotDir") // optional
 
         var scenario = ActivityScenario.launch(MainActivity::class.java)
 
@@ -59,10 +70,7 @@ class NoLoginAutoRestoreUiTest {
         capture("android-trust-l3-01-floor-no-login")
         compose.onNodeWithTag("Unlock").performScrollTo().performClick()
 
-        compose.waitUntil(20_000) {
-            compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() &&
-                compose.onAllNodesWithTag("Stop trusting this device").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitUntil(20_000) { homeShown() }
         capture("android-trust-l3-02-home")
 
         // Cold restart: destroy the activity (clears its ViewModelStore) + launch a fresh one → bootstrap
@@ -70,12 +78,13 @@ class NoLoginAutoRestoreUiTest {
         scenario.close()
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        compose.waitUntil(20_000) { compose.onAllNodesWithText("Unlocked").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { homeShown() }
         assert(compose.onAllNodesWithTag("Instance URL").fetchSemanticsNodes().isEmpty()) { "no connect on auto-restore" }
         assert(compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isEmpty()) { "no floor on auto-restore" }
         capture("android-trust-l3-03-autorestore")
 
-        // Cleanup so the device + owner are left clean.
+        // Cleanup so the device + owner are left clean — untrust from the rail.
+        openRail()
         compose.onNodeWithTag("Stop trusting this device").performClick()
         scenario.close()
     }

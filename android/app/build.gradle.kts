@@ -80,6 +80,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended") // folder/photo/person/settings for the Memory shell (cr-0039)
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     androidTestImplementation(composeBom)
