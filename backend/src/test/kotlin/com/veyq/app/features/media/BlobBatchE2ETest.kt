@@ -88,7 +88,7 @@ class BlobBatchE2ETest {
 
         // complete → backend stats the objects (declare-then-verify), attaches the media
         val blobId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"uploadId":"$uploadId","nodeId":"$memory"}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory"}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].blobId", notNullValue())

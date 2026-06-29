@@ -2,18 +2,34 @@ useCase: uc.memory.gallery
 feature: memory
 title: Open a Memory & browse its gallery
 status: planned
+# The gallery UI is not built on any surface yet, so this stays `planned`. But the three-tier data layer it
+# rides on — en.memory.derivatives (cr-0045): on-device thumbnail/preview generation + role-tagged read-back —
+# now has real web + backend tests, so the data-path criteria carry coverage while the UI render stays a gap
+# (the same shape uc.memory.browse uses: logic covered, the live UI round-trip still pending).
 acceptanceCriteria:
   - id: thumbnail-grid
     text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem).
+    coverage:
+      backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
+      web: { unit: [src/features/memory/media.test.ts] }
   - id: lightbox-preview
     text: Opening an item shows its preview (not the multi-MB original) full-view, with prev/next paging the grid order.
+    coverage:
+      backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
+      web: { unit: [src/features/memory/media.test.ts] }
   - id: download-original
     text: An explicit download fetches the pristine, full-resolution original (the only byte-identical copy).
+    coverage:
+      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip], e2e: [BlobBatchE2ETest.uploadThenDownloadRoundTripsBytes] }
+      web: { unit: [src/features/memory/media.test.ts] }
   - id: favorite-toggle
     text: The header toggle pins/unpins the Memory (operator-blind, via en.memory.favorites).
   - id: operator-blind-fetch
     text: Every tier (thumbnail/preview/original) is fetched as ciphertext via presigned GET and decrypted on device; the server sees no pixel, filename, or content key.
+    coverage:
+      backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
+      web: { unit: [src/features/memory/media.test.ts] }
 gaps:
-  web: "Planned — built first (ADR 0010), on the en.memory.derivatives tiers (which land before the gallery). No UI yet; the underlying media transport is covered by en.memory.media / cr-0028."
-  apple: "Planned — native parity after web; the shell open-hook exists (cr-0034), the detail view does not."
-  android: "Planned — native parity after web; the shell open-hook exists (cr-0039), the detail view does not."
+  web: "Data layer covered (cr-0045): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested with a stubbed deriver, plus a manual live Canvas/<video> round-trip. The remaining gap is the gallery grid/lightbox UI itself (uc.memory.gallery render) — its own CR."
+  apple: "Planned — native derivatives + detail-view parity after web (their own CRs); the shell open-hook exists (cr-0034), neither the deriver nor the detail view does."
+  android: "Planned — native derivatives + detail-view parity after web (their own CRs); the shell open-hook exists (cr-0039), neither the deriver nor the detail view does."

@@ -79,7 +79,8 @@ class BlobEntity : PanacheEntityBase {
 
 /**
  * A media (cr-0028): links a blob to a node (MEMORY/CHAPTER). The share grain stays the Memory's `K_mem`;
- * this row is only the blob→node link.
+ * this row is only the blob→node link. `blobId` is the **original** (pristine) blob; role-tagged derivative
+ * tiers link via [MediaDerivativeEntity] (cr-0045).
  */
 @Entity
 @Table(name = "veyq_media")
@@ -101,4 +102,31 @@ class MediaEntity : PanacheEntityBase {
     lateinit var createdAt: Instant
 
     companion object : PanacheCompanionBase<MediaEntity, String>
+}
+
+/**
+ * A media derivative (en.memory.derivatives, cr-0045): a role-tagged (THUMBNAIL/PREVIEW) blob of a media,
+ * generated + sealed client-side. Each derivative is its **own** blob with its own `K_blob` wrap — never a
+ * key shared with the original or the other tier. Operator-blind: only the opaque role tag + a blob link.
+ */
+@Entity
+@Table(name = "veyq_media_derivative")
+class MediaDerivativeEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "id", length = 36)
+    lateinit var id: String
+
+    @Column(name = "media_id", nullable = false, length = 36)
+    lateinit var mediaId: String
+
+    @Column(name = "kind", nullable = false, length = 16)
+    lateinit var kind: String
+
+    @Column(name = "blob_id", nullable = false, length = 36)
+    lateinit var blobId: String
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    companion object : PanacheCompanionBase<MediaDerivativeEntity, String>
 }

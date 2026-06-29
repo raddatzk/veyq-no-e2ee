@@ -10,6 +10,8 @@ import com.veyq.app.generated.model.BlobUploadsBatchResponse
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MediaBatchRequest
 import com.veyq.app.generated.model.MediaBatchResponse
+import com.veyq.app.generated.model.MediaDerivativeKind
+import com.veyq.app.generated.model.MediaDerivativeSummary
 import com.veyq.app.generated.model.MediaResultItem
 import com.veyq.app.generated.model.MediaSummary
 import com.veyq.app.generated.model.PresignedUrl
@@ -52,7 +54,13 @@ class MediaResource(
     }
 
     override fun completeMedia(scopeId: UUID, mediaBatchRequest: MediaBatchRequest): Response {
-        val items = mediaBatchRequest.items.map { it.uploadId.toString() to it.nodeId.toString() }
+        val items = mediaBatchRequest.items.map { item ->
+            CompleteItem(
+                nodeId = item.nodeId.toString(),
+                originalUploadId = item.originalUploadId.toString(),
+                derivatives = item.derivatives.orEmpty().map { DerivativeDeclare(it.kind.value, it.uploadId.toString()) },
+            )
+        }
         return when (val o = handler.complete(identity.principal.name, scopeId.toString(), items)) {
             is CompleteOutcome.Results -> Response.ok(
                 MediaBatchResponse(
@@ -98,6 +106,16 @@ class MediaResource(
         byteSize = row.byteSize,
         wrappedBlobKey = row.wrappedBlobKey,
         manifest = row.manifest,
+        derivatives = row.derivatives.map(::toDerivativeSummary),
+    )
+
+    private fun toDerivativeSummary(d: DerivativeRow) = MediaDerivativeSummary(
+        kind = MediaDerivativeKind.decode(d.kind),
+        blobId = UUID.fromString(d.blobId),
+        chunkCount = d.chunkCount,
+        byteSize = d.byteSize,
+        wrappedBlobKey = d.wrappedBlobKey,
+        manifest = d.manifest,
     )
 
     private fun error(status: Response.Status, code: String): Response =

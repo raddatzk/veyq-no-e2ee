@@ -12,6 +12,12 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && npm run dev -- --port 8089"],
       "port": 8089
+    },
+    {
+      "name": "veyq-web-smoke",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && VEYQ_SMOKE_HOST=media.test npm run dev"],
+      "port": 5173
     }
   ]
 }

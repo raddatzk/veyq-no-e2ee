@@ -77,13 +77,16 @@ paths:
     post:
       tags: [media]
       operationId: completeMedia
-      summary: Complete N uploads + attach each as media to a node.
+      summary: Complete a media's uploads (original + derivatives) + attach to a node.
       description: >
-        For each item the server verifies the upload session, **stats the stored chunk objects**
+        Each item is **one logical media**: an `originalUploadId` plus up to two role-tagged `derivatives`
+        (THUMBNAIL, PREVIEW — generated client-side, [en.memory.derivatives](../../docs/features/memory/enablers/en.memory.derivatives.md)).
+        The server verifies **every** upload session of the item, **stats the stored chunk objects** per blob
         (declare-then-verify: count + total bytes must match what was declared, else the objects are purged and
-        the item fails `budget_exceeded`), records a `blob` (with the per-chunk size `manifest`) and a `media`
-        row linking the blob to `nodeId`, and returns `{ blobId, mediaId }` — or a per-item error. The target
-        node must be a **MEMORY** or **CHAPTER** (`illegal_target` on a FOLDER).
+        the item fails `budget_exceeded`), records one `blob` per upload (each with its own per-chunk size
+        `manifest` and `K_blob` wrap), and one `media` row linking the original blob to `nodeId` with a
+        derivative row per derivative. Returns `{ blobId (the original), mediaId }` — or a per-item error. The
+        target node must be a **MEMORY** or **CHAPTER** (`illegal_target` on a FOLDER).
       security:
         - bearerAuth: []
       parameters:
@@ -95,8 +98,13 @@ paths:
             schema: { $ref: "#/components/schemas/MediaBatchRequest" }
             example:
               items:
-                - uploadId: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
-                  nodeId: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+                - nodeId: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+                  originalUploadId: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+                  derivatives:
+                    - kind: THUMBNAIL
+                      uploadId: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+                    - kind: PREVIEW
+                      uploadId: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
       responses:
         "200":
           description: Per-item completion results (success carries blob+media ids; failure carries a code).
@@ -122,10 +130,13 @@ paths:
       operationId: listNodeMedia
       summary: List a node's media (opaque metadata for read-back).
       description: >
-        Returns each media attached to the node with its `mediaId`, `blobId`, `chunkCount`, total `byteSize`,
-        the per-chunk size `manifest`, and the `wrappedBlobKey`. The client unwraps `K_blob` under `K_mem`,
-        presigns the downloads (`blob-downloads-batch`), and opens the chunks with `openFrame`. The operator
-        sees only ciphertext sizes.
+        Returns each media attached to the node with its `mediaId`, the **original** blob ref (`blobId`,
+        `chunkCount`, total `byteSize`, the per-chunk size `manifest`, `wrappedBlobKey`), **plus** its
+        role-tagged `derivatives` (THUMBNAIL, PREVIEW — each its own blob ref with its own wrap). A gallery
+        fetches the thumbnail tier for the grid, the preview for the lightbox, and the original only on
+        download — never pulling the full original to render a grid. The client unwraps each `K_blob` under
+        `K_mem`, presigns the downloads (`blob-downloads-batch`), and opens the chunks with `openFrame`. The
+        operator sees only ciphertext sizes.
       security:
         - bearerAuth: []
       parameters:
@@ -290,18 +301,45 @@ components:
 
     MediaRequestItem:
       type: object
-      required: [uploadId, nodeId]
+      description: >
+        One logical media: the original upload plus up to two role-tagged derivative uploads (THUMBNAIL,
+        PREVIEW). Each `*UploadId` references a session opened by `startBlobUploads`.
+      required: [originalUploadId, nodeId]
       properties:
-        uploadId:
+        originalUploadId:
           type: string
           format: uuid
-          description: The upload session opened by `startBlobUploads`.
+          description: The upload session for the **original** (pristine) blob, opened by `startBlobUploads`.
           example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
         nodeId:
           type: string
           format: uuid
           description: The MEMORY/CHAPTER node to attach the media to.
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+        derivatives:
+          type: [array, "null"]
+          description: >
+            Role-tagged derivative uploads (THUMBNAIL, PREVIEW), each its own blob. Empty/absent for a media
+            type with no derivable frame (the gallery falls back to an icon). At most one of each kind.
+          maxItems: 2
+          items: { $ref: "#/components/schemas/MediaDerivativeUpload" }
+
+    MediaDerivativeUpload:
+      type: object
+      required: [kind, uploadId]
+      properties:
+        kind: { $ref: "#/components/schemas/MediaDerivativeKind" }
+        uploadId:
+          type: string
+          format: uuid
+          description: The upload session for this derivative blob, opened by `startBlobUploads`.
+          example: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+
+    MediaDerivativeKind:
+      type: string
+      description: The role of a derivative blob — THUMBNAIL (grid) or PREVIEW (lightbox).
+      enum: [THUMBNAIL, PREVIEW]
+      example: THUMBNAIL
 
     MediaBatchResponse:
       type: object
@@ -313,11 +351,15 @@ components:
 
     MediaResultItem:
       type: object
-      description: One per request item, in order. Success carries `blobId` + `mediaId`; failure carries `error`.
+      description: >
+        One per request item, in order. Success carries the **original** `blobId` + `mediaId`; failure carries
+        `error`. The whole item is atomic — if any of its uploads (original or a derivative) fails to verify,
+        none are attached.
       properties:
         blobId:
           type: [string, "null"]
           format: uuid
+          description: The **original** blob's id, on success (derivative blob ids surface via `listNodeMedia`).
           example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
         mediaId:
           type: [string, "null"]
@@ -332,6 +374,10 @@ components:
     # --- read-back -----------------------------------------------------------
     MediaSummary:
       type: object
+      description: >
+        A media's read-back view: the **original** blob ref plus its role-tagged `derivatives`. A gallery
+        fetches `derivatives[THUMBNAIL]` for the grid, `derivatives[PREVIEW]` for the lightbox, and the
+        original blob only on download.
       required: [mediaId, blobId, chunkCount, byteSize, wrappedBlobKey]
       properties:
         mediaId: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
@@ -350,7 +396,37 @@ components:
           items: { type: integer, format: int64, example: 65536 }
         wrappedBlobKey:
           type: string
-          description: The blob's `K_blob` wrapped under `K_mem` (opaque base64).
+          description: The original blob's `K_blob` wrapped under `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: d3JhcHBlZC1rLWJsb2I=
+        derivatives:
+          type: [array, "null"]
+          description: Role-tagged derivative tiers (THUMBNAIL, PREVIEW), each its own blob ref with its own wrap.
+          items: { $ref: "#/components/schemas/MediaDerivativeSummary" }
+
+    MediaDerivativeSummary:
+      type: object
+      description: A derivative tier's blob ref — same opaque metadata as the original, plus its role `kind`.
+      required: [kind, blobId, chunkCount, byteSize, wrappedBlobKey]
+      properties:
+        kind: { $ref: "#/components/schemas/MediaDerivativeKind" }
+        blobId: { type: string, format: uuid, example: 8b2c1f2d-3e4a-5b6c-7c3f-0e2a9b1d4a6e }
+        chunkCount:
+          type: integer
+          format: int32
+          example: 1
+        byteSize:
+          type: integer
+          format: int64
+          example: 65536
+        manifest:
+          type: [array, "null"]
+          description: Per-chunk ciphertext byte sizes in chunk order (ciphertext sizes only).
+          items: { type: integer, format: int64, example: 65536 }
+        wrappedBlobKey:
+          type: string
+          description: The derivative blob's own `K_blob` wrapped under `K_mem` (opaque base64).
           contentEncoding: base64
           maxLength: 256
           example: d3JhcHBlZC1rLWJsb2I=

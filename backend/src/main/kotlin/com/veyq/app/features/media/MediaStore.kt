@@ -7,7 +7,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.UUID
 
-/** A node's media for read-back (blob metadata + the K_blob wrap). */
+/** A node's media for read-back: the original blob's metadata + wrap, plus its role-tagged derivative tiers. */
 data class MediaRow(
     val mediaId: String,
     val blobId: String,
@@ -15,7 +15,21 @@ data class MediaRow(
     val byteSize: Long,
     val wrappedBlobKey: String,
     val manifest: List<Long>?,
+    val derivatives: List<DerivativeRow>,
 )
+
+/** One role-tagged derivative tier of a media (its own blob metadata + wrap). */
+data class DerivativeRow(
+    val kind: String,
+    val blobId: String,
+    val chunkCount: Int,
+    val byteSize: Long,
+    val wrappedBlobKey: String,
+    val manifest: List<Long>?,
+)
+
+/** A verified derivative upload to attach: its role + session + the verified per-chunk manifest. */
+data class DerivativeAttach(val kind: String, val session: UploadSessionEntity, val manifest: List<Long>?)
 
 /**
  * Persistence for media blobs (cr-0028). Operator-blind: stores ciphertext wraps + opaque metadata only.
@@ -50,9 +64,45 @@ class MediaStore {
     fun findSession(scopeId: String, uploadId: String): UploadSessionEntity? =
         UploadSessionEntity.findById(uploadId)?.takeIf { it.scopeId == scopeId }
 
-    /** Promote a verified session to a blob + attach it to the node, consuming the session. Returns ids. */
+    /**
+     * Promote a media's verified sessions to blobs + attach to the node, consuming every session. The original
+     * session becomes `veyq_media.blob_id`; each derivative becomes its own blob + a `veyq_media_derivative`
+     * row. One transaction — all blobs, the media, and the derivative rows commit together. Returns
+     * (originalBlobId, mediaId).
+     */
     @Transactional
-    fun attach(session: UploadSessionEntity, nodeId: String, manifest: List<Long>?): Pair<String, String> {
+    fun attach(
+        original: UploadSessionEntity,
+        nodeId: String,
+        originalManifest: List<Long>?,
+        derivatives: List<DerivativeAttach>,
+    ): Pair<String, String> {
+        val originalBlobId = persistBlob(original, originalManifest)
+        val mediaId = UUID.randomUUID().toString()
+        MediaEntity().apply {
+            id = mediaId
+            scopeId = original.scopeId
+            this.nodeId = nodeId
+            this.blobId = originalBlobId
+            createdAt = Instant.now()
+        }.persist()
+        for (d in derivatives) {
+            val derivBlobId = persistBlob(d.session, d.manifest)
+            MediaDerivativeEntity().apply {
+                id = UUID.randomUUID().toString()
+                this.mediaId = mediaId
+                kind = d.kind
+                blobId = derivBlobId
+                createdAt = Instant.now()
+            }.persist()
+        }
+        UploadSessionEntity.deleteById(original.id)
+        derivatives.forEach { UploadSessionEntity.deleteById(it.session.id) }
+        return originalBlobId to mediaId
+    }
+
+    /** Persist a blob row from a verified session; returns the new blob id. */
+    private fun persistBlob(session: UploadSessionEntity, manifest: List<Long>?): String {
         val blobId = UUID.randomUUID().toString()
         BlobEntity().apply {
             id = blobId
@@ -64,23 +114,18 @@ class MediaStore {
             this.manifest = manifest?.let { encodeManifest(it) }
             createdAt = Instant.now()
         }.persist()
-        val mediaId = UUID.randomUUID().toString()
-        MediaEntity().apply {
-            id = mediaId
-            scopeId = session.scopeId
-            this.nodeId = nodeId
-            this.blobId = blobId
-            createdAt = Instant.now()
-        }.persist()
-        UploadSessionEntity.deleteById(session.id)
-        return blobId to mediaId
+        return blobId
     }
 
     fun listNodeMedia(scopeId: String, nodeId: String): List<MediaRow> {
         val media = MediaEntity.find("scopeId = ?1 and nodeId = ?2", scopeId, nodeId).list()
         return media.mapNotNull { m ->
             val blob = BlobEntity.findById(m.blobId) ?: return@mapNotNull null
-            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest))
+            val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
+                val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
+                DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
+            }
+            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives)
         }
     }
 

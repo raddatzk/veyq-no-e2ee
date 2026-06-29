@@ -13,6 +13,12 @@ data class PresignedRef(val index: Int, val url: String)
 /** One blob to start: declared shape + the K_blob wrap. */
 data class UploadDeclare(val chunkCount: Int, val byteSize: Long, val wrappedBlobKey: String)
 
+/** One derivative upload of a media to complete: its role + the upload session id. */
+data class DerivativeDeclare(val kind: String, val uploadId: String)
+
+/** One logical media to complete: the original upload + role-tagged derivative uploads, attached to a node. */
+data class CompleteItem(val nodeId: String, val originalUploadId: String, val derivatives: List<DerivativeDeclare>)
+
 /** Per-item result of `start`: success carries the session + presigned PUTs (null when the store can't presign). */
 data class UploadItemResult(val uploadId: String?, val presignedPuts: List<PresignedRef>?, val error: String?)
 
@@ -82,31 +88,67 @@ class MediaHandler(
         return UploadItemResult(uploadId = uploadId, presignedPuts = puts, error = null)
     }
 
-    fun complete(userId: String, scopeId: String, items: List<Pair<String, String>>): CompleteOutcome {
+    fun complete(userId: String, scopeId: String, items: List<CompleteItem>): CompleteOutcome {
         if (!store.isMember(userId, scopeId)) return CompleteOutcome.NoScope
-        return CompleteOutcome.Results(items.map { (uploadId, nodeId) -> completeOne(scopeId, uploadId, nodeId) })
+        return CompleteOutcome.Results(items.map { completeOne(scopeId, it) })
     }
 
-    private fun completeOne(scopeId: String, uploadId: String, nodeId: String): CompleteItemResult {
-        val session = store.findSession(scopeId, uploadId)
-            ?: return CompleteItemResult(null, null, "upload_not_found")
-        val node = store.findNode(scopeId, nodeId)
+    /**
+     * Complete one logical media (original + derivative uploads). The item is **atomic**: the node + every
+     * upload session are resolved first, then **every** blob is declare-then-verified, and only if all pass are
+     * the blobs + media + derivative rows attached. On a budget failure the item's staged objects are purged.
+     */
+    private fun completeOne(scopeId: String, item: CompleteItem): CompleteItemResult {
+        val node = store.findNode(scopeId, item.nodeId)
             ?: return CompleteItemResult(null, null, "node_not_found")
         if (node.kind == NodeEntity.FOLDER) return CompleteItemResult(null, null, "illegal_target")
 
-        val manifest = if (blobStore.canPresign) {
-            val keys = (0 until session.chunkCount).map { chunkKey(session.storageKey, it) }
-            val sizes = keys.map { blobStore.stat(it) }
-            if (sizes.any { it == null } || sizes.filterNotNull().sum() > session.byteSize) {
-                blobStore.delete(keys) // declare-then-verify failed: purge the staged objects
-                return CompleteItemResult(null, null, "budget_exceeded")
-            }
-            sizes.filterNotNull()
-        } else {
-            null // dev store: no transport, trust the declaration (the byte path is e2e-only)
+        val original = store.findSession(scopeId, item.originalUploadId)
+            ?: return CompleteItemResult(null, null, "upload_not_found")
+        val derivSessions = item.derivatives.map { d ->
+            val s = store.findSession(scopeId, d.uploadId)
+                ?: return CompleteItemResult(null, null, "upload_not_found")
+            d.kind to s
         }
-        val (blobId, mediaId) = store.attach(session, nodeId, manifest)
+        val allSessions = listOf(original) + derivSessions.map { it.second }
+
+        // declare-then-verify every blob up front; a single budget failure fails (and purges) the whole item
+        val manifests = HashMap<String, List<Long>?>()
+        for (session in allSessions) {
+            when (val v = verifyBlob(session)) {
+                is BlobVerify.Ok -> manifests[session.id] = v.manifest
+                BlobVerify.Budget -> {
+                    purge(allSessions)
+                    return CompleteItemResult(null, null, "budget_exceeded")
+                }
+            }
+        }
+
+        val (blobId, mediaId) = store.attach(
+            original, item.nodeId, manifests[original.id],
+            derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
+        )
         return CompleteItemResult(blobId, mediaId, null)
+    }
+
+    private sealed interface BlobVerify {
+        data class Ok(val manifest: List<Long>?) : BlobVerify
+        object Budget : BlobVerify
+    }
+
+    /** Stat a session's stored objects against its declaration. Ok carries the manifest (null on the dev store). */
+    private fun verifyBlob(session: UploadSessionEntity): BlobVerify {
+        if (!blobStore.canPresign) return BlobVerify.Ok(null) // dev store: no transport, trust the declaration
+        val keys = (0 until session.chunkCount).map { chunkKey(session.storageKey, it) }
+        val sizes = keys.map { blobStore.stat(it) }
+        if (sizes.any { it == null } || sizes.filterNotNull().sum() > session.byteSize) return BlobVerify.Budget
+        return BlobVerify.Ok(sizes.filterNotNull())
+    }
+
+    /** Best-effort purge of every chunk object staged for the item's sessions (after a budget failure). */
+    private fun purge(sessions: List<UploadSessionEntity>) {
+        if (!blobStore.canPresign) return
+        blobStore.delete(sessions.flatMap { s -> (0 until s.chunkCount).map { chunkKey(s.storageKey, it) } })
     }
 
     fun listMedia(userId: String, scopeId: String, nodeId: String): ListMediaOutcome {

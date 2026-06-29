@@ -81,6 +81,14 @@ back to an icon + name. **Upload always generates the derivatives** — there is
 - **Operator-blind end to end.** Derivatives are generated and sealed on the client; the store/server hold
   only ciphertext + role tags + wraps. A smaller derivative leaks no more than the original already does
   (coarse size).
+- **Parity is by property, not bytes, for the pixel stage.** The *sealing* of every derivative stays
+  vector-gated and **byte-identical** across surfaces (`chunk_frame`, [en.memory.media](en.memory.media.md)).
+  The *pixel* stage before it — decode → downscale → JPEG re-encode — is **platform-native** (web Canvas,
+  apple ImageIO, android Bitmap) and **diverges at the byte level by construction**: a derivative need only be
+  a valid JPEG that hits the target longest-edge. Cross-surface parity for derivative *generation* is therefore
+  verified by **property** (decodable, longest edge ≤ target, dimensions/quality in range), **not** by a byte
+  vector. (This is the one deliberate exception to vector-gated parity, and it is confined to the lossy
+  re-encode — the crypto layer is unaffected.)
 - **Reuses the media transport verbatim.** No new endpoint *shape* beyond the role tagging — same
   start → direct PUT → complete+attach → direct GET → open ([en.memory.media](en.memory.media.md)),
   batch-shaped (now three blobs per item).

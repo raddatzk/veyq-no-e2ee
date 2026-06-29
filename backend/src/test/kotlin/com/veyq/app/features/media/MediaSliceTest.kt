@@ -41,7 +41,7 @@ class MediaSliceTest {
 
         // complete + attach to the Memory
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"uploadId":"$uploadId","nodeId":"$memory"}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory"}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].blobId", notNullValue())
@@ -58,6 +58,84 @@ class MediaSliceTest {
     }
 
     @Test
+    fun derivativesRoundTripWithOwnWraps() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        // three independent uploads: original + thumbnail + preview, each its own K_blob wrap
+        val original = startOne(userId, scopeId, chunkCount = 3, byteSize = 3000, wrap = "b3JpZw==")
+        val thumb = startOne(userId, scopeId, chunkCount = 1, byteSize = 100, wrap = "dGh1bWI=")
+        val preview = startOne(userId, scopeId, chunkCount = 2, byteSize = 900, wrap = "cHJldg==")
+
+        // complete: one logical media = original + two role-tagged derivatives
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body(
+                """{"items":[{"nodeId":"$memory","originalUploadId":"$original","derivatives":[""" +
+                    """{"kind":"THUMBNAIL","uploadId":"$thumb"},{"kind":"PREVIEW","uploadId":"$preview"}]}]}""",
+            )
+            .`when`().post("/api/scopes/$scopeId/media-batch")
+            .then().statusCode(200)
+            .body("results[0].blobId", notNullValue())
+            .body("results[0].mediaId", notNullValue())
+            .body("results[0].error", nullValue())
+
+        // list: the original tier + both derivative tiers, each with its OWN wrap (no shared K_blob)
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
+            .then().statusCode(200)
+            .body("[0].wrappedBlobKey", equalTo("b3JpZw=="))
+            .body("[0].chunkCount", equalTo(3))
+            .body("[0].derivatives.size()", equalTo(2))
+            .body("[0].derivatives.find { it.kind == 'THUMBNAIL' }.wrappedBlobKey", equalTo("dGh1bWI="))
+            .body("[0].derivatives.find { it.kind == 'THUMBNAIL' }.chunkCount", equalTo(1))
+            .body("[0].derivatives.find { it.kind == 'PREVIEW' }.wrappedBlobKey", equalTo("cHJldg=="))
+            .body("[0].derivatives.find { it.kind == 'PREVIEW' }.chunkCount", equalTo(2))
+    }
+
+    @Test
+    fun mediaWithoutDerivativesListsEmptyTiers() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        val original = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "b25seQ==")
+
+        // a media with no derivable frame attaches the original only
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"items":[{"nodeId":"$memory","originalUploadId":"$original"}]}""")
+            .`when`().post("/api/scopes/$scopeId/media-batch")
+            .then().statusCode(200)
+            .body("results[0].error", nullValue())
+
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
+            .then().statusCode(200)
+            .body("[0].wrappedBlobKey", equalTo("b25seQ=="))
+            .body("[0].derivatives.size()", equalTo(0))
+    }
+
+    @Test
+    fun derivativeUploadNotFoundFailsWholeItem() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        val original = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "b3JpZw==")
+        val bogus = UUID.randomUUID()
+
+        // a missing derivative session fails the whole item atomically — nothing is attached
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body(
+                """{"items":[{"nodeId":"$memory","originalUploadId":"$original",""" +
+                    """"derivatives":[{"kind":"THUMBNAIL","uploadId":"$bogus"}]}]}""",
+            )
+            .`when`().post("/api/scopes/$scopeId/media-batch")
+            .then().statusCode(200)
+            .body("results[0].error", equalTo("upload_not_found"))
+            .body("results[0].mediaId", nullValue())
+
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
+            .then().statusCode(200)
+            .body("size()", equalTo(0))
+    }
+
+    @Test
     fun partialBatchPerItemResult() {
         val (userId, scopeId) = seedMemberScope()
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
@@ -65,7 +143,7 @@ class MediaSliceTest {
         val bogus = UUID.randomUUID()
 
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"uploadId":"$uploadId","nodeId":"$memory"},{"uploadId":"$bogus","nodeId":"$memory"}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory"},{"originalUploadId":"$bogus","nodeId":"$memory"}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].mediaId", notNullValue())
@@ -80,7 +158,7 @@ class MediaSliceTest {
         val uploadId = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "aw==")
 
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"uploadId":"$uploadId","nodeId":"$folder"}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$folder"}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].error", equalTo("illegal_target"))

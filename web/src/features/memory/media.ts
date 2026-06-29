@@ -1,32 +1,288 @@
-// en.memory.media (web) — the encrypted media-blob data layer (cr-0028). Operator-blind, direct-to-store:
-// a blob is sealed client-side as chunked AEAD under a fresh random K_blob (wrapped under the Memory's K_mem,
-// ADR 0012), the ciphertext chunks travel straight to the object store via short-TTL presigned URLs
-// (ADR 0013) — never through the backend — and the backend records only opaque metadata + the wrap + the
-// media→node link. The control plane is batch-shaped; this slice sends length-1 lists. The caller opens the
-// Memory first (features/memory/tree.openMemory → K_mem) and passes K_mem in.
+// en.memory.media + en.memory.derivatives (web) — the encrypted media-blob data layer (cr-0028, cr-0045).
+// Operator-blind, direct-to-store: a blob is sealed client-side as chunked AEAD under a fresh random K_blob
+// (wrapped under the Memory's K_mem, ADR 0012), the ciphertext chunks travel straight to the object store via
+// short-TTL presigned URLs (ADR 0013) — never through the backend — and the backend records only opaque
+// metadata + the wrap + the media→node link.
+//
+// On add-media (cr-0045) the client also generates a **thumbnail** and a **preview** derivative (image: two
+// downscales; video: a first-frame poster used for both), seals **each as its own K_blob blob**, and uploads
+// the original + both derivatives in **one batch**. A media then carries them role-tagged, so a gallery fetches
+// grid = thumbnail / lightbox = preview / download = original without ever pulling the full original for a grid.
+// The pixel stage (decode → downscale → JPEG re-encode) is hidden behind an injectable MediaDeriver so the
+// wiring is unit-testable; the real Canvas/<video> decode is exercised by a live browser round-trip.
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { mediaApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import type { MediaSummary, PresignedUrl } from '../../api/generated/media'
+import type { MediaSummary, PresignedUrl, MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
 
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
 
-/** A node's media for the UI/read-back: the blob id + the metadata needed to open it. */
-export type MediaItem = {
-  mediaId: string
+/** Derivative tier specs, pinned from the legacy E2EE client (en.memory.derivatives → *The three tiers*). */
+export const TIER_SPECS: Record<MediaDerivativeKind, { maxEdge: number; quality: number }> = {
+  THUMBNAIL: { maxEdge: 400, quality: 0.8 }, // gallery grid
+  PREVIEW: { maxEdge: 2048, quality: 0.85 }, // lightbox
+}
+
+// --- read-back model -------------------------------------------------------
+
+/** Everything needed to open one blob: its id + the metadata + the K_blob wrap (under K_mem). */
+export type BlobRef = {
   blobId: string
   chunkCount: number
   byteSize: number
   wrappedBlobKey: string
 }
 
-function summaryToItem(s: MediaSummary): MediaItem {
-  return { mediaId: s.mediaId, blobId: s.blobId, chunkCount: s.chunkCount, byteSize: s.byteSize, wrappedBlobKey: s.wrappedBlobKey }
+/** One role-tagged derivative tier of a media. */
+export type MediaDerivative = { kind: MediaDerivativeKind; ref: BlobRef }
+
+/** A node's media for the UI/read-back: the original blob ref + its role-tagged derivative tiers. */
+export type MediaItem = {
+  mediaId: string
+  original: BlobRef
+  derivatives: MediaDerivative[]
 }
+
+function summaryToItem(s: MediaSummary): MediaItem {
+  return {
+    mediaId: s.mediaId,
+    original: { blobId: s.blobId, chunkCount: s.chunkCount, byteSize: s.byteSize, wrappedBlobKey: s.wrappedBlobKey },
+    derivatives: (s.derivatives ?? []).map((d) => ({
+      kind: d.kind,
+      ref: { blobId: d.blobId, chunkCount: d.chunkCount, byteSize: d.byteSize, wrappedBlobKey: d.wrappedBlobKey },
+    })),
+  }
+}
+
+// --- the pixel stage (injectable; jsdom cannot decode real Canvas/Image/Video) ---------------------------
+
+/** The source to attach: the pristine original bytes + their MIME type (decides image/video/other). */
+export type AddMediaSource = { bytes: Uint8Array; mediaType: string }
+
+/**
+ * The platform-native pixel stage behind an interface: the real one uses Canvas + `<video>`; tests inject a
+ * stub. A derivative need only be a valid JPEG at the target longest edge — parity here is by **property**, not
+ * bytes (en.memory.derivatives → *Quality notes*).
+ */
+export interface MediaDeriver {
+  /** Downscale an image Blob to a JPEG with longest edge ≤ `maxEdge` at `quality`. */
+  deriveImage(source: Blob, opts: { maxEdge: number; quality: number }): Promise<Uint8Array>
+  /** Decode a video's first frame to a JPEG poster (used for both the thumbnail and the preview tier). */
+  deriveVideoPoster(source: Blob): Promise<Uint8Array>
+}
+
+/**
+ * Longest-edge target math (pure): scale `width`×`height` so the longest edge is ≤ `maxEdge`, preserving the
+ * aspect ratio and **never upscaling**. Each side is at least 1px.
+ */
+export function scaleToMaxEdge(width: number, height: number, maxEdge: number): { width: number; height: number } {
+  const longest = Math.max(width, height)
+  if (longest <= maxEdge || longest === 0) return { width, height }
+  const scale = maxEdge / longest
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+}
+
+/** The real browser deriver — Canvas decode/downscale + `<video>` first-frame poster. DOM-only (used live). */
+export function createBrowserDeriver(): MediaDeriver {
+  return {
+    async deriveImage(source, { maxEdge, quality }) {
+      const bitmap = await createImageBitmap(source)
+      try {
+        return drawToJpeg(bitmap, bitmap.width, bitmap.height, maxEdge, quality)
+      } finally {
+        bitmap.close()
+      }
+    },
+    async deriveVideoPoster(source) {
+      const url = URL.createObjectURL(source)
+      try {
+        const video = document.createElement('video')
+        video.muted = true
+        video.preload = 'auto'
+        video.src = url
+        await onceEvent(video, 'loadeddata') // first frame decoded
+        if (video.currentTime !== 0) {
+          video.currentTime = 0
+          await onceEvent(video, 'seeked')
+        }
+        // the poster is encoded at the preview tier and reused for the (smaller) thumbnail tier as-is
+        return drawToJpeg(video, video.videoWidth, video.videoHeight, TIER_SPECS.PREVIEW.maxEdge, TIER_SPECS.PREVIEW.quality)
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    },
+  }
+}
+
+async function drawToJpeg(src: CanvasImageSource, w: number, h: number, maxEdge: number, quality: number): Promise<Uint8Array> {
+  const { width, height } = scaleToMaxEdge(w, h, maxEdge)
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas_unavailable')
+  ctx.drawImage(src, 0, 0, width, height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+  if (!blob) throw new Error('encode_failed')
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+function onceEvent(el: HTMLMediaElement, ev: 'loadeddata' | 'seeked'): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ok = () => { cleanup(); resolve() }
+    const bad = () => { cleanup(); reject(new Error(`video_${ev}_failed`)) }
+    const cleanup = () => { el.removeEventListener(ev, ok); el.removeEventListener('error', bad) }
+    el.addEventListener(ev, ok, { once: true })
+    el.addEventListener('error', bad, { once: true })
+  })
+}
+
+/** Generate the role-tagged derivatives for a source (image: two downscales; video: one poster for both). */
+async function deriveTiers(source: AddMediaSource, deriver: MediaDeriver): Promise<{ kind: MediaDerivativeKind; bytes: Uint8Array }[]> {
+  const blob = new Blob([source.bytes as BlobPart], { type: source.mediaType })
+  if (source.mediaType.startsWith('image/')) {
+    const thumbnail = await deriver.deriveImage(blob, TIER_SPECS.THUMBNAIL)
+    const preview = await deriver.deriveImage(blob, TIER_SPECS.PREVIEW)
+    return [{ kind: 'THUMBNAIL', bytes: thumbnail }, { kind: 'PREVIEW', bytes: preview }]
+  }
+  if (source.mediaType.startsWith('video/')) {
+    const poster = await deriver.deriveVideoPoster(blob) // one poster serves both tiers
+    return [{ kind: 'THUMBNAIL', bytes: poster }, { kind: 'PREVIEW', bytes: poster }]
+  }
+  return [] // no derivable frame → original only (the gallery falls back to an icon)
+}
+
+// --- add-media -------------------------------------------------------------
+
+/** A blob sealed and ready to upload: the wrap + the ciphertext frames + the declared shape. */
+type SealedBlob = { wrappedBlobKey: string; frames: Uint8Array[]; chunkCount: number; byteSize: number }
+
+/** Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`). */
+function sealBlob(memoryKey: Uint8Array, data: Uint8Array): SealedBlob {
+  const blobKey = v1.randomBytes(32)
+  const wrappedBlobKey = b64std(v1.symWrap(memoryKey, blobKey, KBLOB_CTX, v1.randomBytes(12)))
+  const plainChunks = chunkify(data)
+  const total = plainChunks.length
+  const frames = plainChunks.map((chunk, i) => v1.sealFrame(blobKey, i, total, chunk, v1.randomBytes(12)))
+  const byteSize = frames.reduce((n, f) => n + f.length, 0)
+  return { wrappedBlobKey, frames, chunkCount: total, byteSize }
+}
+
+/**
+ * Seal the original + its derivatives, each under its **own** `K_blob`, upload all ciphertext chunks
+ * direct-to-store in one batch, and attach the result to `nodeId` (a MEMORY/CHAPTER) as one role-tagged media.
+ * Returns the new ids (the original's `blobId` + the `mediaId`). `deriver` is injectable for tests.
+ */
+export async function addMedia(
+  scopeId: string,
+  nodeId: string,
+  memoryKey: Uint8Array,
+  source: AddMediaSource,
+  deriver: MediaDeriver = createBrowserDeriver(),
+): Promise<{ blobId: string; mediaId: string }> {
+  const tiers = await deriveTiers(source, deriver)
+  // index 0 = original; the rest are the role-tagged derivatives, in order
+  const sealedOriginal = sealBlob(memoryKey, source.bytes)
+  const sealedTiers = tiers.map((t) => ({ kind: t.kind, sealed: sealBlob(memoryKey, t.bytes) }))
+  const sealedAll = [sealedOriginal, ...sealedTiers.map((t) => t.sealed)]
+
+  // start — reserve one upload session + presign one PUT per chunk, per blob
+  const started = await withRefresh(() =>
+    mediaApi().startBlobUploads({
+      scopeId,
+      blobUploadsBatchRequest: {
+        items: sealedAll.map((s) => ({ chunkCount: s.chunkCount, byteSize: s.byteSize, wrappedBlobKey: s.wrappedBlobKey })),
+      },
+    }),
+  )
+  if (started.results.length !== sealedAll.length) throw new Error('upload_failed')
+  const uploads = started.results.map((r, i) => {
+    if (!r || r.error) throw new Error(r?.error ?? 'upload_failed')
+    if (!r.uploadId || !r.presignedPuts) throw new Error('store_unavailable')
+    return { uploadId: r.uploadId, putUrls: byIndex(r.presignedPuts), frames: sealedAll[i].frames }
+  })
+
+  // PUT every chunk of every blob straight to the store (no base64, no JSON, no credentials)
+  await Promise.all(uploads.flatMap((u) => u.putUrls.map((url, i) => putChunk(url, u.frames[i]))))
+
+  // complete — one logical media: the original + its role-tagged derivative uploads
+  const done = await withRefresh(() =>
+    mediaApi().completeMedia({
+      scopeId,
+      mediaBatchRequest: {
+        items: [
+          {
+            nodeId,
+            originalUploadId: uploads[0].uploadId,
+            derivatives: sealedTiers.map((t, i) => ({ kind: t.kind, uploadId: uploads[i + 1].uploadId })),
+          },
+        ],
+      },
+    }),
+  )
+  const m = done.results[0]
+  if (!m || m.error || !m.blobId || !m.mediaId) throw new Error(m?.error ?? 'attach_failed')
+  return { blobId: m.blobId, mediaId: m.mediaId }
+}
+
+// --- read-back -------------------------------------------------------------
+
+/** List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier). */
+export async function listMedia(scopeId: string, nodeId: string): Promise<MediaItem[]> {
+  const rows = await withRefresh(() => mediaApi().listNodeMedia({ scopeId, nodeId }))
+  return rows.map(summaryToItem)
+}
+
+function tierRef(item: MediaItem, kind: MediaDerivativeKind): BlobRef | undefined {
+  return item.derivatives.find((d) => d.kind === kind)?.ref
+}
+
+/** Grid tier (small): the thumbnail derivative, or the original when a media has no derivatives. */
+export function gridRef(item: MediaItem): BlobRef {
+  return tierRef(item, 'THUMBNAIL') ?? item.original
+}
+
+/** Lightbox tier (medium): the preview derivative, or the original when a media has no derivatives. */
+export function lightboxRef(item: MediaItem): BlobRef {
+  return tierRef(item, 'PREVIEW') ?? item.original
+}
+
+/** Download tier: always the pristine original. */
+export function downloadRef(item: MediaItem): BlobRef {
+  return item.original
+}
+
+/**
+ * Open a blob: unwrap its `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
+ * direct-from-store, and `openFrame` them back to plaintext (the AAD position check still applies).
+ */
+export async function openBlob(scopeId: string, memoryKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
+  const blobKey = v1.symUnwrap(memoryKey, fromB64std(ref.wrappedBlobKey), KBLOB_CTX)
+
+  const presigned = await withRefresh(() =>
+    mediaApi().presignBlobDownloads({ scopeId, blobDownloadsBatchRequest: { items: [{ blobId: ref.blobId }] } }),
+  )
+  const d = presigned.results[0]
+  if (!d || d.error || !d.presignedGets) throw new Error(d?.error ?? 'store_unavailable')
+
+  const getUrls = byIndex(d.presignedGets)
+  const frames = await Promise.all(getUrls.map((url) => getChunk(url)))
+  const chunks = frames.map((frame, i) => v1.openFrame(blobKey, i, frames.length, frame))
+  return v1.concat(...chunks)
+}
+
+/** Open the grid tier (thumbnail) of a media. */
+export const openGrid = (scopeId: string, memoryKey: Uint8Array, item: MediaItem) => openBlob(scopeId, memoryKey, gridRef(item))
+/** Open the lightbox tier (preview) of a media. */
+export const openLightbox = (scopeId: string, memoryKey: Uint8Array, item: MediaItem) => openBlob(scopeId, memoryKey, lightboxRef(item))
+/** Open the pristine original of a media (download). */
+export const openOriginal = (scopeId: string, memoryKey: Uint8Array, item: MediaItem) => openBlob(scopeId, memoryKey, downloadRef(item))
+
+// --- transport helpers -----------------------------------------------------
 
 /** Split plaintext into ≥1 chunks of at most CHUNK_SIZE bytes (a 0-byte blob is a single empty chunk). */
 function chunkify(data: Uint8Array): Uint8Array[] {
@@ -39,70 +295,6 @@ function chunkify(data: Uint8Array): Uint8Array[] {
 /** Order presigned URLs by their declared chunk index (the server returns them in order, but don't assume). */
 function byIndex(urls: PresignedUrl[]): string[] {
   return [...urls].sort((a, b) => a.index - b.index).map((u) => u.url)
-}
-
-/**
- * Seal `data` as a media blob under a fresh random `K_blob` (wrapped under `K_mem`), upload the ciphertext
- * chunks direct-to-store, and attach the result to `nodeId` (a MEMORY/CHAPTER). Returns the new ids.
- */
-export async function addMedia(
-  scopeId: string, nodeId: string, memoryKey: Uint8Array, data: Uint8Array,
-): Promise<{ blobId: string; mediaId: string }> {
-  const blobKey = v1.randomBytes(32)
-  const wrappedBlobKey = b64std(v1.symWrap(memoryKey, blobKey, KBLOB_CTX, v1.randomBytes(12)))
-
-  const plainChunks = chunkify(data)
-  const total = plainChunks.length
-  const frames = plainChunks.map((chunk, i) => v1.sealFrame(blobKey, i, total, chunk, v1.randomBytes(12)))
-  const byteSize = frames.reduce((n, f) => n + f.length, 0)
-
-  // start — reserve the upload session + presign one PUT per chunk
-  const started = await withRefresh(() =>
-    mediaApi().startBlobUploads({
-      scopeId,
-      blobUploadsBatchRequest: { items: [{ chunkCount: total, byteSize, wrappedBlobKey }] },
-    }),
-  )
-  const up = started.results[0]
-  if (!up || up.error) throw new Error(up?.error ?? 'upload_failed')
-  if (!up.uploadId || !up.presignedPuts) throw new Error('store_unavailable')
-
-  // PUT each sealed frame straight to the store (no base64, no JSON, no credentials)
-  const putUrls = byIndex(up.presignedPuts)
-  await Promise.all(putUrls.map((url, i) => putChunk(url, frames[i])))
-
-  // complete — the backend stats the objects (declare-then-verify) and attaches the media
-  const done = await withRefresh(() =>
-    mediaApi().completeMedia({ scopeId, mediaBatchRequest: { items: [{ uploadId: up.uploadId!, nodeId }] } }),
-  )
-  const m = done.results[0]
-  if (!m || m.error || !m.blobId || !m.mediaId) throw new Error(m?.error ?? 'attach_failed')
-  return { blobId: m.blobId, mediaId: m.mediaId }
-}
-
-/** List a node's media (opaque metadata + the K_blob wrap). */
-export async function listMedia(scopeId: string, nodeId: string): Promise<MediaItem[]> {
-  const rows = await withRefresh(() => mediaApi().listNodeMedia({ scopeId, nodeId }))
-  return rows.map(summaryToItem)
-}
-
-/**
- * Open a media blob: unwrap `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
- * direct-from-store, and `openFrame` them back to the original plaintext (the AAD position check still applies).
- */
-export async function openMedia(scopeId: string, memoryKey: Uint8Array, media: MediaItem): Promise<Uint8Array> {
-  const blobKey = v1.symUnwrap(memoryKey, fromB64std(media.wrappedBlobKey), KBLOB_CTX)
-
-  const presigned = await withRefresh(() =>
-    mediaApi().presignBlobDownloads({ scopeId, blobDownloadsBatchRequest: { items: [{ blobId: media.blobId }] } }),
-  )
-  const d = presigned.results[0]
-  if (!d || d.error || !d.presignedGets) throw new Error(d?.error ?? 'store_unavailable')
-
-  const getUrls = byIndex(d.presignedGets)
-  const frames = await Promise.all(getUrls.map((url) => getChunk(url)))
-  const chunks = frames.map((frame, i) => v1.openFrame(blobKey, i, frames.length, frame))
-  return v1.concat(...chunks)
 }
 
 async function putChunk(url: string, frame: Uint8Array): Promise<void> {
