@@ -90,11 +90,12 @@ final class RoundTripUITests: XCTestCase {
 
         // Robustness: a prior run may have left this device trusted (Keychain persists). If sign-in folds
         // straight to Home, untrust + sign out + sign in again to reach a known untrusted floor.
-        if app.staticTexts["Unlocked"].waitForExistence(timeout: 20) {
+        if app.buttons["Create"].waitForExistence(timeout: 20) {
+            openSidebar(app)
             if app.buttons["Stop trusting this device"].exists {
                 app.buttons["Stop trusting this device"].activate()
             }
-            app.buttons["Sign out"].activate()
+            signOut(app)
             XCTAssertTrue(app.textFields["Email"].waitForExistence(timeout: 20))
             app.buttons["Sign in"].activate()
         }
@@ -107,26 +108,28 @@ final class RoundTripUITests: XCTestCase {
         shoot(app, shotDir, "trust-02-floor-only-password")
         unlock.activate()
 
-        // 2 — Home, now trusted (the untrust control is present).
-        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25))
+        // 2 — Home, now trusted. Surface the sidebar (a drawer on compact) → the untrust control is present.
+        XCTAssertTrue(app.buttons["Create"].waitForExistence(timeout: 25), "home shell should show")
+        openSidebar(app)
         XCTAssertTrue(app.buttons["Stop trusting this device"].waitForExistence(timeout: 5),
                       "Home shows the trusted state + untrust control")
         shoot(app, shotDir, "trust-03-home-trusted")
 
         // 3 — Sign out → sign in → folds STRAIGHT to Home (no floor), unlocked with only the password.
-        app.buttons["Sign out"].activate()
+        signOut(app)
         XCTAssertTrue(app.textFields["Email"].waitForExistence(timeout: 20))
         app.buttons["Sign in"].activate()
-        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25),
+        XCTAssertTrue(app.buttons["Create"].waitForExistence(timeout: 25),
                       "a trusted device folds login straight to Home")
         XCTAssertFalse(app.buttons["Unlock"].exists, "the floor must not appear on a trusted re-login")
         shoot(app, shotDir, "trust-04-relogin-fold")
 
         // 4 — Untrust → sign out → sign in → back to the floor.
+        openSidebar(app)
         app.buttons["Stop trusting this device"].activate()
         XCTAssertTrue(waitForGone(app.buttons["Stop trusting this device"], timeout: 10),
                       "untrust removes the control")
-        app.buttons["Sign out"].activate()
+        signOut(app)
         XCTAssertTrue(app.textFields["Email"].waitForExistence(timeout: 20))
         app.buttons["Sign in"].activate()
         XCTAssertTrue(app.buttons["Unlock"].waitForExistence(timeout: 25),
@@ -165,20 +168,43 @@ final class RoundTripUITests: XCTestCase {
         app.buttons["level.noLogin"].activate()
         shoot(app, shotDir, "trust-l3-01-floor-no-login")
         unlock.activate()
-        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.buttons["Create"].waitForExistence(timeout: 25))
         shoot(app, shotDir, "trust-l3-02-home")
 
         // Relaunch → auto-restore straight to home (no connect screen, no floor).
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Unlocked"].waitForExistence(timeout: 25),
+        XCTAssertTrue(app.buttons["Create"].waitForExistence(timeout: 25),
                       "an L3 device opens straight to home on relaunch")
         XCTAssertFalse(app.textFields["Instance URL"].exists, "no connect screen on auto-restore")
         XCTAssertFalse(app.buttons["Unlock"].exists, "no Secret-Key floor on auto-restore")
         shoot(app, shotDir, "trust-l3-03-autorestore")
 
-        // Cleanup so the owner + this device are left clean.
+        // Cleanup so the owner + this device are left clean — untrust via the sidebar (a drawer on compact).
+        openSidebar(app)
         app.buttons["Stop trusting this device"].activate()
+    }
+
+    /// Surface the spaces sidebar so its profile-bar controls (Settings → sign-out, and the untrust control)
+    /// are hittable. On regular width (iPad landscape / macOS) the sidebar is already shown — the `Settings`
+    /// button exists and this no-ops. On compact (iPhone) the sidebar is collapsed behind the detail; the
+    /// leading nav-bar button (the sidebar's "veyq" title) reveals it. Mirrors Android's `openRail()`.
+    private func openSidebar(_ app: XCUIApplication) {
+        if app.buttons["Settings"].exists { return }
+        let titled = app.navigationBars.buttons["veyq"]
+        if titled.exists { titled.activate() }
+        else { let first = app.navigationBars.buttons.firstMatch; if first.exists { first.activate() } }
+        _ = app.buttons["Settings"].waitForExistence(timeout: 5)
+    }
+
+    /// Sign out through the shell: open the sidebar → Settings → "Sign out" (the destructive row in the
+    /// Settings sheet, cr-0035). Drawer-aware on compact.
+    private func signOut(_ app: XCUIApplication) {
+        openSidebar(app)
+        app.buttons["Settings"].activate()
+        let signOut = app.buttons["Sign out"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 10), "Settings should offer Sign out")
+        signOut.activate()
     }
 
     /// Wait until an element no longer exists.

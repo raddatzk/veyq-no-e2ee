@@ -1,7 +1,7 @@
 ---
 id: cr-0042
 title: Apple shell — restore the device-trust status + untrust control (regression from cr-0034/0035)
-status: planned
+status: done
 satisfies: [uc.account.set-device-security, uc.account.trust-device, uc.account.biometric-unlock, uc.account.auto-unlock]
 adrs: ["0005"]
 invariants: []
@@ -40,16 +40,16 @@ change.
 
 ## Phases
 
-- [ ] 1 shell control — add the trusted-status + "Stop trusting this device" control to `HomeView`
-  (`sidebar`/`profileBar`, shown when `app.deviceTrusted`), wired to `app.untrust()`. · Done when: `xcodebuild`
-  macOS + iOS Simulator green.
-- [ ] 2 un-stale the UITests — point `testTrustDeviceLifecycle` / `testNoLoginAutoRestoreLifecycle` at the
-  shell (home marker = `Create`; untrust/sign-out via the sidebar, drawer-aware on compact). · Done when: the
-  env-gated UITests drive the lifecycle on an iPhone **and** an iPad destination against a live instance, both
-  `TEST SUCCEEDED`.
-- [ ] 3 coverage — confirm the four account use-cases' Apple e2e refs now resolve to passing tests; no YAML
-  change expected (the refs already point at these methods). · Done when: `python3 scripts/validate_coverage.py`
-  green.
+- [x] 1 shell control — added the trusted-status caption + "Stop trusting this device" control to
+  `HomeView.profileBar` (a `trustedBar`, shown when `app.deviceTrusted`, wired to `app.untrust()`), localized
+  EN/DE (`home.deviceTrusted` / `home.stopTrusting`). · `xcodebuild` macOS + iOS Simulator green.
+- [x] 2 un-stale the UITests — pointed `testTrustDeviceLifecycle` / `testNoLoginAutoRestoreLifecycle` at the
+  shell (home marker `Unlocked` → `Create`; untrust/sign-out reached via a drawer-aware `openSidebar()` +
+  `signOut()` helper, the Apple twin of Android's `openRail()`). · Both UITests + the round-trip drive the
+  lifecycle against a live instance on **iPhone 17 Pro** *and* **iPad Pro 11-inch (M4)** — both `TEST SUCCEEDED`
+  (3/3 each; iPhone = compact/drawer, iPad = regular/permanent sidebar).
+- [x] 3 coverage — `python3 scripts/validate_coverage.py` green; the four account use-cases' Apple e2e refs
+  resolve to the two now-passing tests (no YAML change needed).
 
 ## Definition of done
 
@@ -59,4 +59,26 @@ live instance; coverage green. Parity with Android (cr-0039) restored.
 
 ## Retrospective
 
-_(to be filled on close)_
+- **Planning hit (both):** scoping this as the explicit Apple twin of cr-0039 worked — the regression was
+  already understood, the fix mirrored Android control-for-control (`trustedBar` ≈ `SpacesRail`'s trusted
+  block; `openSidebar()` ≈ `openRail()`), and the two stale UITests were a known list, not a discovery. Small
+  CRs that name their sibling are cheap to land.
+- **Execution miss (assistant) — the env was the whole cost.** The code (phase 1) + test repair (phase 2a)
+  were minutes; the *live* run (phase 2b) was the bulk, and exactly the friction cr-0039's retro predicted.
+  Three snags, all environmental: (1) the seed-tenant gap is still open — there was a `10.0.2.2` tenant
+  (Android's Host) but none for the iOS sim's Host, and the owner's Secret Key is unrecoverable, so a clean
+  run needed a destructive re-seed; (2) `localhost` can't be a tenant domain — the createTenant API requires a
+  dotted, letter-TLD hostname (and even `127.0.0.1` is rejected), so the web/Android `127.0.0.1`/`10.0.2.2`
+  tenants are seeded *around* the API; (3) `xcodebuild`'s allowed sim list didn't include iPhone 16 Pro —
+  only iOS-26 devices (used iPhone 17 Pro + iPad Pro 11" M4).
+- **Process fix landed (partial):** wrote `web/scripts/seed-tenant.mts` (login as Server-Owner → createTenant
+  → read the dev mailer's logged invite link → cold-birth the owner + accept), closing *half* the cr-0039 gap.
+  Two rough edges remain worth an inbox item: it reads the bootstrap secret from the **backend log** (so the
+  log path must be known + ANSI-stripped) and it raced the async mailer flush once (read a prior invite), and
+  the **domain regex** forces a valid-looking domain + a manual `UPDATE veyq_tenant SET domain` to the bare IP
+  the native Host actually sends. A first-class dev tenant-seed (API affordance or a documented DB step for
+  IP/`localhost` Hosts) would remove both.
+- **Coverage caveat unchanged (both):** as cr-0039 flagged, `validate_coverage.py` only checks that a test
+  *symbol resolves*, not that it drives live UI — these two tests read green for two CRs while asserting on a
+  removed marker. The durable fix (a guard that flags e2e tests referencing absent identifiers, or that runs
+  the suite) is still only an inbox candidate, not built.

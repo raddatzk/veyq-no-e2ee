@@ -74,8 +74,13 @@ struct HomeView: View {
     }
 
     /// The profile bar — like the web ProfileMenu, tapping it opens Settings (theme / language / sign-out).
+    /// When this device is trusted it also carries the trusted-status caption + "Stop trusting this device"
+    /// control (restored in cr-0042 — it vanished when cr-0034 swapped the unlocked landing for the shell;
+    /// the Apple twin of Android's spaces-rail untrust). On compact the sidebar is a drawer, so the control
+    /// surfaces only once the drawer is opened.
     private var profileBar: some View {
         VStack(spacing: 0) {
+            if app.deviceTrusted { trustedBar }
             Divider()
             Button { showSettings = true } label: {
                 HStack(spacing: 10) {
@@ -90,6 +95,25 @@ struct HomeView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("Settings")
         }
+    }
+
+    /// Trusted-state caption + the untrust control (shown only when `app.deviceTrusted`). Untrusting drops the
+    /// device's convenience level back to "Secret Key each time" via `app.untrust()`; the caption then vanishes.
+    private var trustedBar: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Divider()
+            Text(l10n.t("home.deviceTrusted"))
+                .font(.system(size: 12)).foregroundStyle(VeyqStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(l10n.t("home.stopTrusting"), role: .destructive) {
+                Task { await app.untrust() }
+            }
+            .font(.system(size: 13)).foregroundStyle(VeyqStyle.danger)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("Stop trusting this device")
+        }
+        .padding(.horizontal, 14).padding(.top, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: detail (the current level)
