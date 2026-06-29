@@ -3,7 +3,7 @@ id: cr-0021
 title: Android — trust this device (DEVICE wrap, Keystore-HMAC) + login-fold unlock
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.trust-device, uc.account.set-device-security, uc.account.unlock]
-adrs: [0005, 0003, 0010]
+adrs: ["0005", "0003", "0010"]
 invariants: [operator-blind]
 ---
 

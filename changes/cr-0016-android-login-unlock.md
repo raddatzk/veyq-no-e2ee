@@ -3,7 +3,7 @@ id: cr-0016
 title: Android client — login + unlock (Kotlin / Jetpack Compose)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.login, uc.account.unlock]   # the Android surface (web ✅, apple ✅ via cr-0015)
-adrs: [0003, 0004, 0005, 0009, 0010]
+adrs: ["0003", "0004", "0005", "0009", "0010"]
 invariants: [operator-blind]
 ---
 

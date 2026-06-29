@@ -3,7 +3,7 @@ id: cr-0004
 title: Account unlock (PASSWORD wrap — open the Master Key client-side)
 status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.unlock]
-adrs: [0003, 0005]
+adrs: ["0003", "0005"]
 invariants: [operator-blind]
 ---
 

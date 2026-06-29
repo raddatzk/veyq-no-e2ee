@@ -3,7 +3,7 @@ id: cr-0027
 title: The Memory tree — encrypted folder/Memory nodes (names, blinded slugs, per-Memory K_mem)
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.memory.tree]   # an enabler — the foundation the Memory use-cases build on
-adrs: [0012, 0009, 0002, 0007]
+adrs: ["0012", "0009", "0002", "0007"]
 invariants: [operator-blind]
 ---
 

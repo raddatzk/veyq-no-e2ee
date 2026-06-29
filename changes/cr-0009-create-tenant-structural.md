@@ -3,7 +3,7 @@ id: cr-0009
 title: Create a tenant (Slice A — structural) — PENDING tenant, domain mapping, email-bound invite & Server Owner management
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.admin.create-tenant]   # Slice A only; activation (cold scope birth) = Slice B / cr-0010
-adrs: [0002, 0006]
+adrs: ["0002", "0006"]
 invariants: [operator-blind]
 ---
 

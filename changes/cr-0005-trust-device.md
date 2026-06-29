@@ -3,7 +3,7 @@ id: cr-0005
 title: Trust this device (web DEVICE wrap — unlock with only the password)
 status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.trust-device]
-adrs: [0005, 0003]
+adrs: ["0005", "0003"]
 invariants: [operator-blind]
 ---
 

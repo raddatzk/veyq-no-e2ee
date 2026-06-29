@@ -3,7 +3,7 @@ id: cr-0013
 title: Signed happy-paths on the http/ surface — Ed25519 in pre-request scripts (close the "no signature" gaps)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: []            # no new use-case — completes the http verification surface for login/unlock/trust-device/create-tenant
-adrs: [0003, 0004]       # exercises the operator-blind challenge-response auth + session lifecycle over the wire
+adrs: ["0003", "0004"]       # exercises the operator-blind challenge-response auth + session lifecycle over the wire
 invariants: []
 ---
 

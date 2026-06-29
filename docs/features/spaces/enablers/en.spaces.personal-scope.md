@@ -23,7 +23,7 @@
 Until now the model collapsed **scope == tenant** (membership keyed by `tenantId`, no scope id/kind). This
 introduces a proper **scope identity**: an opaque **`scopeId`** + a **`kind`** (TENANT / GROUP / PERSONAL),
 with membership referencing the scope it grants. The tenant's root scope (born at
-[cr-0010](../../../changes/cr-0010-tenant-activation.md)) becomes a `kind=TENANT` scope; the personal scope
+[cr-0010](../../../../changes/cr-0010-tenant-activation.md)) becomes a `kind=TENANT` scope; the personal scope
 is a new `kind=PERSONAL` scope in the same tenant. (Realises the
 [scopes & tenancy model](../../../crosscutting/scopes-and-tenancy.md).)
 
@@ -32,7 +32,7 @@ is a new `kind=PERSONAL` scope in the same tenant. (Realises the
 The server **cannot** create the scope — it has no key, and must stay blind. So the **client** mints it:
 generate a random scope key, seal it to the member's **own** identity public key
 (`asymWrap(ownIdentityPub, scopeKey, "scope-grant")` — the hybrid KEM, native-capable since
-[cr-0025](../../../changes/cr-0025-native-hybrid-kem.md)), and hand the server only the **ciphertext grant**.
+[cr-0025](../../../../changes/cr-0025-native-hybrid-kem.md)), and hand the server only the **ciphertext grant**.
 The server mints the scope row + the self-membership. The client **auto-births** it after unlock if
 `GET /api/scopes` shows no personal scope in the active tenant — so it appears "at join"
 ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)) with no explicit user action, and the
@@ -93,7 +93,7 @@ note right of C : server only ever saw ciphertext + the scope row
 - **One per (user, tenant); host-correct.** Per [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)
   the personal scope is tenant-bound, so a later share link lands on the **right** domain.
 - **Grant = the hybrid KEM** (`asymWrap`, X25519 + ML-KEM-768) — the same conformance-pinned primitive used
-  for the tenant grant; native since [cr-0025](../../../changes/cr-0025-native-hybrid-kem.md).
+  for the tenant grant; native since [cr-0025](../../../../changes/cr-0025-native-hybrid-kem.md).
 - **Auth ≠ content.** Holding a session does not open the scope; only the identity-unwrapped grant yields the
   scope key (client-enforced confidentiality, [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md)).
 
@@ -111,6 +111,6 @@ note right of C : server only ever saw ciphertext + the scope row
 - Decisions: [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (personal scope is tenant-bound),
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (membership = role + grant),
   [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant)
-- Work order: [cr-0026](../../../changes/cr-0026-personal-scope.md)
+- Work order: [cr-0026](../../../../changes/cr-0026-personal-scope.md)
 - Related use-cases: [unlock](../../account/use-cases/uc.account.unlock.md) (yields the identity that opens the
   grant), [create-tenant](../../admin/use-cases/uc.admin.create-tenant.md) (the TENANT scope this sits beside)

@@ -3,7 +3,7 @@ id: cr-0017
 title: Apple — two-step unlock floor + Emergency Kit import (upload + QR scan)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.unlock]
-adrs: [0005, 0010]
+adrs: ["0005", "0010"]
 invariants: [operator-blind]
 ---
 

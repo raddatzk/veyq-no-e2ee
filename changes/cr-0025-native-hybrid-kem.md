@@ -3,7 +3,7 @@ id: cr-0025
 title: Port the hybrid KEM (X25519 + ML-KEM-768) + asymWrap/identity bundle to the native crypto suites
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: []            # enabler — unblocks the scope/spaces use-cases (#14, to be refined); no UC yet
-adrs: [0009, 0010]
+adrs: ["0009", "0010"]
 invariants: [operator-blind]
 ---
 

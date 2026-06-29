@@ -3,7 +3,7 @@ id: cr-0010
 title: Activate a tenant (Slice B) — invite acceptance (incl. invite-gated registration), cold TENANT-scope birth & the first membership/grant
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.admin.create-tenant]   # Slice B (activation); Slice A structural was cr-0009
-adrs: [0006, 0007, 0008]
+adrs: ["0006", "0007", "0008"]
 invariants: [operator-blind]
 ---
 

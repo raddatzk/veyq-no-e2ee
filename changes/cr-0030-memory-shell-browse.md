@@ -3,7 +3,7 @@ id: cr-0030
 title: Memory shell — personal-space tree browse (web)
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.memory.browse]
-adrs: [0012, 0010]
+adrs: ["0012", "0010"]
 invariants: [operator-blind]
 ---
 

@@ -3,7 +3,7 @@ id: cr-0003
 title: Account login (operator-blind password challenge-response)
 status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.account.login]
-adrs: [0003, 0004]
+adrs: ["0003", "0004"]
 invariants: [operator-blind, non-enumerable]
 ---
 

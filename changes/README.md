@@ -19,6 +19,10 @@ substitute for state docs.
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
   while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
   coverage file that gaps every target surface.)
+- **The trust-chain guards stay green.** Three deterministic checks gate a CR, all run from `scripts/`:
+  `validate_coverage.py` (use-case → test refs resolve on every surface), `validate_changes.py` (CR
+  number/id unique, `satisfies:`/`adrs:` resolve, adrs quoted), `validate_doc_links.py` (every relative
+  link under `docs/` resolves). A red guard means the CR isn't done.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's

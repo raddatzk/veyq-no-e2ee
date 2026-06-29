@@ -3,7 +3,7 @@ id: cr-0007
 title: Import the Secret Key from the Emergency Kit (upload + QR scan)
 status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.account.unlock]
-adrs: [0005]
+adrs: ["0005"]
 invariants: [operator-blind]
 ---
 

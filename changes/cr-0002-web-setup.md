@@ -3,7 +3,7 @@ id: cr-0002
 title: Web setup flow (reuse legacy UI on the E2EE data layer)
 status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.admin.setup-server]
-adrs: [0001, 0003]
+adrs: ["0001", "0003"]
 invariants: [operator-blind]
 ---
 

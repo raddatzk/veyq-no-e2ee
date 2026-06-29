@@ -3,7 +3,7 @@ id: cr-0029
 title: Vendor-neutral blob store — drop deprecated MinIO (AWS S3 SDK + bundled Garage)
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.memory.media]   # hardening the cr-0028 media transport against a deprecated dependency
-adrs: [0013]
+adrs: ["0013"]
 invariants: [operator-blind, self-hostable]
 ---
 

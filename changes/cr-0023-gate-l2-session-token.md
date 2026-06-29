@@ -3,7 +3,7 @@ id: cr-0023
 title: Gate the L2 persistent session token (encrypt the persisted refresh token under K)
 status: in-progress      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock]
-adrs: [0005, 0004, 0003]
+adrs: ["0005", "0004", "0003"]
 invariants: [operator-blind]
 ---
 

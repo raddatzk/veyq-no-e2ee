@@ -3,7 +3,7 @@ id: cr-0015
 title: Apple universal client — login + unlock (macOS + iOS + iPadOS)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.login, uc.account.unlock]   # the Apple surface of these (web already has them)
-adrs: [0003, 0004, 0005, 0009, 0010]
+adrs: ["0003", "0004", "0005", "0009", "0010"]
 invariants: [operator-blind]
 ---
 

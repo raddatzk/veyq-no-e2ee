@@ -3,7 +3,7 @@ id: cr-0014
 title: Native v1 crypto foundation (auth/unlock subset) — apple + android, conformance-vector-tested
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: []            # crypto foundation — enables native uc.account.login + unlock (next CR), no use-case fully delivered here
-adrs: [0009, 0003]
+adrs: ["0009", "0003"]
 invariants: [operator-blind]
 ---
 

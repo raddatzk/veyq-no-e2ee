@@ -3,7 +3,7 @@ id: cr-0008
 title: Trusted device unlocks at login (drop the redundant second "unlock" step)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.trust-device, uc.account.unlock]
-adrs: [0005, 0003]
+adrs: ["0005", "0003"]
 invariants: [operator-blind]
 ---
 

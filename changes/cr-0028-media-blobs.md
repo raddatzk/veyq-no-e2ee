@@ -3,7 +3,7 @@ id: cr-0028
 title: Media blobs — chunked-AEAD K_blob, direct-to-store presigned, batch-shaped control plane
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.memory.media]   # an enabler — the media data layer the Memory use-cases build on
-adrs: [0013, 0012, 0009, 0007, 0002]
+adrs: ["0013", "0012", "0009", "0007", "0002"]
 invariants: [operator-blind, self-hostable]
 ---
 

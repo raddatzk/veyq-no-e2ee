@@ -3,7 +3,7 @@ id: cr-0038
 title: Trust-chain & ADR hygiene — dead refs, stale ids, ADR drift, validator hardening
 status: done
 satisfies: []
-adrs: [0001, 0004, 0009, 0013]
+adrs: ["0001", "0004", "0009", "0013"]
 invariants: []
 ---
 

@@ -3,7 +3,7 @@ id: cr-0011
 title: Scheduled purge of expired session tokens — extend the @Scheduled cleanup seam to auth
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: []            # cross-cutting infra cleanup — no use-case (like cr-0012); realigns the session lifecycle (ADR 0004)
-adrs: [0004]
+adrs: ["0004"]
 invariants: []           # no operator-blind risk — purely server-side opaque token-hash rows, no content
 ---
 

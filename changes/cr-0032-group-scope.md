@@ -3,7 +3,7 @@ id: cr-0032
 title: Group scope — create, list, switch, browse (G1)
 status: planned
 satisfies: [en.spaces.group-scope, uc.spaces.switch-spaces]
-adrs: [0014, 0015]
+adrs: ["0014", "0015"]
 invariants: [operator-blind-e2ee]
 ---
 

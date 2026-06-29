@@ -3,7 +3,7 @@ id: cr-0024
 title: Unify the passwordless-unlock mechanism across platforms (prompt-free data layer, app layer releases K)
 status: in-progress      # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
-adrs: [0011, 0010, 0005, 0009, 0003]
+adrs: ["0011", "0010", "0005", "0009", "0003"]
 invariants: [operator-blind]
 ---
 

@@ -3,7 +3,7 @@ id: cr-0022
 title: Android — biometric (L2) + no-login (L3) unlock; persistent session; activate the passwordless levels
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
-adrs: [0005, 0003, 0010]
+adrs: ["0005", "0003", "0010"]
 invariants: [operator-blind]
 ---
 

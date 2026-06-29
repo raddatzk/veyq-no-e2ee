@@ -3,7 +3,7 @@ id: cr-0006
 title: Drop the instance name from setup (wrong altitude for a multi-tenant instance)
 status: done             # planned → in-progress → done (then delete the file)
 satisfies: [uc.admin.setup-server]
-adrs: [0002]
+adrs: ["0002"]
 invariants: [operator-blind]
 ---
 

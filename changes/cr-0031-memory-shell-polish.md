@@ -3,7 +3,7 @@ id: cr-0031
 title: Memory shell polish — ProfileMenu, fragment routing, favorites
 status: done
 satisfies: [en.memory.favorites, uc.spaces.switch-spaces]
-adrs: [0015, 0014]
+adrs: ["0015", "0014"]
 invariants: [operator-blind-e2ee]
 ---
 

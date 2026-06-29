@@ -3,7 +3,7 @@ id: cr-0039
 title: Android Memory shell + browse (native parity of cr-0030 / cr-0034)
 status: planned
 satisfies: [uc.memory.browse]
-adrs: [0012]
+adrs: ["0012"]
 invariants: [operator-blind-e2ee]
 ---
 

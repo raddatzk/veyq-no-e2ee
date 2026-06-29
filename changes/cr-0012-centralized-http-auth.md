@@ -3,7 +3,7 @@ id: cr-0012
 title: Centralize HTTP authentication & authorization (Quarkus SecurityIdentity + @RolesAllowed)
 status: done             # planned → in-progress → done (then keep as a record)
 satisfies: []            # cross-cutting refactor — no use-case; realigns the developer-styleguide (inbox #44)
-adrs: [0001, 0003, 0004] # relates to slicing + auth model; this CR introduces ADR 0008
+adrs: ["0001", "0003", "0004"] # relates to slicing + auth model; this CR introduces ADR 0008
 invariants: [operator-blind]
 ---
 

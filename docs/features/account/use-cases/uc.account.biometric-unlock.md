@@ -37,7 +37,7 @@ both are device-side and one is a *liveness* gesture:
 > matching biometric). A stolen, locked device opens nothing; a stolen **unlocked** device still needs the
 > owner's face/finger.
 
-The wrapping key is **never the account password** ([cr-0019 → Deferred](../../../changes/cr-0019-apple-trust-device.md),
+The wrapping key is **never the account password** ([cr-0019 → Deferred](../../../../changes/cr-0019-apple-trust-device.md),
 settled with the user): the password is also the **auth** factor, so storing it — even biometric-gated —
 would let a biometric-passing local attacker authenticate **from anywhere**, not just open *this* device's
 vault. A **random secure-element key** caps the blast radius to this device. Storing the Master Key or

@@ -3,7 +3,7 @@ id: cr-0026
 title: Personal scope — generalise scope identity (scopeId + kind) and birth/open a per-tenant personal space
 status: done             # planned → in-progress → done (the file is kept as a record)
 satisfies: [en.spaces.personal-scope]   # an enabler (reclassified 2026-06-28) — foundation for the Memory use-cases
-adrs: [0002, 0007, 0009, 0010]
+adrs: ["0002", "0007", "0009", "0010"]
 invariants: [operator-blind]
 ---
 
