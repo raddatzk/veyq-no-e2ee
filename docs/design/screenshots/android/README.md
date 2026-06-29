@@ -9,10 +9,15 @@ flow against a real local instance. Same design system, copy, and flow as the Ap
 | `android-01-connect.png` | Connect — enter the instance URL |
 | `android-02-signin.png`  | Sign in (step 1) — email + password, with **Upload kit / Scan QR** (fills email + parks Secret Key) |
 | `android-03-unlock.png`  | Unlock floor (step 2) — Secret Key + the **device unlock-level chooser**, with **Upload kit / Scan QR** |
-| `android-04-home.png`    | Unlocked — session held, vault open on-device |
+| `android-04-home.png`    | Unlocked — the **Memory shell** (cr-0039): personal space, Memory + folder cards |
+| `android-05-folder.png`  | Drilled into a folder (compact — single pane) |
+| `android-06-home-wide.png`   | The Memory shell on an **expanded** (≈900dp) window — the two-pane `PermanentNavigationDrawer` (spaces rail + content) |
+| `android-07-folder-wide.png` | Drilled into a folder on the expanded window |
 
 The two-step flow + Emergency-Kit import (upload + live QR scan, on both steps) landed in cr-0018; the
-floor's **device unlock-level chooser** (`android-03-unlock.png`) landed in cr-0021.
+floor's **device unlock-level chooser** (`android-03-unlock.png`) landed in cr-0021. The Memory shell +
+its responsive compact/expanded captures landed in cr-0039 (the expanded shots were taken by resizing the
+phone **portrait** to ≈900dp, since the `veyq_tablet` AVD would not cold-boot locally).
 
 ## Device trust (cr-0021, L1 — "only password")
 

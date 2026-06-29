@@ -95,23 +95,23 @@ This closes the last Memory-browse parity gap: web ✅ (cr-0030/0031) · apple �
   (`android-04-home` = the real shell, `android-05-folder` = drilled-in). · Done: `connectSignInUnlock`
   `TEST SUCCEEDED`. *(Prereq surfaced: the personal scope is tenant-scoped by Host — a tenant for the
   emulator's Host `10.0.2.2` had to exist first; see the retrospective + the screenshots README.)*
-- [~] 4b verify (expanded/two-pane) — **deferred follow-up** (does not block close). The
-  `PermanentNavigationDrawer` branch is **built** (`:app:assembleDebug` green) + code-reviewed but not run
-  live: the `veyq_tablet` AVD would not finish a cold boot in this environment (hung twice), and forcing
-  expanded width by resizing the phone (`wm size`) is defeated by the **auth screens**
-  (ConnectScreen/SignInScreen, cr-0016 — out of this CR's scope) not laying out in an extreme landscape
-  window. Pick up when a tablet AVD boots: rerun `connectSignInUnlock` on a Medium/Expanded device and confirm
-  the rail + content show side-by-side.
+- [x] 4b verify (expanded/two-pane) — `connectSignInUnlock` re-run live on an **expanded (≈900dp) window**
+  (the Pixel_10 resized **portrait** to `1800x2560 @ 320dpi`; portrait sidesteps the cr-0016 auth-screen
+  landscape-layout quirk that defeated the earlier landscape attempts, and the `veyq_tablet` AVD would not
+  cold-boot here): the shell renders the **`PermanentNavigationDrawer` two-pane** — the spaces rail (veyq ·
+  Personal selected · profile + sign-out) beside the content (3-col Memory grid + folder cards) — and the full
+  browse + create + drill round-trip passed. Screenshots `android-06-home-wide` / `android-07-folder-wide`. ·
+  Done: `connectSignInUnlock` `TEST SUCCEEDED` on the expanded window.
 
 ## Definition of done
 
 The Android app, after unlock, shows the personal space's Memory tree (folders + Memories) and supports
 drill-in + create/rename/delete — built fresh in parallel to Apple, matching its screens, operator-blind
-(names on device). Responsive: **compact (phone) live-verified**; the expanded/two-pane branch is built +
-code-reviewed but its live run is blocked by emulator infra (phase 4b).
-`./gradlew :client:test` + `:app:assembleDebug` green; the compact live round-trip green (browse + create +
-drill, real decrypted tree); coverage updated; the parity ledger reads Memory-browse =
-**web · apple · android ✅** (android = shell live on compact; expanded pending a bootable tablet AVD).
+(names on device). Responsive: live-verified on **both** a compact (phone) **and** an expanded (≈900dp,
+two-pane `PermanentNavigationDrawer`) window.
+`./gradlew :client:test` + `:app:assembleDebug` green; the live round-trip green on compact **and** expanded
+(browse + create + drill, real decrypted tree); coverage updated; the parity ledger reads Memory-browse =
+**web · apple · android ✅**.
 
 **Out of scope (later Android slices):** favorites, theme/language settings, the tenant/space switcher (need
 the favorites + my-tenants data layer ported first); the Memory detail/gallery.
@@ -130,9 +130,10 @@ the favorites + my-tenants data layer ported first); the Memory detail/gallery.
   the suite) would have caught the regression at its source. Worth an inbox item.
 - **Execution (assistant):** phase 4 was planned as a phone+tablet live round-trip, but the environment wasn't
   checked up front. Three env snags ate time: (1) the dev backend was mid-failed-reload; (2) the `veyq_tablet`
-  AVD would not cold-boot here (so expanded stayed unverified live); (3) forcing expanded by resizing the phone
-  hit an unrelated auth-screen landscape-layout issue. For env-gated phases, confirm backend + bootable AVDs up
-  front, and prefer a real tablet AVD over `wm size` hacks.
+  AVD would not cold-boot here; (3) the first attempt to force expanded by resizing the phone used **landscape**
+  and hit an unrelated auth-screen layout quirk. Expanded was ultimately verified by resizing the phone to a
+  **portrait** ≈900dp window (4b) — the lesson: a portrait resize is a reliable stand-in when a tablet AVD
+  won't boot, and confirm backend + AVDs up front for env-gated phases.
 - **Process gap — the tenant seed (both):** the live shell first showed "Couldn't open your space" because the
   personal scope is **tenant-scoped by Host** and the fresh DB had no tenant for the emulator's Host
   (`10.0.2.2`). `seed-owner.mts` mints only a ServerOwner — there is no tenant seed, so the native content
