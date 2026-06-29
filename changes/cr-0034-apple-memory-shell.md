@@ -39,13 +39,14 @@ switcher are **later slices** (their data layer — favorites, my-tenants — is
   (parity of web `browse.ts`) + a public `TreeNode` init for testability. · Done: `swift test
   --filter MemoryBrowseTests` green (5). The `HomeModel` that composes these over `VeyqClient` lands with the
   shell UI (phase 2).
-- [ ] 2 shell UI — replace `apple/App/HomeView.swift` with the shell: `NavigationSplitView` (sidebar: the
-  personal space; content: folder + Memory grid + breadcrumb + create/rename/delete), copying the legacy
-  layout, styled via `VeyqStyle`, **responsive** (split on regular, stack on compact). · Done when:
-  `xcodebuild … -destination platform=macOS` **and** `… generic/platform=iOS Simulator` build green.
-- [ ] 3 coverage — extend `uc.memory.browse.yaml` Apple refs (the shell UI now covered: a UITest browse
-  round-trip and/or the model unit test), narrow the Apple gap to what's still deferred (favorites, settings,
-  switcher). · Done when: `python3 scripts/validate_coverage.py` green.
+- [x] 2 shell UI — replaced `apple/App/HomeView.swift` with the shell + `HomeModel` over `VeyqClient` +
+  `MemoryBrowse`: a `NavigationSplitView` (spaces sidebar + profile/sign-out; content: breadcrumb + Memory grid
+  + folder rows + create/rename/delete), copying the legacy layout, styled via `VeyqStyle`, **responsive**
+  (split on regular, drawer/stack on compact). · Done: `xcodebuild` **macOS** and **iOS Simulator** both
+  `BUILD SUCCEEDED`.
+- [x] 3 coverage — `uc.memory.browse.yaml` adds the Apple `MemoryBrowseTests` ref on the client-side
+  level/breadcrumb criterion; the Apple gap narrowed to "shell built + unit-covered; live UITest + favorites/
+  settings/switcher pending". · Done: `python3 scripts/validate_coverage.py` green.
 
 ## Definition of done
 

@@ -20,6 +20,7 @@ acceptanceCriteria:
     text: The breadcrumb + current level are derived client-side from the local tree (the blind server computes no navigation).
     coverage:
       web: { unit: [src/features/memory/browse.test.ts, src/features/memory/location.test.ts] }
+      apple: { unit: [apple/Tests/VeyqKitTests/MemoryBrowseTests.swift] }
   - id: create-folder-and-memory
     text: Creating a folder/Memory seals the name + blinded slug under K_SC and POSTs only ciphertext (a Memory births its random K_mem).
     coverage:
@@ -49,5 +50,5 @@ acceptanceCriteria:
       backend: { integration: [NodesSliceTest.nonMemberIs404, NodesSliceTest.unauthenticatedIs401] }
       http: { e2e: [http/content/content.http] }
 gaps:
-  apple: "Native data layer covered (ContentTreeTests/ScopesTests); the shell UI (breadcrumb, cards, dialogs) is web-first (cr-0030) — not built natively."
-  android: "Native data layer covered (ContentTreeTest/ScopesTest); the shell UI (breadcrumb, cards, dialogs) is web-first (cr-0030) — not built natively."
+  apple: "Shell UI built (cr-0034, compiles on iOS + macOS) over the covered data layer; browse logic is unit-covered (MemoryBrowseTests). A live UITest round-trip + favorites/settings/switcher are pending."
+  android: "Native data layer covered (ContentTreeTest/ScopesTest); the shell UI (breadcrumb, cards, dialogs) is web-first (cr-0030) — not built natively yet."
