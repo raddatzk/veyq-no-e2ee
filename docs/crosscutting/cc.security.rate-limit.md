@@ -5,8 +5,8 @@
   standalone end-user goal (not a use-case) and is not a feature substrate (not an enabler). It is recorded
   here so its **mechanism + its verification are traceable** from the threat model, rather than living as an
   orphan test next to the code (the gap a 2026-06 coverage audit found).
-- **Status:** mechanism shipped; verification **partial** — see *Verified by* (closed by
-  [cr-0044](../../changes/cr-0044-rate-limit-tests-and-auth-gaps.md)).
+- **Status:** mechanism shipped; verification **complete** — every governed endpoint, window reset and per-IP
+  isolation are asserted (closed by [cr-0044](../../changes/cr-0044-rate-limit-tests-and-auth-gaps.md)).
 
 ## Protects against
 
@@ -20,20 +20,18 @@ brute-force of the password is a *separate* property, handled cryptographically 
 A **fixed-window, per-client-IP** counter (`backend/.../shared/ratelimit/AuthRateLimitFilter.kt`): a JAX-RS
 resource/method marked **`@RateLimited`** is counted per IP per window; past the configured limit the request
 is rejected with **`429` + `rate_limited`**. Limit + window are config (`application.properties`,
-`veyq.auth.rate-limit.*`).
+`veyq.ratelimit.auth.max-requests` / `veyq.ratelimit.auth.window-seconds`).
 
-## Governs (the application matrix)
+## Governs
 
-All four public-auth endpoints already carry `@RateLimited`:
+Two public-auth resources carry a **class-level** `@RateLimited`, so every method they expose is governed:
+`LoginResource` (login challenge/verify) and `TokenResource` (token refresh). The **authoritative** endpoint
+list is the OpenAPI spec (`contracts/api/auth.openapi.yaml`) plus the annotation on those two resources — this
+concern deliberately does **not** restate each path. A hand-kept endpoint matrix here would only duplicate the
+spec and drift out of sync with it (which is exactly what it did: cr-0044 had to delete a phantom `POST
+/api/token` row). When you need the exact set, read the source, not a copy.
 
-| endpoint | resource | annotated |
-|---|---|---|
-| `POST /api/login/challenge` | `LoginResource` | ✅ `@RateLimited` |
-| `POST /api/login/verify` | `LoginResource` | ✅ `@RateLimited` |
-| `POST /api/token` | `TokenResource` | ✅ `@RateLimited` |
-| `POST /api/token/refresh` | `TokenResource` | ✅ `@RateLimited` |
-
-> The **runtime** tests below hit these **real** endpoints, so they prove both the mechanism **and** the
+> The **runtime** tests below hit the real endpoints, so they prove both the mechanism **and** the
 > `@RateLimited` wiring in one — no separate static "is the annotation present?" check is needed at this scale.
 > If the governed set grows large enough that runtime-testing each endpoint hurts, revisit a static
 > annotation check then (pain before tool).
@@ -51,12 +49,19 @@ isn't mistaken for a strong guarantee. It raises the cost of automated abuse; it
 
 ## Verified by
 
-- **Now:** `AuthRateLimitTest.challengeIsThrottledOverTheLimit` — past the limit `/login/challenge` → `429`.
-  Real assertion, but **narrow** (only `challenge`; no window-reset / per-IP / verify+token coverage).
-- **To add ([cr-0044](../../changes/cr-0044-rate-limit-tests-and-auth-gaps.md)):**
-  - `verify` and `token`/`refresh` are throttled (the other governed endpoints).
-  - **window reset** — the count clears after the window elapses.
-  - **per-IP isolation** — one IP tripping the limit does not throttle another IP.
+Runtime tests (RestAssured) hit the **real** governed endpoints, so a `429` can only fire where `@RateLimited`
+is actually wired — proving mechanism **and** configuration in one. Each test presents its own client IP via
+`X-Forwarded-For` (the test profile enables `proxy-address-forwarding`), so the cases are order-independent and
+the per-IP property is asserted directly.
+
+- `AuthRateLimitTest.challengeIsThrottledOverTheLimit` — past the limit `/login/challenge` → `429` +
+  `rate_limited`.
+- `AuthRateLimitTest.verifyIsThrottledOverTheLimit` — `/login/verify` is throttled.
+- `AuthRateLimitTest.refreshIsThrottledOverTheLimit` — `/token/refresh` is throttled.
+- `AuthRateLimitTest.oneIpTrippingTheLimitDoesNotThrottleAnother` — **per-IP isolation**: one IP hitting the
+  limit does not throttle a second IP.
+- `AuthRateLimitWindowResetTest.theCounterClearsAfterTheWindowElapses` — **window reset**: past a 1-second
+  window the per-IP counter clears and requests are allowed again.
 
 **Out of scope for any test:** whether the configured *limit value* is the right number — that is a policy
 judgement (review + config), not something a test asserts.

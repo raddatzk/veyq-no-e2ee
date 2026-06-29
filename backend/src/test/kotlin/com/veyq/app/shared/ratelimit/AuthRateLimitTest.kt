@@ -5,14 +5,23 @@ import io.quarkus.test.junit.TestProfile
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
+import io.restassured.response.Response
 import org.hamcrest.CoreMatchers.equalTo
+import org.hamcrest.CoreMatchers.not
 import org.junit.jupiter.api.Test
 
 /**
- * Verifies [AuthRateLimitFilter] actually throttles the public auth surface. Runs under a profile that drops
- * the limit to 3/window so a few requests trip it (the normal `%test` profile sets it sky-high so the other
- * slice tests, all from 127.0.0.1, never collide). The login-challenge endpoint is non-enumerable (200 for
- * any email), so no user seeding is needed — we only care that the (N+1)th call is a 429.
+ * Verifies [AuthRateLimitFilter] throttles **every** governed public-auth endpoint (login challenge/verify +
+ * token refresh — the three that carry `@RateLimited`), keys the window **per client IP**, and rejects with a
+ * `429` + `rate_limited` past the limit. Mechanism + matrix: `docs/crosscutting/cc.security.rate-limit.md`.
+ *
+ * Runs under a profile that drops the limit to 3/window and turns on proxy-address-forwarding so each test can
+ * present its **own** synthetic client IP via `X-Forwarded-For`. That gives every method an isolated bucket —
+ * the tests are order-independent (they don't share the 127.0.0.1 counter) and the per-IP property is testable
+ * directly. The window here is long (60s) so the count never resets mid-test; window **reset** is its own,
+ * short-window sibling ([AuthRateLimitWindowResetTest]). None of these endpoints need a seeded user: the
+ * limiter is an AUTHENTICATION-priority request filter that runs *before* the handler, so a 429 fires on the
+ * (N+1)th call regardless of whether the request body would otherwise 200/400/401.
  */
 @QuarkusTest
 @TestProfile(AuthRateLimitTest.LowLimitProfile::class)
@@ -22,18 +31,54 @@ class AuthRateLimitTest {
         override fun getConfigOverrides() = mapOf(
             "veyq.ratelimit.auth.max-requests" to "3",
             "veyq.ratelimit.auth.window-seconds" to "60",
+            // Honour X-Forwarded-For so each test keys its own client IP (see class doc).
+            "quarkus.http.proxy.proxy-address-forwarding" to "true",
+            "quarkus.http.proxy.allow-x-forwarded" to "true",
         )
     }
 
     @Test
     fun challengeIsThrottledOverTheLimit() {
-        // 3 requests are allowed inside the window...
-        repeat(3) { challenge().then().statusCode(200) }
-        // ...the 4th from the same IP is rejected with 429 + the rate_limited code.
-        challenge().then().statusCode(429).body("code", equalTo("rate_limited"))
+        val ip = "192.0.2.1"
+        repeat(3) { challenge(ip).then().statusCode(200) } // inside the window
+        challenge(ip).then().statusCode(429).body("code", equalTo("rate_limited"))
     }
 
-    private fun challenge() =
-        given().contentType(ContentType.JSON).body("""{"email":"ratelimit@example.com"}""")
+    @Test
+    fun verifyIsThrottledOverTheLimit() {
+        val ip = "192.0.2.2"
+        repeat(3) { verify(ip).then().statusCode(not(equalTo(429))) } // reach the handler (a generic 401)
+        verify(ip).then().statusCode(429).body("code", equalTo("rate_limited"))
+    }
+
+    @Test
+    fun refreshIsThrottledOverTheLimit() {
+        val ip = "192.0.2.3"
+        repeat(3) { refresh(ip).then().statusCode(not(equalTo(429))) } // reach the handler (a refresh_rejected 401)
+        refresh(ip).then().statusCode(429).body("code", equalTo("rate_limited"))
+    }
+
+    @Test
+    fun oneIpTrippingTheLimitDoesNotThrottleAnother() {
+        val tripped = "198.51.100.10"
+        val bystander = "198.51.100.20"
+        repeat(3) { challenge(tripped).then().statusCode(200) }
+        challenge(tripped).then().statusCode(429) // this IP is now throttled...
+        challenge(bystander).then().statusCode(200) // ...but a different IP is unaffected.
+    }
+
+    private fun challenge(ip: String): Response =
+        given().header("X-Forwarded-For", ip).contentType(ContentType.JSON)
+            .body("""{"email":"ratelimit@example.com"}""")
             .`when`().post("/api/login/challenge")
+
+    private fun verify(ip: String): Response =
+        given().header("X-Forwarded-For", ip).contentType(ContentType.JSON)
+            .body("""{"email":"ratelimit@example.com","signature":"AA=="}""")
+            .`when`().post("/api/login/verify")
+
+    private fun refresh(ip: String): Response =
+        given().header("X-Forwarded-For", ip).contentType(ContentType.JSON)
+            .body("""{"refreshToken":"not-a-real-token"}""")
+            .`when`().post("/api/token/refresh")
 }

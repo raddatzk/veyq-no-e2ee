@@ -14,6 +14,12 @@ substitute for state docs.
   working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
   contracts → backend → web → apple → android.
 - **Genuinely independent work = separate CRs, not phases.**
+- **Verify checkable claims against the source — don't inherit them.** When a CR (or the state doc it builds
+  on) asserts something the code can confirm — endpoint paths, config keys, counts, "all N of X do Y" — grep
+  the source (OpenAPI, `application.properties`, the annotations) before making it a work-order premise. Such
+  claims propagate: an unverified one in a state doc becomes a wrong premise in the next CR. Better still,
+  **don't duplicate a canonical source in prose** — point at it. A hand-kept restatement of the spec can only
+  drift. (cr-0044 inherited a phantom `/api/token` row and a wrong rate-limit config key this way.)
 - **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
   use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done

@@ -10,8 +10,9 @@ Checks per `changes/cr-NNNN-slug.md`:
   - the NNNN in the filename is unique across all CRs
   - frontmatter `id` equals `cr-NNNN` (matches the filename)
   - `status` is one of planned | in-progress | done
-  - every `satisfies:` id resolves to a use-case (docs/features/*/use-cases/uc.<id>.md) or an
-    enabler (docs/features/*/enablers/en.<id>.md)
+  - every `satisfies:` id resolves to a use-case (docs/features/*/use-cases/uc.<id>.md), an
+    enabler (docs/features/*/enablers/en.<id>.md), or a cross-cutting concern
+    (docs/crosscutting/cc.<id>.md)
   - every `adrs:` id is a quoted 4-digit string AND resolves to docs/decisions/NNNN-*.md
 """
 import pathlib
@@ -28,6 +29,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGES = ROOT / "changes"
 FEATURES = ROOT / "docs" / "features"
 DECISIONS = ROOT / "docs" / "decisions"
+CROSSCUTTING = ROOT / "docs" / "crosscutting"
 
 KNOWN_STATUS = {"planned", "in-progress", "done"}
 
@@ -43,9 +45,11 @@ def frontmatter(text: str) -> dict:
     return yaml.safe_load(text[3:end]) or {}
 
 
-# a CR satisfies a use-case (uc.*) or an enabler (en.*) — both are first-class trust-chain targets
+# a CR satisfies a use-case (uc.*), an enabler (en.*), or a cross-cutting concern (cc.*) — all three are
+# first-class trust-chain targets a CR can close (a cc.* concern has no end-user goal but is still tracked).
 satisfiable = ({p.stem for p in FEATURES.glob("*/use-cases/uc.*.md")}
-               | {p.stem for p in FEATURES.glob("*/enablers/en.*.md")})
+               | {p.stem for p in FEATURES.glob("*/enablers/en.*.md")}
+               | {p.stem for p in CROSSCUTTING.glob("cc.*.md")})
 adr_ids = {m.group(1) for p in DECISIONS.glob("*.md") if (m := re.match(r"(\d{4})-", p.name))}
 
 seen: dict[str, str] = {}
@@ -74,7 +78,7 @@ for cr in sorted(CHANGES.glob("cr-*.md")):
 
     for sat in data.get("satisfies") or []:
         if sat not in satisfiable:
-            errors.append(f"{where}: satisfies '{sat}' resolves to no use-case or enabler doc")
+            errors.append(f"{where}: satisfies '{sat}' resolves to no use-case, enabler or concern doc")
 
     for adr in data.get("adrs") or []:
         if not isinstance(adr, str):

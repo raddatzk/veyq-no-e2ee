@@ -25,6 +25,10 @@ concurrency:
 jobs:
   sync:
     name: Sync docs/wiki to the GitHub Wiki
+    # Disabled: scripts/render-wiki-diagrams.mjs was moved to legacy/ in the greenfield reset and not yet
+    # ported back. Also stale: the published wiki now lives in wiki/ (not docs/wiki/), so the trigger paths
+    # and source dir below need revisiting when this is restored. Drop `if: false` to re-enable.
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

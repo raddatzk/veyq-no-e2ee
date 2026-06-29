@@ -32,10 +32,12 @@ concurrency:
 jobs:
   testflight:
     name: Archive iOS app
-    # Restrict release signing to the protected main branch so the job (and its
-    # secrets) cannot be exercised from an attacker-controlled branch via
-    # workflow_dispatch.
-    if: github.ref == 'refs/heads/main'
+    # Disabled: scripts/ios-testflight-distribute.rb was moved to legacy/ in the greenfield reset and not yet
+    # ported back. Drop `if: false` to re-enable — and RESTORE the original guard below, which restricts
+    # release signing + secrets to the protected main branch so the job cannot be exercised from an
+    # attacker-controlled branch via workflow_dispatch:
+    #   if: github.ref == 'refs/heads/main'
+    if: false
     runs-on: macos-26
     environment: testflight
     # Only non-sensitive build configuration is shared job-wide. Apple signing

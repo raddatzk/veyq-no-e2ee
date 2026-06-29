@@ -15,6 +15,7 @@ import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Base64
 
 /**
@@ -81,6 +82,20 @@ class LoginSliceTest {
         verify(EMAIL, sig).then().statusCode(401) // replay → no outstanding nonce
     }
 
+    @Test
+    fun expiredNonceIsRejected() {
+        val nonce = requestChallenge(EMAIL)
+        // Force the stored challenge past its TTL (5 min) without waiting it out — a correctly-signed but
+        // stale nonce must be rejected, not just a replayed one.
+        QuarkusTransaction.requiringNew().run(Runnable {
+            val challenge = LoginChallengeEntity.find("email", EMAIL).firstResult()!!
+            challenge.expiresAt = Instant.now().minus(1, ChronoUnit.MINUTES)
+            challenge.persist()
+        })
+        verify(EMAIL, sign(KEYPAIR, nonce)) // valid signature, expired challenge
+            .then().statusCode(401).body("code", equalTo("authentication_failed"))
+    }
+
     // --- token rotation + reuse detection ---
 
     @Test
@@ -101,9 +116,14 @@ class LoginSliceTest {
     }
 
     @Test
-    fun unknownRefreshTokenIsPlain401() {
-        // A token that matches no stored hash is just rejected — it must NOT revoke anyone's family.
+    fun unknownRefreshTokenIsPlain401AndRevokesNobody() {
+        // A live, innocent refresh family exists alongside the attack.
+        val victim = login()
+        // A token that matches no stored hash is just rejected...
         refresh("not-a-real-token").then().statusCode(401).body("code", equalTo("refresh_rejected"))
+        // ...and crucially revokes nobody: the bystander family still refreshes. A bogus token cannot be a
+        // DoS lever against other sessions.
+        refresh(victim.refreshToken).then().statusCode(200)
     }
 
     @Test
