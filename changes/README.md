@@ -27,8 +27,12 @@ substitute for state docs.
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
   direction (a premature instruction, a missing constraint, a process gap) are both fair game and
-  explicitly wanted. Two or three bullets is enough; the goal is a compounding record of process lessons,
-  not ceremony. If genuinely nothing went wrong, say so in one line — don't manufacture a fault.
+  explicitly wanted. Cover **process & collaboration**, not just the technical work — in particular,
+  did we honor the conventions and feedback we already agreed (language, style, workflow rules, the
+  memory notes)? A rule that already exists but was ignored is a *real* miss, not a non-event. Each
+  retro ends with a forward-looking **"next time"** — one concrete, actionable thing to do differently.
+  Two or three bullets is enough; the goal is a compounding record of process lessons, not ceremony.
+  If genuinely nothing went wrong, say so in one line — don't manufacture a fault.
 
 ## Template
 
@@ -62,6 +66,8 @@ Tests green across the listed platforms, AND `docs/coverage/` updated for each `
 `python3 scripts/validate_coverage.py` green.
 
 ## Retrospective
-What didn't go well — in planning and execution — root cause, and the concrete fix. Both directions
-(assistant misses + human direction). 2–3 bullets, or one line if nothing did.
+What didn't go well — in planning, execution, AND process/collaboration (did we honor the conventions
++ feedback we already agreed — language, style, workflow, the memory notes?) — root cause, and the
+concrete fix. Both directions (assistant misses + human direction). End with a forward-looking "next
+time": one concrete, actionable change. 2–3 bullets, or one line if nothing did.
 ```
