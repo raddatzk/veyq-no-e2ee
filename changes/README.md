@@ -19,6 +19,12 @@ substitute for state docs.
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
   while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
   coverage file that gaps every target surface.)
+- **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
+  in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
+  would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
+  direction (a premature instruction, a missing constraint, a process gap) are both fair game and
+  explicitly wanted. Two or three bullets is enough; the goal is a compounding record of process lessons,
+  not ceremony. If genuinely nothing went wrong, say so in one line — don't manufacture a fault.
 
 ## Template
 
@@ -50,4 +56,8 @@ crosscutting concern(s), ADR(s), and the specific invariants at risk.
 Tests green across the listed platforms, AND `docs/coverage/` updated for each `satisfies:` use-case
 (every new acceptance criterion covered by a test or an explicit gap) with
 `python3 scripts/validate_coverage.py` green.
+
+## Retrospective
+What didn't go well — in planning and execution — root cause, and the concrete fix. Both directions
+(assistant misses + human direction). 2–3 bullets, or one line if nothing did.
 ```

@@ -17,7 +17,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Slice tests for a member's scopes (uc.spaces.personal-scope, cr-0026): a member births their PERSONAL scope
+ * Slice tests for a member's scopes (en.spaces.personal-scope, cr-0026): a member births their PERSONAL scope
  * (client-supplied ciphertext grant) and lists their scopes; one personal scope per (member, tenant); the
  * active tenant is resolved from the Host (X-Forwarded-Host); operator-blind (the stored grant is exactly the
  * ciphertext the client sent). Seeds use UUID-unique domains/emails so the JVM-lived H2 mem DB (shared across

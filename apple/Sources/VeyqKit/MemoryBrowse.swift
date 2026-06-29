@@ -44,4 +44,20 @@ public enum MemoryBrowse {
         guard let nodeId else { return nil }
         return nodes.first { $0.id == nodeId }
     }
+
+    /// The drill path after tapping a breadcrumb crumb (`nodeId == nil` → the root): truncate the path to
+    /// that crumb (inclusive); leave it unchanged if the crumb isn't on the current path.
+    public static func path(_ path: [Node], navigatingTo nodeId: String?) -> [Node] {
+        guard let nodeId else { return [] }
+        guard let idx = path.firstIndex(where: { $0.id == nodeId }) else { return path }
+        return Array(path.prefix(idx + 1))
+    }
+
+    /// The drill path after deleting `nodeId`: if the open path runs through it, step back to its parent
+    /// (drop it and everything below); otherwise unchanged. Mirrors the web client stepping out of a
+    /// subtree it just removed.
+    public static func path(_ path: [Node], afterDeleting nodeId: String) -> [Node] {
+        guard let idx = path.firstIndex(where: { $0.id == nodeId }) else { return path }
+        return Array(path.prefix(idx))
+    }
 }

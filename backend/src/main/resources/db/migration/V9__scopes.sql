@@ -1,4 +1,4 @@
--- Generalise scope identity + the personal scope (uc.spaces.personal-scope, cr-0026). Until now the model
+-- Generalise scope identity + the personal scope (en.spaces.personal-scope, cr-0026). Until now the model
 -- collapsed "scope == tenant" (membership keyed by tenant_id). A scope is now a first-class row (opaque id +
 -- kind TENANT/GROUP/PERSONAL), and membership references the scope it grants (ADR 0007). Operator-blind: a
 -- scope row holds NO key; the scope key lives only in the member's ciphertext wrapped_grant.

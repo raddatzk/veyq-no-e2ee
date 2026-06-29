@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: >
     A member's scopes within the active tenant — the structural layer "where content lives and who may
-    access it" (uc.spaces.personal-scope, cr-0026). A **scope** is the unit content is keyed on, addressed by
+    access it" (en.spaces.personal-scope, cr-0026). A **scope** is the unit content is keyed on, addressed by
     an opaque id and a `kind` (TENANT / GROUP / PERSONAL). The active tenant is resolved from the request
     `Host` (ADR 0002); every scope lives within exactly one tenant.
 

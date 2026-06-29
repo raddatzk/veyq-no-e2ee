@@ -15,7 +15,7 @@ import jakarta.ws.rs.core.Response
 import java.util.UUID
 
 /**
- * HTTP adapter for a member's scopes (uc.spaces.personal-scope, cr-0026). Implements the generated
+ * HTTP adapter for a member's scopes (en.spaces.personal-scope, cr-0026). Implements the generated
  * [ScopesApi]; thin (ADR 0001) — delegates to [ScopesHandler]. Authentication is central (`@Authenticated`):
  * a missing/invalid token is a generic 401 before this runs. The active tenant is resolved from the request
  * Host (the reverse-proxy `X-Forwarded-Host`, else `Host`). Operator-blind: both endpoints handle only the

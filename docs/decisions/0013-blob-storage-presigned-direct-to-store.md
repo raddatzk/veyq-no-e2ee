@@ -78,7 +78,7 @@ GC (stale OPEN sessions + the unreferenced-blob sweep).
 
 For a browser/mobile client to reach a presigned URL the **object store endpoint must be reachable by the
 client**, which may differ from the backend's internal endpoint. Presigned URLs are signed for
-`veyq.blob-store.s3-public-endpoint` (empty ⇒ sign against the internal endpoint, i.e. external S3 or any
+`veyq.blob-store.public-endpoint` (empty ⇒ sign against the internal endpoint, i.e. external S3 or any
 publicly-reachable store); `S3BlobStore` keeps a second client purely for signing (local HMAC, never connects).
 
 **CORS is web-only** — native apps `PUT`/`GET` directly and are never subject to it. It is configured **on the

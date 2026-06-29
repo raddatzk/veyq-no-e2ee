@@ -51,4 +51,34 @@ final class MemoryBrowseTests: XCTestCase {
         XCTAssertNil(MemoryBrowse.node(nil, in: tree))
         XCTAssertNil(MemoryBrowse.node("nope", in: tree))
     }
+
+    // A drill path Trips → 2025 (the shell's `HomeModel.path` stack).
+    private var deepPath: [VeyqClient.TreeNode] {
+        [node("trips", .FOLDER, "Trips", order: 1), node("2025", .FOLDER, "2025", parent: "trips")]
+    }
+
+    func testNavigatingToRootClearsThePath() {
+        XCTAssertEqual(MemoryBrowse.path(deepPath, navigatingTo: nil).map(\.id), [])
+    }
+
+    func testNavigatingToACrumbTruncatesToIt() {
+        XCTAssertEqual(MemoryBrowse.path(deepPath, navigatingTo: "trips").map(\.id), ["trips"])
+        // tapping the deepest crumb is a no-op (whole path kept)
+        XCTAssertEqual(MemoryBrowse.path(deepPath, navigatingTo: "2025").map(\.id), ["trips", "2025"])
+    }
+
+    func testNavigatingToANodeNotOnThePathLeavesItUnchanged() {
+        XCTAssertEqual(MemoryBrowse.path(deepPath, navigatingTo: "elsewhere").map(\.id), ["trips", "2025"])
+    }
+
+    func testDeletingAnAncestorStepsBackToItsParent() {
+        // deleting "trips" while inside Trips → 2025 drops it and everything below
+        XCTAssertEqual(MemoryBrowse.path(deepPath, afterDeleting: "trips").map(\.id), [])
+        // deleting the open leaf "2025" steps back to "trips"
+        XCTAssertEqual(MemoryBrowse.path(deepPath, afterDeleting: "2025").map(\.id), ["trips"])
+    }
+
+    func testDeletingASiblingOutsideThePathLeavesItUnchanged() {
+        XCTAssertEqual(MemoryBrowse.path(deepPath, afterDeleting: "solo").map(\.id), ["trips", "2025"])
+    }
 }

@@ -9,7 +9,7 @@ import jakarta.persistence.Table
 import java.time.Instant
 
 /**
- * A scope — the unit content is keyed on (uc.spaces.personal-scope, cr-0026). Generalises the cr-0010
+ * A scope — the unit content is keyed on (en.spaces.personal-scope, cr-0026). Generalises the cr-0010
  * "scope == tenant" shortcut into a first-class row: an opaque id + a `kind` (TENANT root / GROUP / PERSONAL),
  * living within exactly one tenant (ADR 0002). Operator-blind: there is **no key here** — the scope key
  * exists only inside each member's ciphertext `wrappedGrant` on their membership row. The TENANT root scope

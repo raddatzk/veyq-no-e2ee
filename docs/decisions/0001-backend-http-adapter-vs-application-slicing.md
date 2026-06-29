@@ -30,12 +30,15 @@ Separate the two axes:
    handler**; an operation serving N use-cases dispatches to N handlers (or a small dispatcher).
 
 ```
-features/memory/
-  MemoryNodeResource.kt     # implements NodesApi (generated); thin; delegates per operation
-  create-tree/  CreateFolderHandler.kt, CreateMemoryHandler.kt
-  browse/       BrowseHandler.kt
-  curate/       SetCoverHandler.kt
+features/content/
+  ContentResource.kt        # implements ContentApi (generated); thin; delegates per operation
+  NodesHandler.kt           # the Memory-tree use-cases (create/browse/rename/delete)
+  NodesStore.kt, Entities.kt
+  favorites/  FavoritesResource.kt → FavoritesHandler.kt  # the favorites use-case, same shape
 ```
+
+*(Illustrative — the actual content feature is flatter than one folder per use-case; the rule is the
+two-layer split, not a fixed sub-folder depth.)*
 
 ## Consequences
 

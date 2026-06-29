@@ -25,7 +25,7 @@ acceptanceCriteria:
   - id: no-password-or-secret-key-at-rest
     text: The wrapping key is a random device-bound key (not the password); an extracted key opens only this device's vault.
     coverage:
-      apple: { unit: [DeviceSecurityStoreTests.testPasswordlessRecordCarriesKeyAndToken] }
+      apple: { unit: [DeviceSecurityStoreTests.testPasswordlessCommitCarriesWrapAndToken] }
       android: { unit: [DeviceSecurityStoreTest.passwordlessCommitCarriesLevelWrapAndToken] }
   - id: key-or-token-gone-falls-back
     text: A missing key/wrap or an expired/rotated token degrades to the floor (no silent self-wipe on a single server response).

@@ -9,7 +9,7 @@ acceptanceCriteria:
       http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
       apple: { unit: [TrustDeviceTests.testTrustThenDeviceUnlockRoundTrip], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
-      android: { unit: [TrustDeviceTest.trustThenDeviceUnlockRoundTrip, DeviceTrustStoreTest.enrolCommitLoadClearRoundTrip], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
+      android: { unit: [TrustDeviceTest.trustThenDeviceUnlockRoundTrip, DeviceSecurityStoreTest.l1EnrolCommitClearRoundTrip], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: device-unlock-password-only
     text: A trusted device opens the Master Key with only the password (its DEVICE wrap), no Secret Key — and on apple the unlock folds into login.
     coverage:

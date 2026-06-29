@@ -5,7 +5,8 @@ import VeyqKit
 /// The Memory shell's state (cr-0034) — the Apple parity of the web `treeStore` + `activeSpace` + browse
 /// derivation. Opens the personal scope, loads the decrypted tree once, and derives the current level +
 /// breadcrumb **client-side** (the operator-blind server computes no navigation). Drill is a path stack, like
-/// the web client. `ObservableObject` (not `@Observable`) to match the app's macOS 13 / iOS 16 deployment.
+/// the web client. The path-stack navigation (`navigatingTo` / `afterDeleting`) lives as pure helpers in
+/// `MemoryBrowse` so it's unit-tested via `swift test`.
 @MainActor
 final class HomeModel: ObservableObject {
     @Published var nodes: [VeyqClient.TreeNode] = []
@@ -53,10 +54,7 @@ final class HomeModel: ObservableObject {
 
     func openFolder(_ node: VeyqClient.TreeNode) { path.append(node) }
 
-    func goto(_ crumb: MemoryBrowse.Crumb) {
-        guard let target = crumb.nodeId else { path.removeAll(); return }
-        if let idx = path.firstIndex(where: { $0.id == target }) { path = Array(path.prefix(idx + 1)) }
-    }
+    func goto(_ crumb: MemoryBrowse.Crumb) { path = MemoryBrowse.path(path, navigatingTo: crumb.nodeId) }
 
     func createFolder(_ name: String) async { await mutate { c, id, key in
         _ = try await c.createFolder(scopeId: id, scopeKey: key, name: name, parentId: self.currentParentId)
@@ -72,9 +70,7 @@ final class HomeModel: ObservableObject {
 
     func delete(_ node: VeyqClient.TreeNode) async {
         // If we're inside the node (or its subtree) being deleted, step back to its parent first.
-        if path.contains(where: { $0.id == node.id }) {
-            if let idx = path.firstIndex(where: { $0.id == node.id }) { path = Array(path.prefix(idx)) }
-        }
+        path = MemoryBrowse.path(path, afterDeleting: node.id)
         await mutate { c, id, _ in try await c.deleteNode(scopeId: id, nodeId: node.id) }
     }
 

@@ -2,6 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-06-25
+- Implementation: the **opaque two-token rotating scheme** (access + refresh, named families, reuse
+  detection ⇒ family revocation) is **built** (`features/account/login/*`, `V5__login_sessions.sql`). The
+  **E2EE named-sessions half** — `PUT …/sessions/{id}/name` + the unlocked "active sessions" decrypting
+  view (`uc.account.sessions`) — is **not yet built** (the contract reserves the family id; the name is
+  "attached later"). This ADR records the agreed design for that half.
 
 ## Context
 

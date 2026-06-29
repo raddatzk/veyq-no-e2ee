@@ -16,7 +16,7 @@ sealed interface ListScopesOutcome {
 }
 
 /**
- * Use-case logic for a member's scopes (uc.spaces.personal-scope, cr-0026). The active tenant is resolved
+ * Use-case logic for a member's scopes (en.spaces.personal-scope, cr-0026). The active tenant is resolved
  * from the request Host; the caller must already belong to it (you get a personal scope in tenants you are a
  * member of). Birth is client-driven and operator-blind — the handler only persists the ciphertext grant.
  */

@@ -87,7 +87,7 @@ class TenantInviteEntity : PanacheEntityBase {
  * TENANT root scope is keyed `scopeId == tenantId`, a PERSONAL/GROUP scope gets its own id. `wrappedGrant` is
  * the scope key sealed to the member's identity public key — opaque ciphertext the server stores but never
  * opens. The first row is the owner's, born at tenant activation (cr-0010); members extend the relation
- * later via the invite-wrap, and each member births their own PERSONAL scope (uc.spaces.personal-scope).
+ * later via the invite-wrap, and each member births their own PERSONAL scope (en.spaces.personal-scope).
  */
 @Entity
 @Table(name = "veyq_membership")

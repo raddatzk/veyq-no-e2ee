@@ -19,13 +19,13 @@ There is no shared FFI/Rust core — instead, every implementation ships a **con
 `contracts/crypto/vectors/v1.json`** and must pass it. The vectors *are* the parity guarantee: drift is
 caught by a red test, not by code review.
 
-- **Libraries:** Swift → `swift-crypto` (Ed25519, HKDF, AES-GCM; ML-KEM via its MLKEM module later) + an
-  Argon2id dependency; Kotlin → **BouncyCastle** (Argon2id, Ed25519, HKDF, AES-GCM, ML-KEM all in one).
-- **Slice order mirrors the dependency chain.** The **auth/unlock subset** lands first — `primitives`
+- **Libraries:** Swift → `swift-crypto` (Ed25519, HKDF, AES-GCM, and **`MLKEM768`** for the hybrid KEM) +
+  `swift-sodium` (Argon2id); Kotlin → **BouncyCastle** 1.81 (Argon2id, Ed25519, HKDF, AES-GCM, ML-KEM all in one).
+- **Slice order mirrored the dependency chain.** The **auth/unlock subset** landed first — `primitives`
   (HKDF, AES-GCM), `kek` (Argon2id KEKs), `kdf_params` (the fixed `u32be t‖m‖p‖dkLen‖salt` layout),
   `wrap` (symmetric), the auth keypair derivation, `recovery_auth_tag`. **ML-KEM-768** (`kem_v1`, the
-  asymmetric wrap / scope grants) is **deferred to the first content/scope slice** — native first connects
-  to an already-bootstrapped instance and does login + unlock, neither of which touches the KEM.
+  asymmetric wrap / scope grants) followed in **cr-0025** (now shipped on both native platforms) — native
+  first connected to an already-bootstrapped instance doing login + unlock, neither of which touches the KEM.
 - The vector file stays the **single source of truth**; pinning a new primitive = adding a vector, then
   making every platform green.
 
@@ -33,8 +33,8 @@ caught by a red test, not by code review.
 
 - **Three impls (TS, Swift, Kotlin), one contract.** New crypto is pinned by a vector first; each platform
   follows. The `kdf_params` vector already calls this out ("web encodes at setup, mobile decodes at login").
-- **Native starts without the hardest part.** Login + unlock need only classic crypto, all present in
-  `swift-crypto` / BouncyCastle, so the Apple + Android foundations can land before the ML-KEM port.
+- **Native started without the hardest part.** Login + unlock needed only classic crypto, all present in
+  `swift-crypto` / BouncyCastle, so the Apple + Android foundations landed before the ML-KEM port (cr-0025).
 - **Rejected — a shared Rust/UniFFI crypto core:** it would guarantee parity from one source, but adds a new
   toolchain (Rust + FFI build) to a Quarkus/Kotlin + Swift + TS stack. The vectors already provide the
   parity contract, so per-platform is lighter and on-brand. Revisit only if the hybrid-KEM combiner proves

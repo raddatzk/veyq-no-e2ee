@@ -20,7 +20,7 @@ acceptanceCriteria:
   - id: no-password-at-rest
     text: The wrapping key is a random device-bound key, never the account password — a biometric-passing local attacker gets only this device's vault.
     coverage:
-      apple: { unit: [DeviceSecurityStoreTests.testPasswordlessRecordCarriesKeyAndToken] }
+      apple: { unit: [DeviceSecurityStoreTests.testPasswordlessCommitCarriesWrapAndToken] }
       android: { unit: [DeviceSecurityStoreTest.passwordlessCommitCarriesLevelWrapAndToken] }
   - id: key-or-wrap-gone-no-self-wipe
     text: A missing local key or server wrap degrades to the floor without self-wiping the local key on a single server response.

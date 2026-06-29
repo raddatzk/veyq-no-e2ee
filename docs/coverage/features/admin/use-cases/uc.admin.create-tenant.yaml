@@ -10,7 +10,7 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantsSliceTest.createReturns201Pending] }
       http: { e2e: [http/admin/tenant-authed.http] }
-      web: { e2e: [browser-smoke cr-0009 phase 4 (setup→login→unlock→create, row renders PENDING)] }
+      web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/views/TenantsView.test.ts] }
   - id: reject-duplicate-domain
     text: A domain already mapped to a tenant is rejected (409 domain_taken).
     coverage:
@@ -63,7 +63,7 @@ acceptanceCriteria:
     text: A new owner registers cold and accepts — a MEMBER account is born, the OWNER membership + grant stored, the tenant ACTIVE, the invite CONSUMED.
     coverage:
       backend: { integration: [TenantAcceptSliceTest.registerAndAcceptActivatesTenant] }
-      web: { e2e: [browser-smoke cr-0010 phase 4 (invite different email → register → ACTIVE; DB-verified)] }
+      # web: manual browser smoke only (cr-0010 phase 4, DB-verified); no automated harness yet → see gaps.web
   - id: activate-by-signin
     text: An existing owner signs in and accepts, activating the tenant with the cold-born grant.
     coverage:
@@ -95,6 +95,9 @@ acceptanceCriteria:
       backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
       http: { e2e: [http/admin/tenant.http] }
 gaps:
-  web: built (cr-0009 phase 4) — facade unit tests (tenants.test.ts) + interactive browser smoke; a web acceptance harness is not yet linked here
+  web: Slice A is automation-covered (cr-0038) — facade unit tests (tenants.test.ts) + component acceptance
+    for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call; TenantsView.test.ts renders the
+    PENDING row + invite actions + 401-redirect). Slice B activation UI (TenantJoinView — register/sign-in
+    accept building the identity + cold grant) is still backend-only here; its component harness is pending.
   apple: not built yet — web-first slice; native parity is a later CR
   android: not built yet — web-first slice; native parity is a later CR
