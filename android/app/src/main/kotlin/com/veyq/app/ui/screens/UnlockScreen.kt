@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.security.BiometricGate
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
@@ -54,12 +55,13 @@ fun UnlockScreen(app: AppModel) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val biometricAvailable = activity != null && BiometricGate.available(activity)
+    val l = LocalL10n.current
 
     val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
         val kit = bytes?.let { importKitFromBytes(it) }
-        if (kit == null) error = "Couldn't read an Emergency Kit from that file." else { secretKey = kit.secretKey; error = "" }
+        if (kit == null) error = l.t("kit.readError") else { secretKey = kit.secretKey; error = "" }
     }
 
     if (scanning) {
@@ -70,22 +72,22 @@ fun UnlockScreen(app: AppModel) {
         return
     }
 
-    AuthCard(title = "Unlock your vault", subtitle = app.email) {
+    AuthCard(title = l.t("unlock.title"), subtitle = app.email) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             VeyqField(
-                label = "Secret Key",
+                label = l.t("unlock.secretKey"),
                 value = secretKey,
                 onValueChange = { secretKey = it },
                 secure = true,
-                hint = "From your Emergency Kit. Used with your password to unlock — never sent.",
+                hint = l.t("unlock.secretKeyHint"),
             )
             KitImportBar(
-                label = "Import your Emergency Kit to fill the Secret Key",
+                label = l.t("unlock.kitImport"),
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
                 onScan = { scanning = true },
             )
             DeviceSecurityChooser(selection = level, onSelect = { level = it }, biometricAvailable = biometricAvailable)
-            PrimaryButton(title = "Unlock", busy = busy, enabled = secretKey.isNotEmpty() && level != null) {
+            PrimaryButton(title = l.t("unlock.action"), busy = busy, enabled = secretKey.isNotEmpty() && level != null) {
                 val chosen = level ?: return@PrimaryButton
                 busy = true
                 error = ""
@@ -97,7 +99,7 @@ fun UnlockScreen(app: AppModel) {
                 }
             }
             Text(
-                "Use a different instance",
+                l.t("common.differentInstance"),
                 fontSize = 13.sp,
                 color = veyqColors.muted,
                 modifier = Modifier

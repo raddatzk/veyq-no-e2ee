@@ -7,14 +7,15 @@ acceptanceCriteria:
     coverage:
       web: { unit: [src/shared/state/useThemeState.test.ts] }
       apple: { e2e: [apple/UITests/RoundTripUITests.swift] }
+      android: { e2e: [android/app/src/androidTest/kotlin/com/veyq/app/RoundTripUiTest.kt] }
   - id: language-switch-live
     text: Choosing a language (en/de) re-renders every visible string live (no content reload) and is persisted.
     coverage:
       web: { unit: [src/i18n/setLocale.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/LocalizationTests.swift], e2e: [apple/UITests/RoundTripUITests.swift] }
+      android: { unit: [android/app/src/test/kotlin/com/veyq/app/i18n/LocalizationTest.kt], e2e: [android/app/src/androidTest/kotlin/com/veyq/app/RoundTripUiTest.kt] }
   - id: resolution-fallback
     text: An unknown locale falls back to English; an unknown key resolves to itself; every key has both translations.
     coverage:
       apple: { unit: [apple/Tests/VeyqKitTests/LocalizationTests.swift] }
-gaps:
-  android: "Not built — web + Apple first (no Android UI head for the shell/settings yet)."
+      android: { unit: [android/app/src/test/kotlin/com/veyq/app/i18n/LocalizationTest.kt] }

@@ -19,20 +19,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.theme.VeyqTokens
 import com.veyq.app.ui.theme.veyqColors
 
 /**
  * The per-device unlock-level choice (uc.account.set-device-security; ADR 0005 §8–13), the Android twin of
  * Apple's `DeviceSecurityChooser`. Shown on the floor at unlock time with **no pre-selection** — the user
- * must actively decide. cr-0021 ships L0 + L1; the passwordless notches are previewed disabled ("Coming
- * soon", cr-0022) so the chooser extends rather than gets rewritten.
+ * must actively decide. The title + subtitle are carried as i18n keys ([titleKey] / [subKey]) and resolved
+ * through `L10n` at render so the chooser localizes with the rest of the UI.
  */
-enum class DeviceUnlockLevel(val title: String, val subtitle: String) {
-    SECRET_KEY_EACH_TIME("Secret Key each time", "Most private — enter your password and Secret Key every time."),
-    ONLY_PASSWORD("Only my password", "Trust this device: next time just your password, no Secret Key."),
-    BIOMETRIC("Fingerprint / Face", "Unlock with a touch — no password."),
-    NO_LOGIN("Open straight in", "No prompt at all — relies only on your device’s lock screen."),
+enum class DeviceUnlockLevel(val titleKey: String, val subKey: String) {
+    SECRET_KEY_EACH_TIME("device.secretEachTime.title", "device.secretEachTime.sub"),
+    ONLY_PASSWORD("device.onlyPassword.title", "device.onlyPassword.sub"),
+    BIOMETRIC("device.biometric.title", "device.biometric.sub"),
+    NO_LOGIN("device.noLogin.title", "device.noLogin.sub"),
 }
 
 @Composable
@@ -42,10 +43,11 @@ fun DeviceSecurityChooser(
     biometricAvailable: Boolean = true,
 ) {
     val c = veyqColors
+    val l = LocalL10n.current
     // L2 needs an enrolled biometric; the rest are always offerable (L3 is an explicit, OS-lock-only choice).
     fun available(level: DeviceUnlockLevel) = level != DeviceUnlockLevel.BIOMETRIC || biometricAvailable
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("How should this device unlock next time?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
+        Text(l.t("device.prompt"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
         DeviceUnlockLevel.entries.forEach { level ->
             val selected = selection == level
             val isAvailable = available(level)
@@ -66,14 +68,14 @@ fun DeviceSecurityChooser(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            level.title,
+                            l.t(level.titleKey),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (isAvailable) c.text else c.muted,
                         )
                         if (!isAvailable) {
                             Text(
-                                "Not available",
+                                l.t("device.notAvailable"),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = c.muted,
@@ -84,7 +86,7 @@ fun DeviceSecurityChooser(
                             )
                         }
                     }
-                    Text(level.subtitle, fontSize = 12.sp, color = c.muted)
+                    Text(l.t(level.subKey), fontSize = 12.sp, color = c.muted)
                 }
                 RadioButton(selected = selected, onClick = { if (isAvailable) onSelect(level) }, enabled = isAvailable)
             }

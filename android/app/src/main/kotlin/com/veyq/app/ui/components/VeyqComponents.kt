@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.theme.VeyqTokens
 import com.veyq.app.ui.theme.veyqColors
 
@@ -208,10 +209,11 @@ fun KitImportBar(
     onScan: (() -> Unit)? = null,
 ) {
     val c = veyqColors
+    val l = LocalL10n.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Text(
-                "Upload kit",
+                l.t("kit.uploadKit"),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = c.accent,
@@ -219,7 +221,7 @@ fun KitImportBar(
             )
             if (onScan != null) {
                 Text(
-                    "Scan QR",
+                    l.t("kit.scanQr"),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = c.accent,

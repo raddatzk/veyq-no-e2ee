@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.KitImportBar
@@ -47,20 +48,21 @@ fun SignInScreen(app: AppModel) {
     var scanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val l = LocalL10n.current
 
     // Apply an imported kit: fill the email + park the Secret Key for the floor. On-device only.
     fun apply(kit: KitData) {
         error = ""
         email = kit.email
         app.pendingSecretKey = kit.secretKey
-        info = "Emergency Kit imported — your Secret Key is ready for unlock."
+        info = l.t("signIn.kitImported")
     }
 
     val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
         val kit = bytes?.let { importKitFromBytes(it) }
-        if (kit == null) error = "Couldn't read an Emergency Kit from that file." else apply(kit)
+        if (kit == null) error = l.t("kit.readError") else apply(kit)
     }
 
     val canSubmit = email.trim().isNotEmpty() && password.isNotEmpty()
@@ -70,22 +72,22 @@ fun SignInScreen(app: AppModel) {
         return
     }
 
-    AuthCard(title = "Sign in", subtitle = app.apiBase) {
+    AuthCard(title = l.t("signIn.title"), subtitle = app.apiBase) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             VeyqField(
-                label = "Email",
+                label = l.t("signIn.email"),
                 value = email,
                 onValueChange = { email = it },
                 placeholder = "you@example.com",
                 keyboard = VeyqKeyboard.EMAIL,
             )
-            VeyqField(label = "Password", value = password, onValueChange = { password = it }, secure = true)
+            VeyqField(label = l.t("signIn.password"), value = password, onValueChange = { password = it }, secure = true)
             KitImportBar(
-                label = "Import your Emergency Kit (fills email + Secret Key)",
+                label = l.t("signIn.kitImport"),
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
                 onScan = { scanning = true },
             )
-            PrimaryButton(title = "Sign in", busy = busy, enabled = canSubmit) {
+            PrimaryButton(title = l.t("signIn.title"), busy = busy, enabled = canSubmit) {
                 busy = true
                 error = ""
                 val e = email.trim()
@@ -102,7 +104,7 @@ fun SignInScreen(app: AppModel) {
                 }
             }
             Text(
-                "Use a different instance",
+                l.t("common.differentInstance"),
                 fontSize = 13.sp,
                 color = veyqColors.muted,
                 modifier = Modifier

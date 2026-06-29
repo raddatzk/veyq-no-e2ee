@@ -48,12 +48,19 @@ class RoundTripUiTest {
     /** The Memory shell's stable marker: the "Create" toolbar action is always present once browse renders. */
     private fun homeShown() = compose.onAllNodesWithTag("Create").fetchSemanticsNodes().isNotEmpty()
 
-    /** On compact width the rail is a modal drawer; open it to reach the profile controls (sign-out /
-     *  untrust). On expanded width the rail is permanent so "Sign out" is already present and this no-ops. */
+    /** Whether a node with [tag] is on screen. The modal drawer composes its content **off-screen** while
+     *  closed, so a node can be present in the tree yet not displayed — presence alone isn't enough. */
+    private fun isDisplayed(tag: String): Boolean =
+        try { compose.onNodeWithTag(tag).assertIsDisplayed(); true } catch (_: AssertionError) { false }
+
+    /** On compact width the rail is a modal drawer; slide it in (via the "Spaces" hamburger) to reach the
+     *  profile controls (settings / sign-out / untrust). On expanded width the rail is permanent so "Sign
+     *  out" is already displayed and this no-ops. The closed drawer composes its content off-screen, so we
+     *  gate on **displayed**, not mere presence, then wait for the open animation to settle. */
     private fun openRail() {
-        if (compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isEmpty()) {
+        if (!isDisplayed("Sign out")) {
             compose.onNodeWithTag("Spaces").performClick()
-            compose.waitUntil(5_000) { compose.onAllNodesWithTag("Sign out").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(5_000) { isDisplayed("Sign out") }
         }
     }
 
@@ -206,6 +213,65 @@ class RoundTripUiTest {
         capture("android-trust-04-floor-after-untrust")
     }
 
+    /**
+     * cr-0043 — the **theme + language Settings** round-trip through the real UI: reach the Memory shell, open
+     * the Settings sheet from the rail gear, flip the theme to **dark** (the whole palette flips live) and the
+     * language to **German** (every visible string re-renders **in place** — the sheet title becomes
+     * "Einstellungen" **and** the shell's "Memories" header behind it becomes "Erinnerungen", proving no
+     * navigation reload). Resets to system/system before leaving so the install stays English for the other
+     * tests. Writes the settings design references; run on a phone **and** an expanded window.
+     */
+    @Test
+    fun settingsThemeAndLanguage() {
+        val base = args.getString("veyqBase")
+        assumeNotNull(base)
+        val email = requireNotNull(args.getString("veyqEmail")) { "veyqEmail arg required" }
+        val password = requireNotNull(args.getString("veyqPassword")) { "veyqPassword arg required" }
+        val secret = requireNotNull(args.getString("veyqSecret")) { "veyqSecret arg required" }
+
+        // Connect → sign in → (floor, if shown) unlock at "Secret Key each time" → the Memory shell.
+        compose.onNodeWithTag("Instance URL").assertIsDisplayed()
+        compose.onNodeWithTag("Instance URL").performTextInput(base!!)
+        compose.onNodeWithTag("Connect").performClick()
+        signIn(email, password)
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithText("Unlock").fetchSemanticsNodes().isNotEmpty() || homeShown()
+        }
+        if (!homeShown()) {
+            compose.onNodeWithTag("Secret Key").performTextInput(secret)
+            compose.onNodeWithTag("level.SECRET_KEY_EACH_TIME").performScrollTo().performClick()
+            compose.onNodeWithTag("Unlock").performScrollTo().performClick()
+        }
+        compose.waitUntil(timeoutMillis = 20_000) { homeShown() }
+
+        // Open the rail (modal drawer on compact, permanent on expanded) and tap its Settings gear.
+        openRail()
+        compose.onNodeWithTag("Settings").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("theme.dark").fetchSemanticsNodes().isNotEmpty() }
+        captureScreen("android-settings-01-light")
+
+        // Theme → dark: the whole palette flips live, no reload.
+        compose.onNodeWithTag("theme.dark").performClick()
+        compose.waitForIdle()
+        captureScreen("android-settings-02-dark")
+
+        // Language → German: the sheet title re-renders to "Einstellungen" AND the shell header behind it to
+        // "Erinnerungen" — both in place (snapshot-state re-render, the open tree is never rebuilt).
+        compose.onNodeWithTag("lang.de").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Einstellungen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Erinnerungen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        captureScreen("android-settings-03-de")
+
+        // Reset to system/system, then dismiss the sheet — the shell is still on the same path (home shown),
+        // back in English.
+        compose.onNodeWithTag("lang.system").performClick()
+        compose.onNodeWithTag("theme.system").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Memories").fetchSemanticsNodes().isNotEmpty() }
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(timeoutMillis = 10_000) { homeShown() }
+    }
+
     /** Type email + password on the sign-in screen and tap Sign in (used across the lifecycle re-logins). */
     private fun signIn(email: String, password: String) {
         compose.waitUntil(timeoutMillis = 20_000) {
@@ -223,6 +289,20 @@ class RoundTripUiTest {
      */
     private fun capture(name: String) {
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        save(name, bitmap)
+    }
+
+    /**
+     * Whole-device screenshot (via `UiAutomation`) — needed for the Settings captures, where the
+     * `ModalBottomSheet` is a **separate window** so the Compose `onRoot()` capture is ambiguous; this grabs
+     * everything on screen (the sheet over the shell).
+     */
+    private fun captureScreen(name: String) {
+        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        save(name, bitmap)
+    }
+
+    private fun save(name: String, bitmap: Bitmap) {
         PlatformTestStorageRegistry.getInstance().openOutputFile("$name.png").use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }

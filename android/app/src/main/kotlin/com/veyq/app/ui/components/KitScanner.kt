@@ -40,6 +40,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.theme.VeyqTokens
 import com.veyq.app.ui.theme.veyqColors
 import com.veyq.client.KitData
@@ -59,6 +60,7 @@ import com.google.mlkit.vision.common.InputImage
 fun KitScanner(onResult: (KitData) -> Unit, onCancel: () -> Unit) {
     val context = LocalContext.current
     val c = veyqColors
+    val l = LocalL10n.current
 
     var granted by remember {
         mutableStateOf(
@@ -82,7 +84,7 @@ fun KitScanner(onResult: (KitData) -> Unit, onCancel: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Scan your Emergency Kit", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = c.text)
+            Text(l.t("kit.scanTitle"), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = c.text)
 
             when {
                 granted -> {
@@ -101,14 +103,14 @@ fun KitScanner(onResult: (KitData) -> Unit, onCancel: () -> Unit) {
                             }
                         },
                     )
-                    Text("Point the camera at the QR code on your kit.", fontSize = 13.sp, color = c.muted)
+                    Text(l.t("kit.scanHint"), fontSize = 13.sp, color = c.muted)
                 }
-                denied -> MessageBox("Camera access is off. Allow it in settings, or upload the kit instead.")
-                else -> Text("Requesting camera access…", fontSize = 13.sp, color = c.muted)
+                denied -> MessageBox(l.t("kit.cameraDenied"))
+                else -> Text(l.t("kit.requesting"), fontSize = 13.sp, color = c.muted)
             }
 
             Text(
-                "Cancel",
+                l.t("common.cancel"),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = c.accent,

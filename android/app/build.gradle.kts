@@ -83,6 +83,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended") // folder/photo/person/settings for the Memory shell (cr-0039)
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // JVM unit tests (testDebugUnitTest) — the pure i18n resolver (cr-0043), the analog of Apple's
+    // VeyqKitTests/LocalizationTests. No Android SDK needed.
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
+
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     // 2025 test libs — older espresso reflects on InputManager.getInstance(), removed in API 37.

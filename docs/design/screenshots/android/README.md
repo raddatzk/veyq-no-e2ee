@@ -49,6 +49,24 @@ then **closes + relaunches the activity** (a fresh AppModel re-runs `bootstrap`)
 **L2 (fingerprint) is a manual smoke** — enrolling a fingerprint on the emulator (so `adb emu finger touch`
 works) isn't cleanly automatable; the L2 *data* path is unit-tested and the chooser gate is shown above.
 
+## Settings — theme + language (cr-0043)
+
+Driven by `RoundTripUiTest.settingsThemeAndLanguage`: reach the Memory shell, open Settings from the rail
+gear, flip the **theme** to dark (the whole palette flips live) and the **language** to German (every string
+re-renders **in place** — the sheet title becomes "Einstellungen" *and* the shell behind it becomes
+"Erinnerungen", i.e. no navigation reload). Captured on a phone (compact) **and** an expanded (~900dp) window
+(`-wide`, via `adb shell wm density 192`).
+
+| file | screen |
+|------|--------|
+| `android-settings-01-light.png` / `-wide` | Settings sheet — Appearance + Language (System), Account, Instance |
+| `android-settings-02-dark.png` / `-wide`  | Theme → **Dark**: the palette flips live (sheet + shell behind) |
+| `android-settings-03-de.png` / `-wide`    | Language → **Deutsch**: sheet **and** shell re-render in German, no reload |
+
+> The emulator's Host resolves to `10.0.2.2`, which the tenant-domain validator rejects as a bare IP. Seed a
+> tenant with a valid hostname (`seed-tenant.mts`, e.g. `VEYQ_DOMAIN=android.veyq.test`) then rewrite its
+> `veyq_tenant.domain` to `10.0.2.2` directly in the DB so the shell's Host-scoped personal space resolves.
+
 Captured on the **API-37 emulator** (`Pixel_10` AVD). Unlike macOS UI-test runners, the Android emulator
 has no TCC/Accessibility wall, so these are produced headlessly from the CLI.
 

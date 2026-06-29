@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.MessageBox
@@ -29,23 +30,21 @@ fun ConnectScreen(app: AppModel) {
     var error by remember { mutableStateOf("") }
     var setupNeeded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val l = LocalL10n.current
 
-    AuthCard(title = "Connect to your instance", subtitle = "Enter the address of your veyq server.") {
+    AuthCard(title = l.t("connect.title"), subtitle = l.t("connect.subtitle")) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             VeyqField(
-                label = "Instance URL",
+                label = l.t("connect.url"),
                 value = url,
                 onValueChange = { url = it },
                 placeholder = "https://memories.example.com",
                 keyboard = VeyqKeyboard.URL,
             )
             if (setupNeeded) {
-                MessageBox(
-                    "This instance still needs first-run setup. Finish it in a web browser, then connect here.",
-                    error = false,
-                )
+                MessageBox(l.t("connect.setupNeeded"), error = false)
             }
-            PrimaryButton(title = "Connect", busy = busy, enabled = url.trim().isNotEmpty()) {
+            PrimaryButton(title = l.t("connect.action"), busy = busy, enabled = url.trim().isNotEmpty()) {
                 busy = true
                 error = ""
                 setupNeeded = false

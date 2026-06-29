@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
@@ -77,6 +78,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.HomeModel
 import com.veyq.app.ui.components.MessageBox
@@ -92,14 +94,15 @@ import kotlinx.coroutines.launch
  * a `PermanentNavigationDrawer` on Medium/Expanded (tablet, landscape), a `ModalNavigationDrawer` on Compact
  * (phone, open straight to the content). Drill-in is **state-driven** (a path stack in [HomeModel] + a
  * breadcrumb), not list/detail; the hardware back steps one level up. Operator-blind: names are decrypted on
- * device; the server computes no navigation. Theme / language settings + the real space switcher are later
- * slices (the rail is a thin static "Personal" + a sign-out for now).
+ * device; the server computes no navigation. The rail's gear opens theme + language Settings (cr-0043,
+ * [SettingsSheet]); the real space switcher is a later slice (the rail is a thin static "Personal" for now).
  */
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun HomeScreen(app: AppModel) {
     val activity = LocalContext.current as Activity
     val expanded = calculateWindowSizeClass(activity).widthSizeClass != WindowWidthSizeClass.Compact
+    val l = LocalL10n.current
 
     val model = remember(app) { HomeModel(app.activeClient) }
     LaunchedEffect(Unit) { model.start() }
@@ -111,6 +114,7 @@ fun HomeScreen(app: AppModel) {
     var createIsFolder by remember { mutableStateOf<Boolean?>(null) }
     var renameTarget by remember { mutableStateOf<VeyqClient.TreeNode?>(null) }
     var deleteTarget by remember { mutableStateOf<VeyqClient.TreeNode?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
 
     // Back: close the drawer first (compact), otherwise step one level up the drill path.
     BackHandler(enabled = (!expanded && drawerState.isOpen) || model.path.isNotEmpty()) {
@@ -119,6 +123,7 @@ fun HomeScreen(app: AppModel) {
 
     val onSignOut: () -> Unit = { scope.launch { app.signOut() } }
     val onUntrust: () -> Unit = { scope.launch { app.untrust() } }
+    val onOpenSettings: () -> Unit = { showSettings = true }
     val browse: @Composable () -> Unit = {
         BrowsePane(
             model = model,
@@ -135,22 +140,26 @@ fun HomeScreen(app: AppModel) {
         PermanentNavigationDrawer(
             drawerContent = {
                 PermanentDrawerSheet(Modifier.width(280.dp)) {
-                    SpacesRail(app.email, app.deviceTrusted, onSignOut, onUntrust)
+                    SpacesRail(app.email, app.deviceTrusted, onSignOut, onUntrust, onOpenSettings)
                 }
             },
         ) { browse() }
     } else {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            drawerContent = { ModalDrawerSheet { SpacesRail(app.email, app.deviceTrusted, onSignOut, onUntrust) } },
+            drawerContent = { ModalDrawerSheet { SpacesRail(app.email, app.deviceTrusted, onSignOut, onUntrust, onOpenSettings) } },
         ) { browse() }
+    }
+
+    if (showSettings) {
+        SettingsSheet(email = app.email, instance = app.apiBase, onDismiss = { showSettings = false })
     }
 
     // Dialogs (the Compose analog of Apple's create/rename alerts + delete confirmationDialog).
     createIsFolder?.let { isFolder ->
         NameDialog(
-            title = if (isFolder) "New folder" else "New memory",
-            confirm = "Create",
+            title = if (isFolder) l.t("home.newFolder") else l.t("home.newMemory"),
+            confirm = l.t("common.create"),
             onConfirm = { name ->
                 createIsFolder = null
                 scope.launch { if (isFolder) model.createFolder(name) else model.createMemory(name) }
@@ -160,8 +169,8 @@ fun HomeScreen(app: AppModel) {
     }
     renameTarget?.let { target ->
         NameDialog(
-            title = "Rename",
-            confirm = "Rename",
+            title = l.t("common.rename"),
+            confirm = l.t("common.rename"),
             initial = target.name,
             onConfirm = { name -> renameTarget = null; scope.launch { model.rename(target, name) } },
             onDismiss = { renameTarget = null },
@@ -170,36 +179,42 @@ fun HomeScreen(app: AppModel) {
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("Delete “${target.name}”?") },
-            text = { Text("This removes it and everything inside it.") },
+            title = { Text(l.t("home.deleteTitle", target.name)) },
+            text = { Text(l.t("home.deleteBody")) },
             confirmButton = {
                 TextButton(onClick = { deleteTarget = null; scope.launch { model.delete(target) } }) {
-                    Text("Delete", color = veyqColors.danger)
+                    Text(l.t("common.delete"), color = veyqColors.danger)
                 }
             },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text(l.t("common.cancel")) } },
         )
     }
 }
 
 /** The spaces rail (drawer sheet): a thin static "Personal" entry + a profile bar (device-trust status +
- *  untrust + sign-out) — the Compose analog of Apple's `sidebar` + `profileBar`. The untrust control lives
- *  here (not the old landing) until a device-management/settings slice lands. The real switcher / theme +
- *  language settings are later slices. */
+ *  untrust + a gear to Settings + sign-out) — the Compose analog of Apple's `sidebar` + `profileBar`. The
+ *  gear opens the theme + language Settings sheet (cr-0043); the untrust control lives here too. */
 @Composable
-private fun SpacesRail(email: String, deviceTrusted: Boolean, onSignOut: () -> Unit, onUntrust: () -> Unit) {
+private fun SpacesRail(
+    email: String,
+    deviceTrusted: Boolean,
+    onSignOut: () -> Unit,
+    onUntrust: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val c = veyqColors
+    val l = LocalL10n.current
     Column(Modifier.fillMaxHeight().background(c.bg)) {
         Text("veyq", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = c.text, modifier = Modifier.padding(16.dp))
         Text(
-            "SPACES",
+            l.t("home.spaces"),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = c.muted,
             modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
         )
         NavigationDrawerItem(
-            label = { Text("Personal") },
+            label = { Text(l.t("home.personal")) },
             selected = true,
             icon = { Icon(Icons.Filled.Person, contentDescription = null) },
             onClick = {},
@@ -209,9 +224,9 @@ private fun SpacesRail(email: String, deviceTrusted: Boolean, onSignOut: () -> U
         if (deviceTrusted) {
             HorizontalDivider(color = c.line)
             Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
-                Text("This device is trusted — next time you’ll unlock with just your password.", fontSize = 12.sp, color = c.muted)
+                Text(l.t("home.deviceTrusted"), fontSize = 12.sp, color = c.muted)
                 TextButton(onClick = onUntrust, modifier = Modifier.testTag("Stop trusting this device")) {
-                    Text("Stop trusting this device", fontSize = 13.sp, color = c.danger)
+                    Text(l.t("home.stopTrusting"), fontSize = 13.sp, color = c.danger)
                 }
             }
         }
@@ -230,8 +245,11 @@ private fun SpacesRail(email: String, deviceTrusted: Boolean, onSignOut: () -> U
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("Settings")) {
+                Icon(Icons.Filled.Settings, contentDescription = l.t("settings.title"), tint = c.muted, modifier = Modifier.size(20.dp))
+            }
             TextButton(onClick = onSignOut, modifier = Modifier.testTag("Sign out")) {
-                Text("Sign out", fontSize = 13.sp, color = c.danger)
+                Text(l.t("home.signOut"), fontSize = 13.sp, color = c.danger)
             }
         }
     }
@@ -249,6 +267,7 @@ private fun BrowsePane(
     onDelete: (VeyqClient.TreeNode) -> Unit,
 ) {
     val c = veyqColors
+    val l = LocalL10n.current
     var createMenu by remember { mutableStateOf(false) }
     Scaffold(
         containerColor = c.bg,
@@ -256,7 +275,7 @@ private fun BrowsePane(
             TopAppBar(
                 title = {
                     Text(
-                        model.path.lastOrNull()?.name ?: "Personal",
+                        model.path.lastOrNull()?.name ?: l.t("home.personal"),
                         color = c.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -265,21 +284,21 @@ private fun BrowsePane(
                 navigationIcon = {
                     when {
                         model.path.isNotEmpty() -> IconButton(onClick = { model.goUp() }, modifier = Modifier.testTag("Back")) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.text)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = l.t("home.back"), tint = c.text)
                         }
                         showMenuButton -> IconButton(onClick = onOpenDrawer, modifier = Modifier.testTag("Spaces")) {
-                            Icon(Icons.Filled.Menu, contentDescription = "Spaces", tint = c.text)
+                            Icon(Icons.Filled.Menu, contentDescription = l.t("home.spacesNav"), tint = c.text)
                         }
                     }
                 },
                 actions = {
                     Box {
                         IconButton(onClick = { createMenu = true }, modifier = Modifier.testTag("Create")) {
-                            Icon(Icons.Filled.Add, contentDescription = "Create", tint = c.text)
+                            Icon(Icons.Filled.Add, contentDescription = l.t("home.create"), tint = c.text)
                         }
                         DropdownMenu(expanded = createMenu, onDismissRequest = { createMenu = false }) {
-                            DropdownMenuItem(text = { Text("New memory") }, onClick = { createMenu = false; onCreateMemory() })
-                            DropdownMenuItem(text = { Text("New folder") }, onClick = { createMenu = false; onCreateFolder() })
+                            DropdownMenuItem(text = { Text(l.t("home.newMemory")) }, onClick = { createMenu = false; onCreateMemory() })
+                            DropdownMenuItem(text = { Text(l.t("home.newFolder")) }, onClick = { createMenu = false; onCreateFolder() })
                         }
                     }
                 },
@@ -304,18 +323,18 @@ private fun BrowsePane(
             }
             if (model.crumbs.size > 1) item(span = { GridItemSpan(maxLineSpan) }) { Breadcrumb(model) }
 
-            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Memories", model.level.memories.size) }
+            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(l.t("home.memories"), model.level.memories.size) }
             if (model.level.memories.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { EmptyText("No memories yet") }
+                item(span = { GridItemSpan(maxLineSpan) }) { EmptyText(l.t("home.noMemories")) }
             } else {
                 items(model.level.memories, key = { it.id }) { node ->
                     MemoryCard(node, onRename = { onRename(node) }, onDelete = { onDelete(node) })
                 }
             }
 
-            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Folders", model.level.folders.size) }
+            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(l.t("home.folders"), model.level.folders.size) }
             if (model.level.folders.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { EmptyText("No folders yet") }
+                item(span = { GridItemSpan(maxLineSpan) }) { EmptyText(l.t("home.noFolders")) }
             } else {
                 items(model.level.folders, key = { it.id }, span = { GridItemSpan(maxLineSpan) }) { node ->
                     FolderRow(node, onOpen = { model.openFolder(node) }, onRename = { onRename(node) }, onDelete = { onDelete(node) })
@@ -328,6 +347,7 @@ private fun BrowsePane(
 @Composable
 private fun Breadcrumb(model: HomeModel) {
     val c = veyqColors
+    val l = LocalL10n.current
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -337,7 +357,7 @@ private fun Breadcrumb(model: HomeModel) {
             if (idx > 0) Text("/", fontSize = 14.sp, color = c.muted)
             val last = idx == model.crumbs.lastIndex
             Text(
-                if (crumb.nodeId == null) "Personal" else crumb.name,
+                if (crumb.nodeId == null) l.t("home.personal") else crumb.name,
                 fontSize = 14.sp,
                 fontWeight = if (last) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (last) c.text else c.muted,
@@ -451,9 +471,10 @@ private fun FolderRow(node: VeyqClient.TreeNode, onOpen: () -> Unit, onRename: (
 
 @Composable
 private fun NodeMenu(expanded: Boolean, onDismiss: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+    val l = LocalL10n.current
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(text = { Text("Rename") }, onClick = { onDismiss(); onRename() })
-        DropdownMenuItem(text = { Text("Delete", color = veyqColors.danger) }, onClick = { onDismiss(); onDelete() })
+        DropdownMenuItem(text = { Text(l.t("common.rename")) }, onClick = { onDismiss(); onRename() })
+        DropdownMenuItem(text = { Text(l.t("common.delete"), color = veyqColors.danger) }, onClick = { onDismiss(); onDelete() })
     }
 }
 
@@ -467,6 +488,7 @@ private fun NameDialog(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial) }
+    val l = LocalL10n.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -475,13 +497,13 @@ private fun NameDialog(
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                label = { Text("Name") },
+                label = { Text(l.t("common.name")) },
                 modifier = Modifier.testTag("name.field"),
             )
         },
         confirmButton = {
             TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim()) }) { Text(confirm) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(l.t("common.cancel")) } },
     )
 }

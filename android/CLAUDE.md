@@ -14,10 +14,19 @@ when working here. All content crypto runs on-device; the server is blind.
 - `./gradlew :crypto:test` — crypto **conformance vectors** (`contracts/crypto/vectors/v1.json`); green = parity (ADR 0009).
 - `./gradlew :client:test` — login + unlock **data-layer** tests (`LoginTest`/`UnlockTest`, MockWebServer,
   hermetic). The env-gated `LiveRoundTripTest` runs only with `VEYQ_LIVE_BASE` set.
+- `./gradlew :app:testDebugUnitTest` — `:app` JVM unit tests (no SDK), incl. the i18n `LocalizationTest`
+  (resolution + English fallback + en/de key parity; cr-0043).
 - `./gradlew :app:assembleDebug` — builds the Compose UI head (AGP + SDK).
 - `./gradlew :app:connectedDebugAndroidTest` — the env-gated **live UI round-trip** + screenshot capture on
   an emulator (pass `-Pandroid.testInstrumentationRunnerArguments.veyqBase=…` etc.; see
   `docs/design/screenshots/android/README.md`).
+  - **Shell/settings round-trips need a tenant whose domain = the emulator's Host (`10.0.2.2`)** — the
+    personal scope is Host-scoped, else "Couldn't open your space". Two gotchas, both real, both already-bitten:
+    (a) the create-tenant API rejects bare IPs, so `seed-tenant.mts` with a valid hostname (e.g.
+    `VEYQ_DOMAIN=android.veyq.test`) then `UPDATE veyq_tenant SET domain='10.0.2.2'` directly in the DB; (b)
+    `seed-tenant.mts` reads the invite secret from the **backend log file**, so the dev backend must be
+    started with its stdout redirected to a file (`quarkusDev > /tmp/veyq.log 2>&1`) and `VEYQ_LOG` pointed at
+    it. **Smoke this seeding before relying on a live round-trip as a done-gate.**
 
 ## Toolchain (bleeding-edge, pinned together)
 - Repo Gradle is **9.5.1** (JDK 25). That forces **AGP 9.2.1**, whose **built-in Kotlin is KGP 2.2.10** —
