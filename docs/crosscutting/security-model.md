@@ -26,6 +26,7 @@ never sees. Confidentiality is therefore cryptographic, not a server-side access
 | Passive operator reading the database | Cannot recover content — every blob and sensitive metadata field is encrypted |
 | Offline brute-force of a weak password → **content** | **Secret Key (2SKD)**: the content key derivation folds in a high-entropy Secret Key the server never stores, so a cracked password alone unlocks nothing |
 | Offline brute-force of a weak password → **server login** | The server stores only an Ed25519 **auth public key** (not a credential); the raw password never reaches the server. Forging a login means brute-forcing the password through Argon2id — yielding a session + operational metadata, **never content** (see [ADR 0003](../decisions/0003-operator-blind-password-auth.md)) |
+| **Online** brute-force / credential-stuffing / DoS on the public auth surface | **Per-IP rate limiting** of the public auth endpoints (`@RateLimited` → fixed-window `429`) — defense-in-depth, **honestly limited** (per-instance, resets on restart). Mechanism + verification: [cc.security.rate-limit](cc.security.rate-limit.md) |
 | Active operator doing key-substitution during key exchange | **Partly, and honestly limited** — see *Key-directory trust* below |
 
 We do **not** claim immunity to an *actively malicious* operator before key transparency exists; we
