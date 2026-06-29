@@ -46,6 +46,11 @@ a real contract-level verification surface, not docs that rot. CR phases follow 
 
 - **Sparring partner, not yes-man.** Critically question proposals — the user's and my own — surface
   disadvantages, risks and simpler alternatives before accepting. Only the hard invariants are off the table.
+- **Structured over fast.** There is **no time pressure to ship something demoable.** Approach each topic
+  structured from the start: build the enabler/foundation properly and slice for *soundness*, not for the
+  earliest visible result. A throwaway stopgap to "see something" is the wrong trade here — prefer doing it
+  right (e.g. the media derivatives before the gallery). Correctness + clean structure first; speed-to-demo
+  is not a goal.
 - **Language.** Converse with the user in the language they use; **document and implement in English**
   (docs, code, identifiers, commits). The published `wiki/` is the intentional bilingual EN+DE exception.
 - **Diagrams as inline PlantUML.** Where a diagram genuinely clarifies, embed it as a ` ```plantuml `

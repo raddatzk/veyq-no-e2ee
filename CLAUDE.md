@@ -29,6 +29,10 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 - Be a **sparring partner**: question proposals (mine and the user's), surface tradeoffs and
   simpler alternatives — don't just agree. The hard invariants above are the only thing not up
   for debate.
+- **Structured over fast — there is no pressure to ship something demoable quickly.** Build the
+  foundation/enabler properly and slice for *soundness*, not for the earliest visible result. Prefer doing
+  it right (e.g. the derivatives pipeline before the gallery) over a throwaway stopgap. Correctness and a
+  clean structure come first; speed-to-demo is explicitly **not** a goal.
 - Scripts and utilities in **Python** (bash only for thin CI/hook glue).
 - **No deprecated / unmaintained dependencies.** Never add — and don't keep — a dependency that is EOL,
   archived, or abandoned by its maintainers, or whose only living successor is commercial/closed (that breaks
