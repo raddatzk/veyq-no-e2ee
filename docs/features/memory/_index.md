@@ -32,12 +32,22 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - ★ [en.memory.favorites](enablers/en.memory.favorites.md) — **built** (pin a Memory: the per-(user, scope)
   pinned-id set sealed under `K_SC` as one opaque blob — operator-blind, no plaintext favorite flag;
   [cr-0031](../../../changes/cr-0031-memory-shell-polish.md))
+- ★ [en.memory.derivatives](enablers/en.memory.derivatives.md) — **refined** (per-item **thumbnail / preview /
+  original** tiers — grid = thumbnail, lightbox = preview, download = original; client-generated encrypted
+  blobs, **per-blob `K_blob`**, role-tagged on the media record (`original` + `derivatives[{kind, blob}]`), no
+  backfill, first-frame video poster, legacy sizes. **Built before the gallery** — where
+  [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md)'s deferred thumbnails/previews land)
 
 ## Use-cases (planned, on the tree + media enablers)
 
-- Create & organize memories (folders, rename, move, cover) — the user-facing curation, with UI
-- Add media to a Memory — the value-bearing upload/gallery flow + UI on top of
-  [en.memory.media](enablers/en.memory.media.md) (`K_blob` + chunked AEAD, direct-to-store)
+- Browse & organize the Memory tree — the shell + folder/Memory browse + create/rename/delete
+  ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done**, web/apple/android shells)
+- Add media to a Memory — the upload flow + UI on top of
+  [en.memory.media](enablers/en.memory.media.md) (`K_blob` + chunked AEAD, direct-to-store); the upload also
+  generates the [derivatives](enablers/en.memory.derivatives.md)
+- [uc.memory.gallery](use-cases/uc.memory.gallery.md) — **planned** (open a Memory: thumbnail grid + lightbox
+  preview + download original + header/favorite; on [en.memory.derivatives](enablers/en.memory.derivatives.md),
+  built first)
 - Memory journal — markdown sealed under `K_mem`
 - Places & tracks (map / GPX) — sealed location under `K_mem`
 - Share a Memory — wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012

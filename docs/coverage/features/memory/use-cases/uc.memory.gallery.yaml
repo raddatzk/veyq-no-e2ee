@@ -1,0 +1,19 @@
+useCase: uc.memory.gallery
+feature: memory
+title: Open a Memory & browse its gallery
+status: planned
+acceptanceCriteria:
+  - id: thumbnail-grid
+    text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem).
+  - id: lightbox-preview
+    text: Opening an item shows its preview (not the multi-MB original) full-view, with prev/next paging the grid order.
+  - id: download-original
+    text: An explicit download fetches the pristine, full-resolution original (the only byte-identical copy).
+  - id: favorite-toggle
+    text: The header toggle pins/unpins the Memory (operator-blind, via en.memory.favorites).
+  - id: operator-blind-fetch
+    text: Every tier (thumbnail/preview/original) is fetched as ciphertext via presigned GET and decrypted on device; the server sees no pixel, filename, or content key.
+gaps:
+  web: "Planned — built first (ADR 0010), on the en.memory.derivatives tiers (which land before the gallery). No UI yet; the underlying media transport is covered by en.memory.media / cr-0028."
+  apple: "Planned — native parity after web; the shell open-hook exists (cr-0034), the detail view does not."
+  android: "Planned — native parity after web; the shell open-hook exists (cr-0039), the detail view does not."

@@ -107,9 +107,11 @@ note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno
 - **Position-bound chunks.** The `chunk_frame` AAD (`index ‖ total`) makes reorder/drop/splice detectable —
   integrity of a multi-chunk blob without trusting the store.
 - **Scope of this slice.** The **batch-shaped** control plane (start → direct PUT → complete+attach → direct
-  GET → open, all list-valued) with clients sending length-1 lists. **Resumable uploads, thumbnails/previews,
-  public-share mirrors, and the gallery/curation UI** are their own later slices
-  ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) defers them).
+  GET → open, all list-valued) with clients sending length-1 lists. **Resumable uploads, public-share mirrors,
+  and the gallery/curation UI** are their own later slices
+  ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) defers them); the
+  **thumbnail / preview / original tiers** land in [en.memory.derivatives](en.memory.derivatives.md) (which
+  reuses this transport verbatim — a derivative is just another blob).
 
 > **No end-user section.** As an enabler this has no standalone "what this means for you" story — its end-user
 > value surfaces through the use-case it *serves* ([add media to a Memory](../_index.md)), whose bilingual
@@ -123,4 +125,5 @@ note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno
   `K_mem`), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (`chunk_frame` vector)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy),
   [Account & Key Model](../../../crosscutting/account-key-model.md)
-- Related enabler: [en.memory.tree](en.memory.tree.md) (the Memory + `K_mem` this attaches media to)
+- Related enablers: [en.memory.tree](en.memory.tree.md) (the Memory + `K_mem` this attaches media to),
+  [en.memory.derivatives](en.memory.derivatives.md) (the thumbnail/preview/original tiers built on this transport)
