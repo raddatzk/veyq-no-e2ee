@@ -9,6 +9,11 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
 import { listMedia, openGrid, hasDerivatives, unsealDimensions, type MediaItem } from '../media'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
@@ -30,6 +35,7 @@ const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 const lightboxIndex = ref<number | null>(null)
+const activeTab = ref<'gallery' | 'chapters'>('gallery') // local (the #fragment carries the tree path, cr-0031)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 // --- justified grid (uc.memory.gallery, cr-0059). Each tile's aspect ratio comes from the E2EE-sealed
@@ -179,6 +185,7 @@ watch(
   () => [props.node.id, props.memoryKey] as const,
   () => {
     lightboxIndex.value = null
+    activeTab.value = 'gallery' // reset to the gallery when a different Memory/chapter opens
     void load()
   },
   { immediate: true },
@@ -261,57 +268,84 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <!-- Chapters: nested Memories of this node (cr-0060). Each opens to its own gallery; its media is sealed
-         under the chapter's own K_mem (operator-blind). -->
-    <section v-if="chapters && chapters.length" class="chapter-strip" :aria-label="t('memory.chapters')">
-      <button
-        v-for="chapter in chapters"
-        :key="chapter.id"
-        type="button"
-        class="chapter-chip"
-        @click="$emit('openChapter', chapter)"
-      >
-        <span class="pi pi-book" aria-hidden="true" />
-        <span class="chapter-chip-name">{{ chapter.name }}</span>
-      </button>
-    </section>
+    <!-- Tabbed detail (cr-0061, ported from the design source): Gallery (the media grid) + Chapters (the
+         nested Memories). Other design tabs — journal / map / playlists — arrive with their features. -->
+    <Tabs v-model:value="activeTab" class="memory-detail-tabs">
+      <TabList>
+        <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
+        <Tab value="chapters">
+          {{ t('memory.chapters') }}<span v-if="chapters && chapters.length" class="tab-count">{{ chapters.length }}</span>
+        </Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="gallery">
+          <div v-if="status === 'loading'" class="media-grid-placeholder">
+            <span class="pi pi-spin pi-spinner" />
+            <span>{{ t('media.loading') }}</span>
+          </div>
+          <p v-else-if="status === 'error'" class="veyq-empty">{{ t('media.unavailable') }}</p>
+          <p v-else-if="!items.length" class="veyq-empty">{{ t('media.empty') }}</p>
+          <div
+            v-else
+            ref="gridEl"
+            class="gallery-grid"
+            :style="{ height: `${layout.height}px` }"
+            :aria-label="t('media.gallery')"
+          >
+            <button
+              v-for="tile in tiles"
+              :key="tile.media.mediaId"
+              class="gallery-tile"
+              type="button"
+              :style="{
+                transform: `translate(${tile.left}px, ${tile.top}px)`,
+                width: `${tile.renderedWidth}px`,
+                height: `${tile.renderedHeight}px`,
+              }"
+              :aria-label="t('media.openItem', { index: tile.index + 1 })"
+              @click="lightboxIndex = tile.index"
+            >
+              <img
+                v-if="thumbs.get(tile.media.mediaId)"
+                class="media-grid-tile-media media-grid-tile-media-loaded"
+                :src="thumbs.get(tile.media.mediaId)"
+                :alt="node.name"
+              />
+              <span v-else-if="!hasDerivatives(tile.media)" class="media-grid-icon pi pi-file" />
+              <span v-else class="media-grid-tile-placeholder" />
+            </button>
+          </div>
+        </TabPanel>
 
-    <div v-if="status === 'loading'" class="media-grid-placeholder">
-      <span class="pi pi-spin pi-spinner" />
-      <span>{{ t('media.loading') }}</span>
-    </div>
-    <p v-else-if="status === 'error'" class="veyq-empty">{{ t('media.unavailable') }}</p>
-    <p v-else-if="!items.length" class="veyq-empty">{{ t('media.empty') }}</p>
-    <div
-      v-else
-      ref="gridEl"
-      class="gallery-grid"
-      :style="{ height: `${layout.height}px` }"
-      :aria-label="t('media.gallery')"
-    >
-      <button
-        v-for="tile in tiles"
-        :key="tile.media.mediaId"
-        class="gallery-tile"
-        type="button"
-        :style="{
-          transform: `translate(${tile.left}px, ${tile.top}px)`,
-          width: `${tile.renderedWidth}px`,
-          height: `${tile.renderedHeight}px`,
-        }"
-        :aria-label="t('media.openItem', { index: tile.index + 1 })"
-        @click="lightboxIndex = tile.index"
-      >
-        <img
-          v-if="thumbs.get(tile.media.mediaId)"
-          class="media-grid-tile-media media-grid-tile-media-loaded"
-          :src="thumbs.get(tile.media.mediaId)"
-          :alt="node.name"
-        />
-        <span v-else-if="!hasDerivatives(tile.media)" class="media-grid-icon pi pi-file" />
-        <span v-else class="media-grid-tile-placeholder" />
-      </button>
-    </div>
+        <TabPanel value="chapters">
+          <!-- Each chapter opens to its own gallery; its media is sealed under the chapter's own K_mem. -->
+          <div v-if="chapters && chapters.length" class="chapter-strip" :aria-label="t('memory.chapters')">
+            <button
+              v-for="chapter in chapters"
+              :key="chapter.id"
+              type="button"
+              class="chapter-chip"
+              @click="$emit('openChapter', chapter)"
+            >
+              <span class="pi pi-book" aria-hidden="true" />
+              <span class="chapter-chip-name">{{ chapter.name }}</span>
+            </button>
+          </div>
+          <div v-else class="veyq-empty chapter-empty">
+            <p>{{ t('memory.noChapters') }}</p>
+            <Button
+              type="button"
+              :label="t('memory.addChapter')"
+              icon="pi pi-book"
+              severity="secondary"
+              outlined
+              :disabled="!memoryKey"
+              @click="$emit('createChapter')"
+            />
+          </div>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
 
     <MediaLightbox
       v-if="lightboxIndex !== null && memoryKey"
@@ -375,12 +409,27 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
 }
 
-/* Chapters strip (cr-0060): the nested Memories of this node, as clickable chips above the gallery. */
+/* Chapters strip (cr-0060): the nested Memories of this node, as clickable chips in the Chapters tab. */
 .chapter-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 1rem 0 0;
+}
+/* A small count next to the Chapters tab label. */
+.tab-count {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--app-control-bg);
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+/* Empty Chapters tab: a hint + the add affordance. */
+.chapter-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
 }
 .chapter-chip {
   display: inline-flex;

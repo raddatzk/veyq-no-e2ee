@@ -34,7 +34,7 @@ content node a future **sharing unit** without a re-encryption migration — but
   must walk the `K_mem` chain (K_SC → Memory `K_mem` → chapter `K_mem`) to open nested content.
 - **Reuse the design source** (`legacy/frontend-noe2ee/`, `uc.memory.create-tree`) for the chapter affordance +
   nested gallery; only the data layer is ours.
-- **Scope.** Web only. **Deferred:** aggregated chronological gallery (cr-0062), media metadata/EXIF (cr-0061),
+- **Scope.** Web only. **Deferred:** aggregated chronological gallery (a later CR), media metadata/EXIF (a later CR),
   sharing (#19), map/tracks/playlists/journal/buckets, native chapter UI.
 
 ## Phases
@@ -110,5 +110,5 @@ inspects it. Every content node is now a **sharing unit by construction** — pe
 later without a re-encryption migration.
 
 **Deferred (own CRs):** the aggregated chronological gallery (Memory + all chapters' media in one timeline,
-cr-0062), rich media metadata + the lightbox EXIF (2-tier `wrappedLayout`/`wrappedExif`, cr-0061), sharing
+a later CR), rich media metadata + the lightbox EXIF (2-tier `wrappedLayout`/`wrappedExif`, a later CR), sharing
 (#19), map/tracks/playlists/journal/buckets, and native (apple/android) chapter UI + recursive key plumbing.

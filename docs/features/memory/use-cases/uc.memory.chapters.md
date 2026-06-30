@@ -47,8 +47,8 @@ separate `K_chapter` concept:
   `K_mem`); the chapter appears in the Memory view and opens to its own gallery.
 - **Out (their own use-cases / later slices):**
   - **Aggregated chronological gallery** — showing a Memory *plus all its chapters'* media in one timeline
-    (`uc.memory.gallery`, **cr-0062**); this slice opens a chapter as its **own** gallery only.
-  - **Rich media metadata** (capture time + EXIF, the lightbox detail) — **cr-0061**.
+    (`uc.memory.gallery`, a later CR); this slice opens a chapter as its **own** gallery only.
+  - **Rich media metadata** (capture time + EXIF, the lightbox detail) — a later CR.
   - **Sharing** a chapter (or Memory) to a recipient / public link — **[#19]**; only the key layout is prepared.
   - **map / tracks / playlists / journal / buckets** inside a chapter.
   - **native (apple/android)** chapter UI — web first ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
@@ -91,7 +91,7 @@ Gerät verschlüsselt alles, der Server sieht nur verschlüsselte Daten.
 - Feature: [Memory](../_index.md)
 - Use-cases: [uc.memory.browse](uc.memory.browse.md) (the tree + node CRUD this builds on),
   [uc.memory.gallery](uc.memory.gallery.md) (opening a Memory/chapter gallery; the **aggregated** timeline is
-  cr-0062), [uc.memory.upload](uc.memory.upload.md) (media into a node)
+  a later CR), [uc.memory.upload](uc.memory.upload.md) (media into a node)
 - Enablers: [en.memory.tree](../enablers/en.memory.tree.md) (`K_mem`, node CRUD),
   [en.memory.media](../enablers/en.memory.media.md) (`K_blob` under the parent's `K_mem`)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (content-key hierarchy — this UC

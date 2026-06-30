@@ -20,7 +20,7 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/tree.test.ts]
   - id: chapter-crud-ui
-    text: A Memory shows its chapters; the user can add a chapter, open it to its own gallery, and rename/delete it (chapters live only inside a Memory — folders/root browse, openable nodes render the detail gallery).
+    text: A Memory shows its chapters (in a tabbed detail view — Gallery / Chapters, cr-0061); the user can add a chapter, open it to its own gallery, and rename/delete it (chapters live only inside a Memory — folders/root browse, openable nodes render the detail gallery).
     coverage:
       web:
         unit:

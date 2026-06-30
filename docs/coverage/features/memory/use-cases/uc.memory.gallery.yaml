@@ -7,7 +7,7 @@ title: Open a Memory & browse its gallery
 # render stays a gap (web-first, ADR 0010 — their galleries are their own later CRs).
 acceptanceCriteria:
   - id: thumbnail-grid
-    text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem).
+    text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem). The grid is the Gallery tab of a tabbed detail view (Gallery / Chapters, cr-0061).
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
       web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MemoryDetail.test.ts] }

@@ -10,6 +10,7 @@ vi.mock('../../../api/client', () => ({
 
 import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
+import PrimeVue from 'primevue/config'
 import MemoryDetail from './MemoryDetail.vue'
 import { addMedia, type MediaDeriver } from '../media'
 import { mediaApi } from '../../../api/client'
@@ -26,8 +27,9 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
-      memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters' },
+      memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters', gallery: 'Gallery', noChapters: 'No chapters yet.' },
       media: {
+        upload: 'Upload',
         gallery: 'Memory gallery',
         itemCount: 'No items | {count} item | {count} items',
         openItem: 'Open item {index}',
@@ -61,7 +63,7 @@ function stubDeriver(): MediaDeriver {
 function mountDetail(memoryKey: Uint8Array, props: Partial<Record<string, unknown>> = {}) {
   return mount(MemoryDetail, {
     props: { node: node('Rom 2026'), scopeId: SCOPE_ID, memoryKey, favorite: false, ...props },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, PrimeVue], directives: { tooltip: {} } },
   })
 }
 
@@ -146,6 +148,12 @@ describe('MemoryDetail (gallery grid + header)', () => {
     ]
 
     const wrapper = mountDetail(v1.randomBytes(32), { chapters })
+    await flushPromises()
+
+    // switch to the Chapters tab (the gallery is the default tab)
+    const chaptersTab = wrapper.findAll('[role="tab"]').find((t) => t.text().includes('Chapters'))
+    expect(chaptersTab).toBeTruthy()
+    await chaptersTab!.trigger('click')
     await flushPromises()
 
     // the chapter shows as a chip…
