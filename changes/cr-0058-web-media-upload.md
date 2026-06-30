@@ -1,7 +1,7 @@
 ---
 id: cr-0058
 title: Web media upload — gallery picker + global uploads tray over the ready data layer (web)
-status: planned
+status: done
 satisfies: [uc.memory.upload]
 adrs: ["0013"]
 invariants: [operator-blind-e2ee]
@@ -38,18 +38,18 @@ already in (cr-0028/0029/0045); today `addMedia` is only called from tests. Port
 
 ## Phases
 
-- [ ] 1 data-layer hooks (web) — `addMedia` gains `onProgress` + `signal`; derivation becomes best-effort
+- [x] 1 data-layer hooks (web) — `addMedia` gains `onProgress` + `signal`; derivation becomes best-effort
   (try/catch → original-only). · Done when: `npm run check` green; `media.test.ts` covers progress callbacks,
   abort, and an underivable source → original-only.
-- [ ] 2 upload queue (web) — port `useUploadQueue` as a module singleton (`uploadQueue.ts`): batches of files
+- [x] 2 upload queue (web) — port `useUploadQueue` as a module singleton (`uploadQueue.ts`): batches of files
   against `{scopeId, nodeId, memoryKey}`, sequential runner, status (queued/uploading/done/failed/cancelled),
   progress, cancel, retry-on-transient, acknowledge/clear; `uploadFile` = `addMedia` with progress + abort. ·
   Done when: `npm run check` green; a store test round-trips enqueue → upload (mocked `addMedia`) → done, plus
   cancel + transient-retry + the Safari extension/merge/dedup file-selection helper.
-- [ ] 3 UI (web) — `UploadStatusMenu.vue` (button + popup) mounted in `AppTopbar`; an **Upload** affordance +
+- [x] 3 UI (web) — `UploadStatusMenu.vue` (button + popup) mounted in `AppTopbar`; an **Upload** affordance +
   hidden file input in the `MemoryDetail` gallery header that enqueues against the current Memory; on a batch's
   completion, reload that Memory's media. i18n for the tray + status labels. · Done when: `npm run check` green.
-- [ ] 4 coverage + verify — new
+- [x] 4 coverage + verify — new
   [uc.memory.upload.yaml](../docs/coverage/features/memory/use-cases/uc.memory.upload.yaml); live browser smoke
   against a seeded instance: pick an image → popup shows progress → done → it appears in the gallery; cancel
   mid-upload; a `type:''`/HEIC pick still enqueues. · Done when: the three trust-chain guards green; the smoke
@@ -71,4 +71,26 @@ queue popup. Resumable uploads, speed/ETA, drag-drop, and native parity stay the
 
 ## Retrospective
 
-_(to be written at close)_
+Shipped web media upload in four phases over the ready data layer, ported from `frontend-noe2ee`:
+`addMedia` progress/abort/best-effort derivation → a module-singleton `uploadQueue` → the TopBar
+`UploadStatusMenu` tray + a gallery picker (with the Safari Photos handling). `npm run check` (186 web tests
+incl. media progress/abort/best-effort, the queue runner/cancel/retry/Safari helpers, and the tray) + the three
+trust-chain guards green.
+
+**Live smoke (re-seeded instance, driven in the preview): full end-to-end confirmed.** Created + opened a
+Memory, injected a PNG into the picker → debounced enqueue → the tray showed the batch + progress → **the
+ciphertext landed in Garage** (the `veyq` bucket held 1 object / 98 B) → `completeMedia` attached it → the
+gallery reloaded to **"1 Objekt"**.
+
+**Surfaced along the way (good live-smoke value):**
+- The first run failed with `store_unavailable` because the dev backend was started with the **in-memory store**
+  (`directTransport:false`); the web correctly surfaced that and the tray showed *Failed* + the retry. Re-ran with
+  the backend pointed at **Garage** (`veyq.blob-store.public-endpoint = http://127.0.0.1:8091`, so presigned PUTs
+  ride the Vite `/veyq` proxy same-origin with the SigV4 Host preserved) → bytes flowed. This was the first
+  **browser** exercise of the upload PUT (cr-0028 only had the server-side `BlobBatchE2ETest`); it works through
+  the dev proxy.
+- The headless picker can't be driven via the OS file dialog, so the smoke injected the File via `DataTransfer`
+  (`input.files`), which Chromium allows.
+
+**Deferred (own later work):** resumable uploads (ADR 0013, large-media/video), speed/ETA, drag-and-drop,
+server-side session-abort on cancel, parallelism, and native (apple/android) upload UI.
