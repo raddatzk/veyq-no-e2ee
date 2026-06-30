@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -18,14 +18,14 @@ import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
 import { takeRoute } from '../app/pendingRoute'
 
-// uc.account.remember-this-device (web, cr-0054) — ONE combined login/unlock screen with ONE "remember me"
-// toggle. The same password authenticates AND derives the DEVICE-wrap KEK, so login + unlock collapse: a
-// device that already carries a convenience wrap signs in with email + password only; the Secret-Key floor
-// shows only on the first sign-in per device (or when a device wrap is unusable). On a successful unlock the
-// client AUTO-ENROLS this device's single convenience wrap from the in-memory Master Key (ADR 0005 §17-21):
-// remember off → a password DEVICE wrap; remember on → a password-less DEVICE_KEY wrap + the persistent
-// session cookie. One wrap per device (§9): enrolling one drops the other. The Secret Key is read once to
-// create the wrap, then forgotten — there is no separate "trust this device" checkbox any more.
+// uc.account.remember-this-device (web, cr-0054) — ONE adaptive login/unlock screen with ONE "remember me"
+// toggle (ADR 0005 §17-21). The same password authenticates AND derives the DEVICE-wrap KEK, so login + unlock
+// collapse into a single submit. The screen shows only the fields this device still needs: the FIRST sign-in
+// per device (no DEVICE wrap yet) adds the **Secret Key** field; once a wrap exists it is email + password
+// only; a remembered device opens straight in at boot (no screen). On a successful unlock the client
+// AUTO-ENROLS this device's single convenience wrap from the in-memory Master Key: remember off → a password
+// DEVICE wrap; remember on → a password-less DEVICE_KEY wrap + the persistent session cookie. One wrap per
+// device (§9): enrolling one drops the other. The Secret Key is typed once per device, then forgotten.
 const { t } = useI18n()
 const router = useRouter()
 const email = ref('')
@@ -33,7 +33,12 @@ const password = ref('')
 const secretKey = ref('')
 const busy = ref(false)
 const error = ref('')
-const loggedIn = ref(false)
+// Adaptive: the Secret-Key field shows unless THIS device already carries a password DEVICE wrap for the
+// entered email (then email + password unlock it). Default true so the first sign-in / a cleared device asks
+// for it; resolved from the local trust record on mount + when the email changes.
+const needsSecretKey = ref(true)
+// Login already succeeded for the current inputs → a Secret-Key retry must re-unlock, not re-login.
+const sessionReady = ref(false)
 // The single per-device choice. Drives the login cookie (on → persistent) AND which convenience wrap is
 // auto-enrolled. Only offered where IndexedDB + WebCrypto exist (a wrap can't otherwise be persisted).
 const remember = ref(false)
@@ -43,8 +48,12 @@ const showSecret = ref(false)
 const scanOpen = ref(false)
 const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
-// A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds.
-let pendingSecretKey = ''
+/** Decide whether to show the Secret-Key field for the entered email: needed unless this device already has a
+ *  password DEVICE wrap for it (a remembered device auto-opens at boot, so if it reached this screen its
+ *  restore failed and it correctly falls back to needing the Secret Key). Defaults to "needed" on any error. */
+async function resolveDeviceState() {
+  needsSecretKey.value = !(await isTrusted(email.value).catch(() => false))
+}
 
 /** Auto-enrol this device's single convenience wrap from the in-memory Master Key, per "remember me" (§18).
  *  One wrap per device, so the other method is dropped first. Best-effort — the unlock already succeeded, so a
@@ -61,55 +70,46 @@ async function enrolConvenienceWrap() {
   }
 }
 
-function finishUnlocked() {
-  loggedIn.value = true
+async function finishAndRoute() {
   password.value = ''
   secretKey.value = ''
-  pendingSecretKey = ''
+  await router.push(takeRoute() ?? { name: 'home' })
 }
 
 async function submit() {
   error.value = ''
   busy.value = true
   try {
-    await login(email.value, password.value, remember.value)
-    // Stay on the (spinner-busy) sign-in card while we try a device-wrap unlock — so a returning device jumps
-    // straight to the shell and never flashes the Secret-Key floor. (An IndexedDB hiccup must not break a
-    // successful login — default to the floor if the check fails.)
-    const trusted = await isTrusted(email.value).catch(() => false)
-    if (trusted && (await unlockWithDevice(email.value, password.value).catch(() => false))) {
-      // If "remember me" is now on, upgrade this password-trusted device to the password-less wrap (the toggle
-      // is the per-device choice, §18). Off → keep the existing DEVICE wrap as-is (no needless re-enrol).
-      if (remember.value) await enrolConvenienceWrap()
-      finishUnlocked()
-      await router.push(takeRoute() ?? { name: 'home' })
+    // The password both authenticates and derives the unlock KEK, so a first submit logs in; a Secret-Key
+    // retry (session already up) skips straight to unlock.
+    if (!sessionReady.value) {
+      await login(email.value, password.value, remember.value)
+      sessionReady.value = true
+    }
+    if (!needsSecretKey.value) {
+      // Returning trusted device — unlock with only the password (the DEVICE wrap).
+      if (await unlockWithDevice(email.value, password.value).catch(() => false)) {
+        // "remember me" on now → upgrade this device to the password-less wrap (the toggle is the per-device
+        // choice, §18). Off → keep the existing DEVICE wrap as-is (no needless re-enrol).
+        if (remember.value) await enrolConvenienceWrap()
+        await finishAndRoute()
+        return
+      }
+      // The device's wrap can't unlock (a stale local trust record whose server wrap is gone — e.g. it was
+      // reset, ADR 0005 E2). This is NOT a failure: reveal the Secret-Key field (no error) and let the user
+      // finish with it; the next submit re-unlocks + re-enrols, replacing the stale record. The local key is
+      // intentionally kept (no self-wipe on a single server response — operator-blind anti-withholding).
+      needsSecretKey.value = true
       return
     }
-    // First sign-in on this device, or the device wrap is unusable (E2) — show the password + Secret-Key floor.
-    secretKey.value = pendingSecretKey
-    pendingSecretKey = ''
-    loggedIn.value = true
-  } catch {
-    // wrong password and unknown account both surface as the same generic failure (non-enumerable)
-    error.value = t('login.failed')
-  } finally {
-    busy.value = false
-  }
-}
-
-async function unlock() {
-  error.value = ''
-  busy.value = true
-  try {
-    // Floor: password (carried from login) + Secret Key. The first unlock per device → auto-enrol the
-    // convenience wrap chosen by "remember me", while the just-entered password is still in hand.
+    // First sign-in / degraded device — unlock with the on-screen Secret Key, then auto-enrol the wrap.
     await unlockMasterKey(password.value, secretKey.value)
     await enrolConvenienceWrap()
-    finishUnlocked()
-    await router.push(takeRoute() ?? { name: 'home' })
+    await finishAndRoute()
   } catch {
-    // Wrong password / Secret Key (or no wrap) — one generic failure. Keep the inputs for a retry.
-    error.value = t('unlock.failed')
+    // Before login: wrong password / unknown account → one generic failure. After: wrong Secret Key (keep the
+    // session + inputs for a retry). Both non-enumerable.
+    error.value = sessionReady.value ? t('unlock.failed') : t('login.failed')
   } finally {
     busy.value = false
   }
@@ -139,21 +139,33 @@ function onScanned(kit: { secretKey: string }) {
 
 async function signOut() {
   await logout() // revokes the session, drops tokens, and re-locks the vault (centralised in logout)
-  loggedIn.value = false
+  sessionReady.value = false
   password.value = ''
   secretKey.value = ''
-  pendingSecretKey = ''
   error.value = ''
+  await resolveDeviceState()
 }
 
-onMounted(() => {
-  // Setup hands over email + Secret Key once. The email pre-fills sign-in; the Secret Key is parked off the
-  // reactive ref and surfaces only once login succeeds. A returning user has no prefill.
+// A different email is a different account: drop the established session and re-resolve which fields to show.
+// On change (blur), not per-keystroke, so the Secret-Key field doesn't flicker while typing.
+function onEmailChange() {
+  sessionReady.value = false
+  void resolveDeviceState()
+}
+
+watch(email, () => {
+  sessionReady.value = false // re-login is required once the email changes
+})
+
+onMounted(async () => {
+  // Setup hands over email + Secret Key once, for the first sign-in. Both pre-fill the (adaptive) screen — the
+  // device is fresh, so the Secret-Key field is shown. A returning user has no prefill.
   const prefill = takeAuthPrefill()
   if (prefill) {
     email.value = prefill.email
-    pendingSecretKey = prefill.secretKey
+    secretKey.value = prefill.secretKey
   }
+  await resolveDeviceState()
 })
 </script>
 
@@ -161,11 +173,19 @@ onMounted(() => {
   <Card class="login-card">
     <template #title>{{ t('login.title') }}</template>
     <template #content>
-      <!-- Sign in -->
-      <form v-if="!loggedIn" class="veyq-form" @submit.prevent="submit">
+      <!-- One adaptive sign-in: email + password always; the Secret-Key field only on the first sign-in per
+           device (or when a device wrap is unusable). A single submit logs in AND unlocks. -->
+      <form v-if="!vaultState.unlocked" class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('common.email') }}
-          <InputText v-model="email" type="email" name="email" autocomplete="username" required />
+          <InputText
+            v-model="email"
+            type="email"
+            name="email"
+            autocomplete="username"
+            required
+            @change="onEmailChange"
+          />
         </label>
         <label>
           {{ t('common.password') }}
@@ -179,27 +199,7 @@ onMounted(() => {
             fluid
           />
         </label>
-        <div v-if="rememberSupported" class="checkbox-row">
-          <Checkbox v-model="remember" input-id="remember-me" binary />
-          <label for="remember-me">
-            {{ t('login.rememberMe') }}
-            <small class="field-hint">{{ t('login.rememberMeHint') }}</small>
-          </label>
-        </div>
-        <Button
-          type="submit"
-          :label="busy ? t('login.submitting') : t('login.submit')"
-          icon="pi pi-sign-in"
-          :loading="busy"
-        />
-        <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
-      </form>
-
-      <!-- Unlock: Secret-Key floor (a trusted device auto-unlocks at login and never shows this) -->
-      <form v-else-if="!vaultState.unlocked" class="veyq-form" @submit.prevent="unlock">
-        <Message severity="info" :closable="false">{{ t('unlock.title') }}</Message>
-        <p class="veyq-form-copy">{{ t('unlock.note') }}</p>
-        <label>
+        <label v-if="needsSecretKey">
           {{ t('unlock.secretKey') }}
           <div class="secret-field" :style="{ '--secret-icons': scanSupported ? 3 : 2 }">
             <InputText
@@ -243,6 +243,7 @@ onMounted(() => {
               </button>
             </span>
           </div>
+          <small class="field-hint">{{ t('unlock.secretKeyHint') }}</small>
           <input
             ref="fileInput"
             type="file"
@@ -251,14 +252,22 @@ onMounted(() => {
             @change="onUpload"
           />
         </label>
+        <div v-if="rememberSupported" class="checkbox-row">
+          <Checkbox v-model="remember" input-id="remember-me" binary />
+          <label for="remember-me">
+            {{ t('login.rememberMe') }}
+            <small class="field-hint">{{ t('login.rememberMeHint') }}</small>
+          </label>
+        </div>
         <Button
           type="submit"
-          :label="busy ? t('unlock.submitting') : t('unlock.submit')"
-          icon="pi pi-unlock"
+          :label="busy ? t('login.submitting') : t('login.submit')"
+          icon="pi pi-sign-in"
           :loading="busy"
         />
         <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
         <Button
+          v-if="sessionReady"
           type="button"
           :label="t('login.signOut')"
           icon="pi pi-sign-out"
