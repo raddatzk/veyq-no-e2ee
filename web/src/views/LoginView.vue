@@ -33,10 +33,11 @@ const password = ref('')
 const secretKey = ref('')
 const busy = ref(false)
 const error = ref('')
-// Adaptive: the Secret-Key field shows unless THIS device already carries a password DEVICE wrap for the
-// entered email (then email + password unlock it). Default true so the first sign-in / a cleared device asks
-// for it; resolved from the local trust record on mount + when the email changes.
-const needsSecretKey = ref(true)
+// Adaptive: the Secret-Key field shows only when THIS device has no password DEVICE wrap for the entered
+// email (a trusted device unlocks with email + password and never shows it). Default false (hidden) — we
+// can't know the account until an email is entered — and resolved against the local trust record on mount +
+// when the email changes; an empty email (no account yet) keeps it hidden.
+const needsSecretKey = ref(false)
 // Login already succeeded for the current inputs → a Secret-Key retry must re-unlock, not re-login.
 const sessionReady = ref(false)
 // The single per-device choice. Drives the login cookie (on → persistent) AND which convenience wrap is
@@ -52,7 +53,10 @@ const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevic
  *  password DEVICE wrap for it (a remembered device auto-opens at boot, so if it reached this screen its
  *  restore failed and it correctly falls back to needing the Secret Key). Defaults to "needed" on any error. */
 async function resolveDeviceState() {
-  needsSecretKey.value = !(await isTrusted(email.value).catch(() => false))
+  // No email yet → unknown account, don't ask for the Secret Key. Otherwise it's needed unless this device
+  // already carries a password DEVICE wrap for the email (then email + password unlock it). A remembered
+  // device auto-opens at boot; if it reached this screen its restore failed, so it falls back to needing it.
+  needsSecretKey.value = email.value ? !(await isTrusted(email.value).catch(() => false)) : false
 }
 
 /** Auto-enrol this device's single convenience wrap from the in-memory Master Key, per "remember me" (§18).
