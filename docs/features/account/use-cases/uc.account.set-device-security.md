@@ -26,6 +26,14 @@ at every level** — only *local* device security changes.
 | **L2 — Biometric** | a live FaceID / fingerprint | the biometric gesture | [uc.account.biometric-unlock](uc.account.biometric-unlock.md) |
 | **L3 — No login** | nothing (opens straight in) | *(none beyond the OS lock screen)* | [uc.account.auto-unlock](uc.account.auto-unlock.md) |
 
+> **This chooser is the *native* flow ([ADR 0005 §14–21](../../../decisions/0005-unlock-methods-and-device-trust.md)).**
+> Web does **not** show this slider: it collapses to one adaptive screen + a single "remember me" toggle that
+> auto-enrols a password DEVICE wrap (off) or a password-less device-key wrap (on) — its own use-case,
+> [uc.account.remember-this-device](uc.account.remember-this-device.md) (§17-21). Native keeps the richer
+> choice (password-less **or** biometric — realistic on a phone). The wraps are the same (§9); only the
+> presentation differs, and whether native also simplifies is to be worked out. (L0 "Secret Key each time" is
+> not a routine pick; passkey auth + QR onboarding are their own use-cases, §16.)
+
 **Why these are the user's call, not ours.** The *server* is an unknown, global adversary — that is why
 operator-blindness is non-negotiable and unaffected here. The user's *own device* is a smaller,
 known-circle risk (only "handed over / left unlocked"), so how much local friction to trade for

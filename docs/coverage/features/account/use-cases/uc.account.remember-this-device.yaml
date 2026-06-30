@@ -1,0 +1,29 @@
+useCase: uc.account.remember-this-device
+feature: account
+title: Sign in & remember this device (web — one screen, one toggle)
+status: planned
+# Refined ahead of implementation (ADR 0005 §17-21). The combined web login/unlock screen + auto-enrol + the
+# password-less wrap are cr-0054, which supersedes cr-0052's two overlapping checkboxes + local Master-Key cache.
+acceptanceCriteria:
+  - id: one-screen-adaptive
+    text: Web shows one screen that asks only what the device still needs — email+password+Secret Key on the first sign-in, email+password once a wrap exists, and nothing on a remembered device.
+  - id: remember-off-enrols-device-wrap
+    text: With "remember me" off, a successful first unlock auto-enrols a password-bound DEVICE wrap; the next launch unlocks with the password only (no Secret Key).
+  - id: remember-on-enrols-passwordless-wrap
+    text: With "remember me" on, first unlock auto-enrols a password-less device-key wrap + a persisted session cookie; the next launch opens straight in.
+  - id: secret-key-once-per-device
+    text: The Secret Key is read only on the first unlock per device (to create the wrap) and never stored.
+  - id: no-public-device-level
+    text: There is no "remember nothing" level on web; a genuinely untrusted machine uses a private/incognito window. A stolen device + its password DEVICE wrap is useless without the password.
+  - id: new-passwordless-wrap-method
+    text: The password-less wrap uses a NEW MasterKeyWrap.Method (device key alone, symWrap(K, masterKey), no password/KDF), distinct from the password-mixing DEVICE method.
+  - id: operator-blind-unchanged
+    text: The server holds only ciphertext wraps + an opaque cookie token; it never gains the KEK, Master Key, Secret Key, or password.
+gaps:
+  web: planned — the combined login/unlock screen + auto-enrol + the password-less wrap are cr-0054 (supersedes
+    cr-0052's login "remember me" + unlock "trust device" checkboxes and its local IndexedDB Master-Key cache).
+  apple: N/A — web-only flow; native keeps the uc.account.set-device-security chooser (richer — password-less or
+    biometric).
+  android: N/A — web-only flow; native keeps the uc.account.set-device-security chooser.
+  backend: the new password-less MasterKeyWrap.Method ships with cr-0054 (contract enum + a slice test); no
+    other backend change (the wraps endpoints already store opaque ciphertext per method).

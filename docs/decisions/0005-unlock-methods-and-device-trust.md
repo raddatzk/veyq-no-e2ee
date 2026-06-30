@@ -128,6 +128,75 @@ the *server is not*.
     only as a clearly-labelled choice (and presumes a device passcode/biometric is set at the OS level).
     Considered and **declined** as any kind of default.
 
+## Decision — addendum 2026-06-30: web product shape (L0 not a routine choice; "remember me")
+
+14. **L0 is not a routine, selectable level; it stays the floor (bootstrap + emergency fallback).** Asking
+    for the Secret Key on *every* unlock is the wrong friction for a memory-sharing app (not a secrets
+    vault). The Secret-Key floor (§3) remains, but only as (a) the **first-unlock / bootstrap** on a device
+    (typed **once per device**, until cross-device onboarding lands) and (b) the **always-reachable
+    emergency fallback** when a convenience method's KEK source is lost — operator-blindness means **no
+    operator-side reset**, so removing it would mean permanent lockout. §8/§10's chooser therefore **does
+    not offer "Secret Key each time"** as a standing option.
+
+15. **Web presents the levels as "auth method + remember me", not a four-stop slider.** Auth method =
+    **password** (Model B, ADR 0003) or **passkey** (WebAuthn + PRF — its own future UC, §16). **"Remember
+    me"** = the opt-in into **L3** ([uc.account.auto-unlock](../features/account/use-cases/uc.account.auto-unlock.md)):
+    an ungated persisted session (the [ADR 0004](0004-session-tokens.md) cookie) + an ungated device-held
+    key wrapping the Master Key → the device opens straight in across a full browser restart. **Off** =
+    re-authenticate each launch (no persisted session/vault). This is a **web presentation** of the same
+    wraps (§9: one convenience wrap per device); native keeps its biometric framing. L3's opt-in + warning
+    (§13) is exactly the "remember me" toggle's trade-off.
+
+16. **Passkey auth and QR cross-device onboarding are deferred to their own use-cases/ADRs.** Passkey is a
+    new WebAuthn **auth** path beyond ADR 0003's Model B (plus PRF for the unlock KEK, §4); QR onboarding is
+    the cross-device bootstrap already noted below in *Related / future*. Neither is part of the
+    session-persistence increment (the cookie + remember-me / L3 on the existing password path).
+
+## Decision — addendum 2026-06-30 #2: one combined login/unlock screen, auto-enrol; web's single "remember me" toggle
+
+This concretizes §15 (after cr-0052 shipped the cookie + a local L3 cache and surfaced two overlapping
+checkboxes — login "remember me" + unlock "trust this device" — which are two views of the *same* per-device
+decision, §9). §17-18 (the combined screen + auto-enrol) are **cross-surface**; §19-20 and the single-toggle
+presentation are the **web** shape.
+
+17. **Login + unlock collapse into one screen wherever a device wrap exists — on *every* surface, not just
+    web.** The same password both **authenticates** (the Model B auth keypair, ADR 0003) **and** derives the
+    **DEVICE-wrap KEK** (§4) — so entering email + password does login *and* unlock in a single step. Hence the
+    adaptive screen: the **first** sign-in on a device adds the **Secret Key** field (the floor, §3); once a
+    wrap exists it is **email + password only**; a remembered / biometric device shows **no screen at all**. So
+    the **Secret Key is typed once per device** (§3, §14). (Mobile therefore also has one combined login/unlock
+    screen — this is not a web-only simplification.)
+
+18. **"Remember me" IS the per-device choice on web — it replaces both prior checkboxes.** On a successful
+    first unlock the client **auto-enrols** a convenience wrap from the in-memory Master Key (the Secret Key is
+    never stored):
+    - **Off** → a **DEVICE wrap** (`KEK = Argon2id(device-bound key + password)`) → next launch: **password
+      only**, no Secret Key. (The L1 mechanism, but *automatic* — not a second opt-in.)
+    - **On** → a **password-less device-key wrap** (§20) + a persisted session ([ADR 0004](0004-session-tokens.md)
+      cookie) → next launch: **opens straight in**. (L3.)
+
+19. **No "remember nothing" / public-device level on web — "every device is mine" (refines §14 for web).**
+    Even remember-me-off enrols the password DEVICE wrap; there is **no** L0 "Secret Key each time" option on
+    web. Justification: a stolen device + its DEVICE wrap is **useless without the password** (still gated),
+    and a genuinely untrusted machine is covered by the browser's **private/incognito** mode (no persisted
+    IndexedDB / cookie). The Secret-Key floor stays only as the **first-device bootstrap + emergency recovery**
+    (§14), never a routine web pick.
+
+20. **A new `MasterKeyWrap.Method` for the password-less device-key wrap.** The existing `DEVICE` method mixes
+    the password (`Argon2id(deviceFactor + password)`); the remember-me wrap is the **device key alone**
+    (`symWrap(K, masterKey)` — high-entropy, no password, no KDF), a distinct construction → a **distinct
+    method** (name TBD, e.g. `DEVICE_KEY`). It is the same wrap native uses for L2 (biometric-gated) and L3
+    (ungated); only the local keystore gating differs (§8-9).
+
+21. **The surfaces differ only in the *set* of convenience options, not the screen.** Both share the one-screen
+    login/unlock (§17) and the auto-enrol on first unlock (§18). **Web** offers two, via a single **"remember
+    me"** toggle — the password DEVICE wrap (off) or the password-less wrap (on),
+    [uc.account.remember-this-device](../features/account/use-cases/uc.account.remember-this-device.md).
+    **Native** adds a third — **biometric** — realistic on a phone, via its chooser
+    ([uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md)). Same
+    wraps (§9), same combined screen; only the option set + its presentation (a toggle vs a chooser) differ.
+    Whether native also collapses to a single toggle is **to be worked out**.
+
 ## Related / future
 
 - **Cross-device onboarding (QR / push):** a new device is onboarded by an existing **unlocked** device

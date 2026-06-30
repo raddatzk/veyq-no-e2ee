@@ -15,6 +15,13 @@
   app, on next launch, **resumes the session and opens the vault with no user interaction**. The Secret Key
   and the password were **never stored**.
 
+> **On web, this level is the "remember me" toggle** ([ADR 0005 §15-21](../../../decisions/0005-unlock-methods-and-device-trust.md))
+> — same crypto, a friendlier name. The web flow (one screen, auto-enrol) is its own use-case,
+> [uc.account.remember-this-device](uc.account.remember-this-device.md): a **server-stored password-less
+> device-key wrap** (the device key held ungated in IndexedDB) + the httpOnly refresh cookie
+> ([ADR 0004](../../../decisions/0004-session-tokens.md)). This **supersedes cr-0052's local Master-Key cache**
+> with the spec's portable, server-revocable wrap (the cr-0054 increment).
+
 ## Same wrap as L2 — only the gate differs
 
 L3 is **cryptographically identical** to L2 ([uc.account.biometric-unlock](uc.account.biometric-unlock.md)):
