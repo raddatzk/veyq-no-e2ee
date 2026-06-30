@@ -2,6 +2,7 @@ package com.veyq.app.features.account.login
 
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
 import java.time.Instant
 
 /**
@@ -14,6 +15,10 @@ import java.time.Instant
 @ApplicationScoped
 class SessionPurge(private val sessions: SessionService) {
 
+    // @Transactional so all four deletes share ONE session/transaction on the scheduler thread — without it the
+    // first nested @Transactional commits + closes the session and the next call fails with "EntityManager is
+    // closed" (the Quarkus @Scheduled + Panache pattern, cr-0053).
+    @Transactional
     @Scheduled(every = "{veyq.session.purge.every}")
     fun run() {
         val now = Instant.now()
