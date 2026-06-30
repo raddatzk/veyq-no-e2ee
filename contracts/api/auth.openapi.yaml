@@ -200,10 +200,21 @@ components:
           type: boolean
           default: false
           description: >
-            Web "remember me" (ADR 0004 / ADR 0005 §15): when true the server returns the refresh token as an
-            **httpOnly + Secure + SameSite cookie** (persistent — survives a browser restart) **instead of** in
-            the response body, and `refreshToken` is omitted from the body. Native clients omit this flag and
-            keep the response-body token + `Bearer`. Optional; defaults to false (in-memory body token).
+            Legacy web "remember me" (ADR 0004 / ADR 0005 §15). Superseded by `sessionScope` (cr-0055) and
+            honoured (→ a persistent cookie) only when `sessionScope` is absent. When true the server returns the
+            refresh token as a persistent **httpOnly + Secure + SameSite cookie** instead of in the body, and
+            `refreshToken` is omitted. Native clients omit it (→ response-body token + `Bearer`).
+        sessionScope:
+          type: string
+          description: >
+            Web cookie lifetime (ADR 0004 addendum / ADR 0005 §22, cr-0055). **PERSISTENT** → a persistent
+            httpOnly refresh cookie that survives a browser restart ("remember me"). **SESSION** → a session
+            cookie (no `Max-Age`) that survives page reloads but is dropped when the browser closes (the web
+            default). When present it governs the web transport — the refresh token rides the cookie and is
+            omitted from the body — and takes precedence over `remember`. Native clients omit it (→ response-body
+            token). The cookie carries only the opaque refresh token, so the server stays operator-blind.
+          enum: [SESSION, PERSISTENT]
+          example: SESSION
 
     RefreshRequest:
       type: object

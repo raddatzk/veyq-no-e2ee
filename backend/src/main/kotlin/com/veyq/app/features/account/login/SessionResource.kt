@@ -21,7 +21,8 @@ class SessionResource(private val sessions: SessionService, private val cookie: 
 
     override fun logout(): Response {
         bearerToken(headers)?.let { sessions.revokeByAccessToken(it) }
-        // Drop the web refresh cookie too (cr-0052) — a no-op for native callers that never set one.
-        return Response.noContent().cookie(cookie.cleared()).build()
+        // Drop both web refresh cookies too (persistent + session, cr-0055) — a no-op for native callers that
+        // never set one.
+        return Response.noContent().cookie(*cookie.cleared()).build()
     }
 }

@@ -150,6 +150,42 @@ class LoginSliceTest {
     }
 
     @Test
+    fun sessionScopeSetsSessionCookieWithoutMaxAge() {
+        // Web default "off" (cr-0055): SESSION → a session cookie (no Max-Age, name veyq_refresh_session) so it
+        // survives reloads but is dropped on browser close; the token still rides the cookie, not the body.
+        val nonce = requestChallenge(EMAIL)
+        val res = verifyScope(EMAIL, sign(KEYPAIR, nonce), "SESSION").then().statusCode(200)
+            .body("accessToken", notNullValue())
+            .body("refreshToken", nullValue())
+            .cookie("veyq_refresh_session", notNullValue())
+            .extract()
+        val c = res.detailedCookie("veyq_refresh_session")
+        assertTrue(c.isHttpOnly)
+        assertEquals(-1, c.maxAge) // no Max-Age attribute → a session cookie
+    }
+
+    @Test
+    fun sessionCookieRefreshStaysSessionScoped() {
+        // Rotation must preserve the session lifetime (same cookie name back), never upgrade it to persistent.
+        val cookie = sessionLoginCookie()
+        given().contentType(ContentType.JSON).cookie("veyq_refresh_session", cookie).body("{}")
+            .`when`().post("/api/token/refresh")
+            .then().statusCode(200)
+            .body("refreshToken", nullValue())
+            .cookie("veyq_refresh_session", notNullValue())
+    }
+
+    @Test
+    fun persistentScopeSetsPersistentCookieWithMaxAge() {
+        val nonce = requestChallenge(EMAIL)
+        val res = verifyScope(EMAIL, sign(KEYPAIR, nonce), "PERSISTENT").then().statusCode(200)
+            .body("refreshToken", nullValue())
+            .cookie("veyq_refresh", notNullValue())
+            .extract()
+        assertTrue(res.detailedCookie("veyq_refresh").maxAge > 0) // persistent → survives a browser restart
+    }
+
+    @Test
     fun refreshViaCookieRotatesAndOmitsBodyToken() {
         val cookie = rememberLoginCookie()
         // No body token — the refresh token rides the cookie; the rotated one comes back as a fresh cookie.
@@ -175,6 +211,7 @@ class LoginSliceTest {
             .`when`().post("/api/logout")
             .then().statusCode(204)
             .cookie("veyq_refresh", equalTo("")) // Max-Age 0, empty value — the browser drops it
+            .cookie("veyq_refresh_session", equalTo("")) // both lifetimes cleared (cr-0055)
     }
 
     // --- instance salt ---
@@ -213,10 +250,21 @@ class LoginSliceTest {
             .body("""{"email":"$email","signature":"$signatureB64","remember":true}""")
             .`when`().post("/api/login/verify")
 
+    private fun verifyScope(email: String, signatureB64: String, scope: String) =
+        given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","signature":"$signatureB64","sessionScope":"$scope"}""")
+            .`when`().post("/api/login/verify")
+
     private fun rememberLoginCookie(): String {
         val nonce = requestChallenge(EMAIL)
         return verifyRemember(EMAIL, sign(KEYPAIR, nonce)).then().statusCode(200)
             .extract().cookie("veyq_refresh")
+    }
+
+    private fun sessionLoginCookie(): String {
+        val nonce = requestChallenge(EMAIL)
+        return verifyScope(EMAIL, sign(KEYPAIR, nonce), "SESSION").then().statusCode(200)
+            .extract().cookie("veyq_refresh_session")
     }
 
     private fun refresh(refreshToken: String) =

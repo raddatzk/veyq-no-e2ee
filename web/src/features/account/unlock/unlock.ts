@@ -12,6 +12,7 @@ import { setAccount } from '../../../app/account'
 import { MasterKeyWrapMethodEnum, type AccountKeyMaterial } from '../../../api/generated/account'
 import * as device from '../trustDevice/deviceKey'
 import { restoreDeviceKey } from '../rememberMe/deviceKeyWrap'
+import { loadSessionVault } from '../rememberMe/sessionVault'
 
 function fetchKeyMaterial(): Promise<AccountKeyMaterial> {
   return withRefresh(() => accountApi().getAccountKeyMaterial())
@@ -49,14 +50,22 @@ export async function unlockMasterKey(password: string, secretKeyB64: string): P
  * mismatch) → the same generic failure as the floor path.
  */
 /**
- * Boot path (web "remember me", cr-0054): re-open the vault from this device's password-less DEVICE_KEY wrap
- * with **no prompt**. Fetches the session-gated key material, decrypts the Master Key from the wrap with the
- * local device key, then unwraps the identity key under it. Returns false (→ the user lands on the floor) when
- * this device isn't enrolled, the wrap is gone server-side, or it won't open under the local key. Requires a
- * live session (the caller revives it from the cookie first).
+ * Boot path (web, cr-0054/cr-0055): re-open the vault with **no prompt** after the session cookie revives the
+ * session. Fetches the session-gated key material, then opens the Master Key from whichever device tier is
+ * present: the **session vault** (`sessionStorage`, the "off" tier — survives reloads, gone on browser close) or
+ * the persistent **DEVICE_KEY** wrap (the "on" tier — survives a restart). Returns false (→ the user lands on
+ * the floor) when neither is usable. Requires a live session (the caller revives it from the cookie first).
  */
 export async function restoreVaultFromCache(): Promise<boolean> {
   const material = await fetchKeyMaterial()
+  // "off" (session-scoped): the Master Key sits in sessionStorage for this browser session.
+  const sessionVault = loadSessionVault()
+  if (sessionVault) {
+    setAccount(sessionVault.email)
+    openVault(material, sessionVault.masterKey)
+    return true
+  }
+  // "on" (persistent): decrypt the Master Key from this device's DEVICE_KEY wrap.
   const restored = await restoreDeviceKey(material)
   if (!restored) return false
   setAccount(restored.email)

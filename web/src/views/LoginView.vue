@@ -12,6 +12,8 @@ import { login, logout } from '../features/account/login/login'
 import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/unlock'
 import { trustThisDevice, untrustThisDevice, isTrusted } from '../features/account/trustDevice/trustDevice'
 import { enrolDeviceKey, clearDeviceKey, isRememberSupported } from '../features/account/rememberMe/deviceKeyWrap'
+import { cacheSessionVault, clearSessionVault } from '../features/account/rememberMe/sessionVault'
+import { LoginVerifyRequestSessionScopeEnum } from '../api/generated/auth'
 import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
@@ -59,18 +61,27 @@ async function resolveDeviceState() {
   needsSecretKey.value = email.value ? !(await isTrusted(email.value).catch(() => false)) : false
 }
 
-/** Auto-enrol this device's single convenience wrap from the in-memory Master Key, per "remember me" (§18).
- *  One wrap per device, so the other method is dropped first. Best-effort — the unlock already succeeded, so a
- *  failed enrolment just means the Secret Key is needed again next time (no silent lockout). */
+/** Auto-enrol this device's convenience tier from the in-memory Master Key, per "remember me" (§18, §22).
+ *  - **on** (persistent): a password-less DEVICE_KEY wrap (IndexedDB) — opens straight in across a restart.
+ *  - **off** (session-scoped): the Master Key in `sessionStorage` (this browser session) PLUS a password DEVICE
+ *    wrap so the next launch after a close is email + password (never the Secret Key).
+ *  One tier per device, so the other is dropped first. Best-effort — the unlock already succeeded, so a failed
+ *  enrolment just means a bit more friction next time (no silent lockout). */
 async function enrolConvenienceWrap() {
   const mk = masterKey()
-  if (!mk || !rememberSupported) return
+  if (!mk) return
   if (remember.value) {
-    await untrustThisDevice(email.value).catch(() => {}) // drop a prior password DEVICE wrap
-    await enrolDeviceKey(email.value, mk).catch(() => {})
+    clearSessionVault() // drop the session-scoped vault — this device opts into persistence
+    if (rememberSupported) {
+      await untrustThisDevice(email.value).catch(() => {}) // drop a prior password DEVICE wrap
+      await enrolDeviceKey(email.value, mk).catch(() => {})
+    }
   } else {
-    await clearDeviceKey().catch(() => {}) // drop a prior password-less DEVICE_KEY wrap
-    await trustThisDevice(email.value, password.value, mk).catch(() => {})
+    cacheSessionVault(email.value, mk) // survive reloads this browser session
+    if (rememberSupported) {
+      await clearDeviceKey().catch(() => {}) // drop a prior password-less DEVICE_KEY wrap
+      await trustThisDevice(email.value, password.value, mk).catch(() => {})
+    }
   }
 }
 
@@ -87,15 +98,21 @@ async function submit() {
     // The password both authenticates and derives the unlock KEK, so a first submit logs in; a Secret-Key
     // retry (session already up) skips straight to unlock.
     if (!sessionReady.value) {
-      await login(email.value, password.value, remember.value)
+      // Web is cookie-based: the toggle picks the refresh-cookie lifetime — persistent ("remember me") vs a
+      // session cookie (survives reloads, gone on browser close, §22).
+      const scope = remember.value
+        ? LoginVerifyRequestSessionScopeEnum.Persistent
+        : LoginVerifyRequestSessionScopeEnum.Session
+      await login(email.value, password.value, scope)
       sessionReady.value = true
     }
     if (!needsSecretKey.value) {
       // Returning trusted device — unlock with only the password (the DEVICE wrap).
       if (await unlockWithDevice(email.value, password.value).catch(() => false)) {
         // "remember me" on now → upgrade this device to the password-less wrap (the toggle is the per-device
-        // choice, §18). Off → keep the existing DEVICE wrap as-is (no needless re-enrol).
+        // choice, §18). Off → keep the DEVICE wrap, but refresh the session vault so reloads stay prompt-free.
         if (remember.value) await enrolConvenienceWrap()
+        else cacheSessionVault(email.value, masterKey()!)
         await finishAndRoute()
         return
       }

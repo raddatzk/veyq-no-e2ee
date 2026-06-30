@@ -3,8 +3,10 @@ feature: account
 title: Sign in & remember this device (web — one screen, one toggle)
 # Implemented on web by cr-0054 (ADR 0005 §17-21): the combined login/unlock screen, the single "remember me"
 # toggle, auto-enrol, and the password-less DEVICE_KEY wrap — superseding cr-0052's two overlapping checkboxes +
-# local Master-Key cache. Criteria carry the module/backend test refs that exercise each mechanism; the
-# end-to-end three-state screen adaptivity is confirmed by the live browser smoke recorded in cr-0054.
+# local Master-Key cache. cr-0055 (ADR 0005 §22) makes the "off" tier session-scoped: a session refresh cookie +
+# the Master Key in sessionStorage → survives a reload, dropped on browser close, password-only after a close.
+# Criteria carry the module/backend test refs that exercise each mechanism; the end-to-end screen behaviour is
+# confirmed by the live browser smokes recorded in cr-0054 / cr-0055.
 acceptanceCriteria:
   - id: one-screen-adaptive
     text: Web shows one screen that asks only what the device still needs — email+password+Secret Key on the first sign-in, email+password once a wrap exists, and nothing on a remembered device.
@@ -15,12 +17,15 @@ acceptanceCriteria:
           - src/features/account/unlock/unlock.device.test.ts
           - src/features/account/rememberMe/deviceKeyWrap.test.ts
   - id: remember-off-enrols-device-wrap
-    text: With "remember me" off, a successful first unlock auto-enrols a password-bound DEVICE wrap; the next launch unlocks with the password only (no Secret Key).
+    text: With "remember me" off, the session survives a page reload (session refresh cookie + the Master Key in sessionStorage) and is dropped when the browser closes; a successful first unlock also enrols a password-bound DEVICE wrap, so the next launch after a close unlocks with the password only (no Secret Key).
     coverage:
+      backend:
+        integration: [LoginSliceTest.sessionScopeSetsSessionCookieWithoutMaxAge, LoginSliceTest.sessionCookieRefreshStaysSessionScoped]
       web:
         unit:
           - src/features/account/trustDevice/trustDevice.test.ts
           - src/features/account/unlock/unlock.device.test.ts
+          - src/features/account/rememberMe/sessionVault.test.ts
   - id: remember-on-enrols-passwordless-wrap
     text: With "remember me" on, first unlock auto-enrols a password-less device-key wrap + a persisted session cookie; the next launch opens straight in.
     coverage:

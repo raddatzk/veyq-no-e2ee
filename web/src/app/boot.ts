@@ -9,6 +9,7 @@ import { useServerState } from '../shared/state/useServerState'
 import { refreshSession } from '../features/account/login/login'
 import { restoreVaultFromCache } from '../features/account/unlock/unlock'
 import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
+import { clearSessionVault } from '../features/account/rememberMe/sessionVault'
 
 /**
  * Discover the instance state and prepare the app shell. The result is reflected in the shared server
@@ -32,5 +33,9 @@ export async function boot(): Promise<void> {
   // login; with no live session, drop the local device key so it can never outlive its session.
   const restored = await refreshSession().then(() => true).catch(() => false)
   if (restored) await restoreVaultFromCache().catch(() => {})
-  else await clearDeviceKey(false).catch(() => {})
+  else {
+    // No live session (no cookie, or expired) → drop both local vault tiers so neither outlives its session.
+    clearSessionVault()
+    await clearDeviceKey(false).catch(() => {})
+  }
 }

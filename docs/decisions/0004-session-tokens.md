@@ -67,6 +67,27 @@ into **named session families**. No JWTs.
 - **Transport.** Same opaque value, two transports: httpOnly + Secure + SameSite cookie (web) /
   `Authorization: Bearer` (native, `http/`).
 
+## Decision — addendum 2026-06-30: the web refresh cookie has two lifetimes (session vs persistent)
+
+The web cookie transport comes in **two lifetimes**, chosen by the client at login via the optional
+`LoginVerifyRequest.sessionScope` (`SESSION` | `PERSISTENT`); native omits it and keeps the body token.
+
+- **`PERSISTENT`** — `Max-Age` = the refresh TTL; survives a browser restart. This is web "remember me" (the
+  cr-0052 cookie).
+- **`SESSION`** — **no `Max-Age`** (a *session cookie*): survives page reloads but is dropped when the browser
+  closes. This is the web default ("until I close the browser"), matching the conventional web norm and replacing
+  cr-0052's in-memory-only "off" (which died on the first reload).
+
+Because a cookie does not report its own `Max-Age` back to the server, the lifetime is encoded in the **cookie
+name** — `veyq_refresh` (persistent) vs `veyq_refresh_session` (session). Refresh re-sets the **same-named**
+cookie (so a rotation never silently upgrades/downgrades the lifetime); logout clears **both**. The real expiry
+backstop remains the **server-side refresh TTL** + reuse detection — not the cookie lifetime, which a browser's
+session-restore ("continue where you left off") may extend across a restart anyway. `remember` stays in the
+contract for backward compatibility (native + legacy) and is honoured (→ `PERSISTENT`) only when `sessionScope`
+is absent. Both lifetimes carry the **same opaque token** — no key material — so the server stays operator-blind.
+The web client (cr-0055) is fully cookie-based (it keeps no body refresh token); see ADR 0005 §22 for how the
+**vault key** is persisted to match each lifetime.
+
 ## Consequences
 
 - **Instant revocation** is intrinsic (delete / mark the family revoked) — logout, "log out everywhere,"

@@ -197,6 +197,33 @@ presentation are the **web** shape.
     wraps (§9), same combined screen; only the option set + its presentation (a toggle vs a chooser) differ.
     Whether native also collapses to a single toggle is **to be worked out**.
 
+## Decision — addendum 2026-06-30 #3: web "off" is session-scoped (survives a reload, dies on browser close)
+
+This refines §15/§18's "**Off**" for web (cr-0055). §15 originally said off = "re-authenticate each launch (no
+persisted session/vault)"; in practice that meant the refresh token lived only in memory and was lost on the
+**first page reload** — harsher than the conventional web norm, where a no-"remember me" session survives reloads
+and only ends when the browser closes.
+
+22. **Web "off" = the conventional session tier; "on" = persistent.** Off persists for the **browser session**,
+    on persists across a **browser restart**:
+    - **Off** → a **session refresh cookie** (no `Max-Age`, [ADR 0004](0004-session-tokens.md) addendum) **+** the
+      unlocked Master Key cached in **`sessionStorage`**. A reload re-opens the vault with **no prompt**; closing
+      the browser drops both. Off **also** keeps its password **DEVICE** wrap (§18), so the *next launch after a
+      close* is **email + password only** — never the Secret Key.
+    - **On** → the **persistent** cookie + the password-less **`DEVICE_KEY`** wrap in IndexedDB (§18-20) → opens
+      straight in across a full restart.
+    - The Secret-Key floor is still typed **once per device** (§3, §14, §17); neither tier re-asks it.
+
+23. **The session-scoped relaxation is conscious and bounded.** Within an open browser session, off is **no
+    longer password-gated** — the `sessionStorage` key re-opens the vault without the password. The Master Key
+    sits there as **raw bytes** (`sessionStorage` cannot hold a non-extractable WebCrypto key), so an XSS payload
+    running during the session could read it — but that is **no worse than the already-unlocked in-memory vault**
+    the same payload could read, and it is **cleared when the browser closes**. This is the standard web-session
+    posture; for a **memory-sharing** app (not a secrets vault, §14) it is the right friction. **Operator-blind is
+    untouched** — the server still holds only ciphertext wraps + an opaque cookie token; the relaxation is purely
+    local. A genuinely untrusted machine still uses **private/incognito** (§19). The persistent "on" tier keeps a
+    *non-extractable* device key (IndexedDB), so it never parks raw key bytes.
+
 ## Related / future
 
 - **Cross-device onboarding (QR / push):** a new device is onboarded by an existing **unlocked** device

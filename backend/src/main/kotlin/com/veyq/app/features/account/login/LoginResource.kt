@@ -34,16 +34,21 @@ class LoginResource(private val handler: LoginHandler, private val cookie: Sessi
                 .entity(ErrorResponse(code = "authentication_failed"))
                 .build()
         val family = SessionFamily(id = UUID.fromString(session.familyId))
-        // Web "remember me" (ADR 0005 §15): hand the refresh token over as a persistent httpOnly cookie and omit
-        // it from the body; otherwise the body carries it (native, or in-memory web). Operator-blind either way.
-        return if (loginVerifyRequest.remember == true) {
-            Response.ok(SessionResponse(accessToken = session.accessToken, family = family, refreshToken = null))
-                .cookie(cookie.persistent(session.refreshToken))
-                .build()
-        } else {
-            Response.ok(
-                SessionResponse(accessToken = session.accessToken, family = family, refreshToken = session.refreshToken),
-            ).build()
+        // Pick the refresh transport (ADR 0004 addendum / ADR 0005 §22). Web sends `sessionScope`; native omits
+        // it. Compare by wire value so the exact generated enum constant doesn't matter. `remember` is the legacy
+        // web flag, honoured (→ persistent) only when `sessionScope` is absent. Operator-blind in every case.
+        val noBodyToken = SessionResponse(accessToken = session.accessToken, family = family, refreshToken = null)
+        return when (loginVerifyRequest.sessionScope?.value) {
+            "PERSISTENT" -> Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken)).build()
+            "SESSION" -> Response.ok(noBodyToken).cookie(cookie.session(session.refreshToken)).build()
+            else ->
+                if (loginVerifyRequest.remember == true) {
+                    Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken)).build()
+                } else {
+                    Response.ok(
+                        SessionResponse(accessToken = session.accessToken, family = family, refreshToken = session.refreshToken),
+                    ).build()
+                }
         }
     }
 }

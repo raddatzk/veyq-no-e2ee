@@ -9,22 +9,30 @@ import { clearTokens, session, setTokens } from '../../../app/session'
 import { clearVault } from '../../../app/vault'
 import { setAccount, clearAccount } from '../../../app/account'
 import { clearDeviceKey } from '../rememberMe/deviceKeyWrap'
+import { clearSessionVault } from '../rememberMe/sessionVault'
+import { LoginVerifyRequestSessionScopeEnum } from '../../../api/generated/auth'
 
 /**
  * Log in with email + password. Requests a challenge, derives the auth keypair with the instance salt the
  * challenge carries, signs the nonce, and stores the issued session. Throws on failure — a wrong password
  * or unknown account both surface as the same generic 401 (non-enumerable).
+ *
+ * The web is always cookie-based (cr-0055): `scope` picks the refresh-cookie lifetime — `SESSION` (the
+ * default — survives reloads, dropped on browser close) or `PERSISTENT` ("remember me" — survives a restart).
+ * Either way the body carries no refresh token, so none is kept in memory; refresh rides the cookie.
  */
-export async function login(email: string, password: string, remember = false): Promise<void> {
+export async function login(
+  email: string,
+  password: string,
+  scope: LoginVerifyRequestSessionScopeEnum = LoginVerifyRequestSessionScopeEnum.Session,
+): Promise<void> {
   const challenge = await loginApi().requestLoginChallenge({ loginChallengeRequest: { email } })
   const authSalt = v1.deriveAuthSalt(fromB64std(challenge.instanceSalt), email)
   const auth = await deriveAuthKeypairAsync(password, authSalt)
   const signature = v1.authSign(auth.privateKey, fromB64std(challenge.nonce))
   const result = await loginApi().verifyLogin({
-    loginVerifyRequest: { email, signature: b64std(signature), remember },
+    loginVerifyRequest: { email, signature: b64std(signature), sessionScope: scope },
   })
-  // remember (cr-0052) → the refresh token rides the httpOnly cookie (absent from the body), so keep none in
-  // memory and refresh via the cookie. Otherwise store the body token (in-memory, dies on reload).
   setTokens(result.accessToken, result.refreshToken ?? null, result.family.id)
   setAccount(email)
 }
@@ -52,9 +60,11 @@ export async function refreshSession(): Promise<void> {
  *  the vault clear here means every sign-out path (this view, a future silent logout on refresh failure, a
  *  route guard) drops the unlocked keys — auth and unlock can never drift out of sync. */
 export async function logout(): Promise<void> {
-  // Drop the remember-me wrap FIRST, while the token is still live: delete the server DEVICE_KEY wrap and the
-  // local device key (cr-0054), so an explicit sign-out can't leave the device opening straight in. The DEVICE
-  // trust wrap (if any) is intentionally left — it survives logout (next login stays password-only).
+  // Drop the convenience vaults FIRST, while the token is still live, so an explicit sign-out can't leave the
+  // device opening straight in: the session vault (cr-0055, sessionStorage) and the server DEVICE_KEY wrap +
+  // local device key (cr-0054). The DEVICE trust wrap (if any) is intentionally left — it survives logout
+  // (next login stays password-only, never the Secret Key).
+  clearSessionVault()
   await clearDeviceKey().catch(() => {})
   try {
     await sessionApi().logout()

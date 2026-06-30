@@ -23,8 +23,8 @@ class TokenResource(private val sessions: SessionService, private val cookie: Se
     lateinit var headers: HttpHeaders
 
     override fun refreshSession(refreshRequest: RefreshRequest): Response {
-        val cookieToken = cookie.read(headers)
-        val token = cookieToken ?: refreshRequest.refreshToken
+        val fromCookie = cookie.read(headers)
+        val token = fromCookie?.token ?: refreshRequest.refreshToken
             ?: return Response.status(Response.Status.BAD_REQUEST)
                 .entity(ErrorResponse(code = "invalid_request"))
                 .build()
@@ -32,10 +32,12 @@ class TokenResource(private val sessions: SessionService, private val cookie: Se
             ?: return Response.status(Response.Status.UNAUTHORIZED)
                 .entity(ErrorResponse(code = "refresh_rejected"))
                 .build()
-        return if (cookieToken != null) {
-            Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = null))
-                .cookie(cookie.persistent(rotated.refreshToken))
-                .build()
+        return if (fromCookie != null) {
+            // Re-set the SAME lifetime the request carried (persistent vs session), so rotation never silently
+            // upgrades/downgrades it (ADR 0004 addendum). The token stays out of the body on the web path.
+            val rotatedCookie =
+                if (fromCookie.persistent) cookie.persistent(rotated.refreshToken) else cookie.session(rotated.refreshToken)
+            Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = null)).cookie(rotatedCookie).build()
         } else {
             Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = rotated.refreshToken)).build()
         }
