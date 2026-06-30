@@ -17,11 +17,19 @@ here; the server is blind.
   vault inject); `media.e2e.test.ts` reads it automatically when `VEYQ_EMAIL` etc. are unset. (`POST /api/tenants`
   rejects a numeric domain, so `seed:dev` creates the tenant under a hostname and remaps the domain to
   `127.0.0.1` in the dev DB.)
-- **Run the Memory shell locally (cr-0030):** `npm run dev` (Vite proxies `/api` → `127.0.0.1:8080` with
-  `changeOrigin`, so the backend sees `Host: 127.0.0.1`, port stripped). The shell needs the signed-in user to
-  belong to a tenant whose **`domain` is `127.0.0.1`** (the active tenant is resolved from the Host) — `npm run
-  seed:dev` sets this up. Then login → unlock auto-births the personal scope and the browse renders. If no
-  tenant claims the Host you get the *“no space”* state (expected).
+- **Run the Memory shell locally (cr-0030):** `npm run dev` (Vite proxies `/api` → `127.0.0.1:8080`). The active
+  tenant is resolved server-side from the **Host** (port stripped); the signed-in user must belong to it. The
+  default flow: browse `127.0.0.1:5173` → the tenant whose **`domain` is `127.0.0.1`** (`npm run seed:dev` sets
+  this up) → login → unlock auto-births the personal scope and the browse renders. If no tenant claims the Host
+  you get the *“no space”* state (expected).
+- **Multiple workspaces in parallel from one dev server (cr-0051):** the dev proxy forwards the **real browser
+  Host** (`changeOrigin: false`), so register each tenant under its own `*.localhost` hostname (e.g.
+  `workspace-a.localhost`) and browse `workspace-a.localhost:5173` vs `workspace-b.localhost:5173` — each resolves
+  its own tenant. `*.localhost` resolves to loopback in browsers without `/etc/hosts` (prefer it over `*.local`,
+  which is mDNS on macOS); for another suffix, add it to `allowedHosts` in `vite.config.ts`. `VEYQ_SMOKE_HOST=<host>`
+  pins one fixed tenant regardless of the browser URL (headless smoke). **Footgun:** with the real Host forwarded,
+  `localhost:5173` ≠ `127.0.0.1:5173` (only `127.0.0.1` carries the seed tenant) — the canonical dev URL stays
+  `127.0.0.1:5173`.
 
 ## Conventions
 - **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from
