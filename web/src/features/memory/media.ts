@@ -17,6 +17,8 @@ import { withRefresh } from '../account/login/login'
 import type { MediaSummary, PresignedUrl, MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
+/** AAD context binding the sealed `{w,h}` dimensions to their purpose (cr-0059, separate from the K_blob wrap). */
+const MEDIA_DIMS_CTX = 'media-dims'
 
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
@@ -41,10 +43,15 @@ export type BlobRef = {
 export type MediaDerivative = { kind: MediaDerivativeKind; ref: BlobRef }
 
 /** A node's media for the UI/read-back: the original blob ref + its role-tagged derivative tiers. */
+/** A media's pristine pixel dimensions, used to lay out the justified gallery grid (cr-0059). */
+export type Dimensions = { w: number; h: number }
+
 export type MediaItem = {
   mediaId: string
   original: BlobRef
   derivatives: MediaDerivative[]
+  /** The original's `{w,h}` sealed under `K_mem` (opaque base64); unwrap with [unsealDimensions]. Absent when none. */
+  wrappedDimensions?: string
 }
 
 function summaryToItem(s: MediaSummary): MediaItem {
@@ -55,7 +62,25 @@ function summaryToItem(s: MediaSummary): MediaItem {
       kind: d.kind,
       ref: { blobId: d.blobId, chunkCount: d.chunkCount, byteSize: d.byteSize, wrappedBlobKey: d.wrappedBlobKey },
     })),
+    wrappedDimensions: s.wrappedDimensions ?? undefined,
   }
+}
+
+/**
+ * Unwrap a media's sealed dimensions under `K_mem` (operator-blind — the server only ever holds the ciphertext).
+ * Best-effort: returns null when none were sealed, the wrap doesn't open, or the payload isn't sane `{w,h}` — the
+ * gallery then falls back to a default aspect rather than break the layout.
+ */
+export function unsealDimensions(memoryKey: Uint8Array, item: MediaItem): Dimensions | null {
+  if (!item.wrappedDimensions) return null
+  try {
+    const json = new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(item.wrappedDimensions), MEDIA_DIMS_CTX))
+    const { w, h } = JSON.parse(json) as Dimensions
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) return { w, h }
+  } catch {
+    /* not openable / malformed → fall back to a default aspect */
+  }
+  return null
 }
 
 // --- the pixel stage (injectable; jsdom cannot decode real Canvas/Image/Video) ---------------------------
@@ -73,6 +98,8 @@ export interface MediaDeriver {
   deriveImage(source: Blob, opts: { maxEdge: number; quality: number }): Promise<Uint8Array>
   /** Decode a video's first frame to a JPEG poster (used for both the thumbnail and the preview tier). */
   deriveVideoPoster(source: Blob): Promise<Uint8Array>
+  /** Probe the source's intrinsic pixel `{w,h}` for the justified grid (cr-0059). Optional + best-effort. */
+  probeDimensions?(source: Blob, mediaType: string): Promise<Dimensions | null>
 }
 
 /**
@@ -114,6 +141,30 @@ export function createBrowserDeriver(): MediaDeriver {
       } finally {
         URL.revokeObjectURL(url)
       }
+    },
+    async probeDimensions(source, mediaType) {
+      if (mediaType.startsWith('image/')) {
+        const bitmap = await createImageBitmap(source)
+        try {
+          return { w: bitmap.width, h: bitmap.height }
+        } finally {
+          bitmap.close()
+        }
+      }
+      if (mediaType.startsWith('video/')) {
+        const url = URL.createObjectURL(source)
+        try {
+          const video = document.createElement('video')
+          video.muted = true
+          video.preload = 'metadata'
+          video.src = url
+          await onceEvent(video, 'loadeddata')
+          return { w: video.videoWidth, h: video.videoHeight }
+        } finally {
+          URL.revokeObjectURL(url)
+        }
+      }
+      return null
     },
   }
 }
@@ -178,6 +229,24 @@ function sealBlob(memoryKey: Uint8Array, data: Uint8Array): SealedBlob {
   return { wrappedBlobKey, frames, chunkCount: total, byteSize }
 }
 
+/** Seal `{w,h}` under `K_mem` (a small AEAD payload, like a wrapped key) → opaque base64 for `wrappedDimensions`. */
+function sealDimensions(memoryKey: Uint8Array, dims: Dimensions): string {
+  const bytes = new TextEncoder().encode(JSON.stringify({ w: dims.w, h: dims.h }))
+  return b64std(v1.symWrap(memoryKey, bytes, MEDIA_DIMS_CTX, v1.randomBytes(12)))
+}
+
+/** Probe the original's `{w,h}` and seal it (best-effort — undecodable/unsupported → null, the grid uses a default). */
+async function sealOriginalDimensions(source: AddMediaSource, deriver: MediaDeriver, memoryKey: Uint8Array): Promise<string | null> {
+  if (!deriver.probeDimensions) return null
+  try {
+    const blob = new Blob([source.bytes as BlobPart], { type: source.mediaType })
+    const dims = await deriver.probeDimensions(blob, source.mediaType)
+    return dims ? sealDimensions(memoryKey, dims) : null
+  } catch {
+    return null
+  }
+}
+
 /** Upload progress (0..1) + cancellation hooks for [addMedia], used by the upload queue (uc.memory.upload). */
 export type AddMediaOptions = { onProgress?: (fraction: number) => void; signal?: AbortSignal }
 
@@ -203,6 +272,7 @@ export async function addMedia(
   const { onProgress, signal } = opts
   throwIfAborted(signal)
   const tiers = await deriveTiers(source, deriver)
+  const wrappedDimensions = await sealOriginalDimensions(source, deriver, memoryKey)
   // index 0 = original; the rest are the role-tagged derivatives, in order
   const sealedOriginal = sealBlob(memoryKey, source.bytes)
   const sealedTiers = tiers.map((t) => ({ kind: t.kind, sealed: sealBlob(memoryKey, t.bytes) }))
@@ -252,6 +322,7 @@ export async function addMedia(
             nodeId,
             originalUploadId: uploads[0].uploadId,
             derivatives: sealedTiers.map((t, i) => ({ kind: t.kind, uploadId: uploads[i + 1].uploadId })),
+            wrappedDimensions,
           },
         ],
       },

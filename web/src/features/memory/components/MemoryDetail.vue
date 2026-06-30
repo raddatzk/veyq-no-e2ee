@@ -6,11 +6,12 @@
 // Ported presentation from the design source (legacy/frontend-noe2ee); only the data layer is ours. Decrypted
 // thumbnails become object URLs that are **revoked** on reload / unmount (no lingering plaintext blob URLs).
 // Out of scope (own CRs): journal, chapters + chapter-nested media, map/tracks, playlists, buckets, sharing.
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, hasDerivatives, type MediaItem } from '../media'
+import { listMedia, openGrid, hasDerivatives, unsealDimensions, type MediaItem } from '../media'
+import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
 
@@ -24,6 +25,66 @@ const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail obje
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 const lightboxIndex = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+// --- justified grid (uc.memory.gallery, cr-0059). Each tile's aspect ratio comes from the E2EE-sealed
+// dimensions unwrapped under K_mem (operator-blind); items without sealed dimensions fall back to a default
+// aspect. The layout is recomputed whenever the items or the measured container width change.
+const GAP = 8
+const gridEl = ref<HTMLElement | null>(null)
+const containerWidth = ref(0)
+let gridObserver: ResizeObserver | null = null
+let measureFrame: number | null = null
+
+const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
+const aspectRatios = computed(() => {
+  const key = props.memoryKey
+  const m = new Map<string, number>()
+  for (const item of items.value) {
+    const dims = key ? unsealDimensions(key, item) : null
+    m.set(item.mediaId, galleryDisplayAspectRatio(dims?.w, dims?.h))
+  }
+  return m
+})
+const layout = computed(() =>
+  calculateJustifiedMediaLayout({
+    items: items.value.map((it) => ({ id: it.mediaId, aspectRatio: aspectRatios.value.get(it.mediaId) })),
+    containerWidth: containerWidth.value,
+    targetHeight: targetTileHeight.value,
+    gap: GAP,
+  }),
+)
+const itemsById = computed(() => new Map(items.value.map((it, index) => [it.mediaId, { item: it, index }])))
+const tiles = computed(() =>
+  layout.value.tiles.flatMap((tile) => {
+    const entry = itemsById.value.get(tile.id)
+    return entry ? [{ ...tile, media: entry.item, index: entry.index }] : []
+  }),
+)
+
+function measureGrid() {
+  const el = gridEl.value
+  if (!el) return
+  const width = el.getBoundingClientRect().width || el.clientWidth || el.parentElement?.clientWidth || 0
+  if (width > 0) containerWidth.value = Math.floor(width)
+}
+
+function attachGridObserver() {
+  const el = gridEl.value
+  gridObserver?.disconnect()
+  gridObserver = null
+  if (!el) return
+  measureGrid()
+  if (typeof ResizeObserver === 'undefined') return
+  // rAF-debounce so a width change doesn't trip the ResizeObserver loop guard
+  gridObserver = new ResizeObserver(() => {
+    if (measureFrame !== null) return
+    measureFrame = requestAnimationFrame(() => {
+      measureFrame = null
+      measureGrid()
+    })
+  })
+  gridObserver.observe(el)
+}
 
 // --- upload trigger (uc.memory.upload). The Safari Photos picker populates input.files LATE / across repeated
 // picks with empty MIME types — so we re-read the input over a short window, MERGE (never replace) the picks,
@@ -117,7 +178,15 @@ watch(
   { immediate: true },
 )
 
-onBeforeUnmount(revokeThumbs)
+// The grid element mounts/unmounts with the ready state; (re)attach the size observer when it appears.
+onMounted(attachGridObserver)
+watch(gridEl, attachGridObserver, { flush: 'post' })
+
+onBeforeUnmount(() => {
+  revokeThumbs()
+  gridObserver?.disconnect()
+  if (measureFrame !== null) cancelAnimationFrame(measureFrame)
+})
 </script>
 
 <template>
@@ -178,22 +247,33 @@ onBeforeUnmount(revokeThumbs)
     </div>
     <p v-else-if="status === 'error'" class="veyq-empty">{{ t('media.unavailable') }}</p>
     <p v-else-if="!items.length" class="veyq-empty">{{ t('media.empty') }}</p>
-    <div v-else class="gallery-grid" :aria-label="t('media.gallery')">
+    <div
+      v-else
+      ref="gridEl"
+      class="gallery-grid"
+      :style="{ height: `${layout.height}px` }"
+      :aria-label="t('media.gallery')"
+    >
       <button
-        v-for="(media, i) in items"
-        :key="media.mediaId"
+        v-for="tile in tiles"
+        :key="tile.media.mediaId"
         class="gallery-tile"
         type="button"
-        :aria-label="t('media.openItem', { index: i + 1 })"
-        @click="lightboxIndex = i"
+        :style="{
+          transform: `translate(${tile.left}px, ${tile.top}px)`,
+          width: `${tile.renderedWidth}px`,
+          height: `${tile.renderedHeight}px`,
+        }"
+        :aria-label="t('media.openItem', { index: tile.index + 1 })"
+        @click="lightboxIndex = tile.index"
       >
         <img
-          v-if="thumbs.get(media.mediaId)"
+          v-if="thumbs.get(tile.media.mediaId)"
           class="media-grid-tile-media media-grid-tile-media-loaded"
-          :src="thumbs.get(media.mediaId)"
+          :src="thumbs.get(tile.media.mediaId)"
           :alt="node.name"
         />
-        <span v-else-if="!hasDerivatives(media)" class="media-grid-icon pi pi-file" />
+        <span v-else-if="!hasDerivatives(tile.media)" class="media-grid-icon pi pi-file" />
         <span v-else class="media-grid-tile-placeholder" />
       </button>
     </div>
@@ -260,18 +340,20 @@ onBeforeUnmount(revokeThumbs)
   color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
 }
 
-/* A uniform square-tile grid (the thumbnails are capped at 400px). The design's justified-rows layout +
-   lazy/virtualized loading are a later optimization, not part of this slice (cr-0049). The tile-inner classes
-   (.media-grid-tile-media / -placeholder / -icon) are the design source's (media.css). */
+/* The justified-rows gallery (cr-0059): aspect-preserving tiles laid out by calculateJustifiedMediaLayout into
+   rows that fill the container width (the per-tile aspect ratio comes from the E2EE-sealed dimensions). The
+   container is position:relative with an explicit height; each tile is absolutely positioned via a transform +
+   its rendered width/height. The tile-inner classes (.media-grid-tile-media / -placeholder / -icon) are the
+   design source's (media.css). */
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
-  gap: 0.5rem;
+  position: relative;
+  width: 100%;
 }
 .gallery-tile {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  aspect-ratio: 1;
   overflow: hidden;
   padding: 0;
   border: 0;

@@ -39,22 +39,23 @@ class MediaSliceTest {
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
         val uploadId = startOne(userId, scopeId, chunkCount = 2, byteSize = 1024, wrap = "d3JhcHBlZA==")
 
-        // complete + attach to the Memory
+        // complete + attach to the Memory; the sealed dimensions ride along as opaque ciphertext (cr-0059)
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory"}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedDimensions":"ZGltcw=="}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].blobId", notNullValue())
             .body("results[0].mediaId", notNullValue())
             .body("results[0].error", nullValue())
 
-        // list the node's media — operator-blind: the wrap comes back verbatim, sizes are opaque metadata
+        // list the node's media — operator-blind: the wrap + sealed dimensions come back verbatim, sizes opaque
         given().header("Authorization", token(userId))
             .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
             .then().statusCode(200)
             .body("[0].wrappedBlobKey", equalTo("d3JhcHBlZA=="))
             .body("[0].chunkCount", equalTo(2))
             .body("[0].byteSize", equalTo(1024))
+            .body("[0].wrappedDimensions", equalTo("ZGltcw=="))
     }
 
     @Test
@@ -109,6 +110,7 @@ class MediaSliceTest {
             .then().statusCode(200)
             .body("[0].wrappedBlobKey", equalTo("b25seQ=="))
             .body("[0].derivatives.size()", equalTo(0))
+            .body("[0].wrappedDimensions", nullValue()) // none sealed → null (the grid uses a default aspect)
     }
 
     @Test

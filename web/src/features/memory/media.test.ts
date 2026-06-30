@@ -16,6 +16,7 @@ import {
   lightboxRef,
   downloadRef,
   scaleToMaxEdge,
+  unsealDimensions,
   CHUNK_SIZE,
   TIER_SPECS,
   type MediaDeriver,
@@ -69,6 +70,7 @@ function fakeStore() {
           mediaId: 'media-1',
           ...blobOf(item.originalUploadId),
           derivatives: (item.derivatives ?? []).map((d: any) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
+          wrappedDimensions: item.wrappedDimensions ?? null, // opaque ciphertext, echoed verbatim (cr-0059)
         },
       ]
     }),
@@ -257,6 +259,53 @@ describe('addMedia — progress, abort, best-effort derivation (cr-0058)', () =>
     expect(mediaId).toBe('media-1')
     expect(store.captured.startItems).toHaveLength(1) // original only — no derivative blobs
     expect(store.captured.completeItem.derivatives).toEqual([])
+  })
+})
+
+describe('addMedia — E2EE-sealed dimensions for the justified grid (cr-0059)', () => {
+  it('seals the probed {w,h} under K_mem and round-trips it back through listMedia', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+    deriver.probeDimensions = vi.fn(async () => ({ w: 1920, h: 1080 }))
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/png' }, deriver)
+
+    // the wire carries only opaque ciphertext — never the plaintext dimensions
+    const sealed = store.captured.completeItem.wrappedDimensions
+    expect(typeof sealed).toBe('string')
+    expect(sealed).not.toContain('1920')
+
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(unsealDimensions(memoryKey, item)).toEqual({ w: 1920, h: 1080 })
+    // a wrong K_mem can't open it (bound to the Memory key)
+    expect(unsealDimensions(v1.randomBytes(32), item)).toBeNull()
+  })
+
+  it('seals no dimensions when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+    deriver.probeDimensions = vi.fn(async () => null) // e.g. an empty MIME / non-image
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'application/pdf' }, deriver)
+
+    expect(store.captured.completeItem.wrappedDimensions ?? null).toBeNull()
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(unsealDimensions(memoryKey, item)).toBeNull()
+  })
+
+  it('a deriver with no probeDimensions seals nothing (best-effort, optional)', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+
+    await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver())
+    expect(store.captured.completeItem.wrappedDimensions ?? null).toBeNull()
   })
 })
 

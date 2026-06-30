@@ -323,6 +323,15 @@ components:
             type with no derivable frame (the gallery falls back to an icon). At most one of each kind.
           maxItems: 2
           items: { $ref: "#/components/schemas/MediaDerivativeUpload" }
+        wrappedDimensions:
+          type: [string, "null"]
+          description: >
+            The original's pixel dimensions `{w,h}` sealed under the Memory's `K_mem` (opaque base64), so the
+            gallery can lay out a justified grid without the blind server ever seeing dimensions. Absent for a
+            media type whose frame the client couldn't decode (the grid falls back to a default aspect).
+          contentEncoding: base64
+          maxLength: 256
+          example: ZGltcy1jaXBoZXJ0ZXh0
 
     MediaDerivativeUpload:
       type: object
@@ -404,6 +413,14 @@ components:
           type: [array, "null"]
           description: Role-tagged derivative tiers (THUMBNAIL, PREVIEW), each its own blob ref with its own wrap.
           items: { $ref: "#/components/schemas/MediaDerivativeSummary" }
+        wrappedDimensions:
+          type: [string, "null"]
+          description: >
+            The original's pixel dimensions sealed under `K_mem` (opaque base64); the gallery unwraps it to
+            lay out the justified grid. Null when none was sealed at upload (the grid uses a default aspect).
+          contentEncoding: base64
+          maxLength: 256
+          example: ZGltcy1jaXBoZXJ0ZXh0
 
     MediaDerivativeSummary:
       type: object

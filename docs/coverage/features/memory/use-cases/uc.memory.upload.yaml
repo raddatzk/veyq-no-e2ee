@@ -7,7 +7,7 @@ title: Upload media into a Memory (web)
 # Native upload UI is its own later CR (the VeyqClient.addMedia data layer already exists).
 acceptanceCriteria:
   - id: seal-and-upload-operator-blind
-    text: Each picked file is sealed under a fresh K_blob (wrapped to K_mem), its chunks PUT direct-to-store, and one role-tagged media is attached to the node — the server sees only ciphertext + opaque sizes/counts.
+    text: Each picked file is sealed under a fresh K_blob (wrapped to K_mem), its chunks PUT direct-to-store, and one role-tagged media is attached to the node — the server sees only ciphertext + opaque sizes/counts. The original's pixel dimensions are probed and sealed under K_mem too (cr-0059), so the justified gallery can lay out without the server ever seeing dimensions.
     coverage:
       backend:
         integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.derivativesRoundTripWithOwnWraps]

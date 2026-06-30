@@ -59,6 +59,7 @@ class MediaResource(
                 nodeId = item.nodeId.toString(),
                 originalUploadId = item.originalUploadId.toString(),
                 derivatives = item.derivatives.orEmpty().map { DerivativeDeclare(it.kind.value, it.uploadId.toString()) },
+                wrappedDimensions = item.wrappedDimensions,
             )
         }
         return when (val o = handler.complete(identity.principal.name, scopeId.toString(), items)) {
@@ -107,6 +108,7 @@ class MediaResource(
         wrappedBlobKey = row.wrappedBlobKey,
         manifest = row.manifest,
         derivatives = row.derivatives.map(::toDerivativeSummary),
+        wrappedDimensions = row.wrappedDimensions,
     )
 
     private fun toDerivativeSummary(d: DerivativeRow) = MediaDerivativeSummary(

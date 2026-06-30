@@ -65,8 +65,17 @@ function mountDetail(memoryKey: Uint8Array, props: Partial<Record<string, unknow
   })
 }
 
-beforeEach(() => vi.clearAllMocks())
-afterEach(() => vi.unstubAllGlobals())
+// happy-dom does no layout, so the justified grid (cr-0059) can't measure its container; stub a width + a
+// no-op ResizeObserver so the layout produces tiles (the layout math itself is covered in mediaGridLayout.test).
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 960, height: 0, top: 0, left: 0, right: 960, bottom: 0, x: 0, y: 0, toJSON: () => ({}) })
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('MemoryDetail (gallery grid + header)', () => {
   it('lists the Memory media → renders the decrypted title, item count and a thumbnail tile per item', async () => {

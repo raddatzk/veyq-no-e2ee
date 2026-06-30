@@ -17,7 +17,12 @@ data class UploadDeclare(val chunkCount: Int, val byteSize: Long, val wrappedBlo
 data class DerivativeDeclare(val kind: String, val uploadId: String)
 
 /** One logical media to complete: the original upload + role-tagged derivative uploads, attached to a node. */
-data class CompleteItem(val nodeId: String, val originalUploadId: String, val derivatives: List<DerivativeDeclare>)
+data class CompleteItem(
+    val nodeId: String,
+    val originalUploadId: String,
+    val derivatives: List<DerivativeDeclare>,
+    val wrappedDimensions: String?,
+)
 
 /** Per-item result of `start`: success carries the session + presigned PUTs (null when the store can't presign). */
 data class UploadItemResult(val uploadId: String?, val presignedPuts: List<PresignedRef>?, val error: String?)
@@ -127,6 +132,7 @@ class MediaHandler(
         val (blobId, mediaId) = store.attach(
             original, item.nodeId, manifests[original.id],
             derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
+            item.wrappedDimensions,
         )
         return CompleteItemResult(blobId, mediaId, null)
     }

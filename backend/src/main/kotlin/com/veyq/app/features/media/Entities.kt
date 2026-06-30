@@ -98,6 +98,10 @@ class MediaEntity : PanacheEntityBase {
     @Column(name = "blob_id", nullable = false, length = 36)
     lateinit var blobId: String
 
+    /** The original's `{w,h}` sealed under `K_mem` (opaque base64), for the gallery's justified layout (cr-0059). */
+    @Column(name = "wrapped_dimensions")
+    var wrappedDimensions: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
