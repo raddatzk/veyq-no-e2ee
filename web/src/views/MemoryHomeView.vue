@@ -11,6 +11,7 @@ import { setBreadcrumb } from '../app/breadcrumb'
 import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
 import { treeStore, loadTree } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
+import { openMemory as unwrapMemoryKey } from '../features/memory/tree'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
 import { NodeKind } from '../api/generated/content'
 import type { TreeNode } from '../features/memory/tree'
@@ -35,6 +36,10 @@ const currentFolder = computed(() =>
 const level = computed(() => childrenOf(treeStore.nodes, currentNodeId.value))
 // Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
 const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
+// The open Memory's K_mem, unwrapped from its tree node under K_SC (held on device; the server is blind).
+const memoryKey = computed(() =>
+  isMemory.value && currentNode.value && scopeKey.value ? unwrapMemoryKey(scopeKey.value, currentNode.value) : null,
+)
 
 type Mode = 'create-folder' | 'create-memory' | 'rename'
 const mutationVisible = ref(false)
@@ -108,8 +113,10 @@ async function onDeleteDone() {
     </div>
     <template v-else>
       <MemoryDetail
-        v-if="isMemory && currentNode"
+        v-if="isMemory && currentNode && activeSpace.scopeId"
         :node="currentNode"
+        :scope-id="activeSpace.scopeId"
+        :memory-key="memoryKey"
         :favorite="isFavorite(currentNode.id)"
         @toggle-favorite="currentNode && onToggleFavorite(currentNode)"
         @rename="currentNode && startRename(currentNode)"

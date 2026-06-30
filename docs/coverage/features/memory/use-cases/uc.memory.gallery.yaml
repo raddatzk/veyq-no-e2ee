@@ -1,44 +1,44 @@
 useCase: uc.memory.gallery
 feature: memory
 title: Open a Memory & browse its gallery
-status: planned
-# The gallery UI is not built on any surface yet, so this stays `planned`. But the three-tier data layer it
-# rides on — en.memory.derivatives (cr-0045 web, cr-0047 apple, cr-0048 android): on-device thumbnail/preview
-# generation + role-tagged read-back — now has real web + apple + android + backend tests, so the data-path
-# criteria carry coverage on every surface while the UI render stays a gap (the same shape uc.memory.browse
-# uses: logic covered, the live UI round-trip still pending).
+# The web gallery UI is built (cr-0049): MemoryDetail (grid + header) + MediaLightbox (preview, prev/next,
+# download) over the ready three-tier data layer (en.memory.derivatives). The data-path criteria carry refs on
+# every surface (the cr-0045/0047/0048 data layer) plus the web render tests; the apple/android gallery UI
+# render stays a gap (web-first, ADR 0010 — their galleries are their own later CRs).
 acceptanceCriteria:
   - id: thumbnail-grid
     text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem).
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
-      web: { unit: [src/features/memory/media.test.ts] }
+      web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MemoryDetail.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/media/AndroidMediaDeriverTest.kt] }
   - id: lightbox-preview
     text: Opening an item shows its preview (not the multi-MB original) full-view, with prev/next paging the grid order.
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
-      web: { unit: [src/features/memory/media.test.ts] }
+      web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MediaLightbox.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/media/AndroidMediaDeriverTest.kt] }
   - id: download-original
     text: An explicit download fetches the pristine, full-resolution original (the only byte-identical copy).
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip], e2e: [BlobBatchE2ETest.uploadThenDownloadRoundTripsBytes] }
-      web: { unit: [src/features/memory/media.test.ts] }
+      web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MediaLightbox.test.ts, src/features/memory/download.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
   - id: favorite-toggle
     text: The header toggle pins/unpins the Memory (operator-blind, via en.memory.favorites).
+    coverage:
+      web: { unit: [src/app/favoritesStore.test.ts, src/features/memory/favorites.test.ts] }
   - id: operator-blind-fetch
     text: Every tier (thumbnail/preview/original) is fetched as ciphertext via presigned GET and decrypted on device; the server sees no pixel, filename, or content key.
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
-      web: { unit: [src/features/memory/media.test.ts] }
+      web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MemoryDetail.test.ts, src/features/memory/components/MediaLightbox.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
 gaps:
-  web: "Data layer covered (cr-0045): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested with a stubbed deriver, plus a manual live Canvas/<video> round-trip. The remaining gap is the gallery grid/lightbox UI itself (uc.memory.gallery render) — its own CR."
-  apple: "Data layer covered (cr-0047): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) via the native ImageIO/AVFoundation deriver + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested with a stubbed deriver, plus a manual live ImageIO/AVFoundation round-trip. The remaining gap is the gallery grid/lightbox detail UI itself (cr-0034 shell open-hook exists; the detail view is its own CR)."
-  android: "Data layer covered (cr-0048): on-device tier generation (thumbnail 400/q0.80, preview 2048/q0.85; video first-frame poster) via the `:app` Bitmap/MediaMetadataRetriever deriver behind the `:client` MediaDeriver seam (ADR 0010) + role-tagged read-back (grid=thumbnail / lightbox=preview / download=original), unit-tested in pure-JVM `:client:test` with a stubbed deriver, plus an on-emulator property test of the real deriver (AndroidMediaDeriverTest) and a manual live round-trip. The remaining gap is the gallery grid/lightbox detail UI itself (cr-0039 shell open-hook exists; the detail view is its own CR)."
+  web: "Gallery UI built (cr-0049): MemoryDetail (grid + header: decrypted title, item count, favorite toggle; thumbnail tile per item; E1 icon tile for a non-derivable item; E3 empty state; E2 unavailable when K_mem is absent) + MediaLightbox (preview tier, prev/next clamped at the ends, Esc/close, download the original under a derived operator-blind name) over the covered data layer (cr-0045). Component tests round-trip a listed Memory → grid + lightbox + download with real v1 crypto and a mocked mediaApi/blob transport. The remaining gap is the live browser smoke (Canvas/<video> decode + presigned store) — driven manually per the CR done-gate."
+  apple: "Data layer covered (cr-0047): on-device tier generation + role-tagged read-back, unit-tested with a stubbed deriver, plus a manual live ImageIO/AVFoundation round-trip. The gallery grid/lightbox detail UI is not built yet (cr-0034 shell open-hook exists; the native gallery is its own later CR)."
+  android: "Data layer covered (cr-0048): on-device tier generation via the `:app` deriver behind the `:client` MediaDeriver seam + role-tagged read-back, unit-tested in `:client:test` with a stubbed deriver, plus an on-emulator property test of the real deriver and a manual live round-trip. The gallery grid/lightbox detail UI is not built yet (cr-0039 shell open-hook exists; the native gallery is its own later CR)."

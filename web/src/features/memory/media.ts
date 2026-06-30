@@ -241,6 +241,15 @@ function tierRef(item: MediaItem, kind: MediaDerivativeKind): BlobRef | undefine
   return item.derivatives.find((d) => d.kind === kind)?.ref
 }
 
+/**
+ * Whether a media carries derivative tiers — i.e. it had a derivable frame (an image or video, cr-0045). A
+ * gallery renders these as a thumbnail/preview; one **without** derivatives is a non-image/video (E1) shown as
+ * an icon tile. (No media type is stored — operator-blind — so presence of a tier is the only signal.)
+ */
+export function hasDerivatives(item: MediaItem): boolean {
+  return item.derivatives.length > 0
+}
+
 /** Grid tier (small): the thumbnail derivative, or the original when a media has no derivatives. */
 export function gridRef(item: MediaItem): BlobRef {
   return tierRef(item, 'THUMBNAIL') ?? item.original

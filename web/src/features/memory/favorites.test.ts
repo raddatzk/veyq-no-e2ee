@@ -6,6 +6,7 @@ vi.mock('../account/login/login', () => ({ withRefresh: (fn: () => unknown) => f
 import { loadFavorites, saveFavorites } from './favorites'
 import { favoritesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
+import { fromB64std } from '../../shared/base64'
 
 const K = v1.randomBytes(32)
 
@@ -24,8 +25,14 @@ describe('favorites data layer', () => {
 
     await saveFavorites('scope', K, new Set(['m1', 'm2']))
     expect(stored).toBeTruthy()
-    // operator-blind: the stored blob is opaque ciphertext, never the plaintext ids
-    expect(stored).not.toContain('m1')
+    // operator-blind: the stored blob is a sealed envelope (0x02 ‖ nonce(12) ‖ ciphertext ‖ tag(16)), never the
+    // cleartext id list. Assert that *structurally* — a substring scan of the random base64 is flaky (a 2-byte
+    // needle like "m1" hits the random ciphertext/nonce by chance).
+    const raw = fromB64std(stored!)
+    const plaintext = v1.utf8(JSON.stringify(['m1', 'm2']))
+    expect(raw[0]).toBe(0x02) // SYM_TYPE marker
+    expect(raw.length).toBe(1 + 12 + plaintext.length + 16) // type ‖ nonce ‖ ciphertext ‖ tag, not the raw ids
+    expect([...raw.subarray(13, 13 + plaintext.length)]).not.toEqual([...plaintext]) // the body is encrypted
 
     const loaded = await loadFavorites('scope', K)
     expect([...loaded].sort()).toEqual(['m1', 'm2'])

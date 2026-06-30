@@ -151,6 +151,20 @@ const en = {
     deleteMemoryCopy: 'Delete “{name}”? This can’t be undone.',
     deleteFailed: 'Could not delete it. Please try again.',
   },
+  media: {
+    gallery: 'Memory gallery',
+    itemCount: 'No items | {count} item | {count} items',
+    itemPosition: '{index} of {count}',
+    openItem: 'Open item {index}',
+    empty: 'No photos in this Memory yet.',
+    unavailable: 'This Memory can’t be opened right now.',
+    loading: 'Loading…',
+    loadError: 'This item couldn’t be loaded.',
+    download: 'Download original',
+    close: 'Close',
+    previous: 'Previous',
+    next: 'Next',
+  },
 }
 
 const de: typeof en = {
@@ -299,6 +313,20 @@ const de: typeof en = {
     deleteFolderCopy: '„{name}" und alles darin löschen? Das lässt sich nicht rückgängig machen.',
     deleteMemoryCopy: '„{name}" löschen? Das lässt sich nicht rückgängig machen.',
     deleteFailed: 'Konnte nicht gelöscht werden. Bitte versuche es erneut.',
+  },
+  media: {
+    gallery: 'Erinnerungs-Galerie',
+    itemCount: 'Keine Objekte | {count} Objekt | {count} Objekte',
+    itemPosition: '{index} von {count}',
+    openItem: 'Objekt {index} öffnen',
+    empty: 'In dieser Erinnerung gibt es noch keine Fotos.',
+    unavailable: 'Diese Erinnerung lässt sich gerade nicht öffnen.',
+    loading: 'Wird geladen …',
+    loadError: 'Dieses Objekt konnte nicht geladen werden.',
+    download: 'Original herunterladen',
+    close: 'Schließen',
+    previous: 'Zurück',
+    next: 'Weiter',
   },
 }
 
