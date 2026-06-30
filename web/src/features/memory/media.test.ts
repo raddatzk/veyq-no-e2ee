@@ -212,6 +212,54 @@ describe('addMedia — derivative generation + role/batch assembly', () => {
   })
 })
 
+describe('addMedia — progress, abort, best-effort derivation (cr-0058)', () => {
+  it('reports progress 0 → 1 (monotonic) over the ciphertext chunks', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const seen: number[] = []
+
+    await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array(20).fill(1), mediaType: 'image/png' }, stubDeriver(), {
+      onProgress: (f) => seen.push(f),
+    })
+
+    expect(seen[0]).toBe(0)
+    expect(seen[seen.length - 1]).toBe(1)
+    expect(seen).toEqual([...seen].sort((a, b) => a - b)) // non-decreasing
+  })
+
+  it('a pre-aborted signal throws AbortError and never attaches the media', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const ac = new AbortController()
+    ac.abort()
+
+    await expect(
+      addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver(), {
+        signal: ac.signal,
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(store.api.completeMedia).not.toHaveBeenCalled()
+  })
+
+  it('uploads original-only (no derivatives) when derivation throws — e.g. an undecodable HEIC', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+    deriver.deriveImage = vi.fn(async () => {
+      throw new Error('decode_failed') // browser can't decode this codec (HEIC off Safari)
+    })
+
+    const { mediaId } = await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/heic' }, deriver)
+
+    expect(mediaId).toBe('media-1')
+    expect(store.captured.startItems).toHaveLength(1) // original only — no derivative blobs
+    expect(store.captured.completeItem.derivatives).toEqual([])
+  })
+})
+
 describe('read-back — operator-blind round-trip + tier selection', () => {
   it('round-trips the original through chunked AEAD under a K_blob wrapped by K_mem', async () => {
     const store = fakeStore()

@@ -144,14 +144,20 @@ function onceEvent(el: HTMLMediaElement, ev: 'loadeddata' | 'seeked'): Promise<v
 /** Generate the role-tagged derivatives for a source (image: two downscales; video: one poster for both). */
 async function deriveTiers(source: AddMediaSource, deriver: MediaDeriver): Promise<{ kind: MediaDerivativeKind; bytes: Uint8Array }[]> {
   const blob = new Blob([source.bytes as BlobPart], { type: source.mediaType })
-  if (source.mediaType.startsWith('image/')) {
-    const thumbnail = await deriver.deriveImage(blob, TIER_SPECS.THUMBNAIL)
-    const preview = await deriver.deriveImage(blob, TIER_SPECS.PREVIEW)
-    return [{ kind: 'THUMBNAIL', bytes: thumbnail }, { kind: 'PREVIEW', bytes: preview }]
-  }
-  if (source.mediaType.startsWith('video/')) {
-    const poster = await deriver.deriveVideoPoster(blob) // one poster serves both tiers
-    return [{ kind: 'THUMBNAIL', bytes: poster }, { kind: 'PREVIEW', bytes: poster }]
+  // Best-effort: a codec the browser can't decode (e.g. HEIC off Safari), an empty MIME type, or corrupt bytes
+  // must NOT fail the upload — fall back to original-only (the gallery shows an icon, uc.memory.upload E4).
+  try {
+    if (source.mediaType.startsWith('image/')) {
+      const thumbnail = await deriver.deriveImage(blob, TIER_SPECS.THUMBNAIL)
+      const preview = await deriver.deriveImage(blob, TIER_SPECS.PREVIEW)
+      return [{ kind: 'THUMBNAIL', bytes: thumbnail }, { kind: 'PREVIEW', bytes: preview }]
+    }
+    if (source.mediaType.startsWith('video/')) {
+      const poster = await deriver.deriveVideoPoster(blob) // one poster serves both tiers
+      return [{ kind: 'THUMBNAIL', bytes: poster }, { kind: 'PREVIEW', bytes: poster }]
+    }
+  } catch {
+    /* underivable → original only */
   }
   return [] // no derivable frame → original only (the gallery falls back to an icon)
 }
@@ -172,10 +178,19 @@ function sealBlob(memoryKey: Uint8Array, data: Uint8Array): SealedBlob {
   return { wrappedBlobKey, frames, chunkCount: total, byteSize }
 }
 
+/** Upload progress (0..1) + cancellation hooks for [addMedia], used by the upload queue (uc.memory.upload). */
+export type AddMediaOptions = { onProgress?: (fraction: number) => void; signal?: AbortSignal }
+
+/** Throw an AbortError if the caller cancelled — the queue maps it to a cancelled (not failed) upload. */
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Upload cancelled', 'AbortError')
+}
+
 /**
  * Seal the original + its derivatives, each under its **own** `K_blob`, upload all ciphertext chunks
  * direct-to-store in one batch, and attach the result to `nodeId` (a MEMORY/CHAPTER) as one role-tagged media.
- * Returns the new ids (the original's `blobId` + the `mediaId`). `deriver` is injectable for tests.
+ * Returns the new ids (the original's `blobId` + the `mediaId`). `deriver` is injectable for tests; `opts`
+ * carries an `onProgress` (0..1, over the ciphertext chunks) + an `AbortSignal` for the upload queue.
  */
 export async function addMedia(
   scopeId: string,
@@ -183,7 +198,10 @@ export async function addMedia(
   memoryKey: Uint8Array,
   source: AddMediaSource,
   deriver: MediaDeriver = createBrowserDeriver(),
+  opts: AddMediaOptions = {},
 ): Promise<{ blobId: string; mediaId: string }> {
+  const { onProgress, signal } = opts
+  throwIfAborted(signal)
   const tiers = await deriveTiers(source, deriver)
   // index 0 = original; the rest are the role-tagged derivatives, in order
   const sealedOriginal = sealBlob(memoryKey, source.bytes)
@@ -191,6 +209,7 @@ export async function addMedia(
   const sealedAll = [sealedOriginal, ...sealedTiers.map((t) => t.sealed)]
 
   // start — reserve one upload session + presign one PUT per chunk, per blob
+  throwIfAborted(signal)
   const started = await withRefresh(() =>
     mediaApi().startBlobUploads({
       scopeId,
@@ -206,10 +225,24 @@ export async function addMedia(
     return { uploadId: r.uploadId, putUrls: byIndex(r.presignedPuts), frames: sealedAll[i].frames }
   })
 
-  // PUT every chunk of every blob straight to the store (no base64, no JSON, no credentials)
-  await Promise.all(uploads.flatMap((u) => u.putUrls.map((url, i) => putChunk(url, u.frames[i]))))
+  // PUT every chunk of every blob straight to the store (no base64, no JSON, no credentials), reporting
+  // progress as chunks land and passing the abort signal so a cancel stops the in-flight PUTs.
+  const totalChunks = sealedAll.reduce((n, s) => n + s.chunkCount, 0)
+  let doneChunks = 0
+  onProgress?.(0)
+  await Promise.all(
+    uploads.flatMap((u) =>
+      u.putUrls.map((url, i) =>
+        putChunk(url, u.frames[i], signal).then(() => {
+          doneChunks += 1
+          onProgress?.(totalChunks === 0 ? 1 : doneChunks / totalChunks)
+        }),
+      ),
+    ),
+  )
 
   // complete — one logical media: the original + its role-tagged derivative uploads
+  throwIfAborted(signal)
   const done = await withRefresh(() =>
     mediaApi().completeMedia({
       scopeId,
@@ -306,8 +339,8 @@ function byIndex(urls: PresignedUrl[]): string[] {
   return [...urls].sort((a, b) => a.index - b.index).map((u) => u.url)
 }
 
-async function putChunk(url: string, frame: Uint8Array): Promise<void> {
-  const res = await fetch(url, { method: 'PUT', body: frame as BodyInit })
+async function putChunk(url: string, frame: Uint8Array, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(url, { method: 'PUT', body: frame as BodyInit, signal })
   if (!res.ok) throw new Error(`chunk_put_failed:${res.status}`)
 }
 
