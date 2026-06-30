@@ -12,7 +12,7 @@ import { setAccount } from '../../../app/account'
 import { MasterKeyWrapMethodEnum, type AccountKeyMaterial } from '../../../api/generated/account'
 import * as device from '../trustDevice/deviceKey'
 import { restoreDeviceKey } from '../rememberMe/deviceKeyWrap'
-import { loadSessionVault } from '../rememberMe/sessionVault'
+import { loadSessionVault, clearSessionVault } from '../rememberMe/sessionVault'
 
 function fetchKeyMaterial(): Promise<AccountKeyMaterial> {
   return withRefresh(() => accountApi().getAccountKeyMaterial())
@@ -58,19 +58,23 @@ export async function unlockMasterKey(password: string, secretKeyB64: string): P
  */
 export async function restoreVaultFromCache(): Promise<boolean> {
   const material = await fetchKeyMaterial()
-  // "off" (session-scoped): the Master Key sits in sessionStorage for this browser session.
+  // Open the Master Key from whichever device tier is present: the session vault (sessionStorage, the "off"
+  // tier) or the persistent DEVICE_KEY wrap (the "on" tier).
   const sessionVault = loadSessionVault()
-  if (sessionVault) {
-    setAccount(sessionVault.email)
-    openVault(material, sessionVault.masterKey)
+  const source = sessionVault ?? (await restoreDeviceKey(material))
+  if (!source) return false
+  setAccount(source.email)
+  try {
+    openVault(material, source.masterKey)
     return true
+  } catch {
+    // The cached Master Key no longer fits the served key material (e.g. rotated) — don't keep retrying the
+    // same broken vault on every reload. Drop the session-vault cache and fall back to the floor. The DEVICE_KEY
+    // local key is intentionally left (anti-withholding, like unlockWithDevice/restoreDeviceKey); a genuine
+    // rotation re-enrols it on the next floor unlock.
+    if (sessionVault) clearSessionVault()
+    return false
   }
-  // "on" (persistent): decrypt the Master Key from this device's DEVICE_KEY wrap.
-  const restored = await restoreDeviceKey(material)
-  if (!restored) return false
-  setAccount(restored.email)
-  openVault(material, restored.masterKey)
-  return true
 }
 
 export async function unlockWithDevice(email: string, password: string): Promise<boolean> {
