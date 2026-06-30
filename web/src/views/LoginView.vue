@@ -71,13 +71,13 @@ async function enrolConvenienceWrap() {
   const mk = masterKey()
   if (!mk) return
   if (remember.value) {
-    clearSessionVault() // drop the session-scoped vault — this device opts into persistence
+    await clearSessionVault() // drop the session-scoped vault — this device opts into persistence
     if (rememberSupported) {
       await untrustThisDevice(email.value).catch(() => {}) // drop a prior password DEVICE wrap
       await enrolDeviceKey(email.value, mk).catch(() => {})
     }
   } else {
-    cacheSessionVault(email.value, mk) // survive reloads this browser session
+    await cacheSessionVault(email.value, mk) // survive reloads this browser session
     if (rememberSupported) {
       await clearDeviceKey().catch(() => {}) // drop a prior password-less DEVICE_KEY wrap
       await trustThisDevice(email.value, password.value, mk).catch(() => {})
@@ -112,7 +112,7 @@ async function submit() {
         // "remember me" on now → upgrade this device to the password-less wrap (the toggle is the per-device
         // choice, §18). Off → keep the DEVICE wrap, but refresh the session vault so reloads stay prompt-free.
         if (remember.value) await enrolConvenienceWrap()
-        else cacheSessionVault(email.value, masterKey()!)
+        else await cacheSessionVault(email.value, masterKey()!)
         await finishAndRoute()
         return
       }

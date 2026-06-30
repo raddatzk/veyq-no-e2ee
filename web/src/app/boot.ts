@@ -35,7 +35,7 @@ export async function boot(): Promise<void> {
   if (restored) await restoreVaultFromCache().catch(() => {})
   else {
     // No live session (no cookie, or expired) → drop both local vault tiers so neither outlives its session.
-    clearSessionVault()
+    await clearSessionVault().catch(() => {})
     await clearDeviceKey(false).catch(() => {})
   }
 }

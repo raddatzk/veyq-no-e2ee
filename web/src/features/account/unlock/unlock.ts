@@ -60,7 +60,7 @@ export async function restoreVaultFromCache(): Promise<boolean> {
   const material = await fetchKeyMaterial()
   // Open the Master Key from whichever device tier is present: the session vault (sessionStorage, the "off"
   // tier) or the persistent DEVICE_KEY wrap (the "on" tier).
-  const sessionVault = loadSessionVault()
+  const sessionVault = await loadSessionVault()
   const source = sessionVault ?? (await restoreDeviceKey(material))
   if (!source) return false
   setAccount(source.email)
@@ -72,7 +72,7 @@ export async function restoreVaultFromCache(): Promise<boolean> {
     // same broken vault on every reload. Drop the session-vault cache and fall back to the floor. The DEVICE_KEY
     // local key is intentionally left (anti-withholding, like unlockWithDevice/restoreDeviceKey); a genuine
     // rotation re-enrols it on the next floor unlock.
-    if (sessionVault) clearSessionVault()
+    if (sessionVault) await clearSessionVault()
     return false
   }
 }

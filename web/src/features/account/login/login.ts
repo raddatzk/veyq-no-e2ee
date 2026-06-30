@@ -64,7 +64,7 @@ export async function logout(): Promise<void> {
   // device opening straight in: the session vault (cr-0055, sessionStorage) and the server DEVICE_KEY wrap +
   // local device key (cr-0054). The DEVICE trust wrap (if any) is intentionally left — it survives logout
   // (next login stays password-only, never the Secret Key).
-  clearSessionVault()
+  await clearSessionVault().catch(() => {})
   await clearDeviceKey().catch(() => {})
   try {
     await sessionApi().logout()

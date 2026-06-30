@@ -214,15 +214,18 @@ and only ends when the browser closes.
       straight in across a full restart.
     - The Secret-Key floor is still typed **once per device** (§3, §14, §17); neither tier re-asks it.
 
-23. **The session-scoped relaxation is conscious and bounded.** Within an open browser session, off is **no
-    longer password-gated** — the `sessionStorage` key re-opens the vault without the password. The Master Key
-    sits there as **raw bytes** (`sessionStorage` cannot hold a non-extractable WebCrypto key), so an XSS payload
-    running during the session could read it — but that is **no worse than the already-unlocked in-memory vault**
-    the same payload could read, and it is **cleared when the browser closes**. This is the standard web-session
-    posture; for a **memory-sharing** app (not a secrets vault, §14) it is the right friction. **Operator-blind is
-    untouched** — the server still holds only ciphertext wraps + an opaque cookie token; the relaxation is purely
-    local. A genuinely untrusted machine still uses **private/incognito** (§19). The persistent "on" tier keeps a
-    *non-extractable* device key (IndexedDB), so it never parks raw key bytes.
+23. **The session-scoped relaxation is conscious and bounded.** Within an open browser session, off re-opens the
+    vault without the password — the device-held key opens it (the convenience this tier exists for). The Master
+    Key is sealed under a **non-extractable** AES-GCM key in IndexedDB and only the **ciphertext** sits in
+    `sessionStorage` (cr-0057 — corrected from the initial cr-0055 design, which parked the raw Master Key). So,
+    like every other device tier, the key's bytes never enter JS: an XSS payload can decrypt while it runs but
+    cannot exfiltrate the key, and **nothing plaintext is ever written to `sessionStorage`** — which matters
+    because the browser's session-restore may persist `sessionStorage` to disk. Browser close clears
+    `sessionStorage` → the ciphertext is gone and the orphaned (un-exfiltratable, now-useless) key is dropped on
+    the next boot. This is the standard web-session posture; for a **memory-sharing** app (not a secrets vault,
+    §14) it is the right friction. **Operator-blind is untouched** — the server still holds only ciphertext wraps
+    + an opaque cookie token; the relaxation is purely local. A genuinely untrusted machine still uses
+    **private/incognito** (§19).
 
 ## Related / future
 

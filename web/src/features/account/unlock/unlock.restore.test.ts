@@ -1,8 +1,9 @@
-// @vitest-environment happy-dom
-// restoreVaultFromCache (cr-0055): boot-restore from the "off" session vault — opens the vault when the cached
-// Master Key fits the served material, and DROPS the stale cache (falls back to the floor) when it doesn't, so a
-// reload can't keep retrying a broken vault. Regression guard for the cr-0055 review finding.
+// restoreVaultFromCache (cr-0055/cr-0057): boot-restore from the "off" session vault — opens the vault when the
+// cached Master Key fits the served material, and DROPS the stale cache (falls back to the floor) when it
+// doesn't, so a reload can't keep retrying a broken vault. Regression guard for the review finding.
+import 'fake-indexeddb/auto'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { IDBFactory } from 'fake-indexeddb'
 
 vi.mock('../../../api/client', () => ({
   accountApi: vi.fn(),
@@ -18,6 +19,19 @@ import { cacheSessionVault, loadSessionVault } from '../rememberMe/sessionVault'
 import { isUnlocked, clearVault } from '../../../app/vault'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64std } from '../../../shared/base64'
+
+// Minimal sessionStorage for the node test env (indexedDB from fake-indexeddb, crypto.subtle from node).
+const mem = new Map<string, string>()
+globalThis.sessionStorage = {
+  getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+  setItem: (k: string, v: string) => void mem.set(k, String(v)),
+  removeItem: (k: string) => void mem.delete(k),
+  clear: () => mem.clear(),
+  key: (i: number) => [...mem.keys()][i] ?? null,
+  get length() {
+    return mem.size
+  },
+} as Storage
 
 /** Server key material whose identity key is wrapped under [masterKey] (a PASSWORD wrap rounds out minItems). */
 function materialFor(masterKey: Uint8Array) {
@@ -41,14 +55,15 @@ function serve(material: unknown) {
 describe('restoreVaultFromCache — session vault (cr-0055)', () => {
   beforeEach(() => {
     clearVault()
-    sessionStorage.clear()
+    mem.clear()
+    globalThis.indexedDB = new IDBFactory()
     vi.clearAllMocks()
   })
 
   it('opens the vault from the session vault when the cached Master Key fits the material', async () => {
     const masterKey = v1.randomBytes(32)
     serve(materialFor(masterKey))
-    cacheSessionVault('user@example.com', masterKey)
+    await cacheSessionVault('user@example.com', masterKey)
 
     expect(await restoreVaultFromCache()).toBe(true)
     expect(isUnlocked()).toBe(true)
@@ -56,10 +71,10 @@ describe('restoreVaultFromCache — session vault (cr-0055)', () => {
 
   it('drops the stale session vault and falls back when the cached Master Key no longer fits', async () => {
     serve(materialFor(v1.randomBytes(32))) // material wrapped under a DIFFERENT key than the cache holds
-    cacheSessionVault('user@example.com', v1.randomBytes(32))
+    await cacheSessionVault('user@example.com', v1.randomBytes(32))
 
     expect(await restoreVaultFromCache()).toBe(false)
     expect(isUnlocked()).toBe(false)
-    expect(loadSessionVault()).toBeNull() // cleared, so a reload won't keep retrying the broken vault
+    expect(await loadSessionVault()).toBeNull() // cleared, so a reload won't keep retrying the broken vault
   })
 })
