@@ -8,7 +8,7 @@ import { AddWrapRequestMethodEnum } from '../../../api/generated/account'
 import { withRefresh } from '../login/login'
 import * as device from './deviceKey'
 
-export { isTrustSupported } from './deviceKey'
+export { isTrustSupported, forgetAllTrust } from './deviceKey'
 
 export async function isTrusted(email: string): Promise<boolean> {
   return (await device.loadTrust(email)) !== null

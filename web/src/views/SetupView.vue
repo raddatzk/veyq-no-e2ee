@@ -8,6 +8,8 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { registerServerOwner } from '../features/admin/setupServer/setupServer'
+import { forgetAllTrust } from '../features/account/trustDevice/trustDevice'
+import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
 import { downloadKitPdf } from '../features/account/emergencyKit/emergencyKit'
 import { usePwnedWarning } from '../features/account/passwordWarning'
 import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
@@ -51,8 +53,13 @@ async function submit() {
   }
 }
 
-function proceed() {
+async function proceed() {
   if (!canProceed.value) return
+  // Fresh instance after setup: the owner now holds their Emergency Kit (just downloaded + confirmed), so the
+  // Secret Key lives there. Drop any device convenience wraps this browser kept from a previous account /
+  // instance (local only — the server is fresh) so the owner's first sign-in is pristine: the Secret-Key field
+  // shows upfront and there is no stale-record fallback. Best-effort; a clear failure must not block proceeding.
+  await Promise.allSettled([forgetAllTrust(), clearDeviceKey(false)])
   // Hand the email + Secret Key to the login form so the owner doesn't retype them right after setup.
   setAuthPrefill(kitEmail, secretKey.value!)
   void router.push({ name: 'login' })

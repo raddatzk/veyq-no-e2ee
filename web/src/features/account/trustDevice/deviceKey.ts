@@ -79,3 +79,9 @@ export async function loadTrust(email: string): Promise<TrustRecord | null> {
 export function clearTrust(email: string): Promise<void> {
   return run('readwrite', (s) => s.delete(accountKey(email))).then(() => undefined)
 }
+
+/** Wipe EVERY local trust record on this device (local only — no server call). Used after admin setup, where
+ *  the instance is fresh and any record left in this browser belongs to a previous account/instance. */
+export function forgetAllTrust(): Promise<void> {
+  return run('readwrite', (s) => s.clear()).then(() => undefined)
+}
