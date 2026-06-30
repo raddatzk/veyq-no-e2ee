@@ -1,7 +1,9 @@
 // en.memory.tree (web) — the encrypted Memory tree data layer. Operator-blind: node names are sealed under
-// the scope content key K_SC, the slug token is a blinded keyed MAC under K_SC, and a Memory's K_mem is a
-// fresh random key wrapped under K_SC (the share grain, ADR 0012). The caller opens the scope first (see
-// features/spaces/scopes.openPersonalScope → K_SC) and passes K_SC in.
+// the scope content key K_SC, the slug token is a blinded keyed MAC under K_SC, and every content-bearing node
+// (MEMORY or CHAPTER) carries a fresh random K_mem wrapped under its PARENT's content key — K_SC for a
+// top-level Memory, the parent Memory's K_mem for a chapter (recursive K_mem, the share grain, ADR 0012 +
+// cr-0060). Folders carry no key. The caller opens the scope first (features/spaces/scopes.openPersonalScope →
+// K_SC) and passes K_SC in.
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { contentApi } from '../../api/client'
@@ -94,19 +96,23 @@ export async function createFolder(
   return res.nodeId
 }
 
-/** Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC`. Returns the node id + the K_mem. */
-export async function createMemory(
-  scopeId: string, scopeKey: Uint8Array, name: string, parentId: string | null = null,
-): Promise<{ nodeId: string; memoryKey: Uint8Array }> {
+/**
+ * Create a content-bearing node (MEMORY or CHAPTER) — births a fresh random `K_mem`, wrapped under the
+ * **parent's content key** `wrapKey` (recursive `K_mem`, ADR 0012): `K_SC` for a top-level Memory, the parent
+ * Memory's `K_mem` for a chapter. The name + slug are always sealed under `K_SC` (`scopeKey`).
+ */
+async function createContentNode(
+  scopeId: string, scopeKey: Uint8Array, wrapKey: Uint8Array, kind: NodeKind, name: string, parentId: string | null,
+): Promise<{ nodeId: string; contentKey: Uint8Array }> {
   const parentSlot = parentId ?? scopeId
-  const memoryKey = v1.randomBytes(32)
-  const wrappedContentKey = b64std(v1.symWrap(scopeKey, memoryKey, KMEM_CTX, v1.randomBytes(12)))
+  const contentKey = v1.randomBytes(32)
+  const wrappedContentKey = b64std(v1.symWrap(wrapKey, contentKey, KMEM_CTX, v1.randomBytes(12)))
   const res = await withRefresh(() =>
     contentApi().createNode({
       scopeId,
       createNodeRequest: {
         parentId: parentId ?? undefined,
-        kind: NodeKind.Memory,
+        kind,
         encryptedName: sealName(scopeKey, name),
         slugToken: slugTokenFor(scopeKey, parentSlot, name),
         orderIndex: 0,
@@ -114,13 +120,61 @@ export async function createMemory(
       },
     }),
   )
-  return { nodeId: res.nodeId, memoryKey }
+  return { nodeId: res.nodeId, contentKey }
 }
 
-/** Open a Memory's content key (`K_mem`) from its node, or null if it carries none / not a Memory. */
-export function openMemory(scopeKey: Uint8Array, node: { wrappedContentKey: string | null }): Uint8Array | null {
+/** Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC`. Returns the node id + the K_mem. */
+export async function createMemory(
+  scopeId: string, scopeKey: Uint8Array, name: string, parentId: string | null = null,
+): Promise<{ nodeId: string; memoryKey: Uint8Array }> {
+  const { nodeId, contentKey } = await createContentNode(scopeId, scopeKey, scopeKey, NodeKind.Memory, name, parentId)
+  return { nodeId, memoryKey: contentKey }
+}
+
+/**
+ * Create a CHAPTER inside a Memory (or another chapter) — births a fresh random `K_mem` wrapped under the
+ * **parent node's `K_mem`** (`parentKey`), so the chapter is a sharing unit of its own (ADR 0012, cr-0060).
+ * Returns the node id + the chapter's K_mem.
+ */
+export async function createChapter(
+  scopeId: string, scopeKey: Uint8Array, parentKey: Uint8Array, name: string, parentId: string,
+): Promise<{ nodeId: string; chapterKey: Uint8Array }> {
+  const { nodeId, contentKey } = await createContentNode(scopeId, scopeKey, parentKey, NodeKind.Chapter, name, parentId)
+  return { nodeId, chapterKey: contentKey }
+}
+
+/**
+ * Open a content node's `K_mem` by unwrapping `node.wrappedContentKey` under its parent's content key
+ * (`parentKey` = `K_SC` for a top-level Memory, the parent Memory's `K_mem` for a chapter). Null if it carries
+ * no key (a folder). For a node at arbitrary depth, resolve `parentKey` with [nodeContentKey].
+ */
+export function openContentKey(parentKey: Uint8Array, node: { wrappedContentKey: string | null }): Uint8Array | null {
   if (!node.wrappedContentKey) return null
-  return v1.symUnwrap(scopeKey, fromB64std(node.wrappedContentKey), KMEM_CTX)
+  return v1.symUnwrap(parentKey, fromB64std(node.wrappedContentKey), KMEM_CTX)
+}
+
+/** Back-compat alias: a top-level Memory's `K_mem` opens under `K_SC`. Prefer [openContentKey] / [nodeContentKey]. */
+export const openMemory = openContentKey
+
+/**
+ * Resolve a content node's `K_mem` from `K_SC`, walking the content-bearing ancestors top-down: folders are
+ * transparent (no key), so a Memory opens under `K_SC` and each nested chapter under its parent's `K_mem`.
+ * Returns null if the node carries no key or any link in the chain can't be opened. (Recursive `K_mem`, ADR 0012.)
+ */
+export function nodeContentKey(scopeKey: Uint8Array, tree: TreeNode[], nodeId: string): Uint8Array | null {
+  const byId = new Map(tree.map((n) => [n.id, n]))
+  // collect the content-bearing chain from the node up to the root (nearest-last → reverse to top-down)
+  const chain: TreeNode[] = []
+  for (let cur = byId.get(nodeId); cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+    if (cur.wrappedContentKey) chain.unshift(cur)
+  }
+  let key = scopeKey
+  for (const node of chain) {
+    const opened = openContentKey(key, node)
+    if (!opened) return null
+    key = opened
+  }
+  return chain.length ? key : null
 }
 
 /** Rename a node — re-seal the name + recompute the slug for the (unchanged) parent. */

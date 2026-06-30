@@ -26,7 +26,7 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
-      memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete' },
+      memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters' },
       media: {
         gallery: 'Memory gallery',
         itemCount: 'No items | {count} item | {count} items',
@@ -135,6 +135,30 @@ describe('MemoryDetail (gallery grid + header)', () => {
     const wrapper = mountDetail(null as unknown as Uint8Array, { memoryKey: null })
     await flushPromises()
     expect(wrapper.find('.veyq-empty').text()).toBe('This Memory can’t be opened right now.')
+  })
+
+  it('renders the Memory’s chapters and emits open/create (cr-0060)', async () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const chapters: TreeNode[] = [
+      { id: 'c1', kind: NodeKind.Chapter, name: 'Day 1', parentId: NODE_ID, orderIndex: 0, wrappedContentKey: 'd3JhcA==' },
+    ]
+
+    const wrapper = mountDetail(v1.randomBytes(32), { chapters })
+    await flushPromises()
+
+    // the chapter shows as a chip…
+    const chip = wrapper.find('.chapter-chip')
+    expect(chip.exists()).toBe(true)
+    expect(chip.text()).toContain('Day 1')
+    // …clicking it asks the host to open that chapter
+    await chip.trigger('click')
+    expect(wrapper.emitted('openChapter')?.[0]?.[0]).toMatchObject({ id: 'c1' })
+
+    // the header "add chapter" action asks the host to start creation
+    await wrapper.get('[aria-label="Add chapter"]').trigger('click')
+    expect(wrapper.emitted('createChapter')).toBeTruthy()
   })
 
   it('opens the lightbox when a tile is clicked', async () => {

@@ -7,12 +7,17 @@ import { NodeKind } from '../../api/generated/content'
 
 const byOrder = (a: TreeNode, b: TreeNode): number => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)
 
-/** The children of `parentId` (null = the scope root), split into folders + Memories, each ordered. */
-export function childrenOf(tree: TreeNode[], parentId: string | null): { folders: TreeNode[]; memories: TreeNode[] } {
+/** The children of `parentId` (null = the scope root), split by kind, each ordered. Chapters live inside a
+ *  Memory (or a chapter); folders + Memories live at the root or in a folder. */
+export function childrenOf(
+  tree: TreeNode[],
+  parentId: string | null,
+): { folders: TreeNode[]; memories: TreeNode[]; chapters: TreeNode[] } {
   const kids = tree.filter((n) => (n.parentId ?? null) === parentId)
   return {
     folders: kids.filter((n) => n.kind === NodeKind.Folder).sort(byOrder),
     memories: kids.filter((n) => n.kind === NodeKind.Memory).sort(byOrder),
+    chapters: kids.filter((n) => n.kind === NodeKind.Chapter).sort(byOrder),
   }
 }
 

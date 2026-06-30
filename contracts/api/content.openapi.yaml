@@ -10,8 +10,9 @@ info:
     a name or a content key, and learns only the *shape* of the tree.
 
     The client encrypts the name under the scope content key `K_SC` and computes the blinded slug token (a
-    keyed MAC under `K_SC`); a MEMORY additionally carries a fresh random per-Memory key `K_mem` wrapped under
-    `K_SC` (`wrappedContentKey`) — the share grain ([ADR 0012](../../docs/decisions/0012-content-key-hierarchy.md)).
+    keyed MAC under `K_SC`); a MEMORY **or CHAPTER** additionally carries a fresh random per-node key `K_mem`
+    wrapped under its **parent's content key** — `K_SC` for a top-level Memory, the parent Memory's `K_mem` for
+    a chapter (recursive `K_mem`; `wrappedContentKey`) — the share grain ([ADR 0012](../../docs/decisions/0012-content-key-hierarchy.md)).
     The server enforces structure only: a caller must hold a grant for the scope, slug uniqueness per parent
     (`UNIQUE(parentId, slugToken)`), no folder inside a Memory, no cycle, no cross-scope move. Authorization is
     enforced by code, not this spec (ADR 0008); field validation via `x-field-extra-annotation`.
@@ -35,7 +36,8 @@ paths:
       summary: Create a node (folder / Memory / chapter) in the scope's tree.
       description: >
         Adds a node under `parentId` (or the scope root if omitted). The client supplies the ciphertext name,
-        the blinded slug token, and — for a MEMORY — the `wrappedContentKey` (`K_mem` under `K_SC`). The server
+        the blinded slug token, and — for a MEMORY or CHAPTER — the `wrappedContentKey` (`K_mem` under the
+        parent's content key). The server
         stores it opaquely and enforces slug uniqueness per parent + the structural rules.
       security:
         - bearerAuth: []
@@ -86,7 +88,7 @@ paths:
       summary: List the scope's tree (opaque rows).
       description: >
         Returns every node in the scope with its opaque id, parent, kind, ordering, ciphertext name, slug
-        token, and (for Memories) the `wrappedContentKey`. The client decrypts names with `K_SC` and assembles
+        token, and (for Memories and chapters) the `wrappedContentKey`. The client decrypts names with `K_SC` and assembles
         the tree; the operator sees only the shape.
       security:
         - bearerAuth: []
@@ -261,7 +263,7 @@ components:
   schemas:
     NodeKind:
       type: string
-      description: FOLDER organizes only (no content key); MEMORY is the content unit (owns K_mem); CHAPTER is inside a Memory.
+      description: FOLDER organizes only (no content key); MEMORY is the content unit (owns K_mem); CHAPTER is a nested Memory inside a Memory (owns its own K_mem, wrapped under the parent Memory's K_mem).
       enum: [FOLDER, MEMORY, CHAPTER]
       example: MEMORY
 
@@ -297,7 +299,7 @@ components:
           example: 0
         wrappedContentKey:
           type: [string, "null"]
-          description: For a MEMORY — its random `K_mem` wrapped under `K_SC` (opaque base64). Absent for folders.
+          description: For a MEMORY or CHAPTER — its random `K_mem` wrapped under the parent's content key (`K_SC` for a top-level Memory, the parent Memory's `K_mem` for a chapter; opaque base64). Absent for folders.
           contentEncoding: base64
           maxLength: 256
           example: d3JhcHBlZC1rLW1lbQ==
@@ -368,7 +370,7 @@ components:
           type: [string, "null"]
           contentEncoding: base64
           maxLength: 256
-          description: A MEMORY's `K_mem` wrapped under `K_SC`; null for folders.
+          description: A MEMORY's or CHAPTER's `K_mem` wrapped under its parent's content key; null for folders.
           example: d3JhcHBlZC1rLW1lbQ==
 
     Favorites:

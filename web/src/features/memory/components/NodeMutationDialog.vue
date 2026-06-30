@@ -8,9 +8,9 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { createFolder, createMemory, renameNode, type TreeNode } from '../tree'
+import { createFolder, createMemory, createChapter, renameNode, type TreeNode } from '../tree'
 
-type Mode = 'create-folder' | 'create-memory' | 'rename'
+type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 
 // Mounted via v-if while open; closing = the parent unmounting it on `close` (robust — no two-way `visible`).
 const props = defineProps<{
@@ -18,6 +18,7 @@ const props = defineProps<{
   scopeId: string
   scopeKey: Uint8Array
   parentId?: string | null // create: the parent (null = root)
+  parentKey?: Uint8Array | null // create-chapter: the parent node's K_mem (wraps the new chapter's K_mem)
   node?: TreeNode | null // rename: the node being renamed
 }>()
 const emit = defineEmits<{ done: []; close: [] }>()
@@ -32,7 +33,9 @@ const header = computed(() =>
     ? t('memory.renameTitle')
     : props.mode === 'create-memory'
       ? t('memory.createMemoryTitle')
-      : t('memory.createFolderTitle'),
+      : props.mode === 'create-chapter'
+        ? t('memory.createChapterTitle')
+        : t('memory.createFolderTitle'),
 )
 const confirmLabel = computed(() => (props.mode === 'rename' ? t('memory.save') : t('common.create')))
 const canSubmit = computed(() => name.value.trim().length > 0 && !loading.value)
@@ -47,6 +50,9 @@ async function submit() {
       await createFolder(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null)
     } else if (props.mode === 'create-memory') {
       await createMemory(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null)
+    } else if (props.mode === 'create-chapter') {
+      if (!props.parentId || !props.parentKey) throw new Error('chapter_parent_missing')
+      await createChapter(props.scopeId, props.scopeKey, props.parentKey, trimmed, props.parentId)
     } else if (props.node) {
       await renameNode(props.scopeId, props.scopeKey, { id: props.node.id, parentId: props.node.parentId }, trimmed)
     }

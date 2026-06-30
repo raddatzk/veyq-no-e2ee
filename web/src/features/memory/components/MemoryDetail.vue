@@ -15,8 +15,14 @@ import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../med
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
 
-const props = defineProps<{ node: TreeNode; scopeId: string; memoryKey: Uint8Array | null; favorite?: boolean }>()
-defineEmits<{ toggleFavorite: []; rename: []; delete: [] }>()
+const props = defineProps<{
+  node: TreeNode
+  scopeId: string
+  memoryKey: Uint8Array | null
+  favorite?: boolean
+  chapters?: TreeNode[] // child CHAPTER nodes of this Memory/chapter (cr-0060)
+}>()
+defineEmits<{ toggleFavorite: []; rename: []; delete: []; openChapter: [node: TreeNode]; createChapter: [] }>()
 
 const { t } = useI18n()
 
@@ -214,6 +220,16 @@ onBeforeUnmount(() => {
           @change="onFilesPicked"
         />
         <Button
+          v-tooltip.bottom="t('memory.addChapter')"
+          type="button"
+          :aria-label="t('memory.addChapter')"
+          icon="pi pi-book"
+          severity="secondary"
+          text
+          :disabled="!memoryKey"
+          @click="$emit('createChapter')"
+        />
+        <Button
           v-tooltip.bottom="favorite ? t('memory.unfavorite') : t('memory.favorite')"
           type="button"
           class="memory-detail-fav"
@@ -244,6 +260,21 @@ onBeforeUnmount(() => {
         />
       </div>
     </header>
+
+    <!-- Chapters: nested Memories of this node (cr-0060). Each opens to its own gallery; its media is sealed
+         under the chapter's own K_mem (operator-blind). -->
+    <section v-if="chapters && chapters.length" class="chapter-strip" :aria-label="t('memory.chapters')">
+      <button
+        v-for="chapter in chapters"
+        :key="chapter.id"
+        type="button"
+        class="chapter-chip"
+        @click="$emit('openChapter', chapter)"
+      >
+        <span class="pi pi-book" aria-hidden="true" />
+        <span class="chapter-chip-name">{{ chapter.name }}</span>
+      </button>
+    </section>
 
     <div v-if="status === 'loading'" class="media-grid-placeholder">
       <span class="pi pi-spin pi-spinner" />
@@ -342,6 +373,36 @@ onBeforeUnmount(() => {
 /* The active heart is a heart-red blended with the brand accent, matching the card pin. */
 .memory-detail-fav.is-favorite :deep(.p-button-icon) {
   color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
+}
+
+/* Chapters strip (cr-0060): the nested Memories of this node, as clickable chips above the gallery. */
+.chapter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 0 0;
+}
+.chapter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-control-bg);
+  color: var(--app-text);
+  font: inherit;
+  cursor: pointer;
+}
+.chapter-chip:hover {
+  border-color: var(--app-accent);
+}
+.chapter-chip .pi-book {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+.chapter-chip-name {
+  overflow-wrap: anywhere;
 }
 
 /* The justified-rows gallery (cr-0059): aspect-preserving tiles laid out by calculateJustifiedMediaLayout into

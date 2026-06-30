@@ -13,6 +13,8 @@ const tree: TreeNode[] = [
   node({ id: 'solo', kind: NodeKind.Memory, name: 'Solo', orderIndex: 0 }),
   node({ id: 'italy', kind: NodeKind.Memory, name: 'Italy', parentId: 'trips' }),
   node({ id: '2025', kind: NodeKind.Folder, name: '2025', parentId: 'trips' }),
+  node({ id: 'day1', kind: NodeKind.Chapter, name: 'Day 1', parentId: 'italy', orderIndex: 0 }),
+  node({ id: 'day2', kind: NodeKind.Chapter, name: 'Day 2', parentId: 'italy', orderIndex: 1 }),
 ]
 
 describe('childrenOf', () => {
@@ -26,8 +28,14 @@ describe('childrenOf', () => {
     expect(inTrips.memories.map((n) => n.name)).toEqual(['Italy'])
   })
 
+  it('lists a Memory’s chapters, ordered (cr-0060)', () => {
+    const inItaly = childrenOf(tree, 'italy')
+    expect(inItaly.chapters.map((n) => n.name)).toEqual(['Day 1', 'Day 2'])
+    expect(inItaly.folders).toEqual([]) // no folders inside a Memory
+  })
+
   it('returns empty for a leaf', () => {
-    expect(childrenOf(tree, 'solo')).toEqual({ folders: [], memories: [] })
+    expect(childrenOf(tree, 'solo')).toEqual({ folders: [], memories: [], chapters: [] })
   })
 })
 

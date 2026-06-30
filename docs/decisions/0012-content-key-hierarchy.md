@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-06-28
+- Amended: 2026-06-30 (cr-0060) — resolves the deferred chapter-key question: **recursive `K_mem`** (a chapter
+  carries its own random `K_mem`, wrapped under the parent Memory's `K_mem`). See the Addendum.
 
 ## Context
 
@@ -28,7 +30,8 @@ hierarchy + re-wrap-on-move complexity the product doesn't need.)
    Memory's content.
 2. **`K_mem` — per-Memory content key (one per Memory, a fresh random 32-byte key).** Wrapped under `K_SC`
    for members. Encrypts that Memory's **content** — chapter bodies, journal, sensitive metadata
-   (capture time, location) — and **wraps that Memory's `K_blob`s**. A Memory is the **unit of sharing**.
+   (capture time, location) — and **wraps that Memory's `K_blob`s**. A Memory is the **unit of sharing**
+   (recursively, so is a chapter — see the cr-0060 Addendum).
 3. **`K_blob` — per-blob key (one per media blob, random).** Wrapped under its Memory's `K_mem`; encrypts the
    media blob's `chunk_frame`s. Lets a Memory's media be keyed independently (and dedup tokens stay per-scope).
 
@@ -73,13 +76,38 @@ holds `K_SC`, `K_mem`, `K_blob`, or any name.
   Negligible vs. content size.
 - **Deferred to the implementation CR / vectors:** the exact wire formats (already partly pinned —
   `slug_token`/`chunk_frame`/`dedup_token`/`journal_open` in `contracts/crypto/vectors/v1.json`), whether a
-  shared Memory's *sub*tree (its chapters) shares the one `K_mem` (yes — a chapter is part of its Memory) and
-  the share-record shape. Group/recipient key-directory trust is the active-operator gap already in the
-  Security Model.
+  shared Memory's *sub*tree (its chapters) shares the one `K_mem` — **resolved by cr-0060: a chapter carries
+  its OWN recursive `K_mem`** (see Addendum), not the parent's — and the share-record shape. Group/recipient
+  key-directory trust is the active-operator gap already in the Security Model.
 - **Media dedup — decided in [ADR 0013](0013-blob-storage-presigned-direct-to-store.md): declined.** `K_blob`
   stays **random** (so this ADR's wording holds) and the `dedup_token` vector stays unused: any storage-saving
   dedup would leak the scope-internal blob-equality structure to the blind operator. Scope-wide convergent
   dedup remains a possible *future* slice, not a default.
+
+## Addendum (cr-0060) — recursive `K_mem`: a chapter carries its own key
+
+The Decision left open (above) whether a chapter shares its Memory's `K_mem`. **cr-0060 resolves it: it does
+not.** A **chapter is itself a Memory**, so it carries the **same kind of key, applied recursively** — there is
+no separate `K_chapter` type:
+
+- **Every content-bearing node (MEMORY *and* CHAPTER) has its own random `K_mem`,** wrapped under the
+  **content key of its parent**: a top-level Memory's `K_mem` under `K_SC`; a chapter's `K_mem` under its
+  **parent Memory's `K_mem`** (same `content-key` wrap context, one level deeper). **Folders still carry no
+  key.** This is *not* the "full per-subtree key tree" rejected above — only content nodes get a key, and the
+  shape follows the existing Memory model unchanged.
+- **`K_blob` is wrapped under the `K_mem` of the media's *direct* parent node** — media on a chapter under the
+  chapter's `K_mem`, media on the Memory under the Memory's `K_mem`.
+- **Every content node is therefore a sharing unit.** Sharing one chapter = one extra wrap of *that* chapter's
+  `K_mem`; it reveals neither the parent's `K_mem` nor `K_SC`. Sharing the whole Memory transitively unwraps
+  its chapters (their keys are wrapped under its `K_mem`) — a Memory share includes its chapters; a chapter
+  share never leaks upward.
+- **Moves are a single re-wrap, never a data re-encrypt:** moving media chapter↔Memory re-wraps only its
+  `K_blob`; moving a chapter between Memories re-wraps only that chapter's `K_mem` (its subtree is untouched).
+
+**Why now (vs. the tentative "shares `K_mem`"):** separate **per-chapter sharing** is a product goal, and for
+E2EE data the alternative — bolting it on later — would force a client-side **re-encryption migration** of
+every chapter's media (only the client can re-key). Paying one extra wrap per chapter now avoids that. The
+operator stays blind: it holds one more opaque wrap and nothing else.
 
 ## Related
 

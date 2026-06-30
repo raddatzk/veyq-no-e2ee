@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   sessionApi: vi.fn(),
 }))
 
-import { listTree, createFolder, createMemory, openMemory } from './tree'
+import { listTree, createFolder, createMemory, createChapter, openMemory, openContentKey, nodeContentKey, type TreeNode } from './tree'
 import { contentApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std } from '../../shared/base64'
@@ -44,6 +44,44 @@ describe('createMemory', () => {
     expect(Array.from(openMemory(scopeKey, { wrappedContentKey: req.wrappedContentKey })!)).toEqual(Array.from(memoryKey))
     // slug token = blinded MAC under K_SC over the root parent slot (the scope id) + the slug
     expect(req.slugToken).toBe(b64std(v1.slugToken(scopeKey, SCOPE_ID, 'italien-2026')))
+  })
+})
+
+describe('createChapter — recursive K_mem (cr-0060)', () => {
+  it('wraps the chapter K_mem under the PARENT Memory key, not K_SC', async () => {
+    const create = vi.fn().mockResolvedValue({ nodeId: 'chap-1' })
+    mockContent({ createNode: create })
+    const parentKey = v1.randomBytes(32) // the parent Memory's K_mem
+
+    const { nodeId, chapterKey } = await createChapter(SCOPE_ID, scopeKey, parentKey, 'Tag 1', 'mem-1')
+    expect(nodeId).toBe('chap-1')
+
+    const req = create.mock.calls[0][0].createNodeRequest
+    expect(req.kind).toBe('CHAPTER')
+    expect(req.parentId).toBe('mem-1')
+    // the name is still sealed under K_SC (whole-tree navigation), the slug too
+    expect(new TextDecoder().decode(v1.symUnwrap(scopeKey, fromB64(req.encryptedName), 'node-name'))).toBe('Tag 1')
+    expect(req.slugToken).toBe(b64std(v1.slugToken(scopeKey, 'mem-1', 'tag-1')))
+    // the K_mem opens under the PARENT key…
+    expect(Array.from(openContentKey(parentKey, { wrappedContentKey: req.wrappedContentKey })!)).toEqual(Array.from(chapterKey))
+    // …and NOT under K_SC (a wrong KEK can't open it — crypto-enforced least privilege)
+    expect(() => openContentKey(scopeKey, { wrappedContentKey: req.wrappedContentKey })).toThrow()
+  })
+})
+
+describe('nodeContentKey — resolve a chapter key down the chain', () => {
+  it('walks K_SC → Memory K_mem → chapter K_mem (folders are transparent)', () => {
+    const memKey = v1.randomBytes(32)
+    const chapKey = v1.randomBytes(32)
+    const wrap = (kek: Uint8Array, k: Uint8Array) => b64std(v1.symWrap(kek, k, 'content-key', v1.randomBytes(12)))
+    const tree: TreeNode[] = [
+      { id: 'fold', parentId: null, kind: 'FOLDER' as TreeNode['kind'], orderIndex: 0, name: 'Trips', wrappedContentKey: null },
+      { id: 'mem', parentId: 'fold', kind: 'MEMORY' as TreeNode['kind'], orderIndex: 0, name: 'Italy', wrappedContentKey: wrap(scopeKey, memKey) },
+      { id: 'chap', parentId: 'mem', kind: 'CHAPTER' as TreeNode['kind'], orderIndex: 0, name: 'Day 1', wrappedContentKey: wrap(memKey, chapKey) },
+    ]
+    expect(Array.from(nodeContentKey(scopeKey, tree, 'chap')!)).toEqual(Array.from(chapKey))
+    expect(Array.from(nodeContentKey(scopeKey, tree, 'mem')!)).toEqual(Array.from(memKey))
+    expect(nodeContentKey(scopeKey, tree, 'fold')).toBeNull() // a folder has no content key
   })
 })
 

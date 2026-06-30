@@ -11,7 +11,7 @@ import { setBreadcrumb } from '../app/breadcrumb'
 import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
 import { treeStore, loadTree } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
-import { openMemory as unwrapMemoryKey } from '../features/memory/tree'
+import { nodeContentKey } from '../features/memory/tree'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
 import { NodeKind } from '../api/generated/content'
 import type { TreeNode } from '../features/memory/tree'
@@ -29,19 +29,25 @@ const segments = computed(() => parseHash(route.hash).segments)
 const resolved = computed(() => resolveSlugPath(treeStore.nodes, segments.value))
 const currentNodeId = computed(() => (typeof resolved.value === 'string' ? resolved.value : null))
 const currentNode = computed(() => nodeById(treeStore.nodes, currentNodeId.value))
-const isMemory = computed(() => currentNode.value?.kind === NodeKind.Memory)
+// A MEMORY or a CHAPTER opens to the gallery (a chapter is itself a Memory, cr-0060); folders/root browse.
+const isOpenable = computed(
+  () => currentNode.value?.kind === NodeKind.Memory || currentNode.value?.kind === NodeKind.Chapter,
+)
 const currentFolder = computed(() =>
   currentNode.value && currentNode.value.kind === NodeKind.Folder ? currentNode.value : null,
 )
 const level = computed(() => childrenOf(treeStore.nodes, currentNodeId.value))
 // Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
 const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
-// The open Memory's K_mem, unwrapped from its tree node under K_SC (held on device; the server is blind).
+// The open node's K_mem, resolved by walking the content-key chain from K_SC (a chapter's key is wrapped under
+// its parent Memory's K_mem, recursive K_mem; held on device — the server is blind).
 const memoryKey = computed(() =>
-  isMemory.value && currentNode.value && scopeKey.value ? unwrapMemoryKey(scopeKey.value, currentNode.value) : null,
+  isOpenable.value && currentNodeId.value && scopeKey.value
+    ? nodeContentKey(scopeKey.value, treeStore.nodes, currentNodeId.value)
+    : null,
 )
 
-type Mode = 'create-folder' | 'create-memory' | 'rename'
+type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 const mutationVisible = ref(false)
 const mutationMode = ref<Mode>('create-folder')
 const mutationNode = ref<TreeNode | null>(null)
@@ -75,7 +81,10 @@ function openFolder(folder: TreeNode) {
 function openMemory(memory: TreeNode) {
   void router.push({ hash: hashForNode(treeStore.nodes, memory.id) })
 }
-function startCreate(mode: 'create-folder' | 'create-memory') {
+function openChapter(chapter: TreeNode) {
+  void router.push({ hash: hashForNode(treeStore.nodes, chapter.id) })
+}
+function startCreate(mode: 'create-folder' | 'create-memory' | 'create-chapter') {
   mutationMode.value = mode
   mutationNode.value = null
   mutationVisible.value = true
@@ -113,14 +122,17 @@ async function onDeleteDone() {
     </div>
     <template v-else>
       <MemoryDetail
-        v-if="isMemory && currentNode && activeSpace.scopeId"
+        v-if="isOpenable && currentNode && activeSpace.scopeId"
         :node="currentNode"
         :scope-id="activeSpace.scopeId"
         :memory-key="memoryKey"
         :favorite="isFavorite(currentNode.id)"
+        :chapters="level.chapters"
         @toggle-favorite="currentNode && onToggleFavorite(currentNode)"
         @rename="currentNode && startRename(currentNode)"
         @delete="currentNode && startDelete(currentNode)"
+        @create-chapter="startCreate('create-chapter')"
+        @open-chapter="openChapter"
       />
       <MemoryBrowse
         v-else
@@ -143,6 +155,7 @@ async function onDeleteDone() {
       :scope-id="activeSpace.scopeId"
       :scope-key="scopeKey"
       :parent-id="currentNodeId"
+      :parent-key="memoryKey"
       :node="mutationNode"
       @done="onMutationDone"
       @close="mutationVisible = false"
