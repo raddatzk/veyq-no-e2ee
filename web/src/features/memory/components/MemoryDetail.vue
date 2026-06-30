@@ -198,8 +198,9 @@ onBeforeUnmount(() => {
       </div>
       <div class="gallery-header-actions">
         <Button
+          v-tooltip.bottom="t('media.upload')"
           type="button"
-          :label="t('media.upload')"
+          :aria-label="t('media.upload')"
           icon="pi pi-cloud-upload"
           :disabled="!memoryKey"
           @click="triggerUpload"
@@ -213,26 +214,29 @@ onBeforeUnmount(() => {
           @change="onFilesPicked"
         />
         <Button
+          v-tooltip.bottom="favorite ? t('memory.unfavorite') : t('memory.favorite')"
           type="button"
           class="memory-detail-fav"
           :class="{ 'is-favorite': favorite }"
-          :label="favorite ? t('memory.unfavorite') : t('memory.favorite')"
+          :aria-label="favorite ? t('memory.unfavorite') : t('memory.favorite')"
           :icon="favorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
           severity="secondary"
           text
           @click="$emit('toggleFavorite')"
         />
         <Button
+          v-tooltip.bottom="t('memory.rename')"
           type="button"
-          :label="t('memory.rename')"
+          :aria-label="t('memory.rename')"
           icon="pi pi-pencil"
           severity="secondary"
           text
           @click="$emit('rename')"
         />
         <Button
+          v-tooltip.bottom="t('memory.delete')"
           type="button"
-          :label="t('memory.delete')"
+          :aria-label="t('memory.delete')"
           icon="pi pi-trash"
           severity="danger"
           text

@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
+import Tooltip from 'primevue/tooltip'
 import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import router from './router'
@@ -20,6 +21,7 @@ async function bootstrap() {
     .use(PrimeVue, { theme: { preset: Aura, options: { darkModeSelector: '.veyq-dark' } } })
     .use(i18n)
     .use(router)
+  app.directive('tooltip', Tooltip)
 
   router.isReady().then(() => app.mount('#app'))
 }
