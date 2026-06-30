@@ -1,7 +1,7 @@
 ---
 id: cr-0054
 title: Web combined login/unlock + auto-enrol — one "remember me" toggle, server-stored password-less wrap (web/backend)
-status: planned
+status: done
 satisfies: [uc.account.remember-this-device, uc.account.auto-unlock]
 adrs: ["0003", "0004", "0005"]
 invariants: [operator-blind-e2ee]
@@ -55,25 +55,45 @@ auth; QR onboarding; the email-gated RECOVERY release.
 
 ## Phases
 
-- [ ] 1 new wrap method (contracts + backend) — add the password-less `DEVICE_KEY` value to `MasterKeyWrap.Method`
-  in the contract; regenerate. The wraps `POST` + key-material `GET` already handle arbitrary methods (ciphertext
-  + cap), so the only backend change is the enum. · Done when: `./gradlew -p backend check` green; a slice test
-  adds + reads back a `DEVICE_KEY` wrap and confirms it rides the normal key material (not filtered like RECOVERY).
-- [ ] 2 web password-less wrap (web) — `rememberMe/` module: enrol (non-extractable AES key in IndexedDB →
-  encrypt Master Key → `POST` the ciphertext as a `DEVICE_KEY` wrap, store key + wrapId locally) and
-  boot-restore (fetch key material → find the `DEVICE_KEY` wrap → decrypt with the local key → `openVault`).
-  Retire cr-0052's local Master-Key cache (`vaultCache` becomes the device-key holder + server-wrap client). ·
-  Done when: `npm run check` green; a test round-trips enrol → boot-restore → fallback-on-missing-key/wrap.
-- [ ] 3 combined screen + auto-enrol (web) — `LoginView`: a single **"remember me"** toggle (remove the unlock
-  "trust this device" checkbox); on a floor unlock **auto-enrol** — remember-off → DEVICE wrap, remember-on →
-  `DEVICE_KEY` wrap + cookie; the Secret-Key field shows only when device-unlock is unavailable; re-enrol
-  replaces the prior convenience wrap. · Done when: `npm run check` green; tests cover the three device states +
-  the enrol-replaces-prior-wrap rule.
-- [ ] 4 coverage + verify — flip the web refs on
+- [x] 1 new wrap method (contracts + backend) — added the password-less `DEVICE_KEY` value to
+  `MasterKeyWrap.Method` (+ `AddWrapRequest.method`) across the three identical-duplicate specs
+  (account/setup/tenants); regenerated. No hardcoded Kotlin method enum needed changing — `forUser` filters only
+  RECOVERY (so `DEVICE_KEY` is served) and `addWrap` takes `method` as an opaque string. One real backend change:
+  `KeyMaterialStore.deleteWrap` whitelisted both device-local methods (`DEVICE`, `DEVICE_KEY`) so re-enrol can
+  replace a prior `DEVICE_KEY` wrap. **Decision:** the AEAD iv rides `kdfParams` (opaque base64, no contract-shape
+  change), the ciphertext rides `wrappedKey`. · Done: `./gradlew check` green; `AccountWrapsSliceTest` adds +
+  reads back a `DEVICE_KEY` wrap (rides normal material, removable).
+- [x] 2 web password-less wrap (web) — new `rememberMe/deviceKeyWrap.ts`: `enrolDeviceKey` (non-extractable
+  AES-GCM key in IndexedDB → seal Master Key → `POST` the ciphertext as a `DEVICE_KEY` wrap, store key + wrapId +
+  email locally, replace-prior + rollback-on-local-failure), `restoreDeviceKey(material)` (find the `DEVICE_KEY`
+  wrap by id → decrypt with the local key), and `clearDeviceKey(deleteServerWrap)`. Retired cr-0052's
+  `vaultCache.ts`; `unlock.ts` `restoreVaultFromCache`, `login.ts` `logout`, and `boot.ts` rewired. · Done:
+  `npm run check` green; `deviceKeyWrap.test.ts` round-trips enrol → restore, replace, rollback, and the three
+  fallbacks (no record / wrap gone / undecryptable).
+- [x] 3 combined screen + auto-enrol (web) — `LoginView`: a single **"remember me"** toggle (removed the unlock
+  "trust this device" checkbox + its orphaned i18n keys). On a floor unlock **auto-enrol** via
+  `enrolConvenienceWrap()` — remember-off → DEVICE wrap, remember-on → `DEVICE_KEY` wrap + cookie; one wrap per
+  device (§9), so the other method is dropped first. The Secret-Key floor shows only when device-unlock is
+  unavailable; a returning DEVICE device upgrades to password-less only when the toggle is on (no needless
+  re-enrol). · Done: `npm run check` green; the three states are covered across the module tests
+  (login / unlock floor / unlock.device / deviceKeyWrap), the enrol-replaces rule in `deviceKeyWrap.test.ts`.
+  (No component-test harness exists in web — the end-to-end screen adaptivity is a live-smoke item, per phase 4.)
+- [x] 4 coverage + verify — flipped the web refs on
   [uc.account.remember-this-device.yaml](../docs/coverage/features/account/use-cases/uc.account.remember-this-device.yaml)
-  + the web part of [uc.account.auto-unlock.yaml](../docs/coverage/features/account/use-cases/uc.account.auto-unlock.yaml);
-  live browser smoke across the three states + negative. · Done when: the three trust-chain guards green; the
-  smoke confirmed with screenshots.
+  (now implemented, web + backend refs per criterion) + the web part of
+  [uc.account.auto-unlock.yaml](../docs/coverage/features/account/use-cases/uc.account.auto-unlock.yaml)
+  (server-stored `DEVICE_KEY` wrap replaces the local cache). The three trust-chain guards green. **Live
+  three-state browser smoke green** (re-seeded a fresh instance; signed in as the `127.0.0.1` tenant owner): (1)
+  first sign-in → email+password → Secret-Key floor → unlock → landed in the shell with a `DEVICE` wrap enrolled
+  (`veyq-trust` has the record, `veyq-remember` empty); (2) returning remember-off → email+password only →
+  device-wrap unlock → straight to shell, the Secret-Key floor **never** shown; (3) remember-on first sign-in →
+  unlock enrolled a `DEVICE_KEY` wrap (`veyq-remember` `current`, `veyq-trust` empty — one wrap per device held)
+  + the httpOnly cookie, and a full **reload opened straight into the shell** (no login form, no floor during
+  boot); (4) negative — cleared device (dropped the local key) → reload falls back to the sign-in screen, no
+  silent open. Verified via accessibility snapshots + IndexedDB inspection + route/network assertions (the
+  preferred text-based proof); screenshots couldn't be captured — a known machine-local preview gotcha pauses
+  `requestAnimationFrame` in the backgrounded tab, so the renderer never paints (slivered images / hung rAF), an
+  environment limit unrelated to the app.
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
@@ -94,4 +114,36 @@ superseded. Native, passkey, QR, and the RECOVERY release stay their own work.
 
 ## Retrospective
 
-_(to be written at close)_
+**What shipped.** The web unlock model from ADR 0005 §17-21: one combined login/unlock screen with a single
+"remember me" toggle that auto-enrols the matching convenience wrap on the first unlock per device — remember-off
+→ a password `DEVICE` wrap (email+password next time), remember-on → a password-less `DEVICE_KEY` wrap + the
+persistent cookie (opens straight in). cr-0052's two checkboxes + local IndexedDB Master-Key cache are gone.
+
+**Design calls made during build (the CR left them open):**
+- **iv placement.** The `DEVICE_KEY` wrap is `AES-GCM(deviceKey, masterKey)` from a non-extractable WebCrypto key,
+  so it can't use `v1.symWrap` (no key bytes in JS). The ciphertext rides `wrappedKey`; the 12-byte iv rides
+  `kdfParams` (opaque base64) — no contract-shape change, `AddWrapRequest.kdfParams` stays required.
+- **"One wrap per device" (§9) coordination.** Rather than couple the two modules, `LoginView.enrolConvenienceWrap`
+  drops the *other* method before enrolling the chosen one (remember-on → `untrustThisDevice` + `enrolDeviceKey`;
+  off → `clearDeviceKey` + `trustThisDevice`); each enrol still replaces its own prior. A returning DEVICE device
+  only *upgrades* to password-less when the toggle is on — no wasteful re-enrol of the same method each login.
+- **Backend `deleteWrap` whitelist.** Was DEVICE-only; widened to `{DEVICE, DEVICE_KEY}` so re-enrol can replace a
+  prior `DEVICE_KEY` wrap. The `forUser` RECOVERY-only filter already served `DEVICE_KEY`, and `addWrap` took
+  `method` as an opaque string — so the contract enum was the only other backend change.
+- **logout.** Drops the `DEVICE_KEY` server wrap + local key *before* revoking (no orphan ciphertext); leaves a
+  `DEVICE` trust wrap intact (it survives sign-out by design — next login stays password-only).
+
+**Testing shape.** No Vue component-test harness exists in web, so the three device states are covered at the
+module level (login / unlock floor / unlock.device / deviceKeyWrap enrol+restore+replace+fallbacks), with the
+end-to-end screen adaptivity proven by the live smoke. That matched the repo's prior CRs (gallery, shell).
+
+**Friction / next time.**
+- **Stale shared dev seed.** The first live-smoke attempt hit `verify 401`; the committed dev-seed no longer
+  matched the shared backend (a parallel session had re-created the DB). Confirmed with the project's own seed
+  harness before attributing it (cheap, decisive) rather than guessing at the code. Re-seeding needs `down -v` +
+  a backend restart, which disrupts a parallel session — worth a heads-up that the local dev backend is shared.
+- **preview rAF gotcha.** Screenshots are unobtainable in a backgrounded preview tab on this machine — `rAF` is
+  paused, so the renderer never paints and rAF-based evals hang. Text-based verification (snapshots, IndexedDB,
+  route/network) is both sufficient and the preferred path; don't burn turns chasing the screenshot.
+- **`preview_click` vs `requestSubmit()`.** A `preview_click` on the submit button didn't fire the form handler;
+  `form.requestSubmit()` via eval was reliable. Prefer it for PrimeVue forms.

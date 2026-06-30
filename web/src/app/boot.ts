@@ -8,7 +8,7 @@ import { getSetupStatus } from '../features/account/instance/instance'
 import { useServerState } from '../shared/state/useServerState'
 import { refreshSession } from '../features/account/login/login'
 import { restoreVaultFromCache } from '../features/account/unlock/unlock'
-import { clearMasterKeyCache } from '../features/account/rememberMe/vaultCache'
+import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
 
 /**
  * Discover the instance state and prepare the app shell. The result is reflected in the shared server
@@ -26,11 +26,11 @@ export async function boot(): Promise<void> {
     return
   }
   if (!serverState.setupCompleted) return
-  // Restore a "remember me" session (cr-0052): the httpOnly refresh cookie revives the session, then the local
-  // vault cache re-opens the Master Key — so a browser restart lands straight in the shell, no prompt. All
-  // best-effort: no cookie/cache (or expired) → stays logged out and the router lands on login; a live session
-  // with no usable cache drops any stale cache so it can never outlive its session.
+  // Restore a "remember me" session (cr-0054): the httpOnly refresh cookie revives the session, then the
+  // device's password-less DEVICE_KEY wrap re-opens the Master Key — so a browser restart lands straight in the
+  // shell, no prompt. All best-effort: no cookie/wrap (or expired) → stays logged out and the router lands on
+  // login; with no live session, drop the local device key so it can never outlive its session.
   const restored = await refreshSession().then(() => true).catch(() => false)
   if (restored) await restoreVaultFromCache().catch(() => {})
-  else await clearMasterKeyCache().catch(() => {})
+  else await clearDeviceKey(false).catch(() => {})
 }

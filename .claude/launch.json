@@ -25,6 +25,13 @@
       "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && VITE_PORT=5173 npm run dev"],
       "port": 5173,
       "autoPort": false
+    },
+    {
+      "name": "veyq-web-cr54",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && npm run dev -- --port 8091"],
+      "port": 8091,
+      "autoPort": false
     }
   ]
 }

@@ -154,8 +154,11 @@ components:
           example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
         method:
           type: string
-          description: Which unlock method opens this wrap.
-          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE]
+          description: >
+            Which unlock method opens this wrap. DEVICE mixes the password into the KEK
+            (Argon2id(deviceFactor + password)); DEVICE_KEY is the password-less remember-me wrap — a
+            device-held key alone (no password, no KDF), so its kdfParams carries only the AEAD iv.
+          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE, DEVICE_KEY]
           example: PASSWORD
         wrappedKey:
           type: string
@@ -167,20 +170,25 @@ components:
           type: string
           description: >
             KDF parameters + salt needed to re-derive this method's unlock KEK (opaque base64; present for
-            password/recovery/device methods, absent for passkey which is PRF-derived).
+            password/recovery/device methods, absent for passkey which is PRF-derived). For DEVICE_KEY there
+            is no KDF — this field carries only the AEAD iv for the device-key wrap.
           contentEncoding: base64
           maxLength: 256
           example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz
 
     AddWrapRequest:
       type: object
-      description: A new DEVICE wrap to store for the caller (trust this device).
+      description: >
+        A new device-local convenience wrap to store for the caller: DEVICE (trust this device — password +
+        device key) or DEVICE_KEY (remember me — password-less device key alone).
       required: [method, wrappedKey, kdfParams]
       properties:
         method:
           type: string
-          description: The unlock method this wrap opens. Restricted to DEVICE on this endpoint.
-          enum: [DEVICE]
+          description: >
+            The unlock method this wrap opens. Restricted to the device-local methods on this endpoint:
+            DEVICE (password + device factor) or DEVICE_KEY (password-less device key).
+          enum: [DEVICE, DEVICE_KEY]
           example: DEVICE
         wrappedKey:
           type: string
@@ -191,7 +199,9 @@ components:
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         kdfParams:
           type: string
-          description: KDF parameters + salt to re-derive the device KEK (opaque base64).
+          description: >
+            KDF parameters + salt to re-derive the device KEK (opaque base64). For DEVICE_KEY there is no
+            KDF — this carries only the AEAD iv for the password-less device-key wrap.
           contentEncoding: base64
           maxLength: 256
           example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz

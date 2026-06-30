@@ -56,6 +56,27 @@ class AccountWrapsSliceTest {
     }
 
     @Test
+    fun addDeviceKeyWrapRidesNormalKeyMaterial() {
+        // DEVICE_KEY (password-less remember-me, cr-0054) is a normal interactive wrap — served like DEVICE,
+        // NOT withheld like RECOVERY. Its kdfParams carries only the AEAD iv (opaque to the server).
+        val token = issueToken(USER_A)
+        val id = addWrap(token, "DEVICE_KEY", "ZGV2aWNlLWtleS13cmFw")
+        assert(id.isNotEmpty())
+        keyMaterial(token).then().statusCode(200).body("wraps.method", hasItems("PASSWORD", "DEVICE_KEY"))
+    }
+
+    @Test
+    fun deleteRemovesDeviceKeyWrap() {
+        // Re-enrol replaces (one convenience wrap per device, ADR 0005 §9): a DEVICE_KEY wrap must be removable
+        // through this endpoint, not only DEVICE.
+        val token = issueToken(USER_A)
+        val id = addWrap(token, "DEVICE_KEY", "ZGV2aWNlLWtleS1kZWw=")
+        delete(token, id).then().statusCode(204)
+        keyMaterial(token).then().statusCode(200)
+            .body("wraps.findAll { it.method == 'DEVICE_KEY' }.size()", equalTo(0))
+    }
+
+    @Test
     fun deleteByIdRemovesTheWrap() {
         val token = issueToken(USER_A)
         val id = addDeviceWrap(token, "ZGV2aWNlLXdyYXAtZGVs")
@@ -167,8 +188,11 @@ class AccountWrapsSliceTest {
     private fun issueToken(userId: String): String = sessions.issue(userId).accessToken
 
     private fun addDeviceWrap(token: String, wrappedKey: String): String =
+        addWrap(token, "DEVICE", wrappedKey)
+
+    private fun addWrap(token: String, method: String, wrappedKey: String): String =
         given().header("Authorization", "Bearer $token").contentType(ContentType.JSON)
-            .body("""{"method":"DEVICE","wrappedKey":"$wrappedKey","kdfParams":"$KDF"}""")
+            .body("""{"method":"$method","wrappedKey":"$wrappedKey","kdfParams":"$KDF"}""")
             .`when`().post("/api/account/wraps")
             .then().statusCode(201).extract().path("id")
 

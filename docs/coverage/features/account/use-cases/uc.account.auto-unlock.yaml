@@ -8,13 +8,15 @@ acceptanceCriteria:
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: enrol-ungated-key-and-token
-    text: Picking L3 stores a random key K + the refresh token ungated and enrols a device-key wrap (method=DEVICE).
+    text: Picking L3 stores a random key K + the refresh token ungated and enrols a device-key wrap (method=DEVICE; web's equivalent is the password-less DEVICE_KEY wrap, cr-0054).
     coverage:
+      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts, src/features/account/login/login.test.ts] }
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip], e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { unit: [TrustDeviceTest.noLoginEnrolResumeUnlockRoundTrip], e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: opens-straight-in
     text: On relaunch the app reads the ungated token + K and lands on home with no user interaction (no connect, no floor).
     coverage:
+      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle, LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: same-wrap-as-l2-only-gate-differs
@@ -30,6 +32,7 @@ acceptanceCriteria:
   - id: key-or-token-gone-falls-back
     text: A missing key/wrap or an expired/rotated token degrades to the floor (no silent self-wipe on a single server response).
     coverage:
+      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { unit: [TrustDeviceTests.testResumeSessionWithDeadTokenFallsBack, TrustDeviceTests.testResumeSessionWithNoRecordReturnsFalse] }
       android: { unit: [TrustDeviceTest.resumeSessionWithDeadTokenFallsBack, TrustDeviceTest.resumeSessionWithNoRecordReturnsFalse] }
   - id: reversible-anytime
@@ -40,15 +43,18 @@ acceptanceCriteria:
   - id: operator-blind-unchanged
     text: The relaxation is purely local; the server still holds only ciphertext wraps + an opaque token and cannot distinguish the levels.
     coverage:
+      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
 gaps:
-  web: a "remember me" L3 is built (cr-0052) — a persistent httpOnly refresh cookie restores the session and the
-    unlocked Master Key is cached locally under a non-extractable AES key. Web tests cover the cache round-trip
-    (src/features/account/rememberMe/vaultCache.test.ts) and the cookie round-trip (backend LoginSliceTest), and
-    a live browser smoke confirmed reload opens straight in (refresh 200 + key-material 200, no relogin). It
-    deviates from the native L3 — a local cache, not a server-stored device-key wrap — so the server-wrap
-    criteria (method=DEVICE enrol, reversible-via-untrust) and the explicit chooser/warning stay web gaps;
-    full parity is a follow-up.
+  web: web's L3 is the "remember me on" path of the combined login/unlock screen (cr-0054, which supersedes
+    cr-0052) — a persistent httpOnly refresh cookie restores the session and a password-less DEVICE_KEY wrap (a
+    server-stored device-key wrap, NOT the old local cache) re-opens the Master Key, so a restart opens straight
+    in. Covered by the wrap enrol/restore/replace/clear round-trip
+    (src/features/account/rememberMe/deviceKeyWrap.test.ts), the DEVICE_KEY wrap served + removable (backend
+    AccountWrapsSliceTest), and the cookie round-trip (backend LoginSliceTest); the three-state screen smoke is
+    recorded in cr-0054. Web now matches the server-wrap model. What stays a web gap is the native framing — the
+    explicit L3 chooser + passcode-set warning dialog (web folds the choice into the single "remember me" toggle,
+    ADR 0005 §15, §18-19) and biometric L2.
 # A device-passcode-set check + an explicit L3 warning dialog (ADR 0005 §13) are a polish item on top of
 # the verified flow above (the floor subtitle already warns "relies only on your device's lock screen").

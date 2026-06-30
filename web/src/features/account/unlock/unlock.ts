@@ -11,7 +11,7 @@ import { setUnlocked } from '../../../app/vault'
 import { setAccount } from '../../../app/account'
 import { MasterKeyWrapMethodEnum, type AccountKeyMaterial } from '../../../api/generated/account'
 import * as device from '../trustDevice/deviceKey'
-import { loadCachedMasterKey, clearMasterKeyCache } from '../rememberMe/vaultCache'
+import { restoreDeviceKey } from '../rememberMe/deviceKeyWrap'
 
 function fetchKeyMaterial(): Promise<AccountKeyMaterial> {
   return withRefresh(() => accountApi().getAccountKeyMaterial())
@@ -49,23 +49,19 @@ export async function unlockMasterKey(password: string, secretKeyB64: string): P
  * mismatch) → the same generic failure as the floor path.
  */
 /**
- * Boot path (L3 "remember me", cr-0052): re-open the vault from the local cache with **no prompt**. Loads the
- * cached Master Key (+ its email), fetches the session-gated key material, and unwraps the identity key under
- * it. Returns false (→ the user lands on the floor) when nothing is cached or the material no longer fits the
- * cached key (changed/gone) — and drops the now-stale cache in that case. Requires a live session (the caller
- * restores it from the cookie first).
+ * Boot path (web "remember me", cr-0054): re-open the vault from this device's password-less DEVICE_KEY wrap
+ * with **no prompt**. Fetches the session-gated key material, decrypts the Master Key from the wrap with the
+ * local device key, then unwraps the identity key under it. Returns false (→ the user lands on the floor) when
+ * this device isn't enrolled, the wrap is gone server-side, or it won't open under the local key. Requires a
+ * live session (the caller revives it from the cookie first).
  */
 export async function restoreVaultFromCache(): Promise<boolean> {
-  const cached = await loadCachedMasterKey()
-  if (!cached) return false
-  setAccount(cached.email)
-  try {
-    openVault(await fetchKeyMaterial(), cached.masterKey)
-    return true
-  } catch {
-    await clearMasterKeyCache() // material changed/gone → stale cache, fall back to the floor
-    return false
-  }
+  const material = await fetchKeyMaterial()
+  const restored = await restoreDeviceKey(material)
+  if (!restored) return false
+  setAccount(restored.email)
+  openVault(material, restored.masterKey)
+  return true
 }
 
 export async function unlockWithDevice(email: string, password: string): Promise<boolean> {

@@ -8,7 +8,7 @@ import { loginApi, sessionApi, tokenApi } from '../../../api/client'
 import { clearTokens, session, setTokens } from '../../../app/session'
 import { clearVault } from '../../../app/vault'
 import { setAccount, clearAccount } from '../../../app/account'
-import { clearMasterKeyCache } from '../rememberMe/vaultCache'
+import { clearDeviceKey } from '../rememberMe/deviceKeyWrap'
 
 /**
  * Log in with email + password. Requests a challenge, derives the auth keypair with the instance salt the
@@ -52,13 +52,16 @@ export async function refreshSession(): Promise<void> {
  *  the vault clear here means every sign-out path (this view, a future silent logout on refresh failure, a
  *  route guard) drops the unlocked keys — auth and unlock can never drift out of sync. */
 export async function logout(): Promise<void> {
+  // Drop the remember-me wrap FIRST, while the token is still live: delete the server DEVICE_KEY wrap and the
+  // local device key (cr-0054), so an explicit sign-out can't leave the device opening straight in. The DEVICE
+  // trust wrap (if any) is intentionally left — it survives logout (next login stays password-only).
+  await clearDeviceKey().catch(() => {})
   try {
     await sessionApi().logout()
   } finally {
     clearTokens()
     clearVault()
     clearAccount()
-    await clearMasterKeyCache().catch(() => {}) // drop the remembered vault (cr-0052)
   }
 }
 

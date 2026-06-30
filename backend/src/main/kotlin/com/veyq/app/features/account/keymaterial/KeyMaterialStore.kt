@@ -47,14 +47,20 @@ class KeyMaterialStore {
         return id
     }
 
-    /** Remove a wrap by id — but only the caller's own **DEVICE** wrap (the only kind this untrust endpoint
-     *  creates); otherwise a no-op (idempotent). Whitelisting DEVICE — rather than blacklisting only the
-     *  PASSWORD floor — keeps the floor un-removable AND protects the RECOVERY/PASSKEY methods from being
-     *  stripped through this device-trust endpoint, and doesn't hinge on the exact floor casing. */
+    /** Remove a wrap by id — but only the caller's own **device-local convenience** wrap: DEVICE (trust this
+     *  device) or DEVICE_KEY (password-less remember-me); the only kinds this endpoint creates. Otherwise a
+     *  no-op (idempotent). Whitelisting the device methods — rather than blacklisting only the PASSWORD floor —
+     *  keeps the floor un-removable AND protects the RECOVERY/PASSKEY methods from being stripped through this
+     *  device-trust endpoint, and doesn't hinge on the exact floor casing. Both device methods are removable so
+     *  re-enrol can replace the prior convenience wrap (one per device, ADR 0005 §9). */
     @Transactional
     fun deleteWrap(userId: String, id: String) {
         val wrap = MasterKeyWrapEntity.findById(id) ?: return
-        if (wrap.userId != userId || wrap.method != "DEVICE") return
+        if (wrap.userId != userId || wrap.method !in DEVICE_METHODS) return
         wrap.delete()
+    }
+
+    private companion object {
+        private val DEVICE_METHODS = setOf("DEVICE", "DEVICE_KEY")
     }
 }

@@ -785,8 +785,11 @@ components:
           example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
         method:
           type: string
-          description: Which unlock method opens this wrap.
-          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE]
+          description: >
+            Which unlock method opens this wrap. DEVICE mixes the password into the KEK
+            (Argon2id(deviceFactor + password)); DEVICE_KEY is the password-less remember-me wrap — a
+            device-held key alone (no password, no KDF), so its kdfParams carries only the AEAD iv.
+          enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE, DEVICE_KEY]
           example: PASSWORD
         wrappedKey:
           type: string
@@ -799,7 +802,8 @@ components:
           type: string
           description: >
             KDF parameters + salt to re-derive this method's unlock KEK (opaque base64; present for
-            password/recovery/device, absent for passkey).
+            password/recovery/device, absent for passkey). For DEVICE_KEY there is no KDF — this carries
+            only the AEAD iv for the device-key wrap.
           contentEncoding: base64
           maxLength: 256
           example: AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz

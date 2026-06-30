@@ -10,17 +10,22 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { login, logout } from '../features/account/login/login'
 import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/unlock'
-import { trustThisDevice, isTrusted, isTrustSupported } from '../features/account/trustDevice/trustDevice'
-import { cacheMasterKey, isCacheSupported } from '../features/account/rememberMe/vaultCache'
+import { trustThisDevice, untrustThisDevice, isTrusted } from '../features/account/trustDevice/trustDevice'
+import { enrolDeviceKey, clearDeviceKey, isRememberSupported } from '../features/account/rememberMe/deviceKeyWrap'
 import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
 import { takeRoute } from '../app/pendingRoute'
 
-// uc.account.login + unlock + trust-device (web). Login gates a session; unlock opens the Master Key. A
-// trusted device (a DEVICE wrap, ADR 0005) unlocks with only the password (carried from login); the floor
-// path adds the Secret Key. "Trust this device" enrols at unlock time, reusing the just-entered password.
+// uc.account.remember-this-device (web, cr-0054) — ONE combined login/unlock screen with ONE "remember me"
+// toggle. The same password authenticates AND derives the DEVICE-wrap KEK, so login + unlock collapse: a
+// device that already carries a convenience wrap signs in with email + password only; the Secret-Key floor
+// shows only on the first sign-in per device (or when a device wrap is unusable). On a successful unlock the
+// client AUTO-ENROLS this device's single convenience wrap from the in-memory Master Key (ADR 0005 §17-21):
+// remember off → a password DEVICE wrap; remember on → a password-less DEVICE_KEY wrap + the persistent
+// session cookie. One wrap per device (§9): enrolling one drops the other. The Secret Key is read once to
+// create the wrap, then forgotten — there is no separate "trust this device" checkbox any more.
 const { t } = useI18n()
 const router = useRouter()
 const email = ref('')
@@ -29,14 +34,10 @@ const secretKey = ref('')
 const busy = ref(false)
 const error = ref('')
 const loggedIn = ref(false)
-const deviceTrusted = ref(false)
-const trustChecked = ref(false)
-const trustSupported = isTrustSupported()
-// "Remember me" = opt into L3 (cr-0052): the session rides a persistent cookie and the Master Key is cached
-// locally, so a restart opens straight in. Chosen at sign-in (it drives the login cookie) and reused at unlock
-// (to cache the key). Only offered where IndexedDB + WebCrypto exist.
+// The single per-device choice. Drives the login cookie (on → persistent) AND which convenience wrap is
+// auto-enrolled. Only offered where IndexedDB + WebCrypto exist (a wrap can't otherwise be persisted).
 const remember = ref(false)
-const rememberSupported = isCacheSupported()
+const rememberSupported = isRememberSupported()
 const fileInput = ref<HTMLInputElement | null>(null)
 const showSecret = ref(false)
 const scanOpen = ref(false)
@@ -45,28 +46,46 @@ const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevic
 // A Secret Key handed over by setup is parked here (a plain local, not a bound input) until login succeeds.
 let pendingSecretKey = ''
 
+/** Auto-enrol this device's single convenience wrap from the in-memory Master Key, per "remember me" (§18).
+ *  One wrap per device, so the other method is dropped first. Best-effort — the unlock already succeeded, so a
+ *  failed enrolment just means the Secret Key is needed again next time (no silent lockout). */
+async function enrolConvenienceWrap() {
+  const mk = masterKey()
+  if (!mk || !rememberSupported) return
+  if (remember.value) {
+    await untrustThisDevice(email.value).catch(() => {}) // drop a prior password DEVICE wrap
+    await enrolDeviceKey(email.value, mk).catch(() => {})
+  } else {
+    await clearDeviceKey().catch(() => {}) // drop a prior password-less DEVICE_KEY wrap
+    await trustThisDevice(email.value, password.value, mk).catch(() => {})
+  }
+}
+
+function finishUnlocked() {
+  loggedIn.value = true
+  password.value = ''
+  secretKey.value = ''
+  pendingSecretKey = ''
+}
+
 async function submit() {
   error.value = ''
   busy.value = true
   try {
     await login(email.value, password.value, remember.value)
-    // Stay on the (spinner-busy) sign-in card while we try a trusted-device unlock — so a trusted device
-    // jumps straight to "unlocked" and never flashes the Secret-Key floor as an intermediate step.
-    // (An IndexedDB hiccup must not break a successful login — default to the floor if the check fails.)
+    // Stay on the (spinner-busy) sign-in card while we try a device-wrap unlock — so a returning device jumps
+    // straight to the shell and never flashes the Secret-Key floor. (An IndexedDB hiccup must not break a
+    // successful login — default to the floor if the check fails.)
     const trusted = await isTrusted(email.value).catch(() => false)
     if (trusted && (await unlockWithDevice(email.value, password.value).catch(() => false))) {
-      // The Secret Key belongs to this same login: unlocked already, so go straight to the unlocked card.
-      deviceTrusted.value = true
-      loggedIn.value = true
-      password.value = ''
-      secretKey.value = ''
-      pendingSecretKey = ''
-      if (remember.value) await cacheMasterKey(email.value, masterKey()!).catch(() => {})
+      // If "remember me" is now on, upgrade this password-trusted device to the password-less wrap (the toggle
+      // is the per-device choice, §18). Off → keep the existing DEVICE wrap as-is (no needless re-enrol).
+      if (remember.value) await enrolConvenienceWrap()
+      finishUnlocked()
       await router.push(takeRoute() ?? { name: 'home' })
       return
     }
-    // Untrusted, or the device key/wrap is gone (E1) — show the password + Secret-Key floor.
-    deviceTrusted.value = false
+    // First sign-in on this device, or the device wrap is unusable (E2) — show the password + Secret-Key floor.
     secretKey.value = pendingSecretKey
     pendingSecretKey = ''
     loggedIn.value = true
@@ -82,25 +101,11 @@ async function unlock() {
   error.value = ''
   busy.value = true
   try {
-    // Floor: password (carried from login) + Secret Key. (A trusted device never reaches here — it
-    // auto-unlocks at login; this card is the password + Secret-Key floor only.)
+    // Floor: password (carried from login) + Secret Key. The first unlock per device → auto-enrol the
+    // convenience wrap chosen by "remember me", while the just-entered password is still in hand.
     await unlockMasterKey(password.value, secretKey.value)
-    if (trustChecked.value && trustSupported) {
-      // Enrol now, while the just-entered (known-correct) password is still in hand and the vault is open.
-      // Best-effort — the unlock already succeeded; if enrolment fails the device simply stays untrusted (the
-      // user needs their Secret Key next time). Surfacing that failure is a later improvement (no UI for it now
-      // that the post-unlock card is gone — the screen redirects straight into the shell).
-      try {
-        await trustThisDevice(email.value, password.value, masterKey()!)
-        deviceTrusted.value = true
-      } catch {
-        // best-effort: enrolment failed, device stays untrusted
-      }
-    }
-    trustChecked.value = false
-    if (remember.value) await cacheMasterKey(email.value, masterKey()!).catch(() => {})
-    password.value = ''
-    secretKey.value = ''
+    await enrolConvenienceWrap()
+    finishUnlocked()
     await router.push(takeRoute() ?? { name: 'home' })
   } catch {
     // Wrong password / Secret Key (or no wrap) — one generic failure. Keep the inputs for a retry.
@@ -138,8 +143,6 @@ async function signOut() {
   password.value = ''
   secretKey.value = ''
   pendingSecretKey = ''
-  trustChecked.value = false
-  deviceTrusted.value = false
   error.value = ''
 }
 
@@ -248,13 +251,6 @@ onMounted(() => {
             @change="onUpload"
           />
         </label>
-        <div v-if="trustSupported && !deviceTrusted" class="checkbox-row">
-          <Checkbox v-model="trustChecked" input-id="trust-device" binary />
-          <label for="trust-device">
-            {{ t('unlock.trustDevice') }}
-            <small class="field-hint">{{ t('unlock.trustDeviceHint') }}</small>
-          </label>
-        </div>
         <Button
           type="submit"
           :label="busy ? t('unlock.submitting') : t('unlock.submit')"
