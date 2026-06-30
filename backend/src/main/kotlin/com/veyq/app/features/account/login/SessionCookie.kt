@@ -31,6 +31,13 @@ class SessionCookie(
     /** A session refresh cookie (no Max-Age → dropped on browser close) carrying [token] — the web default. */
     fun session(token: String): NewCookie = build(NAME_SESSION, token, SESSION_MAX_AGE)
 
+    /** The cookies to write for a chosen lifetime: the refresh cookie carrying [token] **and** a clearing
+     *  cookie for the OTHER lifetime — so exactly one refresh cookie ever exists and a stale other-lifetime
+     *  cookie can't shadow it on the next [read] (which prefers persistent). Every write site uses this, so it
+     *  is impossible to set one cookie without clearing the other. */
+    fun issue(token: String, persistent: Boolean): Array<NewCookie> =
+        if (persistent) arrayOf(persistent(token), clearedSession()) else arrayOf(session(token), clearedPersistent())
+
     /** Read the refresh token from whichever cookie is present (persistent wins), or null when neither is. */
     fun read(headers: HttpHeaders): Read? {
         headers.cookies[NAME_PERSISTENT]?.value?.ifBlank { null }?.let { return Read(it, persistent = true) }

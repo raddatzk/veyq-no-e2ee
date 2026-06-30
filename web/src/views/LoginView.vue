@@ -167,15 +167,16 @@ async function signOut() {
   await resolveDeviceState()
 }
 
-// A different email is a different account: drop the established session and re-resolve which fields to show.
-// On change (blur), not per-keystroke, so the Secret-Key field doesn't flicker while typing.
+// A different email is a different account. Two deliberately-split mechanisms: the watcher drops sessionReady on
+// every keystroke (cheap — a re-login is required the moment the email changes, even before blur), while the
+// expensive IndexedDB trust lookup that decides whether to show the Secret-Key field runs only on blur
+// (@change) so the field doesn't flicker while typing.
 function onEmailChange() {
-  sessionReady.value = false
   void resolveDeviceState()
 }
 
 watch(email, () => {
-  sessionReady.value = false // re-login is required once the email changes
+  sessionReady.value = false
 })
 
 onMounted(async () => {

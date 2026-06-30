@@ -9,6 +9,7 @@
 // pinned v1 suite isn't involved — WebCrypto seals directly with a key whose bytes never enter JS. The 12-byte
 // AEAD iv rides the wrap's kdfParams (opaque to the server); the ciphertext rides wrappedKey.
 import { b64std, fromB64std } from '../../../shared/base64'
+import { idbRun } from '../../../shared/idb'
 import { accountWrapsApi } from '../../../api/client'
 import { AddWrapRequestMethodEnum, MasterKeyWrapMethodEnum, type AccountKeyMaterial } from '../../../api/generated/account'
 import { withRefresh } from '../login/login'
@@ -28,42 +29,8 @@ export function isRememberSupported(): boolean {
   return typeof indexedDB !== 'undefined' && typeof crypto !== 'undefined' && !!crypto.subtle
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-    req.onblocked = () => reject(new Error('indexeddb_blocked'))
-  })
-}
-
-function run<T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(STORE, mode)
-        const req = op(tx.objectStore(STORE))
-        let result: T
-        req.onsuccess = () => {
-          result = req.result
-        }
-        // Settle on COMMIT, not req.onsuccess: a write can still abort at commit (quota / clone failure).
-        tx.oncomplete = () => {
-          db.close()
-          resolve(result)
-        }
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error)
-        }
-        tx.onabort = () => {
-          db.close()
-          reject(tx.error)
-        }
-      }),
-  )
-}
+const run = <T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> =>
+  idbRun(DB_NAME, STORE, mode, op)
 
 function loadRecord(): Promise<RememberRecord | null> {
   return run<RememberRecord | undefined>('readonly', (s) => s.get(RECORD_KEY)).then((r) => r ?? null)
@@ -72,20 +39,14 @@ function loadRecord(): Promise<RememberRecord | null> {
 /**
  * Enrol this device for password-less remember-me. Generates a non-extractable AES-GCM key, seals the
  * (in-memory) Master Key under it, uploads the ciphertext as a DEVICE_KEY wrap, and stores the key + wrap id
- * locally. **Re-enrol replaces** (one DEVICE_KEY wrap per device, ADR 0005 §9): an existing remember wrap's
- * server row is removed first. On a local-save failure the just-uploaded wrap is rolled back so it isn't an
- * orphan. (The Secret Key is never involved — the caller holds the already-unlocked Master Key.)
+ * locally. **Re-enrol replaces** (one DEVICE_KEY wrap per device, ADR 0005 §9): the new wrap is uploaded +
+ * recorded FIRST, then the prior server wrap is dropped — so a transient upload failure leaves the prior wrap
+ * intact rather than the device with no remember-me wrap. On a local-save failure the just-uploaded wrap is
+ * rolled back so it isn't an orphan. (The Secret Key is never involved — the caller holds the unlocked Master
+ * Key.)
  */
 export async function enrolDeviceKey(email: string, masterKey: Uint8Array): Promise<void> {
   const prior = await loadRecord()
-  if (prior) {
-    try {
-      await withRefresh(() => accountWrapsApi().deleteAccountWrap({ id: prior.wrapId }))
-    } catch {
-      /* best-effort: a stale server wrap is harmless ciphertext; we replace the local record regardless */
-    }
-    await run('readwrite', (s) => s.delete(RECORD_KEY))
-  }
 
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   const iv = crypto.getRandomValues(new Uint8Array(12))
@@ -112,6 +73,16 @@ export async function enrolDeviceKey(email: string, masterKey: Uint8Array): Prom
       /* best-effort rollback */
     }
     throw e
+  }
+
+  // The new wrap is live and recorded — now drop the prior one (best-effort; a stale server wrap is harmless
+  // ciphertext, and the local record already points at the new wrap).
+  if (prior && prior.wrapId !== result.id) {
+    try {
+      await withRefresh(() => accountWrapsApi().deleteAccountWrap({ id: prior.wrapId }))
+    } catch {
+      /* best-effort */
+    }
   }
 }
 

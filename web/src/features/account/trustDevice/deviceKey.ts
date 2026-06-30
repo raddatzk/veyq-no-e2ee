@@ -3,6 +3,8 @@
 // its bytes never exist in JS; only its HMAC output (the device factor) is ever read — an XSS payload can
 // compute the factor while it runs but cannot carry the key off-device for an offline attack. This is the
 // platform half of the DEVICE wrap; the conformance-pinned crypto (the KEK) lives in v1.ts.
+import { idbRun } from '../../../shared/idb'
+
 const DB_NAME = 'veyq-trust'
 const STORE = 'devices'
 const DEVICE_BIND_INFO = 'veyq/v1/device-bind'
@@ -16,43 +18,8 @@ export function isTrustSupported(): boolean {
   return typeof indexedDB !== 'undefined' && typeof crypto !== 'undefined' && !!crypto.subtle
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-    req.onblocked = () => reject(new Error('indexeddb_blocked')) // else a blocked open would hang the caller
-  })
-}
-
-function run<T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(STORE, mode)
-        const req = op(tx.objectStore(STORE))
-        let result: T
-        req.onsuccess = () => {
-          result = req.result
-        }
-        // Settle on COMMIT, not on req.onsuccess: a write can still abort at commit (quota, clone failure)
-        // after the request "succeeded", so resolving early would report a success that never persisted.
-        tx.oncomplete = () => {
-          db.close()
-          resolve(result)
-        }
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error)
-        }
-        tx.onabort = () => {
-          db.close()
-          reject(tx.error)
-        }
-      }),
-  )
-}
+const run = <T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> =>
+  idbRun(DB_NAME, STORE, mode, op)
 
 const accountKey = (email: string): string => email.trim().toLowerCase()
 

@@ -59,7 +59,7 @@ describe('deviceKeyWrap (web remember-me, cr-0054)', () => {
     expect(restored?.masterKey).toEqual(masterKey())
   })
 
-  it('re-enrol replaces: deletes the prior wrap before uploading the new one', async () => {
+  it('re-enrol replaces: uploads the new wrap, then deletes the prior one', async () => {
     const add1 = vi.fn().mockResolvedValue({ id: 'old-1' })
     const del = vi.fn().mockResolvedValue(undefined)
     mockWrapsApi(add1, del)

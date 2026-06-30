@@ -33,14 +33,11 @@ class TokenResource(private val sessions: SessionService, private val cookie: Se
                 .entity(ErrorResponse(code = "refresh_rejected"))
                 .build()
         return if (fromCookie != null) {
-            // Re-set the SAME lifetime the request carried (persistent vs session), so rotation never silently
-            // upgrades/downgrades it (ADR 0004 addendum), and clear the other lifetime so only one refresh cookie
-            // ever exists. The token stays out of the body on the web path.
-            val (rotatedCookie, clearOther) =
-                if (fromCookie.persistent) cookie.persistent(rotated.refreshToken) to cookie.clearedSession()
-                else cookie.session(rotated.refreshToken) to cookie.clearedPersistent()
+            // Re-issue the SAME lifetime the request carried (persistent vs session) — so rotation never
+            // silently upgrades/downgrades it (ADR 0004 addendum) — and clear the other lifetime, via the one
+            // `issue` API. The token stays out of the body on the web path.
             Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = null))
-                .cookie(rotatedCookie, clearOther).build()
+                .cookie(*cookie.issue(rotated.refreshToken, fromCookie.persistent)).build()
         } else {
             Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = rotated.refreshToken)).build()
         }
