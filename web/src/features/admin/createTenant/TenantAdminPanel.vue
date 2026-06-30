@@ -1,0 +1,205 @@
+<script setup lang="ts">
+// uc.admin.create-tenant (web, Slice A) — the "Manage tenants" rubric of the Server Settings page. Lists every
+// tenant and, for a PENDING one, **edit**s the owner invite (reassign email / resend) or **delete**s (revokes)
+// it. Markup + classes are the design source's ServerSettingsPanel user-management section verbatim
+// (settings-section-header + the ManagementList veyq-list-row rows + management-actions); only the data layer is
+// ours. Operator-blind: only operational metadata is shown — no content keys, no member identities. The backend
+// enforces Server-Owner with a 403 regardless of what the client renders.
+import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import CreateTenantDialog from './CreateTenantDialog.vue'
+import {
+  listTenants,
+  reassignInvite,
+  resendInvite,
+  revokeTenant,
+  tenantError,
+  type TenantSummary,
+} from './tenants'
+
+const { t } = useI18n()
+const router = useRouter()
+
+const tenants = ref<TenantSummary[]>([])
+const loading = ref(true)
+const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
+const notice = ref('')
+const actionError = ref('')
+const createOpen = ref(false)
+
+// The edit dialog folds the two PENDING-invite operations together: change the owner email (reassign) and
+// resend the invite to the current email.
+const editOpen = ref(false)
+const editId = ref('')
+const editEmail = ref('')
+const editBusy = ref(false)
+
+onMounted(load)
+
+async function load() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    tenants.value = await listTenants()
+  } catch (e) {
+    const { status } = await tenantError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    loadError.value = status === 403 ? 'notAuthorized' : 'failed'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onCreated() {
+  notice.value = t('tenant.inviteSent')
+  await load()
+}
+
+async function runAction(action: () => Promise<unknown>, successKey: string) {
+  actionError.value = ''
+  notice.value = ''
+  try {
+    await action()
+    notice.value = t(successKey)
+    await load()
+  } catch (e) {
+    const { status } = await tenantError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value = t('tenant.actionFailed')
+  }
+}
+
+function openEdit(tenant: TenantSummary) {
+  editId.value = tenant.tenantId
+  editEmail.value = tenant.ownerEmail
+  editOpen.value = true
+}
+
+function revoke(id: string) {
+  if (!window.confirm(t('tenant.revokeConfirm'))) return
+  return runAction(() => revokeTenant(id), 'tenant.revoked')
+}
+
+async function resendFromEdit() {
+  editBusy.value = true
+  await runAction(() => resendInvite(editId.value), 'tenant.resent')
+  editBusy.value = false
+  editOpen.value = false
+}
+
+async function submitReassign() {
+  if (editEmail.value.trim().length === 0) return
+  editBusy.value = true
+  await runAction(() => reassignInvite(editId.value, editEmail.value.trim()), 'tenant.reassigned')
+  editBusy.value = false
+  editOpen.value = false
+}
+</script>
+
+<template>
+  <section class="veyq-surface settings-panel">
+    <section class="settings-form">
+      <div class="settings-section-header">
+        <div>
+          <h2>{{ t('tenant.manageTitle') }}</h2>
+          <p>{{ t('tenant.manageSub') }}</p>
+        </div>
+        <Button :label="t('tenant.create')" icon="pi pi-plus" size="small" @click="createOpen = true" />
+      </div>
+
+      <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
+      <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
+
+      <p v-if="loading" class="settings-muted">{{ t('tenant.loading') }}</p>
+      <Message v-else-if="loadError === 'notAuthorized'" severity="warn" :closable="false">
+        {{ t('tenant.notAuthorized') }}
+      </Message>
+      <Message v-else-if="loadError === 'failed'" severity="error" :closable="false">
+        {{ t('tenant.loadFailed') }}
+      </Message>
+      <p v-else-if="tenants.length === 0" class="settings-muted">{{ t('tenant.empty') }}</p>
+
+      <div v-else class="veyq-list management-list">
+        <div class="veyq-list management-list-items">
+          <div v-for="tenant in tenants" :key="tenant.tenantId" class="veyq-list-row tenant-admin-row">
+            <div class="veyq-row-main">
+              <strong class="veyq-row-title">{{ tenant.name }}</strong>
+              <span class="veyq-row-subtitle">{{ tenant.domain }} · {{ tenant.ownerEmail }}</span>
+              <div class="veyq-row-meta">
+                <span class="veyq-badge" :class="tenant.status === 'PENDING' ? 'warning' : 'success'">
+                  {{ tenant.status === 'PENDING' ? t('tenant.statusPending') : t('tenant.statusActive') }}
+                </span>
+              </div>
+            </div>
+            <div v-if="tenant.status === 'PENDING'" class="management-actions">
+              <Button
+                icon="pi pi-pencil"
+                severity="secondary"
+                outlined
+                size="small"
+                :aria-label="t('tenant.edit')"
+                :title="t('tenant.edit')"
+                @click="openEdit(tenant)"
+              />
+              <Button
+                icon="pi pi-trash"
+                severity="danger"
+                outlined
+                size="small"
+                :aria-label="t('tenant.revoke')"
+                :title="t('tenant.revoke')"
+                @click="revoke(tenant.tenantId)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <CreateTenantDialog v-model:visible="createOpen" @created="onCreated" />
+
+    <Dialog v-model:visible="editOpen" :header="t('tenant.reassignTitle')" modal>
+      <form class="veyq-form" @submit.prevent="submitReassign">
+        <label>
+          {{ t('tenant.ownerEmail') }}
+          <InputText v-model="editEmail" type="email" autocomplete="email" required />
+        </label>
+        <div class="dialog-actions">
+          <Button
+            type="button"
+            :label="t('tenant.resend')"
+            icon="pi pi-send"
+            severity="secondary"
+            outlined
+            :loading="editBusy"
+            @click="resendFromEdit"
+          />
+          <Button
+            type="submit"
+            :label="t('tenant.reassignSubmit')"
+            :loading="editBusy"
+            :disabled="editEmail.trim().length === 0"
+          />
+        </div>
+      </form>
+    </Dialog>
+  </section>
+</template>
+
+<style scoped>
+.settings-muted {
+  margin: 0;
+  color: var(--app-muted);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+</style>

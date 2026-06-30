@@ -5,22 +5,25 @@ import { vaultState } from './app/vault'
 import { rememberRoute } from './app/pendingRoute'
 import SetupView from './views/SetupView.vue'
 import LoginView from './views/LoginView.vue'
-import TenantsView from './views/TenantsView.vue'
+import ServerSettingsView from './views/ServerSettingsView.vue'
 import TenantJoinView from './views/TenantJoinView.vue'
 import MemoryHomeView from './views/MemoryHomeView.vue'
 
-// Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /tenants is
-// the first authenticated content route (Server-Owner tenant administration, cr-0009) — it needs a session;
-// the backend enforces the Server-Owner role with a 403. The Memory shell is a single authenticated route
-// (`/`, `meta.layout: 'app'`, needs an unlocked vault) — the current tree position lives in the URL
-// **#fragment** (`#~me/reisen-2026/rom`, cr-0031), resolved client-side, so the operator never sees it.
+// Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /server/settings
+// is the Server-Owner instance-administration page (cr-0050; tenant administration lives there, cr-0009) — it
+// renders inside the app shell and needs a session (no unlocked vault — it's operational metadata only); the
+// backend enforces the Server-Owner role with a 403. The legacy /tenants route redirects to it. The Memory
+// shell is a single authenticated route (`/`, `meta.layout: 'app'`, needs an unlocked vault) — the current tree
+// position lives in the URL **#fragment** (`#~me/reisen-2026/rom`, cr-0031), resolved client-side, so the
+// operator never sees it.
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: MemoryHomeView, meta: { layout: 'app', requiresUnlock: true } },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/tenants', name: 'tenants', component: TenantsView },
+    { path: '/server/settings', name: 'server-settings', component: ServerSettingsView, meta: { layout: 'app' } },
+    { path: '/tenants', redirect: { name: 'server-settings' } },
     // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
     // preview/register are public and the existing-owner path signs in within the view (cr-0010).
     { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },
@@ -43,7 +46,7 @@ router.beforeEach((to) => {
     }
   }
   // Authenticated routes need a live session (an access token).
-  if (to.name === 'tenants' && session.accessToken === null) return { name: 'login' }
+  if (to.name === 'server-settings' && session.accessToken === null) return { name: 'login' }
   // An already-unlocked session on the login card jumps into the shell. The remembered deep link (if any) is
   // restored by the login view after unlock — it is the single consumer of pendingRoute, so we don't take it
   // here (that would race the view to the one-shot value and drop it).

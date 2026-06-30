@@ -10,7 +10,7 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantsSliceTest.createReturns201Pending] }
       http: { e2e: [http/admin/tenant-authed.http] }
-      web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/views/TenantsView.test.ts] }
+      web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/features/admin/createTenant/TenantAdminPanel.test.ts] }
   - id: reject-duplicate-domain
     text: A domain already mapped to a tenant is rejected (409 domain_taken).
     coverage:
@@ -20,6 +20,9 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantsSliceTest.listIncludesCreatedTenantWithActiveInvite] }
       http: { e2e: [http/admin/tenant-authed.http] }
+      # cr-0050: the Server Settings "Manage tenants" rubric lists all tenants; the ProfileMenu entry + the page
+      # are Server-Owner-gated by the backend 403 (no client serverRole yet).
+      web: { unit: [src/features/admin/createTenant/TenantAdminPanel.test.ts] }
   - id: resend-supersedes-invite
     text: Resend soft-supersedes the current ACTIVE invite and mints a fresh ACTIVE one (one ACTIVE kept).
     coverage:
@@ -95,9 +98,11 @@ acceptanceCriteria:
       backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
       http: { e2e: [http/admin/tenant.http] }
 gaps:
-  web: Slice A is automation-covered (cr-0038) — facade unit tests (tenants.test.ts) + component acceptance
-    for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call; TenantsView.test.ts renders the
-    PENDING row + invite actions + 401-redirect). Slice B activation UI (TenantJoinView — register/sign-in
-    accept building the identity + cold grant) is still backend-only here; its component harness is pending.
+  web: Slice A is automation-covered (cr-0038, cr-0050) — facade unit tests (tenants.test.ts) + component
+    acceptance for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call; TenantAdminPanel.test.ts
+    is the Server Settings "Manage tenants" rubric — renders the PENDING row + edit/delete actions, confirm-gated
+    revoke, 403 not-authorized, 401-redirect). The rubric + its ProfileMenu entry are Server-Owner-gated by the
+    backend 403. Slice B activation UI (TenantJoinView — register/sign-in accept building the identity + cold
+    grant) is still backend-only here; its component harness is pending.
   apple: not built yet — web-first slice; native parity is a later CR
   android: not built yet — web-first slice; native parity is a later CR

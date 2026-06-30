@@ -19,6 +19,7 @@ const en = {
     inviteSent: 'Tenant created — an owner invite was sent.',
     statusPending: 'Pending',
     statusActive: 'Active',
+    edit: 'Edit invite',
     resend: 'Resend invite',
     reassign: 'Change email',
     revoke: 'Revoke',
@@ -107,6 +108,8 @@ const en = {
   shell: {
     appName: 'veyq',
     spaces: 'Spaces',
+    serverSettings: 'Server settings',
+    serverSettingsSub: 'Administer this instance.',
     personal: 'Personal',
     favorites: 'Favorites',
     logout: 'Sign out',
@@ -182,6 +185,7 @@ const de: typeof en = {
     inviteSent: 'Tenant angelegt — eine Owner-Einladung wurde gesendet.',
     statusPending: 'Ausstehend',
     statusActive: 'Aktiv',
+    edit: 'Einladung bearbeiten',
     resend: 'Einladung erneut senden',
     reassign: 'E-Mail ändern',
     revoke: 'Widerrufen',
@@ -270,6 +274,8 @@ const de: typeof en = {
   shell: {
     appName: 'veyq',
     spaces: 'Bereiche',
+    serverSettings: 'Servereinstellungen',
+    serverSettingsSub: 'Diese Instanz verwalten.',
     personal: 'Persönlich',
     favorites: 'Favoriten',
     logout: 'Abmelden',
