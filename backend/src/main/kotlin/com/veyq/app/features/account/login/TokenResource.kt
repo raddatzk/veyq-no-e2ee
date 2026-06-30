@@ -34,10 +34,13 @@ class TokenResource(private val sessions: SessionService, private val cookie: Se
                 .build()
         return if (fromCookie != null) {
             // Re-set the SAME lifetime the request carried (persistent vs session), so rotation never silently
-            // upgrades/downgrades it (ADR 0004 addendum). The token stays out of the body on the web path.
-            val rotatedCookie =
-                if (fromCookie.persistent) cookie.persistent(rotated.refreshToken) else cookie.session(rotated.refreshToken)
-            Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = null)).cookie(rotatedCookie).build()
+            // upgrades/downgrades it (ADR 0004 addendum), and clear the other lifetime so only one refresh cookie
+            // ever exists. The token stays out of the body on the web path.
+            val (rotatedCookie, clearOther) =
+                if (fromCookie.persistent) cookie.persistent(rotated.refreshToken) to cookie.clearedSession()
+                else cookie.session(rotated.refreshToken) to cookie.clearedPersistent()
+            Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = null))
+                .cookie(rotatedCookie, clearOther).build()
         } else {
             Response.ok(TokenPair(accessToken = rotated.accessToken, refreshToken = rotated.refreshToken)).build()
         }

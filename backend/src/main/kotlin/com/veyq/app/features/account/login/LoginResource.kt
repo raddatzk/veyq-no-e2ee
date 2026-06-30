@@ -38,12 +38,16 @@ class LoginResource(private val handler: LoginHandler, private val cookie: Sessi
         // it. Compare by wire value so the exact generated enum constant doesn't matter. `remember` is the legacy
         // web flag, honoured (→ persistent) only when `sessionScope` is absent. Operator-blind in every case.
         val noBodyToken = SessionResponse(accessToken = session.accessToken, family = family, refreshToken = null)
+        // Set ONE refresh cookie and CLEAR the other lifetime — exactly one refresh cookie per device, so a
+        // leftover persistent cookie can't shadow a fresh session one on refresh (read() prefers persistent).
         return when (loginVerifyRequest.sessionScope?.value) {
-            "PERSISTENT" -> Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken)).build()
-            "SESSION" -> Response.ok(noBodyToken).cookie(cookie.session(session.refreshToken)).build()
+            "PERSISTENT" ->
+                Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken), cookie.clearedSession()).build()
+            "SESSION" ->
+                Response.ok(noBodyToken).cookie(cookie.session(session.refreshToken), cookie.clearedPersistent()).build()
             else ->
                 if (loginVerifyRequest.remember == true) {
-                    Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken)).build()
+                    Response.ok(noBodyToken).cookie(cookie.persistent(session.refreshToken), cookie.clearedSession()).build()
                 } else {
                     Response.ok(
                         SessionResponse(accessToken = session.accessToken, family = family, refreshToken = session.refreshToken),

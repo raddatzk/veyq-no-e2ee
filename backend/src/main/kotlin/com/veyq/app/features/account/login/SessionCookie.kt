@@ -38,8 +38,15 @@ class SessionCookie(
         return null
     }
 
+    /** A clearing cookie (Max-Age 0) for the persistent name — set when issuing a SESSION cookie so a prior
+     *  persistent cookie can't shadow it (read() prefers persistent). */
+    fun clearedPersistent(): NewCookie = build(NAME_PERSISTENT, "", 0)
+
+    /** A clearing cookie (Max-Age 0) for the session name — set when issuing a PERSISTENT cookie. */
+    fun clearedSession(): NewCookie = build(NAME_SESSION, "", 0)
+
     /** Clearing cookies (Max-Age 0) for BOTH names — logout drops whichever lifetime the browser holds. */
-    fun cleared(): Array<NewCookie> = arrayOf(build(NAME_PERSISTENT, "", 0), build(NAME_SESSION, "", 0))
+    fun cleared(): Array<NewCookie> = arrayOf(clearedPersistent(), clearedSession())
 
     private fun build(name: String, value: String, maxAge: Int): NewCookie =
         NewCookie.Builder(name)

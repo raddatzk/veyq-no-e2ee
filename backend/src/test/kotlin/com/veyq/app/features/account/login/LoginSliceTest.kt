@@ -9,6 +9,7 @@ import org.hamcrest.CoreMatchers.equalTo
 import org.hamcrest.CoreMatchers.notNullValue
 import org.hamcrest.CoreMatchers.nullValue
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -158,10 +159,14 @@ class LoginSliceTest {
             .body("accessToken", notNullValue())
             .body("refreshToken", nullValue())
             .cookie("veyq_refresh_session", notNullValue())
+            .cookie("veyq_refresh", equalTo("")) // clears any prior persistent cookie so it can't shadow this one
             .extract()
         val c = res.detailedCookie("veyq_refresh_session")
         assertTrue(c.isHttpOnly)
-        assertEquals(-1, c.maxAge) // no Max-Age attribute → a session cookie
+        // A session cookie must OMIT Max-Age entirely. A literal `Max-Age=-1` (or any negative) makes browsers
+        // treat the cookie as already-expired and drop it — so the raw Set-Cookie header must carry no Max-Age.
+        val raw = res.headers().getValues("Set-Cookie").first { it.startsWith("veyq_refresh_session=") }
+        assertFalse(raw.contains("Max-Age", ignoreCase = true), "session cookie must omit Max-Age, got: $raw")
     }
 
     @Test
@@ -181,6 +186,7 @@ class LoginSliceTest {
         val res = verifyScope(EMAIL, sign(KEYPAIR, nonce), "PERSISTENT").then().statusCode(200)
             .body("refreshToken", nullValue())
             .cookie("veyq_refresh", notNullValue())
+            .cookie("veyq_refresh_session", equalTo("")) // clears any prior session cookie (one tier per device)
             .extract()
         assertTrue(res.detailedCookie("veyq_refresh").maxAge > 0) // persistent → survives a browser restart
     }
