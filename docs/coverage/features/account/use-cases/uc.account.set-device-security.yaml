@@ -32,5 +32,7 @@ acceptanceCriteria:
     coverage:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance, LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance] }
 gaps:
-  web: the unified slider is not yet built on web (web has the L1 trust-device flow today); planned.
+  web: no unified L0–L3 slider yet — web has the L1 trust-device flow plus the L3 "remember me" opt-in (cr-0052,
+    a checkbox at sign-in that drives the persistent cookie + local Master-Key cache), but not the full
+    mutually-exclusive chooser; planned.
   backend: no backend change — the slider is a client concern over the existing wraps endpoints (N/A as a distinct surface).

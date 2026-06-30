@@ -196,17 +196,27 @@ components:
           maxLength: 256
           example: c2lnbmF0dXJlLW92ZXItbm9uY2U=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        remember:
+          type: boolean
+          default: false
+          description: >
+            Web "remember me" (ADR 0004 / ADR 0005 §15): when true the server returns the refresh token as an
+            **httpOnly + Secure + SameSite cookie** (persistent — survives a browser restart) **instead of** in
+            the response body, and `refreshToken` is omitted from the body. Native clients omit this flag and
+            keep the response-body token + `Bearer`. Optional; defaults to false (in-memory body token).
 
     RefreshRequest:
       type: object
-      required: [refreshToken]
       properties:
         refreshToken:
           type: string
-          description: The opaque refresh token to rotate.
+          description: >
+            The opaque refresh token to rotate. **Optional**: web "remember me" sessions send the token in the
+            httpOnly cookie instead (an empty body), native clients send it here. The server uses the cookie
+            when present, else this field; one of the two must be supplied.
           maxLength: 512
           example: cmVmcmVzaC10b2tlbi1vcGFxdWU
-          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 512)'
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512)'
 
     SessionFamily:
       type: object
@@ -220,7 +230,7 @@ components:
 
     TokenPair:
       type: object
-      required: [accessToken, refreshToken]
+      required: [accessToken]
       properties:
         accessToken:
           type: string
@@ -229,13 +239,15 @@ components:
           example: YWNjZXNzLXRva2Vu
         refreshToken:
           type: string
-          description: Opaque refresh token (long-lived); send only to /api/token/refresh.
+          description: >
+            Opaque refresh token (long-lived); send only to /api/token/refresh. **Omitted** when the rotation
+            rode the httpOnly cookie (web "remember me") — the new refresh token is then set as a fresh cookie.
           maxLength: 512
           example: cmVmcmVzaC10b2tlbg
 
     SessionResponse:
       type: object
-      required: [accessToken, refreshToken, family]
+      required: [accessToken, family]
       properties:
         accessToken:
           type: string
@@ -244,7 +256,9 @@ components:
           example: YWNjZXNzLXRva2Vu
         refreshToken:
           type: string
-          description: Opaque refresh token (long-lived); send only to /api/token/refresh.
+          description: >
+            Opaque refresh token (long-lived); send only to /api/token/refresh. **Omitted** when `remember` was
+            true — the token is then set as an httpOnly cookie instead (web "remember me").
           maxLength: 512
           example: cmVmcmVzaC10b2tlbg
         family: { $ref: "#/components/schemas/SessionFamily" }

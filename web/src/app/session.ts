@@ -11,8 +11,10 @@ export const session = reactive({
   familyId: null as string | null,
 })
 
-/** Store the tokens from a login or a rotation. `familyId` is set at login and kept across refreshes. */
-export function setTokens(accessToken: string, refreshToken: string, familyId?: string): void {
+/** Store the tokens from a login or a rotation. `familyId` is set at login and kept across refreshes.
+ *  `refreshToken` is **null** for a "remember me" session (cr-0052): the refresh token then lives only in the
+ *  httpOnly cookie and refresh sends an empty body so the browser attaches it — it never reaches JS. */
+export function setTokens(accessToken: string, refreshToken: string | null, familyId?: string): void {
   session.accessToken = accessToken
   session.refreshToken = refreshToken
   if (familyId !== undefined) session.familyId = familyId

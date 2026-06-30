@@ -10,7 +10,8 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { login, logout } from '../features/account/login/login'
 import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/unlock'
-import { trustThisDevice, untrustThisDevice, isTrusted, isTrustSupported } from '../features/account/trustDevice/trustDevice'
+import { trustThisDevice, isTrusted, isTrustSupported } from '../features/account/trustDevice/trustDevice'
+import { cacheMasterKey, isCacheSupported } from '../features/account/rememberMe/vaultCache'
 import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
@@ -29,9 +30,13 @@ const busy = ref(false)
 const error = ref('')
 const loggedIn = ref(false)
 const deviceTrusted = ref(false)
-const trustFailed = ref(false)
 const trustChecked = ref(false)
 const trustSupported = isTrustSupported()
+// "Remember me" = opt into L3 (cr-0052): the session rides a persistent cookie and the Master Key is cached
+// locally, so a restart opens straight in. Chosen at sign-in (it drives the login cookie) and reused at unlock
+// (to cache the key). Only offered where IndexedDB + WebCrypto exist.
+const remember = ref(false)
+const rememberSupported = isCacheSupported()
 const fileInput = ref<HTMLInputElement | null>(null)
 const showSecret = ref(false)
 const scanOpen = ref(false)
@@ -44,7 +49,7 @@ async function submit() {
   error.value = ''
   busy.value = true
   try {
-    await login(email.value, password.value)
+    await login(email.value, password.value, remember.value)
     // Stay on the (spinner-busy) sign-in card while we try a trusted-device unlock — so a trusted device
     // jumps straight to "unlocked" and never flashes the Secret-Key floor as an intermediate step.
     // (An IndexedDB hiccup must not break a successful login — default to the floor if the check fails.)
@@ -56,6 +61,7 @@ async function submit() {
       password.value = ''
       secretKey.value = ''
       pendingSecretKey = ''
+      if (remember.value) await cacheMasterKey(email.value, masterKey()!).catch(() => {})
       await router.push(takeRoute() ?? { name: 'home' })
       return
     }
@@ -81,16 +87,18 @@ async function unlock() {
     await unlockMasterKey(password.value, secretKey.value)
     if (trustChecked.value && trustSupported) {
       // Enrol now, while the just-entered (known-correct) password is still in hand and the vault is open.
-      // Enrolment is best-effort — the unlock already succeeded — but a failure is surfaced (not silent) so
-      // the user isn't misled into thinking the device is trusted when it isn't.
+      // Best-effort — the unlock already succeeded; if enrolment fails the device simply stays untrusted (the
+      // user needs their Secret Key next time). Surfacing that failure is a later improvement (no UI for it now
+      // that the post-unlock card is gone — the screen redirects straight into the shell).
       try {
         await trustThisDevice(email.value, password.value, masterKey()!)
         deviceTrusted.value = true
       } catch {
-        trustFailed.value = true
+        // best-effort: enrolment failed, device stays untrusted
       }
     }
     trustChecked.value = false
+    if (remember.value) await cacheMasterKey(email.value, masterKey()!).catch(() => {})
     password.value = ''
     secretKey.value = ''
     await router.push(takeRoute() ?? { name: 'home' })
@@ -124,16 +132,6 @@ function onScanned(kit: { secretKey: string }) {
   error.value = ''
 }
 
-async function untrust() {
-  busy.value = true
-  try {
-    await untrustThisDevice(email.value)
-    deviceTrusted.value = false
-  } finally {
-    busy.value = false
-  }
-}
-
 async function signOut() {
   await logout() // revokes the session, drops tokens, and re-locks the vault (centralised in logout)
   loggedIn.value = false
@@ -142,7 +140,6 @@ async function signOut() {
   pendingSecretKey = ''
   trustChecked.value = false
   deviceTrusted.value = false
-  trustFailed.value = false
   error.value = ''
 }
 
@@ -179,6 +176,13 @@ onMounted(() => {
             fluid
           />
         </label>
+        <div v-if="rememberSupported" class="checkbox-row">
+          <Checkbox v-model="remember" input-id="remember-me" binary />
+          <label for="remember-me">
+            {{ t('login.rememberMe') }}
+            <small class="field-hint">{{ t('login.rememberMeHint') }}</small>
+          </label>
+        </div>
         <Button
           type="submit"
           :label="busy ? t('login.submitting') : t('login.submit')"
@@ -268,36 +272,24 @@ onMounted(() => {
         />
       </form>
 
-      <!-- Unlocked -->
-      <div v-else class="veyq-form">
-        <Message severity="success" :closable="false">{{ t('unlock.unlockedTitle') }}</Message>
-        <p class="veyq-form-copy">{{ t('unlock.unlockedNote') }}</p>
-        <Message v-if="trustFailed" severity="warn" :closable="false" class="form-message">{{ t('unlock.trustFailed') }}</Message>
-        <Button
-          type="button"
-          :label="t('tenant.manageTitle')"
-          icon="pi pi-building"
-          @click="router.push({ name: 'tenants' })"
-        />
-        <Button
-          v-if="deviceTrusted"
-          type="button"
-          :label="t('unlock.untrust')"
-          icon="pi pi-shield"
-          severity="secondary"
-          text
-          :loading="busy"
-          @click="untrust"
-        />
-        <Button
-          type="button"
-          :label="t('login.signOut')"
-          icon="pi pi-sign-out"
-          severity="secondary"
-          @click="signOut"
-        />
+      <!-- Unlocked → redirecting into the shell. No confirmation card; the navigation is the feedback. -->
+      <div v-else class="login-redirecting" aria-hidden="true">
+        <span class="pi pi-spin pi-spinner" />
       </div>
     </template>
   </Card>
   <KitScanner v-if="scanOpen" @found="onScanned" @close="scanOpen = false" />
 </template>
+
+<style scoped>
+/* The unlocked state only flashes for the moment before the redirect — a neutral spinner, no card. */
+.login-redirecting {
+  display: grid;
+  place-items: center;
+  padding: 1.5rem 0;
+}
+.login-redirecting .pi-spinner {
+  font-size: 1.5rem;
+  color: var(--app-muted);
+}
+</style>

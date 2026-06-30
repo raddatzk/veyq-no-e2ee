@@ -8,8 +8,10 @@ import { fromB64std } from '../../../shared/base64'
 import { accountApi } from '../../../api/client'
 import { withRefresh } from '../login/login'
 import { setUnlocked } from '../../../app/vault'
+import { setAccount } from '../../../app/account'
 import { MasterKeyWrapMethodEnum, type AccountKeyMaterial } from '../../../api/generated/account'
 import * as device from '../trustDevice/deviceKey'
+import { loadCachedMasterKey, clearMasterKeyCache } from '../rememberMe/vaultCache'
 
 function fetchKeyMaterial(): Promise<AccountKeyMaterial> {
   return withRefresh(() => accountApi().getAccountKeyMaterial())
@@ -46,6 +48,26 @@ export async function unlockMasterKey(password: string, secretKeyB64: string): P
  * cleared here) — so the caller falls back to the PASSWORD floor. **Throws** on a wrong password (AEAD tag
  * mismatch) → the same generic failure as the floor path.
  */
+/**
+ * Boot path (L3 "remember me", cr-0052): re-open the vault from the local cache with **no prompt**. Loads the
+ * cached Master Key (+ its email), fetches the session-gated key material, and unwraps the identity key under
+ * it. Returns false (→ the user lands on the floor) when nothing is cached or the material no longer fits the
+ * cached key (changed/gone) — and drops the now-stale cache in that case. Requires a live session (the caller
+ * restores it from the cookie first).
+ */
+export async function restoreVaultFromCache(): Promise<boolean> {
+  const cached = await loadCachedMasterKey()
+  if (!cached) return false
+  setAccount(cached.email)
+  try {
+    openVault(await fetchKeyMaterial(), cached.masterKey)
+    return true
+  } catch {
+    await clearMasterKeyCache() // material changed/gone → stale cache, fall back to the floor
+    return false
+  }
+}
+
 export async function unlockWithDevice(email: string, password: string): Promise<boolean> {
   const trust = await device.loadTrust(email)
   if (!trust) return false

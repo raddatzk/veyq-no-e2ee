@@ -10,6 +10,7 @@ import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.equalTo
 import org.hamcrest.CoreMatchers.hasItems
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -98,7 +99,9 @@ class AccountWrapsSliceTest {
         }
         val token = issueToken(USER_A)
         delete(token, recId).then().statusCode(204)
-        keyMaterial(token).then().statusCode(200).body("wraps.method", hasItems("RECOVERY"))
+        // RECOVERY is no longer served in the normal material (cr-0052) — verify the no-op delete left the row
+        // in place directly in the DB.
+        QuarkusTransaction.requiringNew().run { assertNotNull(MasterKeyWrapEntity.findById(recId)) }
     }
 
     @Test

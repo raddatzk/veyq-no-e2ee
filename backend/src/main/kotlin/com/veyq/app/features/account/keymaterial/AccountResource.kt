@@ -19,7 +19,9 @@ import org.jboss.logging.Logger
  * The material is keyed off the authenticated caller (the `SecurityIdentity` principal), never an id in the
  * request, so it is no cross-account read. Authentication is central (`@Authenticated`, cr-0012): a missing,
  * malformed, expired, or revoked token is a single generic 401 before this runs (auth ≠ unlock — a stolen token
- * yields only ciphertext, useless without the password and Secret Key).
+ * yields only ciphertext, useless without the password and Secret Key). That last property holds because the
+ * handler serves only the **interactive** wraps: the password-less RECOVERY wrap is withheld here and released
+ * only by the (future) email-gated recovery flow (cr-0052), so a session alone never opens the vault.
  */
 @Authenticated
 class AccountResource(

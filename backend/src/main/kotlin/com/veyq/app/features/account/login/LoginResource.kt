@@ -19,7 +19,7 @@ import java.util.UUID
  */
 @PermitAll
 @RateLimited
-class LoginResource(private val handler: LoginHandler) : LoginApi {
+class LoginResource(private val handler: LoginHandler, private val cookie: SessionCookie) : LoginApi {
 
     override fun requestLoginChallenge(loginChallengeRequest: LoginChallengeRequest): Response {
         val challenge = handler.challenge(loginChallengeRequest.email)
@@ -33,12 +33,17 @@ class LoginResource(private val handler: LoginHandler) : LoginApi {
             ?: return Response.status(Response.Status.UNAUTHORIZED)
                 .entity(ErrorResponse(code = "authentication_failed"))
                 .build()
-        return Response.ok(
-            SessionResponse(
-                accessToken = session.accessToken,
-                refreshToken = session.refreshToken,
-                family = SessionFamily(id = UUID.fromString(session.familyId)),
-            ),
-        ).build()
+        val family = SessionFamily(id = UUID.fromString(session.familyId))
+        // Web "remember me" (ADR 0005 §15): hand the refresh token over as a persistent httpOnly cookie and omit
+        // it from the body; otherwise the body carries it (native, or in-memory web). Operator-blind either way.
+        return if (loginVerifyRequest.remember == true) {
+            Response.ok(SessionResponse(accessToken = session.accessToken, family = family, refreshToken = null))
+                .cookie(cookie.persistent(session.refreshToken))
+                .build()
+        } else {
+            Response.ok(
+                SessionResponse(accessToken = session.accessToken, family = family, refreshToken = session.refreshToken),
+            ).build()
+        }
     }
 }

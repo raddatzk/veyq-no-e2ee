@@ -11,6 +11,8 @@ import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.equalTo
+import org.hamcrest.CoreMatchers.not
+import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -37,14 +39,25 @@ class AccountKeyMaterialSliceTest {
 
     @Test
     fun validTokenReturnsCallersMaterial() {
+        // The account is seeded with a PASSWORD floor + a RECOVERY wrap, but the normal material serves only
+        // the interactive (PASSWORD) wrap — RECOVERY is withheld for the email-gated recovery flow (cr-0052).
         get(issueToken(USER_A))
             .then().statusCode(200)
             .body("suiteId", equalTo("v1"))
             .body("wrappedIdentityPrivateKey", equalTo(A_PRIV))
-            .body("wraps.size()", equalTo(2))
-            .body("wraps.method", hasItems("PASSWORD", "RECOVERY"))
+            .body("wraps.size()", equalTo(1))
+            .body("wraps.method", hasItems("PASSWORD"))
             .body("wraps.find { it.method == 'PASSWORD' }.wrappedKey", equalTo(A_PW_WRAP))
             .body("wraps.find { it.method == 'PASSWORD' }.kdfParams", equalTo(KDF))
+    }
+
+    @Test
+    fun recoveryWrapIsNeverServedInNormalMaterial() {
+        // The Secret-Key-only RECOVERY wrap must not ride the normal unlock material (else a session + the
+        // Secret Key would open the vault without the password). It is released only by the recovery flow.
+        get(issueToken(USER_A))
+            .then().statusCode(200)
+            .body("wraps.method", not(hasItem("RECOVERY")))
     }
 
     @Test

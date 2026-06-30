@@ -7,6 +7,7 @@ import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import org.hamcrest.CoreMatchers.equalTo
 import org.hamcrest.CoreMatchers.notNullValue
+import org.hamcrest.CoreMatchers.nullValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -135,6 +136,47 @@ class LoginSliceTest {
         refresh(session.refreshToken).then().statusCode(401) // family gone
     }
 
+    // --- "remember me" cookie transport (cr-0052) ---
+
+    @Test
+    fun rememberLoginSetsHttpOnlyRefreshCookieAndOmitsBodyToken() {
+        val nonce = requestChallenge(EMAIL)
+        val res = verifyRemember(EMAIL, sign(KEYPAIR, nonce)).then().statusCode(200)
+            .body("accessToken", notNullValue())
+            .body("refreshToken", nullValue()) // omitted from the body — it rides the cookie instead
+            .cookie("veyq_refresh", notNullValue())
+            .extract()
+        assertTrue(res.detailedCookie("veyq_refresh").isHttpOnly)
+    }
+
+    @Test
+    fun refreshViaCookieRotatesAndOmitsBodyToken() {
+        val cookie = rememberLoginCookie()
+        // No body token — the refresh token rides the cookie; the rotated one comes back as a fresh cookie.
+        given().contentType(ContentType.JSON).cookie("veyq_refresh", cookie).body("{}")
+            .`when`().post("/api/token/refresh")
+            .then().statusCode(200)
+            .body("accessToken", notNullValue())
+            .body("refreshToken", nullValue())
+            .cookie("veyq_refresh", notNullValue())
+    }
+
+    @Test
+    fun refreshWithNeitherCookieNorBodyTokenIs400() {
+        given().contentType(ContentType.JSON).body("{}")
+            .`when`().post("/api/token/refresh")
+            .then().statusCode(400).body("code", equalTo("invalid_request"))
+    }
+
+    @Test
+    fun logoutClearsRefreshCookie() {
+        val session = login()
+        given().header("Authorization", "Bearer ${session.accessToken}")
+            .`when`().post("/api/logout")
+            .then().statusCode(204)
+            .cookie("veyq_refresh", equalTo("")) // Max-Age 0, empty value — the browser drops it
+    }
+
     // --- instance salt ---
 
     @Test
@@ -165,6 +207,17 @@ class LoginSliceTest {
     private fun verify(email: String, signatureB64: String) =
         given().contentType(ContentType.JSON).body("""{"email":"$email","signature":"$signatureB64"}""")
             .`when`().post("/api/login/verify")
+
+    private fun verifyRemember(email: String, signatureB64: String) =
+        given().contentType(ContentType.JSON)
+            .body("""{"email":"$email","signature":"$signatureB64","remember":true}""")
+            .`when`().post("/api/login/verify")
+
+    private fun rememberLoginCookie(): String {
+        val nonce = requestChallenge(EMAIL)
+        return verifyRemember(EMAIL, sign(KEYPAIR, nonce)).then().statusCode(200)
+            .extract().cookie("veyq_refresh")
+    }
 
     private fun refresh(refreshToken: String) =
         given().contentType(ContentType.JSON).body("""{"refreshToken":"$refreshToken"}""")

@@ -18,10 +18,18 @@ sealed interface AddWrapOutcome {
 @ApplicationScoped
 class KeyMaterialHandler(private val store: KeyMaterialStore) {
 
-    /** The caller's key material, or null only if the account has none — a server-side inconsistency for an
-     *  authenticated user (every account is created with its wraps), surfaced as a 500 at the boundary. */
+    /** The caller's key material for the **normal unlock** path, or null only if the account has none — a
+     *  server-side inconsistency for an authenticated user (every account is created with its wraps), surfaced
+     *  as a 500 at the boundary.
+     *
+     *  Serves only the **interactive** unlock wraps. The RECOVERY wrap is a password-less, Secret-Key-only path
+     *  (`KEK = Argon2id(secretKey)`) — it must be released **only** by the future email-gated recovery flow,
+     *  never in the normal material; otherwise a live session + the Secret Key would open the vault **without
+     *  the password**, silently demoting the password from a content factor (cr-0052). PASSWORD / DEVICE /
+     *  PASSKEY stay (their KEKs are device- or password-bound); the client's normal unlock uses PASSWORD. */
     @Transactional
-    fun forUser(userId: String): KeyMaterial? = store.find(userId)
+    fun forUser(userId: String): KeyMaterial? =
+        store.find(userId)?.let { m -> m.copy(wraps = m.wraps.filterNot { it.method == RECOVERY_METHOD }) }
 
     /** Add a wrap for the authenticated caller. Caps DEVICE enrolments per account so a buggy/malicious
      *  client can't flood the row set (re-trust replaces, so normal use never approaches the cap). */
@@ -39,5 +47,6 @@ class KeyMaterialHandler(private val store: KeyMaterialStore) {
 
     companion object {
         const val MAX_WRAPS_PER_METHOD = 20L
+        private const val RECOVERY_METHOD = "RECOVERY"
     }
 }

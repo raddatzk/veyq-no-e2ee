@@ -14,13 +14,14 @@ import jakarta.ws.rs.core.Response
  * `@Authenticated`. This is the one endpoint that still parses the header itself.
  */
 @PermitAll
-class SessionResource(private val sessions: SessionService) : SessionApi {
+class SessionResource(private val sessions: SessionService, private val cookie: SessionCookie) : SessionApi {
 
     @Context
     lateinit var headers: HttpHeaders
 
     override fun logout(): Response {
         bearerToken(headers)?.let { sessions.revokeByAccessToken(it) }
-        return Response.noContent().build()
+        // Drop the web refresh cookie too (cr-0052) — a no-op for native callers that never set one.
+        return Response.noContent().cookie(cookie.cleared()).build()
     }
 }

@@ -43,6 +43,12 @@ acceptanceCriteria:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
 gaps:
-  web: planned — an equivalent "stay signed in" web level is not yet built.
+  web: a "remember me" L3 is built (cr-0052) — a persistent httpOnly refresh cookie restores the session and the
+    unlocked Master Key is cached locally under a non-extractable AES key. Web tests cover the cache round-trip
+    (src/features/account/rememberMe/vaultCache.test.ts) and the cookie round-trip (backend LoginSliceTest), and
+    a live browser smoke confirmed reload opens straight in (refresh 200 + key-material 200, no relogin). It
+    deviates from the native L3 — a local cache, not a server-stored device-key wrap — so the server-wrap
+    criteria (method=DEVICE enrol, reversible-via-untrust) and the explicit chooser/warning stay web gaps;
+    full parity is a follow-up.
 # A device-passcode-set check + an explicit L3 warning dialog (ADR 0005 §13) are a polish item on top of
 # the verified flow above (the floor subtitle already warns "relies only on your device's lock screen").
