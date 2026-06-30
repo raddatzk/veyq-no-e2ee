@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import Breadcrumb from 'primevue/breadcrumb'
 import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
+import UploadStatusMenu from '../../features/memory/components/UploadStatusMenu.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -35,6 +36,8 @@ const items = computed<MenuItem[]>(() =>
         <kbd>⌘K</kbd>
       </label>
     </div>
-    <div class="workspace-topbar-actions" />
+    <div class="workspace-topbar-actions">
+      <UploadStatusMenu />
+    </div>
   </header>
 </template>

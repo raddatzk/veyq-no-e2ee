@@ -11,6 +11,7 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
 import { listMedia, openGrid, hasDerivatives, type MediaItem } from '../media'
+import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
 
 const props = defineProps<{ node: TreeNode; scopeId: string; memoryKey: Uint8Array | null; favorite?: boolean }>()
@@ -22,6 +23,51 @@ const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 const lightboxIndex = ref<number | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+// --- upload trigger (uc.memory.upload). The Safari Photos picker populates input.files LATE / across repeated
+// picks with empty MIME types — so we re-read the input over a short window, MERGE (never replace) the picks,
+// and only enqueue after a brief quiet period; selection accepts files by extension when the MIME is empty.
+const RETRY_DELAYS = [250, 750, 1500, 3000]
+const QUIET_MS = 1200
+let selection: File[] = []
+let quietTimer: ReturnType<typeof setTimeout> | null = null
+
+function triggerUpload() {
+  fileInput.value?.click()
+}
+
+function onFilesPicked() {
+  const input = fileInput.value
+  if (!input) return
+  collect(input)
+  RETRY_DELAYS.forEach((d) => setTimeout(() => collect(input), d))
+}
+
+function collect(input: HTMLInputElement) {
+  const before = selection.length
+  const incoming = Array.from(input.files ?? []).filter(isSupportedMediaFile)
+  selection = mergeFiles(selection, incoming)
+  if (selection.length !== before || (selection.length > 0 && quietTimer === null)) {
+    if (quietTimer) clearTimeout(quietTimer)
+    quietTimer = setTimeout(flushSelection, QUIET_MS)
+  }
+}
+
+function flushSelection() {
+  quietTimer = null
+  const key = props.memoryKey
+  const picked = selection
+  selection = []
+  if (fileInput.value) fileInput.value.value = '' // allow re-picking the same file
+  if (picked.length === 0 || !key) return
+  const targetNodeId = props.node.id
+  enqueueUploads(
+    { scopeId: props.scopeId, nodeId: targetNodeId, memoryKey: key },
+    picked.map((file) => ({ file, mediaType: inferMediaType(file) })),
+    { label: props.node.name, onComplete: () => { if (props.node.id === targetNodeId) void load() } },
+  )
+}
 
 function revokeThumbs() {
   for (const url of thumbs.value.values()) URL.revokeObjectURL(url)
@@ -82,6 +128,21 @@ onBeforeUnmount(revokeThumbs)
         <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
       </div>
       <div class="gallery-header-actions">
+        <Button
+          type="button"
+          :label="t('media.upload')"
+          icon="pi pi-cloud-upload"
+          :disabled="!memoryKey"
+          @click="triggerUpload"
+        />
+        <input
+          ref="fileInput"
+          type="file"
+          multiple
+          accept="image/*,video/*,.heic,.heif,.mov,.m4v,.mkv,.avi,.tif,.tiff"
+          class="visually-hidden"
+          @change="onFilesPicked"
+        />
         <Button
           type="button"
           class="memory-detail-fav"
