@@ -72,12 +72,12 @@ User-facing result:
   `DEVICE_KEY` wrap + `sessionScope: PERSISTENT` (+ clears the session vault). Boot restore tries the session
   vault first (off), then the `DEVICE_KEY` wrap (on); logout + the no-session boot path clear the session vault.
   · Done: `npm run check` green (168 tests).
-- [~] 4 coverage + verify — updated
+- [x] 4 coverage + verify — updated
   [uc.account.remember-this-device.yaml](../docs/coverage/features/account/use-cases/uc.account.remember-this-device.yaml)
   (the "off" criterion now: survives reload, password-only after close; backend session-cookie + web session-vault
-  refs). The three trust-chain guards green. **Live browser smoke left to the user** (their request — they test
-  in parallel): off → reload stays in / close+reopen → email+password (no Secret Key); on → reload + restart open
-  straight in; logout drops both cookies + the session vault.
+  refs). The three trust-chain guards green. **Live browser smoke green** (re-seeded instance, driven in the
+  preview): off-login → reached the shell + cached the session vault → **reload stayed in the shell**
+  (`token/refresh` 200, key-material 200, no prompt). Surfaced + fixed a real bug first (see retro).
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
@@ -114,8 +114,18 @@ and (via the kept `DEVICE` wrap) password-only after a close. "On" stays persist
   there — a conscious, bounded relaxation (ADR 0005 §23): no worse than the already-open in-memory vault, cleared
   on close, operator-blind untouched. "On" keeps the non-extractable IndexedDB key (never raw).
 
-**Verification.** `./gradlew check` (new session-cookie slice tests) + `npm run check` (168 tests, incl.
-`sessionVault.test.ts`) + the three trust-chain guards green. The live three-state browser smoke was **delegated
-to the user** (they test in parallel); if it surfaces anything, iterate as with cr-0054.
+**Verification.** `./gradlew check` (session-cookie slice tests) + `npm run check` (168 tests, incl.
+`sessionVault.test.ts`) + the three trust-chain guards green; the off-reload smoke confirmed end-to-end in the
+preview against a re-seeded instance.
+
+**Bug found during live testing (fixed, `09e2d93e`).** A login set one refresh cookie but left the other; since
+`read()` prefers the persistent cookie, a leftover `veyq_refresh` (from an earlier "remember me" login) **shadowed**
+the fresh `veyq_refresh_session` — `sessions.refresh()` got the stale token and 401'd, so "off" was logged out on
+the first reload (while "on" worked). The two cookie names that solve the rotation-lifetime problem (above)
+created this shadowing exactly when a user switches tiers. Fix: each login sets one refresh cookie and **clears the
+other lifetime** (rotation too) → exactly one refresh cookie per device. This was **not** Safari-specific — it
+reproduced in Chromium. Lesson: the first off-test that failed was on a stale backend, but the *real* defect only
+surfaced once a `veyq_refresh` cookie existed from a prior on-login — worth seeding the "switch tiers" path into
+the smoke, not just first-login-per-tier.
 
 **Note.** Native (apple/android) is body-token only and has no browser-session concept — N/A, no parity action.
