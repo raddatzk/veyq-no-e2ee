@@ -42,7 +42,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   `K_mem`, threaded through `createNode` / partial `updateNode` / `listNodes`, materialized so a card/map reads
   it without loading media. Envelope + `date` sub-object shipped cr-0067; `location` sub-object planned)
 
-## Use-cases (planned, on the tree + media enablers)
+## Use-cases (on the tree + media enablers)
 
 - Browse & organize the Memory tree — the shell + folder/Memory browse + create/rename/delete
   ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done**, web/apple/android shells)
