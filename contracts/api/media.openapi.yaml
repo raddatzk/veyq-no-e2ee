@@ -189,16 +189,17 @@ paths:
           description: No such scope/media, or the caller holds no grant for the scope.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+
+  /api/scopes/{scopeId}/media/{mediaId}/captured-at:
     put:
       tags: [media]
-      operationId: updateMediaMeta
-      summary: Overwrite a media's sealed EXIF bundle (e.g. a corrected capture time) — opaque.
+      operationId: updateMediaCapturedAt
+      summary: Overwrite a media's sealed capture-time tier (e.g. a corrected date) — opaque.
       description: >
-        Re-store the media's `wrappedExif` verbatim: the client unseals the current bundle under `K_mem`, adds
-        or removes a correction (e.g. a `capturedAtOverride`), re-seals the **whole** bundle, and PUTs the new
-        opaque base64 (or null to clear it). Operator-blind — the server overwrites the ciphertext it holds and
-        never inspects the fields inside; it can't merge at field level (it can't read the bundle). Guards: the
-        caller holds a grant for the scope; a media target must exist.
+        Re-store the media's `wrappedCapturedAt` verbatim: the client re-seals the `{v,capturedAt,
+        capturedAtOverride}` tier under `K_mem` (correction added/removed) and PUTs the new opaque base64 (or
+        null to clear it). Operator-blind — the server overwrites the ciphertext it holds and never inspects the
+        timestamp inside. Guards: the caller holds a grant for the scope; a media target must exist.
       security:
         - bearerAuth: []
       parameters:
@@ -208,15 +209,15 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaMetaUpdate" }
+            schema: { $ref: "#/components/schemas/MediaCapturedAtUpdate" }
             example:
-              wrappedExif: ZXhpZi1jaXBoZXJ0ZXh0
+              wrappedCapturedAt: ZGF0ZS1jaXBoZXJ0ZXh0
       responses:
         "200":
-          description: The stored EXIF (echoed opaque base64, or null when cleared).
+          description: The stored capture-time tier (echoed opaque base64, or null when cleared).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaMetaResponse" }
+              schema: { $ref: "#/components/schemas/MediaCapturedAtResponse" }
         "400":
           description: Malformed request.
           content:
@@ -411,13 +412,23 @@ components:
           contentEncoding: base64
           maxLength: 256
           example: ZGltcy1jaXBoZXJ0ZXh0
+        wrappedCapturedAt:
+          type: [string, "null"]
+          description: >
+            The original's **capture-time tier** `{v,capturedAt,capturedAtOverride}` sealed under the Memory's
+            `K_mem` (opaque base64) — the derived original (EXIF date or the file's creation date) plus any user
+            correction. Small and **returned with every list** so the gallery can sort by date without the blind
+            server ever seeing a timestamp. Absent when the source carried no usable date.
+          contentEncoding: base64
+          maxLength: 256
+          example: ZGF0ZS1jaXBoZXJ0ZXh0
         wrappedExif:
           type: [string, "null"]
           description: >
-            The original's **full EXIF bundle** (camera, lens, aperture, ISO, GPS, capture time, …) sealed under
+            The original's **full EXIF bundle** (camera, lens, aperture, ISO, GPS, dimensions, …) sealed under
             the Memory's `K_mem` (opaque base64). Stored verbatim, **not** returned by `listNodeMedia` (kept
             constant-small) — the lightbox lazy-loads it via `getMediaMeta`. Absent when the source carried no
-            readable EXIF. Larger than the layout tier, so a wider cap.
+            readable EXIF. The capture time lives in `wrappedCapturedAt`, not here. Larger, so a wider cap.
           contentEncoding: base64
           maxLength: 16384
           example: ZXhpZi1jaXBoZXJ0ZXh0
@@ -507,10 +518,19 @@ components:
           description: >
             The original's layout tier `{v,w,h}` sealed under `K_mem` (opaque base64) — pixel geometry only; the
             gallery unwraps it to lay out the justified grid. Null when none was sealed at upload (the grid uses
-            a default aspect). Capture time + the heavier EXIF tier are lazy via `getMediaMeta`.
+            a default aspect). The heavier EXIF tier is lazy via `getMediaMeta`.
           contentEncoding: base64
           maxLength: 256
           example: ZGltcy1jaXBoZXJ0ZXh0
+        wrappedCapturedAt:
+          type: [string, "null"]
+          description: >
+            The original's capture-time tier `{v,capturedAt,capturedAtOverride}` sealed under `K_mem` (opaque
+            base64); the gallery unwraps it to sort tiles by effective capture time (`override ?? capturedAt`).
+            Null when no date was sealed (the media sorts last).
+          contentEncoding: base64
+          maxLength: 256
+          example: ZGF0ZS1jaXBoZXJ0ZXh0
 
     MediaDerivativeSummary:
       type: object
@@ -553,18 +573,29 @@ components:
           maxLength: 16384
           example: ZXhpZi1jaXBoZXJ0ZXh0
 
-    MediaMetaUpdate:
+    MediaCapturedAtUpdate:
       type: object
       description: >
-        Overwrite a media's sealed EXIF bundle (re-sealed client-side under `K_mem`), e.g. to persist a
-        corrected capture time. Null clears it. Opaque to the server.
+        Overwrite a media's sealed capture-time tier (re-sealed client-side under `K_mem`), e.g. to persist a
+        corrected date. Null clears it. Opaque to the server.
       properties:
-        wrappedExif:
+        wrappedCapturedAt:
           type: [string, "null"]
-          description: The re-sealed full EXIF bundle (opaque base64), or null to clear the media's EXIF tier.
+          description: The re-sealed capture-time tier (opaque base64), or null to clear the media's date.
           contentEncoding: base64
-          maxLength: 16384
-          example: ZXhpZi1jaXBoZXJ0ZXh0
+          maxLength: 256
+          example: ZGF0ZS1jaXBoZXJ0ZXh0
+
+    MediaCapturedAtResponse:
+      type: object
+      description: A media's stored capture-time tier (opaque), echoed after an update.
+      properties:
+        wrappedCapturedAt:
+          type: [string, "null"]
+          description: The sealed capture-time tier (opaque base64), or null when cleared.
+          contentEncoding: base64
+          maxLength: 256
+          example: ZGF0ZS1jaXBoZXJ0ZXh0
 
     # --- presign downloads ---------------------------------------------------
     BlobDownloadsBatchRequest:

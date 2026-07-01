@@ -8,7 +8,11 @@ vi.mock('../../../api/client', () => ({
   sessionApi: vi.fn(),
 }))
 
+// exifr drives the sealed capture-time tier; default = no date, tests override per media (cr-0066).
+vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
+
 import { mount, flushPromises } from '@vue/test-utils'
+import exifr from 'exifr'
 import { createI18n } from 'vue-i18n'
 import PrimeVue from 'primevue/config'
 import MemoryDetail from './MemoryDetail.vue'
@@ -42,6 +46,8 @@ const i18n = createI18n({
         previous: 'Previous',
         next: 'Next',
         loadError: 'This item couldn’t be loaded.',
+        sortNewest: 'Newest first',
+        sortOldest: 'Oldest first',
       },
     },
   },
@@ -101,6 +107,34 @@ describe('MemoryDetail (gallery grid + header)', () => {
     // operator-blind: each thumbnail came back through a presigned GET + on-device decrypt
     expect(store.api.listNodeMedia).toHaveBeenCalledWith({ scopeId: SCOPE_ID, nodeId: NODE_ID })
     expect(store.api.presignBlobDownloads).toHaveBeenCalled()
+  })
+
+  it('sorts the grid by capture time — newest first by default, and toggles to oldest first (cr-0066)', async () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const memoryKey = v1.randomBytes(32)
+    // media-0 = 2020, media-1 = 2022, media-2 = 2021 (creation order); the exifr date drives the capturedAt tier
+    vi.mocked(exifr.parse)
+      .mockResolvedValueOnce({ DateTimeOriginal: new Date(Date.UTC(2020, 0, 1)) } as never)
+      .mockResolvedValueOnce({ DateTimeOriginal: new Date(Date.UTC(2022, 0, 1)) } as never)
+      .mockResolvedValueOnce({ DateTimeOriginal: new Date(Date.UTC(2021, 0, 1)) } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(2), mediaType: 'image/jpeg' }, stubDeriver())
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(3), mediaType: 'image/jpeg' }, stubDeriver())
+
+    const wrapper = mountDetail(memoryKey)
+    await flushPromises()
+    await flushPromises()
+
+    const order = () => wrapper.findAll('.gallery-tile').map((t) => t.attributes('data-media-id'))
+    // newest first (default): 2022 (media-1), 2021 (media-2), 2020 (media-0)
+    expect(order()).toEqual(['media-1', 'media-2', 'media-0'])
+
+    // toggle → oldest first
+    await wrapper.find('.gallery-sort-toggle').trigger('click')
+    await flushPromises()
+    expect(order()).toEqual(['media-0', 'media-2', 'media-1'])
   })
 
   it('shows the empty state for a Memory with no media', async () => {

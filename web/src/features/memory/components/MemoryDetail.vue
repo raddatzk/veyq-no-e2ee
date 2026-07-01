@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, hasDerivatives, unsealLayout, type MediaItem } from '../media'
+import { listMedia, openGrid, hasDerivatives, unsealLayout, unsealCapturedAt, effectiveCapturedAt, type MediaItem } from '../media'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
@@ -39,6 +39,9 @@ const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 const lightboxIndex = ref<number | null>(null)
+const lightboxItems = ref<MediaItem[]>([]) // a snapshot of the sorted order at open time (so an in-lightbox date edit can't reorder underfoot)
+// date sort (cr-0066): tiles order by effective capturedAt; newest first by default.
+const sortDir = ref<'newest' | 'oldest'>('newest')
 const activeTab = ref<'gallery' | 'chapters'>('gallery') // local (the #fragment carries the tree path, cr-0031)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -50,6 +53,24 @@ const gridEl = ref<HTMLElement | null>(null)
 const containerWidth = ref(0)
 let gridObserver: ResizeObserver | null = null
 let measureFrame: number | null = null
+
+// The effective capture time of an item (from its sealed capture-time tier), or undefined when it has none.
+function capturedAtOf(item: MediaItem): number | undefined {
+  return props.memoryKey ? effectiveCapturedAt(unsealCapturedAt(props.memoryKey, item)) : undefined
+}
+// Tiles ordered by effective capture time (newest first by default, toggleable); undated media always last.
+const sortedItems = computed(() => {
+  const dir = sortDir.value === 'newest' ? -1 : 1
+  return items.value
+    .map((it, i) => ({ it, i, t: capturedAtOf(it) }))
+    .sort((a, b) => {
+      if (a.t === undefined && b.t === undefined) return a.i - b.i // both undated → stable list order
+      if (a.t === undefined) return 1 // undated last, regardless of direction
+      if (b.t === undefined) return -1
+      return (a.t - b.t) * dir
+    })
+    .map((x) => x.it)
+})
 
 const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
 const aspectRatios = computed(() => {
@@ -63,13 +84,13 @@ const aspectRatios = computed(() => {
 })
 const layout = computed(() =>
   calculateJustifiedMediaLayout({
-    items: items.value.map((it) => ({ id: it.mediaId, aspectRatio: aspectRatios.value.get(it.mediaId) })),
+    items: sortedItems.value.map((it) => ({ id: it.mediaId, aspectRatio: aspectRatios.value.get(it.mediaId) })),
     containerWidth: containerWidth.value,
     targetHeight: targetTileHeight.value,
     gap: GAP,
   }),
 )
-const itemsById = computed(() => new Map(items.value.map((it, index) => [it.mediaId, { item: it, index }])))
+const itemsById = computed(() => new Map(sortedItems.value.map((it, index) => [it.mediaId, { item: it, index }])))
 const tiles = computed(() =>
   layout.value.tiles.flatMap((tile) => {
     const entry = itemsById.value.get(tile.id)
@@ -152,6 +173,20 @@ function revokeThumbs() {
 }
 
 /** List the Memory's media and fetch each derivable item's thumbnail tier (parallel, operator-blind). */
+/** Open the lightbox on a grid tile, snapshotting the current sorted order so an in-lightbox edit can't reorder it. */
+function openLightboxAt(index: number) {
+  lightboxItems.value = sortedItems.value.slice()
+  lightboxIndex.value = index
+}
+/** A date correction from the lightbox → patch the item's sealed tier so the grid re-sorts (no refetch). The
+ *  item object is shared with the open lightbox's snapshot, so the reopened detail stays consistent too. */
+function onCapturedAtUpdated(payload: { mediaId: string; wrappedCapturedAt: string | null }) {
+  const item = items.value.find((it) => it.mediaId === payload.mediaId)
+  if (!item) return
+  item.wrappedCapturedAt = payload.wrappedCapturedAt ?? undefined
+  items.value = [...items.value] // reassign so sortedItems recomputes and the grid re-sorts
+}
+
 async function load() {
   revokeThumbs()
   items.value = []
@@ -279,10 +314,22 @@ onBeforeUnmount(() => {
           </div>
           <p v-else-if="status === 'error'" class="veyq-empty">{{ t('media.unavailable') }}</p>
           <p v-else-if="!items.length" class="veyq-empty">{{ t('media.empty') }}</p>
-          <div
-            v-else
-            ref="gridEl"
-            class="gallery-grid"
+          <template v-else>
+            <div class="gallery-toolbar">
+              <button
+                class="veyq-icon-button gallery-sort-toggle"
+                type="button"
+                :aria-label="sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest')"
+                :title="sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest')"
+                @click="sortDir = sortDir === 'newest' ? 'oldest' : 'newest'"
+              >
+                <span class="pi" :class="sortDir === 'newest' ? 'pi-sort-amount-down' : 'pi-sort-amount-up-alt'" />
+                <span>{{ sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest') }}</span>
+              </button>
+            </div>
+            <div
+              ref="gridEl"
+              class="gallery-grid"
             :style="{ height: `${layout.height}px` }"
             :aria-label="t('media.gallery')"
           >
@@ -291,13 +338,14 @@ onBeforeUnmount(() => {
               :key="tile.media.mediaId"
               class="gallery-tile"
               type="button"
+              :data-media-id="tile.media.mediaId"
               :style="{
                 transform: `translate(${tile.left}px, ${tile.top}px)`,
                 width: `${tile.renderedWidth}px`,
                 height: `${tile.renderedHeight}px`,
               }"
               :aria-label="t('media.openItem', { index: tile.index + 1 })"
-              @click="lightboxIndex = tile.index"
+              @click="openLightboxAt(tile.index)"
             >
               <img
                 v-if="thumbs.get(tile.media.mediaId)"
@@ -308,7 +356,8 @@ onBeforeUnmount(() => {
               <span v-else-if="!hasDerivatives(tile.media)" class="media-grid-icon pi pi-file" />
               <span v-else class="media-grid-tile-placeholder" />
             </button>
-          </div>
+            </div>
+          </template>
         </TabPanel>
 
         <TabPanel value="chapters">
@@ -347,15 +396,33 @@ onBeforeUnmount(() => {
       v-if="lightboxIndex !== null && memoryKey"
       :scope-id="scopeId"
       :memory-key="memoryKey"
-      :items="items"
+      :items="lightboxItems"
       :start-index="lightboxIndex"
       :memory-name="node.name"
       @close="lightboxIndex = null"
+      @updated="onCapturedAtUpdated"
     />
   </div>
 </template>
 
 <style scoped>
+.gallery-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+.gallery-sort-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 0.86rem;
+}
 .gallery-header {
   display: flex;
   align-items: flex-start;

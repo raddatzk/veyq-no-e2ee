@@ -247,7 +247,7 @@ describe('MediaLightbox — lazy EXIF detail panel (cr-0064)', () => {
   })
 })
 
-describe('MediaLightbox — correct the capture time (cr-0065)', () => {
+describe('MediaLightbox — correct the capture time (cr-0065/0066)', () => {
   async function seedOne(memoryKey: Uint8Array, exifRaw: unknown) {
     vi.mocked(exifr.parse).mockResolvedValue(exifRaw as never)
     const store = galleryFakeStore()
@@ -273,7 +273,7 @@ describe('MediaLightbox — correct the capture time (cr-0065)', () => {
     await flushPromises()
 
     // the correction went out only as opaque ciphertext, and the badge now shows
-    const sent = store.api.updateMediaMeta.mock.calls.at(-1)![0].mediaMetaUpdate.wrappedExif
+    const sent = store.api.updateMediaCapturedAt.mock.calls.at(-1)![0].mediaCapturedAtUpdate.wrappedCapturedAt
     expect(typeof sent).toBe('string')
     expect(sent).not.toContain('2019')
     expect(wrapper.text()).toContain('Corrected')
@@ -284,7 +284,7 @@ describe('MediaLightbox — correct the capture time (cr-0065)', () => {
     await resetBtn.trigger('click')
     await flushPromises()
 
-    expect(store.api.updateMediaMeta).toHaveBeenCalledTimes(2)
+    expect(store.api.updateMediaCapturedAt).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).not.toContain('Corrected')
   })
 
@@ -302,8 +302,8 @@ describe('MediaLightbox — correct the capture time (cr-0065)', () => {
     await wrapper.find('.media-lightbox-date-form').trigger('submit')
     await flushPromises()
 
-    const sent = store.api.updateMediaMeta.mock.calls.at(-1)![0].mediaMetaUpdate.wrappedExif
-    expect(typeof sent).toBe('string') // a fresh sealed bundle
+    const sent = store.api.updateMediaCapturedAt.mock.calls.at(-1)![0].mediaCapturedAtUpdate.wrappedCapturedAt
+    expect(typeof sent).toBe('string') // a fresh sealed tier
     expect(wrapper.text()).toContain('Corrected')
   })
 })

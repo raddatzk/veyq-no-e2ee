@@ -201,6 +201,8 @@ const en = {
     resetCapturedAt: 'Reset to original',
     capturedAtCorrected: 'Corrected',
     capturedAtSaveFailed: 'Could not save the capture time.',
+    sortNewest: 'Newest first',
+    sortOldest: 'Oldest first',
   },
 }
 
@@ -401,6 +403,8 @@ const de: typeof en = {
     resetCapturedAt: 'Auf Original zurücksetzen',
     capturedAtCorrected: 'Korrigiert',
     capturedAtSaveFailed: 'Aufnahmezeit konnte nicht gespeichert werden.',
+    sortNewest: 'Neueste zuerst',
+    sortOldest: 'Älteste zuerst',
   },
 }
 

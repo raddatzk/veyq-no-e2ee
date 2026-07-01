@@ -22,6 +22,7 @@ data class CompleteItem(
     val originalUploadId: String,
     val derivatives: List<DerivativeDeclare>,
     val wrappedLayout: String?,
+    val wrappedCapturedAt: String?,
     val wrappedExif: String?,
 )
 
@@ -58,6 +59,12 @@ sealed interface MediaMetaOutcome {
     /** The media's sealed EXIF (opaque base64), or null when none was sealed. */
     data class Found(val wrappedExif: String?) : MediaMetaOutcome
     object NoMedia : MediaMetaOutcome
+}
+
+sealed interface CapturedAtOutcome {
+    /** The media's sealed capture-time tier (opaque base64), or null when none/cleared. */
+    data class Found(val wrappedCapturedAt: String?) : CapturedAtOutcome
+    object NoMedia : CapturedAtOutcome
 }
 
 /**
@@ -140,6 +147,7 @@ class MediaHandler(
             original, item.nodeId, manifests[original.id],
             derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
             item.wrappedLayout,
+            item.wrappedCapturedAt,
             item.wrappedExif,
         )
         return CompleteItemResult(blobId, mediaId, null)
@@ -178,11 +186,11 @@ class MediaHandler(
         return MediaMetaOutcome.Found(media.wrappedExif)
     }
 
-    /** Overwrite the media's sealed EXIF tier (opaque re-seal, e.g. a corrected capture time). */
-    fun updateMediaExif(userId: String, scopeId: String, mediaId: String, wrappedExif: String?): MediaMetaOutcome {
-        if (!store.isMember(userId, scopeId)) return MediaMetaOutcome.NoMedia
-        val media = store.setMediaExif(scopeId, mediaId, wrappedExif) ?: return MediaMetaOutcome.NoMedia
-        return MediaMetaOutcome.Found(media.wrappedExif)
+    /** Overwrite the media's sealed capture-time tier (opaque re-seal, e.g. a corrected date). */
+    fun updateCapturedAt(userId: String, scopeId: String, mediaId: String, wrappedCapturedAt: String?): CapturedAtOutcome {
+        if (!store.isMember(userId, scopeId)) return CapturedAtOutcome.NoMedia
+        val media = store.setCapturedAt(scopeId, mediaId, wrappedCapturedAt) ?: return CapturedAtOutcome.NoMedia
+        return CapturedAtOutcome.Found(media.wrappedCapturedAt)
     }
 
     fun download(userId: String, scopeId: String, blobIds: List<String>): DownloadOutcome {

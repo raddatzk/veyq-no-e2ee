@@ -112,7 +112,8 @@ async function uploadOne(file: UploadFile): Promise<void> {
   file.attempts += 1
   try {
     const bytes = new Uint8Array(await file.file.arrayBuffer())
-    await addMedia(batch.target.scopeId, batch.target.nodeId, batch.target.memoryKey, { bytes, mediaType: file.mediaType }, undefined, {
+    // pass the file's creation date so addMedia can fall back to it when the source carries no EXIF date (cr-0066)
+    await addMedia(batch.target.scopeId, batch.target.nodeId, batch.target.memoryKey, { bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, undefined, {
       onProgress: (p) => {
         file.progress = p
       },

@@ -18,9 +18,11 @@ import { withRefresh } from '../account/login/login'
 import type { MediaSummary, PresignedUrl, MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
-/** AAD context binding the sealed layout tier `{v,w,h,capturedAt}` to its purpose (cr-0064, was `media-dims`). */
+/** AAD context binding the sealed geometry tier `{v,w,h}` to its purpose (cr-0064, was `media-dims`). */
 const MEDIA_LAYOUT_CTX = 'media-layout'
-/** AAD context binding the sealed EXIF tier to its purpose (cr-0064) — distinct from the layout tier's. */
+/** AAD context binding the sealed capture-time tier `{v,capturedAt,capturedAtOverride}` to its purpose (cr-0066). */
+const MEDIA_CAPTUREDAT_CTX = 'media-capturedat'
+/** AAD context binding the sealed EXIF tier to its purpose (cr-0064) — distinct from the other tiers'. */
 const MEDIA_EXIF_CTX = 'media-exif'
 
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
@@ -49,24 +51,26 @@ export type MediaDerivative = { kind: MediaDerivativeKind; ref: BlobRef }
 export type Dimensions = { w: number; h: number }
 
 /**
- * Tier 1 — the **layout tier** sealed under `K_mem`: pure pixel geometry. Always listed (returned with every
- * `listMedia`), so it is kept minimal — the justified grid reads only `{w,h}`. Versioned `v` for forward
- * evolution. Capture time lives in the EXIF tier (cr-0064), not here (a timeline reads it via a batch meta
- * fetch when built, inbox #47) — so the list tier stays geometry-only.
+ * Tier 1 — the **geometry tier** sealed under `K_mem`: pure pixel geometry. Always listed (returned with every
+ * `listMedia`), kept minimal — the justified grid reads only `{w,h}`. Versioned `v` for forward evolution.
  */
 export type MediaLayout = { v: number; w: number; h: number }
 
 /**
- * Tier 2 — the full **EXIF bundle** sealed under `K_mem`, lazy-loaded per item for the lightbox (cr-0064). A
+ * Tier 2 — the **capture-time tier** sealed under `K_mem` (cr-0066): the derived original capture time
+ * (`capturedAt`, EXIF date or the file's creation date) plus any user correction (`capturedAtOverride`).
+ * **Always listed** (small), so the gallery can sort by date. Effective = `capturedAtOverride ?? capturedAt`.
+ */
+export type MediaCapturedAt = { v: number; capturedAt?: number; capturedAtOverride?: number }
+
+/**
+ * Tier 3 — the full **EXIF bundle** sealed under `K_mem`, lazy-loaded per item for the lightbox (cr-0064). A
  * client-only, versioned shape (never a contract field), so it can grow without the operator ever learning a
- * field. `capturedAt`/`gps*` are epoch-ms / decimal degrees; every field is optional (best-effort extraction).
+ * field. `gps*` are decimal degrees; every field is optional (best-effort extraction). The capture time lives
+ * in the capture-time tier, not here (cr-0066).
  */
 export type MediaExif = {
   v: number
-  /** The extracted original capture time (epoch-ms). Immutable — a user correction goes to [capturedAtOverride]. */
-  capturedAt?: number
-  /** A user's corrected capture time (epoch-ms, cr-0065). Effective time = `capturedAtOverride ?? capturedAt`. */
-  capturedAtOverride?: number
   make?: string
   model?: string
   lens?: string
@@ -86,8 +90,10 @@ export type MediaItem = {
   mediaId: string
   original: BlobRef
   derivatives: MediaDerivative[]
-  /** The original's layout tier sealed under `K_mem` (opaque base64); unwrap with [unsealLayout]. Absent when none. */
+  /** The original's geometry tier sealed under `K_mem` (opaque base64); unwrap with [unsealLayout]. Absent when none. */
   wrappedLayout?: string
+  /** The original's capture-time tier sealed under `K_mem` (opaque base64); unwrap with [unsealCapturedAt]. Absent when none. */
+  wrappedCapturedAt?: string
 }
 
 function summaryToItem(s: MediaSummary): MediaItem {
@@ -99,6 +105,7 @@ function summaryToItem(s: MediaSummary): MediaItem {
       ref: { blobId: d.blobId, chunkCount: d.chunkCount, byteSize: d.byteSize, wrappedBlobKey: d.wrappedBlobKey },
     })),
     wrappedLayout: s.wrappedLayout ?? undefined,
+    wrappedCapturedAt: s.wrappedCapturedAt ?? undefined,
   }
 }
 
@@ -122,10 +129,34 @@ export function unsealLayout(memoryKey: Uint8Array, item: MediaItem): MediaLayou
   return null
 }
 
+/**
+ * Unwrap a media's sealed capture-time tier under `K_mem` (cr-0066). Best-effort: null when none was sealed or
+ * the wrap doesn't open. Use [effectiveCapturedAt] for the sort/display value.
+ */
+export function unsealCapturedAt(memoryKey: Uint8Array, item: MediaItem): MediaCapturedAt | null {
+  if (!item.wrappedCapturedAt) return null
+  try {
+    const json = new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(item.wrappedCapturedAt), MEDIA_CAPTUREDAT_CTX))
+    const parsed = JSON.parse(json) as unknown
+    if (parsed && typeof parsed === 'object') {
+      const c = parsed as MediaCapturedAt
+      return { v: finiteNum(c.v) ?? 1, capturedAt: finiteNum(c.capturedAt), capturedAtOverride: finiteNum(c.capturedAtOverride) }
+    }
+  } catch {
+    /* not openable / malformed → treated as no date */
+  }
+  return null
+}
+
+/** The effective capture time of a capture-time tier: the user's correction if set, else the derived original. */
+export function effectiveCapturedAt(captured: MediaCapturedAt | null): number | undefined {
+  return finiteNum(captured?.capturedAtOverride) ?? finiteNum(captured?.capturedAt)
+}
+
 // --- the pixel stage (injectable; jsdom cannot decode real Canvas/Image/Video) ---------------------------
 
-/** The source to attach: the pristine original bytes + their MIME type (decides image/video/other). */
-export type AddMediaSource = { bytes: Uint8Array; mediaType: string }
+/** The source to attach: the pristine original bytes + their MIME type, plus the file's creation date (cr-0066). */
+export type AddMediaSource = { bytes: Uint8Array; mediaType: string; lastModified?: number }
 
 /**
  * The platform-native pixel stage behind an interface: the real one uses Canvas + `<video>`; tests inject a
@@ -306,19 +337,19 @@ async function probeDims(source: AddMediaSource, deriver: MediaDeriver): Promise
 }
 
 /**
- * Extract the full EXIF bundle from an image's original bytes with `exifr` (HEIC/JPEG/TIFF/PNG; GPS auto-decoded
- * DMS→decimal). Best-effort: non-images, unreadable/absent EXIF, or a decode error → null (the item still
- * uploads, the lightbox just shows no detail). Never leaves the device in the clear — the caller seals it.
+ * Read an image's original bytes with `exifr` (HEIC/JPEG/TIFF/PNG; GPS auto-decoded DMS→decimal) and split the
+ * result into the **capture time** (epoch-ms, cr-0066) and the **EXIF bundle** (camera/lens/gps/dims, date-free).
+ * Best-effort: non-images, unreadable/absent EXIF, or a decode error → `{ capturedAt: undefined, exif: null }`
+ * (the item still uploads). Never leaves the device in the clear — the caller seals both.
  */
-async function extractExif(source: AddMediaSource): Promise<MediaExif | null> {
-  if (!source.mediaType.startsWith('image/')) return null
+async function readExif(source: AddMediaSource): Promise<{ capturedAt?: number; exif: MediaExif | null }> {
+  if (!source.mediaType.startsWith('image/')) return { exif: null }
   try {
     const blob = new Blob([source.bytes as BlobPart], { type: source.mediaType })
     const raw = await exifr.parse(blob, { tiff: true, exif: true, gps: true })
-    if (!raw) return null
+    if (!raw) return { exif: null }
     const exif: MediaExif = {
       v: 1,
-      capturedAt: toEpochMs(raw.DateTimeOriginal ?? raw.CreateDate ?? raw.ModifyDate),
       make: cleanStr(raw.Make),
       model: cleanStr(raw.Model),
       lens: cleanStr(raw.LensModel ?? raw.LensMake),
@@ -332,26 +363,31 @@ async function extractExif(source: AddMediaSource): Promise<MediaExif | null> {
       w: finiteNum(raw.ExifImageWidth ?? raw.ImageWidth),
       h: finiteNum(raw.ExifImageHeight ?? raw.ImageHeight),
     }
-    return hasExifPayload(exif) ? exif : null
+    return {
+      capturedAt: toEpochMs(raw.DateTimeOriginal ?? raw.CreateDate ?? raw.ModifyDate),
+      exif: hasExifPayload(exif) ? exif : null,
+    }
   } catch {
-    return null
+    return { exif: null }
   }
 }
 
 /**
- * Seal both metadata tiers under `K_mem` (best-effort, operator-blind): the always-listed **layout** tier
- * (`{v,w,h}` — geometry only, kept minimal) and the lazy **EXIF** tier (which carries the capture time). Either
- * tier is null when its source is absent (no dims / no readable EXIF) — the item still uploads.
+ * Seal the three metadata tiers under `K_mem` (best-effort, operator-blind): the always-listed **geometry** tier
+ * (`{v,w,h}`), the always-listed **capture-time** tier (`{v,capturedAt}` — the EXIF date, else the file's
+ * creation date), and the lazy **EXIF** tier (camera/lens/gps/dims). Each tier is null when its source is absent.
  */
 async function sealMetadata(
   source: AddMediaSource,
   deriver: MediaDeriver,
   memoryKey: Uint8Array,
-): Promise<{ wrappedLayout: string | null; wrappedExif: string | null }> {
-  const [dims, exif] = await Promise.all([probeDims(source, deriver), extractExif(source)])
+): Promise<{ wrappedLayout: string | null; wrappedCapturedAt: string | null; wrappedExif: string | null }> {
+  const [dims, meta] = await Promise.all([probeDims(source, deriver), readExif(source)])
+  const capturedAt = meta.capturedAt ?? finiteNum(source.lastModified) // EXIF date, else the file's creation date
   const wrappedLayout = dims ? sealJson(memoryKey, { v: 1, w: dims.w, h: dims.h }, MEDIA_LAYOUT_CTX) : null
-  const wrappedExif = exif ? sealJson(memoryKey, exif, MEDIA_EXIF_CTX) : null
-  return { wrappedLayout, wrappedExif }
+  const wrappedCapturedAt = capturedAt !== undefined ? sealJson(memoryKey, { v: 1, capturedAt }, MEDIA_CAPTUREDAT_CTX) : null
+  const wrappedExif = meta.exif ? sealJson(memoryKey, meta.exif, MEDIA_EXIF_CTX) : null
+  return { wrappedLayout, wrappedCapturedAt, wrappedExif }
 }
 
 /** Upload progress (0..1) + cancellation hooks for [addMedia], used by the upload queue (uc.memory.upload). */
@@ -379,7 +415,7 @@ export async function addMedia(
   const { onProgress, signal } = opts
   throwIfAborted(signal)
   const tiers = await deriveTiers(source, deriver)
-  const { wrappedLayout, wrappedExif } = await sealMetadata(source, deriver, memoryKey)
+  const { wrappedLayout, wrappedCapturedAt, wrappedExif } = await sealMetadata(source, deriver, memoryKey)
   // index 0 = original; the rest are the role-tagged derivatives, in order
   const sealedOriginal = sealBlob(memoryKey, source.bytes)
   const sealedTiers = tiers.map((t) => ({ kind: t.kind, sealed: sealBlob(memoryKey, t.bytes) }))
@@ -430,6 +466,7 @@ export async function addMedia(
             originalUploadId: uploads[0].uploadId,
             derivatives: sealedTiers.map((t, i) => ({ kind: t.kind, uploadId: uploads[i + 1].uploadId })),
             wrappedLayout,
+            wrappedCapturedAt,
             wrappedExif,
           },
         ],
@@ -467,29 +504,26 @@ export async function loadMediaExif(scopeId: string, mediaId: string, memoryKey:
   }
 }
 
-/** The effective capture time of a decoded EXIF bundle: the user's correction if set, else the extracted original. */
-export function effectiveCapturedAt(exif: MediaExif | null): number | undefined {
-  return finiteNum(exif?.capturedAtOverride) ?? finiteNum(exif?.capturedAt)
-}
-
 /**
- * Set (or clear, with `null`) a media's **capturedAt override** (cr-0065) — a corrected capture time. Operator-
- * blind: the whole EXIF bundle is re-sealed under `K_mem` with the override added/removed and PUT verbatim (the
- * server can't merge fields it can't read). `exif` is the bundle already decoded by the lightbox (or null for a
- * media with none — a fresh bundle is sealed). Clearing the last field drops the tier to null. Returns the new
- * bundle so the caller can update local state.
+ * Set (or clear, with `null`) a media's **capturedAt override** (cr-0065/0066) — a corrected capture time.
+ * Operator-blind: the capture-time tier is re-sealed under `K_mem` with the override added/removed and PUT
+ * verbatim. `captured` is the tier already unsealed by the lightbox (or null for a media with none — a fresh
+ * tier is sealed). Clearing the last field drops the tier to null. Returns the new tier so the caller can update
+ * local state (and the grid can re-sort).
  */
 export async function setMediaCapturedAt(
   scopeId: string,
   mediaId: string,
   memoryKey: Uint8Array,
-  exif: MediaExif | null,
+  captured: MediaCapturedAt | null,
   overrideMs: number | null,
-): Promise<MediaExif | null> {
-  const next: MediaExif = { ...(exif ?? { v: 1 }), capturedAtOverride: overrideMs ?? undefined }
-  const wrappedExif = hasExifPayload(next) ? sealJson(memoryKey, next, MEDIA_EXIF_CTX) : null
-  await withRefresh(() => mediaApi().updateMediaMeta({ scopeId, mediaId, mediaMetaUpdate: { wrappedExif } }))
-  return wrappedExif ? next : null
+): Promise<{ tier: MediaCapturedAt | null; wrappedCapturedAt: string | null }> {
+  const next: MediaCapturedAt = { ...(captured ?? { v: 1 }), capturedAtOverride: overrideMs ?? undefined }
+  const hasDate = next.capturedAt !== undefined || next.capturedAtOverride !== undefined
+  const wrappedCapturedAt = hasDate ? sealJson(memoryKey, next, MEDIA_CAPTUREDAT_CTX) : null
+  await withRefresh(() => mediaApi().updateMediaCapturedAt({ scopeId, mediaId, mediaCapturedAtUpdate: { wrappedCapturedAt } }))
+  // return both the unsealed tier (for local state) and the sealed blob (so the grid item stays consistent)
+  return { tier: wrappedCapturedAt ? next : null, wrappedCapturedAt }
 }
 
 function tierRef(item: MediaItem, kind: MediaDerivativeKind): BlobRef | undefined {

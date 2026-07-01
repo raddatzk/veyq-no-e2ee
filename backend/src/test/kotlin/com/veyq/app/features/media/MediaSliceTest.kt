@@ -39,9 +39,9 @@ class MediaSliceTest {
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
         val uploadId = startOne(userId, scopeId, chunkCount = 2, byteSize = 1024, wrap = "d3JhcHBlZA==")
 
-        // complete + attach to the Memory; the sealed layout + EXIF tiers ride along as opaque ciphertext (cr-0064)
+        // complete + attach to the Memory; the layout + capturedAt tiers are listed, EXIF is lazy (cr-0064/0066)
         val mediaId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedLayout":"bGF5b3V0","wrappedExif":"ZXhpZg=="}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedLayout":"bGF5b3V0","wrappedCapturedAt":"ZGF0ZQ==","wrappedExif":"ZXhpZg=="}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].blobId", notNullValue())
@@ -49,7 +49,7 @@ class MediaSliceTest {
             .body("results[0].error", nullValue())
             .extract().path<String>("results[0].mediaId")
 
-        // list the node's media — operator-blind: the wrap + sealed layout come back verbatim, sizes opaque.
+        // list the node's media — operator-blind: the wrap + sealed layout + capturedAt come back verbatim.
         // The heavier EXIF tier is deliberately NOT listed (kept constant-small); it is lazy via getMediaMeta.
         given().header("Authorization", token(userId))
             .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
@@ -58,6 +58,7 @@ class MediaSliceTest {
             .body("[0].chunkCount", equalTo(2))
             .body("[0].byteSize", equalTo(1024))
             .body("[0].wrappedLayout", equalTo("bGF5b3V0"))
+            .body("[0].wrappedCapturedAt", equalTo("ZGF0ZQ==")) // the capture-time tier is listed (for date sorting)
             .body("[0].wrappedExif", nullValue()) // the list never carries EXIF
 
         // the lazy meta endpoint returns the sealed EXIF verbatim (opaque, never inspected)
@@ -96,42 +97,42 @@ class MediaSliceTest {
     }
 
     @Test
-    fun updateMediaMetaOverwritesSealedExif() {
+    fun updateCapturedAtOverwritesSealedTierAndLists() {
         val (userId, scopeId) = seedMemberScope()
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
         val uploadId = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "b25seQ==")
 
-        // complete with an initial EXIF tier (cr-0064)
+        // complete with an initial capture-time tier (cr-0066)
         val mediaId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedExif":"ZXhpZg=="}]}""")
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedCapturedAt":"ZGF0ZQ=="}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200).body("results[0].error", nullValue())
             .extract().path<String>("results[0].mediaId")
 
-        // PUT a re-sealed bundle (e.g. a corrected capture time) — opaque, echoed back verbatim (cr-0065)
+        // PUT a re-sealed capture-time tier (e.g. a corrected date) — opaque, echoed back verbatim (cr-0066)
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"wrappedExif":"Y29ycmVjdGVk"}""")
-            .`when`().put("/api/scopes/$scopeId/media/$mediaId/meta")
-            .then().statusCode(200).body("wrappedExif", equalTo("Y29ycmVjdGVk"))
+            .body("""{"wrappedCapturedAt":"Y29ycmVjdGVk"}""")
+            .`when`().put("/api/scopes/$scopeId/media/$mediaId/captured-at")
+            .then().statusCode(200).body("wrappedCapturedAt", equalTo("Y29ycmVjdGVk"))
 
-        // the meta endpoint now returns the overwritten value
+        // the overwritten value comes back on list (the tier is always listed, for date sorting)
         given().header("Authorization", token(userId))
-            .`when`().get("/api/scopes/$scopeId/media/$mediaId/meta")
-            .then().statusCode(200).body("wrappedExif", equalTo("Y29ycmVjdGVk"))
+            .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
+            .then().statusCode(200).body("[0].wrappedCapturedAt", equalTo("Y29ycmVjdGVk"))
 
         // null clears it
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"wrappedExif":null}""")
-            .`when`().put("/api/scopes/$scopeId/media/$mediaId/meta")
-            .then().statusCode(200).body("wrappedExif", nullValue())
+            .body("""{"wrappedCapturedAt":null}""")
+            .`when`().put("/api/scopes/$scopeId/media/$mediaId/captured-at")
+            .then().statusCode(200).body("wrappedCapturedAt", nullValue())
     }
 
     @Test
-    fun updateMediaMetaForUnknownMediaIs404() {
+    fun updateCapturedAtForUnknownMediaIs404() {
         val (userId, scopeId) = seedMemberScope()
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"wrappedExif":"Y29ycmVjdGVk"}""")
-            .`when`().put("/api/scopes/$scopeId/media/${UUID.randomUUID()}/meta")
+            .body("""{"wrappedCapturedAt":"Y29ycmVjdGVk"}""")
+            .`when`().put("/api/scopes/$scopeId/media/${UUID.randomUUID()}/captured-at")
             .then().statusCode(404).body("code", equalTo("media_not_found"))
     }
 

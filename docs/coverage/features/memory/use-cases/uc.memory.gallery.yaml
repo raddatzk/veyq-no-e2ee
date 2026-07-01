@@ -55,10 +55,18 @@ acceptanceCriteria:
         unit:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MediaLightbox.test.ts
+  - id: date-sorted-grid
+    text: The gallery sorts tiles by effective capture time (newest first by default, a header toggle for oldest first; undated media last). Each media's capturedAt is sealed under K_mem in its own always-listed tier (wrappedCapturedAt {v,capturedAt,capturedAtOverride}, cr-0066) — the derived original is the EXIF DateTimeOriginal or the file's creation date, so the blind server never sees a timestamp yet the grid can order client-side. A lightbox correction re-sorts without a refetch.
+    coverage:
+      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.updateCapturedAtOverwritesSealedTierAndLists] }
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: lightbox-correct-capturedat
     text: From the lightbox a user can correct (or set) a media's capture time; the correction is sealed under K_mem inside wrappedExif as capturedAtOverride alongside the immutable extracted original, re-sealed client-side and PUT verbatim (updateMediaMeta) — the blind server never sees the date. The panel shows the effective time (override ?? original) with a "corrected" indicator and can reset to the original; a media with no EXIF can have a date set (cr-0065).
     coverage:
-      backend: { integration: [MediaSliceTest.updateMediaMetaOverwritesSealedExif, MediaSliceTest.updateMediaMetaForUnknownMediaIs404] }
+      backend: { integration: [MediaSliceTest.updateCapturedAtOverwritesSealedTierAndLists, MediaSliceTest.updateCapturedAtForUnknownMediaIs404] }
       web:
         unit:
           - src/features/memory/media.test.ts

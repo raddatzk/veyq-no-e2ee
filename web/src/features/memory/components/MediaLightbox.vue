@@ -13,10 +13,12 @@ import {
   openOriginal,
   hasDerivatives,
   loadMediaExif,
+  unsealCapturedAt,
   setMediaCapturedAt,
   effectiveCapturedAt,
   type MediaItem,
   type MediaExif,
+  type MediaCapturedAt,
 } from '../media'
 import { derivedDownloadName, saveBytes } from '../download'
 
@@ -27,7 +29,7 @@ const props = defineProps<{
   startIndex: number
   memoryName: string
 }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; updated: [{ mediaId: string; wrappedCapturedAt: string | null }] }>()
 
 const { t, locale } = useI18n()
 
@@ -36,11 +38,13 @@ const previewUrl = ref<string | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const downloading = ref(false)
-// Tier-2 EXIF (cr-0064), lazy-loaded per item via the meta endpoint + unsealed under K_mem. Null = none/undecoded.
+// The capture-time tier (cr-0066): unsealed instantly from the listed item (no fetch). Null = no date sealed.
+const captured = ref<MediaCapturedAt | null>(null)
+// Tier-3 EXIF (cr-0064): camera/lens/gps, lazy-loaded per item via the meta endpoint. Null = none/undecoded.
 const exif = ref<MediaExif | null>(null)
 const detailsLoading = ref(false)
 const isDetailsOpen = ref(false) // mobile bottom-sheet toggle (the design's swipe handle)
-// capturedAt override editor (cr-0065)
+// capturedAt override editor (cr-0065/0066)
 const isEditingCapturedAt = ref(false)
 const capturedAtInput = ref('') // bound to <input type="datetime-local">
 const savingCapturedAt = ref(false)
@@ -79,13 +83,15 @@ async function loadPreview() {
 
 watch(current, loadPreview, { immediate: true })
 
-// Lazily fetch + unseal this item's EXIF tier when it opens (operator-blind; the list never carries EXIF).
+// When the item changes: unseal the capture-time tier **instantly** from the listed item (no fetch), then
+// lazily fetch + unseal the heavy EXIF tier (camera/lens/gps) via the meta endpoint (the list never carries it).
 async function loadDetails() {
   exif.value = null
   isEditingCapturedAt.value = false // close the editor when the item changes
   capturedAtError.value = false
   const target = item.value
   if (!target) return
+  captured.value = unsealCapturedAt(props.memoryKey, target)
   detailsLoading.value = true
   try {
     const loaded = await loadMediaExif(props.scopeId, target.mediaId, props.memoryKey)
@@ -98,11 +104,11 @@ async function loadDetails() {
 }
 watch(current, loadDetails, { immediate: true })
 
-// --- capturedAt override (cr-0065): effective time = override ?? original; edit re-seals the EXIF tier ---
-const effectiveCaptured = computed(() => effectiveCapturedAt(exif.value))
-const isCapturedAtCorrected = computed(() => exif.value?.capturedAtOverride !== undefined)
-// editable once the (lazy) EXIF load settled — even with no EXIF, the user can *set* a date (a fresh bundle)
-const canEditCapturedAt = computed(() => !!item.value && !detailsLoading.value)
+// --- capturedAt (cr-0066): effective time = override ?? derived original, from the listed capture-time tier ---
+const effectiveCaptured = computed(() => effectiveCapturedAt(captured.value))
+const isCapturedAtCorrected = computed(() => captured.value?.capturedAtOverride !== undefined)
+// editable as soon as the item is shown — even with no date, the user can *set* one (a fresh tier)
+const canEditCapturedAt = computed(() => !!item.value)
 
 /** epoch-ms → the `<input type="datetime-local">` value (local wall-clock, minute precision). */
 function msToDatetimeLocal(ms: number | undefined): string {
@@ -130,10 +136,11 @@ async function persistCapturedAt(overrideMs: number | null) {
   savingCapturedAt.value = true
   capturedAtError.value = false
   try {
-    const updated = await setMediaCapturedAt(props.scopeId, target.mediaId, props.memoryKey, exif.value, overrideMs)
+    const updated = await setMediaCapturedAt(props.scopeId, target.mediaId, props.memoryKey, captured.value, overrideMs)
     if (item.value !== target) return // navigated away mid-save — drop the stale result
-    exif.value = updated
+    captured.value = updated.tier
     isEditingCapturedAt.value = false
+    emit('updated', { mediaId: target.mediaId, wrappedCapturedAt: updated.wrappedCapturedAt }) // let the grid re-sort
   } catch {
     if (item.value === target) capturedAtError.value = true
   } finally {
@@ -170,17 +177,21 @@ const gpsLabel = computed(() =>
 )
 const metadataRows = computed(() => {
   const e = exif.value
-  if (!e) return []
-  return [
-    { label: t('media.captured'), value: formatCaptured(effectiveCaptured.value) },
-    { label: t('media.camera'), value: [e.make, e.model].filter(Boolean).join(' ').trim() },
-    { label: t('media.lens'), value: e.lens ?? '' },
-    { label: t('media.focalLength'), value: formatFocal(e.focalLength) },
-    { label: t('media.aperture'), value: formatAperture(e.fNumber) },
-    { label: t('media.exposure'), value: formatExposure(e.exposureTime) },
-    { label: t('media.iso'), value: e.iso !== undefined ? String(e.iso) : '' },
-    { label: t('media.dimensions'), value: e.w && e.h ? `${e.w} × ${e.h} px` : '' },
-  ].filter((row) => row.value)
+  // The capture date comes from the always-listed capture-time tier (independent of the lazy EXIF); the
+  // camera/lens/exposure rows come from the EXIF tier once it loads.
+  const rows = [{ label: t('media.captured'), value: formatCaptured(effectiveCaptured.value) }]
+  if (e) {
+    rows.push(
+      { label: t('media.camera'), value: [e.make, e.model].filter(Boolean).join(' ').trim() },
+      { label: t('media.lens'), value: e.lens ?? '' },
+      { label: t('media.focalLength'), value: formatFocal(e.focalLength) },
+      { label: t('media.aperture'), value: formatAperture(e.fNumber) },
+      { label: t('media.exposure'), value: formatExposure(e.exposureTime) },
+      { label: t('media.iso'), value: e.iso !== undefined ? String(e.iso) : '' },
+      { label: t('media.dimensions'), value: e.w && e.h ? `${e.w} × ${e.h} px` : '' },
+    )
+  }
+  return rows.filter((row) => row.value)
 })
 const hasDetail = computed(() => metadataRows.value.length > 0 || hasGps.value)
 
