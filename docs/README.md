@@ -111,7 +111,9 @@ docs/
 - **Architecture** sits above all and **indexes** them — a map kept current as work lands, not a satisfiable
   record.
 - The wiring is machine-checked: `scripts/validate_changes.py` (`satisfies ∈ {uc,en,cc}`; `adrs` resolve),
-  `scripts/validate_coverage.py` (every use-case has coverage **or** declared gaps), `scripts/validate_doc_links.py`.
+  `scripts/validate_coverage.py` (every use-case has coverage **or** declared gaps), `scripts/validate_doc_links.py`
+  (every relative link resolves), and `scripts/validate_feature_wiring.py` (every `uc`/`en` is linked from its
+  feature `_index.md`; an enabler's `Serves` and the served doc's back-reference are **symmetric**).
 
 ## Formats (the per-kind templates)
 

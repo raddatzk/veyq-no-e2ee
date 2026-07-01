@@ -79,7 +79,8 @@ späteren Schritt; vorerst ist dies das Zuhause, das deinen verschlüsselten Ber
 - Feature: [Memory](../_index.md)
 - Enablers: [en.memory.tree](../enablers/en.memory.tree.md) (the encrypted node tree this browses),
   [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (`K_SC`, auto-birth),
-  [en.memory.media](../enablers/en.memory.media.md) (media — display is a later slice)
+  [en.memory.media](../enablers/en.memory.media.md) (media — display is a later slice),
+  [en.memory.favorites](../enablers/en.memory.favorites.md) (the sidebar Favorites section)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`→`K_mem`),
   [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native shells later)
 - Related use-cases: [login](../../account/use-cases/uc.account.login.md), unlock — done; the **Memory detail

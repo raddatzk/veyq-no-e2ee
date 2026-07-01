@@ -8,8 +8,10 @@
   that **every platform implements identically** with its own native APIs. An external reviewer studies *this
   one document*, then checks only the per-platform native-API mapping below.
 - **Serves (use-cases):** [biometric-unlock (L2)](../use-cases/uc.account.biometric-unlock.md),
-  [auto-unlock (L3)](../use-cases/uc.account.auto-unlock.md), [set-device-security](../use-cases/uc.account.set-device-security.md),
-  [trust-device (L1)](../use-cases/uc.account.trust-device.md), [unlock (L0 floor)](../use-cases/uc.account.unlock.md).
+  [auto-unlock (L3)](../use-cases/uc.account.auto-unlock.md), and the
+  [set-device-security](../use-cases/uc.account.set-device-security.md) chooser that configures them — the
+  **passwordless** levels only. (L0 floor-unlock and L1 trust-device are **password-bound**: they use the
+  [key model](en.account.key-model.md) directly, not this orchestration.)
 - **Depends on:** [en.account.key-model](en.account.key-model.md) (the Master Key + wraps this opens); governed
   by [ADR 0011](../../../decisions/0011-uniform-passwordless-unlock-orchestration.md) (the layering),
   [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) (the levels),
