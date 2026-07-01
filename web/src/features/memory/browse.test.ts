@@ -4,7 +4,7 @@ import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
 
 function node(over: Partial<TreeNode> & Pick<TreeNode, 'id' | 'kind'>): TreeNode {
-  return { parentId: null, orderIndex: 0, name: over.id, wrappedContentKey: null, ...over }
+  return { parentId: null, orderIndex: 0, name: over.id, wrappedContentKey: null, wrappedMeta: null, ...over }
 }
 
 // A small tree: root has folder "Trips" + memory "Solo"; "Trips" holds memory "Italy" + folder "2025".

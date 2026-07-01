@@ -15,7 +15,7 @@ const i18n = createI18n({
 })
 
 const node = (id: string, kind: NodeKind, name: string): TreeNode => ({
-  id, kind, name, parentId: null, orderIndex: 0, wrappedContentKey: null,
+  id, kind, name, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null,
 })
 
 describe('MemoryBrowse', () => {

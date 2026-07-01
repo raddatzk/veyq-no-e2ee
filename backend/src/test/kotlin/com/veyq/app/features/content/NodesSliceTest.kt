@@ -107,6 +107,37 @@ class NodesSliceTest {
             .then().statusCode(200).body("id", org.hamcrest.CoreMatchers.not(hasItems(folder, memory)))
     }
 
+    @Test
+    fun wrappedMetaRoundTripsAndPartialUpdateLeavesItUnchanged() {
+        val (userId, scopeId) = seedMemberScope()
+        // create a Memory carrying an opaque sealed wrappedMeta blob (cr-0067) — the server never inspects it
+        val memory = createNode(
+            userId, scopeId,
+            """{"kind":"MEMORY","encryptedName":"bWVt","slugToken":"bWV0YS1z","orderIndex":0,"wrappedContentKey":"aw==","wrappedMeta":"bWV0YS12MQ=="}""",
+        )
+        given().header("Authorization", token(userId)).`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200)
+            .body("find { it.id == '$memory' }.wrappedMeta", equalTo("bWV0YS12MQ=="))
+
+        // a rename that OMITS wrappedMeta must leave the sealed blob unchanged (partial semantics)
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"encryptedName":"bmV3","slugToken":"bmV3LXNsdWc="}""")
+            .`when`().patch("/api/scopes/$scopeId/nodes/$memory")
+            .then().statusCode(204)
+        given().header("Authorization", token(userId)).`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200)
+            .body("find { it.id == '$memory' }.wrappedMeta", equalTo("bWV0YS12MQ=="))
+
+        // a partial update that SETS wrappedMeta replaces it
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"wrappedMeta":"bWV0YS12Mg=="}""")
+            .`when`().patch("/api/scopes/$scopeId/nodes/$memory")
+            .then().statusCode(204)
+        given().header("Authorization", token(userId)).`when`().get("/api/scopes/$scopeId/nodes")
+            .then().statusCode(200)
+            .body("find { it.id == '$memory' }.wrappedMeta", equalTo("bWV0YS12Mg=="))
+    }
+
     // --- helpers ---
 
     private fun createNode(userId: String, scopeId: String, body: String): String =

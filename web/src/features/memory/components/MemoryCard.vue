@@ -1,17 +1,32 @@
 <script setup lang="ts">
 // A Memory tile (cr-0030/0031). Template + classes are the design source's MemoryCard verbatim (so memory.css
-// styles it identically); only the data is ours — a decrypted TreeNode. No cover/date yet (media display +
-// metadata are later slices). A favorite star sits top-left over the cover (cr-0031); it toggles on click
-// without opening the Memory (the card itself is the open button, so the star is a sibling — no nested button).
+// styles it identically); only the data is ours — a decrypted TreeNode. The sealed date range (cr-0067) shows
+// under the title, unsealed by the parent from the node's `wrappedMeta` (no media load). A favorite star sits
+// top-left over the cover (cr-0031); it toggles on click without opening the Memory (the card itself is the
+// open button, so the star is a sibling — no nested button).
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Card from 'primevue/card'
 import type { TreeNode } from '../tree'
+import type { MemoryDate } from '../memoryDate'
+import { formatClosedRange, formatDay } from '../memoryDateRange'
 
 // `favoritable` (default true) shows the favorite pin; chapters (cr-0062) render the card open-only without it.
-withDefaults(defineProps<{ memory: TreeNode; favorite?: boolean; favoritable?: boolean }>(), { favoritable: true })
+// `date` is the node's sealed range (already unsealed by the parent), or null when it carries none.
+const props = withDefaults(
+  defineProps<{ memory: TreeNode; favorite?: boolean; favoritable?: boolean; date?: MemoryDate | null }>(),
+  { favoritable: true, date: null },
+)
 defineEmits<{ open: [memory: TreeNode]; toggleFavorite: [memory: TreeNode] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+const dateLabel = computed(() => {
+  const d = props.date
+  if (!d) return ''
+  if (d.mode === 'ongoing') return d.from ? t('memory.date.since', { day: formatDay(d.from, locale.value) }) : ''
+  return formatClosedRange(d.from, d.to, locale.value)
+})
 </script>
 
 <template>
@@ -23,6 +38,7 @@ const { t } = useI18n()
         </span>
         <span class="memory-card-text">
           <strong>{{ memory.name }}</strong>
+          <small v-if="dateLabel" class="memory-card-date">{{ dateLabel }}</small>
         </span>
       </button>
       <button
@@ -43,6 +59,17 @@ const { t } = useI18n()
 <style scoped>
 .memory-card :deep(.p-card-content) {
   position: relative;
+}
+/* The sealed date range under the title (cr-0067) — muted, single line, ellipsized. */
+.memory-card-date {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* The favorite pin reuses the design's icon-tile language: a soft rounded tile. Inactive = a Surface tile so
    it stays legible over the (accent-tinted) cover; active = the accent-soft tile + filled accent heart, the

@@ -69,7 +69,7 @@ describe('NodeMutationDialog', () => {
   })
 
   it('rename calls renameNode with the node id + parent', async () => {
-    const node = { id: 'n9', parentId: 'p1', kind: 'FOLDER', name: 'Old', orderIndex: 0, wrappedContentKey: null }
+    const node = { id: 'n9', parentId: 'p1', kind: 'FOLDER', name: 'Old', orderIndex: 0, wrappedContentKey: null, wrappedMeta: null }
     const wrapper = mountDialog({ mode: 'rename', node })
     expect((wrapper.find('input').element as HTMLInputElement).value).toBe('Old') // prefilled
     await wrapper.find('input').setValue('New')

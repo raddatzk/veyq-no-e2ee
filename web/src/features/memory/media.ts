@@ -60,8 +60,18 @@ export type MediaLayout = { v: number; w: number; h: number }
  * Tier 2 — the **capture-time tier** sealed under `K_mem` (cr-0066): the derived original capture time
  * (`capturedAt`, EXIF date or the file's creation date) plus any user correction (`capturedAtOverride`).
  * **Always listed** (small), so the gallery can sort by date. Effective = `capturedAtOverride ?? capturedAt`.
+ *
+ * `capturedAtSource` (cr-0067) records where the derived `capturedAt` came from: `'exif'` (a real
+ * `DateTimeOriginal`, trustworthy) or `'file'` (the file's modification date, a fallback that must NOT feed a
+ * Memory's `auto` date range — an edited photo's file date would wrongly stretch it). Absent on legacy blobs
+ * (treated as untrustworthy by `auto`). The tier stays opaque/versioned — no contract change.
  */
-export type MediaCapturedAt = { v: number; capturedAt?: number; capturedAtOverride?: number }
+export type MediaCapturedAt = {
+  v: number
+  capturedAt?: number
+  capturedAtOverride?: number
+  capturedAtSource?: 'exif' | 'file'
+}
 
 /**
  * Tier 3 — the full **EXIF bundle** sealed under `K_mem`, lazy-loaded per item for the lightbox (cr-0064). A
@@ -140,7 +150,13 @@ export function unsealCapturedAt(memoryKey: Uint8Array, item: MediaItem): MediaC
     const parsed = JSON.parse(json) as unknown
     if (parsed && typeof parsed === 'object') {
       const c = parsed as MediaCapturedAt
-      return { v: finiteNum(c.v) ?? 1, capturedAt: finiteNum(c.capturedAt), capturedAtOverride: finiteNum(c.capturedAtOverride) }
+      const source = c.capturedAtSource === 'exif' || c.capturedAtSource === 'file' ? c.capturedAtSource : undefined
+      return {
+        v: finiteNum(c.v) ?? 1,
+        capturedAt: finiteNum(c.capturedAt),
+        capturedAtOverride: finiteNum(c.capturedAtOverride),
+        capturedAtSource: source,
+      }
     }
   } catch {
     /* not openable / malformed → treated as no date */
@@ -384,8 +400,13 @@ async function sealMetadata(
 ): Promise<{ wrappedLayout: string | null; wrappedCapturedAt: string | null; wrappedExif: string | null }> {
   const [dims, meta] = await Promise.all([probeDims(source, deriver), readExif(source)])
   const capturedAt = meta.capturedAt ?? finiteNum(source.lastModified) // EXIF date, else the file's creation date
+  // the source distinguishes a trustworthy EXIF date from a file-modification-date fallback (cr-0067): only
+  // the former (or a user override) feeds a Memory's `auto` range — a file date must not stretch it.
+  const capturedAtSource: 'exif' | 'file' | undefined =
+    meta.capturedAt !== undefined ? 'exif' : capturedAt !== undefined ? 'file' : undefined
   const wrappedLayout = dims ? sealJson(memoryKey, { v: 1, w: dims.w, h: dims.h }, MEDIA_LAYOUT_CTX) : null
-  const wrappedCapturedAt = capturedAt !== undefined ? sealJson(memoryKey, { v: 1, capturedAt }, MEDIA_CAPTUREDAT_CTX) : null
+  const wrappedCapturedAt =
+    capturedAt !== undefined ? sealJson(memoryKey, { v: 1, capturedAt, capturedAtSource }, MEDIA_CAPTUREDAT_CTX) : null
   const wrappedExif = meta.exif ? sealJson(memoryKey, meta.exif, MEDIA_EXIF_CTX) : null
   return { wrappedLayout, wrappedCapturedAt, wrappedExif }
 }

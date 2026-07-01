@@ -9,10 +9,10 @@ import type { TreeNode } from '../tree'
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
-  messages: { en: { memory: { favorite: 'Favorite', unfavorite: 'Remove favorite' } } },
+  messages: { en: { memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', date: { since: 'Since {day}' } } } },
 })
 
-const memory: TreeNode = { id: 'm1', kind: NodeKind.Memory, name: 'Rom', parentId: null, orderIndex: 0, wrappedContentKey: null }
+const memory: TreeNode = { id: 'm1', kind: NodeKind.Memory, name: 'Rom', parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null }
 
 const mountCard = (favorite: boolean) =>
   mount(MemoryCard, { props: { memory, favorite }, global: { plugins: [i18n] } })
@@ -42,5 +42,29 @@ describe('MemoryCard favorite pin', () => {
     const w = mountCard(false)
     await w.find('.memory-card-main').trigger('click')
     expect(w.emitted('open')?.[0]?.[0]).toMatchObject({ id: 'm1' })
+  })
+})
+
+describe('MemoryCard sealed date (cr-0067)', () => {
+  const mountWithDate = (date: unknown) =>
+    mount(MemoryCard, { props: { memory, date } as never, global: { plugins: [i18n] } })
+
+  it('shows no date line when the node carries none', () => {
+    expect(mountWithDate(null).find('.memory-card-date').exists()).toBe(false)
+  })
+
+  it('renders a single day', () => {
+    const w = mountWithDate({ mode: 'single', from: '2026-06-15', to: '2026-06-15' })
+    expect(w.find('.memory-card-date').text()).toBe('06/15/2026')
+  })
+
+  it('renders a range', () => {
+    const w = mountWithDate({ mode: 'range', from: '2026-06-01', to: '2026-06-30' })
+    expect(w.find('.memory-card-date').text()).toBe('06/01/2026 – 06/30/2026')
+  })
+
+  it('renders an ongoing “since …”', () => {
+    const w = mountWithDate({ mode: 'ongoing', from: '2026-01-01' })
+    expect(w.find('.memory-card-date').text()).toBe('Since 01/01/2026')
   })
 })

@@ -24,6 +24,15 @@ export async function loadTree(): Promise<void> {
   }
 }
 
+/**
+ * Patch a node's sealed `wrappedMeta` in place after a date/meta edit (cr-0067) — keeps the browse card + detail
+ * header reactive without a full re-list. No-op if the node isn't loaded.
+ */
+export function patchNodeMeta(nodeId: string, wrappedMeta: string): void {
+  const node = treeStore.nodes.find((n) => n.id === nodeId)
+  if (node) node.wrappedMeta = wrappedMeta
+}
+
 /** Forget the loaded tree (logout / space switch). */
 export function resetTree(): void {
   treeStore.nodes = []

@@ -75,9 +75,9 @@ describe('nodeContentKey — resolve a chapter key down the chain', () => {
     const chapKey = v1.randomBytes(32)
     const wrap = (kek: Uint8Array, k: Uint8Array) => b64std(v1.symWrap(kek, k, 'content-key', v1.randomBytes(12)))
     const tree: TreeNode[] = [
-      { id: 'fold', parentId: null, kind: 'FOLDER' as TreeNode['kind'], orderIndex: 0, name: 'Trips', wrappedContentKey: null },
-      { id: 'mem', parentId: 'fold', kind: 'MEMORY' as TreeNode['kind'], orderIndex: 0, name: 'Italy', wrappedContentKey: wrap(scopeKey, memKey) },
-      { id: 'chap', parentId: 'mem', kind: 'CHAPTER' as TreeNode['kind'], orderIndex: 0, name: 'Day 1', wrappedContentKey: wrap(memKey, chapKey) },
+      { id: 'fold', parentId: null, kind: 'FOLDER' as TreeNode['kind'], orderIndex: 0, name: 'Trips', wrappedContentKey: null, wrappedMeta: null },
+      { id: 'mem', parentId: 'fold', kind: 'MEMORY' as TreeNode['kind'], orderIndex: 0, name: 'Italy', wrappedContentKey: wrap(scopeKey, memKey), wrappedMeta: null },
+      { id: 'chap', parentId: 'mem', kind: 'CHAPTER' as TreeNode['kind'], orderIndex: 0, name: 'Day 1', wrappedContentKey: wrap(memKey, chapKey), wrappedMeta: null },
     ]
     expect(Array.from(nodeContentKey(scopeKey, tree, 'chap')!)).toEqual(Array.from(chapKey))
     expect(Array.from(nodeContentKey(scopeKey, tree, 'mem')!)).toEqual(Array.from(memKey))

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../../api/client', () => ({
   mediaApi: vi.fn(),
+  contentApi: vi.fn(),
   loginApi: vi.fn(),
   tokenApi: vi.fn(),
   sessionApi: vi.fn(),
@@ -17,7 +18,9 @@ import { createI18n } from 'vue-i18n'
 import PrimeVue from 'primevue/config'
 import MemoryDetail from './MemoryDetail.vue'
 import { addMedia, type MediaDeriver } from '../media'
-import { mediaApi } from '../../../api/client'
+import { sealMemoryDate, unsealMemoryDate, type MemoryDate } from '../memoryDate'
+import { epochMsToIsoDate } from '../../../shared/isoDate'
+import { mediaApi, contentApi } from '../../../api/client'
 import * as v1 from '../../../shared/crypto/v1'
 import { NodeKind } from '../../../api/generated/content'
 import type { TreeNode } from '../tree'
@@ -32,7 +35,14 @@ const i18n = createI18n({
   messages: {
     en: {
       common: { save: 'Save', cancel: 'Cancel' },
-      memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters', gallery: 'Gallery', noChapters: 'No chapters yet.' },
+      memory: {
+        favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters', gallery: 'Gallery', noChapters: 'No chapters yet.',
+        date: {
+          title: 'Date', edit: 'Edit date', noDate: 'No date yet', since: 'Since {day}', autoHint: 'Derived from your photos.', autoEmpty: 'Add dated photos, or set a date manually.',
+          day: 'Day', from: 'From', to: 'To', start: 'Start', invalidRange: 'The end can’t be before the start.', saveFailed: 'Could not save the date.',
+          mode: { auto: 'Automatic', single: 'Single day', range: 'Range', ongoing: 'Ongoing' },
+        },
+      },
       media: {
         upload: 'Upload',
         information: 'Details',
@@ -63,8 +73,8 @@ const i18n = createI18n({
   },
 })
 
-const node = (name: string): TreeNode => ({
-  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, wrappedContentKey: null,
+const node = (name: string, wrappedMeta: string | null = null): TreeNode => ({
+  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta,
 })
 
 /** A stub deriver: a tiny "JPEG" tagged by the requested maxEdge so each tier's bytes are distinct. */
@@ -85,11 +95,23 @@ function mountDetail(memoryKey: Uint8Array, props: Partial<Record<string, unknow
 
 // happy-dom does no layout, so the justified grid (cr-0059) can't measure its container; stub a width + a
 // no-op ResizeObserver so the layout produces tiles (the layout math itself is covered in mediaGridLayout.test).
+let updateNode: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
+  // default: a no-op content client so the open-time auto-reconcile (cr-0067) never throws; date tests assert on it
+  updateNode = vi.fn().mockResolvedValue(undefined)
+  vi.mocked(contentApi).mockReturnValue({ updateNode } as unknown as ReturnType<typeof contentApi>)
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 960, height: 0, top: 0, left: 0, right: 960, bottom: 0, x: 0, y: 0, toJSON: () => ({}) })
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
 })
+
+/** The MemoryDate sealed into the most recent updateNode PATCH (cr-0067), unsealed under `key` for assertions. */
+function lastPatchedDate(key: Uint8Array): MemoryDate | null {
+  const calls = updateNode.mock.calls
+  if (!calls.length) return null
+  const wrappedMeta = calls[calls.length - 1][0].updateNodeRequest.wrappedMeta as string
+  return unsealMemoryDate(key, { wrappedMeta })
+}
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -222,7 +244,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
     const chapters: TreeNode[] = [
-      { id: 'c1', kind: NodeKind.Chapter, name: 'Day 1', parentId: NODE_ID, orderIndex: 0, wrappedContentKey: 'd3JhcA==' },
+      { id: 'c1', kind: NodeKind.Chapter, name: 'Day 1', parentId: NODE_ID, orderIndex: 0, wrappedContentKey: 'd3JhcA==', wrappedMeta: null },
     ]
 
     const wrapper = mountDetail(v1.randomBytes(32), { chapters })
@@ -263,5 +285,96 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await wrapper.find('.gallery-tile').trigger('click')
     await flushPromises()
     expect(wrapper.find('.media-lightbox').exists()).toBe(true)
+  })
+})
+
+describe('MemoryDetail (Memory date — header + auto-reconcile, cr-0067)', () => {
+  /** Add one EXIF-dated media (trustworthy source) at `epoch`, into a fresh gallery store. */
+  async function seedDatedMedia(memoryKey: Uint8Array, epoch: number) {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    vi.mocked(exifr.parse).mockResolvedValue({ DateTimeOriginal: new Date(epoch) } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+    return store
+  }
+  const emptyStore = () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    return store
+  }
+
+  it('shows the neutral “no date yet” chip for a Memory with no trustworthy date', async () => {
+    emptyStore()
+    const wrapper = mountDetail(v1.randomBytes(32))
+    await flushPromises()
+    expect(wrapper.find('.memory-date-chip').text()).toContain('No date yet')
+    expect(updateNode).not.toHaveBeenCalled() // absent meta already == empty auto; nothing to seal
+  })
+
+  it('renders a sealed manual single date in the header chip (locale-formatted)', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const sealed = sealMemoryDate(memoryKey, { mode: 'single', from: '2026-06-15', to: '2026-06-15' })
+    const wrapper = mountDetail(memoryKey, { node: node('Rom 2026', sealed) })
+    await flushPromises()
+    expect(wrapper.find('.memory-date-chip').text()).toContain('06/15/2026')
+    expect(updateNode).not.toHaveBeenCalled() // a manual date is never auto-reconciled
+  })
+
+  it('materializes the auto range from EXIF-dated media on open (fresh Memory)', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const epoch = Date.UTC(2021, 4, 1, 10, 0, 0)
+    await seedDatedMedia(memoryKey, epoch)
+    const wrapper = mountDetail(memoryKey) // node.wrappedMeta = null
+    await flushPromises()
+    await flushPromises()
+    const day = epochMsToIsoDate(epoch)
+    expect(lastPatchedDate(memoryKey)).toEqual({ mode: 'auto', from: day, to: day })
+    expect(wrapper.emitted('metaUpdated')?.[0]?.[0]).toMatchObject({ nodeId: NODE_ID })
+  })
+
+  it('self-heals a stale stored auto range on open', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const epoch = Date.UTC(2021, 4, 1, 10, 0, 0)
+    await seedDatedMedia(memoryKey, epoch)
+    const stale = sealMemoryDate(memoryKey, { mode: 'auto', from: '2000-01-01', to: '2000-01-02' })
+    mountDetail(memoryKey, { node: node('Rom 2026', stale) })
+    await flushPromises()
+    await flushPromises()
+    const day = epochMsToIsoDate(epoch)
+    expect(lastPatchedDate(memoryKey)).toEqual({ mode: 'auto', from: day, to: day })
+  })
+
+  it('does not overwrite a manual date when reconciling on open', async () => {
+    const memoryKey = v1.randomBytes(32)
+    await seedDatedMedia(memoryKey, Date.UTC(2021, 4, 1))
+    const manual = sealMemoryDate(memoryKey, { mode: 'single', from: '2026-06-15', to: '2026-06-15' })
+    mountDetail(memoryKey, { node: node('Rom 2026', manual) })
+    await flushPromises()
+    await flushPromises()
+    expect(updateNode).not.toHaveBeenCalled()
+  })
+
+  it('saves an edited date — re-seals via updateNode + emits metaUpdated for the tree', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const DateEditorStub = {
+      props: ['date', 'autoRange'],
+      emits: ['save', 'close'],
+      template: `<button class="stub-save" @click="$emit('save', { mode: 'single', from: '2026-06-15', to: '2026-06-15' })" />`,
+    }
+    const wrapper = mount(MemoryDetail, {
+      props: { node: node('Rom 2026'), scopeId: SCOPE_ID, memoryKey, favorite: false },
+      global: { plugins: [i18n, PrimeVue], directives: { tooltip: {} }, stubs: { MemoryDateEditor: DateEditorStub } },
+    })
+    await flushPromises()
+    await wrapper.find('.memory-date-chip').trigger('click') // open the editor
+    await flushPromises()
+    await wrapper.find('.stub-save').trigger('click')
+    await flushPromises()
+    expect(lastPatchedDate(memoryKey)).toEqual({ mode: 'single', from: '2026-06-15', to: '2026-06-15' })
+    expect(wrapper.emitted('metaUpdated')?.[0]?.[0]).toMatchObject({ nodeId: NODE_ID })
   })
 })

@@ -9,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { activeSpace, activeScopeKey, enterPersonalSpace } from '../app/activeSpace'
 import { setBreadcrumb } from '../app/breadcrumb'
 import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
-import { treeStore, loadTree } from '../features/memory/treeStore'
+import { treeStore, loadTree, patchNodeMeta } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
 import { nodeContentKey } from '../features/memory/tree'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
@@ -133,12 +133,14 @@ async function onDeleteDone() {
         @delete="currentNode && startDelete(currentNode)"
         @create-chapter="startCreate('create-chapter')"
         @open-chapter="openChapter"
+        @meta-updated="patchNodeMeta($event.nodeId, $event.wrappedMeta)"
       />
       <MemoryBrowse
         v-else
         :folder="currentFolder"
         :folders="level.folders"
         :memories="level.memories"
+        :scope-key="scopeKey"
         @open-folder="openFolder"
         @open-memory="openMemory"
         @toggle-favorite="onToggleFavorite"

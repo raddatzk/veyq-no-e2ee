@@ -43,7 +43,7 @@ class NodesHandler(private val store: NodesStore) {
 
     fun create(
         userId: String, scopeId: String, parentSlotId: String?, kind: String,
-        encryptedName: String, slugToken: String, orderIndex: Int, wrappedContentKey: String?,
+        encryptedName: String, slugToken: String, orderIndex: Int, wrappedContentKey: String?, wrappedMeta: String?,
     ): CreateNodeOutcome {
         if (!store.isMember(userId, scopeId)) return CreateNodeOutcome.NoScope
         val slot = parentSlotId ?: scopeId // null/absent → the scope root (slot = scope id)
@@ -52,7 +52,7 @@ class NodesHandler(private val store: NodesStore) {
         if (!parentAllows(kind, parent)) return CreateNodeOutcome.IllegalStructure
         if (store.slugTaken(slot, slugToken)) return CreateNodeOutcome.SlugTaken
         return CreateNodeOutcome.Created(
-            store.create(scopeId, slot, kind, encryptedName, slugToken, orderIndex, wrappedContentKey),
+            store.create(scopeId, slot, kind, encryptedName, slugToken, orderIndex, wrappedContentKey, wrappedMeta),
         )
     }
 
@@ -63,7 +63,7 @@ class NodesHandler(private val store: NodesStore) {
 
     fun update(
         userId: String, scopeId: String, nodeId: String,
-        encryptedName: String?, slugToken: String?, newParentSlotId: String?, orderIndex: Int?,
+        encryptedName: String?, slugToken: String?, newParentSlotId: String?, orderIndex: Int?, wrappedMeta: String?,
     ): UpdateNodeOutcome {
         if (!store.isMember(userId, scopeId)) return UpdateNodeOutcome.NotFound
         val node = store.findInScope(scopeId, nodeId) ?: return UpdateNodeOutcome.NotFound
@@ -82,7 +82,7 @@ class NodesHandler(private val store: NodesStore) {
         if (slugToken != null && store.slugTaken(targetSlot, slugToken, exceptNodeId = nodeId)) {
             return UpdateNodeOutcome.SlugTaken
         }
-        store.applyUpdate(nodeId, encryptedName, slugToken, moveSlot, orderIndex)
+        store.applyUpdate(nodeId, encryptedName, slugToken, moveSlot, orderIndex, wrappedMeta)
         return UpdateNodeOutcome.Updated
     }
 

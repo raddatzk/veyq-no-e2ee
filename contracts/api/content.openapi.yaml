@@ -304,6 +304,13 @@ components:
           maxLength: 256
           example: d3JhcHBlZC1rLW1lbQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        wrappedMeta:
+          type: [string, "null"]
+          description: A MEMORY's or CHAPTER's curated metadata (date now, place later) — a client-versioned JSON blob AEAD-sealed under this node's `K_mem` (AAD context `node-meta`; opaque base64). Absent = the implicit `auto`-with-no-dated-media state. The server never inspects it.
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1tZXRh
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     UpdateNodeRequest:
       type: object
@@ -330,6 +337,13 @@ components:
           type: integer
           format: int32
           example: 1
+        wrappedMeta:
+          type: [string, "null"]
+          description: Curated metadata sealed under the node's `K_mem` (see NodeSummary.wrappedMeta). Partial semantics — a non-null value replaces it; an omitted/null one leaves it unchanged. Opaque base64.
+          contentEncoding: base64
+          maxLength: 8192
+          example: d3JhcHBlZC1tZXRh
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     NodeCreated:
       type: object
@@ -372,6 +386,12 @@ components:
           maxLength: 256
           description: A MEMORY's or CHAPTER's `K_mem` wrapped under its parent's content key; null for folders.
           example: d3JhcHBlZC1rLW1lbQ==
+        wrappedMeta:
+          type: [string, "null"]
+          contentEncoding: base64
+          maxLength: 8192
+          description: A MEMORY's or CHAPTER's curated metadata (date/place) — a client-versioned JSON blob sealed under this node's `K_mem` (AAD context `node-meta`); null when unset. Lets a browse card show + sort by the date without loading the Memory's media. Opaque to the server.
+          example: d3JhcHBlZC1tZXRh
 
     Favorites:
       type: object

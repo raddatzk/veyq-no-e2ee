@@ -43,6 +43,9 @@ class NodeEntity : PanacheEntityBase {
     @Column(name = "wrapped_content_key")
     var wrappedContentKey: String? = null
 
+    @Column(name = "wrapped_meta")
+    var wrappedMeta: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

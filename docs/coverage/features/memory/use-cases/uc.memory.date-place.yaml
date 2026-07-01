@@ -1,0 +1,53 @@
+useCase: uc.memory.date-place
+feature: memory
+title: Curate a Memory's date (and later place) — sealed on the node
+# Slice 1 (cr-0067) = the sealed date. The node gains one opaque, client-versioned `wrappedMeta` blob
+# (`{v,date{mode,from?,to?},place?}`) sealed under K_mem (AAD context node-meta) — set at createNode + the partial
+# updateNode, returned on listNodes; the blind server only stores + echoes ciphertext. Web ships the 4-mode date
+# editor in the detail header, the materialized `auto` range (self-healing on open + after an upload batch), and
+# the browse card range + date-sort. Place chips, autosuggestion, aggregated/native are later slices (see gaps).
+acceptanceCriteria:
+  - id: sealed-wrapped-meta-node
+    text: A MEMORY/CHAPTER node carries an optional opaque `wrappedMeta` blob (a client-versioned JSON `{v,date,place?}` sealed under the node's K_mem, AAD context node-meta). It is set at createNode, updated by the partial updateNode (a non-null value replaces it; a rename that omits it leaves it unchanged), and returned on listNodes so a browse card can read it without loading media. The operator-blind server stores + echoes the ciphertext and never inspects it.
+    coverage:
+      backend: { integration: [NodesSliceTest.wrappedMetaRoundTripsAndPartialUpdateLeavesItUnchanged] }
+      web:
+        unit:
+          - src/features/memory/memoryDate.test.ts
+  - id: four-mode-date-header-editor
+    text: A Memory's date is a mode switch — auto / single / range / ongoing — materialized into `wrappedMeta.date` (`single` ⇒ from==to; `range` ⇒ both; `ongoing` ⇒ from, no to). The detail header shows the effective date (locale-formatted, a neutral "no date yet"); an editor reveals the fitting IsoDateField inputs (none / one / two / one), rejects an invalid range (to < from, E4), and on save re-seals under K_mem + PATCHes updateNode + emits the updated node so the tree updates.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/memoryDate.test.ts
+          - src/features/memory/components/MemoryDateEditor.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
+  - id: auto-materialized-trustworthy
+    text: The `auto` range is materialized min→from / max→to (day-truncated to a local YYYY-MM-DD) over only TRUSTWORTHY capture times — a media whose capturedAt is EXIF-sourced (capturedAtSource === 'exif') or carries a user capturedAtOverride; file-modification-date fallbacks (and legacy source-less media) are excluded so an edited photo can't stretch the range. It is recomputed from the complete media list and re-sealed only when it changed, at settle points — on Memory open (the self-heal), after an upload batch — leaving an empty `auto` for a Memory with no trustworthy dated media.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/memoryDate.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
+  - id: browse-card-range-and-sort
+    text: The browse card shows the sealed range under the cover + title, and the memory card grid (browse + chapters) is sorted by start date (newest first, undated last). Each card's date is read from the node's own `wrappedMeta` — opening its K_mem under the parent key (K_SC for a top-level Memory, the parent Memory's K_mem for a chapter), best-effort — WITHOUT loading the Memory's media.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/components/MemoryCard.test.ts
+          - src/features/memory/memoryDate.test.ts
+          - src/features/memory/components/MemoryBrowse.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
+  - id: operator-blind-date
+    text: The server sees only the opaque `wrappedMeta` ciphertext + the unchanged node shape — never a day, and (later) never a place name. A malformed or wrong-key blob is treated best-effort as no manual date (falls back to auto, E3), never a broken header/card.
+    coverage:
+      backend: { integration: [NodesSliceTest.wrappedMetaRoundTripsAndPartialUpdateLeavesItUnchanged] }
+      web:
+        unit:
+          - src/features/memory/memoryDate.test.ts
+gaps:
+  http: "No new endpoint — the sealed date folds into the existing createNode / updateNode / listNodes (a MEMORY/CHAPTER now round-trips an extra opaque `wrappedMeta` field), whose contract-level e2e is covered by uc.memory.browse's http surface. The blind round-trip of the field is asserted at the backend integration level (NodesSliceTest); no date-specific .http file is added."
+  apple: "Data layer carries `wrappedMeta` after contract regen, but the native date/place UI (4-mode editor, card range, sort) is not built — web-first (ADR 0010); it is Apple's own later CR."
+  android: "Data layer carries `wrappedMeta` after contract regen, but the native date/place UI is not built — web-first (ADR 0010); it is Android's own later CR."
+  web: "Date slice built (cr-0067): sealed `wrappedMeta` seal/unseal under K_mem, the 4-mode header editor (IsoDateField ported from the design source), the materialized `auto` range with open-time + post-upload self-heal, and the browse card range + date-sort — all unit-tested with real v1 crypto and mocked content/media APIs. Remaining gaps: the PLACE slice (chips + autosuggestion) and the aggregated cross-chapter timeline are later CRs; the live browser smoke (upload dated media → auto range materializes + card shows it + grid sorts + wrapped_meta sealed) is driven manually per the CR done-gate."

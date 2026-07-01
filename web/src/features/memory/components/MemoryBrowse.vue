@@ -4,15 +4,18 @@
 // "create" card) so memory.css styles it identically; only the data is ours — decrypted TreeNodes instead of
 // server Memory/MemoryFolder DTOs, and the breadcrumb/navigation are derived on device (the server is blind).
 // The folder header carries delete (as in the original) plus rename, added in-style.
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
+import { sortNodesByDate } from '../memoryDate'
 import { isFavorite } from '../../../app/favoritesStore'
 import { useViewMode } from '../../../shared/state/useViewMode'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 
-defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[] }>()
+// `scopeKey` (K_SC) unseals each Memory's sealed date for the card + the date-sort; null (locked) ⇒ no dates.
+const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; scopeKey?: Uint8Array | null }>()
 defineEmits<{
   openFolder: [folder: TreeNode]
   openMemory: [memory: TreeNode]
@@ -25,6 +28,9 @@ defineEmits<{
 
 const { t } = useI18n()
 const { viewMode } = useViewMode()
+
+// Memories ordered by their sealed start date (newest first, undated last) — read from wrappedMeta, no media load.
+const datedMemories = computed(() => sortNodesByDate(props.scopeKey ?? null, props.memories))
 </script>
 
 <template>
@@ -73,9 +79,10 @@ const { viewMode } = useViewMode()
           {{ t('memory.memoryEmpty') }}
         </p>
         <MemoryCard
-          v-for="memory in memories"
+          v-for="{ node: memory, date } in datedMemories"
           :key="memory.id"
           :memory="memory"
+          :date="date"
           :favorite="isFavorite(memory.id)"
           @open="$emit('openMemory', $event)"
           @toggle-favorite="$emit('toggleFavorite', $event)"

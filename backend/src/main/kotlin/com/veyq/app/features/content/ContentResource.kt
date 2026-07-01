@@ -28,7 +28,7 @@ class ContentResource(
         val outcome = handler.create(
             identity.principal.name, scopeId.toString(), createNodeRequest.parentId?.toString(),
             createNodeRequest.kind.value, createNodeRequest.encryptedName, createNodeRequest.slugToken,
-            createNodeRequest.orderIndex ?: 0, createNodeRequest.wrappedContentKey,
+            createNodeRequest.orderIndex ?: 0, createNodeRequest.wrappedContentKey, createNodeRequest.wrappedMeta,
         )
         return when (outcome) {
             is CreateNodeOutcome.Created ->
@@ -51,7 +51,7 @@ class ContentResource(
         when (handler.update(
             identity.principal.name, scopeId.toString(), nodeId.toString(),
             updateNodeRequest.encryptedName, updateNodeRequest.slugToken,
-            updateNodeRequest.parentId?.toString(), updateNodeRequest.orderIndex,
+            updateNodeRequest.parentId?.toString(), updateNodeRequest.orderIndex, updateNodeRequest.wrappedMeta,
         )) {
             UpdateNodeOutcome.Updated -> Response.noContent().build()
             UpdateNodeOutcome.NotFound -> error(Response.Status.NOT_FOUND, "node_not_found")
@@ -74,6 +74,7 @@ class ContentResource(
         orderIndex = orderIndex,
         parentId = if (parentId == scopeId) null else UUID.fromString(parentId),
         wrappedContentKey = wrappedContentKey,
+        wrappedMeta = wrappedMeta,
     )
 
     private fun error(status: Response.Status, code: String): Response =

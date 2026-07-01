@@ -16,6 +16,7 @@ data class NodeRow(
     val slugToken: String,
     val orderIndex: Int,
     val wrappedContentKey: String?,
+    val wrappedMeta: String?,
 )
 
 /** What a parent slot resolves to: the scope root, an existing node's kind, or nothing (foreign/missing). */
@@ -65,7 +66,7 @@ class NodesStore {
     @Transactional
     fun create(
         scopeId: String, parentSlot: String, kind: String, encryptedName: String,
-        slugToken: String, orderIndex: Int, wrappedContentKey: String?,
+        slugToken: String, orderIndex: Int, wrappedContentKey: String?, wrappedMeta: String?,
     ): String {
         val id = UUID.randomUUID().toString()
         NodeEntity().apply {
@@ -77,6 +78,7 @@ class NodesStore {
             this.slugToken = slugToken
             this.orderIndex = orderIndex
             this.wrappedContentKey = wrappedContentKey
+            this.wrappedMeta = wrappedMeta
             createdAt = Instant.now()
         }.persist()
         return id
@@ -84,7 +86,7 @@ class NodesStore {
 
     fun list(scopeId: String): List<NodeRow> =
         NodeEntity.find("scopeId", scopeId).list().map {
-            NodeRow(it.id, it.parentId, it.kind, it.encryptedName, it.slugToken, it.orderIndex, it.wrappedContentKey)
+            NodeRow(it.id, it.parentId, it.kind, it.encryptedName, it.slugToken, it.orderIndex, it.wrappedContentKey, it.wrappedMeta)
         }
 
     /** Re-load the node **inside** the transaction (the one the handler validated may be detached) and mutate
@@ -92,12 +94,14 @@ class NodesStore {
     @Transactional
     fun applyUpdate(
         nodeId: String, encryptedName: String?, slugToken: String?, newParentSlot: String?, orderIndex: Int?,
+        wrappedMeta: String?,
     ) {
         val node = NodeEntity.findById(nodeId) ?: return
         encryptedName?.let { node.encryptedName = it }
         slugToken?.let { node.slugToken = it }
         newParentSlot?.let { node.parentId = it }
         orderIndex?.let { node.orderIndex = it }
+        wrappedMeta?.let { node.wrappedMeta = it } // partial: present replaces, omitted/null leaves unchanged
     }
 
     /** Delete the node + its whole subtree (within the scope). Idempotent. */

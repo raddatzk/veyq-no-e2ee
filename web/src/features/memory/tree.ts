@@ -22,6 +22,8 @@ export type TreeNode = {
   orderIndex: number
   name: string
   wrappedContentKey: string | null
+  /** Curated metadata (date now, place later) sealed under this node's `K_mem` (cr-0067); null when unset. */
+  wrappedMeta: string | null
 }
 
 const GERMAN_FOLDING: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
@@ -73,6 +75,7 @@ export async function listTree(scopeId: string, scopeKey: Uint8Array): Promise<T
     orderIndex: r.orderIndex,
     name: openName(scopeKey, r.encryptedName),
     wrappedContentKey: r.wrappedContentKey ?? null,
+    wrappedMeta: r.wrappedMeta ?? null,
   }))
 }
 

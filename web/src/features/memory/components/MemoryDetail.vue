@@ -16,9 +16,12 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
 import { listMedia, openGrid, hasDerivatives, unsealLayout, unsealCapturedAt, effectiveCapturedAt, type MediaItem } from '../media'
+import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
+import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
+import MemoryDateEditor from './MemoryDateEditor.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import { useViewMode } from '../../../shared/state/useViewMode'
@@ -30,9 +33,16 @@ const props = defineProps<{
   favorite?: boolean
   chapters?: TreeNode[] // child CHAPTER nodes of this Memory/chapter (cr-0060)
 }>()
-defineEmits<{ toggleFavorite: []; rename: []; delete: []; openChapter: [node: TreeNode]; createChapter: [] }>()
+const emit = defineEmits<{
+  toggleFavorite: []
+  rename: []
+  delete: []
+  openChapter: [node: TreeNode]
+  createChapter: []
+  metaUpdated: [{ nodeId: string; wrappedMeta: string }]
+}>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { viewMode } = useViewMode()
 
 const items = ref<MediaItem[]>([])
@@ -71,6 +81,60 @@ const sortedItems = computed(() => {
     })
     .map((x) => x.it)
 })
+
+// --- Memory date (cr-0067, uc.memory.date-place). The effective range is sealed on the NODE under K_mem
+// (operator-blind) and shown in the header; an editor sets a manual mode or `auto`. `auto` is **materialized**
+// from the Memory's own media and self-heals on open + after an upload batch (a media-delete surface doesn't
+// exist yet — the open-time self-heal covers it once it lands).
+const dateEditorOpen = ref(false)
+const storedDate = computed(() => (props.memoryKey ? unsealMemoryDate(props.memoryKey, props.node) : null))
+const autoRange = computed<MemoryDate>(() =>
+  props.memoryKey ? computeAutoRange(items.value, props.memoryKey) : { mode: 'auto' },
+)
+// What the header shows: a manual date as sealed, else the live materialized `auto` range (before/without a seal).
+const effectiveDate = computed<MemoryDate>(() => {
+  const s = storedDate.value
+  return s && (s.mode !== 'auto' || s.from) ? s : autoRange.value
+})
+const dateLabel = computed(() => {
+  const d = effectiveDate.value
+  if (d.mode === 'ongoing') return d.from ? t('memory.date.since', { day: formatDay(d.from, locale.value) }) : ''
+  return formatClosedRange(d.from, d.to, locale.value)
+})
+// Chapters ordered by their own sealed start date — a chapter's K_mem opens under THIS Memory's K_mem (cr-0067).
+const datedChapters = computed(() => sortNodesByDate(props.memoryKey, props.chapters ?? []))
+
+/** Save an edited date: re-seal under K_mem, PATCH via updateNode, and let the host update the tree. */
+async function onDateSave(date: MemoryDate) {
+  const key = props.memoryKey
+  if (!key) return
+  const nodeId = props.node.id
+  try {
+    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, date)
+    emit('metaUpdated', { nodeId, wrappedMeta })
+  } catch {
+    // best-effort: keep the header stable; the next open-time reconcile can re-materialize an `auto` range
+  }
+}
+
+/** Materialize the `auto` range from the full media list and re-seal only when it changed (the self-heal). */
+async function reconcileAuto() {
+  const key = props.memoryKey
+  if (!key) return
+  const stored = unsealMemoryDate(key, props.node)
+  if (stored && stored.mode !== 'auto') return // a manual date is the user's — never overwritten
+  const next = computeAutoRange(items.value, key)
+  const current: MemoryDate = stored ?? { mode: 'auto' }
+  if (sameMemoryDate(current, next)) return
+  if (!stored && next.from === undefined) return // absent meta already == the empty `auto` state; nothing to seal
+  const nodeId = props.node.id
+  try {
+    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, next)
+    if (props.node.id === nodeId) emit('metaUpdated', { nodeId, wrappedMeta })
+  } catch {
+    // leave the stale range; the next Memory open self-heals it
+  }
+}
 
 const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
 const aspectRatios = computed(() => {
@@ -215,6 +279,7 @@ async function load() {
         }
       }),
     )
+    if (props.node.id === nodeId) await reconcileAuto() // settle point: open-time self-heal + post-upload-batch
   } catch {
     if (props.node.id === nodeId) status.value = 'error'
   }
@@ -247,6 +312,18 @@ onBeforeUnmount(() => {
       <div class="gallery-header-copy">
         <h1 class="gallery-title">{{ node.name }}</h1>
         <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
+        <button
+          type="button"
+          class="memory-date-chip"
+          :class="{ 'is-empty': !dateLabel }"
+          :disabled="!memoryKey"
+          :aria-label="t('memory.date.edit')"
+          :title="t('memory.date.edit')"
+          @click="dateEditorOpen = true"
+        >
+          <span class="pi pi-calendar" />
+          <span>{{ dateLabel || t('memory.date.noDate') }}</span>
+        </button>
       </div>
       <div class="gallery-header-actions">
         <Button
@@ -372,9 +449,10 @@ onBeforeUnmount(() => {
             :aria-label="t('memory.chapters')"
           >
             <MemoryCard
-              v-for="chapter in chapters"
+              v-for="{ node: chapter, date } in datedChapters"
               :key="chapter.id"
               :memory="chapter"
+              :date="date"
               :favoritable="false"
               @open="$emit('openChapter', $event)"
             />
@@ -401,6 +479,14 @@ onBeforeUnmount(() => {
       :memory-name="node.name"
       @close="lightboxIndex = null"
       @updated="onCapturedAtUpdated"
+    />
+
+    <MemoryDateEditor
+      v-if="dateEditorOpen && memoryKey"
+      :date="storedDate"
+      :auto-range="autoRange"
+      @save="onDateSave"
+      @close="dateEditorOpen = false"
     />
   </div>
 </template>
@@ -446,6 +532,32 @@ onBeforeUnmount(() => {
   color: var(--app-muted);
   font-size: 0.9rem;
   font-weight: 700;
+}
+/* The sealed Memory date, shown under the title as a clickable chip that opens the date editor (cr-0067). */
+.memory-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  justify-self: start;
+  margin-top: 0.15rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.memory-date-chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.memory-date-chip.is-empty {
+  color: var(--app-muted);
+}
+.memory-date-chip .pi {
+  font-size: 0.9rem;
 }
 .gallery-header-actions {
   display: flex;

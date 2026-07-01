@@ -4,7 +4,7 @@ import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
 
 const node = (id: string, name: string, parentId: string | null, kind: NodeKind = NodeKind.Folder): TreeNode => ({
-  id, name, parentId, kind, orderIndex: 0, wrappedContentKey: null,
+  id, name, parentId, kind, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null,
 })
 
 // ~me / Reisen 2026 / Rom
