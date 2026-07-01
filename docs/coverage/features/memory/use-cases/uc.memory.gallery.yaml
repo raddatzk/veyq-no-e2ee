@@ -56,7 +56,7 @@ acceptanceCriteria:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MediaLightbox.test.ts
   - id: date-sorted-grid
-    text: The gallery sorts tiles by effective capture time (newest first by default, a header toggle for oldest first; undated media last). Each media's capturedAt is sealed under K_mem in the always-listed metadata tier (wrappedMeta {v,w,h,capturedAt,capturedAtOverride,capturedAtSource,gpsLat,gpsLng}, cr-0066/0068) — the derived original is the EXIF DateTimeOriginal or the file's creation date, so the blind server never sees a timestamp yet the grid can order client-side. A lightbox correction re-sorts without a refetch.
+    text: The gallery sorts tiles by effective capture time (newest first by default, a header toggle for oldest first; undated media last). Each media's capturedAt is sealed under K_mem in the always-listed metadata tier (wrappedMeta — geometry + capture time + GPS; cr-0066/0068) — the derived original is the EXIF DateTimeOriginal or the file's creation date, so the blind server never sees a timestamp yet the grid can order client-side. A lightbox correction re-sorts without a refetch.
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.updateMetaOverwritesSealedTierAndLists] }
       web:

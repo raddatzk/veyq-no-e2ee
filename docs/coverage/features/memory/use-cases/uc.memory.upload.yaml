@@ -7,7 +7,7 @@ title: Upload media into a Memory (web)
 # Native upload UI is its own later CR (the VeyqClient.addMedia data layer already exists).
 acceptanceCriteria:
   - id: seal-and-upload-operator-blind
-    text: Each picked file is sealed under a fresh K_blob (wrapped to K_mem), its chunks PUT direct-to-store, and one role-tagged media is attached to the node — the server sees only ciphertext + opaque sizes/counts. Metadata is sealed under K_mem in two tiers (cr-0064/0068) — the always-listed wrappedMeta {v,w,h,capturedAt,capturedAtOverride,capturedAtSource,gpsLat,gpsLng} (geometry + capture time + GPS, returned with every list) and the heavy wrappedExif bundle (camera/lens/exposure, kept out of the list, lazy via getMediaExif) — so the gallery lays out + sorts and the lightbox shows detail without the server ever seeing dimensions, capture time, GPS, or camera.
+    text: Each picked file is sealed under a fresh K_blob (wrapped to K_mem), its chunks PUT direct-to-store, and one role-tagged media is attached to the node — the server sees only ciphertext + opaque sizes/counts. Metadata is sealed under K_mem in two tiers (cr-0064/0068) — the always-listed wrappedMeta tier (geometry + capture time + GPS, returned with every list) and the heavy wrappedExif bundle (camera/lens/exposure, kept out of the list, lazy via getMediaExif) — so the gallery lays out + sorts and the lightbox shows detail without the server ever seeing dimensions, capture time, GPS, or camera.
     coverage:
       backend:
         integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.derivativesRoundTripWithOwnWraps, MediaSliceTest.mediaExifWithoutExifIsNull]
