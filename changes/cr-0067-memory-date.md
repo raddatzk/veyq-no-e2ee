@@ -2,7 +2,7 @@
 id: cr-0067
 title: Memory date — sealed wrappedMeta on the node + 4-mode date UI (web/backend)
 status: done
-satisfies: [uc.memory.date-place]
+satisfies: [uc.memory.date]
 adrs: ["0012"]
 invariants: [operator-blind-e2ee]
 ---
@@ -11,8 +11,8 @@ invariants: [operator-blind-e2ee]
 
 Give a Memory a **date** the user can curate — a mode-switch (`auto` / `single` / `range` / `ongoing`) — shown
 on its **browse card** (cover + title + range, grid sorted by start date) and in the detail header, all
-**operator-blind**. First slice of [uc.memory.date-place](../docs/features/memory/use-cases/uc.memory.date-place.md):
-it introduces the node's sealed **`wrappedMeta`** blob (which the place slice will reuse) and the date UI.
+**operator-blind**. Realizes [uc.memory.date](../docs/features/memory/use-cases/uc.memory.date.md) — it
+introduces the node's sealed **`wrappedMeta`** blob (which [uc.memory.place](../docs/features/memory/use-cases/uc.memory.place.md) will reuse) and the date UI.
 
 - The effective **day range** `{ mode, from?, to? }` is **materialized** into the node's sealed `wrappedMeta`
   for *every* mode — the browse card grid must show + sort by it **without loading a Memory's media**.
@@ -83,7 +83,7 @@ it introduces the node's sealed **`wrappedMeta`** blob (which the place slice wi
   under its `K_mem`. · Done when: `npm run check` green; a test renders a card's range and orders a mixed grid
   by start date.
 - [x] 5 coverage + verify — add
-  [uc.memory.date-place.yaml](../docs/coverage/features/memory/use-cases/uc.memory.date-place.yaml); live browser
+  [uc.memory.date.yaml](../docs/coverage/features/memory/use-cases/uc.memory.date.yaml); live browser
   smoke: upload dated media → the Memory's `auto` range materializes + the card shows it + the grid sorts by it;
   switch to `single`/`range`/`ongoing` and it persists + re-renders; `wrapped_meta` sealed (no plaintext date).
   · Done when: the three trust-chain guards green; the smoke confirmed.
