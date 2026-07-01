@@ -6,9 +6,12 @@
 - **Provides:** the **encrypted node tree** inside a scope — **folders** (organization only) and **Memories**
   (the content unit, nested **Chapters**) — with **encrypted names**, **blinded slug tokens** for permalinks,
   and a **per-Memory content key `K_mem`** born on creation. Tree + names + keys only.
-- **Serves (use-cases):** the value-bearing [Memory](../_index.md) flows build on this — *add media*,
-  *journal*, *organize/curate*, *share a Memory* (all planned). Creating an empty named node is not itself a
-  user goal; it is the substrate those carry.
+- **Serves (use-cases):** [uc.memory.browse](../use-cases/uc.memory.browse.md) (tree navigation + node CRUD),
+  [uc.memory.upload](../use-cases/uc.memory.upload.md), [uc.memory.gallery](../use-cases/uc.memory.gallery.md),
+  [uc.memory.chapters](../use-cases/uc.memory.chapters.md), and the sealed node-meta
+  ([uc.memory.date](../use-cases/uc.memory.date.md) / [uc.memory.place](../use-cases/uc.memory.place.md)) —
+  plus *journal* / *share a Memory* (planned). Creating an empty named node is not itself a user goal; it is
+  the substrate those carry.
 - **Depends on:** [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (content lives
   in a scope) → and through it `uc.account.unlock` (the identity + scope key).
 - **Preconditions:** An **unlocked** vault (identity → scope key → `K_SC` available for the active scope); a

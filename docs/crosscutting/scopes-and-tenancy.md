@@ -85,15 +85,16 @@ end note
 - **Group/tenant roles** live in membership rows (e.g. group admin, tenant admin) and gate *management*
   actions, not content readability — content readability is purely the grant.
 
-## Authorization vs. confidentiality — two enforcement layers
+## Authorization vs. confidentiality — how the split maps to scopes
 
-This separation is the heart of the model:
+The [Security Model](security-model.md#the-one-guarantee) owns the guarantee — *the server enforces
+authorization, the client enforces confidentiality with keys it never sees.* Here is how that split lands on
+scope architecture:
 
-- **The server enforces *authorization*:** a valid grant + `ACTIVE` membership, checked by small guards
-  (e.g. a scope-access guard, a tenant-admin guard) on **opaque IDs**. The server never reads content to
-  decide.
-- **The client enforces *confidentiality*:** only the grant unwraps the scope key, so a member can read
-  a scope **only** if they hold a grant for it. *Visibility is cryptographic*, not a server promise.
+- **Authorization (server):** a valid grant + `ACTIVE` membership, checked by small guards (a scope-access
+  guard, a tenant-admin guard) on **opaque IDs** — the server never reads content to decide.
+- **Confidentiality (client):** only the grant unwraps the scope key, so a member can read a scope **only** if
+  they hold one. *Visibility is cryptographic*, not a server promise.
 
 ## Membership — the user↔scope relation (role + grant)
 

@@ -6,8 +6,9 @@
   It speeds finding a Memory; value flows through the [Memory](../_index.md) use-cases it accelerates.
 - **Provides:** a **per-(user, scope) set of pinned Memory ids**, sealed on device and stored as **one opaque
   blob** — surfaced as the sidebar **Favorites** section + a heart toggle on the Memory card and detail.
-- **Serves (use-cases/enablers):** the browse / open-Memory flows over [en.memory.tree](en.memory.tree.md) —
-  a shortcut to frequently-opened Memories.
+- **Serves (use-cases):** [uc.memory.gallery](../use-cases/uc.memory.gallery.md) (the header favorite toggle) +
+  [uc.memory.browse](../use-cases/uc.memory.browse.md) (the sidebar Favorites section) — a shortcut to
+  frequently-opened Memories.
 - **Depends on:** [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (the `K_SC`
   the set is sealed under) + [en.memory.tree](en.memory.tree.md) (the nodes pinned).
 - **Preconditions:** An **authenticated, unlocked** member with the scope open (so `K_SC` is in memory).
@@ -15,13 +16,13 @@
   a single ciphertext blob; the client holds the decrypted set in memory and reflects it in the UI. The server
   never learns **which** Memories are pinned.
 
-## Operator-blind: why a favorite is ciphertext, not a flag
+## Operator-blind: a favorite is ciphertext
 
-The obvious design — a boolean `favorite` column per node — is **rejected**: a pin is a **preference**, and the
-[operator-blind invariant](../../../crosscutting/security-model.md) sanctions only *IDs, sizes, coarse
-timestamps, scope/membership, blinded tokens* as server-visible metadata. A plaintext favorite flag is **none of
-those** — it would leak to the operator *what matters to you* among the (opaque) nodes. So a favorite is
-**ciphertext**:
+A plaintext `favorite` boolean per node would break the
+[operator-blind invariant](../../../crosscutting/security-model.md): it sanctions only *IDs, sizes, coarse
+timestamps, scope/membership, blinded tokens* as server-visible metadata. A pin is a **preference** — **none of
+those** — so a plaintext flag would leak to the operator *what matters to you* among the (opaque) nodes. The
+invariant therefore forces a favorite to be **ciphertext**:
 
 - The caller's pinned-id **set** is AEAD-sealed under `K_SC` (context `favorites`) and stored as **one opaque
   blob** per `(user, scope)`. The server sees only the ciphertext + its size — never the subset of pinned ids.

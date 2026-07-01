@@ -18,9 +18,10 @@
    behind an **Upload** affordance).
 2. Each file is enqueued into the **global upload queue** as a batch against the current `{scopeId, nodeId}` +
    the Memory key. The TopBar **uploads** button shows a spinner + an active-file count badge.
-3. The queue uploads **sequentially** (one file at a time): derive tiers on-device → seal original + tiers →
-   `start` (reserve a session + presign a PUT per chunk per blob) → PUT every chunk → `complete` (attach the
-   media to the node). Per-file + per-batch **progress** advance as chunks land.
+3. The queue uploads **one file at a time**: each file is sealed on-device (with its
+   [derivatives](../enablers/en.memory.derivatives.md)) and sent **direct-to-store**, then attached to the
+   Memory node — the seal → start → PUT → attach choreography is
+   [en.memory.media](../enablers/en.memory.media.md)'s. Per-file + per-batch **progress** advance as it uploads.
 4. Opening the uploads popup shows each batch's files with status (queued / uploading / done / failed /
    cancelled), a progress bar, and a **cancel** control while a file is queued/uploading.
 5. When a batch's files all finish, the gallery for that Memory reloads so the new media appears; the user can
@@ -48,8 +49,7 @@
   filename reaches the server in the clear.
 - **The tray is global + non-blocking.** Uploads continue while the user browses other Memories; the queue is a
   module singleton, the popup lives in the app shell.
-- **Sequential, not parallel (first slice).** One file at a time keeps the byte-budget + open-session
-  accounting simple; parallelism is a later tuning.
+- **Sequential, not parallel.** One file at a time keeps the byte-budget + open-session accounting simple.
 
 ## What this means for you / Was das für dich bedeutet
 

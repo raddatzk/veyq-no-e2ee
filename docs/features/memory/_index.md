@@ -46,12 +46,15 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 
 - Browse & organize the Memory tree — the shell + folder/Memory browse + create/rename/delete
   ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done**, web/apple/android shells)
-- Add media to a Memory — the upload flow + UI on top of
-  [en.memory.media](enablers/en.memory.media.md) (`K_blob` + chunked AEAD, direct-to-store); the upload also
-  generates the [derivatives](enablers/en.memory.derivatives.md)
+- [uc.memory.upload](use-cases/uc.memory.upload.md) — **refined** (add media to a Memory: the web upload flow +
+  global uploads tray on [en.memory.media](enablers/en.memory.media.md) — `K_blob` + chunked AEAD,
+  direct-to-store; the upload also generates the [derivatives](enablers/en.memory.derivatives.md))
 - [uc.memory.gallery](use-cases/uc.memory.gallery.md) — **planned** (open a Memory: thumbnail grid + lightbox
   preview + download original + header/favorite; on [en.memory.derivatives](enablers/en.memory.derivatives.md),
   built first)
+- [uc.memory.chapters](use-cases/uc.memory.chapters.md) — **refined** (nested Memories inside a Memory — each
+  chapter a full Memory with its own recursive `K_mem`, wrapped under the parent's;
+  [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
 - [uc.memory.date](use-cases/uc.memory.date.md) — **done** (cr-0067): a curatable date (auto/single/range/ongoing),
   sealed on the node's `wrappedMeta`; browse card range + date-sort
 - [uc.memory.place](use-cases/uc.memory.place.md) — **planned**: one named location on the same `wrappedMeta`

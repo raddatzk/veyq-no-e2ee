@@ -8,7 +8,8 @@
   **direct-to-store** via presigned URLs ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)),
   and **attached** to a node (a Memory or one of its Chapters). Bytes only — the *curation* of media into a
   gallery (covers, ordering, captions, the UI) is the use-case on top.
-- **Serves (use-cases):** [add media to a Memory](../_index.md) (the value-bearing flow + UI), and later
+- **Serves (use-cases):** [uc.memory.upload](../use-cases/uc.memory.upload.md) (add media — the value-bearing
+  flow + UI) and [uc.memory.gallery](../use-cases/uc.memory.gallery.md) (reads the blobs back), plus later
   *journal attachments* / *places & tracks* media. Storing one encrypted blob is not itself a user goal; it is
   the substrate those carry.
 - **Depends on:** [en.memory.tree](en.memory.tree.md) (a **Memory** exists and owns a `K_mem`) → through it

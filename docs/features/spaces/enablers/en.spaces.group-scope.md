@@ -9,9 +9,10 @@
   device** — a keyed container designed to be held by **many** members (one grant each), confidential **even
   from the tenant owner** ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)). This enabler is
   the scope itself born by its owner; **adding other members** is the next slice.
-- **Serves (use-cases/enablers):** the planned group use-cases (create / share with a group, list & switch
-  spaces) and — unchanged, per-scope — [en.memory.tree](../../memory/enablers/en.memory.tree.md) + the
-  [Memory](../../memory/_index.md) flows (a group holds a Memory tree like any scope).
+- **Serves (use-cases/enablers):** [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) (groups
+  appear in the switcher) — plus the *planned* create-group / share-with-a-group flows; and — unchanged,
+  per-scope — [en.memory.tree](../../memory/enablers/en.memory.tree.md) + the [Memory](../../memory/_index.md)
+  flows (a group holds a Memory tree like any scope).
 - **Depends on:** [en.spaces.personal-scope](en.spaces.personal-scope.md) (generalised scope identity +
   client-driven birth/open), `uc.account.unlock` (the identity that seals/opens the grant),
   [uc.admin.create-tenant](../../admin/use-cases/uc.admin.create-tenant.md) (the tenant it lives within).

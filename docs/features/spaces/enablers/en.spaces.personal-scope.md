@@ -7,8 +7,9 @@
 - **Provides:** a **per-tenant PERSONAL scope** that **exists and can be opened on this device**, with **no
   other key-holder** ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)) — the keyed container
   the content flows fill. No content (folders / memories) here — only the scope itself.
-- **Serves (use-cases/enablers):** [en.memory.tree](../../memory/enablers/en.memory.tree.md) and the planned
-  [Memory](../../memory/_index.md) use-cases (add media / journal / **share a Memory**) — all need a scope to
+- **Serves (use-cases/enablers):** [uc.memory.browse](../../memory/use-cases/uc.memory.browse.md) (the tree
+  lives in this scope) + [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) (lists & opens it),
+  and the enabler [en.memory.tree](../../memory/enablers/en.memory.tree.md) built on it — all need a scope to
   live in. Generalising scope identity (scopeId + kind) here also unblocks **groups**.
 - **Depends on:** `uc.account.unlock` (the identity that seals/opens the grant) +
   [uc.admin.create-tenant](../../admin/use-cases/uc.admin.create-tenant.md) (the tenant it lives within).
