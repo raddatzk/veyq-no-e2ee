@@ -14,7 +14,7 @@ acceptanceCriteria:
   - id: deliberate-set-location
     text: A location is created only by a deliberate "set location" act (on Memory open, or pre-armed at Memory creation with a mandatory fallback name + derivedMode auto); there is no empty-name / unnamed-pin state (no name ⇒ no location). Setup never happens silently on upload.
   - id: medoid-position
-    text: The position `derived` is the MEDOID of the Memory's media GPS (the actual photo location nearest the centre), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` auto re-medoids on new media; fixed is a snapshot.
+    text: The position `derived` is the MEDOID of the Memory's media GPS — the actual photo minimizing the summed Haversine distance to the others (robust to an outlier), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` defaults to auto on set-with-media (re-medoids as media are added) and flips to fixed when the user moves the pin by hand; fixed is a frozen snapshot. GPS is read from the always-listed capture tier (promoted alongside `capturedAt`, like cr-0066), so the medoid and every auto re-medoid are list-level — no per-item EXIF fetch; no backfill, so legacy media without the tier do not contribute.
   - id: name-manual-or-reverse-geocoded
     text: The name is independent of the coordinate — either typed by hand (nameSource manual, frozen) or reverse-geocoded from nameAnchor (coordinate + zoom → granularity Atlantik/Kanaren/Teneriffa; nameSource geocoded, may refresh when the anchor moves). A geocoded fallback typed at creation is a placeholder the lookup replaces; if geocoding stays off it persists, blind.
   - id: reverse-only-veyq-blind-geocoding
@@ -22,8 +22,8 @@ acceptanceCriteria:
   - id: tenant-map-via-listnodes
     text: A tenant-root toggle shows every Memory as a pin, read from each node's sealed `location` via listNodes (unsealed client-side, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name. Map tiles are a separate opt-in/self-host seam.
 gaps:
-  backend: "Not built. The node's `wrappedMeta` already round-trips opaquely (cr-0067), so the `location` sub-object needs no backend change beyond what the date shipped; a place CR adds no endpoint. Asserted at the backend integration level only once a place CR references it."
-  web: "Not built. The place slices (set location + medoid + name; the tenant map; reverse-geocoding) are their own CRs on top of the shipped `wrappedMeta` blob — web-first per ADR 0010."
+  backend: "Not built. The node's `location` round-trips inside the opaque `wrappedMeta` (cr-0067) — no backend change there. But the medoid's GPS source needs promoting GPS into the listed media capture tier (a contract + backend + migration slice, analogous to cr-0066's `capturedAt` tier; no backfill) — the set-location slice depends on it. Asserted at the backend integration level once those CRs land."
+  web: "Not built. Slices: (2a) GPS into the listed capture tier, (2b) web set-location + medoid + name, (3) the tenant map, (4) reverse-geocoding — their own CRs on the shipped `wrappedMeta` blob; web-first per ADR 0010."
   apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
   android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
-  http: "No new endpoint — place folds into the existing createNode / updateNode / listNodes (an extra opaque `location` inside the same `wrappedMeta`), covered at the contract level by uc.memory.browse's http surface once a place CR lands."
+  http: "The `location` folds into the existing createNode / updateNode / listNodes (an extra opaque field in the same `wrappedMeta`). The one contract change is the listed media capture tier gaining GPS (like cr-0066); covered at the contract level once the GPS-tier + place CRs land."

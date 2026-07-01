@@ -23,7 +23,8 @@ is [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md). This us
 ## Main flow
 
 **Set up with media present (Memory open).** The user triggers **"set location"**; the client forms `derived` as
-the **medoid** of the Memory's media GPS (from the media's already-sealed EXIF) and asks for a **name** — either
+the **medoid** of the Memory's media GPS — read from the **always-listed capture tier** (which carries the
+media's GPS alongside its `capturedAt`, so no per-item fetch) — and asks for a **name** — either
 **typed** (`manual`, e.g. "at grandma's") *or*, if the reverse lookup is enabled, **framed on the map** (its
 centre + zoom = `nameAnchor` → the provider returns a name at that resolution, `geocoded`, still editable). On
 save the client seals `{ v, …, location }` under `K_mem` and PATCHes `wrappedMeta`.
@@ -34,8 +35,10 @@ to be resolved) with `derivedMode: 'auto'` (forced — nothing to snapshot). The
 `derived` forms as the medoid and — if the user opted into geocoding — `nameAnchor` forms at a default zoom and
 the name resolves, replacing the fallback. No opt-in ⇒ the fallback simply stands (blind).
 
-**After set-up.** `derivedMode: 'auto'` re-medoids `derived` as media are added (it barely moves); a `manual` name
-and a `fixed` position are frozen; a `geocoded` name may refresh when its anchor moves.
+**After set-up.** Position is **`auto` by default** — it re-medoids `derived` as media are added (it barely
+moves); **moving the pin by hand flips it to `fixed`** (the deliberate correction wins, then stays frozen — like
+a manual date beats `auto`). A `manual` name and a `fixed` position are frozen; a `geocoded` name may refresh when
+its anchor moves.
 
 **The map.** A **toggle in the tenant root** shows all Memories as pins, read from each node's sealed `location`
 via `listNodes` (no media load, no locations endpoint). Clicking a pin opens the Memory.
@@ -80,6 +83,12 @@ hard error on an unsupported language) — so de+en are well covered and further
   may auto-fill: the position is the **medoid** of the media GPS (an actual photo spot, never the sea, barely
   moving as media are added — this is what makes `derivedMode: 'auto'` safe), and, **only under the user's opt-in**,
   the `geocoded` name auto-resolves on the first geotagged media (standing consent — see the reverse-lookup note).
+- **GPS rides the listed capture tier — like the date.** The medoid (and every `auto` re-medoid on media-add)
+  reads GPS **list-level**, the way date-`auto` reads `capturedAt` — GPS is promoted into the always-listed
+  capture tier rather than left in the per-item EXIF blob. The lazy alternative (fetch each media's sealed EXIF
+  on demand) was rejected: it would make `derivedMode: 'auto'` re-medoid an N-fetch operation on every upload.
+  Still sealed under `K_mem`, still operator-blind; no backfill — legacy media without the listed tier don't
+  contribute to the medoid (exactly as they don't to date-`auto`).
 - **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
 
 ## What this means for you / Was das für dich bedeutet
@@ -111,5 +120,5 @@ veyq sieht sie nie.
   (reverse-only, provider-neutral geocoding; Nominatim reference; veyq-blind), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
 - Crosscutting: [security-model](../../../crosscutting/security-model.md) (operator-blind = the veyq operator;
   third-party services are a separate consented boundary)
-- Future: the always-listed **geo-tier** + **on-device coarse names** optimizations; **derived** place from GPS
-  clusters aggregated across chapters
+- Future: **on-device coarse names** (a bundled gazetteer, ADR 0016); **derived** place from GPS clusters
+  aggregated across a Memory *plus its chapters*

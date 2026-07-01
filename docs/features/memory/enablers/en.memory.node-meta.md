@@ -35,15 +35,16 @@
                  to?:   'YYYY-MM-DD' },       // end day    (absent for ongoing / undated auto)
     location?: { name:         string,        // the label — MANDATORY (no location without a name)
                  nameSource:   'geocoded' | 'manual',   // manual = frozen; geocoded = may refresh on anchor move
-                 derived?:     { lat, lng },   // map position = the MEDOID of the media GPS (never the mean)
-                 derivedMode?: 'fixed' | 'auto',        // set-time choice: snapshot vs. re-medoid on media add
+                 derived?:     { lat, lng },   // map position = the MEDOID of media GPS (min summed Haversine dist — never the mean)
+                 derivedMode?: 'fixed' | 'auto',        // 'auto' re-medoids on media add (default); a manual pin move flips it to 'fixed'
                  nameAnchor?:  { lat, lng, zoom } } }   // coord + zoom a geocoded name was resolved at
   ```
 
   - **`date`** ([uc.memory.date](../use-cases/uc.memory.date.md)) — the effective day range, materialized for
     every mode; `auto` = min→max over the Memory's *trustworthy* `capturedAt`.
   - **`location`** ([uc.memory.place](../use-cases/uc.memory.place.md)) — one named place; `name` is mandatory
-    (no name ⇒ no location); `derived` is the **MEDOID** of the media GPS (an actual photo spot → never the sea);
+    (no name ⇒ no location); `derived` is the **medoid** of the media GPS — the actual photo minimizing the summed
+    **Haversine** distance (a real spot, robust to an outlier → never the sea, never the mean);
     `nameAnchor` records where + at what zoom a geocoded name came from, for re-resolution. Reverse-only,
     opt-in, veyq-blind geocoding: [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md).
 
