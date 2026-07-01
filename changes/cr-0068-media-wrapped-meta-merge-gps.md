@@ -1,7 +1,7 @@
 ---
 id: cr-0068
 title: Consolidate the listed per-media tiers into wrapped_meta + promote GPS (place slice 2a)
-status: in-progress
+status: done
 satisfies: [uc.memory.place]
 adrs: ["0012"]
 invariants: [operator-blind-e2ee]
@@ -84,7 +84,7 @@ geocoding here.
   meta blob. · Done when: `npm run check` green; `media.test.ts` round-trips the merged tier (geometry, date via
   EXIF + mtime fallback, override set/clear, GPS present) and asserts `wrappedExif` is date- **and** GPS-free;
   `MemoryDetail.test.ts` (layout + newest-first sort) and `MediaLightbox.test.ts` (date edit) stay green.
-- [~] 4 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml` (the
+- [x] 4 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml` (the
   `medoid-position` criterion's **GPS-into-the-listed-tier** half now backed by backend + web tests; the medoid
   computation + set-location stay gapped for slice 2b) and `uc.memory.gallery.yaml` (retarget the layout/date-tier
   test refs to the merged `wrapped_meta`; no regression). Live browser smoke: upload a geotagged photo → its
@@ -107,14 +107,19 @@ A media carries **one** always-listed sealed `wrapped_meta` blob (geometry + eff
 **lazy, GPS-free** `wrapped_exif` — the server holding only ciphertext under `K_mem`. The gallery grid lays out +
 sorts exactly as before; the lightbox shows+edits the date via `PUT …/meta` and reads EXIF via `GET …/exif`. The
 listed GPS is the source the place medoid (slice 2b) will read without a per-item fetch. `./gradlew -p backend
-check` + `npm run check` + the three trust-chain guards green; the browser smoke confirmed (sealed GPS, zero
-plaintext leak).
+check` + `npm run check` + the three trust-chain guards green; live smoke confirmed on a re-seeded MariaDB +
+Garage — V18 applied, a geotagged upload sealed GPS into `wrapped_meta`, and the stored ciphertext leaked zero
+plaintext coordinate/date.
 
 ## Retrospective
 
-Code + trust chain landed across contracts → backend → web in one session; the live browser smoke is the one
-remaining gate (delegated — it needs a re-seeded instance so Flyway applies V18, plus the live Garage/decode
-stack). What was rough:
+Code + trust chain + the live smoke all landed in one session. Live proof (re-seeded MariaDB + Garage,
+`quarkusDev` against the store): Flyway applied **V18 on real MariaDB** (`now at version v18`; `veyq_media` ends
+with `wrapped_meta` + `wrapped_exif`, the old `wrapped_layout`/`wrapped_captured_at` **dropped**); the existing
+`media.e2e` round-tripped bytes through real presigned PUT/GET on the cr-0068 contract; and a focused live e2e
+uploaded two **geotagged** JPEGs through the real data layer → their `wrapped_meta` unsealed to the right GPS +
+capture date, while the stored MariaDB ciphertext (180/164 B) carried **zero plaintext** coordinate or year
+(operator-blind confirmed at the DB). What was rough:
 
 - **The CR under-scoped itself in its own title.** It opened as "promote GPS into the capture tier" and only
   during refinement (with the user) grew into "consolidate the two listed tiers into `wrapped_meta` + move GPS
@@ -136,6 +141,15 @@ stack). What was rough:
   shared test method is a cross-use-case change. **Next time:** grep `docs/coverage` for a test method name before
   renaming it, the same way we grep source.
 
+- **The browser smoke fought back; the headless path won.** Driving login via the PrimeVue form through the
+  preview tools stalled — a native `.value` set doesn't reach the `Password` component's v-model, and even with
+  proper input events the submit didn't fire a challenge; each retry cost a full network-dump read. Switching to
+  a **headless e2e harness** (reusing `media.e2e`'s login→unlock→addMedia path with a geotagged fixture + a
+  FileReader polyfill so exifr's Blob path runs under node) proved the GPS-sealing end-to-end far more cheaply and
+  reliably, and a direct `docker exec` DB query gave the operator-blind proof. **Next time:** for a data-path
+  smoke, reach for the headless e2e harness first and reserve browser-driving for genuinely visual/layout checks —
+  it matches the memory note's "cheap diagnostics before expensive ones."
+
 - **Process honored:** conversed in German throughout, delegated the surface-wide read to an Explore agent (per
-  the memory note), kept docs/code in English, no deprecated deps, migration in the H2 ∩ MariaDB subset. The one
-  gap vs. our norms is the live smoke — correctly left to the user's machine rather than claimed as done.
+  the memory note), kept docs/code in English, no deprecated deps, migration in the H2 ∩ MariaDB subset, and ran
+  the live smoke to completion rather than claiming done on unit tests alone.
