@@ -10,7 +10,7 @@ type MediaRecord = {
   mediaId: string
   originalUploadId: string
   derivatives: { kind: string; uploadId: string }[]
-  wrappedCapturedAt: string | null
+  wrappedMeta: string | null
   wrappedExif: string | null
 }
 
@@ -47,7 +47,7 @@ export function galleryFakeStore() {
           mediaId,
           originalUploadId: item.originalUploadId,
           derivatives: item.derivatives ?? [],
-          wrappedCapturedAt: item.wrappedCapturedAt ?? null,
+          wrappedMeta: item.wrappedMeta ?? null,
           wrappedExif: item.wrappedExif ?? null,
         })
         return { blobId: `blob-${item.originalUploadId}`, mediaId, error: null }
@@ -58,19 +58,19 @@ export function galleryFakeStore() {
         mediaId: m.mediaId,
         ...blobOf(m.originalUploadId),
         derivatives: m.derivatives.map((d) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
-        wrappedCapturedAt: m.wrappedCapturedAt, // the capture-time tier is listed, for date sorting (cr-0066)
-        // wrappedExif is deliberately NOT listed — it is lazy via getMediaMeta (cr-0064)
+        wrappedMeta: m.wrappedMeta, // the listed-metadata tier is listed, for grid layout + date sorting (cr-0068)
+        // wrappedExif is deliberately NOT listed — it is lazy via getMediaExif (cr-0064)
       })),
     ),
-    // Tier-3 EXIF, echoed only through the meta endpoint (kept out of the list) — operator-blind ciphertext.
-    getMediaMeta: vi.fn(async ({ mediaId }: any) => ({
+    // The heavy EXIF, echoed only through the exif endpoint (kept out of the list) — operator-blind ciphertext.
+    getMediaExif: vi.fn(async ({ mediaId }: any) => ({
       wrappedExif: media.find((m) => m.mediaId === mediaId)?.wrappedExif ?? null,
     })),
-    // Overwrite a media's sealed capture-time tier verbatim (cr-0066) — e.g. a corrected date.
-    updateMediaCapturedAt: vi.fn(async ({ mediaId, mediaCapturedAtUpdate }: any) => {
+    // Overwrite a media's sealed listed-metadata tier verbatim (cr-0068) — e.g. a corrected date.
+    updateMediaMeta: vi.fn(async ({ mediaId, mediaMetaUpdate }: any) => {
       const rec = media.find((m) => m.mediaId === mediaId)
-      if (rec) rec.wrappedCapturedAt = mediaCapturedAtUpdate.wrappedCapturedAt ?? null
-      return { wrappedCapturedAt: mediaCapturedAtUpdate.wrappedCapturedAt ?? null }
+      if (rec) rec.wrappedMeta = mediaMetaUpdate.wrappedMeta ?? null
+      return { wrappedMeta: mediaMetaUpdate.wrappedMeta ?? null }
     }),
     presignBlobDownloads: vi.fn(async ({ blobDownloadsBatchRequest }: any) => ({
       results: blobDownloadsBatchRequest.items.map((it: any) => ({ presignedGets: getsFor(it.blobId), error: null })),

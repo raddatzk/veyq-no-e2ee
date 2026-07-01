@@ -16,8 +16,7 @@ data class MediaRow(
     val wrappedBlobKey: String,
     val manifest: List<Long>?,
     val derivatives: List<DerivativeRow>,
-    val wrappedLayout: String?,
-    val wrappedCapturedAt: String?,
+    val wrappedMeta: String?,
 )
 
 /** One role-tagged derivative tier of a media (its own blob metadata + wrap). */
@@ -78,8 +77,7 @@ class MediaStore {
         nodeId: String,
         originalManifest: List<Long>?,
         derivatives: List<DerivativeAttach>,
-        wrappedLayout: String?,
-        wrappedCapturedAt: String?,
+        wrappedMeta: String?,
         wrappedExif: String?,
     ): Pair<String, String> {
         val originalBlobId = persistBlob(original, originalManifest)
@@ -89,8 +87,7 @@ class MediaStore {
             scopeId = original.scopeId
             this.nodeId = nodeId
             this.blobId = originalBlobId
-            this.wrappedLayout = wrappedLayout
-            this.wrappedCapturedAt = wrappedCapturedAt
+            this.wrappedMeta = wrappedMeta
             this.wrappedExif = wrappedExif
             createdAt = Instant.now()
         }.persist()
@@ -133,19 +130,19 @@ class MediaStore {
                 val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
                 DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
             }
-            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives, m.wrappedLayout, m.wrappedCapturedAt)
+            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives, m.wrappedMeta)
         }
     }
 
-    /** The media, if it exists in this scope — carries the lazy `wrappedExif` for the lightbox meta endpoint. */
+    /** The media, if it exists in this scope — carries the lazy `wrappedExif` for the lightbox exif endpoint. */
     fun findMedia(scopeId: String, mediaId: String): MediaEntity? =
         MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId }
 
-    /** Overwrite a media's sealed `wrappedCapturedAt` verbatim (opaque; e.g. a re-sealed corrected date). */
+    /** Overwrite a media's sealed `wrappedMeta` verbatim (opaque; e.g. a re-sealed corrected date). */
     @Transactional
-    fun setCapturedAt(scopeId: String, mediaId: String, wrappedCapturedAt: String?): MediaEntity? {
+    fun setMeta(scopeId: String, mediaId: String, wrappedMeta: String?): MediaEntity? {
         val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId } ?: return null
-        media.wrappedCapturedAt = wrappedCapturedAt
+        media.wrappedMeta = wrappedMeta
         media.persist()
         return media
     }

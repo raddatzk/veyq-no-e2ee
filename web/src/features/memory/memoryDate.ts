@@ -8,7 +8,7 @@ import { b64std, fromB64std } from '../../shared/base64'
 import { contentApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { epochMsToIsoDate } from '../../shared/isoDate'
-import { effectiveCapturedAt, unsealCapturedAt, type MediaItem } from './media'
+import { effectiveCapturedAt, unsealMeta, type MediaItem } from './media'
 import { openContentKey, type TreeNode } from './tree'
 
 /** AAD context binding the sealed node-metadata blob (`wrappedMeta`) to its purpose (cr-0067). */
@@ -87,7 +87,7 @@ export async function setMemoryDate(
 export function computeAutoRange(items: MediaItem[], nodeKey: Uint8Array): MemoryDate {
   const days: number[] = []
   for (const item of items) {
-    const tier = unsealCapturedAt(nodeKey, item)
+    const tier = unsealMeta(nodeKey, item)
     if (!tier) continue
     const trustworthy = tier.capturedAtOverride !== undefined || tier.capturedAtSource === 'exif'
     const ms = effectiveCapturedAt(tier)

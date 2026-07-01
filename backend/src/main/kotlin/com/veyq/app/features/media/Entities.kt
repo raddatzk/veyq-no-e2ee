@@ -98,15 +98,11 @@ class MediaEntity : PanacheEntityBase {
     @Column(name = "blob_id", nullable = false, length = 36)
     lateinit var blobId: String
 
-    /** The original's `{v,w,h}` geometry tier sealed under `K_mem` (opaque base64), for the gallery's justified layout (cr-0059/cr-0064). */
-    @Column(name = "wrapped_layout")
-    var wrappedLayout: String? = null
+    /** The original's `{v,w,h,capturedAt,capturedAtOverride,capturedAtSource,gpsLat,gpsLng}` listed-metadata tier sealed under `K_mem` (opaque base64); always listed, for grid layout + date sorting + the place medoid (cr-0068, consolidates cr-0059/cr-0064 layout + cr-0066 capturedAt). */
+    @Column(name = "wrapped_meta")
+    var wrappedMeta: String? = null
 
-    /** The original's `{v,capturedAt,capturedAtOverride}` capture-time tier sealed under `K_mem` (opaque base64); always listed, for date sorting (cr-0066). */
-    @Column(name = "wrapped_captured_at")
-    var wrappedCapturedAt: String? = null
-
-    /** The original's full EXIF bundle sealed under `K_mem` (opaque base64); lazy-loaded by the lightbox, never listed (cr-0064). */
+    /** The original's heavy EXIF bundle sealed under `K_mem` (opaque base64); lazy-loaded by the lightbox, never listed (cr-0064; GPS moved to `wrappedMeta` in cr-0068). */
     @Column(name = "wrapped_exif")
     var wrappedExif: String? = null
 

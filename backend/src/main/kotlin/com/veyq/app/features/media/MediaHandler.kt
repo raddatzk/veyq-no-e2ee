@@ -21,8 +21,7 @@ data class CompleteItem(
     val nodeId: String,
     val originalUploadId: String,
     val derivatives: List<DerivativeDeclare>,
-    val wrappedLayout: String?,
-    val wrappedCapturedAt: String?,
+    val wrappedMeta: String?,
     val wrappedExif: String?,
 )
 
@@ -55,16 +54,16 @@ sealed interface DownloadOutcome {
     object NoScope : DownloadOutcome
 }
 
-sealed interface MediaMetaOutcome {
-    /** The media's sealed EXIF (opaque base64), or null when none was sealed. */
-    data class Found(val wrappedExif: String?) : MediaMetaOutcome
-    object NoMedia : MediaMetaOutcome
+sealed interface MediaExifOutcome {
+    /** The media's sealed heavy EXIF (opaque base64), or null when none was sealed. */
+    data class Found(val wrappedExif: String?) : MediaExifOutcome
+    object NoMedia : MediaExifOutcome
 }
 
-sealed interface CapturedAtOutcome {
-    /** The media's sealed capture-time tier (opaque base64), or null when none/cleared. */
-    data class Found(val wrappedCapturedAt: String?) : CapturedAtOutcome
-    object NoMedia : CapturedAtOutcome
+sealed interface MetaOutcome {
+    /** The media's sealed listed-metadata blob (opaque base64), or null when none/cleared. */
+    data class Found(val wrappedMeta: String?) : MetaOutcome
+    object NoMedia : MetaOutcome
 }
 
 /**
@@ -146,8 +145,7 @@ class MediaHandler(
         val (blobId, mediaId) = store.attach(
             original, item.nodeId, manifests[original.id],
             derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
-            item.wrappedLayout,
-            item.wrappedCapturedAt,
+            item.wrappedMeta,
             item.wrappedExif,
         )
         return CompleteItemResult(blobId, mediaId, null)
@@ -179,18 +177,18 @@ class MediaHandler(
         return ListMediaOutcome.Rows(store.listNodeMedia(scopeId, nodeId))
     }
 
-    /** The media's lazy EXIF tier for the lightbox. Non-member or unknown media → NoMedia (a 404, no reveal). */
-    fun mediaMeta(userId: String, scopeId: String, mediaId: String): MediaMetaOutcome {
-        if (!store.isMember(userId, scopeId)) return MediaMetaOutcome.NoMedia
-        val media = store.findMedia(scopeId, mediaId) ?: return MediaMetaOutcome.NoMedia
-        return MediaMetaOutcome.Found(media.wrappedExif)
+    /** The media's lazy heavy EXIF tier for the lightbox. Non-member or unknown media → NoMedia (a 404, no reveal). */
+    fun mediaExif(userId: String, scopeId: String, mediaId: String): MediaExifOutcome {
+        if (!store.isMember(userId, scopeId)) return MediaExifOutcome.NoMedia
+        val media = store.findMedia(scopeId, mediaId) ?: return MediaExifOutcome.NoMedia
+        return MediaExifOutcome.Found(media.wrappedExif)
     }
 
-    /** Overwrite the media's sealed capture-time tier (opaque re-seal, e.g. a corrected date). */
-    fun updateCapturedAt(userId: String, scopeId: String, mediaId: String, wrappedCapturedAt: String?): CapturedAtOutcome {
-        if (!store.isMember(userId, scopeId)) return CapturedAtOutcome.NoMedia
-        val media = store.setCapturedAt(scopeId, mediaId, wrappedCapturedAt) ?: return CapturedAtOutcome.NoMedia
-        return CapturedAtOutcome.Found(media.wrappedCapturedAt)
+    /** Overwrite the media's sealed listed-metadata blob (opaque re-seal, e.g. a corrected date). */
+    fun updateMeta(userId: String, scopeId: String, mediaId: String, wrappedMeta: String?): MetaOutcome {
+        if (!store.isMember(userId, scopeId)) return MetaOutcome.NoMedia
+        val media = store.setMeta(scopeId, mediaId, wrappedMeta) ?: return MetaOutcome.NoMedia
+        return MetaOutcome.Found(media.wrappedMeta)
     }
 
     fun download(userId: String, scopeId: String, blobIds: List<String>): DownloadOutcome {

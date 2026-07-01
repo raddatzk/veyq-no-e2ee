@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, hasDerivatives, unsealLayout, unsealCapturedAt, effectiveCapturedAt, type MediaItem } from '../media'
+import { listMedia, openGrid, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
@@ -64,9 +64,9 @@ const containerWidth = ref(0)
 let gridObserver: ResizeObserver | null = null
 let measureFrame: number | null = null
 
-// The effective capture time of an item (from its sealed capture-time tier), or undefined when it has none.
+// The effective capture time of an item (from its sealed metadata tier), or undefined when it has none.
 function capturedAtOf(item: MediaItem): number | undefined {
-  return props.memoryKey ? effectiveCapturedAt(unsealCapturedAt(props.memoryKey, item)) : undefined
+  return props.memoryKey ? effectiveCapturedAt(unsealMeta(props.memoryKey, item)) : undefined
 }
 // Tiles ordered by effective capture time (newest first by default, toggleable); undated media always last.
 const sortedItems = computed(() => {
@@ -141,7 +141,7 @@ const aspectRatios = computed(() => {
   const key = props.memoryKey
   const m = new Map<string, number>()
   for (const item of items.value) {
-    const dims = key ? unsealLayout(key, item) : null
+    const dims = key ? unsealMeta(key, item) : null
     m.set(item.mediaId, galleryDisplayAspectRatio(dims?.w, dims?.h))
   }
   return m
@@ -244,10 +244,10 @@ function openLightboxAt(index: number) {
 }
 /** A date correction from the lightbox → patch the item's sealed tier so the grid re-sorts (no refetch). The
  *  item object is shared with the open lightbox's snapshot, so the reopened detail stays consistent too. */
-function onCapturedAtUpdated(payload: { mediaId: string; wrappedCapturedAt: string | null }) {
+function onCapturedAtUpdated(payload: { mediaId: string; wrappedMeta: string | null }) {
   const item = items.value.find((it) => it.mediaId === payload.mediaId)
   if (!item) return
-  item.wrappedCapturedAt = payload.wrappedCapturedAt ?? undefined
+  item.wrappedMeta = payload.wrappedMeta ?? undefined
   items.value = [...items.value] // reassign so sortedItems recomputes and the grid re-sorts
 }
 

@@ -20,15 +20,14 @@ import {
   lightboxRef,
   downloadRef,
   scaleToMaxEdge,
-  unsealLayout,
-  unsealCapturedAt,
-  setMediaCapturedAt,
+  unsealMeta,
+  setMediaMeta,
   effectiveCapturedAt,
   CHUNK_SIZE,
   TIER_SPECS,
   type MediaDeriver,
   type MediaItem,
-  type MediaCapturedAt,
+  type MediaMeta,
 } from './media'
 import exifr from 'exifr'
 import { mediaApi } from '../../api/client'
@@ -49,7 +48,7 @@ function fakeStore() {
   const objects = new Map<string, Uint8Array>()
   const sessions = new Map<string, { wrappedBlobKey: string; chunkCount: number }>()
   let upCounter = 0
-  const captured = { startItems: [] as any[], completeItem: undefined as any, updatedCapturedAt: undefined as any }
+  const captured = { startItems: [] as any[], completeItem: undefined as any, updatedMeta: undefined as any }
 
   const blobOf = (uploadId: string) => {
     const s = sessions.get(uploadId)!
@@ -79,15 +78,14 @@ function fakeStore() {
           mediaId: 'media-1',
           ...blobOf(item.originalUploadId),
           derivatives: (item.derivatives ?? []).map((d: any) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
-          wrappedLayout: item.wrappedLayout ?? null, // opaque ciphertext, echoed verbatim (cr-0059/cr-0064)
-          wrappedCapturedAt: captured.updatedCapturedAt ?? item.wrappedCapturedAt ?? null, // listed for date sorting (cr-0066)
-          // wrappedExif is deliberately NOT echoed by listNodeMedia — it is lazy via getMediaMeta (cr-0064)
+          wrappedMeta: captured.updatedMeta ?? item.wrappedMeta ?? null, // listed for grid layout + date sorting (cr-0068)
+          // wrappedExif is deliberately NOT echoed by listNodeMedia — it is lazy via getMediaExif (cr-0064)
         },
       ]
     }),
-    updateMediaCapturedAt: vi.fn(async ({ mediaCapturedAtUpdate }: any) => {
-      captured.updatedCapturedAt = mediaCapturedAtUpdate.wrappedCapturedAt // opaque ciphertext (or null to clear)
-      return { wrappedCapturedAt: mediaCapturedAtUpdate.wrappedCapturedAt ?? null }
+    updateMediaMeta: vi.fn(async ({ mediaMetaUpdate }: any) => {
+      captured.updatedMeta = mediaMetaUpdate.wrappedMeta // opaque ciphertext (or null to clear)
+      return { wrappedMeta: mediaMetaUpdate.wrappedMeta ?? null }
     }),
     presignBlobDownloads: vi.fn(async ({ blobDownloadsBatchRequest }: any) => {
       const uploadId = blobDownloadsBatchRequest.items[0].blobId // == uploadId in this fake
@@ -297,18 +295,18 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/png' }, deriver)
 
     // the wire carries only opaque ciphertext — never the plaintext dimensions
-    const sealed = store.captured.completeItem.wrappedLayout
+    const sealed = store.captured.completeItem.wrappedMeta
     expect(typeof sealed).toBe('string')
     expect(sealed).not.toContain('1920')
 
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    const layout = unsealLayout(memoryKey, item)
-    expect(layout).toEqual({ v: 1, w: 1920, h: 1080 }) // geometry only — capture time lives in the EXIF tier
+    const meta = unsealMeta(memoryKey, item)
+    expect(meta).toMatchObject({ v: 1, w: 1920, h: 1080 }) // geometry rides the listed metadata tier (cr-0068)
     // a wrong K_mem can't open it (bound to the Memory key)
-    expect(unsealLayout(v1.randomBytes(32), item)).toBeNull()
+    expect(unsealMeta(v1.randomBytes(32), item)).toBeNull()
   })
 
-  it('splits date into the capturedAt tier + a date-free EXIF tier; only EXIF is lazy', async () => {
+  it('seals date + GPS in the listed tier, a date/gps-free EXIF tier lazy alongside', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
@@ -322,22 +320,27 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
     const memoryKey = v1.randomBytes(32)
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/jpeg' }, deriver)
 
-    // the capture time is sealed in its own always-listed tier (opaque — no plaintext date on the wire)
-    const sealedDate = store.captured.completeItem.wrappedCapturedAt
-    expect(typeof sealedDate).toBe('string')
-    expect(sealedDate).not.toContain('2021')
-    // the EXIF tier is sealed opaque and **date-free** — camera/coords, no capturedAt
+    // the capture time + GPS are sealed in the always-listed metadata tier (opaque — no plaintext on the wire)
+    const sealedMeta = store.captured.completeItem.wrappedMeta
+    expect(typeof sealedMeta).toBe('string')
+    expect(sealedMeta).not.toContain('2021')
+    expect(sealedMeta).not.toContain('48.137')
+    // the EXIF tier is sealed opaque and **date- AND gps-free** — camera only (cr-0068)
     const sealedExif = store.captured.completeItem.wrappedExif
     expect(sealedExif).not.toContain('Canon')
     const exif = JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealedExif), 'media-exif')))
-    expect(exif).toMatchObject({ v: 1, make: 'Canon', model: 'EOS R', lens: 'RF 50mm', fNumber: 1.8, iso: 200, gpsLat: 48.137, gpsLng: 11.575 })
+    expect(exif).toMatchObject({ v: 1, make: 'Canon', model: 'EOS R', lens: 'RF 50mm', fNumber: 1.8, iso: 200 })
     expect(exif.capturedAt).toBeUndefined()
+    expect(exif.gpsLat).toBeUndefined() // GPS moved to the listed tier (cr-0068)
+    expect(exif.gpsLng).toBeUndefined()
 
-    // listMedia carries the capturedAt tier (for date sorting) but NOT the EXIF tier
+    // listMedia carries the metadata tier (for date sorting + the place medoid) but NOT the EXIF tier
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(item.wrappedCapturedAt).toBeDefined()
+    expect(item.wrappedMeta).toBeDefined()
     expect((item as Record<string, unknown>).wrappedExif).toBeUndefined()
-    expect(effectiveCapturedAt(unsealCapturedAt(memoryKey, item))).toBe(CAPTURED_AT)
+    const meta = unsealMeta(memoryKey, item)
+    expect(effectiveCapturedAt(meta)).toBe(CAPTURED_AT)
+    expect(meta).toMatchObject({ gpsLat: 48.137, gpsLng: 11.575 }) // GPS available at list-level for the medoid
   })
 
   it('falls back to the file creation date when the source carries no EXIF date', async () => {
@@ -354,11 +357,13 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
 
     expect(store.captured.completeItem.wrappedExif ?? null).toBeNull() // no EXIF bundle
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealLayout(memoryKey, item)).toEqual({ v: 1, w: 640, h: 480 })
-    expect(effectiveCapturedAt(unsealCapturedAt(memoryKey, item))).toBe(FILE_MTIME) // file-date fallback
+    const meta = unsealMeta(memoryKey, item)
+    expect(meta).toMatchObject({ v: 1, w: 640, h: 480 })
+    expect(effectiveCapturedAt(meta)).toBe(FILE_MTIME) // file-date fallback
+    expect(meta?.capturedAtSource).toBe('file') // marked untrustworthy for the Memory `auto` range
   })
 
-  it('seals no capturedAt tier when there is neither an EXIF date nor a file date', async () => {
+  it('seals no capture date in the tier when there is neither an EXIF date nor a file date', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
@@ -368,12 +373,13 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
     const memoryKey = v1.randomBytes(32)
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/png' }, deriver)
 
-    expect(store.captured.completeItem.wrappedCapturedAt ?? null).toBeNull()
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealCapturedAt(memoryKey, item)).toBeNull() // sorts last
+    const meta = unsealMeta(memoryKey, item)
+    expect(effectiveCapturedAt(meta)).toBeUndefined() // no date → sorts last
+    expect(meta).toMatchObject({ w: 640, h: 480 }) // geometry still rides the tier
   })
 
-  it('seals no layout when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
+  it('seals no metadata tier when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
@@ -383,83 +389,84 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
     const memoryKey = v1.randomBytes(32)
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'application/pdf' }, deriver)
 
-    expect(store.captured.completeItem.wrappedLayout ?? null).toBeNull()
+    expect(store.captured.completeItem.wrappedMeta ?? null).toBeNull()
     expect(store.captured.completeItem.wrappedExif ?? null).toBeNull()
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealLayout(memoryKey, item)).toBeNull()
+    expect(unsealMeta(memoryKey, item)).toBeNull()
   })
 
-  it('a deriver with no probeDimensions seals no layout (best-effort, optional)', async () => {
+  it('a deriver with no probeDimensions seals no metadata tier (best-effort, optional)', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
 
     await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver())
-    expect(store.captured.completeItem.wrappedLayout ?? null).toBeNull()
+    expect(store.captured.completeItem.wrappedMeta ?? null).toBeNull()
   })
 })
 
-describe('setMediaCapturedAt — sealed capturedAt override in the capture-time tier (cr-0066)', () => {
+describe('setMediaMeta — sealed capturedAt override in the listed-metadata tier (cr-0066/0068)', () => {
   const ORIG = Date.UTC(2021, 4, 1, 10, 0, 0)
   const CORRECTED = Date.UTC(2019, 7, 15, 8, 30, 0)
   const MEDIA_ID = 'media-1'
 
-  function decodeCaptured(memoryKey: Uint8Array, sealed: string): MediaCapturedAt {
-    return JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealed), 'media-capturedat')))
+  function decodeMeta(memoryKey: Uint8Array, sealed: string): MediaMeta {
+    return JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealed), 'media-meta')))
   }
 
-  it('re-seals the tier with the override, keeping the original capturedAt (operator-blind)', async () => {
+  it('re-seals the tier with the override, keeping the original capturedAt + geometry/GPS (operator-blind)', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     const memoryKey = v1.randomBytes(32)
-    const captured: MediaCapturedAt = { v: 1, capturedAt: ORIG }
+    // a full listed tier: geometry + date + GPS. Only the date is user-editable; the rest rides along unchanged.
+    const captured: MediaMeta = { v: 1, w: 800, h: 600, capturedAt: ORIG, gpsLat: 48.1, gpsLng: 11.5 }
 
-    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, captured, CORRECTED)
+    const updated = await setMediaMeta(SCOPE_ID, MEDIA_ID, memoryKey, captured, CORRECTED)
 
     // the wire carries only opaque ciphertext — never the plaintext date
-    const sealed = store.captured.updatedCapturedAt
+    const sealed = store.captured.updatedMeta
     expect(typeof sealed).toBe('string')
     expect(sealed).not.toContain('2019')
-    // the sealed tier keeps the original + adds the override
-    expect(decodeCaptured(memoryKey, sealed)).toEqual({ v: 1, capturedAt: ORIG, capturedAtOverride: CORRECTED })
+    // the sealed tier keeps the original + geometry + GPS, and adds the override
+    expect(decodeMeta(memoryKey, sealed)).toEqual({ v: 1, w: 800, h: 600, capturedAt: ORIG, gpsLat: 48.1, gpsLng: 11.5, capturedAtOverride: CORRECTED })
     // effective time now prefers the correction
     expect(effectiveCapturedAt(updated.tier)).toBe(CORRECTED)
     // a wrong K_mem can't open it
-    expect(() => decodeCaptured(v1.randomBytes(32), sealed)).toThrow()
+    expect(() => decodeMeta(v1.randomBytes(32), sealed)).toThrow()
   })
 
   it('clears the override (null) back to the original', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     const memoryKey = v1.randomBytes(32)
-    const captured: MediaCapturedAt = { v: 1, capturedAt: ORIG, capturedAtOverride: CORRECTED }
+    const captured: MediaMeta = { v: 1, capturedAt: ORIG, capturedAtOverride: CORRECTED }
 
-    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, captured, null)
+    const updated = await setMediaMeta(SCOPE_ID, MEDIA_ID, memoryKey, captured, null)
 
-    expect(decodeCaptured(memoryKey, store.captured.updatedCapturedAt)).toEqual({ v: 1, capturedAt: ORIG })
+    expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, capturedAt: ORIG })
     expect(effectiveCapturedAt(updated.tier)).toBe(ORIG) // falls back to the derived original
   })
 
-  it('clearing an override with no original drops the whole tier to null', async () => {
+  it('clearing an override with no other content drops the whole tier to null', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     const memoryKey = v1.randomBytes(32)
-    const captured: MediaCapturedAt = { v: 1, capturedAtOverride: CORRECTED } // only ever had a manual date
+    const captured: MediaMeta = { v: 1, capturedAtOverride: CORRECTED } // only ever had a manual date, no geometry/GPS
 
-    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, captured, null)
+    const updated = await setMediaMeta(SCOPE_ID, MEDIA_ID, memoryKey, captured, null)
 
-    expect(store.captured.updatedCapturedAt).toBeNull() // nothing left to seal → the tier is cleared
+    expect(store.captured.updatedMeta).toBeNull() // nothing left to seal → the tier is cleared
     expect(updated.tier).toBeNull()
   })
 
-  it('sets a date on a media with no date tier at all (fresh tier)', async () => {
+  it('sets a date on a media with no metadata tier at all (fresh tier)', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     const memoryKey = v1.randomBytes(32)
 
-    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, null, CORRECTED)
+    const updated = await setMediaMeta(SCOPE_ID, MEDIA_ID, memoryKey, null, CORRECTED)
 
-    expect(decodeCaptured(memoryKey, store.captured.updatedCapturedAt)).toEqual({ v: 1, capturedAtOverride: CORRECTED })
+    expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, capturedAtOverride: CORRECTED })
     expect(effectiveCapturedAt(updated.tier)).toBe(CORRECTED)
   })
 })

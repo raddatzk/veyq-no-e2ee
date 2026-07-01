@@ -39,7 +39,7 @@ acceptanceCriteria:
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
   - id: justified-grid-sealed-dimensions
-    text: The web grid is laid out justified (aspect-preserving rows that fill the width); each media's layout tier (wrappedLayout {v,w,h} geometry, cr-0064 generalizing cr-0059's dimensions) is sealed under K_mem at upload and unwrapped on device to drive the layout, so the blind server never sees pixel dimensions. Media without a sealed layout fall back to a default aspect.
+    text: The web grid is laid out justified (aspect-preserving rows that fill the width); each media's geometry (w,h) rides the always-listed metadata tier (wrappedMeta, cr-0068 consolidating cr-0064's wrappedLayout + cr-0066's wrappedCapturedAt) sealed under K_mem at upload and unwrapped on device to drive the layout, so the blind server never sees pixel dimensions. Media without a sealed geometry fall back to a default aspect.
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
       web:
@@ -48,25 +48,25 @@ acceptanceCriteria:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MemoryDetail.test.ts
   - id: lightbox-exif-detail
-    text: Opening an item lazily fetches its sealed EXIF tier (wrappedExif) via the meta endpoint — kept out of the list so it stays constant-small — and unwraps it on device under K_mem to show the detail (capture date, camera, lens, focal length, aperture, exposure, ISO, dimensions, coordinates). The blind server never sees any EXIF field; an item without sealed EXIF shows a no-detail message (cr-0064).
+    text: Opening an item lazily fetches its sealed heavy EXIF tier (wrappedExif) via the exif endpoint (getMediaExif) — kept out of the list so it stays constant-small — and unwraps it on device under K_mem to show the camera detail (camera, lens, focal length, aperture, exposure, ISO, dimensions). The capture date + coordinates come instantly from the always-listed metadata tier (wrappedMeta), not the lazy EXIF. The blind server never sees any field; an item without sealed EXIF shows a no-detail message (cr-0064/0068).
     coverage:
-      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.mediaMetaWithoutExifIsNull, MediaSliceTest.mediaMetaForUnknownMediaIs404] }
+      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.mediaExifWithoutExifIsNull, MediaSliceTest.mediaExifForUnknownMediaIs404] }
       web:
         unit:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MediaLightbox.test.ts
   - id: date-sorted-grid
-    text: The gallery sorts tiles by effective capture time (newest first by default, a header toggle for oldest first; undated media last). Each media's capturedAt is sealed under K_mem in its own always-listed tier (wrappedCapturedAt {v,capturedAt,capturedAtOverride}, cr-0066) — the derived original is the EXIF DateTimeOriginal or the file's creation date, so the blind server never sees a timestamp yet the grid can order client-side. A lightbox correction re-sorts without a refetch.
+    text: The gallery sorts tiles by effective capture time (newest first by default, a header toggle for oldest first; undated media last). Each media's capturedAt is sealed under K_mem in the always-listed metadata tier (wrappedMeta {v,w,h,capturedAt,capturedAtOverride,capturedAtSource,gpsLat,gpsLng}, cr-0066/0068) — the derived original is the EXIF DateTimeOriginal or the file's creation date, so the blind server never sees a timestamp yet the grid can order client-side. A lightbox correction re-sorts without a refetch.
     coverage:
-      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.updateCapturedAtOverwritesSealedTierAndLists] }
+      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.updateMetaOverwritesSealedTierAndLists] }
       web:
         unit:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MemoryDetail.test.ts
   - id: lightbox-correct-capturedat
-    text: From the lightbox a user can correct (or set) a media's capture time; the correction is sealed under K_mem inside wrappedExif as capturedAtOverride alongside the immutable extracted original, re-sealed client-side and PUT verbatim (updateMediaMeta) — the blind server never sees the date. The panel shows the effective time (override ?? original) with a "corrected" indicator and can reset to the original; a media with no EXIF can have a date set (cr-0065).
+    text: From the lightbox a user can correct (or set) a media's capture time; the correction is sealed under K_mem inside the listed metadata tier (wrappedMeta) as capturedAtOverride alongside the immutable extracted original (geometry + GPS ride along unchanged), re-sealed client-side and PUT verbatim (updateMediaMeta) — the blind server never sees the date. The panel shows the effective time (override ?? original) with a "corrected" indicator and can reset to the original; a media with no EXIF can have a date set (cr-0065/0068).
     coverage:
-      backend: { integration: [MediaSliceTest.updateCapturedAtOverwritesSealedTierAndLists, MediaSliceTest.updateCapturedAtForUnknownMediaIs404] }
+      backend: { integration: [MediaSliceTest.updateMetaOverwritesSealedTierAndLists, MediaSliceTest.updateMetaForUnknownMediaIs404] }
       web:
         unit:
           - src/features/memory/media.test.ts

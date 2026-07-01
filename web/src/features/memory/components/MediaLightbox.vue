@@ -13,12 +13,12 @@ import {
   openOriginal,
   hasDerivatives,
   loadMediaExif,
-  unsealCapturedAt,
-  setMediaCapturedAt,
+  unsealMeta,
+  setMediaMeta,
   effectiveCapturedAt,
   type MediaItem,
   type MediaExif,
-  type MediaCapturedAt,
+  type MediaMeta,
 } from '../media'
 import { derivedDownloadName, saveBytes } from '../download'
 
@@ -29,7 +29,7 @@ const props = defineProps<{
   startIndex: number
   memoryName: string
 }>()
-const emit = defineEmits<{ close: []; updated: [{ mediaId: string; wrappedCapturedAt: string | null }] }>()
+const emit = defineEmits<{ close: []; updated: [{ mediaId: string; wrappedMeta: string | null }] }>()
 
 const { t, locale } = useI18n()
 
@@ -38,9 +38,9 @@ const previewUrl = ref<string | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const downloading = ref(false)
-// The capture-time tier (cr-0066): unsealed instantly from the listed item (no fetch). Null = no date sealed.
-const captured = ref<MediaCapturedAt | null>(null)
-// Tier-3 EXIF (cr-0064): camera/lens/gps, lazy-loaded per item via the meta endpoint. Null = none/undecoded.
+// The listed-metadata tier (cr-0066/0068): unsealed instantly from the listed item (no fetch). Null = none sealed.
+const captured = ref<MediaMeta | null>(null)
+// The heavy EXIF (cr-0064): camera/lens, lazy-loaded per item via the exif endpoint. Null = none/undecoded.
 const exif = ref<MediaExif | null>(null)
 const detailsLoading = ref(false)
 const isDetailsOpen = ref(false) // mobile bottom-sheet toggle (the design's swipe handle)
@@ -83,15 +83,15 @@ async function loadPreview() {
 
 watch(current, loadPreview, { immediate: true })
 
-// When the item changes: unseal the capture-time tier **instantly** from the listed item (no fetch), then
-// lazily fetch + unseal the heavy EXIF tier (camera/lens/gps) via the meta endpoint (the list never carries it).
+// When the item changes: unseal the listed metadata tier (date + GPS) **instantly** from the listed item (no
+// fetch), then lazily fetch + unseal the heavy EXIF tier (camera/lens) via the exif endpoint (never listed).
 async function loadDetails() {
   exif.value = null
   isEditingCapturedAt.value = false // close the editor when the item changes
   capturedAtError.value = false
   const target = item.value
   if (!target) return
-  captured.value = unsealCapturedAt(props.memoryKey, target)
+  captured.value = unsealMeta(props.memoryKey, target)
   detailsLoading.value = true
   try {
     const loaded = await loadMediaExif(props.scopeId, target.mediaId, props.memoryKey)
@@ -136,11 +136,11 @@ async function persistCapturedAt(overrideMs: number | null) {
   savingCapturedAt.value = true
   capturedAtError.value = false
   try {
-    const updated = await setMediaCapturedAt(props.scopeId, target.mediaId, props.memoryKey, captured.value, overrideMs)
+    const updated = await setMediaMeta(props.scopeId, target.mediaId, props.memoryKey, captured.value, overrideMs)
     if (item.value !== target) return // navigated away mid-save — drop the stale result
     captured.value = updated.tier
     isEditingCapturedAt.value = false
-    emit('updated', { mediaId: target.mediaId, wrappedCapturedAt: updated.wrappedCapturedAt }) // let the grid re-sort
+    emit('updated', { mediaId: target.mediaId, wrappedMeta: updated.wrappedMeta }) // let the grid re-sort
   } catch {
     if (item.value === target) capturedAtError.value = true
   } finally {
@@ -168,12 +168,14 @@ function formatExposure(s?: number): string {
   return s >= 1 ? `${Number(s.toFixed(1))} s` : `1/${Math.round(1 / s)} s`
 }
 
+// GPS rides the always-listed metadata tier now (cr-0068), so coordinates show instantly from `captured` —
+// no wait for the lazy EXIF fetch (and it's the same source the place medoid reads).
 const hasGps = computed(() => {
-  const e = exif.value
-  return !!e && e.gpsLat !== undefined && e.gpsLng !== undefined
+  const m = captured.value
+  return !!m && m.gpsLat !== undefined && m.gpsLng !== undefined
 })
 const gpsLabel = computed(() =>
-  hasGps.value ? `${exif.value!.gpsLat!.toFixed(6)}, ${exif.value!.gpsLng!.toFixed(6)}` : '',
+  hasGps.value ? `${captured.value!.gpsLat!.toFixed(6)}, ${captured.value!.gpsLng!.toFixed(6)}` : '',
 )
 const metadataRows = computed(() => {
   const e = exif.value

@@ -17,7 +17,7 @@ import {
   sortNodesByDate,
   type MemoryDate,
 } from './memoryDate'
-import type { MediaItem, MediaCapturedAt } from './media'
+import type { MediaItem, MediaMeta } from './media'
 import type { TreeNode } from './tree'
 import { NodeKind } from '../../api/generated/content'
 import { contentApi } from '../../api/client'
@@ -30,8 +30,8 @@ const nodeKey = v1.randomBytes(32)
 
 beforeEach(() => vi.clearAllMocks())
 
-/** Build a MediaItem whose capture-time tier is sealed under `nodeKey` (mirrors media.ts's `sealMetadata`). */
-function itemWith(tier: Partial<MediaCapturedAt> | null): MediaItem {
+/** Build a MediaItem whose listed-metadata tier is sealed under `nodeKey` (mirrors media.ts's `sealMetadata`). */
+function itemWith(tier: Partial<MediaMeta> | null): MediaItem {
   const base: MediaItem = {
     mediaId: 'm-' + Math.random().toString(36).slice(2),
     original: { blobId: 'b', chunkCount: 1, byteSize: 1, wrappedBlobKey: 'x' },
@@ -39,7 +39,7 @@ function itemWith(tier: Partial<MediaCapturedAt> | null): MediaItem {
   }
   if (!tier) return base
   const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, ...tier }))
-  base.wrappedCapturedAt = b64std(v1.symWrap(nodeKey, bytes, 'media-capturedat', v1.randomBytes(12)))
+  base.wrappedMeta = b64std(v1.symWrap(nodeKey, bytes, 'media-meta', v1.randomBytes(12)))
   return base
 }
 

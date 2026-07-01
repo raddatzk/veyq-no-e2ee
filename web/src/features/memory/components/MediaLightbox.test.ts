@@ -196,7 +196,7 @@ describe('MediaLightbox (preview, prev/next, download)', () => {
 })
 
 describe('MediaLightbox — lazy EXIF detail panel (cr-0064)', () => {
-  it('lazily loads the EXIF tier via getMediaMeta and renders the decoded detail rows', async () => {
+  it('lazily loads the EXIF tier via getMediaExif and renders the decoded detail rows', async () => {
     const memoryKey = v1.randomBytes(32)
     // the source carries readable EXIF → addMedia seals it under K_mem into the (lazy) Tier-2 blob
     vi.mocked(exifr.parse).mockResolvedValue({
@@ -217,8 +217,8 @@ describe('MediaLightbox — lazy EXIF detail panel (cr-0064)', () => {
     const wrapper = mountLightbox(memoryKey, items, 0)
     await flushPromises()
 
-    // the panel fetched the meta endpoint once and unsealed it under K_mem
-    expect(store.api.getMediaMeta).toHaveBeenCalledWith({ scopeId: SCOPE_ID, mediaId: 'media-0' })
+    // the panel fetched the exif endpoint once and unsealed it under K_mem
+    expect(store.api.getMediaExif).toHaveBeenCalledWith({ scopeId: SCOPE_ID, mediaId: 'media-0' })
     const dds = wrapper.findAll('.media-lightbox-metadata dd').map((d) => d.text())
     expect(dds).toContain('Canon EOS R')
     expect(dds).toContain('RF 50mm')
@@ -273,7 +273,7 @@ describe('MediaLightbox — correct the capture time (cr-0065/0066)', () => {
     await flushPromises()
 
     // the correction went out only as opaque ciphertext, and the badge now shows
-    const sent = store.api.updateMediaCapturedAt.mock.calls.at(-1)![0].mediaCapturedAtUpdate.wrappedCapturedAt
+    const sent = store.api.updateMediaMeta.mock.calls.at(-1)![0].mediaMetaUpdate.wrappedMeta
     expect(typeof sent).toBe('string')
     expect(sent).not.toContain('2019')
     expect(wrapper.text()).toContain('Corrected')
@@ -284,7 +284,7 @@ describe('MediaLightbox — correct the capture time (cr-0065/0066)', () => {
     await resetBtn.trigger('click')
     await flushPromises()
 
-    expect(store.api.updateMediaCapturedAt).toHaveBeenCalledTimes(2)
+    expect(store.api.updateMediaMeta).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).not.toContain('Corrected')
   })
 
@@ -302,7 +302,7 @@ describe('MediaLightbox — correct the capture time (cr-0065/0066)', () => {
     await wrapper.find('.media-lightbox-date-form').trigger('submit')
     await flushPromises()
 
-    const sent = store.api.updateMediaCapturedAt.mock.calls.at(-1)![0].mediaCapturedAtUpdate.wrappedCapturedAt
+    const sent = store.api.updateMediaMeta.mock.calls.at(-1)![0].mediaMetaUpdate.wrappedMeta
     expect(typeof sent).toBe('string') // a fresh sealed tier
     expect(wrapper.text()).toContain('Corrected')
   })
