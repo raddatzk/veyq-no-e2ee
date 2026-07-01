@@ -159,6 +159,77 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
 
+  /api/scopes/{scopeId}/media/{mediaId}/meta:
+    get:
+      tags: [media]
+      operationId: getMediaMeta
+      summary: A media's sealed EXIF bundle (lazy, opaque) — for the lightbox detail.
+      description: >
+        Returns the media's `wrappedExif`: the full EXIF bundle (camera, lens, aperture, ISO, GPS, capture
+        time, …) sealed client-side under the Memory's `K_mem` (opaque base64), or null when none was sealed
+        at upload. Deliberately **not** part of `listNodeMedia` (which stays constant-small): the lightbox
+        fetches + unseals this only when an item opens. Operator-blind — the server stores + returns the
+        ciphertext verbatim, never inspecting the fields inside.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: The media's sealed EXIF (opaque base64), or null when none was sealed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaMetaResponse" }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/media, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+    put:
+      tags: [media]
+      operationId: updateMediaMeta
+      summary: Overwrite a media's sealed EXIF bundle (e.g. a corrected capture time) — opaque.
+      description: >
+        Re-store the media's `wrappedExif` verbatim: the client unseals the current bundle under `K_mem`, adds
+        or removes a correction (e.g. a `capturedAtOverride`), re-seals the **whole** bundle, and PUTs the new
+        opaque base64 (or null to clear it). Operator-blind — the server overwrites the ciphertext it holds and
+        never inspects the fields inside; it can't merge at field level (it can't read the bundle). Guards: the
+        caller holds a grant for the scope; a media target must exist.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/MediaId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaMetaUpdate" }
+            example:
+              wrappedExif: ZXhpZi1jaXBoZXJ0ZXh0
+      responses:
+        "200":
+          description: The stored EXIF (echoed opaque base64, or null when cleared).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaMetaResponse" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/media, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+
   /api/scopes/{scopeId}/blob-downloads-batch:
     post:
       tags: [media]
@@ -223,6 +294,12 @@ components:
       required: true
       description: Opaque id of the node (MEMORY/CHAPTER) the media is attached to.
       schema: { type: string, format: uuid, example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      description: Opaque id of the media whose sealed EXIF is requested.
+      schema: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
 
   schemas:
     # --- start uploads -------------------------------------------------------
@@ -323,15 +400,27 @@ components:
             type with no derivable frame (the gallery falls back to an icon). At most one of each kind.
           maxItems: 2
           items: { $ref: "#/components/schemas/MediaDerivativeUpload" }
-        wrappedDimensions:
+        wrappedLayout:
           type: [string, "null"]
           description: >
-            The original's pixel dimensions `{w,h}` sealed under the Memory's `K_mem` (opaque base64), so the
-            gallery can lay out a justified grid without the blind server ever seeing dimensions. Absent for a
-            media type whose frame the client couldn't decode (the grid falls back to a default aspect).
+            The original's **layout tier** `{v,w,h}` sealed under the Memory's `K_mem` (opaque base64) — pixel
+            geometry only, kept minimal since it's returned with every list; the gallery unwraps it to lay out
+            the justified grid. Absent for a media type whose frame the client couldn't decode (the grid falls
+            back to a default aspect). Generalizes cr-0059's `wrappedDimensions` (versioned). Capture time lives
+            in `wrappedExif`, not here.
           contentEncoding: base64
           maxLength: 256
           example: ZGltcy1jaXBoZXJ0ZXh0
+        wrappedExif:
+          type: [string, "null"]
+          description: >
+            The original's **full EXIF bundle** (camera, lens, aperture, ISO, GPS, capture time, …) sealed under
+            the Memory's `K_mem` (opaque base64). Stored verbatim, **not** returned by `listNodeMedia` (kept
+            constant-small) — the lightbox lazy-loads it via `getMediaMeta`. Absent when the source carried no
+            readable EXIF. Larger than the layout tier, so a wider cap.
+          contentEncoding: base64
+          maxLength: 16384
+          example: ZXhpZi1jaXBoZXJ0ZXh0
 
     MediaDerivativeUpload:
       type: object
@@ -413,11 +502,12 @@ components:
           type: [array, "null"]
           description: Role-tagged derivative tiers (THUMBNAIL, PREVIEW), each its own blob ref with its own wrap.
           items: { $ref: "#/components/schemas/MediaDerivativeSummary" }
-        wrappedDimensions:
+        wrappedLayout:
           type: [string, "null"]
           description: >
-            The original's pixel dimensions sealed under `K_mem` (opaque base64); the gallery unwraps it to
-            lay out the justified grid. Null when none was sealed at upload (the grid uses a default aspect).
+            The original's layout tier `{v,w,h}` sealed under `K_mem` (opaque base64) — pixel geometry only; the
+            gallery unwraps it to lay out the justified grid. Null when none was sealed at upload (the grid uses
+            a default aspect). Capture time + the heavier EXIF tier are lazy via `getMediaMeta`.
           contentEncoding: base64
           maxLength: 256
           example: ZGltcy1jaXBoZXJ0ZXh0
@@ -447,6 +537,34 @@ components:
           contentEncoding: base64
           maxLength: 256
           example: d3JhcHBlZC1rLWJsb2I=
+
+    MediaMetaResponse:
+      type: object
+      description: >
+        A media's lazy metadata: the sealed EXIF bundle, opaque to the server. Fetched per-item when the
+        lightbox opens (kept out of `listNodeMedia` so the list stays constant-small).
+      properties:
+        wrappedExif:
+          type: [string, "null"]
+          description: >
+            The original's full EXIF bundle sealed under `K_mem` (opaque base64); the lightbox unwraps it to
+            show camera/lens/exposure/coordinates. Null when none was sealed at upload.
+          contentEncoding: base64
+          maxLength: 16384
+          example: ZXhpZi1jaXBoZXJ0ZXh0
+
+    MediaMetaUpdate:
+      type: object
+      description: >
+        Overwrite a media's sealed EXIF bundle (re-sealed client-side under `K_mem`), e.g. to persist a
+        corrected capture time. Null clears it. Opaque to the server.
+      properties:
+        wrappedExif:
+          type: [string, "null"]
+          description: The re-sealed full EXIF bundle (opaque base64), or null to clear the media's EXIF tier.
+          contentEncoding: base64
+          maxLength: 16384
+          example: ZXhpZi1jaXBoZXJ0ZXh0
 
     # --- presign downloads ---------------------------------------------------
     BlobDownloadsBatchRequest:

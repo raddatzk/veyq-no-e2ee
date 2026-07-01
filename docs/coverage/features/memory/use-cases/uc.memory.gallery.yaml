@@ -39,7 +39,7 @@ acceptanceCriteria:
       apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
   - id: justified-grid-sealed-dimensions
-    text: The web grid is laid out justified (aspect-preserving rows that fill the width); each media's dimensions are sealed under K_mem at upload and unwrapped on device to drive the layout, so the blind server never sees pixel dimensions. Media without sealed dimensions fall back to a default aspect.
+    text: The web grid is laid out justified (aspect-preserving rows that fill the width); each media's layout tier (wrappedLayout {v,w,h} geometry, cr-0064 generalizing cr-0059's dimensions) is sealed under K_mem at upload and unwrapped on device to drive the layout, so the blind server never sees pixel dimensions. Media without a sealed layout fall back to a default aspect.
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
       web:
@@ -47,6 +47,22 @@ acceptanceCriteria:
           - src/features/memory/mediaGridLayout.test.ts
           - src/features/memory/media.test.ts
           - src/features/memory/components/MemoryDetail.test.ts
+  - id: lightbox-exif-detail
+    text: Opening an item lazily fetches its sealed EXIF tier (wrappedExif) via the meta endpoint — kept out of the list so it stays constant-small — and unwraps it on device under K_mem to show the detail (capture date, camera, lens, focal length, aperture, exposure, ISO, dimensions, coordinates). The blind server never sees any EXIF field; an item without sealed EXIF shows a no-detail message (cr-0064).
+    coverage:
+      backend: { integration: [MediaSliceTest.startCompleteListRoundTrip, MediaSliceTest.mediaMetaWithoutExifIsNull, MediaSliceTest.mediaMetaForUnknownMediaIs404] }
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MediaLightbox.test.ts
+  - id: lightbox-correct-capturedat
+    text: From the lightbox a user can correct (or set) a media's capture time; the correction is sealed under K_mem inside wrappedExif as capturedAtOverride alongside the immutable extracted original, re-sealed client-side and PUT verbatim (updateMediaMeta) — the blind server never sees the date. The panel shows the effective time (override ?? original) with a "corrected" indicator and can reset to the original; a media with no EXIF can have a date set (cr-0065).
+    coverage:
+      backend: { integration: [MediaSliceTest.updateMediaMetaOverwritesSealedExif, MediaSliceTest.updateMediaMetaForUnknownMediaIs404] }
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MediaLightbox.test.ts
 gaps:
   web: "Gallery UI built (cr-0049): MemoryDetail (grid + header: decrypted title, item count, favorite toggle; thumbnail tile per item; E1 icon tile for a non-derivable item; E3 empty state; E2 unavailable when K_mem is absent) + MediaLightbox (preview tier, prev/next clamped at the ends, Esc/close, download the original under a derived operator-blind name) over the covered data layer (cr-0045). cr-0059 replaced the uniform square grid with the design source's justified-rows layout (mediaGridLayout) driven by each media's E2EE-sealed dimensions (sealed under K_mem at upload, unwrapped on device); dimensionless media fall back to a default aspect. Component tests round-trip a listed Memory → grid + lightbox + download with real v1 crypto and a mocked mediaApi/blob transport. The remaining gap is the live browser smoke (Canvas/<video> decode + presigned store) — driven manually per the CR done-gate."
   apple: "Data layer covered (cr-0047): on-device tier generation + role-tagged read-back, unit-tested with a stubbed deriver, plus a manual live ImageIO/AVFoundation round-trip. The gallery grid/lightbox detail UI is not built yet (cr-0034 shell open-hook exists; the native gallery is its own later CR)."

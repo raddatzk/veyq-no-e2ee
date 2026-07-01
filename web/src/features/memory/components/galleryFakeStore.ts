@@ -6,7 +6,12 @@
 import { vi } from 'vitest'
 
 type Session = { wrappedBlobKey: string; chunkCount: number }
-type MediaRecord = { mediaId: string; originalUploadId: string; derivatives: { kind: string; uploadId: string }[] }
+type MediaRecord = {
+  mediaId: string
+  originalUploadId: string
+  derivatives: { kind: string; uploadId: string }[]
+  wrappedExif: string | null
+}
 
 export function galleryFakeStore() {
   const objects = new Map<string, Uint8Array>()
@@ -37,7 +42,12 @@ export function galleryFakeStore() {
     completeMedia: vi.fn(async ({ mediaBatchRequest }: any) => ({
       results: mediaBatchRequest.items.map((item: any) => {
         const mediaId = `media-${mediaCounter++}`
-        media.push({ mediaId, originalUploadId: item.originalUploadId, derivatives: item.derivatives ?? [] })
+        media.push({
+          mediaId,
+          originalUploadId: item.originalUploadId,
+          derivatives: item.derivatives ?? [],
+          wrappedExif: item.wrappedExif ?? null,
+        })
         return { blobId: `blob-${item.originalUploadId}`, mediaId, error: null }
       }),
     })),
@@ -46,8 +56,19 @@ export function galleryFakeStore() {
         mediaId: m.mediaId,
         ...blobOf(m.originalUploadId),
         derivatives: m.derivatives.map((d) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
+        // wrappedExif is deliberately NOT listed — it is lazy via getMediaMeta (cr-0064)
       })),
     ),
+    // Tier-2 EXIF, echoed only through the meta endpoint (kept out of the list) — operator-blind ciphertext.
+    getMediaMeta: vi.fn(async ({ mediaId }: any) => ({
+      wrappedExif: media.find((m) => m.mediaId === mediaId)?.wrappedExif ?? null,
+    })),
+    // Overwrite a media's sealed EXIF verbatim (cr-0065) — e.g. a corrected capture time.
+    updateMediaMeta: vi.fn(async ({ mediaId, mediaMetaUpdate }: any) => {
+      const rec = media.find((m) => m.mediaId === mediaId)
+      if (rec) rec.wrappedExif = mediaMetaUpdate.wrappedExif ?? null
+      return { wrappedExif: mediaMetaUpdate.wrappedExif ?? null }
+    }),
     presignBlobDownloads: vi.fn(async ({ blobDownloadsBatchRequest }: any) => ({
       results: blobDownloadsBatchRequest.items.map((it: any) => ({ presignedGets: getsFor(it.blobId), error: null })),
     })),

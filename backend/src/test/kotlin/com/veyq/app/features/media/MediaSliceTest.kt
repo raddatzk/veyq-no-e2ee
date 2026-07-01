@@ -39,23 +39,100 @@ class MediaSliceTest {
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
         val uploadId = startOne(userId, scopeId, chunkCount = 2, byteSize = 1024, wrap = "d3JhcHBlZA==")
 
-        // complete + attach to the Memory; the sealed dimensions ride along as opaque ciphertext (cr-0059)
-        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedDimensions":"ZGltcw=="}]}""")
+        // complete + attach to the Memory; the sealed layout + EXIF tiers ride along as opaque ciphertext (cr-0064)
+        val mediaId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedLayout":"bGF5b3V0","wrappedExif":"ZXhpZg=="}]}""")
             .`when`().post("/api/scopes/$scopeId/media-batch")
             .then().statusCode(200)
             .body("results[0].blobId", notNullValue())
             .body("results[0].mediaId", notNullValue())
             .body("results[0].error", nullValue())
+            .extract().path<String>("results[0].mediaId")
 
-        // list the node's media — operator-blind: the wrap + sealed dimensions come back verbatim, sizes opaque
+        // list the node's media — operator-blind: the wrap + sealed layout come back verbatim, sizes opaque.
+        // The heavier EXIF tier is deliberately NOT listed (kept constant-small); it is lazy via getMediaMeta.
         given().header("Authorization", token(userId))
             .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
             .then().statusCode(200)
             .body("[0].wrappedBlobKey", equalTo("d3JhcHBlZA=="))
             .body("[0].chunkCount", equalTo(2))
             .body("[0].byteSize", equalTo(1024))
-            .body("[0].wrappedDimensions", equalTo("ZGltcw=="))
+            .body("[0].wrappedLayout", equalTo("bGF5b3V0"))
+            .body("[0].wrappedExif", nullValue()) // the list never carries EXIF
+
+        // the lazy meta endpoint returns the sealed EXIF verbatim (opaque, never inspected)
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/media/$mediaId/meta")
+            .then().statusCode(200)
+            .body("wrappedExif", equalTo("ZXhpZg=="))
+    }
+
+    @Test
+    fun mediaMetaWithoutExifIsNull() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        val uploadId = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "b25seQ==")
+
+        // complete with no EXIF sealed (source carried no readable EXIF)
+        val mediaId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory"}]}""")
+            .`when`().post("/api/scopes/$scopeId/media-batch")
+            .then().statusCode(200)
+            .body("results[0].error", nullValue())
+            .extract().path<String>("results[0].mediaId")
+
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/media/$mediaId/meta")
+            .then().statusCode(200)
+            .body("wrappedExif", nullValue())
+    }
+
+    @Test
+    fun mediaMetaForUnknownMediaIs404() {
+        val (userId, scopeId) = seedMemberScope()
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/media/${UUID.randomUUID()}/meta")
+            .then().statusCode(404).body("code", equalTo("media_not_found"))
+    }
+
+    @Test
+    fun updateMediaMetaOverwritesSealedExif() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        val uploadId = startOne(userId, scopeId, chunkCount = 1, byteSize = 16, wrap = "b25seQ==")
+
+        // complete with an initial EXIF tier (cr-0064)
+        val mediaId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"items":[{"originalUploadId":"$uploadId","nodeId":"$memory","wrappedExif":"ZXhpZg=="}]}""")
+            .`when`().post("/api/scopes/$scopeId/media-batch")
+            .then().statusCode(200).body("results[0].error", nullValue())
+            .extract().path<String>("results[0].mediaId")
+
+        // PUT a re-sealed bundle (e.g. a corrected capture time) — opaque, echoed back verbatim (cr-0065)
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"wrappedExif":"Y29ycmVjdGVk"}""")
+            .`when`().put("/api/scopes/$scopeId/media/$mediaId/meta")
+            .then().statusCode(200).body("wrappedExif", equalTo("Y29ycmVjdGVk"))
+
+        // the meta endpoint now returns the overwritten value
+        given().header("Authorization", token(userId))
+            .`when`().get("/api/scopes/$scopeId/media/$mediaId/meta")
+            .then().statusCode(200).body("wrappedExif", equalTo("Y29ycmVjdGVk"))
+
+        // null clears it
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"wrappedExif":null}""")
+            .`when`().put("/api/scopes/$scopeId/media/$mediaId/meta")
+            .then().statusCode(200).body("wrappedExif", nullValue())
+    }
+
+    @Test
+    fun updateMediaMetaForUnknownMediaIs404() {
+        val (userId, scopeId) = seedMemberScope()
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"wrappedExif":"Y29ycmVjdGVk"}""")
+            .`when`().put("/api/scopes/$scopeId/media/${UUID.randomUUID()}/meta")
+            .then().statusCode(404).body("code", equalTo("media_not_found"))
     }
 
     @Test
@@ -110,7 +187,7 @@ class MediaSliceTest {
             .then().statusCode(200)
             .body("[0].wrappedBlobKey", equalTo("b25seQ=="))
             .body("[0].derivatives.size()", equalTo(0))
-            .body("[0].wrappedDimensions", nullValue()) // none sealed → null (the grid uses a default aspect)
+            .body("[0].wrappedLayout", nullValue()) // none sealed → null (the grid uses a default aspect)
     }
 
     @Test

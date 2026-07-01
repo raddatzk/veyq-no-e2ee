@@ -21,7 +21,8 @@ data class CompleteItem(
     val nodeId: String,
     val originalUploadId: String,
     val derivatives: List<DerivativeDeclare>,
-    val wrappedDimensions: String?,
+    val wrappedLayout: String?,
+    val wrappedExif: String?,
 )
 
 /** Per-item result of `start`: success carries the session + presigned PUTs (null when the store can't presign). */
@@ -51,6 +52,12 @@ sealed interface ListMediaOutcome {
 sealed interface DownloadOutcome {
     data class Results(val items: List<DownloadItemResult>) : DownloadOutcome
     object NoScope : DownloadOutcome
+}
+
+sealed interface MediaMetaOutcome {
+    /** The media's sealed EXIF (opaque base64), or null when none was sealed. */
+    data class Found(val wrappedExif: String?) : MediaMetaOutcome
+    object NoMedia : MediaMetaOutcome
 }
 
 /**
@@ -132,7 +139,8 @@ class MediaHandler(
         val (blobId, mediaId) = store.attach(
             original, item.nodeId, manifests[original.id],
             derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
-            item.wrappedDimensions,
+            item.wrappedLayout,
+            item.wrappedExif,
         )
         return CompleteItemResult(blobId, mediaId, null)
     }
@@ -161,6 +169,20 @@ class MediaHandler(
         if (!store.isMember(userId, scopeId)) return ListMediaOutcome.NoNode
         store.findNode(scopeId, nodeId) ?: return ListMediaOutcome.NoNode
         return ListMediaOutcome.Rows(store.listNodeMedia(scopeId, nodeId))
+    }
+
+    /** The media's lazy EXIF tier for the lightbox. Non-member or unknown media → NoMedia (a 404, no reveal). */
+    fun mediaMeta(userId: String, scopeId: String, mediaId: String): MediaMetaOutcome {
+        if (!store.isMember(userId, scopeId)) return MediaMetaOutcome.NoMedia
+        val media = store.findMedia(scopeId, mediaId) ?: return MediaMetaOutcome.NoMedia
+        return MediaMetaOutcome.Found(media.wrappedExif)
+    }
+
+    /** Overwrite the media's sealed EXIF tier (opaque re-seal, e.g. a corrected capture time). */
+    fun updateMediaExif(userId: String, scopeId: String, mediaId: String, wrappedExif: String?): MediaMetaOutcome {
+        if (!store.isMember(userId, scopeId)) return MediaMetaOutcome.NoMedia
+        val media = store.setMediaExif(scopeId, mediaId, wrappedExif) ?: return MediaMetaOutcome.NoMedia
+        return MediaMetaOutcome.Found(media.wrappedExif)
     }
 
     fun download(userId: String, scopeId: String, blobIds: List<String>): DownloadOutcome {

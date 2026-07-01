@@ -12,6 +12,8 @@ import com.veyq.app.generated.model.MediaBatchRequest
 import com.veyq.app.generated.model.MediaBatchResponse
 import com.veyq.app.generated.model.MediaDerivativeKind
 import com.veyq.app.generated.model.MediaDerivativeSummary
+import com.veyq.app.generated.model.MediaMetaResponse
+import com.veyq.app.generated.model.MediaMetaUpdate
 import com.veyq.app.generated.model.MediaResultItem
 import com.veyq.app.generated.model.MediaSummary
 import com.veyq.app.generated.model.PresignedUrl
@@ -59,7 +61,8 @@ class MediaResource(
                 nodeId = item.nodeId.toString(),
                 originalUploadId = item.originalUploadId.toString(),
                 derivatives = item.derivatives.orEmpty().map { DerivativeDeclare(it.kind.value, it.uploadId.toString()) },
-                wrappedDimensions = item.wrappedDimensions,
+                wrappedLayout = item.wrappedLayout,
+                wrappedExif = item.wrappedExif,
             )
         }
         return when (val o = handler.complete(identity.principal.name, scopeId.toString(), items)) {
@@ -82,6 +85,18 @@ class MediaResource(
         when (val o = handler.listMedia(identity.principal.name, scopeId.toString(), nodeId.toString())) {
             is ListMediaOutcome.Rows -> Response.ok(o.rows.map(::toSummary)).build()
             ListMediaOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+        }
+
+    override fun getMediaMeta(scopeId: UUID, mediaId: UUID): Response =
+        when (val o = handler.mediaMeta(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+            is MediaMetaOutcome.Found -> Response.ok(MediaMetaResponse(wrappedExif = o.wrappedExif)).build()
+            MediaMetaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+        }
+
+    override fun updateMediaMeta(scopeId: UUID, mediaId: UUID, mediaMetaUpdate: MediaMetaUpdate): Response =
+        when (val o = handler.updateMediaExif(identity.principal.name, scopeId.toString(), mediaId.toString(), mediaMetaUpdate.wrappedExif)) {
+            is MediaMetaOutcome.Found -> Response.ok(MediaMetaResponse(wrappedExif = o.wrappedExif)).build()
+            MediaMetaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
         }
 
     override fun presignBlobDownloads(scopeId: UUID, blobDownloadsBatchRequest: BlobDownloadsBatchRequest): Response {
@@ -108,7 +123,7 @@ class MediaResource(
         wrappedBlobKey = row.wrappedBlobKey,
         manifest = row.manifest,
         derivatives = row.derivatives.map(::toDerivativeSummary),
-        wrappedDimensions = row.wrappedDimensions,
+        wrappedLayout = row.wrappedLayout,
     )
 
     private fun toDerivativeSummary(d: DerivativeRow) = MediaDerivativeSummary(

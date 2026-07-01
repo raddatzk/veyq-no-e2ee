@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 export type SupportedLocale = 'en' | 'de'
 
 const en = {
-  common: { email: 'Email', password: 'Password', cancel: 'Cancel', create: 'Create', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
+  common: { email: 'Email', password: 'Password', cancel: 'Cancel', save: 'Save', create: 'Create', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
   tenant: {
     manageTitle: 'Manage tenants',
     manageSub: 'Create tenants and manage their owner invites. You are not a member of any tenant and cannot read its content.',
@@ -184,11 +184,28 @@ const en = {
     close: 'Close',
     previous: 'Previous',
     next: 'Next',
+    information: 'Details',
+    toggleInfo: 'Toggle details',
+    noDetail: 'No details for this item.',
+    captured: 'Taken',
+    camera: 'Camera',
+    lens: 'Lens',
+    focalLength: 'Focal length',
+    aperture: 'Aperture',
+    exposure: 'Exposure',
+    iso: 'ISO',
+    dimensions: 'Dimensions',
+    location: 'Location',
+    status: 'Status',
+    editCapturedAt: 'Edit capture time',
+    resetCapturedAt: 'Reset to original',
+    capturedAtCorrected: 'Corrected',
+    capturedAtSaveFailed: 'Could not save the capture time.',
   },
 }
 
 const de: typeof en = {
-  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', create: 'Erstellen', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
+  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', save: 'Speichern', create: 'Erstellen', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
   tenant: {
     manageTitle: 'Tenants verwalten',
     manageSub: 'Lege Tenants an und verwalte ihre Owner-Einladungen. Du bist in keinem Tenant Mitglied und kannst dessen Inhalte nicht lesen.',
@@ -367,6 +384,23 @@ const de: typeof en = {
     close: 'Schließen',
     previous: 'Zurück',
     next: 'Weiter',
+    information: 'Details',
+    toggleInfo: 'Details umschalten',
+    noDetail: 'Keine Details für dieses Objekt.',
+    captured: 'Aufgenommen',
+    camera: 'Kamera',
+    lens: 'Objektiv',
+    focalLength: 'Brennweite',
+    aperture: 'Blende',
+    exposure: 'Belichtung',
+    iso: 'ISO',
+    dimensions: 'Abmessungen',
+    location: 'Ort',
+    status: 'Status',
+    editCapturedAt: 'Aufnahmezeit bearbeiten',
+    resetCapturedAt: 'Auf Original zurücksetzen',
+    capturedAtCorrected: 'Korrigiert',
+    capturedAtSaveFailed: 'Aufnahmezeit konnte nicht gespeichert werden.',
   },
 }
 

@@ -7,6 +7,10 @@ vi.mock('../../api/client', () => ({
   sessionApi: vi.fn(),
 }))
 
+// exifr does the real image parse in the browser; here we drive it so the seal/round-trip is deterministic.
+// Default: no EXIF (parse → undefined), so the non-EXIF paths behave exactly as a source without metadata.
+vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
+
 import {
   addMedia,
   listMedia,
@@ -16,12 +20,16 @@ import {
   lightboxRef,
   downloadRef,
   scaleToMaxEdge,
-  unsealDimensions,
+  unsealLayout,
+  setMediaCapturedAt,
+  effectiveCapturedAt,
   CHUNK_SIZE,
   TIER_SPECS,
   type MediaDeriver,
   type MediaItem,
+  type MediaExif,
 } from './media'
+import exifr from 'exifr'
 import { mediaApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
 import { fromB64std } from '../../shared/base64'
@@ -40,7 +48,7 @@ function fakeStore() {
   const objects = new Map<string, Uint8Array>()
   const sessions = new Map<string, { wrappedBlobKey: string; chunkCount: number }>()
   let upCounter = 0
-  const captured = { startItems: [] as any[], completeItem: undefined as any }
+  const captured = { startItems: [] as any[], completeItem: undefined as any, updatedExif: undefined as any }
 
   const blobOf = (uploadId: string) => {
     const s = sessions.get(uploadId)!
@@ -70,9 +78,14 @@ function fakeStore() {
           mediaId: 'media-1',
           ...blobOf(item.originalUploadId),
           derivatives: (item.derivatives ?? []).map((d: any) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
-          wrappedDimensions: item.wrappedDimensions ?? null, // opaque ciphertext, echoed verbatim (cr-0059)
+          wrappedLayout: item.wrappedLayout ?? null, // opaque ciphertext, echoed verbatim (cr-0059/cr-0064)
+          // wrappedExif is deliberately NOT echoed by listNodeMedia — it is lazy via getMediaMeta (cr-0064)
         },
       ]
+    }),
+    updateMediaMeta: vi.fn(async ({ mediaMetaUpdate }: any) => {
+      captured.updatedExif = mediaMetaUpdate.wrappedExif // opaque ciphertext (or null to clear)
+      return { wrappedExif: mediaMetaUpdate.wrappedExif ?? null }
     }),
     presignBlobDownloads: vi.fn(async ({ blobDownloadsBatchRequest }: any) => {
       const uploadId = blobDownloadsBatchRequest.items[0].blobId // == uploadId in this fake
@@ -262,29 +275,83 @@ describe('addMedia — progress, abort, best-effort derivation (cr-0058)', () =>
   })
 })
 
-describe('addMedia — E2EE-sealed dimensions for the justified grid (cr-0059)', () => {
-  it('seals the probed {w,h} under K_mem and round-trips it back through listMedia', async () => {
+describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () => {
+  const CAPTURED_AT = Date.UTC(2021, 4, 1, 10, 0, 0) // 2021-05-01T10:00:00Z
+
+  afterEach(() => {
+    vi.mocked(exifr.parse).mockReset()
+    vi.mocked(exifr.parse).mockResolvedValue(undefined as never)
+  })
+
+  it('seals the layout tier {v,w,h} (geometry only) under K_mem and round-trips it through listMedia', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
     const deriver = stubDeriver()
     deriver.probeDimensions = vi.fn(async () => ({ w: 1920, h: 1080 }))
+    vi.mocked(exifr.parse).mockResolvedValue({ DateTimeOriginal: new Date(CAPTURED_AT), Make: 'Canon' } as never)
 
     const memoryKey = v1.randomBytes(32)
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/png' }, deriver)
 
     // the wire carries only opaque ciphertext — never the plaintext dimensions
-    const sealed = store.captured.completeItem.wrappedDimensions
+    const sealed = store.captured.completeItem.wrappedLayout
     expect(typeof sealed).toBe('string')
     expect(sealed).not.toContain('1920')
 
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealDimensions(memoryKey, item)).toEqual({ w: 1920, h: 1080 })
+    const layout = unsealLayout(memoryKey, item)
+    expect(layout).toEqual({ v: 1, w: 1920, h: 1080 }) // geometry only — capture time lives in the EXIF tier
     // a wrong K_mem can't open it (bound to the Memory key)
-    expect(unsealDimensions(v1.randomBytes(32), item)).toBeNull()
+    expect(unsealLayout(v1.randomBytes(32), item)).toBeNull()
   })
 
-  it('seals no dimensions when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
+  it('seals the full EXIF tier under K_mem — and listMedia never carries it (lazy via getMediaMeta)', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+    deriver.probeDimensions = vi.fn(async () => ({ w: 800, h: 600 }))
+    vi.mocked(exifr.parse).mockResolvedValue({
+      DateTimeOriginal: new Date(CAPTURED_AT),
+      Make: 'Canon', Model: 'EOS R', LensModel: 'RF 50mm', FNumber: 1.8, ISO: 200, latitude: 48.137, longitude: 11.575,
+    } as never)
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/jpeg' }, deriver)
+
+    // the EXIF tier is sealed opaque — plaintext camera/coords never hit the wire
+    const sealedExif = store.captured.completeItem.wrappedExif
+    expect(typeof sealedExif).toBe('string')
+    expect(sealedExif).not.toContain('Canon')
+    expect(sealedExif).not.toContain('48.137')
+    // unseal it directly (the lightbox does this after getMediaMeta) — every field round-trips
+    const exif = JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealedExif), 'media-exif')))
+    expect(exif).toMatchObject({ v: 1, make: 'Canon', model: 'EOS R', lens: 'RF 50mm', fNumber: 1.8, iso: 200, gpsLat: 48.137, gpsLng: 11.575, capturedAt: CAPTURED_AT })
+
+    // listMedia stays constant-small: it echoes the layout tier but NOT the EXIF tier
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(item.wrappedLayout).toBeDefined()
+    expect((item as Record<string, unknown>).wrappedExif).toBeUndefined()
+  })
+
+  it('tolerates a no-EXIF source — layout still seals from dims, EXIF tier is null', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+    deriver.probeDimensions = vi.fn(async () => ({ w: 640, h: 480 }))
+    // exifr.parse → undefined (default mock): the source carries no readable EXIF
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/png' }, deriver)
+
+    expect(store.captured.completeItem.wrappedExif ?? null).toBeNull()
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(unsealLayout(memoryKey, item)).toEqual({ v: 1, w: 640, h: 480 })
+  })
+
+  it('seals no layout when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
@@ -294,18 +361,84 @@ describe('addMedia — E2EE-sealed dimensions for the justified grid (cr-0059)',
     const memoryKey = v1.randomBytes(32)
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'application/pdf' }, deriver)
 
-    expect(store.captured.completeItem.wrappedDimensions ?? null).toBeNull()
+    expect(store.captured.completeItem.wrappedLayout ?? null).toBeNull()
+    expect(store.captured.completeItem.wrappedExif ?? null).toBeNull()
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealDimensions(memoryKey, item)).toBeNull()
+    expect(unsealLayout(memoryKey, item)).toBeNull()
   })
 
-  it('a deriver with no probeDimensions seals nothing (best-effort, optional)', async () => {
+  it('a deriver with no probeDimensions seals no layout (best-effort, optional)', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
 
     await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver())
-    expect(store.captured.completeItem.wrappedDimensions ?? null).toBeNull()
+    expect(store.captured.completeItem.wrappedLayout ?? null).toBeNull()
+  })
+})
+
+describe('setMediaCapturedAt — sealed capturedAt override (cr-0065)', () => {
+  const ORIG = Date.UTC(2021, 4, 1, 10, 0, 0)
+  const CORRECTED = Date.UTC(2019, 7, 15, 8, 30, 0)
+  const MEDIA_ID = 'media-1'
+
+  function decodeExif(memoryKey: Uint8Array, sealed: string): MediaExif {
+    return JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealed), 'media-exif')))
+  }
+
+  it('re-seals the bundle with the override, keeping the original capturedAt (operator-blind)', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+    const exif: MediaExif = { v: 1, capturedAt: ORIG, make: 'Canon' }
+
+    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, exif, CORRECTED)
+
+    // the wire carries only opaque ciphertext — never the plaintext date
+    const sealed = store.captured.updatedExif
+    expect(typeof sealed).toBe('string')
+    expect(sealed).not.toContain('2019')
+    // the sealed bundle keeps the original + adds the override
+    expect(decodeExif(memoryKey, sealed)).toEqual({ v: 1, capturedAt: ORIG, make: 'Canon', capturedAtOverride: CORRECTED })
+    // effective time now prefers the correction
+    expect(effectiveCapturedAt(updated)).toBe(CORRECTED)
+    // a wrong K_mem can't open it
+    expect(() => decodeExif(v1.randomBytes(32), sealed)).toThrow()
+  })
+
+  it('clears the override (null) back to the original, keeping the rest of the bundle', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+    const exif: MediaExif = { v: 1, capturedAt: ORIG, make: 'Canon', capturedAtOverride: CORRECTED }
+
+    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, exif, null)
+
+    expect(decodeExif(memoryKey, store.captured.updatedExif)).toEqual({ v: 1, capturedAt: ORIG, make: 'Canon' })
+    expect(effectiveCapturedAt(updated)).toBe(ORIG) // falls back to the extracted original
+  })
+
+  it('clearing the only field drops the whole EXIF tier to null', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+    const exif: MediaExif = { v: 1, capturedAtOverride: CORRECTED } // a media that only ever had a manual date
+
+    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, exif, null)
+
+    expect(store.captured.updatedExif).toBeNull() // nothing left to seal → the tier is cleared
+    expect(updated).toBeNull()
+  })
+
+  it('sets a date on a media with no EXIF (fresh bundle)', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+
+    const updated = await setMediaCapturedAt(SCOPE_ID, MEDIA_ID, memoryKey, null, CORRECTED)
+
+    expect(decodeExif(memoryKey, store.captured.updatedExif)).toEqual({ v: 1, capturedAtOverride: CORRECTED })
+    expect(effectiveCapturedAt(updated)).toBe(CORRECTED)
   })
 })
 

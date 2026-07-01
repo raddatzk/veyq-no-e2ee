@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, hasDerivatives, unsealDimensions, type MediaItem } from '../media'
+import { listMedia, openGrid, hasDerivatives, unsealLayout, type MediaItem } from '../media'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
@@ -56,7 +56,7 @@ const aspectRatios = computed(() => {
   const key = props.memoryKey
   const m = new Map<string, number>()
   for (const item of items.value) {
-    const dims = key ? unsealDimensions(key, item) : null
+    const dims = key ? unsealLayout(key, item) : null
     m.set(item.mediaId, galleryDisplayAspectRatio(dims?.w, dims?.h))
   }
   return m

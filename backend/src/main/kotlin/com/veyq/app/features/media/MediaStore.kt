@@ -16,7 +16,7 @@ data class MediaRow(
     val wrappedBlobKey: String,
     val manifest: List<Long>?,
     val derivatives: List<DerivativeRow>,
-    val wrappedDimensions: String?,
+    val wrappedLayout: String?,
 )
 
 /** One role-tagged derivative tier of a media (its own blob metadata + wrap). */
@@ -77,7 +77,8 @@ class MediaStore {
         nodeId: String,
         originalManifest: List<Long>?,
         derivatives: List<DerivativeAttach>,
-        wrappedDimensions: String?,
+        wrappedLayout: String?,
+        wrappedExif: String?,
     ): Pair<String, String> {
         val originalBlobId = persistBlob(original, originalManifest)
         val mediaId = UUID.randomUUID().toString()
@@ -86,7 +87,8 @@ class MediaStore {
             scopeId = original.scopeId
             this.nodeId = nodeId
             this.blobId = originalBlobId
-            this.wrappedDimensions = wrappedDimensions
+            this.wrappedLayout = wrappedLayout
+            this.wrappedExif = wrappedExif
             createdAt = Instant.now()
         }.persist()
         for (d in derivatives) {
@@ -128,8 +130,21 @@ class MediaStore {
                 val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
                 DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
             }
-            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives, m.wrappedDimensions)
+            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives, m.wrappedLayout)
         }
+    }
+
+    /** The media, if it exists in this scope — carries the lazy `wrappedExif` for the lightbox meta endpoint. */
+    fun findMedia(scopeId: String, mediaId: String): MediaEntity? =
+        MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId }
+
+    /** Overwrite a media's sealed `wrappedExif` verbatim (opaque; e.g. a re-sealed corrected capture time). */
+    @Transactional
+    fun setMediaExif(scopeId: String, mediaId: String, wrappedExif: String?): MediaEntity? {
+        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId } ?: return null
+        media.wrappedExif = wrappedExif
+        media.persist()
+        return media
     }
 
     fun findBlob(scopeId: String, blobId: String): BlobEntity? =

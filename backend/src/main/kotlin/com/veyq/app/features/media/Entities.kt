@@ -98,9 +98,13 @@ class MediaEntity : PanacheEntityBase {
     @Column(name = "blob_id", nullable = false, length = 36)
     lateinit var blobId: String
 
-    /** The original's `{w,h}` sealed under `K_mem` (opaque base64), for the gallery's justified layout (cr-0059). */
-    @Column(name = "wrapped_dimensions")
-    var wrappedDimensions: String? = null
+    /** The original's `{v,w,h,capturedAt}` layout tier sealed under `K_mem` (opaque base64), for the gallery's justified layout + timeline (cr-0059/cr-0064). */
+    @Column(name = "wrapped_layout")
+    var wrappedLayout: String? = null
+
+    /** The original's full EXIF bundle sealed under `K_mem` (opaque base64); lazy-loaded by the lightbox, never listed (cr-0064). */
+    @Column(name = "wrapped_exif")
+    var wrappedExif: String? = null
 
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
