@@ -106,7 +106,7 @@ note right of C : server only ever saw ciphertext + the scope row
 
 - Feature: [Spaces (scopes)](../_index.md)
 - Concepts: [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md) (grants, scope kinds, membership),
-  [Account & Key Model](../../../crosscutting/account-key-model.md) (identity opens grants),
+  [Account & Key Model](../../account/enablers/en.account.key-model.md) (identity opens grants),
   [Security Model](../../../crosscutting/security-model.md) (operator-blind)
 - Decisions: [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (personal scope is tenant-bound),
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (membership = role + grant),

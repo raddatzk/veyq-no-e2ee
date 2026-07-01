@@ -26,13 +26,26 @@
 - **`wrappedMeta`** — an optional field on a content node, **AEAD-sealed under the node's `K_mem`** (AAD context
   `node-meta`), wire-encoded as opaque **base64**. It carries a **client-only, versioned** JSON blob whose shape
   can **grow without a contract change** (the operator never learns a field — the lesson from the media EXIF
-  tiers). Each sub-object's shape is defined by **its** use-case:
+  tiers):
 
   ```
   { v: 1,
-    date?:     { … },   // the sealed date  — see uc.memory.date
-    location?: { … } }  // the sealed place — see uc.memory.place
+    date?:     { mode: 'auto' | 'single' | 'range' | 'ongoing',
+                 from?: 'YYYY-MM-DD',        // start day  (single ⇒ from == to; ongoing ⇒ no `to`)
+                 to?:   'YYYY-MM-DD' },       // end day    (absent for ongoing / undated auto)
+    location?: { name:         string,        // the label — MANDATORY (no location without a name)
+                 nameSource:   'geocoded' | 'manual',   // manual = frozen; geocoded = may refresh on anchor move
+                 derived?:     { lat, lng },   // map position = the MEDOID of the media GPS (never the mean)
+                 derivedMode?: 'fixed' | 'auto',        // set-time choice: snapshot vs. re-medoid on media add
+                 nameAnchor?:  { lat, lng, zoom } } }   // coord + zoom a geocoded name was resolved at
   ```
+
+  - **`date`** ([uc.memory.date](../use-cases/uc.memory.date.md)) — the effective day range, materialized for
+    every mode; `auto` = min→max over the Memory's *trustworthy* `capturedAt`.
+  - **`location`** ([uc.memory.place](../use-cases/uc.memory.place.md)) — one named place; `name` is mandatory
+    (no name ⇒ no location); `derived` is the **MEDOID** of the media GPS (an actual photo spot → never the sea);
+    `nameAnchor` records where + at what zoom a geocoded name came from, for re-resolution. Reverse-only,
+    opt-in, veyq-blind geocoding: [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md).
 
 - **Threaded through the existing node CRUD — no new endpoint.** Set at `createNode`; updated by the **partial**
   `updateNode` (`PATCH …/nodes/{nodeId}`) with **partial semantics** — a non-null `wrappedMeta` replaces it, an
@@ -46,8 +59,13 @@ The browse card grid (and, later, the tenant map) show + sort by this metadata *
 media**. So the effective value must **already be sealed on the node**, not computed at display from the media.
 That is the whole reason `wrappedMeta` sits on the node and is returned by `listNodes`: a client unseals each
 node's blob under its `K_mem` and renders — no media fetch, no server-side computation, operator-blind. Each
-use-case defines **how** its sub-object is materialized (the date's `auto` reconcile; the place's deliberate
-"set location").
+use-case defines **how** its sub-object is materialized — the date's `auto` reconcile over the media; the
+place's deliberate **"set location"** (the medoid of the media GPS, formed on demand).
+
+**No "locations API".** The tenant map plots every Memory from the sealed `location` that `listNodes` already
+returns, unsealed client-side — a dedicated locations endpoint would hand the operator the coordinates, so
+there is none; the blind server cannot geo-query what it never sees (the client fetches all + plots what it can
+open).
 
 ## Decisions / notes
 

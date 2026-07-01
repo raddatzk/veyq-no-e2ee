@@ -109,7 +109,7 @@ Active --> [*]
   presupposes an **existing key-holder** who reseals the scope key to the invitee. Here **no one** holds
   the key beforehand, so the invited owner is the **cryptographic root** of the tenant scope — they
   generate it cold, exactly like the first account in `setup-server` but for a *scope*. This distinct
-  path is recorded in **ADR 0006** (proposed).
+  path is recorded in [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md).
 - **The invite token is a bootstrap secret, not a key.** It only **gates acceptance** (proves the
   recipient holds the emailed link); it transports **no content key**. The server may therefore hold it
   without breaking operator-blindness — content access exists only once the owner has cold-born the
@@ -129,41 +129,16 @@ Active --> [*]
   then it is a reserved domain mapping and an outstanding invite.
 - **One tenant = one domain (for now).** The schema leaves room for more, but multi-domain and
   tenant self-service are SaaS concerns (inbox #41), not part of this use-case.
-- **Role vs. grant — the owner role is management only, and hollow without a key.** Being "owner" is a
-  **server-side management role**; the power to *read* and to *invite* (the invite-wrap needs the scope
-  key) comes from the **scope-key grant**, held only by key-holders. So:
-  - **Promoting an existing member who already holds a grant to owner is a full, working handoff** — a
-    pure role flip, **no key transfer** (they could already read). This is the normal way a tenant gains
-    or replaces an owner.
-  - **Promoting a non-key-holder (or the operator itself) yields a hollow title** — no grant, so they
-    can neither read existing content nor invite anyone; at most they could cold-birth a *fresh, empty*
-    scope. This is precisely why "operator smuggles itself in as owner" is closed by construction.
-  - A **key-preserving handoff to someone with no grant yet** needs a current key-holder to invite-wrap
-    a grant to them — the operator can never do it.
-- **The operator controls availability, never confidentiality.** A Server Owner can disrupt an `ACTIVE`
-  tenant — deactivate it, block its owner (an unavoidable operator power, like pulling the plug on any
-  self-hosted box) — but cannot read its content.
-- **The operator never selects a successor — it cannot.** Operator-blindness is not only "no key" but
-  **no identity view**: the Server Owner sees opaque member IDs, never who they are, so it could not
-  meaningfully *choose* a new owner even setting crypto aside. Promotion is therefore **purely
-  tenant-internal** (an existing owner/admin promotes a member — they see decrypted membership). This is
-  the universal E2EE pattern: the infrastructure operator does recovery/succession **nowhere** (Signal,
-  Keybase, Proton, 1Password, Bitwarden, Apple ADP all keep it one level *inside* — multiple admins, an
-  org key, or designated recovery contacts, always arranged **in advance**).
-- **The single-key-holder cliff — accepted (`solo owner gone == content gone`).** Owner removal is a
-  non-event **as long as another key-holder exists** (a tenant owner/admin promotes them). It bites only
-  when the owner is the **sole** key-holder: the content is then cryptographically orphaned and
-  unrecoverable — escrow to the operator is forbidden. Accepted as the owner's own risk, exactly like a
-  personal account that loses all unlock methods. Redundancy is **not forced** at activation; richer
-  succession mechanisms (co-owner / designated successor / tenant recovery key) are **deferred with the
-  SaaS layer** (inbox #41) — see ADR 0006.
-- **On-premise collapses the operator/owner split.** The two-party flow targets multi-tenant/SaaS. In
-  the common self-hosted case there is **one server, usually one tenant, administered by one of its own
-  members** — so Server Owner and Tenant Owner are the **same person**. The single invite flow already
-  covers this: the operator enters **their own email** and accepts their own invite. No special-case path
-  is needed (a "create & claim ownership myself" shortcut is a possible later convenience, not a
-  requirement). The operator-vs-owner separation only earns its keep once one deployment hosts tenants
-  for *other* people — i.e. SaaS.
+- **The operator controls availability, never confidentiality.** A Server Owner can deactivate a tenant or
+  block its owner (an unavoidable operator power), but never read its content.
+- **On-premise collapses the operator/owner split.** In the common self-hosted case (one server, usually one
+  tenant, self-administered) the Server Owner *is* the Tenant Owner — they enter their own email and accept
+  their own invite; the single flow already covers it, no special-case path.
+
+> The **governance model** behind these — role vs. grant (an owner title is hollow without a key), why the
+> operator can never select a successor, the single-key-holder cliff (`solo owner gone == content gone`,
+> escrow forbidden, succession deferred to SaaS) — is the decision record
+> [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md) (Consequences), not restated here.
 
 ## Proposed CR cut (decided separately)
 
@@ -201,9 +176,9 @@ eine reservierte Adresse.
 
 - Feature: [Administration & Operations](../_index.md)
 - Concepts: [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md) (scope kinds, grants,
-  host-based routing), [Account & Key Model](../../../crosscutting/account-key-model.md) (cold key
+  host-based routing), [Account & Key Model](../../account/enablers/en.account.key-model.md) (cold key
   birth, identity keys), [Security Model](../../../crosscutting/security-model.md) (operator-blind).
 - Decisions: [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (tenant-bound scopes),
-  **ADR 0006** (proposed — cold tenant-scope birth by the invited owner).
+  [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md) (cold tenant-scope birth by the invited owner).
 - Related use-cases: [setup-server](uc.admin.setup-server.md), [login](../../account/use-cases/uc.account.login.md);
   member invites & the personal-scope bootstrap on join (planned).

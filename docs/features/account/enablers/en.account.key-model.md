@@ -1,18 +1,29 @@
-# Account & Key Model
+# Enabler: Account keys — identity, Master Key, unlock & recovery
 
-> The engineering sibling to the [Security Model](security-model.md). It covers a **single account's**
-> keys: identity, the Master Key, the unlock methods that open it, KEK derivation, and recovery.
-> The cross-platform **orchestration** of the passwordless (L2/L3) device-key unlock — how every platform
-> releases the device key and resumes the session uniformly — is the
-> [Passwordless unlock mechanism](passwordless-unlock-mechanism.md).
->
-> Out of scope here, by design: **scope, content and share keys** and the **invite/onboarding key
-> transfer** (granting access to a space) live in the [scopes & tenancy model](scopes-and-tenancy.md);
-> exact **byte formats**
-> (suite layouts, the KEM combiner, wrap encodings) live in the crypto wire-format spec.
-> Plain-language companion: [wiki: Account keys & recovery](../../wiki/en/account-keys-and-recovery.md).
+- **ID:** en.account.key-model
+- **Type:** **Enabler** — structural foundation, no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
+- **Provides:** a **single account's** key model — the identity keypair, the one **Master Key** (wrapped once
+  per unlock method), the **unlock methods + KEK derivation** that open it, and recovery. It is the **root of
+  the key chain** the scope + content keys extend downstream.
+- **Serves (use-cases):** [login](../use-cases/uc.account.login.md), [unlock](../use-cases/uc.account.unlock.md),
+  [trust-device](../use-cases/uc.account.trust-device.md), [biometric-unlock](../use-cases/uc.account.biometric-unlock.md),
+  [auto-unlock](../use-cases/uc.account.auto-unlock.md), [set-device-security](../use-cases/uc.account.set-device-security.md),
+  [remember-this-device](../use-cases/uc.account.remember-this-device.md); and downstream
+  [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) →
+  [en.memory.tree](../../memory/enablers/en.memory.tree.md) build their scope/content keys on it.
+- **Depends on:** the crypto strategy ([ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md))
+  + the operator-blind auth/unlock split ([ADR 0003](../../../decisions/0003-operator-blind-password-auth.md),
+  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)). The cross-platform passwordless
+  (L2/L3) **orchestration** is [en.account.passwordless-unlock](en.account.passwordless-unlock.md).
+- **Out of scope (by design):** **scope, content & share keys** + the invite/onboarding key transfer live in
+  [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md); exact **byte formats** (suite layouts, KEM
+  combiner, wrap encodings) in the crypto wire-format spec. Whole-system security concern: the sibling
+  [Security Model](../../../crosscutting/security-model.md).
 
-This is the **target model**; first-build scope is tracked via the inbox and change-requests.
+> **No end-user section** (enabler) — its value surfaces through the account use-cases it serves. Plain-language
+> companion: [wiki: Account keys & recovery](../../../../wiki/en/account-keys-and-recovery.md). This is the
+> **target model**; first-build scope is tracked via the inbox + change-requests.
 
 ## Principle: one Master Key, many wraps
 
@@ -56,7 +67,7 @@ always ciphertext the server stores but cannot open.
 |---|---|---|---|
 | Account password | Human secret, **never sent to the server** | — (never leaves the device) | Locally derives two domain-separated things: the **auth keypair** (login) and the **unlock KEK** (with the Secret Key, to open a Master Key wrap). |
 | Auth keypair (`authPublicKey` / `authPrivateKey`) | Ed25519 signing keypair derived from the password (`seed = Argon2id(password, authSalt)`) | Only the **public** key is stored; the private key is derived on demand, never stored or sent | Login by **challenge-response**: the client signs a server nonce with `authPrivateKey`; the server verifies with `authPublicKey`. Separate from the identity keypair and from content; Ed25519 now, PQ/hybrid later. |
-| Secret Key | High-entropy user-held secret (Emergency Kit / enrolled devices) | **Never** stored server-side | Combined with the password for two-secret key derivation (2SKD); protects content unlock after a DB breach. See [Security Model → Secret Key (2SKD)](security-model.md). |
+| Secret Key | High-entropy user-held secret (Emergency Kit / enrolled devices) | **Never** stored server-side | Combined with the password for two-secret key derivation (2SKD); protects content unlock after a DB breach. See [Security Model → Secret Key (2SKD)](../../../crosscutting/security-model.md). |
 | Master Key | 32-byte symmetric account root | Only as `MasterKeyWrap.wrappedKey`, **one wrap per unlock method** (`PASSWORD`, `PASSKEY`, `RECOVERY`, `DEVICE`) | Opens `wrappedIdentityPrivateKey`. Stable across password changes; changing a method replaces only its wrap. |
 | Unlock KEK | Derived in-memory wrapping key | **Never** stored server-side | Opens exactly one Master Key wrap. Derived on the client, then discarded. |
 | Identity public key (`identityPublicKey`) | Hybrid KEM public bundle + signing public key | Published in the key directory | Grant address ("mailbox slot"); fingerprint/safety-number input; signature verification for key/device changes. |
@@ -76,7 +87,7 @@ These are deliberately distinct (this is the crux of operator-blind sign-in):
   key (not a credential): forging a login means breaking Ed25519 (~2¹²⁸) or brute-forcing the password
   through Argon2id, either way buying a session + operational metadata, **never content**. The auth
   keypair is Ed25519 now and moves to a PQ/hybrid signature later (no harvest-now-decrypt-later for
-  authentication — see [Security Model](security-model.md) and [ADR 0003](../decisions/0003-operator-blind-password-auth.md)).
+  authentication — see [Security Model](../../../crosscutting/security-model.md) and [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md)).
 - **Unlock (client-side):** a **Unlock KEK** derived on the device opens one Master Key wrap. The KEK's
   source (password+Secret Key, passkey PRF, recovery code, device key) is never sent to the server.
 
@@ -92,11 +103,18 @@ signature authenticates and its **PRF** secret derives an unlock KEK.)
 | **Password + Secret Key** | `Argon2id(password ‖ secretKey, salt)` | The **mandatory floor** — always present, cannot be removed. The Secret Key (never sent) is what stops a cracked password from opening content. |
 | **Passkey (PRF)** | the authenticator's PRF output | Passwordless; one credential covers auth (signature) and unlock (PRF). |
 | **Recovery code** | the high-entropy code itself | Single-use; standalone bypass of both password and Secret Key. |
-| **Trusted device** | a device-held key | Lets an already-enrolled device unlock with no typing (e.g. Face ID). |
+| **Trusted device (L1, `DEVICE`)** | `Argon2id(password ‖ HMAC(deviceKey, "veyq/v1/device-bind"), salt)` | Two factors — the password **+** a device-bound key — swapping the *cold* Secret Key for a device-local one; this device unlocks with the **password alone** (no Secret Key). Still password-gated: a stolen device alone opens nothing. |
+| **Passwordless device (L2/L3, `DEVICE_KEY`)** | a device-held **random** key `K` (`wrap = symWrap(K, masterKey)`) | **No password** — `K` is released by a live biometric (L2) or ungated (L3). Orchestration + per-platform store: [en.account.passwordless-unlock](en.account.passwordless-unlock.md). |
 
 Each KEK is derived **fresh on the device** with a stored salt (so it reproduces identically), used to
 open its wrap, then **discarded**. None is ever stored or sent — which is exactly why the server stays
 blind.
+
+**Device keys are bound, not stored raw.** The L1 `deviceKey` is a **non-extractable** HMAC key (its bytes
+never exist in the clear — usable to compute the bind, never exfiltratable); the L2/L3 `K` is a random
+secure-element key. Device trust is **per device**: each trusted/enrolled device writes **its own** wrap (own
+key + salt), so a phone and a laptop are two independent wraps on the same Master Key — unlike the floor
+methods, `DEVICE`/`DEVICE_KEY`/`PASSKEY` may appear more than once ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)).
 
 ## Adding / removing unlock methods
 

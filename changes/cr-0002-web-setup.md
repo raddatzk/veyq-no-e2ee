@@ -20,7 +20,7 @@ to setup (login identifier + Model B `authSalt` source).
 - UI source (reuse, read-only): `legacy/frontend/src/views/SetupView.vue`, app shell/router/boot,
   `src/features/admin/setupServer`, `src/features/account/emergencyKit`.
 - Crypto (adopt): `legacy/frontend/src/shared/crypto/v1.ts` + conformance vectors.
-- Concepts: [Account & Key Model](../docs/crosscutting/account-key-model.md),
+- Concepts: [Account & Key Model](../docs/features/account/enablers/en.account.key-model.md),
   [ADR 0003](../docs/decisions/0003-operator-blind-password-auth.md) (Model B), Developer Styleguide.
 - Invariant at risk: **operator-blind** — content crypto stays client-side; the server only gains a
   server-visible `email` (low-sensitivity identity metadata) plus the existing ciphertext + `authPublicKey`.

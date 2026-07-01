@@ -7,8 +7,8 @@
   prev/next), and **download** an original — with every byte decrypted **on device**.
 - **Preconditions:** The user has unlocked the vault and is browsing the tree
   ([uc.memory.browse](uc.memory.browse.md)); the Memory exists and its **`K_mem`** can be unwrapped; its media
-  carry **derivatives** ([en.memory.derivatives](../enablers/en.memory.derivatives.md) — see *Scope* for media
-  that don't yet).
+  carry **derivatives** ([en.memory.derivatives](../enablers/en.memory.derivatives.md); a non-derivable item
+  shows an icon tile).
 - **Postconditions (success):** The user sees the Memory's media as a grid, opens any item in a lightbox and
   pages through, can favorite the Memory, and can download an item's original. The server saw only **ciphertext
   fetches** — no pixel, no filename, no content key.
@@ -26,19 +26,6 @@
 4. **Download:** an explicit download fetches the **original** (the only pristine, full-resolution copy) and
    saves it.
 5. **Favorite:** the header toggle pins / unpins the Memory ([en.memory.favorites](../enablers/en.memory.favorites.md)).
-
-## Scope of this slice
-
-- **In:** **open** a Memory; the thumbnail **grid**; the **lightbox** (preview, prev/next); **download
-  original**; a header (title, item count, favorite toggle). Media attached **directly to the Memory node**.
-- **Out (later slices / their own use-cases):** the **journal** (`uc.memory.journal`); **chapters** &
-  chapter-scoped views (`uc.memory.chapters`) — so media nested **inside a chapter is not aggregated** into this
-  gallery yet; **map / tracks**; **playlists**; per-uploader **buckets** + a *mine / group* filter;
-  **participants**; a chosen **cover** (the grid/lightbox use derivatives; a dedicated cover image is later);
-  **sharing**.
-- **Depends on:** [en.memory.derivatives](../enablers/en.memory.derivatives.md) (**built first** — the
-  grid/lightbox/download tiers), [en.memory.media](../enablers/en.memory.media.md),
-  [en.memory.favorites](../enablers/en.memory.favorites.md).
 
 ## Alternate / exception flows
 

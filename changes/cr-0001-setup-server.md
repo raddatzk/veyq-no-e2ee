@@ -21,7 +21,7 @@ the auth public key, nothing more.
 Honour these (links, not copies):
 - Use-case: [uc.admin.setup-server](../docs/features/admin/use-cases/uc.admin.setup-server.md)
 - Concepts: [Security Model](../docs/crosscutting/security-model.md) (operator-blind, what's
-  server-visible), [Account & Key Model](../docs/crosscutting/account-key-model.md) (cold key birth,
+  server-visible), [Account & Key Model](../docs/features/account/enablers/en.account.key-model.md) (cold key birth,
   Master Key wraps, auth keypair — [ADR 0003](../docs/decisions/0003-operator-blind-password-auth.md)),
   [Scopes & Tenancy](../docs/crosscutting/scopes-and-tenancy.md)
 - Conventions: [Developer Styleguide](../docs/crosscutting/developer-styleguide.md) — resource-shaped

@@ -22,7 +22,7 @@ deferral** — the auth keypair is derived with `instanceSalt` at **both** regis
 
 - Use-case: [uc.account.login](../docs/features/account/use-cases/uc.account.login.md) (server-auth only;
   auth ≠ unlock).
-- Concepts: [Account & Key Model → Auth vs. unlock](../docs/crosscutting/account-key-model.md),
+- Concepts: [Account & Key Model → Auth vs. unlock](../docs/features/account/enablers/en.account.key-model.md),
   [Security Model](../docs/crosscutting/security-model.md) (operator-blind, non-enumerability),
   [ADR 0003](../docs/decisions/0003-operator-blind-password-auth.md) (password-derived keypair +
   challenge-response), [ADR 0004](../docs/decisions/0004-session-tokens.md) (opaque rotating

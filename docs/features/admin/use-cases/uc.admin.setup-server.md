@@ -69,7 +69,7 @@ SetupComplete --> [*]
 - **Operator-blind from account #1.** Even the Server Owner's content is E2E-encrypted; the server never
   holds content keys. See [Security Model](../../../crosscutting/security-model.md).
 - **Cold key birth.** Unlike invitation-based registration there is no temp-wrap to import — the first
-  user is the root of their own key tree. See [Account & Key Model](../../../crosscutting/account-key-model.md).
+  user is the root of their own key tree. See [Account & Key Model](../../account/enablers/en.account.key-model.md).
 - **Tenant routing is Host-based.** The reverse proxy forwards the request and the backend resolves the
   active tenant from the `Host` (tenant↔domain) — see
   [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md). At first-run there is no tenant yet
@@ -102,6 +102,6 @@ Account existiert, schließt sich die Setup-Seite endgültig.
 
 - Feature: [Administration & Operations](../_index.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy, operator-blind),
-  [Account & Key Model](../../../crosscutting/account-key-model.md) (cold key birth, Emergency Kit),
+  [Account & Key Model](../../account/enablers/en.account.key-model.md) (cold key birth, Emergency Kit),
   [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md) (tenant routing, scopes)
 - Related use-cases (planned): account login, create-tenant-invite-owner

@@ -4,13 +4,21 @@ Account lifecycle and authentication: logging in, unlocking the Master Key, trus
 changing the password / Secret Key, and recovering access. **Operator-blind throughout** — the server
 holds only **public** keys and ciphertext, never the password and never a content key.
 
-- **Cross-cutting:** [Account & Key Model](../../crosscutting/account-key-model.md) (auth vs. unlock, the
-  one-Master-Key/many-wraps model), [Security Model](../../crosscutting/security-model.md)
+- **Cross-cutting:** [Security Model](../../crosscutting/security-model.md)
   (operator-blind, non-enumerability), [ADR 0003](../../decisions/0003-operator-blind-password-auth.md)
   (password-derived keypair + challenge-response), [ADR 0005](../../decisions/0005-unlock-methods-and-device-trust.md)
   (unlock methods, device trust, re-lock & precedence).
 - **Note:** *auth* (proving who you are to the server) and *unlock* (opening your Master Key on the
   device) are deliberately **separate layers** — they appear as separate use-cases here.
+
+## Enablers
+
+- ★ [en.account.key-model](enablers/en.account.key-model.md) — the account key model: identity + the one
+  **Master Key** (many wraps), the unlock methods + KEK derivation, and recovery; the **root** the scope/content
+  keys extend.
+- ★ [en.account.passwordless-unlock](enablers/en.account.passwordless-unlock.md) — the **L2/L3
+  passwordless-unlock** orchestration (two-layer split, native per platform; the single security-reviewer
+  reference).
 
 ## Use-cases
 

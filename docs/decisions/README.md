@@ -6,6 +6,10 @@ something is the way it is. One file per decision: `NNNN-kebab-title.md`, number
 - **Status:** `Proposed` · `Accepted` · `Superseded by NNNN`. Supersede rather than delete.
 - Keep them concise: context, the decision, consequences — not a tutorial.
 - Refinements that produce a durable decision create an ADR; change-requests link the ADRs they touch.
+- **Current state, edited in place.** State the decision *as it is now*; when it changes, **edit the ADR** and
+  let **git** hold the history — **no** `Amended: <date>` lines or `## Decision — addendum <date>` sections
+  (a change-log belongs in git, not the doc). Keep the full current reasoning + rejected alternatives. Canonical
+  rule: [`../README.md`](../README.md).
 
 ## Format
 

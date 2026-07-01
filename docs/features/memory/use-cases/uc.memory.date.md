@@ -12,40 +12,25 @@
 - **Postconditions (success):** The Memory shows its effective date; the user can switch the date mode and enter
   manual values. The server stored only an **opaque `wrappedMeta` blob** + the unchanged node shape.
 
-## The sealed date
+## How `auto` is derived
 
-The date lives in the node's sealed `wrappedMeta` blob — the **envelope** (sealing under `K_mem`, versioning,
-`updateNode` / `listNodes` threading, and *why it is materialized on the node so a card reads it without loading
-media*) is the enabler [en.memory.node-meta](../enablers/en.memory.node-meta.md). This use-case defines the
-`date` sub-object and how the `auto` mode is derived:
-
-```
-date?: { mode: 'auto' | 'single' | 'range' | 'ongoing',
-         from?: 'YYYY-MM-DD',   // start day (single ⇒ from == to; ongoing ⇒ no `to`)
-         to?:   'YYYY-MM-DD' }  // end day (absent for ongoing / undated auto)
-```
-
-- **A materialized range for every mode.** `wrappedMeta.date` stores the actual `{ mode, from?, to? }` day range
-  for **every** mode (`single` ⇒ `from == to`; `range` ⇒ both; `ongoing` ⇒ `from`, no `to`) — so the card grid,
-  which never loads a Memory's media, can show + sort by it straight from the sealed node.
+The date's sealed **shape** + envelope (sealing under `K_mem`, versioning, `updateNode` / `listNodes` threading,
+materialization on the node) is the enabler [en.memory.node-meta](../enablers/en.memory.node-meta.md). What this
+use-case adds is the **`auto`** behaviour — the other three modes just carry the user's typed days:
 
 - **`auto` counts only *trustworthy* capture times.** A media's `capturedAt` (cr-0066) is the EXIF
   `DateTimeOriginal` **or**, absent that, a **file-modification-date fallback**. A file date is not a real
   capture time — an edited photo whose EXIF was dropped would carry its *edit* date and wrongly stretch the
-  range — so the capture-time tier now records `capturedAtSource: 'exif' | 'file'`, and **`auto` includes a
-  media only when its `capturedAt` is EXIF-sourced *or* the user set a `capturedAtOverride`** (an intentional
-  correction). File-fallback media (and legacy media with no recorded source) are excluded from `auto`; a Memory
-  with only such media has an empty `auto` range (set it manually). (The media grid still *sorts* by the
-  effective `capturedAt` regardless of source — cr-0066 unchanged.)
+  range — so the capture-time tier records `capturedAtSource: 'exif' | 'file'`, and **`auto` includes a media
+  only when its `capturedAt` is EXIF-sourced *or* the user set a `capturedAtOverride`** (an intentional
+  correction). File-fallback media (and legacy source-less media) are excluded; a Memory with only such media
+  has an empty `auto` range (set it manually). (The media grid still *sorts* by the effective `capturedAt`
+  regardless of source — cr-0066 unchanged.)
 
-- **`auto` derives from the Memory's own media, materialized by a full-list reconcile.** The range is
-  `min → start`, `max → end` (day-truncated, time ignored) over the **trustworthy** `capturedAt` of the Memory's
-  media — the always-listed capture-time tier from [uc.memory.gallery](uc.memory.gallery.md) (cr-0064/0066). The
-  reconcile recomputes from the **complete** media list and re-seals `wrappedMeta` **only if the range changed**,
-  at three settle points: (a) **when an upload batch finishes** (once, not per file — so both files of a batch
-  are included), (b) **when the Memory is opened** (compare the stored range to the actual and correct — the
-  **self-heal**), and (c) after a media delete. (Aggregating a Memory *plus its chapters'* media is a later
-  slice.)
+- **`auto` is materialized by a full-list reconcile** — `min → from`, `max → to` (day-truncated) over the
+  Memory's trustworthy `capturedAt` (the always-listed capture-time tier, [uc.memory.gallery](uc.memory.gallery.md)),
+  re-sealed **only if the range changed**, at three settle points: an upload batch finishing, the Memory opening
+  (the **self-heal**), and a media delete. (Aggregating a Memory *plus its chapters'* media is a later slice.)
 
 ## Main flow
 
@@ -59,17 +44,6 @@ date?: { mode: 'auto' | 'single' | 'range' | 'ongoing',
    (and, next browse, the card) re-render. Choosing `auto` re-materializes the range from the current media.
 4. **When media is added or removed** from an `auto` Memory, the client recomputes min/max over its media and
    re-seals `wrappedMeta` so the card stays correct (self-healed on the next open as a safety net).
-
-## Scope — sliced
-
-- **Slice 1 — date (cr-0067, done):** the `wrappedMeta` plumbing (contract field on create/update/summary,
-  migration, backend threading, web seal/unseal under `K_mem`); **the 4-mode date editor** in the Memory detail
-  header; **`auto` materialized** from the Memory's own media on add/remove/open; and the **browse card** showing
-  the range + the card grid **sorted by start date**. i18n EN+DE.
-- **Out (own CRs / later):**
-  - **Aggregated `auto` date/timeline** — a Memory *plus its chapters'* media in one chronological range/gallery.
-  - **Native (apple/android)** date UI — web first ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)); the data layer carries `wrappedMeta` after regen.
-  - **Place** — the node's `location` in the same blob is its own use-case ([uc.memory.place](uc.memory.place.md)).
 
 ## Alternate / exception flows
 

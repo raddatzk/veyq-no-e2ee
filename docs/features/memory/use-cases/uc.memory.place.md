@@ -14,68 +14,11 @@
   medoid position + a typed or reverse-geocoded name), move/rename it, and see it as a pin on the tenant map. The
   server stored only the **opaque `wrappedMeta` blob** + the unchanged node shape.
 
-## The sealed place — the node's `location`
-
-Place reuses the **same** node-level `wrappedMeta` blob the date introduced — the **envelope** (sealing under
-`K_mem`, versioning, `updateNode` / `listNodes` threading, and *why it is materialized on the node so the map
-reads it without loading media*) is the enabler
-[en.memory.node-meta](../enablers/en.memory.node-meta.md); adding `location` needs **no contract change**. This
-use-case defines the `location` sub-object and its behavior:
-
-```
-location?: {                        // ONE named place; only ever materialized WITH a name
-  name:         string,             // the label — mandatory (there is no empty-name / unnamed-pin state)
-  nameSource:   'geocoded' | 'manual',   // manual = frozen; geocoded = may refresh when the anchor moves
-  derived?:     { lat, lng },        // map position = the MEDOID of the media GPS (never the arithmetic mean)
-  derivedMode?: 'fixed' | 'auto',    // user's choice at set-time: snapshot vs. re-medoid as media are added
-  nameAnchor?:  { lat, lng, zoom } } // coord + zoom a geocoded name was resolved at (Atlantik→Kanaren→Teneriffa)
-```
-
-A Memory carries **one location**: a map position plus a name. The two are **independent fields with independent
-provenance**, and setup is **deliberate** — the opposite of the date's silent `auto`.
-
-- **Deliberate setup, then optional auto-fill.** A location never *appears from nothing*: the user makes a
-  deliberate choice to have one, and a **name is mandatory** (no empty-name / unnamed-pin state — no name ⇒ no
-  location). But the *filling* can be deferred: setup can happen **on the Memory open** (from media already
-  present) **or already at Memory creation** — same as the date is offered up front. Set up at creation there are
-  no media yet, so you give a **fallback name** and `derivedMode` **must be `auto`** (nothing to snapshot);
-  `derived` (and, under opt-in, the geocoded name) then fill from the **first geotagged media**. The deliberate
-  act is the *setup + the opt-in*; the fill is what follows.
-- **The fallback name is a placeholder under `geocoded`, not a frozen `manual` name.** With `nameSource:
-  'geocoded'` the typed fallback is the display value **until** the reverse lookup resolves a real name and
-  replaces it; if no geotagged media ever arrive (or geocoding stays off), the fallback simply persists — so a
-  name exists from creation and it degrades **blind**. A `manual` fallback, by contrast, is the final name,
-  frozen, never geocoded.
-- **Position = the MEDOID of the media GPS**, not the arithmetic mean. The medoid is the *actual* photo location
-  nearest the centre of the set — so the marker (a) **never lands in the sea** (the mean of scattered points can),
-  and (b) is **outlier-robust + stable** (a single stray photo, or a few new ones, barely move it). `derivedMode`
-  is the user's choice at set-time: `fixed` (a snapshot) or `auto` (re-medoid as media are added — and it stays
-  put *because* it's a medoid).
-- **Name and coordinate are independent.** `name` is either **typed by hand** (`nameSource: 'manual'`, e.g. "at
-  grandma's") **or reverse-geocoded** from `nameAnchor` (`'geocoded'`). `nameSource` decides whether it may
-  auto-refresh when the anchor moves; a manual name is frozen and always wins.
-- **`nameAnchor` = coordinate + zoom.** The **zoom picks the name's granularity** — the same coordinate resolves
-  to `Atlantischer Ozean` (zoomed out) → `Kanaren` (region) → `Teneriffa` (island). This is the standard
-  reverse-geocoding model (Nominatim's `zoom`). On the map you frame an extent; its centre + zoom is the anchor.
-- **Reverse-only geocoding, opt-in, blind to *veyq*.** The coordinate always comes first (photos or a set marker);
-  the name follows via a **reverse** lookup. veyq never does forward autocomplete. The lookup is **opt-in**, goes
-  **client-direct to the provider** (never through the veyq backend — that is what keeps the *veyq operator*
-  blind), carries **no veyq identity** (a bare coordinate), and is behind a **provider-neutral seam**
-  (`reverse(lat, lng, zoom, lang) → name`; reference **Nominatim**, operator-configurable, off-until-configured —
-  see [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)).
-- **When the request fires — opt-in is standing consent.** With the lookup enabled it runs either on an
-  **explicit action** (you frame an extent on the map → name at your chosen zoom) **or automatically when the
-  first geotagged media arrives** for a `geocoded` `auto` location (forming `nameAnchor` at a **default zoom** —
-  refine it later on the map). It **never** fires without the user's opt-in; enabling auto-geocode *is* the
-  consent to those automatic reverse lookups. A member who hasn't opted in makes **no request at all**.
-- **On the map ⟺ a coordinate; a location ⟺ a name.** These are two different conditions: `name + derived` ⇒ a
-  labelled pin; `name` only (no photo GPS) ⇒ shown in the detail as text, **not** on the map; GPS without a name
-  ⇒ doesn't exist (you name it when setting).
-- **The tenant-wide map reuses `listNodes` — there is no "locations API".** A locations endpoint would hand the
-  operator the coordinates. Instead the map reads the **same opaque `wrappedMeta`** `listNodes` already returns,
-  unseals each `location` under its `K_mem`, and plots client-side. No server-side geo query (the blind server
-  can't filter by a coordinate it never sees); the client fetches all and plots what it can open. (Map tiles are
-  their own opt-in/self-host concern — the tile server sees the viewport — handled by the map slice.)
+A Memory carries **one location** — a map position (from its own photo GPS) plus a **name** (typed or
+reverse-geocoded). Name and coordinate are **independent**, and setup is **deliberate** (never silent). The
+sealed **shape** + how it is materialized live in the enabler
+[en.memory.node-meta](../enablers/en.memory.node-meta.md); the reverse-only, veyq-blind **geocoding** decision
+is [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md). This use-case is the **user flow**.
 
 ## Main flow
 
@@ -107,29 +50,6 @@ keep it translated across locale switches (the server can't, and it would mean a
 `nameAnchor` is kept, an opted-in viewer can re-resolve the name in **their** language on demand. Nominatim
 returns names from OSM `name:<lang>` tags via `accept-language` with **graceful fallback to the local name** (no
 hard error on an unsupported language) — so de+en are well covered and further locales degrade, never break.
-
-## Scope — sliced
-
-- **Slice 1 — set location (first place CR):** the `location` model (`derived` medoid / `derivedMode` /
-  `nameAnchor` / `name` / `nameSource`) in the **same** opaque `wrappedMeta` blob — **no contract change** (the
-  blob is client-versioned); the **"set location"** action (medoid from the media's existing GPS + a mandatory
-  name, typed) in the detail header, plus **pre-arm at creation**. Blind, no external call, immediately visible.
-- **Slice 2 — the tenant map:** a toggle in the tenant root plotting all Memories from their sealed `location`
-  (via `listNodes`, no media load); pin → open; plus a **tile-provider seam** (opt-in/self-host — the tile server
-  sees the viewport).
-- **Slice 3 — reverse-geocoding:** the opt-in `reverse(lat,lng,zoom,lang) → name` behind the provider-neutral
-  seam (reference **Nominatim**, operator-configurable, off-until-configured); the map's frame-an-extent → name
-  UX; the standing-consent auto-geocode on the first geotagged media; the provider-neutrality **ADR**
-  ([ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)) lands with it. Commercial geocoders
-  (Google/Mapbox/HERE) rejected (lock-in + leak).
-- **Out (own CRs / later):**
-  - **Always-listed geo-tier** — an optimization moving media GPS out of the lazy `wrappedExif` into an
-    always-listed tier (a cr-0066-style move), so "set location" and a per-photo map don't lazy-load. Deferred:
-    the deliberate "set location" reads GPS on demand, so it's an optimization, **not** a prerequisite.
-  - **On-device coarse names** — a bundled place dataset resolving `lat/lng → country/region/city` **blind**
-    (no request), as a leak-free alternative to the external reverse-lookup for coarse labels; multilingual cost
-    (per-locale data), so deferred behind the provider seam.
-  - **Native (apple/android)** place/map UI — web first ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)); the data layer carries `wrappedMeta` after regen. (Note: the OS geocoders — `CLGeocoder`, Android `Geocoder` — call home, so native "blind" naming means our bundled dataset, not the platform API.)
 
 ## Alternate / exception flows
 

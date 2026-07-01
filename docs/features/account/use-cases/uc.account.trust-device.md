@@ -17,29 +17,20 @@
 
 ## Many devices, one Master Key
 
-Device trust is **per device**: each trusted device enrols **its own** DEVICE wrap (its own non-extractable
-key, its own random salt) — trusting a phone *and* a laptop yields **two** DEVICE wraps on the same Master
-Key, not a single shared one. (So "one wrap per method" from
-[ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) §1 is the *floor* methods' rule;
-DEVICE/PASSKEY are inherently per-device and may appear more than once.) The server stores each as an
-independent ciphertext row; a device finds **its own** wrap in the fetched set by the **salt** it kept at
-enrolment (`kdfParams`), so the wrong device's wrap is never even attempted (one Argon2id, not one per row).
+Device trust is **per device** — trusting a phone *and* a laptop yields **two** independent DEVICE wraps on
+the same Master Key, not a shared one; untrusting a device deletes only its wrap. (The wrap layout + the
+per-device KEK derivation live in
+[account-key-model → Unlock methods & KEK derivation](../enablers/en.account.key-model.md).)
 
-## Why this preserves 2SKD and operator-blindness
+## Why this is safe (still 2-factor, operator-blind)
 
-The PASSWORD floor is `KEK = Argon2id(password + Secret Key)` — two **user** secrets. The DEVICE wrap keeps
-two factors but swaps the *cold* Secret Key for a *device-bound* one that never leaves the device:
-
-> **`KEK = Argon2id(password + HMAC(deviceKey, "veyq/v1/device-bind"), salt)`**, then
-> **DEVICE wrap = `symWrap(KEK, masterKey, "master-key")`** — structurally identical to the PASSWORD wrap,
-> only the second factor differs.
-
-`deviceKey` is a **non-extractable HMAC `CryptoKey`** (`crypto.subtle.generateKey({extractable: false})`)
-stored in IndexedDB: its bytes **never exist in JS**, so it can be *used* (to compute the HMAC) but not
-*exfiltrated* — a stolen DB or an XSS payload cannot carry it off-device for an offline attack. The password
-stays a real factor (a stolen device alone cannot unlock), so this is **not** "raw key at rest." Storing the
-Secret Key or the raw Master Key in `localStorage`/`sessionStorage` is the **rejected** anti-pattern
-([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)); we do neither.
+The DEVICE wrap keeps **two factors** — it swaps the *cold* Secret Key for a *device-bound* key, but the
+**password stays a real factor**, so a stolen device alone cannot unlock (**not** "raw key at rest"). The
+device key is a **non-extractable** HMAC key: its bytes never exist in JS, so a stolen DB or an XSS payload
+can *use* it but not carry it off for an offline attack. The KEK derivation
+(`Argon2id(password + device-bind, …)`) is
+[en.account.key-model](../enablers/en.account.key-model.md); storing the Secret Key or the raw Master Key
+at rest is the **rejected** anti-pattern ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)).
 
 ## Main flow — enrol ("trust this device")
 
@@ -53,9 +44,9 @@ which is **known-correct** (it just opened the floor wrap) and not yet cleared.
    password + Secret Key). On success, before the password is cleared, enrolment runs:
 2. The client generates a **non-extractable** HMAC `deviceKey` and stores it in **IndexedDB** (this device
    only; it never syncs).
-3. The client computes the device factor `df = HMAC(deviceKey, "veyq/v1/device-bind")`, picks a fresh
-   `salt`, and derives `KEK = Argon2id(password + df, salt)`.
-4. The client wraps the **in-memory** Master Key: `DEVICE wrap = symWrap(KEK, masterKey, "master-key")`.
+3. The client derives the device KEK from the **password + the device key** (a fresh salt; the exact
+   derivation is [en.account.key-model](../enablers/en.account.key-model.md)).
+4. The client wraps the **in-memory** Master Key under that KEK — the **DEVICE wrap**.
 5. The client **adds** the DEVICE wrap (+ its `kdfParams` = Argon2id params ‖ salt) to the server, which
    appends a new wrap row and returns its **id**. The client stores `{deviceKey, salt, wrapId}` in
    IndexedDB and discards the KEK.
@@ -187,7 +178,7 @@ Key.
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many wraps),
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (one Master Key / many wraps),
   [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind)
 - Decisions: [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) (DEVICE wrap = device
   key + password; non-extractable backing; re-lock; method precedence), [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md)

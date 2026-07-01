@@ -2,8 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-06-28
-- Amended: 2026-06-30 (cr-0060) — resolves the deferred chapter-key question: **recursive `K_mem`** (a chapter
-  carries its own random `K_mem`, wrapped under the parent Memory's `K_mem`). See the Addendum.
 
 ## Context
 
@@ -31,7 +29,7 @@ hierarchy + re-wrap-on-move complexity the product doesn't need.)
 2. **`K_mem` — per-Memory content key (one per Memory, a fresh random 32-byte key).** Wrapped under `K_SC`
    for members. Encrypts that Memory's **content** — chapter bodies, journal, sensitive metadata
    (capture time, location) — and **wraps that Memory's `K_blob`s**. A Memory is the **unit of sharing**
-   (recursively, so is a chapter — see the cr-0060 Addendum).
+   (recursively, so is a chapter — see *Recursive `K_mem`* below).
 3. **`K_blob` — per-blob key (one per media blob, random).** Wrapped under its Memory's `K_mem`; encrypts the
    media blob's `chunk_frame`s. Lets a Memory's media be keyed independently (and dedup tokens stay per-scope).
 
@@ -75,19 +73,17 @@ holds `K_SC`, `K_mem`, `K_blob`, or any name.
 - **Cost:** one wrap (`K_mem`-under-`K_SC`) per Memory + one per `K_blob`; a share adds one wrap per share.
   Negligible vs. content size.
 - **Deferred to the implementation CR / vectors:** the exact wire formats (already partly pinned —
-  `slug_token`/`chunk_frame`/`dedup_token`/`journal_open` in `contracts/crypto/vectors/v1.json`), whether a
-  shared Memory's *sub*tree (its chapters) shares the one `K_mem` — **resolved by cr-0060: a chapter carries
-  its OWN recursive `K_mem`** (see Addendum), not the parent's — and the share-record shape. Group/recipient
-  key-directory trust is the active-operator gap already in the Security Model.
+  `slug_token`/`chunk_frame`/`dedup_token`/`journal_open` in `contracts/crypto/vectors/v1.json`) and the
+  share-record shape. (A chapter carries its **own recursive `K_mem`**, not the parent's — see *Recursive
+  `K_mem`* below.) Group/recipient key-directory trust is the active-operator gap already in the Security Model.
 - **Media dedup — decided in [ADR 0013](0013-blob-storage-presigned-direct-to-store.md): declined.** `K_blob`
   stays **random** (so this ADR's wording holds) and the `dedup_token` vector stays unused: any storage-saving
   dedup would leak the scope-internal blob-equality structure to the blind operator. Scope-wide convergent
   dedup remains a possible *future* slice, not a default.
 
-## Addendum (cr-0060) — recursive `K_mem`: a chapter carries its own key
+## Recursive `K_mem` — a chapter carries its own key
 
-The Decision left open (above) whether a chapter shares its Memory's `K_mem`. **cr-0060 resolves it: it does
-not.** A **chapter is itself a Memory**, so it carries the **same kind of key, applied recursively** — there is
+A **chapter is itself a Memory**, so it carries the **same kind of key, applied recursively** — there is
 no separate `K_chapter` type:
 
 - **Every content-bearing node (MEMORY *and* CHAPTER) has its own random `K_mem`,** wrapped under the
@@ -104,16 +100,16 @@ no separate `K_chapter` type:
 - **Moves are a single re-wrap, never a data re-encrypt:** moving media chapter↔Memory re-wraps only its
   `K_blob`; moving a chapter between Memories re-wraps only that chapter's `K_mem` (its subtree is untouched).
 
-**Why now (vs. the tentative "shares `K_mem`"):** separate **per-chapter sharing** is a product goal, and for
-E2EE data the alternative — bolting it on later — would force a client-side **re-encryption migration** of
-every chapter's media (only the client can re-key). Paying one extra wrap per chapter now avoids that. The
-operator stays blind: it holds one more opaque wrap and nothing else.
+**Rejected — a chapter shares its Memory's `K_mem`:** separate **per-chapter sharing** is a product goal, and
+for E2EE data bolting it on later would force a client-side **re-encryption migration** of every chapter's
+media (only the client can re-key). Paying one extra wrap per chapter avoids that. The operator stays blind: it
+holds one more opaque wrap and nothing else.
 
 ## Related
 
 - [Security Model](../crosscutting/security-model.md) (the key-hierarchy diagram + sharing/T&S),
   [Scopes & Tenancy](../crosscutting/scopes-and-tenancy.md) (scope keys, grants, navigation contract),
-  [Account & Key Model](../crosscutting/account-key-model.md).
+  [Account & Key Model](../features/account/enablers/en.account.key-model.md).
 - [ADR 0002](0002-personal-scope-per-tenant.md), [ADR 0005](0005-unlock-methods-and-device-trust.md)
   (one-key-many-wraps), [ADR 0009](0009-native-crypto-per-platform-vectors.md) (vectors are the byte
   contract).

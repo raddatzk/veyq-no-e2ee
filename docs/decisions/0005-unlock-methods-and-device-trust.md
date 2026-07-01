@@ -19,7 +19,7 @@ session end**.
 
 1. **One Master Key, many wraps.** Exactly one Master Key per account; **one `MasterKeyWrap` per unlock
    method** (`PASSWORD`, `DEVICE`, `PASSKEY`, `RECOVERY`). Adding/removing a method adds/removes **one
-   wrap**; content is never re-encrypted. (Binding basis: [account-key-model](../crosscutting/account-key-model.md).)
+   wrap**; content is never re-encrypted. (Binding basis: [en.account.key-model](../features/account/enablers/en.account.key-model.md).)
 
 2. **The wrap blob is server-side (portable); the KEK source is what binds.** Every wrap (ciphertext)
    lives on the blind server and is fetchable by any authenticated client. What differs is whether a
@@ -76,12 +76,11 @@ session end**.
   key. **Rejected — periodic trusted-device expiry:** dropped per product choice. **Rejected —
   server-side method selection:** kept client-side for blindness + parity.
 
-## Decision — addendum 2026-06-27: device unlock levels (the per-device slider)
+## Decision — device unlock levels (the per-device slider)
 
-§7 settled *automatic precedence among openable wraps*. This addendum settles the **product shape** the
-clients expose for it: a **per-device "unlock level"** the user picks themselves, after the first floor
-unlock, from an **ordered, mutually-exclusive** set — the *security of my own device is the user's call*,
-the *server is not*.
+§7 settled *automatic precedence among openable wraps*; the clients expose that as a **per-device "unlock
+level"** the user picks themselves, after the first floor unlock, from an **ordered, mutually-exclusive**
+set — the *security of my own device is the user's call*, the *server is not*.
 
 8. **Four ordered levels; the user chooses one per device.**
    - **L0 — Secret Key each time** (no convenience wrap; the bare floor). The default state of a fresh
@@ -128,7 +127,7 @@ the *server is not*.
     only as a clearly-labelled choice (and presumes a device passcode/biometric is set at the OS level).
     Considered and **declined** as any kind of default.
 
-## Decision — addendum 2026-06-30: web product shape (L0 not a routine choice; "remember me")
+## Decision — web product shape (L0 not a routine choice; "remember me")
 
 14. **L0 is not a routine, selectable level; it stays the floor (bootstrap + emergency fallback).** Asking
     for the Secret Key on *every* unlock is the wrong friction for a memory-sharing app (not a secrets
@@ -152,12 +151,11 @@ the *server is not*.
     the cross-device bootstrap already noted below in *Related / future*. Neither is part of the
     session-persistence increment (the cookie + remember-me / L3 on the existing password path).
 
-## Decision — addendum 2026-06-30 #2: one combined login/unlock screen, auto-enrol; web's single "remember me" toggle
+## Decision — one combined login/unlock screen, auto-enrol; web's single "remember me" toggle
 
-This concretizes §15 (after cr-0052 shipped the cookie + a local L3 cache and surfaced two overlapping
-checkboxes — login "remember me" + unlock "trust this device" — which are two views of the *same* per-device
-decision, §9). §17-18 (the combined screen + auto-enrol) are **cross-surface**; §19-20 and the single-toggle
-presentation are the **web** shape.
+This concretizes §15: the login "remember me" and unlock "trust this device" choices are two views of the
+*same* per-device decision (§9). §17-18 (the combined screen + auto-enrol) are **cross-surface**; §19-20 and
+the single-toggle presentation are the **web** shape.
 
 17. **Login + unlock collapse into one screen wherever a device wrap exists — on *every* surface, not just
     web.** The same password both **authenticates** (the Model B auth keypair, ADR 0003) **and** derives the
@@ -197,16 +195,15 @@ presentation are the **web** shape.
     wraps (§9), same combined screen; only the option set + its presentation (a toggle vs a chooser) differ.
     Whether native also collapses to a single toggle is **to be worked out**.
 
-## Decision — addendum 2026-06-30 #3: web "off" is session-scoped (survives a reload, dies on browser close)
+## Decision — web "off" is session-scoped (survives a reload, dies on browser close)
 
-This refines §15/§18's "**Off**" for web (cr-0055). §15 originally said off = "re-authenticate each launch (no
-persisted session/vault)"; in practice that meant the refresh token lived only in memory and was lost on the
-**first page reload** — harsher than the conventional web norm, where a no-"remember me" session survives reloads
-and only ends when the browser closes.
+This refines §15/§18's "**Off**" for web: it persists for the **browser session** — a no-"remember me" session
+survives page reloads and ends only when the browser closes, matching the conventional web norm (rather than an
+in-memory-only session that dies on the first reload).
 
 22. **Web "off" = the conventional session tier; "on" = persistent.** Off persists for the **browser session**,
     on persists across a **browser restart**:
-    - **Off** → a **session refresh cookie** (no `Max-Age`, [ADR 0004](0004-session-tokens.md) addendum) **+** the
+    - **Off** → a **session refresh cookie** (no `Max-Age`, [ADR 0004](0004-session-tokens.md)) **+** the
       unlocked Master Key cached in **`sessionStorage`**. A reload re-opens the vault with **no prompt**; closing
       the browser drops both. Off **also** keeps its password **DEVICE** wrap (§18), so the *next launch after a
       close* is **email + password only** — never the Secret Key.
@@ -217,8 +214,8 @@ and only ends when the browser closes.
 23. **The session-scoped relaxation is conscious and bounded.** Within an open browser session, off re-opens the
     vault without the password — the device-held key opens it (the convenience this tier exists for). The Master
     Key is sealed under a **non-extractable** AES-GCM key in IndexedDB and only the **ciphertext** sits in
-    `sessionStorage` (cr-0057 — corrected from the initial cr-0055 design, which parked the raw Master Key). So,
-    like every other device tier, the key's bytes never enter JS: an XSS payload can decrypt while it runs but
+    `sessionStorage`. So, like every other device tier, the key's bytes never enter JS: an XSS payload can
+    decrypt while it runs but
     cannot exfiltrate the key, and **nothing plaintext is ever written to `sessionStorage`** — which matters
     because the browser's session-restore may persist `sessionStorage` to disk. Browser close clears
     `sessionStorage` → the ciphertext is gone and the orphaned (un-exfiltratable, now-useless) key is dropped on
@@ -234,6 +231,6 @@ and only ends when the browser closes.
   (no secrets), the existing device encrypts the Master Key / a fresh wrap to it. Its own use-case + ADR;
   must carry the **E2E unlock-transfer**, **QR-login phishing** and **non-enumerability** (ADR 0003)
   constraints.
-- **Device unlock levels** (addendum above) — the user-facing flow of choosing/switching a level is
+- **Device unlock levels** (§8–13 above) — the user-facing flow of choosing/switching a level is
   [uc.account.set-device-security](../features/account/use-cases/uc.account.set-device-security.md); the
   per-level mechanics are the four level use-cases it links.

@@ -22,7 +22,7 @@ wraps each open the *same* Master Key via their own wrap and are **separate, pla
 
 - Use-case: [uc.account.unlock](../docs/features/account/use-cases/uc.account.unlock.md) (PASSWORD floor
   path; auth ≠ unlock; ephemeral by default — no DEVICE wrap / persistence here).
-- Concepts: [Account & Key Model](../docs/crosscutting/account-key-model.md) (one Master Key / many wraps,
+- Concepts: [Account & Key Model](../docs/features/account/enablers/en.account.key-model.md) (one Master Key / many wraps,
   the Unlock KEK, 2SKD), [Security Model](../docs/crosscutting/security-model.md) (Secret Key never reaches
   the server, operator-blind).
 - Decisions: [ADR 0003](../docs/decisions/0003-operator-blind-password-auth.md) (the auth-vs-unlock split),

@@ -11,24 +11,10 @@
   chapter and upload media into it. Each chapter holds its **own random `K_mem`**, wrapped under the parent
   Memory's `K_mem`; the server stored only ciphertext + the opaque wrap + the node shape.
 
-## The key model — recursive `K_mem` (extends [ADR 0012](../../../decisions/0012-content-key-hierarchy.md))
-
-A **chapter is itself a Memory**, so it carries the **same kind of key**, applied recursively — there is no
-separate `K_chapter` concept:
-
-- **Every content-bearing node (MEMORY *and* CHAPTER) has its own random `K_mem`**, wrapped under the
-  **content key of its parent**: a top-level Memory's `K_mem` is wrapped under **`K_SC`**; a chapter's `K_mem`
-  is wrapped under its **parent Memory's `K_mem`** (same `content-key` wrap context). **Folders carry no key.**
-- **`K_blob` is always wrapped under the `K_mem` of the media's *direct* parent node** — media on a chapter is
-  sealed under the chapter's `K_mem`, media on the Memory under the Memory's `K_mem`.
-- **Every content node is therefore a sharing unit.** Sharing one chapter later = one extra wrap of *that*
-  chapter's `K_mem` to the recipient — it reveals neither the parent Memory's `K_mem` nor `K_SC`. Sharing the
-  whole Memory hands over its `K_mem`, which transitively unwraps the chapters' keys (they're wrapped under it)
-  — so a Memory share includes its chapters, a chapter share does not leak upward. **(Sharing itself is not
-  built here — only the key layout that makes it possible without a re-encryption migration, [#19].)**
-- **Moves are a single re-wrap, never a data re-encrypt:** moving media chapter↔Memory re-wraps only its
-  **`K_blob`** (the blob bytes are untouched); moving a whole chapter between Memories re-wraps only the
-  chapter's **`K_mem`** (its subtree stays as-is).
+A chapter is itself a content unit, so it carries its **own** `K_mem` (wrapped under the parent Memory's
+`K_mem`) — **recursive `K_mem`**, which is what makes per-chapter sharing possible later without a re-encryption
+migration. The key layout lives in [en.memory.tree](../enablers/en.memory.tree.md); the decision + rationale
+in [ADR 0012](../../../decisions/0012-content-key-hierarchy.md).
 
 ## Main flow
 
@@ -39,19 +25,6 @@ separate `K_chapter` concept:
 3. **Open a chapter** → it behaves like a Memory: its own gallery of media, and it may nest further chapters.
 4. **Upload into a chapter:** media is sealed under the **chapter's `K_mem`** ([en.memory.media](../enablers/en.memory.media.md)) and attached to the chapter node.
 5. **Rename / delete** a chapter like any node (delete removes its subtree).
-
-## Scope of this slice (cr-0060)
-
-- **In:** create / open / rename / delete a **chapter** inside a Memory (web); a chapter **births + carries its
-  own `K_mem`** (recursive key model above); **upload media into a chapter** (sealed under the chapter's
-  `K_mem`); the chapter appears in the Memory view and opens to its own gallery.
-- **Out (their own use-cases / later slices):**
-  - **Aggregated chronological gallery** — showing a Memory *plus all its chapters'* media in one timeline
-    (`uc.memory.gallery`, a later CR); this slice opens a chapter as its **own** gallery only.
-  - **Rich media metadata** (capture time + EXIF, the lightbox detail) — a later CR.
-  - **Sharing** a chapter (or Memory) to a recipient / public link — **[#19]**; only the key layout is prepared.
-  - **map / tracks / playlists / journal / buckets** inside a chapter.
-  - **native (apple/android)** chapter UI — web first ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
 
 ## Alternate / exception flows
 
@@ -95,6 +68,6 @@ Gerät verschlüsselt alles, der Server sieht nur verschlüsselte Daten.
 - Enablers: [en.memory.tree](../enablers/en.memory.tree.md) (`K_mem`, node CRUD),
   [en.memory.media](../enablers/en.memory.media.md) (`K_blob` under the parent's `K_mem`)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (content-key hierarchy — this UC
-  resolves its deferred chapter-key question: **recursive `K_mem`**),
+  applies its **recursive `K_mem`** decision for chapters),
   [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
 - Future: chapter **sharing** (#19) — the key layout here is the groundwork

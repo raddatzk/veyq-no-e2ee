@@ -6,7 +6,7 @@ device. **Operator-blind throughout** — the server stores only the opaque scop
 the **ciphertext grant** (the scope key sealed to a member's identity); it never holds a scope key.
 
 - **Cross-cutting:** [Scopes & Tenancy](../../crosscutting/scopes-and-tenancy.md) (scope kinds, grants =
-  membership, host-based tenant resolution), [Account & Key Model](../../crosscutting/account-key-model.md)
+  membership, host-based tenant resolution), [Account & Key Model](../account/enablers/en.account.key-model.md)
   (identity key opens grants), [Security Model](../../crosscutting/security-model.md) (operator-blind).
 - **Decisions:** [ADR 0002](../../decisions/0002-personal-scope-per-tenant.md) (personal scope is
   tenant-bound, one per member per tenant), [ADR 0007](../../decisions/0007-membership-role-grant-relation.md)

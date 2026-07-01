@@ -105,7 +105,7 @@ note right of C : server only ever saw ciphertext name + the scope row
 
 - Feature: [Spaces (scopes)](../_index.md)
 - Concepts: [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md),
-  [Account & Key Model](../../../crosscutting/account-key-model.md),
+  [Account & Key Model](../../account/enablers/en.account.key-model.md),
   [Security Model](../../../crosscutting/security-model.md)
 - Decisions: [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (group governance),
   [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (scopes are tenant-bound),

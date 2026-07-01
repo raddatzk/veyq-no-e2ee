@@ -23,9 +23,19 @@ A **node** has an opaque id, a `parentId` (or the scope root), a `kind`, an **en
 **`orderIndex`**, and a **`slugToken`**:
 
 - **FOLDER** — organization only; **no content key**.
-- **MEMORY** — the content unit; **owns a random `K_mem`** (wrapped under `K_SC`). Its chapters/media/journal
-  (later slices) live under `K_mem`.
-- **CHAPTER** — a section **inside a Memory**; shares its Memory's `K_mem`.
+- **MEMORY** — the content unit; **owns a random `K_mem`** (wrapped under `K_SC`). Its media/journal live under
+  `K_mem`.
+- **CHAPTER** — a section **inside a Memory**, itself a content unit: it **owns its own random `K_mem`**, wrapped
+  under its **parent Memory's `K_mem`** (recursive `K_mem`, one level deeper — *not* the parent's key, *not* a
+  separate `K_chapter` type).
+
+**Recursive `K_mem` (chapters — [ADR 0012](../../../decisions/0012-content-key-hierarchy.md)).** Every
+content-bearing node (MEMORY *and* CHAPTER) carries its own random `K_mem`, wrapped under the **content key of
+its parent** — a top-level Memory under `K_SC`, a chapter under its parent Memory's `K_mem` (same `content-key`
+wrap context). A media's **`K_blob` is wrapped under the `K_mem` of its *direct* parent node** (chapter media
+under the chapter's key). Consequence of this layout: every content node is a **sharing unit**, and a move is a
+single **re-wrap, never a data re-encrypt** — the *decision + rationale* (why recursive, not "shares the
+parent's key") is ADR 0012.
 
 Names, slugs and dedup key off **`K_SC`** (navigation), so one scope key decrypts the whole tree's structure;
 a Memory's *content* needs its `K_mem` ([ADR 0012](../../../decisions/0012-content-key-hierarchy.md)).
@@ -82,9 +92,10 @@ note right of S : stores ciphertext + opaque tokens only — no name, no K_mem
 
 - **Operator-blind.** The server stores ciphertext names + opaque `parentId`/`kind`/`orderIndex`/`slugToken`
   + the `K_mem` wrap; it never sees a name or a content key. It learns only the **shape** of the tree.
-- **`K_mem` is the share grain** ([ADR 0012](../../../decisions/0012-content-key-hierarchy.md)): a Memory is
-  born with a random `K_mem` so it can later be shared (an extra wrap of `K_mem`) without exposing `K_SC` or
-  any other Memory. Folders, being keyless, are never shared — you share a Memory.
+- **`K_mem` is the share grain** ([ADR 0012](../../../decisions/0012-content-key-hierarchy.md)): every content
+  node — a Memory **or a chapter** — is born with a random `K_mem` so it can later be shared (an extra wrap of
+  `K_mem`) without exposing `K_SC`, the parent, or any other node. Folders, being keyless, are never shared —
+  you share a Memory or a chapter.
 - **Blinded permalinks.** The slug token gives human-readable, unique-per-parent permalinks without the
   operator ever seeing or reversing a name (keyed MAC under `K_SC`).
 - **Scope of this slice.** Tree + names + `K_mem` only. **Media (`K_blob` + chunked AEAD), journal, places &
@@ -99,7 +110,7 @@ note right of S : stores ciphertext + opaque tokens only — no name, no K_mem
 - Feature: [Memory](../_index.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy, blinded tokens),
   [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md) (navigation contract; content in a scope),
-  [Account & Key Model](../../../crosscutting/account-key-model.md)
+  [Account & Key Model](../../account/enablers/en.account.key-model.md)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`/`K_mem`/`K_blob`),
   [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned content crypto)
 - Related: [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (the enabler this

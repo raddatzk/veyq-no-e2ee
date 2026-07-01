@@ -61,7 +61,7 @@ This **generalises the Android model to all platforms**. It is the right directi
 ## Consequences
 
 - **One concept doc** describes the mechanism for all surfaces
-  ([passwordless-unlock-mechanism](../crosscutting/passwordless-unlock-mechanism.md)); per-platform docs only
+  ([en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)); per-platform docs only
   map native APIs. This is the externally-reviewable artifact the decision exists to enable.
 - **Apple is refactored to match** ([cr-0024](../../changes/cr-0024-unify-passwordless-unlock-mechanism.md)):
   the `K`-release moves out of the data layer into the app layer (`AppModel`); `resumeSession` /
@@ -90,7 +90,7 @@ This **generalises the Android model to all platforms**. It is the right directi
   the Android split and that this decision now makes uniform.
 - [cr-0023](../../changes/cr-0023-gate-l2-session-token.md) — sealing the persisted token under `K` (the
   property that lets the data layer stay prompt-free and ciphertext-only).
-- Concept: [passwordless-unlock-mechanism](../crosscutting/passwordless-unlock-mechanism.md).
+- Concept: [en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md).
 - Use-cases: [biometric-unlock (L2)](../features/account/use-cases/uc.account.biometric-unlock.md),
   [auto-unlock (L3)](../features/account/use-cases/uc.account.auto-unlock.md),
   [set-device-security (chooser)](../features/account/use-cases/uc.account.set-device-security.md).

@@ -113,7 +113,7 @@ Gerät so einrichten, dass es sich nur mit deinem Passwort (oder Biometrie) ents
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (one Master Key / many
   wraps, the Unlock KEK, 2SKD), [Security Model](../../../crosscutting/security-model.md) (Secret Key /
   2SKD, operator-blind)
 - Decisions: [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (the auth-vs-unlock

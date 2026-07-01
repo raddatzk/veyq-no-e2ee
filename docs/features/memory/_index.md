@@ -8,7 +8,7 @@ tokens; it never sees a name or a content key.
 
 - **Cross-cutting:** [Security Model](../../crosscutting/security-model.md) (the key hierarchy + sharing),
   [Scopes & Tenancy](../../crosscutting/scopes-and-tenancy.md) (the navigation contract; content lives in a
-  scope), [Account & Key Model](../../crosscutting/account-key-model.md).
+  scope), [Account & Key Model](../account/enablers/en.account.key-model.md).
 - **Decisions:** [ADR 0012](../../decisions/0012-content-key-hierarchy.md) (per-Memory content key `K_mem`,
   random + many-wrapped — the unit of sharing; `K_SC` for navigation; `K_blob` per blob),
   [ADR 0009](../../decisions/0009-native-crypto-per-platform-vectors.md) (the vector-pinned content crypto).
@@ -37,6 +37,10 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   blobs, **per-blob `K_blob`**, role-tagged on the media record (`original` + `derivatives[{kind, blob}]`), no
   backfill, first-frame video poster, legacy sizes. **Built before the gallery** — where
   [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md)'s deferred thumbnails/previews land)
+- ★ [en.memory.node-meta](enablers/en.memory.node-meta.md) — **partly built** (the sealed, client-versioned
+  `wrappedMeta` blob on a content node — one opaque envelope for a Memory's node-level metadata, sealed under
+  `K_mem`, threaded through `createNode` / partial `updateNode` / `listNodes`, materialized so a card/map reads
+  it without loading media. Envelope + `date` sub-object shipped cr-0067; `location` sub-object planned)
 
 ## Use-cases (planned, on the tree + media enablers)
 
@@ -48,6 +52,10 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - [uc.memory.gallery](use-cases/uc.memory.gallery.md) — **planned** (open a Memory: thumbnail grid + lightbox
   preview + download original + header/favorite; on [en.memory.derivatives](enablers/en.memory.derivatives.md),
   built first)
+- [uc.memory.date](use-cases/uc.memory.date.md) — **done** (cr-0067): a curatable date (auto/single/range/ongoing),
+  sealed on the node's `wrappedMeta`; browse card range + date-sort
+- [uc.memory.place](use-cases/uc.memory.place.md) — **planned**: one named location on the same `wrappedMeta`
+  (medoid position + typed/reverse-geocoded name), a tenant-wide map; reverse-only, veyq-blind geocoding (ADR 0016)
 - Memory journal — markdown sealed under `K_mem`
-- Places & tracks (map / GPX) — sealed location under `K_mem`
+- Tracks (GPX) — sealed under `K_mem` (the sealed *location* is now [uc.memory.place](use-cases/uc.memory.place.md))
 - Share a Memory — wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012

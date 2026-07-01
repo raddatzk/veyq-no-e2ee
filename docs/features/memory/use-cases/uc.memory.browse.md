@@ -30,16 +30,6 @@
    ciphertext (a Memory also births its random `K_mem` wrapped under `K_SC`); *rename* re-seals the name +
    recomputes the slug; *delete* removes the node and its subtree. All via [en.memory.tree](../enablers/en.memory.tree.md).
 
-## Scope of this slice
-
-- **In:** the authenticated **app shell** (sidebar + topbar/breadcrumb + content), **personal-space**
-  tree **browse** (folders + Memories, drill-in, client-side breadcrumb), and **create / rename / delete**
-  for folders + Memories.
-- **Out (later slices):** the **Memory detail view** (gallery, journal, chapters, map/tracks, playlists,
-  participants, shares); **media display** (cards show an icon + name, **no cover thumbnail** — derivatives
-  are deferred, [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)); **multi-space
-  switching** (tenant / group), favorites, and search; settings / profile panels.
-
 ## Alternate / exception flows
 
 - **A1 — no personal scope yet:** first unlock auto-births it before listing (idempotent; a no-op

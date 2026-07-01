@@ -15,7 +15,7 @@ issues a **session**. The session form was deliberately left open by
 [uc.account.login](../features/account/use-cases/uc.account.login.md). Forces on the choice:
 
 - **Operator-blind.** A session gates *a session + server role over ciphertext* — it **never** unlocks
-  content (auth ≠ unlock, see [Account & Key Model](../crosscutting/account-key-model.md)). So a stolen
+  content (auth ≠ unlock, see [Account & Key Model](../features/account/enablers/en.account.key-model.md)). So a stolen
   session yields metadata + the ability to operate over ciphertext, **never plaintext**. The session
   layer must not become a metadata leak either (no cleartext device fingerprints server-side).
 - **Self-hostable, single-instance default.** Stateless horizontal scaling — the one real argument for
@@ -67,16 +67,14 @@ into **named session families**. No JWTs.
 - **Transport.** Same opaque value, two transports: httpOnly + Secure + SameSite cookie (web) /
   `Authorization: Bearer` (native, `http/`).
 
-## Decision — addendum 2026-06-30: the web refresh cookie has two lifetimes (session vs persistent)
+## Decision — web refresh cookie lifetimes (session vs persistent)
 
 The web cookie transport comes in **two lifetimes**, chosen by the client at login via the optional
 `LoginVerifyRequest.sessionScope` (`SESSION` | `PERSISTENT`); native omits it and keeps the body token.
 
-- **`PERSISTENT`** — `Max-Age` = the refresh TTL; survives a browser restart. This is web "remember me" (the
-  cr-0052 cookie).
+- **`PERSISTENT`** — `Max-Age` = the refresh TTL; survives a browser restart. This is web "remember me".
 - **`SESSION`** — **no `Max-Age`** (a *session cookie*): survives page reloads but is dropped when the browser
-  closes. This is the web default ("until I close the browser"), matching the conventional web norm and replacing
-  cr-0052's in-memory-only "off" (which died on the first reload).
+  closes. This is the web default ("until I close the browser"), matching the conventional web norm.
 
 Because a cookie does not report its own `Max-Age` back to the server, the lifetime is encoded in the **cookie
 name** — `veyq_refresh` (persistent) vs `veyq_refresh_session` (session). Refresh re-sets the **same-named**

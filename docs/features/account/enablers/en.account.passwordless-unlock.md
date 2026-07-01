@@ -1,18 +1,26 @@
-# Passwordless unlock mechanism (L2/L3) — one mechanism, native per platform
+# Enabler: Passwordless-unlock orchestration (L2/L3) — one mechanism, native per platform
 
-> The **single reference** for how a passwordless device (L2 biometric / L3 no-login) resumes its session
-> and opens the vault. It is arranged so **every platform implements the same mechanism** with its own
-> native APIs — an external reviewer studies *this one document* and then only checks the per-platform
-> **native-API mapping** below. Engineering sibling of the [Account & Key Model](account-key-model.md);
-> governed by [ADR 0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md) (the layering),
-> [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md) (the levels), and
-> [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) (parity via contracts, not code).
->
-> This is the **target model**. What has actually landed per surface is tracked in the
-> [parity matrix](platform-parity.md) and [cr-0024](../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).
-> Scope note: this is the **native secure-element** path (apple / android, later windows / linux). Web's
-> passwordless path is a different mechanism (WebAuthn passkey + PRF) and web persists **no** session, so the
-> persisted-session flow here is native-only by design (see *Web* below).
+- **ID:** en.account.passwordless-unlock
+- **Type:** **Enabler** — structural foundation, no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
+- **Provides:** the **single reference** for how a passwordless device (L2 biometric / L3 no-login) resumes its
+  session and opens the vault — a **two-layer split** (a prompt-free data layer + the native app-layer gate)
+  that **every platform implements identically** with its own native APIs. An external reviewer studies *this
+  one document*, then checks only the per-platform native-API mapping below.
+- **Serves (use-cases):** [biometric-unlock (L2)](../use-cases/uc.account.biometric-unlock.md),
+  [auto-unlock (L3)](../use-cases/uc.account.auto-unlock.md), [set-device-security](../use-cases/uc.account.set-device-security.md),
+  [trust-device (L1)](../use-cases/uc.account.trust-device.md), [unlock (L0 floor)](../use-cases/uc.account.unlock.md).
+- **Depends on:** [en.account.key-model](en.account.key-model.md) (the Master Key + wraps this opens); governed
+  by [ADR 0011](../../../decisions/0011-uniform-passwordless-unlock-orchestration.md) (the layering),
+  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) (the levels),
+  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (parity via contracts).
+- **Scope note:** the **native secure-element** path (apple/android, later windows/linux). Web's passwordless
+  path is a different mechanism (WebAuthn passkey + PRF) and web persists **no** session — the persisted-session
+  flow here is native-only by design (see *Web* below).
+
+> **No end-user section** (enabler) — its value surfaces through the unlock use-cases it serves. This is the
+> **target model**; what landed per surface is the [parity matrix](../../../crosscutting/platform-parity.md) +
+> [cr-0024](../../../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).
 
 ## The one rule: two layers, and where the prompt lives
 
@@ -44,7 +52,7 @@ knowable without a prompt, and only the *secret* costs a gesture:
 `K` *is* the KEK for the passwordless wrap: `device-key wrap = symWrap(K, masterKey, "master-key")`, stored
 server-side as a `method=DEVICE` wrap (no contract change; the server cannot tell L2 from L3 — both are the
 same ciphertext). The refresh token is **sealed under `K`**: `sealedRefreshToken = symWrap(K, token,
-"session-token")` ([cr-0023](../../changes/cr-0023-gate-l2-session-token.md)) — so the store and the data
+"session-token")` ([cr-0023](../../../../changes/cr-0023-gate-l2-session-token.md)) — so the store and the data
 layer only ever see **ciphertext**, never a usable token at rest.
 
 ## The unified sequences
@@ -107,7 +115,7 @@ isn't held; a plaintext token is **never** written.
 Any failure of the convenience path — no record, dead token, missing/incompatible server wrap, biometric
 cancelled, key invalidated — degrades to the **L0 floor** (password + Secret Key). The client never
 self-wipes on a single server response (a blind operator must not be able to force a wipe by withholding the
-wrap — [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md); the device-security use-cases, E1).
+wrap — [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md); the device-security use-cases, E1).
 
 ## Native-API mapping (the only per-platform part)
 
@@ -119,14 +127,14 @@ wrap — [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md); the d
 | Release gesture | Face ID / Touch ID (OS-driven by the ACL) | `BiometricPrompt` (Activity-bound, async) | — | Windows Hello | `fprintd` |
 | Crypto (`symWrap`/`symUnwrap`) | `VeyqCrypto` | `:crypto` | `v1.ts` | BouncyCastle.NET | Rust crypto crate |
 
-All crypto rows are **vector-pinned** identical ([ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md));
+All crypto rows are **vector-pinned** identical ([ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md));
 only the **store + gesture** rows are genuinely native. Everything *between* releasing `K` and opening the
 vault is the same code path per platform but **the same algorithm everywhere**.
 
 ### Web
 
 Web has **no persisted session** (in-memory tokens; the Master Key is worker-cached and dies on real close —
-[ADR 0005 §6](../decisions/0005-unlock-methods-and-device-trust.md)), so the *persisted-session* mechanism on
+[ADR 0005 §6](../../../decisions/0005-unlock-methods-and-device-trust.md)), so the *persisted-session* mechanism on
 this page is **native-only**. Web's passwordless unlock is the separate **WebAuthn passkey + PRF** method.
 The *rule* still holds trivially: web's data layer is already prompt-free. A future "stay signed in on web"
 (L3-web) would follow the same two-layer rule.
@@ -135,15 +143,15 @@ The *rule* still holds trivially: web's data layer is already prompt-free. A fut
 
 - **Operator-blind.** The server holds only ciphertext wraps + an opaque, **sealed** session token. It never
   sees `K`, the Master Key, the Secret Key, or the password — and cannot distinguish L2 from L3 (same
-  ciphertext; the gate is purely local). This is the [hard invariant](../../CLAUDE.md); the layering is a
+  ciphertext; the gate is purely local). This is the [hard invariant](../../../../CLAUDE.md); the layering is a
   client-internal arrangement only.
 - **Exactly one prompt at launch.** One gesture releases `K`; `K` opens **both** the sealed token and the
   vault. An app-layer property, uniform across platforms.
 - **No password / Secret Key / Master Key at rest.** The wrapping key is a **random**, device-bound `K`, not
   the password — so an extracted key opens **this device's vault only**, never a way to authenticate
-  elsewhere (bounded blast radius; [biometric-unlock](../features/account/use-cases/uc.account.biometric-unlock.md)).
+  elsewhere (bounded blast radius; [biometric-unlock](../use-cases/uc.account.biometric-unlock.md)).
 - **Token sealed under `K`.** The persisted refresh token is useless without the (gated) `K` — closing
-  security finding M2 ([cr-0023](../../changes/cr-0023-gate-l2-session-token.md)).
+  security finding M2 ([cr-0023](../../../../changes/cr-0023-gate-l2-session-token.md)).
 
 ## What is identical vs. native (reviewer's summary)
 
@@ -157,17 +165,17 @@ The *rule* still holds trivially: web's data layer is already prompt-free. A fut
 
 ## Related
 
-- Decisions: [ADR 0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md) (this layering),
-  [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md) (levels),
-  [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) (parity via contracts),
-  [ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned crypto),
-  [ADR 0003](../decisions/0003-operator-blind-password-auth.md) (auth vs. unlock — why passwordless needs a
+- Decisions: [ADR 0011](../../../decisions/0011-uniform-passwordless-unlock-orchestration.md) (this layering),
+  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) (levels),
+  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (parity via contracts),
+  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned crypto),
+  [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (auth vs. unlock — why passwordless needs a
   persisted session).
-- Concepts: [Account & Key Model](account-key-model.md), [Security Model](security-model.md),
-  [Cross-platform parity matrix](platform-parity.md).
-- Use-cases: [biometric-unlock (L2)](../features/account/use-cases/uc.account.biometric-unlock.md),
-  [auto-unlock (L3)](../features/account/use-cases/uc.account.auto-unlock.md),
-  [set-device-security (chooser)](../features/account/use-cases/uc.account.set-device-security.md),
-  [trust-device (L1)](../features/account/use-cases/uc.account.trust-device.md),
-  [unlock (L0 floor)](../features/account/use-cases/uc.account.unlock.md).
-- Work order: [cr-0024](../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).
+- Concepts: [Account & Key Model](en.account.key-model.md), [Security Model](../../../crosscutting/security-model.md),
+  [Cross-platform parity matrix](../../../crosscutting/platform-parity.md).
+- Use-cases: [biometric-unlock (L2)](../use-cases/uc.account.biometric-unlock.md),
+  [auto-unlock (L3)](../use-cases/uc.account.auto-unlock.md),
+  [set-device-security (chooser)](../use-cases/uc.account.set-device-security.md),
+  [trust-device (L1)](../use-cases/uc.account.trust-device.md),
+  [unlock (L0 floor)](../use-cases/uc.account.unlock.md).
+- Work order: [cr-0024](../../../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).

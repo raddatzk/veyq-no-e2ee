@@ -4,6 +4,9 @@ Product capabilities. Each feature is a folder with an overview (`_index.md`), i
 **enablers**. A use-case is the unit of the trust chain *and* the single source for the end-user wiki; an
 enabler is shared foundation that several use-cases build on.
 
+> **What belongs in which kind of doc** (use-case vs enabler vs crosscutting vs ADR vs architecture) is
+> canonical in [`../README.md`](../README.md). This page covers the **format** of use-cases + enablers.
+
 ```
 features/<feature>/
   _index.md                          # feature overview, scope, cross-cutting links

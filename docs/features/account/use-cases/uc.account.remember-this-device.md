@@ -91,10 +91,9 @@ end
   (ADR 0005 §18); a device carries exactly one convenience wrap.
 - **A stolen device alone yields nothing without "remember me".** The password DEVICE wrap is password-gated, so
   device theft without the password opens nothing — which is why even "off" can safely auto-enrol it (§19).
-- **New `MasterKeyWrap.Method` for the password-less wrap.** The existing `DEVICE` method mixes the password;
-  the remember-me wrap is the device key alone (no password, no KDF) → a **distinct method** (name TBD, e.g.
-  `DEVICE_KEY`; ADR 0005 §20). The server stores it as ciphertext like any other wrap and cannot tell it apart
-  beyond a method label + count.
+- **The remember-me wrap is the device key alone** (no password, no KDF) — its own `MasterKeyWrap.Method`
+  (the enum decision is [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) §20). The server
+  stores it as ciphertext like any other wrap and cannot tell it apart beyond a method label + count.
 - **Operator-blind, unchanged.** The server holds only ciphertext wraps + an opaque cookie token; no KEK,
   Master Key, Secret Key, or password is ever server-side (ADR 0005 §12). The relaxation is **purely local**.
 - **Supersedes cr-0052's local cache.** The remember-me vault is the **server-stored** password-less wrap (+
@@ -118,6 +117,8 @@ bleibt nichts zurück.
 ## Related
 
 - Feature: [Account & auth](../_index.md)
+- Enabler: [en.account.key-model](../enablers/en.account.key-model.md) (the Master Key + per-device wraps this
+  convenience wrap builds on)
 - Decisions: [ADR 0005 §17-21](../../../decisions/0005-unlock-methods-and-device-trust.md) (the web flow:
   one screen, one toggle, auto-enrol, the password-less wrap method, no public-device level),
   [ADR 0004](../../../decisions/0004-session-tokens.md) (the refresh-token cookie), [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (Model B auth).

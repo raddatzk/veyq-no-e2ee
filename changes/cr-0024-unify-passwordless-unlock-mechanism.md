@@ -22,7 +22,7 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
 ## Context & constraints
 
 - Concept (the single mechanism this CR realises):
-  [passwordless-unlock-mechanism](../docs/crosscutting/passwordless-unlock-mechanism.md).
+  [passwordless-unlock-mechanism](../docs/features/account/enablers/en.account.passwordless-unlock.md).
 - Decision: [ADR 0011](../docs/decisions/0011-uniform-passwordless-unlock-orchestration.md) (prompt-free data
   layer; app layer releases `K`) — generalises the constraint in
   [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md) (no shared code; `:client`
@@ -53,8 +53,8 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
 ## Phases
 
 - [x] **1 — state (decision + concept doc).** Landed [ADR 0011](../docs/decisions/0011-uniform-passwordless-unlock-orchestration.md)
-  and [passwordless-unlock-mechanism](../docs/crosscutting/passwordless-unlock-mechanism.md); cross-linked from
-  [platform-parity](../docs/crosscutting/platform-parity.md), [account-key-model](../docs/crosscutting/account-key-model.md),
+  and [passwordless-unlock-mechanism](../docs/features/account/enablers/en.account.passwordless-unlock.md); cross-linked from
+  [platform-parity](../docs/crosscutting/platform-parity.md), [account-key-model](../docs/features/account/enablers/en.account.key-model.md),
   and the L2/L3 + chooser use-cases. **Done:** docs exist, links resolve, the mechanism matches the agreed
   layering.
 - [x] **2 — android (make the surface identical).** Added `autoRestore(email, k: ByteArray)` to `:client`

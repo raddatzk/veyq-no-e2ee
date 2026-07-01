@@ -24,19 +24,17 @@
 
 ## Same wrap as L2 — only the gate differs
 
-L3 is **cryptographically identical** to L2 ([uc.account.biometric-unlock](uc.account.biometric-unlock.md)):
-a **device-held random key** wraps the Master Key (`device-key wrap = symWrap(K, masterKey, "master-key")`)
-and the **refresh token** is persisted so the session resumes without the password
-([ADR 0005 §11](../../../decisions/0005-unlock-methods-and-device-trust.md)). The **only** difference is the
-keystore access policy on `K` and the token:
+L3 is **cryptographically identical** to L2 ([uc.account.biometric-unlock](uc.account.biometric-unlock.md)) —
+the same `device-key wrap = symWrap(K, masterKey)` and the same persisted, sealed refresh token; the wrap
+mechanism is the single reference
+[en.account.passwordless-unlock](../enablers/en.account.passwordless-unlock.md). The **only**
+difference is the keystore gate on `K` and the token:
 
-> **L2:** `K` + token gated by `.biometryCurrentSet` — released only after a **live biometric**.
-> **L3:** `K` + token stored **ungated** (`WhenUnlockedThisDeviceOnly` / equivalent) — released **whenever
-> the device is unlocked**, with no gesture.
+> **L2:** gated by a **live biometric** (`.biometryCurrentSet`). **L3:** stored **ungated** — released
+> whenever the device is unlocked, with no gesture.
 
-So L3 needs no new crypto over L2 — it is a **local policy choice**, invisible to the server (which cannot
-tell L2 from L3; both are the same ciphertext wrap, [uc.account.biometric-unlock](uc.account.biometric-unlock.md)
-quality notes).
+So L3 adds **no new crypto** over L2 — it is a **local policy choice**, invisible to the server (which cannot
+tell L2 from L3; both are the same ciphertext wrap).
 
 ## Why this is offered at all — and why it is never a default
 
@@ -153,9 +151,9 @@ hochstellen — und Passwort + Secret Key funktionieren immer weiter.
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many wraps),
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (one Master Key / many wraps),
   [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind),
-  [Passwordless unlock mechanism](../../../crosscutting/passwordless-unlock-mechanism.md) (the cross-platform L2/L3 orchestration)
+  [Passwordless unlock mechanism](../enablers/en.account.passwordless-unlock.md) (the cross-platform L2/L3 orchestration)
 - Decisions: [ADR 0005 §8–13](../../../decisions/0005-unlock-methods-and-device-trust.md) (device unlock
   levels; L3 = no login; operator-blind at every level; never a default)
 - Related use-cases: [set-device-security](uc.account.set-device-security.md) (the chooser),

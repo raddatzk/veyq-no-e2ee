@@ -23,7 +23,7 @@ their own wrap). The **worker-cached re-lock / reload persistence** (ADR 0005 §
 
 - Use-case: [uc.account.trust-device](../docs/features/account/use-cases/uc.account.trust-device.md)
   (DEVICE wrap = device key + password; multi-device; untrust; floor always reachable).
-- Concepts: [Account & Key Model](../docs/crosscutting/account-key-model.md) (one Master Key / many wraps),
+- Concepts: [Account & Key Model](../docs/features/account/enablers/en.account.key-model.md) (one Master Key / many wraps),
   [Security Model](../docs/crosscutting/security-model.md) (2SKD, operator-blind).
 - Decisions: [ADR 0005](../docs/decisions/0005-unlock-methods-and-device-trust.md) (DEVICE backing =
   non-extractable WebCrypto key in IndexedDB; method precedence; re-lock — §6 deferred),

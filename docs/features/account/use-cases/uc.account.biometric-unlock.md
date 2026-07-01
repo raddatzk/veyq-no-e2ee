@@ -25,24 +25,20 @@ biometric** as the unlock key ([ADR 0005 §11](../../../decisions/0005-unlock-me
 On open: one biometric releases **both** the session token (resume the session) **and** the unlock key
 (open the vault). When the refresh token finally expires or rotates out, L2 falls back to the **floor**.
 
-## Why this preserves 2SKD-equivalence and operator-blindness
+## Why this is safe (operator-blind, bounded blast radius)
 
-The floor is `KEK = Argon2id(password + Secret Key)` — two user secrets. L2 keeps **two factors**, but
-both are device-side and one is a *liveness* gesture:
+Two factors, both device-side, one a **liveness** gesture: a **non-extractable secure-element key** released
+**only after a live FaceID / fingerprint** produces the wrap KEK — so a stolen *locked* device opens nothing,
+and a stolen *unlocked* one still needs the owner's face/finger. The wrapping key is a **random** device key,
+**never the account password**: the password is also the *auth* factor, so storing it (even biometric-gated)
+would let a biometric-passing local attacker authenticate **from anywhere** — a random key caps the blast
+radius to *this* device. The Master Key and Secret Key are **never stored at rest**.
 
-> A **non-extractable secure-element key** (Secure Enclave on apple, hardware Keystore on android),
-> created with a **biometry-current gate**, produces the wrap **KEK only after a live FaceID /
-> fingerprint**; **device-key wrap = `symWrap(KEK, masterKey, "master-key")`**. The KEK source = *device
-> possession* (the secure-element key never leaves it) **+** *liveness* (the OS releases it only on a
-> matching biometric). A stolen, locked device opens nothing; a stolen **unlocked** device still needs the
-> owner's face/finger.
-
-The wrapping key is **never the account password** ([cr-0019 → Deferred](../../../../changes/cr-0019-apple-trust-device.md),
-settled with the user): the password is also the **auth** factor, so storing it — even biometric-gated —
-would let a biometric-passing local attacker authenticate **from anywhere**, not just open *this* device's
-vault. A **random secure-element key** caps the blast radius to this device. Storing the Master Key or
-Secret Key at rest is the **rejected** anti-pattern ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md));
-we store neither.
+The wrap mechanism itself (`device-key wrap = symWrap(K, masterKey)`, the two-part gated store, the sealed
+session token) is the single reference
+[en.account.passwordless-unlock](../enablers/en.account.passwordless-unlock.md); the level + the
+rejected "store the key at rest" alternative are
+[ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md).
 
 ## Main flow — enrol ("use FaceID on this device")
 
@@ -166,9 +162,9 @@ nicht klappt, geht immer der Weg über Passwort und Secret Key.
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many wraps),
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (one Master Key / many wraps),
   [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind),
-  [Passwordless unlock mechanism](../../../crosscutting/passwordless-unlock-mechanism.md) (the cross-platform L2/L3 orchestration)
+  [Passwordless unlock mechanism](../enablers/en.account.passwordless-unlock.md) (the cross-platform L2/L3 orchestration)
 - Decisions: [ADR 0005 §4, §8–13](../../../decisions/0005-unlock-methods-and-device-trust.md) (biometric =
   secure-element key used directly; device unlock levels), [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md)
   (auth vs. unlock — why passwordless needs a persisted session)

@@ -86,7 +86,7 @@ Authenticated --> [*]
 - **Auth ≠ unlock.** Login only gates a **session + server role**; it **never** unlocks content. The
   **Secret Key is not used here** — it belongs to the *unlock* layer (`Argon2id(password + Secret Key)` →
   Unlock KEK), which is a separate use-case. See
-  [Account & Key Model → Auth vs. unlock](../../../crosscutting/account-key-model.md).
+  [Account & Key Model → Auth vs. unlock](../enablers/en.account.key-model.md).
 - **Replay-resistant.** Authentication is a signature over a fresh single-use nonce, not a transmitted
   bearer secret.
 - **Session shape is decided in [ADR 0004](../../../decisions/0004-session-tokens.md).** Opaque,
@@ -114,7 +114,7 @@ Passwort nicht von einem nicht existierenden Konto unterscheiden und verrät so 
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (auth vs. unlock, auth
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (auth vs. unlock, auth
   keypair), [Security Model](../../../crosscutting/security-model.md) (operator-blind, non-enumerability)
 - Decisions: [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (password-derived keypair
   + challenge-response), [ADR 0004](../../../decisions/0004-session-tokens.md) (session token form)

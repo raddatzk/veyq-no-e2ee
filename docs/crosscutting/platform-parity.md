@@ -5,7 +5,7 @@ Per [developer styleguide §11](developer-styleguide.md), the surfaces **http / 
 explicitly** here. This is the one-glance overview of *which use-case is implemented on which surface*.
 
 The cross-platform **mechanism** behind the passwordless levels (L2/L3) — one design, native APIs per
-surface — is documented in [Passwordless unlock mechanism](passwordless-unlock-mechanism.md).
+surface — is documented in [Passwordless unlock mechanism](../features/account/enablers/en.account.passwordless-unlock.md).
 
 This tracks **implementation status / intent** (is the behaviour built, or deliberately N/A on a
 surface). It is **not** the test-coverage chain — that lives in

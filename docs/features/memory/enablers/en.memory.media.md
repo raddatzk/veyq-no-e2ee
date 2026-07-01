@@ -124,6 +124,6 @@ note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno
   direct-to-store, no dedup), [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_blob` under
   `K_mem`), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (`chunk_frame` vector)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy),
-  [Account & Key Model](../../../crosscutting/account-key-model.md)
+  [Account & Key Model](../../account/enablers/en.account.key-model.md)
 - Related enablers: [en.memory.tree](en.memory.tree.md) (the Memory + `K_mem` this attaches media to),
   [en.memory.derivatives](en.memory.derivatives.md) (the thumbnail/preview/original tiers built on this transport)

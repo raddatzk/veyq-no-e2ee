@@ -6,7 +6,7 @@
 > concept — processing, search, sharing, recovery, deletion — is designed around this.
 >
 > Plain-language companion for end users: [wiki: Is my data safe?](../../wiki/en/is-my-data-safe.md).
-> Sibling engineering docs: the [account & key model](account-key-model.md), the
+> Sibling engineering docs: the [account & key model](../features/account/enablers/en.account.key-model.md), the
 > [scopes & tenancy model](scopes-and-tenancy.md), and the crypto wire-format spec (refined separately).
 
 This document is the **target model**. What ships in the first build is tracked via the inbox and
@@ -31,6 +31,32 @@ never sees. Confidentiality is therefore cryptographic, not a server-side access
 
 We do **not** claim immunity to an *actively malicious* operator before key transparency exists; we
 state that gap plainly. In a **self-hosted** deployment the operator is the user, so that threat is moot.
+
+### The operator we blind is the *veyq* operator — third-party services are a separate, consented boundary
+
+"Operator-blind" names one adversary: **the veyq server / operator.** It does **not** mean the client never
+talks to any external service. A feature may let the client reach a **third party directly** — today the
+opt-in **reverse-geocoding** lookup that turns a photo coordinate into a place name
+([ADR 0016](../decisions/0016-geocoding-provider-neutrality.md)), tomorrow map tiles for the tenant map. Such a
+request is a **different trust boundary** the user consents to, and it is fenced so it can never widen the veyq
+operator's view:
+
+- **Client-direct, never proxied through the veyq backend.** Routing it through veyq's server would hand the
+  operator the coordinate — so these requests go **straight from the device to the provider**. Proxying is
+  explicitly disallowed.
+- **No veyq identity, no content context.** The provider receives only what its function needs — a bare
+  coordinate (+ the client IP) — never a user id, a Memory id, or any veyq token.
+- **Opt-in + transparent — and opt-in is standing consent.** Off by default; enabling it is an explicit choice
+  with a plain-language note that a request leaves the device. Once enabled it may run **automatically** (e.g. a
+  reverse lookup on the first geotagged media of an auto-location) — enabling it *is* the consent to those
+  requests; it **never** fires without opt-in. A blind, request-free alternative stays available (e.g. typing a
+  place name).
+- **Results are sealed content.** Anything fetched (e.g. a resolved place name) is sealed under `K_mem` like any
+  other content — so it is shareable to other members **without their device making a request**, and the veyq
+  operator still sees only ciphertext.
+
+So the veyq operator stays blind by construction; the only thing that ever crosses is a consented, identity-free
+request the **user** turned on, straight to the chosen provider.
 
 ## What is encrypted vs. server-visible
 
@@ -70,7 +96,7 @@ skinparam rectangle {
   BorderColor #888888
 }
 
-rectangle "Unlock methods\n(password + Secret Key, passkey PRF,\nrecovery code, trusted device)" as unlock
+rectangle "Unlock methods\n(one wrap each — see account/key model)" as unlock
 rectangle "Master Key" as muk
 rectangle "Identity private key\n(you)" as idk
 rectangle "Identity private key\n(another member)" as idk2
@@ -107,17 +133,12 @@ end note
 
 ## Cryptographic stance
 
-- **Standard, well-reviewed primitives only** — no home-grown crypto. Symmetric content encryption is
-  already quantum-resistant (AES-256-GCM class); key wrapping is per-recipient (HPKE-style multi-recipient).
-- **Post-quantum from the start, by intent.** Memories live for decades, so harvest-now-decrypt-later is
-  a real threat. The target is a **hybrid KEM (X25519 + ML-KEM-768)** for key wrapping — secure if
-  either component holds. **Signatures** (login auth, key-directory, derivative-signing) are less
-  HNDL-urgent — there is no harvest-now-decrypt-later for a one-time verification — so PQ urgency is
-  **high for encryption (now)** and **low for signatures (Ed25519 now → hybrid ML-DSA later)**. **The
-  concrete contents of crypto suite `v1` are decided in the first crypto change-request**, not here.
-- **Crypto-agility is non-negotiable.** Every wrapped key and encrypted artifact carries a **versioned
-  suite id**. New artifacts use the current suite; old artifacts stay readable under their stored suite
-  id. This is what makes adopting (and later upgrading) post-quantum safe without breaking the model.
+Standard, well-reviewed primitives only (no home-grown crypto); **post-quantum from the start** for encryption
+(a hybrid KEM, secure if either component holds) because decade-lived memories make harvest-now-decrypt-later
+real, while signatures stay classical for now; and **crypto-agility** via a versioned suite id on every
+artifact, so upgrades never break old data. The strategy + its rejected alternatives are
+[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md); the concrete per-platform byte
+contract is [ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md).
 
 ## Names & blinded tokens
 

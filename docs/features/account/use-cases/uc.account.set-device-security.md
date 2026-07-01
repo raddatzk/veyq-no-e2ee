@@ -174,9 +174,9 @@ jederzeit änderbar. Was du auch wählst: Der Server sieht weiterhin nur verschl
 ## Related
 
 - Feature: [Account & auth](../_index.md)
-- Concepts: [Account & Key Model](../../../crosscutting/account-key-model.md) (one Master Key / many wraps),
+- Concepts: [Account & Key Model](../enablers/en.account.key-model.md) (one Master Key / many wraps),
   [Security Model](../../../crosscutting/security-model.md) (Secret Key / 2SKD, operator-blind),
-  [Passwordless unlock mechanism](../../../crosscutting/passwordless-unlock-mechanism.md) (the cross-platform L2/L3 orchestration)
+  [Passwordless unlock mechanism](../enablers/en.account.passwordless-unlock.md) (the cross-platform L2/L3 orchestration)
 - Decisions: [ADR 0005 §8–13](../../../decisions/0005-unlock-methods-and-device-trust.md) (device unlock
   levels; mutually exclusive; no default; operator-blind at every level)
 - Level use-cases: [unlock](uc.account.unlock.md) (L0 floor), [trust-device](uc.account.trust-device.md)
