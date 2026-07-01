@@ -8,7 +8,9 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import type { TreeNode } from '../tree'
 import { isFavorite } from '../../../app/favoritesStore'
+import { useViewMode } from '../../../shared/state/useViewMode'
 import MemoryCard from './MemoryCard.vue'
+import ViewModeToggle from './ViewModeToggle.vue'
 
 defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[] }>()
 defineEmits<{
@@ -22,10 +24,14 @@ defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { viewMode } = useViewMode()
 </script>
 
 <template>
   <div class="memory-route-surface">
+    <div class="memory-browse-toolbar">
+      <ViewModeToggle />
+    </div>
     <section v-if="folder" class="veyq-section memory-section">
       <div class="veyq-section-header">
         <div class="veyq-card memory-folder-card memory-folder-overview-card">
@@ -62,7 +68,7 @@ const { t } = useI18n()
         <h2>{{ t('memory.memories') }}</h2>
         <span>{{ memories.length }}</span>
       </div>
-      <div class="memory-card-grid memory-card-grid-memories">
+      <div class="memory-card-grid memory-card-grid-memories" :class="{ 'is-list': viewMode === 'list' }">
         <p v-if="!memories.length" class="veyq-empty veyq-empty-inline">
           {{ t('memory.memoryEmpty') }}
         </p>
@@ -90,7 +96,7 @@ const { t } = useI18n()
         <h2>{{ t('memory.folders') }}</h2>
         <span>{{ folders.length }}</span>
       </div>
-      <div class="memory-card-grid">
+      <div class="memory-card-grid" :class="{ 'is-list': viewMode === 'list' }">
         <p v-if="!folders.length" class="veyq-empty veyq-empty-inline">
           {{ t('memory.folderEmpty') }}
         </p>
@@ -116,3 +122,11 @@ const { t } = useI18n()
     </section>
   </div>
 </template>
+
+<style scoped>
+.memory-browse-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+</style>

@@ -20,6 +20,8 @@ import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../med
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryCard from './MemoryCard.vue'
+import ViewModeToggle from './ViewModeToggle.vue'
+import { useViewMode } from '../../../shared/state/useViewMode'
 
 const props = defineProps<{
   node: TreeNode
@@ -31,6 +33,7 @@ const props = defineProps<{
 defineEmits<{ toggleFavorite: []; rename: []; delete: []; openChapter: [node: TreeNode]; createChapter: [] }>()
 
 const { t } = useI18n()
+const { viewMode } = useViewMode()
 
 const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
@@ -311,7 +314,14 @@ onBeforeUnmount(() => {
         <TabPanel value="chapters">
           <!-- Chapters as a MemoryCard grid + a create card, like the browse Memories section (design source).
                Each chapter opens to its own gallery; its media is sealed under the chapter's own K_mem. -->
-          <div class="memory-card-grid memory-card-grid-memories" :aria-label="t('memory.chapters')">
+          <div class="chapters-toolbar">
+            <ViewModeToggle />
+          </div>
+          <div
+            class="memory-card-grid memory-card-grid-memories"
+            :class="{ 'is-list': viewMode === 'list' }"
+            :aria-label="t('memory.chapters')"
+          >
             <MemoryCard
               v-for="chapter in chapters"
               :key="chapter.id"
@@ -395,6 +405,12 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
 }
 
+/* The Chapters tab's view toggle, right-aligned above the card grid. */
+.chapters-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
 /* A small count next to the Chapters tab label. */
 .tab-count {
   margin-left: 0.4rem;
