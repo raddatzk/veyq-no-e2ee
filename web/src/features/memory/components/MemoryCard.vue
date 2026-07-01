@@ -7,7 +7,8 @@ import { useI18n } from 'vue-i18n'
 import Card from 'primevue/card'
 import type { TreeNode } from '../tree'
 
-defineProps<{ memory: TreeNode; favorite?: boolean }>()
+// `favoritable` (default true) shows the favorite pin; chapters (cr-0062) render the card open-only without it.
+withDefaults(defineProps<{ memory: TreeNode; favorite?: boolean; favoritable?: boolean }>(), { favoritable: true })
 defineEmits<{ open: [memory: TreeNode]; toggleFavorite: [memory: TreeNode] }>()
 
 const { t } = useI18n()
@@ -25,6 +26,7 @@ const { t } = useI18n()
         </span>
       </button>
       <button
+        v-if="favoritable"
         class="memory-card-pin"
         :class="{ 'is-favorite': favorite }"
         type="button"

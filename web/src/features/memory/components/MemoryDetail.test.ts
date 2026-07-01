@@ -156,16 +156,17 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await chaptersTab!.trigger('click')
     await flushPromises()
 
-    // the chapter shows as a chip…
-    const chip = wrapper.find('.chapter-chip')
-    expect(chip.exists()).toBe(true)
-    expect(chip.text()).toContain('Day 1')
-    // …clicking it asks the host to open that chapter
-    await chip.trigger('click')
+    // the chapter shows as a MemoryCard (not a chip, cr-0062), open-only (no favorite pin)
+    const card = wrapper.find('.memory-card')
+    expect(card.exists()).toBe(true)
+    expect(card.text()).toContain('Day 1')
+    expect(card.find('.memory-card-pin').exists()).toBe(false) // favoritable=false
+    // clicking the card asks the host to open that chapter
+    await card.find('.memory-card-main').trigger('click')
     expect(wrapper.emitted('openChapter')?.[0]?.[0]).toMatchObject({ id: 'c1' })
 
-    // the header "add chapter" action asks the host to start creation
-    await wrapper.get('[aria-label="Add chapter"]').trigger('click')
+    // the create card asks the host to start creation
+    await wrapper.find('.memory-create-card').trigger('click')
     expect(wrapper.emitted('createChapter')).toBeTruthy()
   })
 

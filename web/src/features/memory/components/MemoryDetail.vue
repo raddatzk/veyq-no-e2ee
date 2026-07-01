@@ -19,6 +19,7 @@ import { listMedia, openGrid, hasDerivatives, unsealDimensions, type MediaItem }
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
+import MemoryCard from './MemoryCard.vue'
 
 const props = defineProps<{
   node: TreeNode
@@ -227,16 +228,6 @@ onBeforeUnmount(() => {
           @change="onFilesPicked"
         />
         <Button
-          v-tooltip.bottom="t('memory.addChapter')"
-          type="button"
-          :aria-label="t('memory.addChapter')"
-          icon="pi pi-book"
-          severity="secondary"
-          text
-          :disabled="!memoryKey"
-          @click="$emit('createChapter')"
-        />
-        <Button
           v-tooltip.bottom="favorite ? t('memory.unfavorite') : t('memory.favorite')"
           type="button"
           class="memory-detail-fav"
@@ -318,30 +309,25 @@ onBeforeUnmount(() => {
         </TabPanel>
 
         <TabPanel value="chapters">
-          <!-- Each chapter opens to its own gallery; its media is sealed under the chapter's own K_mem. -->
-          <div v-if="chapters && chapters.length" class="chapter-strip" :aria-label="t('memory.chapters')">
-            <button
+          <!-- Chapters as a MemoryCard grid + a create card, like the browse Memories section (design source).
+               Each chapter opens to its own gallery; its media is sealed under the chapter's own K_mem. -->
+          <div class="memory-card-grid memory-card-grid-memories" :aria-label="t('memory.chapters')">
+            <MemoryCard
               v-for="chapter in chapters"
               :key="chapter.id"
+              :memory="chapter"
+              :favoritable="false"
+              @open="$emit('openChapter', $event)"
+            />
+            <button
+              class="veyq-card veyq-card-interactive memory-create-card memory-create-card-memory"
               type="button"
-              class="chapter-chip"
-              @click="$emit('openChapter', chapter)"
-            >
-              <span class="pi pi-book" aria-hidden="true" />
-              <span class="chapter-chip-name">{{ chapter.name }}</span>
-            </button>
-          </div>
-          <div v-else class="veyq-empty chapter-empty">
-            <p>{{ t('memory.noChapters') }}</p>
-            <Button
-              type="button"
-              :label="t('memory.addChapter')"
-              icon="pi pi-book"
-              severity="secondary"
-              outlined
               :disabled="!memoryKey"
               @click="$emit('createChapter')"
-            />
+            >
+              <span class="pi pi-plus" />
+              <strong>{{ t('memory.addChapter') }}</strong>
+            </button>
           </div>
         </TabPanel>
       </TabPanels>
@@ -409,12 +395,6 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
 }
 
-/* Chapters strip (cr-0060): the nested Memories of this node, as clickable chips in the Chapters tab. */
-.chapter-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
 /* A small count next to the Chapters tab label. */
 .tab-count {
   margin-left: 0.4rem;
@@ -425,35 +405,6 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
   font-weight: 700;
 }
-/* Empty Chapters tab: a hint + the add affordance. */
-.chapter-empty {
-  display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-}
-.chapter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--app-line);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-control-bg);
-  color: var(--app-text);
-  font: inherit;
-  cursor: pointer;
-}
-.chapter-chip:hover {
-  border-color: var(--app-accent);
-}
-.chapter-chip .pi-book {
-  color: var(--app-muted);
-  font-size: 0.9rem;
-}
-.chapter-chip-name {
-  overflow-wrap: anywhere;
-}
-
 /* The justified-rows gallery (cr-0059): aspect-preserving tiles laid out by calculateJustifiedMediaLayout into
    rows that fill the container width (the per-tile aspect ratio comes from the E2EE-sealed dimensions). The
    container is position:relative with an explicit height; each tile is absolutely positioned via a transform +
