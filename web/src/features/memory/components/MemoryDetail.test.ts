@@ -31,9 +31,19 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
+      common: { save: 'Save', cancel: 'Cancel' },
       memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', rename: 'Rename', delete: 'Delete', addChapter: 'Add chapter', chapters: 'Chapters', gallery: 'Gallery', noChapters: 'No chapters yet.' },
       media: {
         upload: 'Upload',
+        information: 'Details',
+        toggleInfo: 'Toggle details',
+        noDetail: 'No details for this item.',
+        captured: 'Taken',
+        status: 'Status',
+        editCapturedAt: 'Edit capture time',
+        resetCapturedAt: 'Reset to original',
+        capturedAtCorrected: 'Corrected',
+        capturedAtSaveFailed: 'Could not save the capture time.',
         gallery: 'Memory gallery',
         itemCount: 'No items | {count} item | {count} items',
         openItem: 'Open item {index}',
@@ -135,6 +145,40 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await wrapper.find('.gallery-sort-toggle').trigger('click')
     await flushPromises()
     expect(order()).toEqual(['media-0', 'media-2', 'media-1'])
+  })
+
+  it('a lightbox date correction persists on close + reopen — no stale date (cr-0066 regression guard)', async () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const memoryKey = v1.randomBytes(32)
+    vi.mocked(exifr.parse).mockResolvedValue({ DateTimeOriginal: new Date(Date.UTC(2021, 4, 1, 10, 0, 0)) } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+
+    const wrapper = mountDetail(memoryKey)
+    await flushPromises()
+    await flushPromises()
+
+    // open the lightbox, correct the capture time
+    await wrapper.find('.gallery-tile').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Corrected')
+    await wrapper.find('[aria-label="Edit capture time"]').trigger('click')
+    await wrapper.find('#captured-at-input').setValue('2019-08-15T08:30')
+    await wrapper.find('.media-lightbox-date-form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Corrected')
+
+    // close the lightbox
+    await wrapper.find('.media-lightbox [aria-label="Close"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.media-lightbox').exists()).toBe(false)
+
+    // reopen the SAME tile → the correction persisted (the grid item was patched, not just a transient sort key).
+    // The regression: an in-lightbox edit updated only the sort order, so reopening unsealed the stale tier.
+    await wrapper.find('.gallery-tile').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Corrected')
   })
 
   it('shows the empty state for a Memory with no media', async () => {
