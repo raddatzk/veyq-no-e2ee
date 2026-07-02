@@ -36,16 +36,24 @@ per-item fetch.
   the date editor's shape. Basemap tiles come from a provider-neutral, self-host-or-opt-in-public tile seam
   ([ADR 0018](../docs/decisions/0018-map-tiles-provider-neutrality.md)) rendered by **Leaflet** (BSD-2, actively
   maintained, vendor-neutral — a new web dep; no deprecated/locked map client).
-- **Set-location goes through the map — no name-only-without-map path in this slice.** A location is placed on
-  the map from the medoid; the **medoid** gives the coordinate (min summed **Haversine** distance over the media
-  GPS — never the mean, robust to an outlier). If a Memory has **no photo GPS** (no medoid) or **no tiles**
-  configured/consented, "set location" is **not offered yet** (deferred) — we do **not** fall back to a bare
-  name-only field for now. The **name** comes from reverse-geocoding the framed `nameAnchor` (`geocoded`,
-  editable) **or**, when geocoding is off/unreachable, a **typed string** (`manual`) **still entered on the map**
-  (the pin/medoid works without geocoding). A **name is mandatory** — no unnamed place.
+- **Location is a deliberate per-Memory choice — "does this Memory happen at *one* place?"** Not every Memory
+  has one, and a location is **never auto-created from GPS presence**: a broad "Climbing" Memory spread across
+  many gyms (its sessions are chapters, each possibly with its **own** location) sensibly has **no** location,
+  even though its media carry GPS. The user opts the Memory in ("set location") or leaves it out (the default).
+- **When present, a location is always a position + a name together — never one without the other; no
+  "name-only".**
+  - **Position** comes from either the **medoid** of the media GPS (min summed **Haversine** distance — never the
+    mean, robust to an outlier; `auto`) **or** a **manually-dropped pin** (`fixed`). So an opted-in Memory with
+    **no photo GPS** can still get a location — the user places the pin by hand; there is no name-only substitute.
+  - **Name** is either **reverse-geocoded** from the framed `nameAnchor` (`nameSource: geocoded`, editable) **or**
+    **typed** (`nameSource: manual`) — but **always** alongside the position (the geocoding-off case = a manual
+    name on an active location, *not* a name without a position).
+  - Set-location needs a **map (tiles)** to place/show the position; **without tiles it is unavailable** (a
+    location can't exist without a position, and the position is set on the map).
 - **`fixed` ⟷ `auto` is a user choice, not a forced default — and fully reversible.** `derivedMode` is a field in
-  the sealed `location` blob, written by `setMemoryLocation`. In the open-Memory editor, `auto` is only
-  **pre-selected** (the pin sits on the computed medoid); the user may keep `auto`, or go to **`fixed`** via an
+  the sealed `location` blob, written by `setMemoryLocation`. When the media carry GPS, `auto` is
+  **pre-selected** (the pin sits on the computed medoid); with no media GPS there's nothing to medoid, so the user
+  drops a pin → `fixed`. The user may keep `auto`, or go to **`fixed`** via an
   **explicit toggle** ("keep current" ↔ "freeze here") **or** by **dragging the pin** (which sets `fixed`). The
   toggle is **bidirectional** — a `fixed` location can be switched **back to `auto`** anytime (it drops the frozen
   coordinate and re-medoids). An `auto` location **re-medoids** `derived` as media are added — the self-heal runs
@@ -60,8 +68,8 @@ per-item fetch.
   name granularity; `lang` = the UI locale. Opt-in is standing consent; manual names need no request.
 - **Tiles per ADR 0018** — a configurable `{z}/{x}/{y}` tile-URL seam, **client-direct**, identity-free (bare
   viewport), attribution shown; **self-host = blind**, **public OSM = opt-in** (same consented boundary as
-  geocoding). No tiles configured/consented ⇒ no map surface ⇒ **set-location is not offered** in this slice (no
-  bare name-only fallback for now).
+  geocoding). No tiles configured/consented ⇒ no map to place a position ⇒ **set-location is unavailable** (a
+  location always needs a position, so there is no name-only substitute).
 - **The central risk: the node-meta seal is destructive.** `memoryDate.ts`'s `sealMemoryDate` seals a **fresh**
   `{v, date}` and PATCHes the whole `wrappedMeta` — it does not preserve siblings. Writing a `location` the same
   way would **wipe the date**. So this CR first **refactors the node-meta seal to read-modify-write** (unseal the
@@ -99,9 +107,10 @@ per-item fetch.
   pan/zoom updates `nameAnchor` → (opt-in) reverse-geocode → fills the editable name; when geocoding is off the
   name is **typed manually on the map** (pin still from the medoid); a **bidirectional `auto`⟷`fixed` toggle**
   (pin-drag ⇒ `fixed`; switching back to `auto` re-medoids); a **remove-location** action (clears it, keeps the
-  date); save requires a name. "Set location" is only offered when the Memory has a medoid **and** tiles (no
-  name-only-without-map path this slice). A **location chip** (pin icon) in the `MemoryDetail` header showing the
-  name (or a "set location" affordance when eligible). Wire `locationEditorOpen` + `onLocationSave` →
+  date); **save requires both a position and a name** (no name-only). Set-location is offered whenever **tiles**
+  exist — the position is the medoid (media GPS) or a hand-dropped pin. A **location chip** (pin icon) in the
+  `MemoryDetail` header shows the place **when the Memory has one**, else a "set location" affordance (when tiles
+  are available). Wire `locationEditorOpen` + `onLocationSave` →
   `setMemoryLocation` → `emit('metaUpdated', { nodeId, wrappedMeta })`; the medoid is computed at open from
   `items`. i18n EN+DE (`memory.place.*`, transparency notes for tiles + geocoding). · Done when: `npm run check`
   green; tests: set a `geocoded` location (medoid from two geotagged items + a stubbed reverse lookup) shows the
