@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -35,11 +35,12 @@ const password = ref('')
 const secretKey = ref('')
 const busy = ref(false)
 const error = ref('')
-// Adaptive: the Secret-Key field shows only when THIS device has no password DEVICE wrap for the entered
-// email (a trusted device unlocks with email + password and never shows it). Default false (hidden) — we
-// can't know the account until an email is entered — and resolved against the local trust record on mount +
-// when the email changes; an empty email (no account yet) keeps it hidden.
-const needsSecretKey = ref(false)
+// Adaptive: the Secret-Key field shows unless THIS device has a password DEVICE wrap for the entered email
+// (a trusted device unlocks with email + password and never shows it). Default true (shown) — the safe
+// direction: a first sign-in and a fresh origin (empty per-origin IndexedDB) both need it, so we show it up
+// front and only HIDE it once we positively confirm the entered email is trusted on this device. Resolved
+// against the local trust record on mount + when the email changes.
+const needsSecretKey = ref(true)
 // Login already succeeded for the current inputs → a Secret-Key retry must re-unlock, not re-login.
 const sessionReady = ref(false)
 // The single per-device choice. Drives the login cookie (on → persistent) AND which convenience wrap is
@@ -55,10 +56,11 @@ const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevic
  *  password DEVICE wrap for it (a remembered device auto-opens at boot, so if it reached this screen its
  *  restore failed and it correctly falls back to needing the Secret Key). Defaults to "needed" on any error. */
 async function resolveDeviceState() {
-  // No email yet → unknown account, don't ask for the Secret Key. Otherwise it's needed unless this device
-  // already carries a password DEVICE wrap for the email (then email + password unlock it). A remembered
-  // device auto-opens at boot; if it reached this screen its restore failed, so it falls back to needing it.
-  needsSecretKey.value = email.value ? !(await isTrusted(email.value).catch(() => false)) : false
+  // No email yet → unknown account, keep the Secret Key shown (the safe first-sign-in default). With an email
+  // it's needed unless this device already carries a password DEVICE wrap for it (then email + password
+  // unlock it). A remembered device auto-opens at boot; if it reached this screen its restore failed, so it
+  // falls back to needing it.
+  needsSecretKey.value = email.value ? !(await isTrusted(email.value).catch(() => false)) : true
 }
 
 /** Auto-enrol this device's convenience tier from the in-memory Master Key, per "remember me" (§18, §22).
@@ -167,17 +169,27 @@ async function signOut() {
   await resolveDeviceState()
 }
 
-// A different email is a different account. Two deliberately-split mechanisms: the watcher drops sessionReady on
-// every keystroke (cheap — a re-login is required the moment the email changes, even before blur), while the
-// expensive IndexedDB trust lookup that decides whether to show the Secret-Key field runs only on blur
-// (@change) so the field doesn't flicker while typing.
+// A different email is a different account. The watcher drops sessionReady on every keystroke (cheap — a
+// re-login is required the moment the email changes, even before blur). The expensive IndexedDB trust lookup
+// that decides whether to show the Secret-Key field is debounced so it runs shortly after the user pauses
+// typing (the field appears without waiting for a blur) while still not flickering on every keystroke; blur
+// (@change) resolves it immediately.
+let resolveTimer: ReturnType<typeof setTimeout> | undefined
+function scheduleResolve() {
+  clearTimeout(resolveTimer)
+  resolveTimer = setTimeout(() => void resolveDeviceState(), 250)
+}
 function onEmailChange() {
+  clearTimeout(resolveTimer)
   void resolveDeviceState()
 }
 
 watch(email, () => {
   sessionReady.value = false
+  scheduleResolve()
 })
+
+onBeforeUnmount(() => clearTimeout(resolveTimer))
 
 onMounted(async () => {
   // Setup hands over email + Secret Key once, for the first sign-in. Both pre-fill the (adaptive) screen — the

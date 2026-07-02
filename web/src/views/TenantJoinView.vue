@@ -4,7 +4,7 @@
 // invited email already has an account: a NEW owner registers cold (Emergency Kit) here, an EXISTING owner
 // signs in + unlocks. Either way the client cold-births the TENANT scope and seals the first grant to its
 // own identity — the scope key never leaves the device.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -15,9 +15,10 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { previewInvite, acceptInvite, registerAndAccept, scopeGrant, tenantError } from '../features/admin/createTenant/tenants'
 import { buildAccount, type BuiltAccount } from '../features/account/register/accountBirth'
-import { login } from '../features/account/login/login'
+import { login, withRefresh } from '../features/account/login/login'
 import { unlockMasterKey } from '../features/account/unlock/unlock'
-import { identityPrivate } from '../app/vault'
+import { identityPrivate, vaultState } from '../app/vault'
+import { account } from '../app/account'
 import { setupApi } from '../api/client'
 import { fromB64std } from '../shared/base64'
 import { hybridPublic } from '../shared/crypto/v1'
@@ -42,6 +43,16 @@ const secretKeyDisplay = ref('')
 const kitSaved = ref(false)
 // sign-in form
 const secretKey = ref('')
+// Fast path: the session lapsed while the vault stayed unlocked → ask for the password only (re-login), never
+// the Secret Key (the identity key is already in memory).
+const needsReauth = ref(false)
+
+// This browser already holds the INVITED owner's unlocked vault (same-origin setup → create-tenant flow):
+// the identity key is in memory, so we can seal the grant and accept in one click — no password, no Secret
+// Key. Gated on the email so we never seal to a different signed-in identity (the server also enforces this).
+const alreadyUnlocked = computed(
+  () => vaultState.unlocked && account.email.trim().toLowerCase() === ownerEmail.value.trim().toLowerCase(),
+)
 
 const secret = String(route.hash || '').replace(/^#/, '')
 // Non-reactive: keep the freshly born identity's Uint8Arrays out of Vue's deep proxy.
@@ -117,6 +128,59 @@ async function signInAndAccept() {
   }
 }
 
+/** With an already-unlocked identity in memory, cold-birth the scope grant and accept. acceptInvite isn't
+ *  withRefresh-wrapped itself, so wrap it here: an expired access token rotates silently from the cookie. */
+async function sealAndAccept() {
+  const priv = identityPrivate()
+  if (!priv) throw new Error('locked')
+  const grant = scopeGrant(hybridPublic(priv))
+  await withRefresh(() => acceptInvite(secret, grant))
+  password.value = ''
+  phase.value = 'done'
+}
+
+/** A "no live session" failure (access expired AND the silent refresh had nothing to rotate) — distinct from
+ *  a real invite error (400 malformed grant / 403 / 404 / 410), which must surface via mapError instead.
+ *  Only a 401 means the session lapsed: withRefresh already rotated once and still got 401, or the refresh
+ *  endpoint itself rejected. Duck-typed on the HTTP status: each generated client package throws its own
+ *  ResponseError class, so a cross-package instanceof wouldn't match (same reason as login's withRefresh). */
+function isAuthLapse(e: unknown): boolean {
+  return (e as { response?: { status?: unknown } })?.response?.status === 401
+}
+
+/** One-click accept when this browser already holds the invited owner's unlocked vault. */
+async function acceptDirect() {
+  error.value = ''
+  busy.value = true
+  try {
+    await sealAndAccept()
+  } catch (e) {
+    // Vault unlocked but the session is gone and the cookie couldn't refresh it → fall to a password-only
+    // re-login (the Secret Key stays unnecessary). Anything else is a real invite error.
+    if (isAuthLapse(e)) needsReauth.value = true
+    else error.value = await mapError(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+/** Session-lapsed branch: re-establish the session with the password only (the vault is still unlocked, so no
+ *  Secret Key), then seal + accept. */
+async function reauthAndAccept() {
+  if (password.value.length === 0) return
+  error.value = ''
+  busy.value = true
+  try {
+    await login(ownerEmail.value, password.value)
+    await sealAndAccept()
+    needsReauth.value = false
+  } catch (e) {
+    error.value = await mapError(e)
+  } finally {
+    busy.value = false
+  }
+}
+
 async function mapError(e: unknown): Promise<string> {
   const { status, code } = await tenantError(e)
   if (status === 410) return t('tenant.join.expired')
@@ -161,14 +225,37 @@ async function mapError(e: unknown): Promise<string> {
 
       <template v-else-if="phase === 'signin'">
         <p class="veyq-form-copy">{{ t('tenant.join.invitedTo', { tenant: tenantName, domain }) }}</p>
-        <p class="veyq-form-copy">{{ t('tenant.join.signinSub', { email: ownerEmail }) }}</p>
-        <form class="veyq-form" @submit.prevent="signInAndAccept">
-          <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="signin-password" /></label>
-          <label>{{ t('unlock.secretKey') }}<InputText v-model="secretKey" autocomplete="off" required /></label>
-          <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-          <Button type="submit" :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy"
-                  :disabled="password.length === 0 || secretKey.trim().length === 0" />
-        </form>
+
+        <!-- Fast path: this browser already holds the invited owner's unlocked vault → accept in one click,
+             or ask for the password only if the session lapsed. Never the Secret Key. -->
+        <template v-if="alreadyUnlocked">
+          <template v-if="needsReauth">
+            <p class="veyq-form-copy">{{ t('tenant.join.reauthSub') }}</p>
+            <form class="veyq-form" @submit.prevent="reauthAndAccept">
+              <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="reauth-password" /></label>
+              <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+              <Button type="submit" :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy"
+                      :disabled="password.length === 0" />
+            </form>
+          </template>
+          <template v-else>
+            <p class="veyq-form-copy">{{ t('tenant.join.signinReadySub', { email: ownerEmail }) }}</p>
+            <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+            <Button :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy" @click="acceptDirect" />
+          </template>
+        </template>
+
+        <!-- Cold path: locked vault or a different account signed in → full sign-in + unlock. -->
+        <template v-else>
+          <p class="veyq-form-copy">{{ t('tenant.join.signinSub', { email: ownerEmail }) }}</p>
+          <form class="veyq-form" @submit.prevent="signInAndAccept">
+            <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="signin-password" /></label>
+            <label>{{ t('unlock.secretKey') }}<InputText v-model="secretKey" autocomplete="off" required /></label>
+            <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+            <Button type="submit" :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy"
+                    :disabled="password.length === 0 || secretKey.trim().length === 0" />
+          </form>
+        </template>
       </template>
 
       <template v-else-if="phase === 'done'">
