@@ -33,20 +33,27 @@
     date?:     { mode: 'auto' | 'single' | 'range' | 'ongoing',
                  from?: 'YYYY-MM-DD',        // start day  (single ⇒ from == to; ongoing ⇒ no `to`)
                  to?:   'YYYY-MM-DD' },       // end day    (absent for ongoing / undated auto)
-    location?: { name:         string,        // the label — MANDATORY (no location without a name)
+    location?: { name:         string,        // the label — MANDATORY, except a still-PENDING auto place (see below)
                  nameSource:   'geocoded' | 'manual',   // manual = frozen; geocoded = may refresh on anchor move
                  derived?:     { lat, lng },   // map position = the MEDOID of media GPS (min summed Haversine dist — never the mean)
-                 derivedMode?: 'fixed' | 'auto',        // 'auto' re-medoids on media add (default); a manual pin move flips it to 'fixed'
-                 nameAnchor?:  { lat, lng, zoom } } }   // coord + zoom a geocoded name was resolved at
+                 derivedMode?: 'fixed' | 'auto',        // 'auto' follows the medoid (default); 'fixed' freezes the framed map centre
+                 nameAnchor?:  { lat, lng, level } } }  // coord + granularity level (road…country) a geocoded name resolved at
   ```
 
   - **`date`** ([uc.memory.date](../use-cases/uc.memory.date.md)) — the effective day range, materialized for
     every mode; `auto` = min→max over the Memory's *trustworthy* `capturedAt`.
-  - **`location`** ([uc.memory.place](../use-cases/uc.memory.place.md)) — one named place; `name` is mandatory
-    (no name ⇒ no location); `derived` is the **medoid** of the media GPS — the actual photo minimizing the summed
-    **Haversine** distance (a real spot, robust to an outlier → never the sea, never the mean);
-    `nameAnchor` records where + at what zoom a geocoded name came from, for re-resolution. Reverse-only,
-    opt-in, veyq-blind geocoding: [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md).
+  - **`location`** ([uc.memory.place](../use-cases/uc.memory.place.md)) — one named place, set **intent-first**
+    (cr-0069): the editor opens on the **medoid** of the media GPS with the pin as the map's centre crosshair
+    ("Karte verschieben" — you move the map, the centre is the place). Leaving it there = `auto` (follows the
+    photos, re-medoids as media arrive); **moving the map by hand** takes over → `fixed` (the framed centre is
+    frozen). The medoid is the actual photo minimizing the summed **Haversine** distance (a real spot, robust to
+    an outlier → never the sea, never the mean). The **name** comes from the reverse-geocoded **address
+    hierarchy** — the user picks the granularity `level` (road…country) or types their own; `nameAnchor` records
+    the coordinate **and that level** so an `auto` refresh keeps the grain. `name` is mandatory **except a
+    still-*pending* `auto` place**: an `auto` + `geocoded` location armed at creation with **no name/position
+    yet** (the "follows your photos" opt-in), whose position and name are **materialized by the first geotagged
+    upload** (the `MemoryDetail` self-heal). Reverse-only, opt-in, veyq-blind geocoding:
+    [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md).
 
 - **Threaded through the existing node CRUD — no new endpoint.** Set at `createNode`; updated by the **partial**
   `updateNode` (`PATCH …/nodes/{nodeId}`) with **partial semantics** — a non-null `wrappedMeta` replaces it, an

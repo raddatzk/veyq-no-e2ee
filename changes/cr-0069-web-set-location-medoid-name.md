@@ -1,7 +1,7 @@
 ---
 id: cr-0069
 title: Web set-location — editor map, medoid pin, pan/zoom→geocoded name, fixed⟷auto, pre-arm at creation (place slice 2b)
-status: planned
+status: done
 satisfies: [uc.memory.place]
 adrs: ["0012", "0016", "0018"]
 invariants: [operator-blind-e2ee]
@@ -95,7 +95,7 @@ per-item fetch.
 
 ## Phases
 
-- [ ] 1 web model — refactor the node-meta seal to **read-modify-write** (shared `unsealNodeMeta`/`sealNodeMeta`
+- [x] 1 web model — refactor the node-meta seal to **read-modify-write** (shared `unsealNodeMeta`/`sealNodeMeta`
   over `{v, date?, location?}`; `setMemoryDate` preserves an existing `location`). New `memoryLocation.ts`:
   `MemoryLocation` type; `unsealMemoryLocation`; `setMemoryLocation(scopeId, nodeId, nodeKey, location | null)`
   (preserves the date); pure `computeMedoid(points) → {lat,lng} | null` (**min summed Haversine**, tie→lowest
@@ -105,7 +105,7 @@ per-item fetch.
   the date; set date keeps the location; **removing the location** via `setMemoryLocation(null)` keeps the date),
   `derivedMode` `auto` vs `fixed` **and back** (`fixed`→`auto` drops the frozen coord + re-medoids), and the
   reverse seam (absent endpoint ⇒ no request, manual name stands).
-- [ ] 2 web UI — add **Leaflet**; a `MemoryMap`/tile-layer wrapper honoring the ADR 0018 tile seam (configurable
+- [x] 2 web UI — add **Leaflet**; a `MemoryMap`/tile-layer wrapper honoring the ADR 0018 tile seam (configurable
   URL, attribution, third-party public source; behind the personal two-stage opt-in). A
   **`MemoryLocationEditor.vue`**: map centred on the medoid pin;
   pan/zoom updates `nameAnchor` → (opt-in) reverse-geocode → fills the editable name; when geocoding is off the
@@ -121,14 +121,14 @@ per-item fetch.
   chip and the emitted `wrappedMeta` still unseals the **date**; a pin drag flips to `fixed` and the toggle
   switches back to `auto`; **removing** the location clears the chip while the date survives; geocoding-off falls
   back to a typed name on the map.
-- [ ] 3 web pre-arm at creation — the Memory create dialog (`NodeMutationDialog` / `createMemory`) gains an
+- [x] 3 web pre-arm at creation — the Memory create dialog (`NodeMutationDialog` / `createMemory`) gains an
   optional **location step**: **none** (default) / **manual-fix** (drop a pin on the map → `fixed`) / **auto**
   (no `derived` yet — re-medoids on the first geotagged media), each with a **mandatory name**. Reuses the phase-2
   editor/model; on create, the sealed `location` rides the same node `wrappedMeta` the date already uses. ·
   Done when: `npm run check` green; a test creates a Memory with (i) a manual-fixed pin + name → `fixed` location
   sealed at birth, and (ii) `auto` + name → a named `auto` location with no `derived`, which gains a medoid after
   an upload (the self-heal); no-location creation is unchanged.
-- [ ] 4 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml`: the
+- [x] 4 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml`: the
   `deliberate-set-location`, `medoid-position`, `name-manual-or-reverse-geocoded`, and
   `reverse-only-veyq-blind-geocoding` criteria carry web test refs; the `tenant-map-via-listnodes` criterion stays
   gapped (its own slice). Live smoke (re-seeded instance, a configured Nominatim + OSM tiles): a Memory with two
@@ -158,5 +158,79 @@ trust-chain guards green; the live smoke confirmed. The tenant map is a separate
 
 ## Retrospective
 
-_(to be written at close — planning + execution + process/collaboration misses, both directions, root cause, one
-concrete "next time".)_
+**Outcome.** All four phases landed; `npm run check` green (280 unit/component tests + typecheck + build), the
+three trust-chain guards green, and the live smoke confirmed end-to-end against a re-seeded instance + real OSM
+tiles + real Nominatim.
+
+**What went well.**
+- The **read-modify-write refactor first** (a shared `nodeMeta.ts` envelope) was the right central move — once
+  `setMemoryDate`/`setMemoryLocation` both merged into `{v, date?, location?}`, date-preservation fell out for
+  free and was pinned by a cross-preservation test in both directions. The CR flagged this "destructive seal" as
+  the central risk and tackling it in phase 1 paid off.
+- **Stubbing Leaflet at the component seam** (a `MemoryMap` wrapper the editor drives via events) kept the whole
+  editor unit-testable in happy-dom; the real Leaflet render was then confirmed once, live, in the browser smoke.
+- The **live e2e mirrored `media.e2e.test.ts`** (seed → login → unlock → scope), so the operator-blind seal +
+  RMW + remove + create-pre-arm + real geocode all ran as one gated test, and a MariaDB grep proved zero
+  plaintext at rest.
+
+**Misses / root causes.**
+- **"Two-stage consent" was ambiguous** in the ADRs — it reads like it could be two independent toggles, but
+  ADR 0018 forbids a tiles-on/geocoding-off middle stage. Resolved to one coupled boolean; asked the user only
+  the genuinely-open question (endpoint defaults). Next time: pin coupled-vs-independent explicitly in the ADR.
+- **`nameSource` initial value bug** — a fresh location defaulted to `manual`, which silently blocked the
+  onMounted geocode; caught immediately by the editor test (name stayed empty). Root cause: conflating "no
+  source yet" with "user typed". Fix: seed `geocoded` when geocoding is available, flip to `manual` on real input.
+- **Browser-automation friction** — a plain `preview_click` on the submit button didn't fire the Vue form
+  submit; `form.requestSubmit()` did. Cost a couple of round-trips. Next time: drive PrimeVue forms via
+  `requestSubmit` from the start, and remember the seed tenant only resolves on the `127.0.0.1` Host.
+- **Nominatim 403 on the node default UA** — a real usage-policy artifact, not a bug (the browser supplies its
+  own UA; the seam correctly returned null and the manual name would stand). Injected a descriptive UA via the
+  seam's `fetchImpl` for the node smoke.
+
+**Next time (one concrete).** When a CR introduces a coupled consent/opt-in, write the composable + its unit
+test in the same step as the ADR reading — the `mapsAvailable`/`geocodingAvailable` split only became crisp once
+the test forced me to state exactly which knob gates which capability.
+
+**Post-review redesign (same branch).** First-use feedback on the create dialog reframed the interaction, and it
+was the right call — closer to ADR 0016's "pan/zoom → geocoded name" than the shipped click-to-drop-pin:
+- **Position is framed, not pinned.** A `fixed` place is the map's **centre** (a crosshair); panning/zooming
+  moves it — no dropped/dragged marker. An `auto` place shows the medoid pin. (`MemoryMap` lost its drag/click
+  emits; gained a `crosshair` + a static `marker`.)
+- **Name is auto-geocoded by default, with an explicit "name it myself" checkbox** (replacing the implicit
+  type-to-go-manual), so the source is a visible toggle; geocoding-off forces manual.
+- **`auto` without media is now truly deferred (pending).** It arms with **no name/position**; the first
+  geotagged upload materializes both — the self-heal re-medoids *and* reverse-geocodes the name (ADR 0016 standing
+  consent). The chip shows a "location pending…" placeholder meanwhile. This relaxed the enabler's "name
+  mandatory" to "mandatory except a pending auto place" (doc updated). Model: `normalizeLocation` keeps a nameless
+  `auto`+`geocoded` blob; `isLocationPending` drives the chip.
+- **Root cause of the original miss:** I read "a manually-dropped pin (fixed)" in the CR literally as a click
+  interaction, when the ADR's framing model was the better read all along. Lesson: when the ADR and a CR sentence
+  seem to describe the same gesture differently, prototype the ADR's version first.
+
+**Consolidation (same branch).** More first-use feedback: the create dialog had its **own** location UI (a
+none/auto/fixed `SelectButton` + a duplicated map/geocode/name implementation) that diverged from the editor's
+(a two-way auto/fixed toggle + a separate remove button). Collapsed to **one** control in **one** component: the
+`MemoryLocationEditor` now owns the **3-way `SelectButton` (Kein Ort / Auto / Fest)** — `Kein Ort` folds in the
+old remove button (Save with it clears the place) — and the create dialog reuses that same editor, opened as a
+**second dialog** via an "Ort hinzufügen" affordance (a summary row with change/remove). All the duplicated
+framing/geocode logic is gone. To make the editor context-free, it now supports `auto` **without a medoid** (a
+pending place — no map, deferred name) and defaults to `auto`. Two iterations of feedback here (button-vs-tabs,
+inline-vs-second-dialog) — the lesson: for a control the user will actually touch, mock the exact affordance and
+confirm it before wiring, rather than inferring it from the prose. Build the shared component once and reuse it
+from both entry points; the inlined "simpler" copy always drifts.
+
+**Intent-first redesign (same branch, co-designed via mockups).** The tabbed editor still surfaced too much
+mechanism. Reworked to hide it:
+- **"Karte verschieben" (map-pan), not a dropped pin.** A fixed centre crosshair *is* the position (like
+  Uber/Maps "set location"); the map opens on the medoid with faint **photo dots** + a "Folgt deinen Fotos" pill.
+  Moving the map by hand takes over → `fixed`, with a one-tap "wieder folgen". No mode tabs, no drag target.
+- **Name = the reverse-geocoded address *hierarchy*, not a single string.** The user's insight — position and
+  *granularity* are two levers — became: move the map for *where*, pick the **level** (road…country) for *how
+  specific*. The seam changed from `reverse(…zoom…)→name` to `reverse(…lang)→level[]`; `nameAnchor.zoom` became
+  `nameAnchor.level` so an auto refresh keeps the chosen grain. ADR 0016 amended with a dated revision.
+- **Create is now one line** ("Ort — folgt automatisch deinen Fotos" → a pending auto place); the heavy map/name
+  live only on the open Memory, where photos give context. No second dialog, no name field, no privacy paragraph
+  (a small ⓘ tooltip instead).
+- **Process win:** comparing directions with inline **mockups before coding** cut the churn — the user picked
+  "map-pan + level-picker" from a picture in one round, versus the several prose round-trips the earlier
+  tabs/dialog decisions took. For a control the user will touch, mock the affordance first.

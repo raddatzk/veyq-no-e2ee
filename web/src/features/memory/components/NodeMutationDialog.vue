@@ -2,13 +2,20 @@
 // Create a folder / create a Memory / rename a node (cr-0030 P4). Ported dialog shape; wired to the E2EE
 // tree data layer (names sealed under K_SC client-side). One dialog, three modes. Inline slug_taken (409) /
 // illegal_structure (422) errors.
+//
+// create-memory can **pre-arm a location** (cr-0069) behind the personal maps opt-in — but at creation there are
+// no photos yet, so the heavy map/name belong later (on the open Memory, via the shared editor). Here it is a
+// single opt-in: "Ort — folgt automatisch deinen Fotos" arms a **pending `auto`** place whose position + name are
+// materialized by the first geotagged upload (the `MemoryDetail` self-heal). Sealed at birth into `wrappedMeta`.
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import { createFolder, createMemory, createChapter, renameNode, type TreeNode } from '../tree'
+import { useMapConfig } from '../../../shared/state/useMapConfig'
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 
@@ -23,10 +30,13 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ done: []; close: [] }>()
 const { t } = useI18n()
+const { mapsAvailable } = useMapConfig()
 
 const name = ref(props.mode === 'rename' ? (props.node?.name ?? '') : '')
 const error = ref('')
 const loading = ref(false)
+const wantsLocation = ref(false) // opt into a pending `auto` place (create-memory, behind the maps opt-in)
+const showLocationStep = computed(() => props.mode === 'create-memory' && mapsAvailable.value)
 
 const header = computed(() =>
   props.mode === 'rename'
@@ -49,7 +59,8 @@ async function submit() {
     if (props.mode === 'create-folder') {
       await createFolder(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null)
     } else if (props.mode === 'create-memory') {
-      await createMemory(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null)
+      const location = showLocationStep.value && wantsLocation.value ? { name: '', nameSource: 'geocoded' as const, derivedMode: 'auto' as const } : null
+      await createMemory(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null, location)
     } else if (props.mode === 'create-chapter') {
       if (!props.parentId || !props.parentKey) throw new Error('chapter_parent_missing')
       await createChapter(props.scopeId, props.scopeKey, props.parentKey, trimmed, props.parentId)
@@ -74,6 +85,15 @@ async function submit() {
         {{ t('memory.nameLabel') }}
         <InputText v-model="name" autocomplete="off" required autofocus />
       </label>
+
+      <div v-if="showLocationStep" class="node-location-optin">
+        <Checkbox v-model="wantsLocation" input-id="wants-location" binary />
+        <label for="wants-location" class="node-location-optin-text">
+          <span>{{ t('memory.place.autoOptIn') }}</span>
+          <span class="node-location-optin-hint">{{ t('memory.place.autoOptInHint') }}</span>
+        </label>
+      </div>
+
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="dialog-actions">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
@@ -89,5 +109,20 @@ async function submit() {
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+.node-location-optin {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+.node-location-optin-text {
+  display: grid;
+  gap: 0.12rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+.node-location-optin-hint {
+  color: var(--app-muted);
+  font-size: 0.82rem;
 }
 </style>

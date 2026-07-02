@@ -9,6 +9,8 @@ import { b64std, fromB64std } from '../../shared/base64'
 import { contentApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { NodeKind, type NodeSummary } from '../../api/generated/content'
+import { sealNodeMeta } from './nodeMeta'
+import type { MemoryLocation } from './memoryLocation'
 
 const NAME_CTX = 'node-name'
 const KMEM_CTX = 'content-key'
@@ -106,6 +108,7 @@ export async function createFolder(
  */
 async function createContentNode(
   scopeId: string, scopeKey: Uint8Array, wrapKey: Uint8Array, kind: NodeKind, name: string, parentId: string | null,
+  metaSealer?: (contentKey: Uint8Array) => string,
 ): Promise<{ nodeId: string; contentKey: Uint8Array }> {
   const parentSlot = parentId ?? scopeId
   const contentKey = v1.randomBytes(32)
@@ -120,17 +123,24 @@ async function createContentNode(
         slugToken: slugTokenFor(scopeKey, parentSlot, name),
         orderIndex: 0,
         wrappedContentKey,
+        wrappedMeta: metaSealer?.(contentKey), // sealed under the just-minted K_mem (e.g. a pre-armed location)
       },
     }),
   )
   return { nodeId: res.nodeId, contentKey }
 }
 
-/** Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC`. Returns the node id + the K_mem. */
+/**
+ * Create a MEMORY — births a fresh random `K_mem` wrapped under `K_SC`. Returns the node id + the K_mem. An
+ * optional `location` is **sealed at birth** into the node's `wrappedMeta` under that fresh `K_mem` (cr-0069
+ * pre-arm) — a `fixed` pin, or an `auto` name with no `derived` yet (it re-medoids on the first geotagged media).
+ */
 export async function createMemory(
   scopeId: string, scopeKey: Uint8Array, name: string, parentId: string | null = null,
+  location: MemoryLocation | null = null,
 ): Promise<{ nodeId: string; memoryKey: Uint8Array }> {
-  const { nodeId, contentKey } = await createContentNode(scopeId, scopeKey, scopeKey, NodeKind.Memory, name, parentId)
+  const metaSealer = location ? (key: Uint8Array) => sealNodeMeta(key, { v: 1, location }) : undefined
+  const { nodeId, contentKey } = await createContentNode(scopeId, scopeKey, scopeKey, NodeKind.Memory, name, parentId, metaSealer)
   return { nodeId, memoryKey: contentKey }
 }
 

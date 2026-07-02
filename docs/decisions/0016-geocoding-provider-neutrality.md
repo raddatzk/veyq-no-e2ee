@@ -3,6 +3,12 @@
 - Status: Accepted
 - Date: 2026-07-01 (revised 2026-07-02)
 
+> **Revision (2026-07-02, cr-0069 build).** The seam **returns the address hierarchy**, not a single name: the
+> client picks the granularity **level** (Straße…Land) from the returned levels, decoupling *where* (the map
+> position) from *how specific the name is*. So the request no longer carries a granularity `zoom` — it asks for
+> the full breakdown once, and the UI offers a level picker. The principle below is unchanged (reverse-only,
+> coordinate-first, third-party, veyq-blind); only the seam's return shape is refined from `→ name` to `→ level[]`.
+
 ## Context
 
 A Memory can carry a **named location** ([uc.memory.place](../features/memory/use-cases/uc.memory.place.md)):
@@ -43,8 +49,11 @@ Considered and rejected:
 (never the operator, never a proxy), and consented per space. Tiles + geocoding are one coupled opt-in
 ([ADR 0018](0018-map-tiles-provider-neutrality.md)). Nominatim is the reference provider.**
 
-- **The seam is `reverse(lat, lng, zoom, lang) → name`.** `zoom` = the map's framed zoom → name granularity;
-  `lang` = the resolving language (see *tenant language* below). Providers map these as best they can.
+- **The seam is `reverse(lat, lng, lang) → level[]`** (the address hierarchy, finest→coarsest — road, suburb,
+  city, county, state, country). The client **picks the granularity level** (and may type its own name); `lang` =
+  the resolving language (see *tenant language* below). Providers map their address components onto these levels.
+  *(Originally `reverse(lat,lng,zoom,lang)→name` with `zoom`=granularity; refined per the revision note above so
+  granularity is a deliberate pick, not a side-effect of the map zoom.)*
 - **Third-party only, veyq-blind by construction.** The request goes **client-direct to a third-party provider**
   (public Nominatim/OSM or another the operator points at that it does **not** run), **never through the veyq
   backend and never to an operator-run instance**. It carries **no veyq identity and no Memory context** — a bare

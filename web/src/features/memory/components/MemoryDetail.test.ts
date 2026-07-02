@@ -11,6 +11,9 @@ vi.mock('../../../api/client', () => ({
 
 // exifr drives the sealed capture-time tier; default = no date, tests override per media (cr-0066).
 vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
+// the reverse-geocode seam is mocked — the self-heal that materializes a pending auto name is under test.
+// Keep the real defaultLevel/nameAtLevel helpers (the self-heal picks a level from the mocked hierarchy).
+vi.mock('../geocode', async (orig) => ({ ...(await orig<typeof import('../geocode')>()), reverseGeocode: vi.fn() }))
 
 import { mount, flushPromises } from '@vue/test-utils'
 import exifr from 'exifr'
@@ -19,6 +22,10 @@ import PrimeVue from 'primevue/config'
 import MemoryDetail from './MemoryDetail.vue'
 import { addMedia, type MediaDeriver } from '../media'
 import { sealMemoryDate, unsealMemoryDate, type MemoryDate } from '../memoryDate'
+import { unsealMemoryLocation, type MemoryLocation } from '../memoryLocation'
+import { sealNodeMeta } from '../nodeMeta'
+import { setMapsConsent, setGeocoderUrl } from '../../../shared/state/useMapConfig'
+import { reverseGeocode } from '../geocode'
 import { epochMsToIsoDate } from '../../../shared/isoDate'
 import { mediaApi, contentApi } from '../../../api/client'
 import * as v1 from '../../../shared/crypto/v1'
@@ -41,6 +48,10 @@ const i18n = createI18n({
           title: 'Date', edit: 'Edit date', noDate: 'No date yet', since: 'Since {day}', autoHint: 'Derived from your photos.', autoEmpty: 'Add dated photos, or set a date manually.',
           day: 'Day', from: 'From', to: 'To', start: 'Start', invalidRange: 'The end can’t be before the start.', saveFailed: 'Could not save the date.',
           mode: { auto: 'Automatic', single: 'Single day', range: 'Range', ongoing: 'Ongoing' },
+        },
+        place: {
+          title: 'Location', edit: 'Edit location', set: 'Set location', noPlace: 'No location yet', name: 'Name',
+          pending: 'Location pending…', remove: 'Remove location', consentTitle: 'Enable maps?', consentBody: 'Third-party tiles + geocoder.', consentEnable: 'Enable maps',
         },
       },
       media: {
@@ -111,6 +122,13 @@ function lastPatchedDate(key: Uint8Array): MemoryDate | null {
   if (!calls.length) return null
   const wrappedMeta = calls[calls.length - 1][0].updateNodeRequest.wrappedMeta as string
   return unsealMemoryDate(key, { wrappedMeta })
+}
+/** The MemoryLocation sealed into the most recent updateNode PATCH (cr-0069), unsealed under `key`. */
+function lastPatchedLocation(key: Uint8Array): MemoryLocation | null {
+  const calls = updateNode.mock.calls
+  if (!calls.length) return null
+  const wrappedMeta = calls[calls.length - 1][0].updateNodeRequest.wrappedMeta as string
+  return unsealMemoryLocation(key, { wrappedMeta })
 }
 afterEach(() => {
   vi.restoreAllMocks()
@@ -376,5 +394,156 @@ describe('MemoryDetail (Memory date — header + auto-reconcile, cr-0067)', () =
     await flushPromises()
     expect(lastPatchedDate(memoryKey)).toEqual({ mode: 'single', from: '2026-06-15', to: '2026-06-15' })
     expect(wrapper.emitted('metaUpdated')?.[0]?.[0]).toMatchObject({ nodeId: NODE_ID })
+  })
+})
+
+describe('MemoryDetail (Memory location — header chip + read-modify-write, cr-0069)', () => {
+  const emptyStore = () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    return store
+  }
+  const GEOCODED: MemoryLocation = {
+    name: 'Teneriffa', nameSource: 'geocoded', derived: { lat: 28.27, lng: -16.61 }, derivedMode: 'auto',
+    nameAnchor: { lat: 28.27, lng: -16.61, level: 'city' },
+  }
+  // A stub editor: two buttons emit save(location) / save(null) so the detail's RMW wiring is what's under test.
+  const LocationEditorStub = {
+    props: ['location', 'medoid'],
+    emits: ['save', 'close'],
+    setup(_: unknown, { emit }: { emit: (e: string, ...args: unknown[]) => void }) {
+      return { doSave: () => emit('save', GEOCODED), doRemove: () => emit('save', null) }
+    },
+    template: `<div class="loc-editor"><button class="loc-save" @click="doSave"></button><button class="loc-remove" @click="doRemove"></button></div>`,
+  }
+  function mountWithLocationStub(memoryKey: Uint8Array, wrappedMeta: string | null) {
+    setMapsConsent(true) // skip the consent dialog — go straight into the (stubbed) editor
+    return mount(MemoryDetail, {
+      props: { node: node('Rom 2026', wrappedMeta), scopeId: SCOPE_ID, memoryKey, favorite: false },
+      global: { plugins: [i18n, PrimeVue], directives: { tooltip: {} }, stubs: { MemoryLocationEditor: LocationEditorStub } },
+    })
+  }
+
+  it('shows a “Set location” affordance when the Memory has no place', async () => {
+    emptyStore()
+    const wrapper = mountWithLocationStub(v1.randomBytes(32), null)
+    await flushPromises()
+    expect(wrapper.find('.memory-location-chip').text()).toContain('Set location')
+  })
+
+  it('renders the stored location name in the chip', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const sealed = sealNodeMeta(memoryKey, { v: 1, location: GEOCODED })
+    const wrapper = mountWithLocationStub(memoryKey, sealed)
+    await flushPromises()
+    expect(wrapper.find('.memory-location-chip').text()).toContain('Teneriffa')
+  })
+
+  it('saving a location read-modify-writes the blob — the sibling date is preserved', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const date: MemoryDate = { mode: 'single', from: '2026-06-15', to: '2026-06-15' }
+    const sealed = sealNodeMeta(memoryKey, { v: 1, date }) // node already has a manual date
+    const wrapper = mountWithLocationStub(memoryKey, sealed)
+    await flushPromises()
+
+    await wrapper.find('.memory-location-chip').trigger('click') // maps consented → editor opens
+    await flushPromises()
+    await wrapper.find('.loc-save').trigger('click')
+    await flushPromises()
+
+    // the PATCH sealed the location AND kept the date
+    expect(lastPatchedLocation(memoryKey)).toMatchObject({ name: 'Teneriffa', derivedMode: 'auto' })
+    expect(lastPatchedDate(memoryKey)).toEqual(date)
+    expect(wrapper.emitted('metaUpdated')?.[0]?.[0]).toMatchObject({ nodeId: NODE_ID })
+  })
+
+  it('removing the location clears the place but keeps the date (RMW)', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const date: MemoryDate = { mode: 'ongoing', from: '2026-01-01' }
+    const sealed = sealNodeMeta(memoryKey, { v: 1, date, location: GEOCODED })
+    const wrapper = mountWithLocationStub(memoryKey, sealed)
+    await flushPromises()
+
+    await wrapper.find('.memory-location-chip').trigger('click')
+    await flushPromises()
+    await wrapper.find('.loc-remove').trigger('click')
+    await flushPromises()
+
+    expect(lastPatchedLocation(memoryKey)).toBeNull() // place gone
+    expect(lastPatchedDate(memoryKey)).toEqual(date) // date intact
+  })
+
+  it('self-heals a pre-armed AUTO location (no derived) to the media medoid on open', async () => {
+    // an `auto` location pre-armed at creation carries a name but no position yet (cr-0069 phase 3)
+    const memoryKey = v1.randomBytes(32)
+    const pending: MemoryLocation = { name: 'Boulder gym', nameSource: 'manual', derivedMode: 'auto' }
+    const sealed = sealNodeMeta(memoryKey, { v: 1, location: pending })
+
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    vi.mocked(exifr.parse).mockResolvedValue({ latitude: 48.85, longitude: 2.35 } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+
+    mountWithLocationStub(memoryKey, sealed)
+    await flushPromises()
+    await flushPromises()
+
+    // the open-time self-heal filled `derived` from the medoid while keeping the name + auto mode
+    expect(lastPatchedLocation(memoryKey)).toEqual({
+      name: 'Boulder gym', nameSource: 'manual', derivedMode: 'auto', derived: { lat: 48.85, lng: 2.35 }, nameAnchor: undefined,
+    })
+  })
+
+  it('shows a “pending” placeholder in the chip for an armed-but-unnamed auto location', async () => {
+    emptyStore()
+    const memoryKey = v1.randomBytes(32)
+    const pending = sealNodeMeta(memoryKey, { v: 1, location: { nameSource: 'geocoded', derivedMode: 'auto' } })
+    const wrapper = mountWithLocationStub(memoryKey, pending)
+    await flushPromises()
+    expect(wrapper.find('.memory-location-chip').text()).toContain('Location pending')
+  })
+
+  it('materializes a pending auto location — geocodes the medoid name on the first geotagged media (self-heal)', async () => {
+    setMapsConsent(true)
+    setGeocoderUrl('https://nominatim.example')
+    vi.mocked(reverseGeocode).mockResolvedValue([{ key: 'city', name: 'La Orotava' }, { key: 'state', name: 'Kanaren' }])
+    const memoryKey = v1.randomBytes(32)
+    const pending = sealNodeMeta(memoryKey, { v: 1, location: { nameSource: 'geocoded', derivedMode: 'auto' } })
+
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    vi.mocked(exifr.parse).mockResolvedValue({ latitude: 48.85, longitude: 2.35 } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+
+    mountWithLocationStub(memoryKey, pending)
+    await flushPromises()
+    await flushPromises()
+
+    expect(reverseGeocode).toHaveBeenCalled()
+    expect(lastPatchedLocation(memoryKey)).toMatchObject({
+      name: 'La Orotava', nameSource: 'geocoded', derivedMode: 'auto', derived: { lat: 48.85, lng: 2.35 },
+      nameAnchor: { lat: 48.85, lng: 2.35, level: 'city' },
+    })
+  })
+
+  it('with maps not consented, the chip opens the consent dialog instead of the editor', async () => {
+    emptyStore()
+    setMapsConsent(false)
+    const DialogStub = { props: ['visible'], template: '<div v-if="visible" class="dlg"><slot /></div>' }
+    const wrapper = mount(MemoryDetail, {
+      props: { node: node('Rom 2026'), scopeId: SCOPE_ID, memoryKey: v1.randomBytes(32), favorite: false },
+      global: { plugins: [i18n, PrimeVue], directives: { tooltip: {} }, stubs: { MemoryLocationEditor: LocationEditorStub, Dialog: DialogStub } },
+    })
+    await flushPromises()
+    await wrapper.find('.memory-location-chip').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.loc-editor').exists()).toBe(false) // no editor
+    expect(wrapper.find('.dlg').text()).toContain('Third-party tiles') // the consent dialog body
   })
 })

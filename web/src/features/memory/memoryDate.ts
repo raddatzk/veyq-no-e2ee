@@ -1,18 +1,18 @@
 // en.memory.date (web) — a Memory's curated date, sealed on the NODE under its `K_mem` (uc.memory.date-place,
 // cr-0067). Operator-blind: the effective day range travels in one client-versioned JSON blob `wrappedMeta`
-// `{ v, date: { mode, from?, to? }, place? }` (the place slice grows the same blob — no contract change),
+// `{ v, date: { mode, from?, to? }, location? }` (the place slice rides the same blob — no contract change),
 // AEAD-sealed under `K_mem` (AAD context `node-meta`) so the server only ever holds ciphertext. The range is
 // **materialized** for every mode — the browse card grid shows + sorts by it WITHOUT loading a Memory's media.
-import * as v1 from '../../shared/crypto/v1'
-import { b64std, fromB64std } from '../../shared/base64'
+//
+// The seal is **read-modify-write** (cr-0069): `setMemoryDate` unseals the current `{ v, date?, location? }`,
+// swaps in only the `date`, and re-seals — so writing a date never clobbers a sibling `location` (and vice-versa,
+// via `setMemoryLocation`). The shared envelope lives in `nodeMeta.ts`.
 import { contentApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { epochMsToIsoDate } from '../../shared/isoDate'
 import { effectiveCapturedAt, unsealMeta, type MediaItem } from './media'
 import { openContentKey, type TreeNode } from './tree'
-
-/** AAD context binding the sealed node-metadata blob (`wrappedMeta`) to its purpose (cr-0067). */
-const NODE_META_CTX = 'node-meta'
+import { sealNodeMeta, unsealNodeMeta } from './nodeMeta'
 
 /** The four date modes: derive from media (`auto`), a single day, a `from..to` span, or an open-ended `since`. */
 export type MemoryDateMode = 'auto' | 'single' | 'range' | 'ongoing'
@@ -22,9 +22,6 @@ export type MemoryDateMode = 'auto' | 'single' | 'range' | 'ongoing'
  * materialized `auto` ⇒ both (or neither when the Memory has no trustworthy dated media). Days are `YYYY-MM-DD`.
  */
 export type MemoryDate = { mode: MemoryDateMode; from?: string; to?: string }
-
-/** The client-versioned node-metadata blob. `place` (a later slice) rides the same blob — no contract change. */
-type WrappedMeta = { v: number; date?: MemoryDate; place?: unknown }
 
 const MODES: readonly MemoryDateMode[] = ['auto', 'single', 'range', 'ongoing']
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -39,11 +36,9 @@ function normalizeDate(raw: unknown): MemoryDate | null {
   return { mode: d.mode as MemoryDateMode, from: isoDayOrUndef(d.from), to: isoDayOrUndef(d.to) }
 }
 
-/** Seal a Memory's date into the opaque `wrappedMeta` blob under `nodeKey` (`K_mem`) → base64. */
+/** Seal a **fresh** date-only `wrappedMeta` blob under `nodeKey` (`K_mem`) → base64 (a node born with only a date). */
 export function sealMemoryDate(nodeKey: Uint8Array, date: MemoryDate): string {
-  const blob: WrappedMeta = { v: 1, date }
-  const bytes = new TextEncoder().encode(JSON.stringify(blob))
-  return b64std(v1.symWrap(nodeKey, bytes, NODE_META_CTX, v1.randomBytes(12)))
+  return sealNodeMeta(nodeKey, { v: 1, date })
 }
 
 /**
@@ -52,28 +47,26 @@ export function sealMemoryDate(nodeKey: Uint8Array, date: MemoryDate): string {
  * then falls back to the neutral `auto`/no-date state rather than break.
  */
 export function unsealMemoryDate(nodeKey: Uint8Array, node: { wrappedMeta: string | null }): MemoryDate | null {
-  if (!node.wrappedMeta) return null
-  try {
-    const json = new TextDecoder().decode(v1.symUnwrap(nodeKey, fromB64std(node.wrappedMeta), NODE_META_CTX))
-    const parsed = JSON.parse(json) as WrappedMeta
-    return normalizeDate(parsed?.date)
-  } catch {
-    return null
-  }
+  return normalizeDate(unsealNodeMeta(nodeKey, node.wrappedMeta).date)
 }
 
 /**
- * Re-seal `date` under `nodeKey` (`K_mem`) and PATCH it onto the node via the partial `updateNode` (cr-0067).
- * Returns the sealed blob so the caller can update its local `node.wrappedMeta` (and re-render the card/header)
- * without a re-list. (The place slice will merge `place` into the same blob here.)
+ * **Read-modify-write** the node-meta blob: unseal the current `{ v, date?, location? }` under `nodeKey`
+ * (`K_mem`), swap in only the `date`, re-seal, and PATCH via the partial `updateNode` (cr-0067 / cr-0069). This
+ * **preserves a sibling `location`** — writing a date never clobbers the place. `currentMeta` is the node's live
+ * `wrappedMeta` (or null for a node with none). Returns the sealed blob so the caller can update its local
+ * `node.wrappedMeta` (and re-render the card/header) without a re-list.
  */
 export async function setMemoryDate(
   scopeId: string,
   nodeId: string,
   nodeKey: Uint8Array,
   date: MemoryDate,
+  currentMeta: string | null,
 ): Promise<string> {
-  const wrappedMeta = sealMemoryDate(nodeKey, date)
+  const meta = unsealNodeMeta(nodeKey, currentMeta)
+  meta.date = date
+  const wrappedMeta = sealNodeMeta(nodeKey, meta)
   await withRefresh(() => contentApi().updateNode({ scopeId, nodeId, updateNodeRequest: { wrappedMeta } }))
   return wrappedMeta
 }

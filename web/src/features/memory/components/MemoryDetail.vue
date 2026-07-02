@@ -17,14 +17,27 @@ import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
 import { listMedia, openGrid, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
+import {
+  unsealMemoryLocation,
+  setMemoryLocation,
+  computeMedoid,
+  mediaGpsPoints,
+  sameMemoryLocation,
+  isLocationPending,
+  type MemoryLocation,
+} from '../memoryLocation'
+import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from '../uploadQueue'
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryDateEditor from './MemoryDateEditor.vue'
+import MemoryLocationEditor from './MemoryLocationEditor.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
+import Dialog from 'primevue/dialog'
 import { useViewMode } from '../../../shared/state/useViewMode'
+import { useMapConfig, setMapsConsent } from '../../../shared/state/useMapConfig'
 
 const props = defineProps<{
   node: TreeNode
@@ -110,7 +123,7 @@ async function onDateSave(date: MemoryDate) {
   if (!key) return
   const nodeId = props.node.id
   try {
-    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, date)
+    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, date, props.node.wrappedMeta)
     emit('metaUpdated', { nodeId, wrappedMeta })
   } catch {
     // best-effort: keep the header stable; the next open-time reconcile can re-materialize an `auto` range
@@ -129,10 +142,83 @@ async function reconcileAuto() {
   if (!stored && next.from === undefined) return // absent meta already == the empty `auto` state; nothing to seal
   const nodeId = props.node.id
   try {
-    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, next)
+    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, next, props.node.wrappedMeta)
     if (props.node.id === nodeId) emit('metaUpdated', { nodeId, wrappedMeta })
   } catch {
     // leave the stale range; the next Memory open self-heals it
+  }
+}
+
+// --- Memory location (cr-0069, uc.memory.place). A deliberate per-Memory named place sealed in the SAME node
+// `wrappedMeta` blob as the date (read-modify-write, operator-blind). The map + geocoding are gated behind a
+// personal two-stage opt-in (ADR 0016/0018); the position is the medoid of the Memory's photo GPS (`auto`,
+// self-heals as media arrive) or a hand-dropped pin (`fixed`).
+const { mapsAvailable, geocoderUrl, geocodingAvailable } = useMapConfig()
+const locationEditorOpen = ref(false)
+const consentDialogOpen = ref(false)
+const storedLocation = computed(() => (props.memoryKey ? unsealMemoryLocation(props.memoryKey, props.node) : null))
+const gpsPoints = computed(() => (props.memoryKey ? mediaGpsPoints(items.value, props.memoryKey) : []))
+const medoid = computed(() => computeMedoid(gpsPoints.value))
+// A pending auto place (armed, name deferred) shows a "…being determined" label until the first media names it.
+const locationLabel = computed(() => {
+  const loc = storedLocation.value
+  if (!loc) return ''
+  return isLocationPending(loc) ? t('memory.place.pending') : loc.name
+})
+
+/** Open the location editor — but first gate on the personal maps opt-in (no consent ⇒ ask, no external calls). */
+function openLocationEditor() {
+  if (!props.memoryKey) return
+  if (mapsAvailable.value) locationEditorOpen.value = true
+  else consentDialogOpen.value = true
+}
+
+/** The user grants the coupled tiles+geocoding consent → enable and proceed into the editor. */
+function enableMaps() {
+  setMapsConsent(true)
+  consentDialogOpen.value = false
+  if (mapsAvailable.value) locationEditorOpen.value = true
+}
+
+/** Save (or, for null, remove) the location: read-modify-write under K_mem — the date is preserved either way. */
+async function onLocationSave(location: MemoryLocation | null) {
+  const key = props.memoryKey
+  if (!key) return
+  const nodeId = props.node.id
+  try {
+    const wrappedMeta = await setMemoryLocation(props.scopeId, nodeId, key, location, props.node.wrappedMeta)
+    emit('metaUpdated', { nodeId, wrappedMeta })
+  } catch {
+    // best-effort: keep the header stable; a retry re-seals
+  }
+}
+
+/** Re-medoid an `auto` location from the media, and materialize a **pending** name by reverse-geocoding the
+ *  medoid once (opt-in) — the self-heal that turns a create-time `auto` arm into a named place on the first
+ *  geotagged upload. Re-seals only when something changed. A `manual` name / a `fixed` place is never touched. */
+async function reconcileAutoLocation() {
+  const key = props.memoryKey
+  if (!key) return
+  const stored = unsealMemoryLocation(key, props.node)
+  if (!stored || stored.derivedMode !== 'auto') return // no location / a `fixed` place is the user's — never moved
+  const point = computeMedoid(mediaGpsPoints(items.value, key))
+  if (!point) return // no GPS yet (e.g. an `auto` pre-armed at creation) — nothing to derive from
+  let next: MemoryLocation = { ...stored, derived: point }
+  // Materialize/refresh a geocoded name from the medoid at the stored granularity `level` (client-direct
+  // third-party, ADR 0016 standing consent): a pending arm gets its first name; a moved medoid refreshes it.
+  const medoidMoved = stored.derived?.lat !== point.lat || stored.derived?.lng !== point.lng
+  if (stored.nameSource === 'geocoded' && geocodingAvailable.value && (isLocationPending(stored) || medoidMoved)) {
+    const levels = await reverseGeocode(geocoderUrl.value, point.lat, point.lng, locale.value)
+    const level = levels ? (stored.nameAnchor?.level && levels.find((l) => l.key === stored.nameAnchor?.level) ? { key: stored.nameAnchor.level, name: nameAtLevel(levels, stored.nameAnchor.level)! } : defaultLevel(levels)) : null
+    if (level) next = { ...next, name: level.name, nameAnchor: { lat: point.lat, lng: point.lng, level: level.key } }
+  }
+  if (sameMemoryLocation(stored, next)) return
+  const nodeId = props.node.id
+  try {
+    const wrappedMeta = await setMemoryLocation(props.scopeId, nodeId, key, next, props.node.wrappedMeta)
+    if (props.node.id === nodeId) emit('metaUpdated', { nodeId, wrappedMeta })
+  } catch {
+    // leave the stale position; the next Memory open self-heals it
   }
 }
 
@@ -279,7 +365,10 @@ async function load() {
         }
       }),
     )
-    if (props.node.id === nodeId) await reconcileAuto() // settle point: open-time self-heal + post-upload-batch
+    if (props.node.id === nodeId) {
+      await reconcileAuto() // settle point: open-time self-heal + post-upload-batch (date, then location)
+      await reconcileAutoLocation() // reads the date-reconciled wrappedMeta (patched in place) → RMW-safe
+    }
   } catch {
     if (props.node.id === nodeId) status.value = 'error'
   }
@@ -323,6 +412,18 @@ onBeforeUnmount(() => {
         >
           <span class="pi pi-calendar" />
           <span>{{ dateLabel || t('memory.date.noDate') }}</span>
+        </button>
+        <button
+          type="button"
+          class="memory-date-chip memory-location-chip"
+          :class="{ 'is-empty': !locationLabel }"
+          :disabled="!memoryKey"
+          :aria-label="locationLabel ? t('memory.place.edit') : t('memory.place.set')"
+          :title="locationLabel ? t('memory.place.edit') : t('memory.place.set')"
+          @click="openLocationEditor"
+        >
+          <span class="pi pi-map-marker" />
+          <span>{{ locationLabel || t('memory.place.set') }}</span>
         </button>
       </div>
       <div class="gallery-header-actions">
@@ -376,7 +477,7 @@ onBeforeUnmount(() => {
 
     <!-- Tabbed detail (cr-0061, ported from the design source): Gallery (the media grid) + Chapters (the
          nested Memories). Other design tabs — journal / map / playlists — arrive with their features. -->
-    <Tabs v-model:value="activeTab" class="memory-detail-tabs">
+    <Tabs v-model:value="activeTab" class="memory-tabs">
       <TabList>
         <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
         <Tab value="chapters">
@@ -394,7 +495,7 @@ onBeforeUnmount(() => {
           <template v-else>
             <div class="gallery-toolbar">
               <button
-                class="veyq-icon-button gallery-sort-toggle"
+                class="gallery-sort-toggle"
                 type="button"
                 :aria-label="sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest')"
                 :title="sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest')"
@@ -488,6 +589,29 @@ onBeforeUnmount(() => {
       @save="onDateSave"
       @close="dateEditorOpen = false"
     />
+
+    <MemoryLocationEditor
+      v-if="locationEditorOpen && memoryKey"
+      :location="storedLocation"
+      :medoid="medoid"
+      :points="gpsPoints"
+      @save="onLocationSave"
+      @close="locationEditorOpen = false"
+    />
+
+    <Dialog
+      :visible="consentDialogOpen"
+      :header="t('memory.place.consentTitle')"
+      modal
+      class="memory-location-consent"
+      @update:visible="consentDialogOpen = false"
+    >
+      <p>{{ t('memory.place.consentBody') }}</p>
+      <div class="dialog-actions">
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="consentDialogOpen = false" />
+        <Button type="button" :label="t('memory.place.consentEnable')" icon="pi pi-map" @click="enableMaps" />
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -497,17 +621,29 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   margin-bottom: 0.6rem;
 }
+/* Icon + label pill (NOT the icon-only .veyq-icon-button utility, which forces a square grid-centered box and
+   stacks the icon over the label). Matches the header date/place chips for a consistent toolbar affordance. */
 .gallery-sort-toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  width: auto;
-  padding: 0.35rem 0.6rem;
+  padding: 0.35rem 0.7rem;
   border: 1px solid var(--app-line);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--app-surface);
   color: var(--app-text);
   font-size: 0.86rem;
+  cursor: pointer;
+}
+.gallery-sort-toggle:hover {
+  background: var(--app-hover);
+}
+.gallery-sort-toggle:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+.gallery-sort-toggle .pi {
+  font-size: 0.9rem;
 }
 .gallery-header {
   display: flex;
@@ -634,5 +770,11 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   font-size: 1.5rem;
+}
+.memory-location-consent .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
 }
 </style>

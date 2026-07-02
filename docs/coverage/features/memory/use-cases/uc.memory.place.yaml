@@ -3,27 +3,57 @@ feature: memory
 title: Curate a Memory's place — one sealed, named location
 status: planned
 # Refined, not yet built. Place reuses the node's `wrappedMeta` blob (shipped for the date, cr-0067) and adds a
-# `location` sub-object `{ name, nameSource, derived (medoid), derivedMode, nameAnchor{lat,lng,zoom} }` — sealed
+# `location` sub-object `{ name, nameSource, derived (medoid), derivedMode, nameAnchor{lat,lng,level} }` — sealed
 # under K_mem, set via the same partial updateNode, returned on listNodes. Deliberate set-up (never silent), a
 # mandatory name, position = the MEDOID of the media GPS, reverse-only opt-in geocoding (client-direct, Nominatim
 # reference, ADR 0016), and a tenant-wide map that plots every Memory from listNodes without loading media. Every
 # surface is a gap until the place slices land; the acceptance criteria pin what each slice must satisfy.
 acceptanceCriteria:
   - id: sealed-location-on-node
-    text: A MEMORY/CHAPTER node's `wrappedMeta.location` carries ONE named place — name (mandatory) + nameSource (geocoded|manual) + derived {lat,lng} + derivedMode (fixed|auto) + nameAnchor {lat,lng,zoom} — sealed under K_mem in the same client-versioned blob as the date (no contract change), set via the partial updateNode and returned on listNodes. The operator-blind server never sees a coordinate or a place name.
+    text: A MEMORY/CHAPTER node's `wrappedMeta.location` carries ONE named place — name (mandatory, except a pending auto place) + nameSource (geocoded|manual) + derived {lat,lng} + derivedMode (fixed|auto) + nameAnchor {lat,lng,level} — sealed under K_mem in the same client-versioned blob as the date (no contract change), set via the partial updateNode and returned on listNodes. The operator-blind server never sees a coordinate or a place name.
+    coverage:
+      backend: { integration: [NodesSliceTest.wrappedMetaRoundTripsAndPartialUpdateLeavesItUnchanged] }
+      web:
+        unit:
+          - src/features/memory/memoryLocation.test.ts
+          - src/features/memory/memoryDate.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: deliberate-set-location
     text: A location is created only by a deliberate "set location" act (on Memory open, or pre-armed at Memory creation with a mandatory fallback name + derivedMode auto); there is no empty-name / unnamed-pin state (no name ⇒ no location). Setup never happens silently on upload.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/components/MemoryLocationEditor.test.ts
+          - src/features/memory/components/NodeMutationDialog.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: medoid-position
-    text: The position `derived` is the MEDOID of the Memory's media GPS — the actual photo minimizing the summed Haversine distance to the others (robust to an outlier), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` defaults to auto on set-with-media (re-medoids as media are added) and flips to fixed when the user moves the pin by hand; fixed is a frozen snapshot. GPS is read from the always-listed capture tier (promoted alongside `capturedAt`, like cr-0066), so the medoid and every auto re-medoid are list-level — no per-item EXIF fetch; no backfill, so legacy media without the tier do not contribute.
+    text: The position `derived` is the MEDOID of the Memory's media GPS — the actual photo minimizing the summed Haversine distance to the others (robust to an outlier), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` defaults to auto on set-with-media (re-medoids as media are added) and flips to fixed when the user moves the MAP by hand (the centre crosshair becomes the position — "Karte verschieben"); fixed is a frozen snapshot. GPS is read from the always-listed capture tier (promoted alongside `capturedAt`, like cr-0066), so the medoid and every auto re-medoid are list-level — no per-item EXIF fetch; no backfill, so legacy media without the tier do not contribute.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/memoryLocation.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: name-manual-or-reverse-geocoded
-    text: The name is independent of the coordinate — either typed by hand (nameSource manual, frozen) or reverse-geocoded from nameAnchor (coordinate + zoom → granularity Atlantik/Kanaren/Teneriffa; nameSource geocoded, may refresh when the anchor moves). A geocoded fallback typed at creation is a placeholder the lookup replaces; if geocoding stays off it persists, blind.
+    text: The name is independent of the position — either typed by hand (nameSource manual, frozen) or picked from the reverse-geocoded ADDRESS HIERARCHY (road…country; the user chooses the granularity `level`, e.g. Straße › Viertel › Stadt › Land; nameSource geocoded, may refresh at the stored level when the auto medoid moves). Position (move the map) and granularity (pick the level) are separate levers; a pending auto place gets both from the first geotagged media; if geocoding stays off the name is typed, blind.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/geocode.test.ts
+          - src/features/memory/memoryLocation.test.ts
+          - src/features/memory/components/MemoryLocationEditor.test.ts
   - id: reverse-only-veyq-blind-geocoding
-    text: Geocoding is reverse-only and opt-in; the request goes client-direct to the provider (never through the veyq backend), carries no veyq identity (a bare coordinate), and sits behind a provider-neutral seam reverse(lat,lng,zoom,lang)->name (reference Nominatim, operator-configurable, off-until-configured — ADR 0016). Opt-in is standing consent (may auto-resolve on the first geotagged media at a default zoom); it never fires without opt-in, and a member who declined sees a name another member resolved without any request.
+    text: Geocoding is reverse-only and opt-in; the request goes client-direct to the provider (never through the veyq backend), carries no veyq identity (a bare coordinate), and sits behind a provider-neutral seam reverse(lat,lng,lang)->level[] (the address hierarchy; reference Nominatim, operator-configurable, off-until-configured — ADR 0016). Opt-in is standing consent (may auto-resolve on the first geotagged media at a default level); it never fires without opt-in, and a member who declined sees a name another member resolved without any request.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/geocode.test.ts
+          - src/shared/state/useMapConfig.test.ts
+          - src/features/memory/components/MemoryLocationEditor.test.ts
   - id: tenant-map-via-listnodes
     text: A tenant-root toggle shows every Memory as a pin, read from each node's sealed `location` via listNodes (unsealed client-side, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name. Map tiles are a separate opt-in/self-host seam.
 gaps:
   backend: "Slice 2a done (cr-0068): GPS is promoted into the always-listed media metadata tier — the two listed tiers (`wrappedLayout` + `wrappedCapturedAt`) are consolidated into one `wrapped_meta` blob (geometry + capture time + GPS) sealed under K_mem (migration V18, no backfill), so the medoid can read GPS list-level without a per-item fetch; round-tripped by MediaSliceTest (complete→list + PUT `/meta`→list). The node's `location` itself round-trips inside the opaque node `wrappedMeta` (cr-0067) — no further backend change. Remaining: nothing at the backend level; the medoid + name are client-side (slice 2b)."
-  web: "Slice 2a done (cr-0068): the media data layer seals GPS into the listed `wrappedMeta` tier (context `media-meta`), moved out of the lazy EXIF; media.test.ts round-trips GPS at list-level. Remaining slices: (2b) web set-location + medoid + name, (3) the tenant map, (4) reverse-geocoding — their own CRs on the shipped `wrappedMeta` blobs; web-first per ADR 0010."
+  web: "Slice 2b done (cr-0069): the node-meta seal is now read-modify-write (shared `nodeMeta.ts` over `{v,date?,location?}`), so setting a location preserves the sibling date (and vice-versa). `memoryLocation.ts` adds the `location` model + the medoid (min summed Haversine, sea-outlier-resistant), `geocode.ts` the reverse-only client-direct seam (off-until-configured), `useMapConfig.ts` the coupled two-stage tiles+geocoding opt-in (ADR 0016/0018, public OSM/Nominatim default, env/localStorage override). UI is intent-first: a Leaflet `MemoryMap` (fixed centre crosshair — move the map, the centre is the place — + faint photo dots), a `MemoryLocationEditor` (opens on the medoid with a follows-your-photos pill; moving the map by hand flips to fixed with a one-tap follow-again; the name is picked from the reverse-geocoded address-hierarchy `level` or typed; quiet remove), a detail-header location chip + open-time/post-upload self-heal (re-medoid + refresh the geocoded name at the stored level), and a create-dialog single opt-in (follows-your-photos toggle arming a pending auto place). All unit-tested with real v1 crypto + a stubbed map/geocode. Remaining slices (own CRs, web-first per ADR 0010): (2c) the tenant map plotting every Memory from listNodes; (deferred) the group consent state-machine + tenant language (ADR 0016), and an on-device blind gazetteer."
   apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
   android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
   http: "The `location` folds into the existing createNode / updateNode / listNodes (an extra opaque field in the same node `wrappedMeta`). The listed media metadata tier gaining GPS landed with cr-0068 (the `wrappedMeta` merge; no dedicated http media file exists — the media contract is exercised at the backend integration + web levels). Covered at the contract level once the set-location CR (2b) lands."

@@ -78,7 +78,7 @@ describe('setMemoryDate', () => {
     vi.mocked(contentApi).mockReturnValue({ updateNode } as unknown as ReturnType<typeof contentApi>)
 
     const date: MemoryDate = { mode: 'range', from: '2026-05-01', to: '2026-05-09' }
-    const sealed = await setMemoryDate(SCOPE_ID, 'node-9', nodeKey, date)
+    const sealed = await setMemoryDate(SCOPE_ID, 'node-9', nodeKey, date, null)
 
     const req = updateNode.mock.calls[0][0]
     expect(req.scopeId).toBe(SCOPE_ID)
@@ -86,6 +86,28 @@ describe('setMemoryDate', () => {
     expect(req.updateNodeRequest.wrappedMeta).toBe(sealed)
     // what we sealed opens back to the date under K_mem (operator-blind round-trip)
     expect(unsealMemoryDate(nodeKey, { wrappedMeta: sealed })).toEqual(date)
+  })
+
+  it('read-modify-write: setting a date preserves a sibling location in the same blob (cr-0069)', async () => {
+    const updateNode = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(contentApi).mockReturnValue({ updateNode } as unknown as ReturnType<typeof contentApi>)
+
+    // a blob that already carries a location (sealed as the RMW envelope would)
+    const withLocation = b64std(
+      v1.symWrap(
+        nodeKey,
+        new TextEncoder().encode(JSON.stringify({ v: 1, location: { name: 'Teneriffa', nameSource: 'manual', derivedMode: 'fixed' } })),
+        'node-meta',
+        v1.randomBytes(12),
+      ),
+    )
+    const date: MemoryDate = { mode: 'single', from: '2026-05-01', to: '2026-05-01' }
+    const sealed = await setMemoryDate(SCOPE_ID, 'node-9', nodeKey, date, withLocation)
+
+    // the date landed AND the location survived the re-seal
+    expect(unsealMemoryDate(nodeKey, { wrappedMeta: sealed })).toEqual(date)
+    const blob = JSON.parse(new TextDecoder().decode(v1.symUnwrap(nodeKey, fromB64std(sealed), 'node-meta')))
+    expect(blob.location).toEqual({ name: 'Teneriffa', nameSource: 'manual', derivedMode: 'fixed' })
   })
 })
 
