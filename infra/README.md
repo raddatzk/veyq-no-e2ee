@@ -13,9 +13,9 @@ docker compose -f infra/docker-compose.yml up -d
 docker compose -f infra/docker-compose.yml down        # stop, keep data
 docker compose -f infra/docker-compose.yml down -v      # stop AND wipe (fresh instance)
 
-# + the bundled object store (media transport) — start, then init once
+# + the bundled object store (media transport) — the garage-init sidecar sets up
+# layout + bucket + dev key automatically (idempotent; also after a `down -v` wipe)
 docker compose -f infra/docker-compose.yml --profile s3 up -d
-./infra/garage-init.sh                                  # idempotent: layout + bucket + dev key
 ```
 
 ## Object store (media, `--profile s3`)
@@ -23,14 +23,16 @@ docker compose -f infra/docker-compose.yml --profile s3 up -d
 The backend is **operator-blind**: it never streams media bytes, it only **presigns** short-TTL URLs the
 client PUT/GETs directly against the store ([ADR 0013](../docs/decisions/0013-blob-storage-presigned-direct-to-store.md)),
 via the **vendor-neutral AWS S3 SDK** (works against any S3-compatible store). The bundled store is **Garage**
-(S3-compatible, AGPL, built for self-hosting — it replaced the archived MinIO, cr-0029). Garage's image is
-shell-less, so a one-shot host script (`garage-init.sh`) drives its CLI via `docker exec` to assign a
-single-node layout, create the `veyq` bucket, and import **deterministic dev credentials** (so the e2e + a dev
-backend use fixed keys). Re-running it is a no-op once the bucket exists.
+(S3-compatible, AGPL, built for self-hosting — it replaced the archived MinIO, cr-0029). On `--profile s3 up`
+the **`garage-init`** sidecar assigns a single-node layout, creates the `veyq` bucket, and imports
+**deterministic dev credentials** (so the e2e + a dev backend use fixed keys) — automatically, and idempotent
+(a no-op once the bucket exists, so it self-heals after a `down -v`). Garage's own image is shell-less, so the
+sidecar is a tiny Alpine + Garage-CLI image (`garage-init.Dockerfile`) that drives the node over RPC. The same
+script still runs by hand from the host (`./infra/garage-init.sh`, via `docker exec`) if you ever need it.
 
 - **S3 API** → `http://localhost:19000`. Dev key `GK0123456789abcdef01234567` / secret
   `0123…` (64 hex, see `garage-init.sh`), bucket `veyq`, region `us-east-1` — local throwaway only.
-- **Backend e2e** (`BlobBatchE2ETest`): bring the profile up + init, then
+- **Backend e2e** (`BlobBatchE2ETest`): bring the profile up (the sidecar inits it), then
   `VEYQ_S3_E2E=1 ./gradlew :backend:test --tests '*BlobBatchE2ETest'` (defaults match the compose; override via
   `VEYQ_S3_ENDPOINT`/`VEYQ_S3_ACCESS_KEY`/`VEYQ_S3_SECRET_KEY`/`VEYQ_S3_BUCKET`/`VEYQ_S3_REGION`).
 - **Backend against the store** (`quarkusDev`): point it at the store via env —
