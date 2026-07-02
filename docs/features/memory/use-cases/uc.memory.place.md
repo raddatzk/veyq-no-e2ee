@@ -43,16 +43,21 @@ its anchor moves.
 **The map.** A **toggle in the tenant root** shows all Memories as pins, read from each node's sealed `location`
 via `listNodes` (no media load, no locations endpoint). Clicking a pin opens the Memory.
 
-**Sharing (groups/tenant).** The resolved name is stored **sealed in the shared `wrappedMeta`**, so any member
-holding `K_mem` sees it **without their own device contacting the provider**. The opt-in governs whether *your*
-device makes a request — not whether you may see a name someone else resolved. One member's opt-in benefits the
-group; if nobody opts in, only manually-typed names exist.
+**Sharing (groups/tenant) — consent is per space, not a free-ride.** Tiles + geocoding are **one opt-in**
+consented **per space** ([ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)): a user pre-opts-in
+in personal settings (then a join is just an info pill) or opts in per space. An owner enabling it **notifies**
+members and does **not** bind them — a **non-consenting** member's device makes no request, so they get **no map**
+and see an already-resolved name only as **text**; they give up the map to keep their privacy (not a free-ride).
+**Unanimity binds:** once all members consent it is binding for new members (a ratchet — to withdraw you leave the
+space, you don't stay as a text-only rider). A resolved name is sealed in the shared `wrappedMeta`, so members
+holding `K_mem` see it without their own device contacting the provider.
 
-**Multilingual names.** A stored `name` is a **single frozen string** in the resolver's language — we do **not**
-keep it translated across locale switches (the server can't, and it would mean a fresh request). Because
-`nameAnchor` is kept, an opted-in viewer can re-resolve the name in **their** language on demand. Nominatim
-returns names from OSM `name:<lang>` tags via `accept-language` with **graceful fallback to the local name** (no
-hard error on an unsupported language) — so de+en are well covered and further locales degrade, never break.
+**Multilingual names.** A stored `name` is a **single frozen string**. For **shared** content it resolves in the
+**tenant's configured language** (a tenant setting) — consistent across members, not the random locale of whoever
+resolved it first; a personal space uses the user's own locale. Because `nameAnchor` is kept, an opted-in viewer
+can re-resolve in **their** language on demand. Nominatim returns names from OSM `name:<lang>` tags via
+`accept-language` with **graceful fallback to the local name** (no hard error on an unsupported language) — so
+de+en are well covered and further locales degrade, never break.
 
 ## Alternate / exception flows
 

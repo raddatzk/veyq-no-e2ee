@@ -33,7 +33,7 @@ per-item fetch.
 
 - **The map is the UI — not a modal (correcting an earlier mis-scope).** Set-location is a slippy-map
   interaction: a basemap with the medoid pin, pan/zoom to reframe, a name that follows the frame. It is **not**
-  the date editor's shape. Basemap tiles come from a provider-neutral, self-host-or-opt-in-public tile seam
+  the date editor's shape. Basemap tiles come from a provider-neutral, **third-party** tile seam
   ([ADR 0018](../docs/decisions/0018-map-tiles-provider-neutrality.md)) rendered by **Leaflet** (BSD-2, actively
   maintained, vendor-neutral — a new web dep; no deprecated/locked map client).
 - **Location is a deliberate per-Memory choice — "does this Memory happen at *one* place?"** Not every Memory
@@ -62,14 +62,15 @@ per-item fetch.
 - **Remove the location entirely.** The editor can **clear** a Memory's location (back to no place) — a `null`
   through `setMemoryLocation` that drops the `location` sub-object while **preserving the date** in the same blob.
   (Clearing the mandatory name is the same as removing the location.)
-- **Reverse-geocoding per ADR 0016** — the seam is `reverse(lat, lng, zoom, lang) → name`, **client-direct** to
-  the provider (never through the veyq backend), **identity-free** (a bare coordinate), **opt-in** (off until an
-  endpoint is configured + the user consents), reference **Nominatim**. `zoom` = the map's framed zoom →
-  name granularity; `lang` = the UI locale. Opt-in is standing consent; manual names need no request.
-- **Tiles per ADR 0018** — a configurable `{z}/{x}/{y}` tile-URL seam, **client-direct**, identity-free (bare
-  viewport), attribution shown; **self-host = blind**, **public OSM = opt-in** (same consented boundary as
-  geocoding). No tiles configured/consented ⇒ no map to place a position ⇒ **set-location is unavailable** (a
-  location always needs a position, so there is no name-only substitute).
+- **Tiles + geocoding are ONE two-stage consent, third-party-only (ADR 0016 / 0018).** Both go **client-direct**
+  to a **third party** (public OSM tiles / Nominatim), **never through the veyq backend and never an
+  operator-run instance** (an operator-run one would see the viewport/coordinate → not blind), **identity-free**
+  (bare `{z,x,y}` / bare coordinate). The consent is **off** ⇒ no map ⇒ no location feature; **on** ⇒ tiles +
+  reverse-geocoding (`reverse(lat,lng,zoom,lang)→name`; `zoom` = framed zoom → name granularity; a name may still
+  be typed manually). **For this slice (personal space) it is simply the user's own two-stage toggle**; the group
+  model (owner soft-enable, per-member notice/consent, unanimity-binds, leave-to-withdraw) and the **tenant
+  language** for shared names are **deferred to the groups CR** (ADR 0016). `lang` in a personal space = the
+  user's locale.
 - **The central risk: the node-meta seal is destructive.** `memoryDate.ts`'s `sealMemoryDate` seals a **fresh**
   `{v, date}` and PATCHes the whole `wrappedMeta` — it does not preserve siblings. Writing a `location` the same
   way would **wipe the date**. So this CR first **refactors the node-meta seal to read-modify-write** (unseal the
@@ -87,7 +88,9 @@ per-item fetch.
   until the first geotagged media** re-medoids it (the `MemoryDetail` self-heal), while **manual-fix** drops a pin
   now (`fixed`). Both reuse the same model + editor + `setMemoryLocation`.
 - **Scope.** Web only. **Deferred (own slices/CRs):** the **tenant map** (all Memories as pins across the tenant
-  root — a *different*, read-only map, reusing this tile seam); native parity (web-first, ADR 0010); an
+  root — a *different*, read-only map, reusing this tile seam); the **group consent state-machine** (owner
+  soft-enable, per-member notice/consent, unanimity-binds, leave-to-withdraw) + the **tenant language** for
+  shared resolved names (ADR 0016); native parity (web-first, ADR 0010); an
   **on-device coarse gazetteer** (fully-blind names, ADR 0016).
 
 ## Phases
@@ -103,7 +106,8 @@ per-item fetch.
   `derivedMode` `auto` vs `fixed` **and back** (`fixed`→`auto` drops the frozen coord + re-medoids), and the
   reverse seam (absent endpoint ⇒ no request, manual name stands).
 - [ ] 2 web UI — add **Leaflet**; a `MemoryMap`/tile-layer wrapper honoring the ADR 0018 tile seam (configurable
-  URL, attribution, self-host vs opt-in public). A **`MemoryLocationEditor.vue`**: map centred on the medoid pin;
+  URL, attribution, third-party public source; behind the personal two-stage opt-in). A
+  **`MemoryLocationEditor.vue`**: map centred on the medoid pin;
   pan/zoom updates `nameAnchor` → (opt-in) reverse-geocode → fills the editable name; when geocoding is off the
   name is **typed manually on the map** (pin still from the medoid); a **bidirectional `auto`⟷`fixed` toggle**
   (pin-drag ⇒ `fixed`; switching back to `auto` re-medoids); a **remove-location** action (clears it, keeps the
