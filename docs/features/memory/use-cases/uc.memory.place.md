@@ -117,7 +117,9 @@ veyq sieht sie nie.
   [uc.memory.gallery](uc.memory.gallery.md) (the media EXIF/GPS tier the medoid derives from)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (K_mem seals "capture time, location"
   — this UC applies it at the node level), [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)
-  (reverse-only, provider-neutral geocoding; Nominatim reference; veyq-blind), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  (reverse-only, provider-neutral geocoding; Nominatim reference; veyq-blind),
+  [ADR 0018](../../../decisions/0018-map-tiles-provider-neutrality.md) (map tiles: raster via Leaflet,
+  provider-neutral, self-host/opt-in-public, veyq-blind), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
 - Crosscutting: [security-model](../../../crosscutting/security-model.md) (operator-blind = the veyq operator;
   third-party services are a separate consented boundary)
 - Future: **on-device coarse names** (a bundled gazetteer, ADR 0016); **derived** place from GPS clusters
