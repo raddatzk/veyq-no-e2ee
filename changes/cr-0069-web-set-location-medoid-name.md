@@ -42,13 +42,17 @@ per-item fetch.
   name-only field for now. The **name** comes from reverse-geocoding the framed `nameAnchor` (`geocoded`,
   editable) **or**, when geocoding is off/unreachable, a **typed string** (`manual`) **still entered on the map**
   (the pin/medoid works without geocoding). A **name is mandatory** — no unnamed place.
-- **`fixed` vs `auto` — where the default lives.** `derivedMode` is a field in the sealed `location` blob,
-  written by `setMemoryLocation`. Default **`auto`** (the pin sits on the computed medoid, untouched). It becomes
-  **`fixed`** either by an **explicit editor toggle** ("keep this position current" ↔ "freeze here") **or** by
-  **dragging the pin by hand** (which sets the toggle to `fixed` — the deliberate correction wins). An `auto`
-  location **re-medoids** `derived` as media are added — the self-heal runs in `MemoryDetail` on open + after an
-  upload, mirroring the date's `reconcileAuto`; a `fixed` one is frozen. A `manual` name is frozen; a `geocoded`
-  name may refresh when its `nameAnchor` moves.
+- **`fixed` ⟷ `auto` is a user choice, not a forced default — and fully reversible.** `derivedMode` is a field in
+  the sealed `location` blob, written by `setMemoryLocation`. In the open-Memory editor, `auto` is only
+  **pre-selected** (the pin sits on the computed medoid); the user may keep `auto`, or go to **`fixed`** via an
+  **explicit toggle** ("keep current" ↔ "freeze here") **or** by **dragging the pin** (which sets `fixed`). The
+  toggle is **bidirectional** — a `fixed` location can be switched **back to `auto`** anytime (it drops the frozen
+  coordinate and re-medoids). An `auto` location **re-medoids** `derived` as media are added — the self-heal runs
+  in `MemoryDetail` on open + after an upload, mirroring the date's `reconcileAuto`; a `fixed` one is frozen. A
+  `manual` name is frozen; a `geocoded` name may refresh when its `nameAnchor` moves.
+- **Remove the location entirely.** The editor can **clear** a Memory's location (back to no place) — a `null`
+  through `setMemoryLocation` that drops the `location` sub-object while **preserving the date** in the same blob.
+  (Clearing the mandatory name is the same as removing the location.)
 - **Reverse-geocoding per ADR 0016** — the seam is `reverse(lat, lng, zoom, lang) → name`, **client-direct** to
   the provider (never through the veyq backend), **identity-free** (a bare coordinate), **opt-in** (off until an
   endpoint is configured + the user consents), reference **Nominatim**. `zoom` = the map's framed zoom →
@@ -82,20 +86,23 @@ per-item fetch.
   index, null on empty). New `geocode.ts`: the `reverse(lat,lng,zoom,lang) → name` seam (ADR 0016), client-direct,
   off-until-configured. · Done when: `npm run check` green; unit tests cover the medoid (3-point set, sea-outlier
   the mean would pull but the medoid resists, single, empty→null), the **read-modify-write** (set location keeps
-  the date; set date keeps the location; clearing the name ⇒ no location), `derivedMode` default `auto` vs an
-  explicit/pin-move `fixed`, and the reverse seam (absent endpoint ⇒ no request, manual name stands).
+  the date; set date keeps the location; **removing the location** via `setMemoryLocation(null)` keeps the date),
+  `derivedMode` `auto` vs `fixed` **and back** (`fixed`→`auto` drops the frozen coord + re-medoids), and the
+  reverse seam (absent endpoint ⇒ no request, manual name stands).
 - [ ] 2 web UI — add **Leaflet**; a `MemoryMap`/tile-layer wrapper honoring the ADR 0018 tile seam (configurable
   URL, attribution, self-host vs opt-in public). A **`MemoryLocationEditor.vue`**: map centred on the medoid pin;
   pan/zoom updates `nameAnchor` → (opt-in) reverse-geocode → fills the editable name; when geocoding is off the
-  name is **typed manually on the map** (pin still from the medoid); an explicit **`auto`/`fixed` toggle** (and a
-  pin-drag ⇒ `fixed`); save requires a name. "Set location" is only offered when the Memory has a medoid **and**
-  tiles (no name-only-without-map path this slice). A **location chip** (pin icon) in the `MemoryDetail` header
-  showing the name (or a "set location" affordance when eligible). Wire `locationEditorOpen` + `onLocationSave` →
+  name is **typed manually on the map** (pin still from the medoid); a **bidirectional `auto`⟷`fixed` toggle**
+  (pin-drag ⇒ `fixed`; switching back to `auto` re-medoids); a **remove-location** action (clears it, keeps the
+  date); save requires a name. "Set location" is only offered when the Memory has a medoid **and** tiles (no
+  name-only-without-map path this slice). A **location chip** (pin icon) in the `MemoryDetail` header showing the
+  name (or a "set location" affordance when eligible). Wire `locationEditorOpen` + `onLocationSave` →
   `setMemoryLocation` → `emit('metaUpdated', { nodeId, wrappedMeta })`; the medoid is computed at open from
   `items`. i18n EN+DE (`memory.place.*`, transparency notes for tiles + geocoding). · Done when: `npm run check`
   green; tests: set a `geocoded` location (medoid from two geotagged items + a stubbed reverse lookup) shows the
-  chip and the emitted `wrappedMeta` still unseals the **date**; a pin drag flips to `fixed`; the explicit toggle
-  sets `fixed`/`auto`; geocoding-off falls back to a typed name on the map.
+  chip and the emitted `wrappedMeta` still unseals the **date**; a pin drag flips to `fixed` and the toggle
+  switches back to `auto`; **removing** the location clears the chip while the date survives; geocoding-off falls
+  back to a typed name on the map.
 - [ ] 3 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml`: the
   `deliberate-set-location`, `medoid-position`, `name-manual-or-reverse-geocoded`, and
   `reverse-only-veyq-blind-geocoding` criteria carry web test refs; the `tenant-map-via-listnodes` criterion stays
