@@ -1,6 +1,6 @@
 ---
 id: cr-0069
-title: Web set-location — editor map, medoid pin, pan/zoom→geocoded name, fixed/auto (place slice 2b)
+title: Web set-location — editor map, medoid pin, pan/zoom→geocoded name, fixed⟷auto, pre-arm at creation (place slice 2b)
 status: planned
 satisfies: [uc.memory.place]
 adrs: ["0012", "0016", "0018"]
@@ -14,8 +14,9 @@ Give a Memory a **place** through the real "set location" experience
 **medoid** of the Memory's own photo GPS; the user **pans/zooms** to frame the spot, and the framed centre + zoom
 (the `nameAnchor`) drive a **reverse-geocoded name** ([ADR 0016](../docs/decisions/0016-geocoding-provider-neutrality.md));
 the name stays editable, and the user chooses to **freeze** the position (`fixed`) or let it **auto-update**
-(`auto`, re-medoids as new media arrive). The result — one sealed `location` — lands in the node's existing
-`wrappedMeta` blob beside the date, operator-blind. Web-only.
+(`auto`, re-medoids as new media arrive) — reversibly, and removable. The same choice is offered **up front at
+Memory creation** (none / manual-fix / auto + a name). The result — one sealed `location` — lands in the node's
+existing `wrappedMeta` blob beside the date, operator-blind. Web-only.
 
 Sealed shape (canonical in [en.memory.node-meta](../docs/features/memory/enablers/en.memory.node-meta.md)):
 
@@ -72,10 +73,14 @@ per-item fetch.
   identity-free tile + geocode requests (ADR 0018 / 0016), never to the veyq operator.
 - **Naming.** `web/src/features/memory/location.ts` is already taken (URL-fragment nav, cr-0031) — the place
   model lives in a **new** `memoryLocation.ts`.
-- **Scope.** Web only, one open-Memory "set location" flow. **Deferred (own slices/CRs):** the **tenant map** (all
-  Memories as pins across the tenant root — a *different*, read-only map, reusing this tile seam); **pre-arm at
-  Memory creation**; native parity (web-first, ADR 0010); an **on-device coarse gazetteer** (fully-blind names,
-  ADR 0016).
+- **Two entry points (both in scope).** (a) **Set location on an open Memory** — the map editor with the medoid
+  pre-selected. (b) **Pre-arm at Memory creation** — in the create dialog the user chooses **none / manual-fix a
+  pin / auto**, plus a **mandatory name**. At creation there is **no media yet**, so `auto` carries **no `derived`
+  until the first geotagged media** re-medoids it (the `MemoryDetail` self-heal), while **manual-fix** drops a pin
+  now (`fixed`). Both reuse the same model + editor + `setMemoryLocation`.
+- **Scope.** Web only. **Deferred (own slices/CRs):** the **tenant map** (all Memories as pins across the tenant
+  root — a *different*, read-only map, reusing this tile seam); native parity (web-first, ADR 0010); an
+  **on-device coarse gazetteer** (fully-blind names, ADR 0016).
 
 ## Phases
 
@@ -103,32 +108,40 @@ per-item fetch.
   chip and the emitted `wrappedMeta` still unseals the **date**; a pin drag flips to `fixed` and the toggle
   switches back to `auto`; **removing** the location clears the chip while the date survives; geocoding-off falls
   back to a typed name on the map.
-- [ ] 3 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml`: the
+- [ ] 3 web pre-arm at creation — the Memory create dialog (`NodeMutationDialog` / `createMemory`) gains an
+  optional **location step**: **none** (default) / **manual-fix** (drop a pin on the map → `fixed`) / **auto**
+  (no `derived` yet — re-medoids on the first geotagged media), each with a **mandatory name**. Reuses the phase-2
+  editor/model; on create, the sealed `location` rides the same node `wrappedMeta` the date already uses. ·
+  Done when: `npm run check` green; a test creates a Memory with (i) a manual-fixed pin + name → `fixed` location
+  sealed at birth, and (ii) `auto` + name → a named `auto` location with no `derived`, which gains a medoid after
+  an upload (the self-heal); no-location creation is unchanged.
+- [ ] 4 coverage + verify — update `docs/coverage/features/memory/use-cases/uc.memory.place.yaml`: the
   `deliberate-set-location`, `medoid-position`, `name-manual-or-reverse-geocoded`, and
   `reverse-only-veyq-blind-geocoding` criteria carry web test refs; the `tenant-map-via-listnodes` criterion stays
   gapped (its own slice). Live smoke (re-seeded instance, a configured Nominatim + OSM tiles): a Memory with two
   geotagged photos → "set location" → the map centres on the medoid → pan → a geocoded name appears → save →
   `veyq_node.wrapped_meta` seals the `location` (**DB opaque, zero plaintext** name/coord, **date preserved**);
-  plus a geocoding-off run (typed name on the map). · Done when: the three trust-chain guards green; the smoke
-  confirmed.
+  plus a geocoding-off run (typed name on the map), a **remove** (place gone, date intact), and a **create-time**
+  pre-arm (a new Memory born with an `auto` + name that medoids after an upload). · Done when: the three
+  trust-chain guards green; the smoke confirmed.
 
 ## Parity ledger (per [ADR 0010](../docs/decisions/0010-native-clients-shared-contracts-not-code.md))
 
 | Surface | Editor map + medoid + pan/zoom→geocoded name + fixed/auto, sealed in node `wrappedMeta` | Status |
 |---|---|---|
 | backend / contracts | none — `wrappedMeta` already threads `location` verbatim via `updateNode` | ✅ n/a (no change) |
-| web | node-meta read-modify-write; `memoryLocation.ts` + medoid; Leaflet map + tile/geocode seams; editor + chip | ◻ planned |
+| web | node-meta read-modify-write; `memoryLocation.ts` + medoid; Leaflet map + tile/geocode seams; editor + chip + create-dialog pre-arm | ◻ planned |
 | apple / android | native place map/UI is their own later CR (web-first, ADR 0010) | ◻ **separate (native)** |
 
 ## Definition of done
 
 A Memory carries one sealed named `location` set through a map: the medoid of its photos' GPS as the pin, a
 name reverse-geocoded from the framed anchor (editable; a typed manual name on the map when geocoding is off),
-and a fixed/auto choice —
-sealed in the same node `wrappedMeta` as the date, operator-blind (the server holds only opaque ciphertext; the
-date is never clobbered; tiles + geocoding are consented, identity-free, client-direct third-party boundaries per
-ADR 0018 / 0016). `npm run check` + the three trust-chain guards green; the live smoke confirmed. The tenant map
-is a separate later slice.
+and a reversible, removable fixed⟷auto
+choice — offered both on an open Memory and up front at creation, sealed in the same node `wrappedMeta` as the
+date, operator-blind (the server holds only opaque ciphertext; the date is never clobbered; tiles + geocoding are
+consented, identity-free, client-direct third-party boundaries per ADR 0018 / 0016). `npm run check` + the three
+trust-chain guards green; the live smoke confirmed. The tenant map is a separate later slice.
 
 ## Retrospective
 
