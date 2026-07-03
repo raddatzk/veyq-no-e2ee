@@ -1,6 +1,10 @@
 # Created by https://www.toptal.com/developers/gitignore/api/git,intellij+all,vue,vuejs,gradle,kotlin,macos,windows,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=git,intellij+all,vue,vuejs,gradle,kotlin,macos,windows,linux
 
+# Local dev principal (cr-0075): throwaway creds + derived key material for a local instance, filled by
+# `npm run bootstrap:user`. Never committed; `.run/.env.example` is the tracked template.
+.run/.env
+
 ### Git ###
 # Created by git for backups. To disable backups in Git:
 # $ git config --global mergetool.keepBackup false
