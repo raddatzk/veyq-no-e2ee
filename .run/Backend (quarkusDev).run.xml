@@ -14,6 +14,23 @@
         </list>
       </option>
       <option name="vmOptions" />
+      <!-- Store config for the IntelliJ dev flow. Without an endpoint the backend falls back to the in-memory
+           dev store (canPresign=false) → blob-uploads-batch returns presignedPuts=null → every media upload fails
+           with store_unavailable. Endpoint + creds point at the bundled compose Garage; these are the documented
+           throwaway dev creds (infra/README.md, garage.toml) — not secrets.
+           PUBLIC_ENDPOINT is the browser origin the presigned PUT/GET URLs are signed for: it MUST equal the host
+           in the address bar (SigV4 signs host+path; the Vite dev server proxies /veyq same-origin to the store).
+           It is developer-specific — set it to whatever origin you browse. Here: veyq.localhost:8081 (the *.localhost
+           per-tenant workspace flow, cr-0051, served by Vite on VITE_PORT=8081). Adjust per setup. -->
+      <option name="env">
+        <map>
+          <entry key="VEYQ_BLOB_STORE_ENDPOINT" value="http://localhost:19000" />
+          <entry key="VEYQ_BLOB_STORE_ACCESS_KEY" value="GK0123456789abcdef01234567" />
+          <entry key="VEYQ_BLOB_STORE_SECRET_KEY" value="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" />
+          <entry key="VEYQ_BLOB_STORE_PUBLIC_ENDPOINT" value="http://veyq.localhost:8081" />
+          <entry key="VEYQ_TENANT_INVITE_DEV_FILE" value="$PROJECT_DIR$/backend/build/dev-invites.jsonl" />
+        </map>
+      </option>
     </ExternalSystemSettings>
     <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
     <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
