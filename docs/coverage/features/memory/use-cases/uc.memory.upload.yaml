@@ -42,6 +42,14 @@ acceptanceCriteria:
     coverage:
       web:
         unit: [src/features/memory/media.test.ts]
+  - id: optimistic-in-grid-tiles
+    text: Picked files appear immediately as tiles in the Memory's gallery grid — an instant local object-URL preview (never uploaded in the clear) with a per-tile progress ring or failed+retry state, pinned ahead of the listed media — and each reconciles into the real decrypted thumbnail once its media lists (matched by the returned mediaId) with no empty-flash and no duplicate; the queue records that mediaId on each settled file (cr-0074).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/optimisticUpload.test.ts
+          - src/features/memory/uploadQueue.test.ts
+          - src/features/memory/components/MemoryDetail.optimistic.test.ts
 gaps:
   apple: N/A this CR — the VeyqClient.addMedia data layer exists; the apple upload UI is its own later CR.
   android: N/A this CR — the VeyqClient.addMedia data layer exists; the android upload UI is its own later CR.

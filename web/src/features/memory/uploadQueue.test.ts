@@ -47,6 +47,16 @@ describe('uploadQueue — runner', () => {
     expect(source.mediaType).toBe('image/png')
   })
 
+  it('records the mediaId addMedia returns on the settled file (cr-0074 reconcile key)', async () => {
+    vi.mocked(addMedia).mockResolvedValue({ blobId: 'b', mediaId: 'media-xyz' })
+    const { batches } = useUploadQueue()
+    enqueueUploads(TARGET, [sel(png())], { label: '1' })
+    const file = batches.value[0].files[0]
+
+    await vi.waitFor(() => expect(file.status).toBe('done'))
+    expect(file.mediaId).toBe('media-xyz')
+  })
+
   it('uploads multiple files sequentially (FIFO)', async () => {
     const order: string[] = []
     vi.mocked(addMedia).mockImplementation(async (_s, _n, _k, source) => {

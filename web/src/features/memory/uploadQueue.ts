@@ -20,6 +20,9 @@ export type UploadFile = {
   attempts: number
   controller: AbortController
   file: File
+  /** The media id `addMedia` returned once this file settled `done` — lets the gallery reconcile its optimistic
+   *  in-grid tile against the listed media by id (cr-0074). Undefined until then. */
+  mediaId?: string
 }
 
 /** Where a batch's media attach: the active scope, the Memory node, and its in-memory key. */
@@ -113,12 +116,13 @@ async function uploadOne(file: UploadFile): Promise<void> {
   try {
     const bytes = new Uint8Array(await file.file.arrayBuffer())
     // pass the file's creation date so addMedia can fall back to it when the source carries no EXIF date (cr-0066)
-    await addMedia(batch.target.scopeId, batch.target.nodeId, batch.target.memoryKey, { bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, undefined, {
+    const { mediaId } = await addMedia(batch.target.scopeId, batch.target.nodeId, batch.target.memoryKey, { bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, undefined, {
       onProgress: (p) => {
         file.progress = p
       },
       signal: file.controller.signal,
     })
+    file.mediaId = mediaId // the gallery reconciles its optimistic tile against the listed media by this id (cr-0074)
     file.status = 'done'
     file.progress = 1
   } catch (e) {

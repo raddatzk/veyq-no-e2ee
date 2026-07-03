@@ -17,15 +17,19 @@
 1. In the open Memory's gallery the user picks files (a hidden `<input type=file multiple accept=image/*,video/*>`
    behind an **Upload** affordance).
 2. Each file is enqueued into the **global upload queue** as a batch against the current `{scopeId, nodeId}` +
-   the Memory key. The TopBar **uploads** button shows a spinner + an active-file count badge.
+   the Memory key. The TopBar **uploads** button shows a spinner + an active-file count badge, **and** the picked
+   photos appear **immediately as tiles in that Memory's gallery grid** — an instant **local preview** (the user's
+   own image, before it is sealed — a local object URL, never uploaded in the clear) with a per-tile progress /
+   error(+retry) state (cr-0074).
 3. The queue uploads **one file at a time**: each file is sealed on-device (with its
    [derivatives](../enablers/en.memory.derivatives.md)) and sent **direct-to-store**, then attached to the
    Memory node — the seal → start → PUT → attach choreography is
    [en.memory.media](../enablers/en.memory.media.md)'s. Per-file + per-batch **progress** advance as it uploads.
 4. Opening the uploads popup shows each batch's files with status (queued / uploading / done / failed /
    cancelled), a progress bar, and a **cancel** control while a file is queued/uploading.
-5. When a batch's files all finish, the gallery for that Memory reloads so the new media appears; the user can
-   **close** (acknowledge) the finished batch.
+5. As each file finishes, its optimistic tile **reconciles into the real decrypted thumbnail** (matched by the
+   returned `mediaId`) with no empty-flash and no duplicate; the tile sorts into its date position. The user can
+   **close** (acknowledge) the finished batch in the tray.
 
 ## Alternate / exception flows
 
