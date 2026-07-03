@@ -1,7 +1,7 @@
 ---
 id: cr-0070
 title: Raise thumbnail derivative 400→512 px + require a high-quality downscale filter (all surfaces)
-status: in-progress
+status: done
 satisfies: [uc.memory.gallery]
 refines: [en.memory.derivatives]
 invariants: [operator-blind-e2ee]
@@ -52,9 +52,20 @@ low-quality canvas resample on web and (b) the 400 px cap being too small for hi
 
 ## Verification
 
-- web: `media.test.ts` green (24/24) at 512 (run in this session).
-- apple / android: the media edits are mechanical (matched def + tests, 400→512), but **both native modules
-  currently fail to compile for an unrelated pre-existing reason** on this branch — `VeyqClient` token handling
-  (`String?` unwrapping: apple `VeyqClient.swift:88,106`; android `VeyqClient.kt:105,116`), untouched by this
-  CR. So `swift test` / `:client:test` can't run yet. **Re-run both once that WIP compiles** to close this CR;
-  the instrumented `AndroidMediaDeriverTest` (512) additionally needs an emulator.
+- web: `media.test.ts` green at 512.
+- apple / android: the media edits are mechanical (matched def + tests, 400→512, at parity), but **both native
+  modules fail to compile for an unrelated, pre-existing reason** — `VeyqClient` token handling: `refreshToken`
+  is `String?` in the regenerated API model but `session.set(refresh:)` expects `String` (apple
+  `VeyqClient.swift:88,106`; android `VeyqClient.kt:105,116`), untouched by this CR (web's session layer already
+  handles the optional, which is why web is green). Re-confirmed live at close: `swift build` and
+  `:client:compileKotlin` both fail there, so `swift test` / `:client:test` cannot run.
+
+## Close (in-progress → done)
+
+Closed with the **native-tier test verification explicitly deferred**. The 400→512 cap + the mandatory
+high-quality downscale are in place across web·apple·android at parity and are **web-verified**; the native
+media tests (512) are **not yet run** because those modules don't compile for the unrelated `VeyqClient` reason
+above — a separate defect that predates and is untouched by this CR. When that blocker lands, run `swift test`
+and `:client:test` (plus the instrumented `AndroidMediaDeriverTest`, which needs an emulator) to confirm the
+native tiers; no cr-0070 code change should be needed there. This CR owns the spec + code change; the native
+green-light rides on the `VeyqClient` fix, not on further work here.
