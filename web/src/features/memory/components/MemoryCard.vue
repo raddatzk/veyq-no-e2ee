@@ -9,13 +9,24 @@ import { useI18n } from 'vue-i18n'
 import Card from 'primevue/card'
 import type { TreeNode } from '../tree'
 import type { MemoryDate } from '../memoryDate'
+import type { CoverCrop } from '../memoryCover'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
+import MemoryCoverImage from './MemoryCoverImage.vue'
 
 // `favoritable` (default true) shows the favorite pin; chapters (cr-0062) render the card open-only without it.
-// `date` is the node's sealed range (already unsealed by the parent), or null when it carries none.
+// `date` is the node's sealed range (already unsealed by the parent), or null when it carries none. `coverSrc` +
+// `coverCrop` are the node's chosen cover (a decrypted thumbnail URL + its crop, resolved by the parent, cr-0072);
+// absent ⇒ the placeholder images tile.
 const props = withDefaults(
-  defineProps<{ memory: TreeNode; favorite?: boolean; favoritable?: boolean; date?: MemoryDate | null }>(),
-  { favoritable: true, date: null },
+  defineProps<{
+    memory: TreeNode
+    favorite?: boolean
+    favoritable?: boolean
+    date?: MemoryDate | null
+    coverSrc?: string | null
+    coverCrop?: CoverCrop | null
+  }>(),
+  { favoritable: true, date: null, coverSrc: null, coverCrop: null },
 )
 defineEmits<{ open: [memory: TreeNode]; toggleFavorite: [memory: TreeNode] }>()
 
@@ -34,7 +45,11 @@ const dateLabel = computed(() => {
     <template #content>
       <button class="memory-card-main" type="button" @click="$emit('open', memory)">
         <span class="memory-card-cover">
-          <span class="memory-card-icon pi pi-images" />
+          <MemoryCoverImage :src="coverSrc" :crop="coverCrop" :alt="memory.name">
+            <template #placeholder>
+              <span class="memory-card-icon pi pi-images" />
+            </template>
+          </MemoryCoverImage>
         </span>
         <span class="memory-card-text">
           <strong>{{ memory.name }}</strong>

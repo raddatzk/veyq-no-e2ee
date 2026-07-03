@@ -26,6 +26,7 @@ import {
   isLocationPending,
   type MemoryLocation,
 } from '../memoryLocation'
+import { unsealMemoryCover, setMemoryCover, type MemoryCover, type CoverPickItem } from '../memoryCover'
 import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
@@ -33,6 +34,8 @@ import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles } from
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryDateEditor from './MemoryDateEditor.vue'
 import MemoryLocationEditor from './MemoryLocationEditor.vue'
+import MemoryCoverImage from './MemoryCoverImage.vue'
+import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import Dialog from 'primevue/dialog'
@@ -222,6 +225,35 @@ async function reconcileAutoLocation() {
   }
 }
 
+// --- Memory cover (cr-0072, uc.memory.cover). A deliberately chosen media + a 16:9 crop, sealed in the SAME node
+// `wrappedMeta` blob as the date/location (read-modify-write, operator-blind). The picker + crop source is the
+// Memory's already-loaded media (its decrypted thumbnails); the header shows the chosen cover via the shared crop
+// formula. No auto-cover — unset ⇒ the placeholder tile.
+const coverEditorOpen = ref(false)
+const storedCover = computed(() => (props.memoryKey ? unsealMemoryCover(props.memoryKey, props.node) : null))
+// The decrypted thumbnail of the cover's chosen media (already in `thumbs`); null if not loaded / the media is gone.
+const coverSrc = computed(() => (storedCover.value ? thumbs.value.get(storedCover.value.mediaId) ?? null : null))
+// The cover picker source: this Memory's media with a loaded thumbnail (derivable items) — id + decrypted URL.
+const coverPickItems = computed<CoverPickItem[]>(() =>
+  items.value.flatMap((it) => {
+    const url = thumbs.value.get(it.mediaId)
+    return url ? [{ mediaId: it.mediaId, url }] : []
+  }),
+)
+
+/** Save (or, for null, remove) the cover: read-modify-write under K_mem — the date + location are preserved. */
+async function onCoverSave(cover: MemoryCover | null) {
+  const key = props.memoryKey
+  if (!key) return
+  const nodeId = props.node.id
+  try {
+    const wrappedMeta = await setMemoryCover(props.scopeId, nodeId, key, cover, props.node.wrappedMeta)
+    emit('metaUpdated', { nodeId, wrappedMeta })
+  } catch {
+    // best-effort: keep the header stable; a retry re-seals
+  }
+}
+
 const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
 const aspectRatios = computed(() => {
   const key = props.memoryKey
@@ -398,6 +430,22 @@ onBeforeUnmount(() => {
 <template>
   <div class="memory-route-surface memory-detail">
     <header class="gallery-header">
+      <div class="gallery-header-lead">
+        <button
+          type="button"
+          class="memory-cover-preview"
+          :class="{ 'is-empty': !coverSrc }"
+          :disabled="!memoryKey"
+          :aria-label="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
+          :title="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
+          @click="coverEditorOpen = true"
+        >
+          <MemoryCoverImage :src="coverSrc" :crop="storedCover?.crop ?? null" :alt="node.name" />
+          <span class="memory-cover-preview-hint">
+            <span class="pi pi-image" />
+            <span>{{ storedCover ? t('memory.cover.edit') : t('memory.cover.set') }}</span>
+          </span>
+        </button>
       <div class="gallery-header-copy">
         <h1 class="gallery-title">{{ node.name }}</h1>
         <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
@@ -425,6 +473,7 @@ onBeforeUnmount(() => {
           <span class="pi pi-map-marker" />
           <span>{{ locationLabel || t('memory.place.set') }}</span>
         </button>
+      </div>
       </div>
       <div class="gallery-header-actions">
         <Button
@@ -599,6 +648,14 @@ onBeforeUnmount(() => {
       @close="locationEditorOpen = false"
     />
 
+    <MemoryCoverDialog
+      v-if="coverEditorOpen && memoryKey"
+      :items="coverPickItems"
+      :cover="storedCover"
+      @save="onCoverSave"
+      @close="coverEditorOpen = false"
+    />
+
     <Dialog
       :visible="consentDialogOpen"
       :header="t('memory.place.consentTitle')"
@@ -653,10 +710,69 @@ onBeforeUnmount(() => {
   padding-bottom: 1.15rem;
   border-bottom: 1px solid var(--app-line);
 }
+/* The leading group: the cover preview beside the title + chips. */
+.gallery-header-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-width: 0;
+}
 .gallery-header-copy {
   display: grid;
   gap: 0.3rem;
   min-width: 0;
+}
+/* The Memory cover (cr-0072): a 16:9 tile showing the chosen, cropped cover (or the placeholder). It IS the
+   "set/edit cover" button — clicking it opens the crop dialog. A hint label sits over it (always when empty,
+   on hover once a cover is set). */
+.memory-cover-preview {
+  position: relative;
+  flex: 0 0 auto;
+  width: 180px;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  cursor: pointer;
+}
+.memory-cover-preview:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.memory-cover-preview-hint {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 62%, transparent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.memory-cover-preview.is-empty .memory-cover-preview-hint,
+.memory-cover-preview:hover .memory-cover-preview-hint,
+.memory-cover-preview:focus-visible .memory-cover-preview-hint {
+  opacity: 1;
+}
+.memory-cover-preview-hint .pi {
+  font-size: 0.85rem;
+}
+@media (max-width: 640px) {
+  .gallery-header-lead {
+    flex-direction: column;
+  }
+  .memory-cover-preview {
+    width: 100%;
+    max-width: 260px;
+  }
 }
 .gallery-title {
   margin: 0;

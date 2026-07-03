@@ -45,6 +45,26 @@ describe('MemoryCard favorite pin', () => {
   })
 })
 
+describe('MemoryCard cover (cr-0072)', () => {
+  it('shows the placeholder images tile when no cover is set', () => {
+    const w = mount(MemoryCard, { props: { memory }, global: { plugins: [i18n] } })
+    expect(w.find('.memory-card-cover .memory-card-icon.pi-images').exists()).toBe(true)
+    expect(w.find('.memory-card-cover img').exists()).toBe(false)
+  })
+
+  it('renders the decrypted cover with the crop-offset styles when set', () => {
+    const w = mount(MemoryCard, {
+      props: { memory, coverSrc: 'blob:cover', coverCrop: { x: 0.1, y: 0.2, width: 0.8, height: 0.6 } } as never,
+      global: { plugins: [i18n] },
+    })
+    const img = w.find('.memory-card-cover img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe('blob:cover')
+    expect(img.attributes('style') ?? '').toContain(`width: ${100 / 0.8}%`)
+    expect(w.find('.memory-card-cover .memory-card-icon.pi-images').exists()).toBe(false)
+  })
+})
+
 describe('MemoryCard sealed date (cr-0067)', () => {
   const mountWithDate = (date: unknown) =>
     mount(MemoryCard, { props: { memory, date } as never, global: { plugins: [i18n] } })

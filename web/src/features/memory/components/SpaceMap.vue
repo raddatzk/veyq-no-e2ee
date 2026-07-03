@@ -17,11 +17,13 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMapConfig, setMapsConsent } from '../../../shared/state/useMapConfig'
 import { clusterPins, sortPinsByStartDate, type LocatedPin, type PinCluster } from '../spaceMap'
+import { coverImageStyle, type LoadedCover } from '../memoryCover'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 
-// `covers` maps a node id → a decrypted cover-thumbnail object URL (loaded by the host); a pin with one shows the
-// photo, the rest fall back to the cover placeholder. Read-only here — the host owns the URLs' lifecycle.
-const props = defineProps<{ pins: LocatedPin[]; covers?: Map<string, string> }>()
+// `covers` maps a node id → the node's chosen cover (a decrypted thumbnail URL + its crop, loaded by the host,
+// cr-0072); a pin with one shows that cropped cover via the shared `coverImageStyle` formula, the rest fall back to
+// the placeholder. Read-only here — the host owns the URLs' lifecycle.
+const props = defineProps<{ pins: LocatedPin[]; covers?: Map<string, LoadedCover> }>()
 const emit = defineEmits<{ open: [nodeId: string] }>()
 
 const { t, locale } = useI18n()
@@ -67,9 +69,15 @@ function cardEl(pin: LocatedPin): HTMLElement {
 
   const thumb = document.createElement('span')
   thumb.className = 'veyq-space-card-thumb'
-  const url = props.covers?.get(pin.node.id)
-  if (url) {
-    thumb.style.backgroundImage = `url('${url.replace(/'/g, "\\'")}')`
+  const cover = props.covers?.get(pin.node.id)
+  if (cover) {
+    // The chosen cover, cropped by the SAME formula as the card + detail header — an `<img>` expanded + offset
+    // inside the overflow-hidden thumb box (no markup from user data: only a URL + numeric styles are set).
+    const img = document.createElement('img')
+    img.src = cover.url
+    img.draggable = false
+    Object.assign(img.style, coverImageStyle(cover.crop))
+    thumb.appendChild(img)
   } else {
     thumb.classList.add('veyq-space-card-thumb-ph')
     const icon = document.createElement('span')
@@ -393,12 +401,18 @@ function enableMaps() {
   transform: translate(-50%, -50%) scale(1.04);
 }
 :deep(.veyq-space-card-thumb) {
+  position: relative;
   width: 34px;
   height: 34px;
   flex: none;
+  overflow: hidden;
   border-radius: 8px;
-  background-size: cover;
-  background-position: center;
+}
+/* The cover image, positioned + sized by coverImageStyle inside the overflow-hidden thumb (mirrors MemoryCoverImage). */
+:deep(.veyq-space-card-thumb img) {
+  position: absolute;
+  display: block;
+  max-width: none;
 }
 :deep(.veyq-space-card-thumb-ph) {
   display: grid;

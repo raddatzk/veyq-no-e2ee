@@ -13,7 +13,7 @@ import { sortNodesByDate } from '../memoryDate'
 import { nodeById } from '../browse'
 import { treeStore } from '../treeStore'
 import { collectLocatedPins } from '../spaceMap'
-import { loadPinCover } from '../pinCover'
+import { loadNodeCover, type LoadedCover } from '../memoryCover'
 import { isFavorite } from '../../../app/favoritesStore'
 import { activeSpace } from '../../../app/activeSpace'
 import { useViewMode } from '../../../shared/state/useViewMode'
@@ -51,32 +51,38 @@ function onPinOpen(nodeId: string) {
   if (node) emit('openMemory', node)
 }
 
-// Pin cover thumbnails (nodeId → object URL), loaded lazily on device only while the map is shown. Kept here (we
-// hold `scopeKey` + `scopeId`); passed read-only to SpaceMap. `nodeContentKey` is resolved off the reactive proxy
-// so K_mem bytes never enter Vue's reactivity (matching activeSpace's key handling).
-const covers = reactive(new Map<string, string>())
+// Each node's chosen cover (nodeId → decrypted thumbnail URL + crop, cr-0072), loaded lazily on device. Kept here
+// (we hold `scopeKey` + `scopeId`); passed read-only to the cards AND SpaceMap. `nodeContentKey` is resolved off
+// the reactive proxy so K_mem bytes never enter Vue's reactivity (matching activeSpace's key handling). A node
+// without a cover (or a not-yet-openable key) is retried until settled, so a `null` outcome isn't looked up forever.
+const covers = reactive(new Map<string, LoadedCover>())
+const coverTried = new Set<string>() // nodeIds resolved to a definite cover-or-none (so a "no cover" isn't retried)
 
 function revokeCovers() {
-  for (const url of covers.values()) URL.revokeObjectURL(url)
+  for (const cover of covers.values()) URL.revokeObjectURL(cover.url)
   covers.clear()
+  coverTried.clear()
 }
 
-/** For each map pin without a cover yet, decrypt its thumbnail (best-effort, parallel) and cache the object URL. */
+/** Resolve the chosen cover for the currently-visible nodes — the card grid's Memories, or the map's pins —
+ *  decrypting the chosen media's thumbnail on device (best-effort, parallel), cached so a settled node isn't redone. */
 function syncCovers() {
-  if (viewMode.value !== 'map' || !activeSpace.scopeId || !props.scopeKey) return
+  if (!activeSpace.scopeId || !props.scopeKey) return
   const scopeId = activeSpace.scopeId
   const scopeKey = props.scopeKey
-  for (const pin of pins.value) {
-    if (covers.has(pin.node.id)) continue
-    const nodeKey = nodeContentKey(scopeKey, treeStore.nodes, pin.node.id)
-    if (!nodeKey) continue
-    void loadPinCover(scopeId, nodeKey, pin.node.id, pin.location.derived).then((url) => {
-      if (url) covers.set(pin.node.id, url)
+  const nodes = viewMode.value === 'map' ? pins.value.map((pin) => pin.node) : props.memories
+  for (const node of nodes) {
+    if (coverTried.has(node.id)) continue
+    const nodeKey = nodeContentKey(scopeKey, treeStore.nodes, node.id)
+    if (!nodeKey) continue // K_mem not openable yet (e.g. still unlocking) — leave un-tried so a later pass retries
+    coverTried.add(node.id)
+    void loadNodeCover(scopeId, nodeKey, node).then((cover) => {
+      if (cover) covers.set(node.id, cover)
     })
   }
 }
 
-watch([viewMode, pins], syncCovers, { immediate: true })
+watch([viewMode, pins, () => props.memories], syncCovers, { immediate: true })
 onBeforeUnmount(revokeCovers)
 </script>
 
@@ -136,6 +142,8 @@ onBeforeUnmount(revokeCovers)
           :memory="memory"
           :date="date"
           :favorite="isFavorite(memory.id)"
+          :cover-src="covers.get(memory.id)?.url ?? null"
+          :cover-crop="covers.get(memory.id)?.crop ?? null"
           @open="$emit('openMemory', $event)"
           @toggle-favorite="$emit('toggleFavorite', $event)"
         />

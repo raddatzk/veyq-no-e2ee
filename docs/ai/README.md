@@ -25,6 +25,13 @@ invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
    the refined state. See [`changes/README.md`](../../changes/README.md). CRs are **kept** as a record
    of each piece of work; the durable engineering truth still lives in the updated state + ADRs.
 
+> **Refined state comes before the CR — always.** A change-request is only written once the durable state it
+> builds on already exists as written docs: its **use-case(s) (`uc.*`)**, **enabler(s) (`en.*`)**, **crosscutting
+> concern(s) (`docs/crosscutting/`)**, and any governing **ADR(s) (`docs/decisions/`)**. A CR's `satisfies:` /
+> `adrs:` must resolve to docs that are already there — **never invent the concept inside the CR**. The concept is
+> decided in refinement (step 2, with the user); the CR only turns it into a work-order. And a CR grants no
+> licence to build: **implementation waits for the user's explicit go-ahead on that CR.**
+
 ## Two documentation audiences
 
 - **Internal** (`docs/`): precise, English, for devs + agents. The technical security model lives here.
