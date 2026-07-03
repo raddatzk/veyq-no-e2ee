@@ -222,7 +222,7 @@ final class LiveRoundTripTests: XCTestCase {
         let imgPreview = try await c.openMedia(scopeId: personal.id, memoryKey: memoryKey, media: image, tier: .lightbox)
         let (tw, th) = try MediaFixtures.jpegDimensions(imgThumb)
         let (pw, ph) = try MediaFixtures.jpegDimensions(imgPreview)
-        XCTAssertLessThanOrEqual(max(tw, th), 400, "thumbnail longest edge ≤ 400")
+        XCTAssertLessThanOrEqual(max(tw, th), 512, "thumbnail longest edge ≤ 512")
         XCTAssertLessThanOrEqual(max(pw, ph), 2048, "preview longest edge ≤ 2048")
         XCTAssertEqual(Double(tw) / Double(th), 1600.0 / 900.0, accuracy: 0.02, "thumbnail keeps the aspect ratio")
         try Self.write(imgThumb, to: artifactDir, named: "image-thumbnail-\(tw)x\(th).jpg")

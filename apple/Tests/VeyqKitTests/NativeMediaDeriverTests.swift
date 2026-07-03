@@ -19,7 +19,7 @@ final class NativeMediaDeriverTests: XCTestCase {
         let thumbnail = try await deriver.deriveImage(png, maxEdge: DerivativeSpec.thumbnail.maxEdge,
                                                       quality: DerivativeSpec.thumbnail.quality)
         let (tw, th) = try MediaFixtures.jpegDimensions(thumbnail)   // also asserts it decodes as JPEG
-        XCTAssertEqual(max(tw, th), 400, "thumbnail longest edge hits the 400 cap")
+        XCTAssertEqual(max(tw, th), 512, "thumbnail longest edge hits the 512 cap")
         XCTAssertEqual(Double(tw) / Double(th), 1600.0 / 900.0, accuracy: 0.02, "aspect ratio preserved")
 
         let preview = try await deriver.deriveImage(png, maxEdge: DerivativeSpec.preview.maxEdge,

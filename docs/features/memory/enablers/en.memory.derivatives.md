@@ -22,16 +22,24 @@
 
 ## The three tiers
 
-| role | used by | size / format (pinned from `legacy/apple`) | fetched when |
+| role | used by | size / format | fetched when |
 |------|---------|---------------------------------------------|--------------|
-| **thumbnail** | gallery **grid** | JPEG, longest edge **400 px**, quality **0.80** | listing a Memory |
+| **thumbnail** | gallery **grid** | JPEG, longest edge **512 px**, quality **0.80** | listing a Memory |
 | **preview** | **lightbox** | JPEG, longest edge **2048 px**, quality **0.85** | opening an item |
 | **original** | **download** | **pristine**, as uploaded (full res + metadata) | explicit download only |
 
 - **Sizes are pinned from the legacy E2EE client** (`legacy/apple/App/Veyq/Gallery/MemoryDetailView.swift:318-319`
   — `thumbnail = downscale(maxDim 400, q 0.8)`, `preview = downscale(maxDim 2048, q 0.85)`), so the look
   matches the original product. Tunable, but these are the defaults. (WebP would be smaller — an optional swap,
-  not the default.)
+  not the default.) **Exception (cr-0070):** the **thumbnail** cap was raised **400 → 512 px** so a ~200 px grid
+  tile on a 2×/3× display isn't upscaled into mush; preview stays legacy-pinned.
+- **Use a high-quality downscale filter.** The thumbnail is a large single-step reduction (e.g. 4032 → 512 ≈ 8×);
+  the platform's *cheap* default resampler (web canvas `imageSmoothingQuality: 'low'`) aliases fine detail into
+  a smear. Each surface must select its high-quality scaler (web: **progressive-halving** canvas downscale — ≤2×
+  steps at `imageSmoothingQuality='high'`, since a single big `drawImage` is one bilinear pass and stays soft;
+  apple: ImageIO `CGImageSourceCreateThumbnailAtIndex` — a resampling downscaler; android:
+  `createScaledBitmap(filter = true)` after a power-of-two `inSampleSize` pre-reduction). The legacy web client
+  sidestepped this entirely by deriving **server-side** (libvips) — not an option here (operator-blind).
 - **Video:** decode the **first frame** to a JPEG **poster**, used for **both** the thumbnail and the preview
   (a still — no motion preview this pass); the original video is fetched only on download. Mirrors the legacy
   single-JPEG-poster (`legacy/infra/.env.template:210`).
@@ -73,8 +81,8 @@ back to an icon + name. **Upload always generates the derivatives** — there is
    may **assume** they exist (the only fallback is the rare non-image/non-video type).
 3. **Video = first-frame poster** (JPEG), used for both thumbnail and preview; the video original only on
    download. Motion/short-clip preview is a later pass.
-4. **Sizes pinned from legacy:** thumbnail JPEG longest-edge 400 / q0.80, preview JPEG longest-edge 2048 /
-   q0.85 (see *The three tiers*).
+4. **Tier sizes:** thumbnail JPEG longest-edge 512 / q0.80 (raised from the legacy 400 for hi-DPI, cr-0070),
+   preview JPEG longest-edge 2048 / q0.85 — legacy-pinned (see *The three tiers*).
 
 ## Quality notes
 

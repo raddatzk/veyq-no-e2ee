@@ -63,7 +63,7 @@ class MediaTest {
     }
 
     @Test fun tierSpecsArePinnedFromLegacy() {
-        assertEquals(DerivativeSpec(400, 80), DerivativeSpec.THUMBNAIL)
+        assertEquals(DerivativeSpec(512, 80), DerivativeSpec.THUMBNAIL)
         assertEquals(DerivativeSpec(2048, 85), DerivativeSpec.PREVIEW)
     }
 

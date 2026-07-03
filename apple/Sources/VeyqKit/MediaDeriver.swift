@@ -22,8 +22,8 @@ import UniformTypeIdentifiers
 // (`AVAssetImageGenerator`) for the video first-frame poster — both are macOS+iOS+tvOS. UIKit
 // `UIImage`/`UIGraphicsImageRenderer` is iOS-only and would break the macOS build.
 
-/// A pinned derivative tier spec — longest-edge cap + JPEG quality. Pinned from the legacy E2EE client
-/// (en.memory.derivatives → *The three tiers*): thumbnail 400/q0.80 (grid), preview 2048/q0.85 (lightbox).
+/// A pinned derivative tier spec — longest-edge cap + JPEG quality (en.memory.derivatives → *The three tiers*):
+/// thumbnail 512/q0.80 (grid; raised from the legacy 400 for hi-DPI, cr-0070), preview 2048/q0.85 (lightbox).
 public struct DerivativeSpec: Sendable, Equatable {
     public let maxEdge: Int
     public let quality: Double
@@ -33,8 +33,8 @@ public struct DerivativeSpec: Sendable, Equatable {
         self.quality = quality
     }
 
-    /// Gallery **grid** tier: JPEG, longest edge 400 px, quality 0.80.
-    public static let thumbnail = DerivativeSpec(maxEdge: 400, quality: 0.80)
+    /// Gallery **grid** tier: JPEG, longest edge 512 px, quality 0.80 (512 for retina headroom, cr-0070).
+    public static let thumbnail = DerivativeSpec(maxEdge: 512, quality: 0.80)
     /// **Lightbox** tier: JPEG, longest edge 2048 px, quality 0.85.
     public static let preview = DerivativeSpec(maxEdge: 2048, quality: 0.85)
 }

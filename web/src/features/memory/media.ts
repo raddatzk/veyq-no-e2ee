@@ -30,9 +30,13 @@ const MEDIA_EXIF_CTX = 'media-exif'
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
 
-/** Derivative tier specs, pinned from the legacy E2EE client (en.memory.derivatives → *The three tiers*). */
+/**
+ * Derivative tier specs (en.memory.derivatives → *The three tiers*). `preview` is pinned from the legacy E2EE
+ * client; `thumbnail` was raised 400→512 px (cr-0070) so hi-DPI grid tiles aren't upscaled into mush. Parity is
+ * by-property (a valid JPEG at the target edge), so apple/android carry the same 512.
+ */
 export const TIER_SPECS: Record<MediaDerivativeKind, { maxEdge: number; quality: number }> = {
-  THUMBNAIL: { maxEdge: 400, quality: 0.8 }, // gallery grid
+  THUMBNAIL: { maxEdge: 512, quality: 0.8 }, // gallery grid (512 for retina headroom, cr-0070)
   PREVIEW: { maxEdge: 2048, quality: 0.85 }, // lightbox
 }
 
@@ -244,15 +248,38 @@ export function createBrowserDeriver(): MediaDeriver {
 
 async function drawToJpeg(src: CanvasImageSource, w: number, h: number, maxEdge: number, quality: number): Promise<Uint8Array> {
   const { width, height } = scaleToMaxEdge(w, h, maxEdge)
+  // Progressive-halving downscale. A single large drawImage (e.g. 4032→512 ≈ 8×) stays soft even at
+  // imageSmoothingQuality:'high' — the browser applies ONE bilinear pass, not an iterative filter, so it drops
+  // high-frequency detail. Halving in ≤2× steps (each with high smoothing) preserves that detail, approximating
+  // the multi-tap resample the legacy server did with libvips (frontend-noe2ee derived server-side; operator-blind
+  // forces it on-device here). scaleToMaxEdge never upscales, so a small source just skips the loop.
+  let curSrc: CanvasImageSource = src
+  let curW = w
+  let curH = h
+  while (curW > width * 2 || curH > height * 2) {
+    const nextW = Math.max(Math.round(curW / 2), width)
+    const nextH = Math.max(Math.round(curH / 2), height)
+    curSrc = drawStep(curSrc, nextW, nextH)
+    curW = nextW
+    curH = nextH
+  }
+  const canvas = drawStep(curSrc, width, height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+  if (!blob) throw new Error('encode_failed')
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+/** One high-quality `drawImage` onto a fresh canvas at `width`×`height` (each downscale step of drawToJpeg). */
+function drawStep(src: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas_unavailable')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(src, 0, 0, width, height)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
-  if (!blob) throw new Error('encode_failed')
-  return new Uint8Array(await blob.arrayBuffer())
+  return canvas
 }
 
 function onceEvent(el: HTMLMediaElement, ev: 'loadeddata' | 'seeked'): Promise<void> {

@@ -511,7 +511,7 @@ describe('read-back — operator-blind round-trip + tier selection', () => {
     // the thumbnail tier opens to the 400px-tagged stub bytes, the preview to the 2048px-tagged ones
     const grid = await openBlob(SCOPE_ID, memoryKey, gridRef(item))
     const light = await openBlob(SCOPE_ID, memoryKey, lightboxRef(item))
-    expect(Array.from(grid)).toEqual([0xff, 0xd8, 400 & 0xff, 400 >> 8])
+    expect(Array.from(grid)).toEqual([0xff, 0xd8, 512 & 0xff, 512 >> 8])
     expect(Array.from(light)).toEqual([0xff, 0xd8, 2048 & 0xff, 2048 >> 8])
   })
 

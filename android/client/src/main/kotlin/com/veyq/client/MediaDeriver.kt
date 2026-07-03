@@ -20,8 +20,8 @@ package com.veyq.client
  *  Pinned from the legacy E2EE client (en.memory.derivatives → *The three tiers*). */
 data class DerivativeSpec(val maxEdge: Int, val quality: Int) {
     companion object {
-        /** Gallery **grid** tier: JPEG, longest edge 400 px, quality 0.80. */
-        val THUMBNAIL = DerivativeSpec(maxEdge = 400, quality = 80)
+        /** Gallery **grid** tier: JPEG, longest edge 512 px, quality 0.80 (512 for retina headroom, cr-0070). */
+        val THUMBNAIL = DerivativeSpec(maxEdge = 512, quality = 80)
         /** **Lightbox** tier: JPEG, longest edge 2048 px, quality 0.85. */
         val PREVIEW = DerivativeSpec(maxEdge = 2048, quality = 85)
     }

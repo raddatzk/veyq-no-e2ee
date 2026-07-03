@@ -36,7 +36,7 @@ class AndroidMediaDeriverTest {
 
         val thumbnail = deriver.deriveImage(png, DerivativeSpec.THUMBNAIL.maxEdge, DerivativeSpec.THUMBNAIL.quality)
         val (tw, th) = jpegDimensions(thumbnail)   // also asserts it decodes as JPEG
-        assertEquals("thumbnail longest edge hits the 400 cap", 400, maxOf(tw, th))
+        assertEquals("thumbnail longest edge hits the 512 cap", 512, maxOf(tw, th))
         assertEquals("aspect ratio preserved", 1600.0 / 900.0, tw.toDouble() / th, 0.02)
         save("image-thumbnail-${tw}x$th.jpg", thumbnail)
 

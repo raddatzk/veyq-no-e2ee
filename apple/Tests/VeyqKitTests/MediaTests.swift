@@ -46,7 +46,7 @@ final class MediaTests: XCTestCase {
     }
 
     func testTierSpecsArePinnedFromLegacy() {
-        XCTAssertEqual(DerivativeSpec.thumbnail, DerivativeSpec(maxEdge: 400, quality: 0.80))
+        XCTAssertEqual(DerivativeSpec.thumbnail, DerivativeSpec(maxEdge: 512, quality: 0.80))
         XCTAssertEqual(DerivativeSpec.preview, DerivativeSpec(maxEdge: 2048, quality: 0.85))
     }
 
@@ -67,7 +67,7 @@ final class MediaTests: XCTestCase {
         // three blobs declared in one start batch (original + 2 derivatives)
         XCTAssertEqual(stub.startItemCount, 3)
         // the deriver produced two downscales at the pinned tier specs; no video poster
-        XCTAssertEqual(stub.derivers.imageCalls.map { $0.maxEdge }, [400, 2048])
+        XCTAssertEqual(stub.derivers.imageCalls.map { $0.maxEdge }, [512, 2048])
         XCTAssertEqual(stub.derivers.imageCalls.map { $0.quality }, [0.80, 0.85])
         XCTAssertEqual(stub.derivers.posterCalls, 0)
         // complete carried the role tags in order
@@ -190,7 +190,7 @@ final class MediaTests: XCTestCase {
         let grid = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .grid)
         let lightbox = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .lightbox)
         let download = try await c.openMedia(scopeId: Self.scopeId, memoryKey: memoryKey, media: item, tier: .original)
-        XCTAssertEqual(grid, StubDeriver.imageBytes(maxEdge: 400))
+        XCTAssertEqual(grid, StubDeriver.imageBytes(maxEdge: 512))
         XCTAssertEqual(lightbox, StubDeriver.imageBytes(maxEdge: 2048))
         XCTAssertEqual(download, original)
     }
