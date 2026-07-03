@@ -137,7 +137,7 @@ describe('MemoryLocationEditor (intent-first)', () => {
     const existing: MemoryLocation = { name: 'Teneriffa', nameSource: 'manual', derivedMode: 'fixed', derived: MEDOID }
     const w = mountEditor(existing)
     await flushPromises()
-    await w.find('.memory-location-remove').trigger('click')
+    await w.findAll('button').find((b) => b.text() === 'Remove location')!.trigger('click')
     expect(w.emitted('save')?.[0]?.[0]).toBeNull()
   })
 

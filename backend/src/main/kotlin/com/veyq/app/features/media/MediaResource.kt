@@ -1,6 +1,8 @@
 package com.veyq.app.features.media
 
 import com.veyq.app.generated.api.MediaApi
+import com.veyq.app.generated.model.BlobRef
+import com.veyq.app.generated.model.CoverBlobCommitRequest
 import com.veyq.app.generated.model.BlobDownloadResultItem
 import com.veyq.app.generated.model.BlobDownloadsBatchRequest
 import com.veyq.app.generated.model.BlobDownloadsBatchResponse
@@ -100,6 +102,28 @@ class MediaResource(
             MetaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
         }
 
+    override fun commitCoverBlob(scopeId: UUID, nodeId: UUID, coverBlobCommitRequest: CoverBlobCommitRequest): Response =
+        when (val o = handler.commitCover(identity.principal.name, scopeId.toString(), nodeId.toString(), coverBlobCommitRequest.uploadId.toString())) {
+            is CoverCommitOutcome.Ok -> Response.ok(
+                BlobRef(
+                    blobId = UUID.fromString(o.ref.blobId),
+                    chunkCount = o.ref.chunkCount,
+                    byteSize = o.ref.byteSize,
+                    wrappedBlobKey = o.ref.wrappedBlobKey,
+                    manifest = o.ref.manifest,
+                ),
+            ).build()
+            CoverCommitOutcome.NoTarget -> error(Response.Status.NOT_FOUND, "node_not_found")
+            CoverCommitOutcome.IllegalTarget -> error(422, "illegal_target")
+            CoverCommitOutcome.Budget -> error(Response.Status.BAD_REQUEST, "budget_exceeded")
+        }
+
+    override fun deleteCoverBlob(scopeId: UUID, nodeId: UUID): Response =
+        when (handler.deleteCover(identity.principal.name, scopeId.toString(), nodeId.toString())) {
+            CoverDeleteOutcome.Done -> Response.noContent().build()
+            CoverDeleteOutcome.NoTarget -> error(Response.Status.NOT_FOUND, "node_not_found")
+        }
+
     override fun presignBlobDownloads(scopeId: UUID, blobDownloadsBatchRequest: BlobDownloadsBatchRequest): Response {
         val blobIds = blobDownloadsBatchRequest.items.map { it.blobId.toString() }
         return when (val o = handler.download(identity.principal.name, scopeId.toString(), blobIds)) {
@@ -137,5 +161,8 @@ class MediaResource(
     )
 
     private fun error(status: Response.Status, code: String): Response =
+        Response.status(status).entity(ErrorResponse(code = code)).build()
+
+    private fun error(status: Int, code: String): Response =
         Response.status(status).entity(ErrorResponse(code = code)).build()
 }

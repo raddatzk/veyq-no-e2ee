@@ -159,6 +159,83 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
 
+  /api/scopes/{scopeId}/nodes/{nodeId}/cover-blob:
+    post:
+      tags: [media]
+      operationId: commitCoverBlob
+      summary: Commit an uploaded blob as the node's standalone cover — no media row.
+      description: >
+        Promote one `startBlobUploads` session into a **standalone cover blob** attached to the node. The server
+        verifies the upload session (declare-then-verify: stats the stored chunk objects against the declared
+        count + byte budget, purging + failing on mismatch), records one `veyq_blob`, and sets the node's
+        `cover_blob_id` to it — **atomically replacing + reclaiming** any prior cover blob (its store objects +
+        `veyq_blob` row are purged). Unlike `completeMedia` this creates **no `veyq_media` row** (no gallery
+        entry, no derivative tiers): the cover is a single blob the client downscaled on device. Serving reuses
+        `presignBlobDownloads`. Returns the committed `BlobRef`. Guards: the caller holds a grant for the scope;
+        the target node must be a **MEMORY** or **CHAPTER** (`illegal_target` on a FOLDER). Operator-blind — the
+        server holds the ciphertext + the opaque `cover_blob_id` + size only, never the image, the crop, or the
+        fact that this blob is "the cover" (that stays in the sealed node meta).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CoverBlobCommitRequest" }
+            example:
+              uploadId: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+      responses:
+        "200":
+          description: The committed cover blob ref (opaque metadata; any prior cover blob was reclaimed).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlobRef" }
+        "400":
+          description: Malformed request, or the upload failed declare-then-verify (`budget_exceeded`).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/node/upload, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+        "422":
+          description: The target node is a FOLDER (owns no `K_mem`, so it can carry no cover).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
+    delete:
+      tags: [media]
+      operationId: deleteCoverBlob
+      summary: Detach + reclaim the node's standalone cover blob.
+      description: >
+        Clear the node's `cover_blob_id`, delete its `veyq_blob` row, and purge the blob's store objects. Used
+        when an uploaded cover is removed (the sealed node meta drops its `cover` separately, via `updateNode`).
+        Idempotent — a node with no cover blob answers `204`. Guards: the caller holds a grant for the scope.
+        `deleteNode` performs the same reclaim via the `cover_blob_id` column, so this is the explicit
+        client-driven detach; the deferred unreferenced-blob sweep (ADR 0013 §3) is the crash-safety backstop.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      responses:
+        "204":
+          description: The cover blob was detached + reclaimed (or the node had none).
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+
   /api/scopes/{scopeId}/media/{mediaId}/exif:
     get:
       tags: [media]
@@ -586,6 +663,48 @@ components:
           contentEncoding: base64
           maxLength: 512
           example: bWV0YS1jaXBoZXJ0ZXh0
+
+    # --- cover blob (standalone, no media row) -------------------------------
+    CoverBlobCommitRequest:
+      type: object
+      description: >
+        Promote one upload session into the node's standalone cover blob. The blob was sealed + PUT via the
+        existing `startBlobUploads` transport; here the client hands back only its `uploadId`.
+      required: [uploadId]
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+          description: The upload session for the cover blob, opened by `startBlobUploads`.
+          example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+
+    BlobRef:
+      type: object
+      description: >
+        A committed blob's opaque read-back ref — the same shape the gallery consumes per media tier, reused for
+        the standalone cover. The client unwraps `wrappedBlobKey` under `K_mem`, presigns via
+        `presignBlobDownloads`, and opens the chunks with `openFrame`.
+      required: [blobId, chunkCount, byteSize, wrappedBlobKey]
+      properties:
+        blobId: { type: string, format: uuid, example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a }
+        chunkCount:
+          type: integer
+          format: int32
+          example: 1
+        byteSize:
+          type: integer
+          format: int64
+          example: 65536
+        manifest:
+          type: [array, "null"]
+          description: Per-chunk ciphertext byte sizes in chunk order (server-recorded at commit; ciphertext sizes only).
+          items: { type: integer, format: int64, example: 65536 }
+        wrappedBlobKey:
+          type: string
+          description: The cover blob's random `K_blob` wrapped under the Memory's `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 256
+          example: d3JhcHBlZC1rLWJsb2I=
 
     # --- presign downloads ---------------------------------------------------
     BlobDownloadsBatchRequest:

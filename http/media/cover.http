@@ -1,0 +1,34 @@
+### Memory cover blob — authz boundary (uc.memory.cover, cr-0073)
+# The unauthenticated boundary of the standalone cover-blob endpoints, runnable against ANY instance — no
+# account/scope/membership needed. Like the media blob transport (en.memory.media) and content.http, the
+# authenticated happy-path is NOT reproducible from a bare .http: committing a cover needs an upload session
+# whose ciphertext chunks were sealed client-side (AEAD, chunked) and PUT direct-to-store, plus the
+# operator-blind scope-grant flow. Those, plus replace-reclaim, delete-reclaim, node-delete cascade, the
+# FOLDER illegal_target, non-member 404 and cross-scope 404, are covered at the integration layer
+# (NodeCoverSliceTest, which seeds a member+scope in-tx and drives commit→download→reclaim) and in the web
+# client's live smoke.
+#
+# Run: ijhttp --env-file http/media/http-client.env.json --env dev http/media/cover.http
+
+### 1. Commit a cover blob without a bearer token → generic 401 (auth before validation)
+POST {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/cover-blob
+Content-Type: application/json
+
+{ "uploadId": "00000000-0000-0000-0000-000000000000" }
+
+> {%
+client.test("commit cover requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 2. Delete a cover blob without a bearer token → 401
+DELETE {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/cover-blob
+
+> {%
+client.test("delete cover requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}

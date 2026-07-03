@@ -107,7 +107,7 @@ function save() {
 
       <Message v-if="rangeInvalid" severity="error" :closable="false">{{ t('memory.date.invalidRange') }}</Message>
 
-      <div class="dialog-actions">
+      <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
         <Button type="submit" :label="t('common.save')" icon="pi pi-check" :disabled="!canSave" />
       </div>
@@ -130,11 +130,5 @@ function save() {
 .memory-date-auto-hint {
   color: var(--app-muted);
   font-size: 0.86rem;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 </style>

@@ -22,11 +22,11 @@ describe('MemoryCoverImage', () => {
     expect(w.find('.memory-cover-image-ph').exists()).toBe(false)
   })
 
-  it('full-frame crop still fills the box (object-fit fill, no offset)', () => {
+  it('full-frame crop ⇒ object-fit cover (centre-crop, no distortion — e.g. a one-click gallery cover)', () => {
     const w = mount(MemoryCoverImage, { props: { src: 'blob:abc', crop: FULL_FRAME } })
     const style = w.find('img').attributes('style') ?? ''
     expect(style).toContain('width: 100%')
-    expect(style).toContain('object-fit: fill')
+    expect(style).toContain('object-fit: cover')
   })
 
   it('no src ⇒ the default images-tile placeholder, no <img>', () => {

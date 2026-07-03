@@ -13,6 +13,8 @@ vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
 
 import {
   addMedia,
+  uploadCoverBlob,
+  deleteCoverBlob,
   listMedia,
   openBlob,
   openOriginal,
@@ -24,6 +26,7 @@ import {
   setMediaMeta,
   effectiveCapturedAt,
   CHUNK_SIZE,
+  COVER_SPEC,
   TIER_SPECS,
   type MediaDeriver,
   type MediaItem,
@@ -48,7 +51,7 @@ function fakeStore() {
   const objects = new Map<string, Uint8Array>()
   const sessions = new Map<string, { wrappedBlobKey: string; chunkCount: number }>()
   let upCounter = 0
-  const captured = { startItems: [] as any[], completeItem: undefined as any, updatedMeta: undefined as any }
+  const captured = { startItems: [] as any[], completeItem: undefined as any, updatedMeta: undefined as any, coverUpload: undefined as any, coverDeletedNode: undefined as any }
 
   const blobOf = (uploadId: string) => {
     const s = sessions.get(uploadId)!
@@ -93,6 +96,15 @@ function fakeStore() {
       return {
         results: [{ presignedGets: Array.from({ length: s.chunkCount }, (_, i) => ({ index: i, url: `mem://${uploadId}/${i}` })), error: null }],
       }
+    }),
+    // cr-0073: promote one upload session into a standalone cover blob (no media row). The fake returns the
+    // committed ref keyed by the uploadId so a caller can round-trip it through presignBlobDownloads.
+    commitCoverBlob: vi.fn(async ({ nodeId, coverBlobCommitRequest }: any) => {
+      captured.coverUpload = { nodeId, uploadId: coverBlobCommitRequest.uploadId }
+      return blobOf(coverBlobCommitRequest.uploadId)
+    }),
+    deleteCoverBlob: vi.fn(async ({ nodeId }: any) => {
+      captured.coverDeletedNode = nodeId
     }),
   }
 
@@ -468,6 +480,48 @@ describe('setMediaMeta — sealed capturedAt override in the listed-metadata tie
 
     expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, capturedAtOverride: CORRECTED })
     expect(effectiveCapturedAt(updated.tier)).toBe(CORRECTED)
+  })
+})
+
+describe('uploadCoverBlob / deleteCoverBlob — standalone cover blob (cr-0073)', () => {
+  it('downscales an image to one cover-sized JPEG, seals it, commits it, and round-trips via openBlob', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+
+    const memoryKey = v1.randomBytes(32)
+    const ref = await uploadCoverBlob(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(10).fill(7), mediaType: 'image/png' }, deriver)
+
+    // exactly one downscale at the cover spec (no THUMBNAIL/PREVIEW split), one blob started, no media completed
+    expect(deriver.images).toBe(1)
+    expect(deriver.deriveImage).toHaveBeenCalledWith(expect.anything(), COVER_SPEC)
+    expect(store.captured.startItems).toHaveLength(1)
+    expect(store.api.completeMedia).not.toHaveBeenCalled() // NO veyq_media row
+    expect(store.captured.coverUpload).toEqual({ nodeId: NODE_ID, uploadId: 'up-0' })
+
+    // the committed ref opens back to the downscaled cover bytes (2048-tagged by the stub) under K_mem
+    const opened = await openBlob(SCOPE_ID, memoryKey, ref)
+    expect(Array.from(opened)).toEqual([0xff, 0xd8, 2048 & 0xff, 2048 >> 8])
+  })
+
+  it('seals the pristine bytes for a non-image source (no downscale)', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const deriver = stubDeriver()
+
+    await uploadCoverBlob(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1, 2, 3]), mediaType: 'application/octet-stream' }, deriver)
+    expect(deriver.images).toBe(0) // non-image ⇒ no downscale attempt
+    expect(store.captured.startItems).toHaveLength(1)
+  })
+
+  it('deleteCoverBlob detaches via the endpoint', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    await deleteCoverBlob(SCOPE_ID, NODE_ID)
+    expect(store.api.deleteCoverBlob).toHaveBeenCalledWith({ scopeId: SCOPE_ID, nodeId: NODE_ID })
+    expect(store.captured.coverDeletedNode).toBe(NODE_ID)
   })
 })
 

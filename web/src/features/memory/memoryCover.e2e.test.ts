@@ -60,7 +60,7 @@ describe.skipIf(!process.env.VEYQ_E2E)('memory cover e2e (live, operator-blind r
     // as currentMeta, exactly as the UI's read-modify-write does).
     const date = { mode: 'range' as const, from: '2026-05-01', to: '2026-05-09' }
     const location = { name: 'Teneriffa', nameSource: 'manual' as const, derivedMode: 'fixed' as const }
-    const cover: MemoryCover = { mediaId: 'smoke-media-id', crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.28125 } }
+    const cover: MemoryCover = { source: { kind: 'media', mediaId: 'smoke-media-id' }, crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.28125 } }
 
     let meta = await setMemoryDate(scopeId, nodeId, memoryKey, date, null)
     meta = await setMemoryLocation(scopeId, nodeId, memoryKey, location, meta)

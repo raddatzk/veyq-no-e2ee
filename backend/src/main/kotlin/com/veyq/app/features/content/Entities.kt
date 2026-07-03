@@ -46,6 +46,14 @@ class NodeEntity : PanacheEntityBase {
     @Column(name = "wrapped_meta")
     var wrappedMeta: String? = null
 
+    /** The node's standalone **cover** blob id (cr-0073): a veyq_blob with NO veyq_media row (never in the gallery), or null. Opaque — the server never learns it is "the cover" (that stays in the sealed `wrappedMeta.cover`). */
+    @Column(name = "cover_blob_id", length = 36)
+    var coverBlobId: String? = null
+
+    /** The cover blob's ciphertext size in bytes (cr-0073), for the byte budget + retention; null when no cover blob. */
+    @Column(name = "cover_byte_size")
+    var coverByteSize: Long? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

@@ -17,8 +17,9 @@ A cover is **one image plus a crop**, deliberately chosen — **there is no auto
 nothing; unset ⇒ a placeholder shows, like a location is never auto-created). The image source is:
 
 - **an existing Memory media** — referenced by `mediaId` (this use-case's first slice, cr-0072); or
-- **a brand-new uploaded image** that is **not** added to the Memory's media — a **standalone cover blob** (a later
-  slice / CR: it needs a blob committed to the node with no `veyq_media` row — contract + backend).
+- **a brand-new uploaded image** that is **not** added to the Memory's media — a **standalone cover blob** committed
+  to the node with **no `veyq_media` row** (so it never appears in the gallery), sealed under a `K_blob` wrapped by
+  `K_mem` and served over the existing presigned transport (cr-0073).
 
 The **crop is normalized `{ x, y, width, height }` in 0..1** against the source image (the pre-E2EE design source's
 `CoverCrop`), so **one stored crop renders identically at any size** — a small card, a larger detail header, or a
@@ -28,13 +29,21 @@ and offsets it.
 
 ## Main flow
 
-1. With a Memory **open**, the header offers **"set cover"**. It opens a picker over the Memory's **decrypted
-   media** (the tiers the gallery already loads); the user picks one.
-2. A **16:9 crop viewport** shows the picked image; the user **drag-pans** and **zooms** (1–3×) to frame it. Save
-   normalizes the pan/zoom back to the `0..1` crop rectangle.
-3. On save, the client seals `cover { mediaId, crop }` into the node's `wrappedMeta` under `K_mem` (read-modify-write
-   — the sibling date/location are preserved) and PATCHes it via `updateNode`. The detail header re-renders; the
-   browse card and the map pin pick it up.
+1. The cover image comes from one of two entry points — **there is no modal media picker** (browsing existing
+   photos stays in the gallery, which scales to any count):
+   - **A Memory photo — one click, no interruption:** open a photo in the **gallery lightbox** and choose
+     **"Set as cover"**. It becomes the cover **immediately** with a default centre-crop (full-frame → shown
+     `object-fit: cover`, never distorted), and the **lightbox stays open** so the user keeps browsing; the
+     button marks that photo as the current cover. Fine-tuning the crop is a deliberate later step (below).
+   - **A brand-new image, or re-cropping the current cover:** the header's **"set cover"** opens the editor —
+     **"Upload a photo"** (an `<input type=file accept=image/*>`), or the current cover pre-loaded to re-frame.
+2. In the editor a **16:9 crop viewport** (filling the dialog width) shows the source; the user **drag-pans** and
+   **zooms** (1–3×) to frame it. Save normalizes the pan/zoom back to the `0..1` crop rectangle. (A one-click
+   gallery cover skips this and takes the default centre-crop.)
+3. On save, the client seals `cover { source, crop }` — `source` = the media `mediaId` or the uploaded blob ref —
+   into the node's `wrappedMeta` under `K_mem` (read-modify-write — the sibling date/location are preserved) and
+   PATCHes it via `updateNode`. Switching away from an uploaded cover reclaims its standalone blob. The detail
+   header re-renders; the browse card and the map pin pick it up.
 4. **Everywhere the Memory shows**, its cover is rendered from the same sealed crop over the chosen media's
    decrypted thumbnail: the **browse card**, the **detail header**, the **map pin**. **Remove** clears the cover →
    the placeholder returns on every surface.
@@ -86,8 +95,10 @@ Gerät verschlüsselt; der Server speichert nur verschlüsselte Daten.
   chosen from + displayed with), [uc.memory.browse](uc.memory.browse.md) (the card + `updateNode` this folds into)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (K_mem seals node content),
   [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
-- Future: a cover from a **new upload** (a standalone cover blob — contract + backend, cr-0073); native cover parity.
-  cr-0073 generalizes the cr-0072 **`mediaId`-only** `cover` shape into a discriminated **`source` (media | standalone
-  blob)** — with a backward-compatible `normalizeMemoryCover` so existing `{ mediaId, crop }` seals still open — and
-  branches `loadNodeCover` onto a blob-fetch path; the display (`MemoryCoverImage` + `coverImageStyle`) and the crop
-  editor are reused unchanged.
+- Built: the existing-media source (web, cr-0072) and the **new-upload** source (a standalone cover blob —
+  contract + backend + web, cr-0073). cr-0073 generalized the cr-0072 **`mediaId`-only** `cover` shape into a
+  discriminated **`source` (media | upload blob ref)** — with a backward-compatible `normalizeMemoryCover` so
+  existing `{ mediaId, crop }` seals still open — and branched `loadNodeCover` onto a blob-fetch path; the display
+  (`MemoryCoverImage` + `coverImageStyle`) and the crop editor are reused unchanged.
+- Future: native cover parity (Apple + Android own later CRs, ADR 0010) — the upload source (contract + endpoints)
+  is carried to the native data layer after regen.

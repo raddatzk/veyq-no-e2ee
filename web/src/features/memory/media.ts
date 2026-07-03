@@ -525,6 +525,69 @@ export async function addMedia(
   return { blobId: m.blobId, mediaId: m.mediaId }
 }
 
+// --- standalone cover blob (cr-0073) ---------------------------------------
+
+/**
+ * Cover downscale spec: a Memory's cover is only ever shown small-to-medium (a card tile, a ~180 px detail
+ * preview, a 34 px pin), so an uploaded cover is downscaled to ONE cover-sized JPEG — no THUMBNAIL/PREVIEW
+ * tiers. Matches the PREVIEW long edge; the normalized crop then renders it identically at any size.
+ */
+export const COVER_SPEC = { maxEdge: 2048, quality: 0.85 }
+
+/**
+ * Upload a brand-new image as a Memory's **standalone cover blob** (cr-0073, uc.memory.cover second source):
+ * downscale on device to one cover-sized JPEG, seal it under a fresh `K_blob` (wrapped under `K_mem`), upload
+ * the ciphertext chunks direct-to-store, and commit it to the node via `commitCoverBlob` — attached with **no
+ * `veyq_media` row** (never in the gallery, no derivative tiers). Commit **atomically reclaims** any prior
+ * cover blob on the node. Returns the committed [BlobRef] the display layer opens with [openBlob]. Best-effort
+ * downscale: an undecodable source seals the original bytes rather than fail (uc.memory.upload E4).
+ */
+export async function uploadCoverBlob(
+  scopeId: string,
+  nodeId: string,
+  memoryKey: Uint8Array,
+  source: AddMediaSource,
+  deriver: MediaDeriver = createBrowserDeriver(),
+): Promise<BlobRef> {
+  let bytes = source.bytes
+  if (source.mediaType.startsWith('image/')) {
+    try {
+      bytes = await deriver.deriveImage(new Blob([source.bytes as BlobPart], { type: source.mediaType }), COVER_SPEC)
+    } catch {
+      /* undecodable codec → seal the pristine bytes (still a valid, if larger, cover) */
+    }
+  }
+  const sealed = sealBlob(memoryKey, bytes)
+
+  const started = await withRefresh(() =>
+    mediaApi().startBlobUploads({
+      scopeId,
+      blobUploadsBatchRequest: {
+        items: [{ chunkCount: sealed.chunkCount, byteSize: sealed.byteSize, wrappedBlobKey: sealed.wrappedBlobKey }],
+      },
+    }),
+  )
+  const r = started.results[0]
+  if (!r || r.error) throw new Error(r?.error ?? 'upload_failed')
+  if (!r.uploadId || !r.presignedPuts) throw new Error('store_unavailable')
+  const putUrls = byIndex(r.presignedPuts)
+  await Promise.all(putUrls.map((url, i) => putChunk(url, sealed.frames[i])))
+
+  const committed = await withRefresh(() =>
+    mediaApi().commitCoverBlob({ scopeId, nodeId, coverBlobCommitRequest: { uploadId: r.uploadId! } }),
+  )
+  return { blobId: committed.blobId, chunkCount: committed.chunkCount, byteSize: committed.byteSize, wrappedBlobKey: committed.wrappedBlobKey }
+}
+
+/**
+ * Detach + reclaim a node's standalone cover blob (cr-0073) — the client-driven counterpart to `deleteNode`'s
+ * cascade. Called when an **uploaded** cover is superseded by a media cover or removed (a fresh upload commit
+ * already reclaims the prior blob atomically, so a replace-upload-with-upload needs no explicit delete).
+ */
+export async function deleteCoverBlob(scopeId: string, nodeId: string): Promise<void> {
+  await withRefresh(() => mediaApi().deleteCoverBlob({ scopeId, nodeId }))
+}
+
 // --- read-back -------------------------------------------------------------
 
 /** List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier). */

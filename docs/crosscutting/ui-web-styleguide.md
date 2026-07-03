@@ -56,9 +56,15 @@ one-off `1rem` labels or default component-library button text there.
 
 - Submit/save/confirm = positive (green); cancel/neutral = secondary; destructive = danger with an
   explicit label. Icon-only actions use `.veyq-icon-button` + an `aria-label`/tooltip.
-- Dialog footers (`.veyq-dialog-action-row`): **cancel/secondary left, submit/confirm/destructive
-  right**; source order matches visual order. Confirm/destructive actions show an in-progress state and
-  **disable confirm/cancel/close + inputs while the mutation runs** (no double-submit).
+- **Dialog footers use the one shared `.veyq-dialog-action-row`** (a `space-between` row; never a
+  per-component `.dialog-actions` copy): **cancel/secondary anchored left, submit/confirm anchored right**;
+  source order matches visual order. A **destructive tertiary** action that coexists with the primary confirm
+  (e.g. *Cover entfernen* / *Ort entfernen*) sits in a trailing `.veyq-action-group` **immediately left of the
+  confirm**, styled **`severity="danger" outlined`** (danger colour, but lighter than the filled primary so it
+  doesn't compete). When the destructive action **is** the dialog's primary confirm (a dedicated delete/confirm
+  dialog), it is a **filled `severity="danger"`** button on the right — the dialog's one primary. Confirm/
+  destructive actions show an in-progress state and **disable confirm/cancel/close + inputs while the mutation
+  runs** (no double-submit).
 
 ## Product language
 

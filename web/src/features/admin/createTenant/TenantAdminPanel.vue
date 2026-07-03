@@ -169,7 +169,7 @@ async function submitReassign() {
           {{ t('tenant.ownerEmail') }}
           <InputText v-model="editEmail" type="email" autocomplete="email" required />
         </label>
-        <div class="dialog-actions">
+        <div class="veyq-dialog-action-row">
           <Button
             type="button"
             :label="t('tenant.resend')"
@@ -195,11 +195,5 @@ async function submitReassign() {
 .settings-muted {
   margin: 0;
   color: var(--app-muted);
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 </style>

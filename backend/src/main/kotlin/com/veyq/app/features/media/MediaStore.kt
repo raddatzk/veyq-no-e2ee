@@ -2,6 +2,7 @@ package com.veyq.app.features.media
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.content.NodeEntity
+import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -31,6 +32,18 @@ data class DerivativeRow(
 
 /** A verified derivative upload to attach: its role + session + the verified per-chunk manifest. */
 data class DerivativeAttach(val kind: String, val session: UploadSessionEntity, val manifest: List<Long>?)
+
+/** A committed blob's opaque read-back ref (cr-0073): the same shape a gallery tier carries, reused for the cover. */
+data class BlobRefData(
+    val blobId: String,
+    val chunkCount: Int,
+    val byteSize: Long,
+    val wrappedBlobKey: String,
+    val manifest: List<Long>?,
+)
+
+/** The outcome of committing a cover blob: the new ref + the superseded prior blob's chunk keys to purge from the store. */
+data class CoverCommitRows(val ref: BlobRefData, val reclaimKeys: List<String>)
 
 /**
  * Persistence for media blobs (cr-0028). Operator-blind: stores ciphertext wraps + opaque metadata only.
@@ -149,6 +162,50 @@ class MediaStore {
 
     fun findBlob(scopeId: String, blobId: String): BlobEntity? =
         BlobEntity.findById(blobId)?.takeIf { it.scopeId == scopeId }
+
+    /**
+     * Commit a verified session as the node's **standalone cover** blob (cr-0073): persist one `veyq_blob`
+     * (NO `veyq_media` row, so it never lists in the gallery), point the node's `cover_blob_id` at it, and
+     * **atomically reclaim** any prior cover blob (its row is deleted here; its store objects are purged by the
+     * caller via the returned chunk keys). Consumes the upload session. Returns the new ref + the reclaim keys.
+     */
+    @Transactional
+    fun commitCover(nodeId: String, session: UploadSessionEntity, manifest: List<Long>?): CoverCommitRows {
+        val node = NodeEntity.findById(nodeId)!! // resolved by the handler before verify; reloaded in-tx
+        val reclaimKeys = deleteCoverBlobRow(node.coverBlobId)
+        val blobId = persistBlob(session, manifest)
+        node.coverBlobId = blobId
+        node.coverByteSize = session.byteSize
+        node.persist()
+        UploadSessionEntity.deleteById(session.id)
+        return CoverCommitRows(
+            BlobRefData(blobId, session.chunkCount, session.byteSize, session.wrappedBlobKey, manifest),
+            reclaimKeys,
+        )
+    }
+
+    /**
+     * Detach the node's cover blob (cr-0073): clear its `cover_blob_id`/`cover_byte_size` and delete the
+     * `veyq_blob` row. Returns the blob's chunk keys for a best-effort store purge (empty when the node — or
+     * scope — has no cover blob; idempotent). Null node ⇒ empty (the endpoint answers 204 either way).
+     */
+    @Transactional
+    fun clearCover(scopeId: String, nodeId: String): List<String> {
+        val node = NodeEntity.findById(nodeId)?.takeIf { it.scopeId == scopeId } ?: return emptyList()
+        val reclaimKeys = deleteCoverBlobRow(node.coverBlobId)
+        node.coverBlobId = null
+        node.coverByteSize = null
+        node.persist()
+        return reclaimKeys
+    }
+
+    /** Delete a cover blob row by id (if present) and return its chunk keys for a best-effort store purge. */
+    private fun deleteCoverBlobRow(blobId: String?): List<String> {
+        val blob = blobId?.let { BlobEntity.findById(it) } ?: return emptyList()
+        val keys = (0 until blob.chunkCount).map { chunkKey(blob.storageKey, it) }
+        BlobEntity.deleteById(blob.id)
+        return keys
+    }
 
     // Manifest = a JSON array of per-chunk ciphertext sizes; tiny and integer-only, so encoded by hand.
     private fun encodeManifest(sizes: List<Long>): String = sizes.joinToString(",", "[", "]")

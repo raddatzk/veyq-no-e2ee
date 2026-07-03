@@ -1,7 +1,10 @@
 package com.veyq.app.features.content
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.spaces.scope.ScopeEntity
+import com.veyq.app.shared.blobstore.BlobStore
+import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -31,7 +34,12 @@ sealed interface ParentSlot {
  * Scope access = the caller holds a membership for the scope (cr-0026 scope identity).
  */
 @ApplicationScoped
-class NodesStore {
+class NodesStore(
+    // cr-0073: node-delete reclaims a node's standalone cover blob (a veyq_blob linked by `cover_blob_id`, no
+    // media row). The link lives on the node, so node-delete is where covers are reclaimed — hence the blob
+    // store (shared transport) + BlobEntity (media) here, mirroring media's one-way dependency on content.
+    private val blobStore: BlobStore,
+) {
 
     fun isMember(userId: String, scopeId: String): Boolean =
         MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
@@ -116,6 +124,17 @@ class NodesStore {
             doomed += cur
             byParent[cur]?.forEach { stack.addLast(it.id) }
         }
-        if (doomed.isNotEmpty()) NodeEntity.delete("id in ?1", doomed)
+        if (doomed.isEmpty()) return
+        // cr-0073: reclaim the doomed subtree's standalone cover blobs (row + store objects) before the nodes
+        // go. The cover_blob_id column is the only reference, so once the node rows are gone the blob would
+        // orphan; here the node-delete cascade satisfies the CR's "deleteNode reclaims the cover blob".
+        val doomedSet = doomed.toHashSet()
+        val coverBlobIds = all.filter { it.id in doomedSet }.mapNotNull { it.coverBlobId }
+        if (coverBlobIds.isNotEmpty()) {
+            val coverBlobs = BlobEntity.find("id in ?1", coverBlobIds).list()
+            BlobEntity.delete("id in ?1", coverBlobIds)
+            blobStore.delete(coverBlobs.flatMap { b -> (0 until b.chunkCount).map { chunkKey(b.storageKey, it) } })
+        }
+        NodeEntity.delete("id in ?1", doomed)
     }
 }

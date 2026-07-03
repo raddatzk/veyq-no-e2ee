@@ -66,7 +66,7 @@ async function submit() {
         <InputText v-model="ownerEmail" type="email" autocomplete="email" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="dialog-actions">
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
@@ -86,11 +86,5 @@ async function submit() {
   display: block;
   opacity: 0.7;
   font-size: 0.85em;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 </style>

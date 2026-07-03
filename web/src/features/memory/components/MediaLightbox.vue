@@ -28,8 +28,13 @@ const props = defineProps<{
   items: MediaItem[]
   startIndex: number
   memoryName: string
+  coverMediaId?: string | null // the photo currently used as the Memory's cover — marks the "Set as cover" button
 }>()
-const emit = defineEmits<{ close: []; updated: [{ mediaId: string; wrappedMeta: string | null }] }>()
+const emit = defineEmits<{
+  close: []
+  updated: [{ mediaId: string; wrappedMeta: string | null }]
+  setCover: [{ mediaId: string }] // "use this photo as the Memory's cover" (cr-0073 §gallery-source)
+}>()
 
 const { t, locale } = useI18n()
 
@@ -51,6 +56,7 @@ const savingCapturedAt = ref(false)
 const capturedAtError = ref(false)
 
 const item = computed(() => props.items[current.value])
+const isCover = computed(() => !!item.value && item.value.mediaId === props.coverMediaId) // this photo is the Memory's cover
 const canPrev = computed(() => current.value > 0)
 const canNext = computed(() => current.value < props.items.length - 1)
 const previewable = computed(() => (item.value ? hasDerivatives(item.value) : false))
@@ -256,6 +262,18 @@ onBeforeUnmount(() => {
           <span class="pi" :class="downloading ? 'pi-spin pi-spinner' : 'pi-download'" />
         </button>
         <button
+          v-if="previewable"
+          class="veyq-icon-button lightbox-icon-button"
+          :class="{ 'lightbox-cover-active': isCover }"
+          type="button"
+          :aria-pressed="isCover"
+          :aria-label="t(isCover ? 'memory.cover.isCover' : 'memory.cover.setFromPhoto')"
+          :title="t(isCover ? 'memory.cover.isCover' : 'memory.cover.setFromPhoto')"
+          @click="!isCover && item && emit('setCover', { mediaId: item.mediaId })"
+        >
+          <span class="pi" :class="isCover ? 'pi-check' : 'pi-image'" />
+        </button>
+        <button
           class="veyq-icon-button lightbox-icon-button"
           type="button"
           :aria-label="t('media.close')"
@@ -385,6 +403,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* The "Set as cover" button, when THIS photo is the current cover: an accent-filled state ("it's the cover"). */
+.lightbox-cover-active {
+  color: #fff;
+  background: var(--app-accent);
+  border-color: var(--app-accent);
+}
 .media-lightbox-no-detail {
   margin: 0;
   color: var(--app-muted);

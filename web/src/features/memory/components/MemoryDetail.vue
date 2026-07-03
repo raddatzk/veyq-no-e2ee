@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
+import { listMedia, openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
 import {
   unsealMemoryLocation,
@@ -26,7 +26,7 @@ import {
   isLocationPending,
   type MemoryLocation,
 } from '../memoryLocation'
-import { unsealMemoryCover, setMemoryCover, type MemoryCover, type CoverPickItem } from '../memoryCover'
+import { unsealMemoryCover, setMemoryCover, FULL_FRAME, type MemoryCover, type CoverSaveIntent } from '../memoryCover'
 import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from '../mediaGridLayout'
@@ -225,28 +225,86 @@ async function reconcileAutoLocation() {
   }
 }
 
-// --- Memory cover (cr-0072, uc.memory.cover). A deliberately chosen media + a 16:9 crop, sealed in the SAME node
-// `wrappedMeta` blob as the date/location (read-modify-write, operator-blind). The picker + crop source is the
-// Memory's already-loaded media (its decrypted thumbnails); the header shows the chosen cover via the shared crop
-// formula. No auto-cover — unset ⇒ the placeholder tile.
+// --- Memory cover (cr-0072 + cr-0073, uc.memory.cover). A deliberately chosen image + a 16:9 crop, sealed in the
+// SAME node `wrappedMeta` blob as the date/location (read-modify-write, operator-blind). The source is one of the
+// Memory's own media OR a brand-new uploaded image (a standalone cover blob, cr-0073); the header shows it via the
+// shared crop formula. No auto-cover — unset ⇒ the placeholder tile.
 const coverEditorOpen = ref(false)
 const storedCover = computed(() => (props.memoryKey ? unsealMemoryCover(props.memoryKey, props.node) : null))
-// The decrypted thumbnail of the cover's chosen media (already in `thumbs`); null if not loaded / the media is gone.
-const coverSrc = computed(() => (storedCover.value ? thumbs.value.get(storedCover.value.mediaId) ?? null : null))
-// The cover picker source: this Memory's media with a loaded thumbnail (derivable items) — id + decrypted URL.
-const coverPickItems = computed<CoverPickItem[]>(() =>
-  items.value.flatMap((it) => {
-    const url = thumbs.value.get(it.mediaId)
-    return url ? [{ mediaId: it.mediaId, url }] : []
-  }),
+// An **upload**-source cover isn't in `thumbs` (no media row), so its standalone blob is decrypted on demand into
+// this object URL (revoked on change/unmount). A **media**-source cover reuses the already-decrypted thumbnail.
+const uploadCoverUrl = ref<string | null>(null)
+function revokeUploadCover() {
+  if (uploadCoverUrl.value) URL.revokeObjectURL(uploadCoverUrl.value)
+  uploadCoverUrl.value = null
+}
+watch(
+  storedCover,
+  async (cover) => {
+    revokeUploadCover()
+    const key = props.memoryKey
+    if (!key || cover?.source.kind !== 'upload') return
+    try {
+      const bytes = await openBlob(props.scopeId, key, cover.source.ref)
+      uploadCoverUrl.value = URL.createObjectURL(new Blob([bytes as BlobPart]))
+    } catch {
+      // best-effort: a locked/absent cover blob ⇒ the placeholder tile
+    }
+  },
+  { immediate: true },
 )
+// The decrypted image of the current cover: the media thumbnail (already in `thumbs`) or the uploaded cover blob.
+const coverSrc = computed(() => {
+  const cover = storedCover.value
+  if (!cover) return null
+  return cover.source.kind === 'upload' ? uploadCoverUrl.value : thumbs.value.get(cover.source.mediaId) ?? null
+})
+// The current cover, decrypted, to re-crop in the dialog (its cropper needs the source image — esp. for uploads).
+const coverExistingSrc = computed(() => coverSrc.value)
+// The current cover's media id (when the cover is a Memory photo) — the lightbox marks that photo as the cover.
+const coverMediaId = computed(() => (storedCover.value?.source.kind === 'media' ? storedCover.value.source.mediaId : null))
 
-/** Save (or, for null, remove) the cover: read-modify-write under K_mem — the date + location are preserved. */
-async function onCoverSave(cover: MemoryCover | null) {
+/**
+ * "Set as cover" from the lightbox (cr-0073 §gallery): set that photo as the cover **in one click**, with a
+ * default centre-crop (full frame → `object-fit: cover`), and **keep the lightbox open** so the user can keep
+ * browsing. Fine-tuning the crop is a deliberate step later, via the header cover button.
+ */
+function onSetCoverFromPhoto(payload: { mediaId: string }) {
+  void onCoverSave({ kind: 'media', mediaId: payload.mediaId, crop: { ...FULL_FRAME } })
+}
+
+/**
+ * Apply the cover dialog's save intent (cr-0072 media + cr-0073 upload): read-modify-write the node meta under
+ * K_mem (the date + location are preserved). An **upload** uploads + commits a standalone cover blob (whose
+ * commit atomically reclaims any prior cover blob); switching **away** from a prior upload cover (to a media
+ * cover or none) reclaims its now-orphaned blob via `deleteCoverBlob`. `keep` re-seals the current source with a
+ * moved crop only.
+ */
+async function onCoverSave(intent: CoverSaveIntent) {
   const key = props.memoryKey
   if (!key) return
   const nodeId = props.node.id
+  const priorUpload = storedCover.value?.source.kind === 'upload'
   try {
+    let cover: MemoryCover | null
+    if (intent.kind === 'upload') {
+      const ref = await uploadCoverBlob(props.scopeId, nodeId, key, {
+        bytes: new Uint8Array(await intent.file.arrayBuffer()),
+        mediaType: intent.file.type,
+        lastModified: intent.file.lastModified,
+      })
+      cover = { source: { kind: 'upload', ref }, crop: intent.crop }
+    } else if (intent.kind === 'media') {
+      if (priorUpload) await deleteCoverBlob(props.scopeId, nodeId) // reclaim the now-orphaned upload blob
+      cover = { source: { kind: 'media', mediaId: intent.mediaId }, crop: intent.crop }
+    } else if (intent.kind === 'keep') {
+      const source = storedCover.value?.source
+      if (!source) return
+      cover = { source, crop: intent.crop }
+    } else {
+      if (priorUpload) await deleteCoverBlob(props.scopeId, nodeId)
+      cover = null
+    }
     const wrappedMeta = await setMemoryCover(props.scopeId, nodeId, key, cover, props.node.wrappedMeta)
     emit('metaUpdated', { nodeId, wrappedMeta })
   } catch {
@@ -422,6 +480,7 @@ watch(gridEl, attachGridObserver, { flush: 'post' })
 
 onBeforeUnmount(() => {
   revokeThumbs()
+  revokeUploadCover()
   gridObserver?.disconnect()
   if (measureFrame !== null) cancelAnimationFrame(measureFrame)
 })
@@ -627,8 +686,10 @@ onBeforeUnmount(() => {
       :items="lightboxItems"
       :start-index="lightboxIndex"
       :memory-name="node.name"
+      :cover-media-id="coverMediaId"
       @close="lightboxIndex = null"
       @updated="onCapturedAtUpdated"
+      @set-cover="onSetCoverFromPhoto"
     />
 
     <MemoryDateEditor
@@ -650,8 +711,9 @@ onBeforeUnmount(() => {
 
     <MemoryCoverDialog
       v-if="coverEditorOpen && memoryKey"
-      :items="coverPickItems"
       :cover="storedCover"
+      :existing-src="coverExistingSrc"
+      :has-media="items.length > 0"
       @save="onCoverSave"
       @close="coverEditorOpen = false"
     />
@@ -664,7 +726,7 @@ onBeforeUnmount(() => {
       @update:visible="consentDialogOpen = false"
     >
       <p>{{ t('memory.place.consentBody') }}</p>
-      <div class="dialog-actions">
+      <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="consentDialogOpen = false" />
         <Button type="button" :label="t('memory.place.consentEnable')" icon="pi pi-map" @click="enableMaps" />
       </div>
@@ -886,11 +948,5 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   font-size: 1.5rem;
-}
-.memory-location-consent .dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.9rem;
 }
 </style>

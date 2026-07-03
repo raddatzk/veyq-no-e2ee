@@ -95,7 +95,7 @@ async function submit() {
       </div>
 
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="dialog-actions">
+      <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
         <Button type="submit" :label="confirmLabel" icon="pi pi-check" :loading="loading" :disabled="!canSubmit" />
       </div>
@@ -104,12 +104,6 @@ async function submit() {
 </template>
 
 <style scoped>
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
 .node-location-optin {
   display: flex;
   align-items: flex-start;

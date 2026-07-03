@@ -42,7 +42,7 @@ async function confirm() {
   <Dialog :visible="true" :header="header" modal @update:visible="emit('close')">
     <p class="dialog-copy">{{ copy }}</p>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div class="dialog-actions">
+    <div class="veyq-dialog-action-row">
       <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
       <Button type="button" :label="t('memory.delete')" icon="pi pi-trash" severity="danger" :loading="loading" @click="confirm" />
     </div>
@@ -52,11 +52,5 @@ async function confirm() {
 <style scoped>
 .dialog-copy {
   margin: 0 0 0.75rem;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 </style>

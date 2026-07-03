@@ -66,6 +66,24 @@ sealed interface MetaOutcome {
     object NoMedia : MetaOutcome
 }
 
+sealed interface CoverCommitOutcome {
+    /** The committed cover blob ref (any prior cover blob was reclaimed). */
+    data class Ok(val ref: BlobRefData) : CoverCommitOutcome
+    /** No such scope/node/upload, or the caller holds no grant (a 404, no reveal). */
+    object NoTarget : CoverCommitOutcome
+    /** The target node is a FOLDER (owns no `K_mem`) — a 422. */
+    object IllegalTarget : CoverCommitOutcome
+    /** The upload failed declare-then-verify (staged objects purged) — a 400. */
+    object Budget : CoverCommitOutcome
+}
+
+sealed interface CoverDeleteOutcome {
+    /** The cover blob was detached + reclaimed (or the node had none — idempotent). */
+    object Done : CoverDeleteOutcome
+    /** No such scope/node, or the caller holds no grant (a 404). */
+    object NoTarget : CoverDeleteOutcome
+}
+
 /**
  * Use-case logic for media blobs (en.memory.media, cr-0028). Operator-blind, batch-shaped, per-item results.
  * Scope access = the caller holds a membership (a non-member sees a top-level 404, not a reveal). Direct-to-
@@ -189,6 +207,39 @@ class MediaHandler(
         if (!store.isMember(userId, scopeId)) return MetaOutcome.NoMedia
         val media = store.setMeta(scopeId, mediaId, wrappedMeta) ?: return MetaOutcome.NoMedia
         return MetaOutcome.Found(media.wrappedMeta)
+    }
+
+    /**
+     * Commit an uploaded blob as the node's **standalone cover** (cr-0073): resolve the node + session, run the
+     * same declare-then-verify as `complete` (stat the stored objects against the byte budget, purge + fail on
+     * excess), then persist one `veyq_blob` + point the node's `cover_blob_id` at it, atomically reclaiming any
+     * prior cover blob (its store objects are purged here). No `veyq_media` row — the cover never lists in the
+     * gallery. Guards mirror `complete`: member gate (non-member → NoTarget/404), FOLDER → IllegalTarget/422.
+     */
+    fun commitCover(userId: String, scopeId: String, nodeId: String, uploadId: String): CoverCommitOutcome {
+        if (!store.isMember(userId, scopeId)) return CoverCommitOutcome.NoTarget
+        val node = store.findNode(scopeId, nodeId) ?: return CoverCommitOutcome.NoTarget
+        if (node.kind == NodeEntity.FOLDER) return CoverCommitOutcome.IllegalTarget
+        val session = store.findSession(scopeId, uploadId) ?: return CoverCommitOutcome.NoTarget
+        val manifest = when (val v = verifyBlob(session)) {
+            is BlobVerify.Ok -> v.manifest
+            BlobVerify.Budget -> {
+                purge(listOf(session))
+                return CoverCommitOutcome.Budget
+            }
+        }
+        val rows = store.commitCover(node.id, session, manifest)
+        blobStore.delete(rows.reclaimKeys) // best-effort purge of the superseded prior cover blob's objects
+        return CoverCommitOutcome.Ok(rows.ref)
+    }
+
+    /** Detach + reclaim the node's standalone cover blob (cr-0073). Idempotent — a node with no cover → Done. */
+    fun deleteCover(userId: String, scopeId: String, nodeId: String): CoverDeleteOutcome {
+        if (!store.isMember(userId, scopeId)) return CoverDeleteOutcome.NoTarget
+        if (store.findNode(scopeId, nodeId) == null) return CoverDeleteOutcome.NoTarget
+        val reclaimKeys = store.clearCover(scopeId, nodeId)
+        blobStore.delete(reclaimKeys) // best-effort store purge
+        return CoverDeleteOutcome.Done
     }
 
     fun download(userId: String, scopeId: String, blobIds: List<String>): DownloadOutcome {

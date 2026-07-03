@@ -29,6 +29,7 @@ const i18n = createI18n({
   messages: {
     en: {
       common: { save: 'Save', cancel: 'Cancel' },
+      memory: { cover: { setFromPhoto: 'Set as cover', isCover: 'Current cover' } },
       media: {
         itemPosition: '{index} of {count}',
         download: 'Download original',
@@ -78,9 +79,9 @@ async function seedTwo(memoryKey: Uint8Array) {
   return { store, items }
 }
 
-function mountLightbox(memoryKey: Uint8Array, items: MediaItem[], startIndex = 0) {
+function mountLightbox(memoryKey: Uint8Array, items: MediaItem[], startIndex = 0, coverMediaId: string | null = null) {
   return mount(MediaLightbox, {
-    props: { scopeId: SCOPE_ID, memoryKey, items, startIndex, memoryName: 'Rom 2026' },
+    props: { scopeId: SCOPE_ID, memoryKey, items, startIndex, memoryName: 'Rom 2026', coverMediaId },
     global: { plugins: [i18n] },
   })
 }
@@ -107,6 +108,31 @@ describe('MediaLightbox (preview, prev/next, download)', () => {
     expect(presigned).toContain('up-2')
     expect(presigned).not.toContain('up-0')
     expect(wrapper.find('.media-lightbox-stage img').attributes('src')).toBeTruthy()
+  })
+
+  it('“Set as cover” emits setCover for the current item (cr-0073 gallery source)', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedTwo(memoryKey)
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+
+    const setCover = wrapper.findAll('.media-lightbox-actions button').find((b) => b.attributes('aria-label') === 'Set as cover')
+    expect(setCover).toBeTruthy()
+    await setCover!.trigger('click')
+    expect(wrapper.emitted('setCover')?.[0]?.[0]).toEqual({ mediaId: items[0].mediaId })
+  })
+
+  it('marks the current cover photo (aria-pressed + "Current cover") and re-clicking it is a no-op', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedTwo(memoryKey)
+    const wrapper = mountLightbox(memoryKey, items, 0, items[0].mediaId) // item 0 IS the cover
+    await flushPromises()
+
+    const current = wrapper.findAll('.media-lightbox-actions button').find((b) => b.attributes('aria-label') === 'Current cover')
+    expect(current).toBeTruthy()
+    expect(current!.attributes('aria-pressed')).toBe('true')
+    await current!.trigger('click')
+    expect(wrapper.emitted('setCover')).toBeFalsy() // clicking the current cover does nothing
   })
 
   it('pages prev/next through the grid order, fetching the next item’s preview, and clamps at the ends', async () => {

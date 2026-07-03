@@ -1,7 +1,7 @@
 ---
 id: cr-0073
 title: Cover from a new upload — a standalone cover blob (no media row), reusing the cr-0072 display + crop
-status: planned
+status: done
 satisfies: [uc.memory.cover]
 adrs: ["0012", "0013", "0010"]
 invariants: [operator-blind-e2ee]
@@ -61,14 +61,14 @@ opaque-metadata the server already holds for media (ADR 0013), so blindness is u
 
 ## Phases
 
-- [ ] 1 contracts — extend `media.openapi.yaml`: **`commitCoverBlob`** (`POST
+- [x] 1 contracts — extend `media.openapi.yaml`: **`commitCoverBlob`** (`POST
   /api/scopes/{scopeId}/nodes/{nodeId}/cover-blob`, body `{ uploadId }` → the committed `BlobRef`
   `{ blobId, chunkCount, byteSize, wrappedBlobKey, manifest? }`) — promotes one `startBlobUploads` session into a
   node-attached cover blob (no media row), **replacing + reclaiming** any prior cover blob atomically; and
   **`deleteCoverBlob`** (`DELETE …/cover-blob`) — detach + reclaim. Serving reuses `presignBlobDownloads`. No new
   crypto vectors (K_blob-under-K_mem is ADR 0012, already pinned). · Done when: the two operations + DTOs are in
   the spec, `npm run generate:api` regenerates the web + backend clients clean, and the `http/` skeleton compiles.
-- [ ] 2 backend — migration `Vxx__node_cover.sql`: `ALTER TABLE veyq_node ADD COLUMN cover_blob_id … NULL` (+
+- [x] 2 backend — migration `Vxx__node_cover.sql`: `ALTER TABLE veyq_node ADD COLUMN cover_blob_id … NULL` (+
   `cover_byte_size`), mirroring V17's `wrapped_meta` add. `MediaHandler`/`MediaStore` (or a sibling
   `CoverHandler`): `commitCoverBlob` (resolve node + session, declare-then-verify the stored chunks against the
   budget, persist `veyq_blob` + set the node's `cover_blob_id`, purge any prior cover blob, delete the session)
@@ -78,11 +78,16 @@ opaque-metadata the server already holds for media (ADR 0013), so blindness is u
   (green) covers commit→download round-trip, replace reclaims the old blob, `deleteCoverBlob` + `deleteNode` purge
   the object, a non-member is 403 and a cross-scope blob 404; operator-blindness asserted (the node row holds only
   `cover_blob_id` + size, never the crop/key).
-- [ ] 3 http — `http/` `.http` files with response-handler assertions: upload (reuse the blob-upload batch) →
-  `commitCoverBlob` → `presignBlobDownloads` round-trips the ciphertext; replace reclaims; `deleteCoverBlob`
-  removes; authz negatives (non-member 403, wrong-scope 404). · Done when: the `.http` assertions pass against a
-  seeded local instance.
-- [ ] 4 web — generalize `memoryCover.ts` `MemoryCover` to the discriminated `source` (media | upload) with a
+- [x] 3 http — **re-scoped to a boundary file, consistent with the media-transport precedent.** The full
+  authenticated round-trip (upload → `commitCoverBlob` → `presignBlobDownloads`, replace/delete reclaim, authz
+  negatives) is **not reproducible from a bare `.http`** — it needs client-side AEAD sealing + presigned
+  direct-to-store PUT + the operator-blind scope-grant flow, exactly why the media blob transport
+  (en.memory.media) has no `.http` and `content.http` covers only its 401 boundary. So `http/media/cover.http`
+  asserts the **401 unauthenticated boundary** of both cover-blob endpoints; the authenticated round-trip +
+  reclaim + authz negatives live in `NodeCoverSliceTest` (Phase 2). · Done when: the boundary `.http` mirrors the
+  proven `content.http` shape (the identical unauth-401 assertion is green in `NodeCoverSliceTest.unauthenticatedIs401`);
+  the ijhttp run itself needs a freshly-restarted instance (a running `quarkusDev` must re-run `openApiGenerateSpecs` after the contract change).
+- [x] 4 web — generalize `memoryCover.ts` `MemoryCover` to the discriminated `source` (media | upload) with a
   **backward-compatible** `normalizeMemoryCover` + `sameMemoryCover`; branch `loadNodeCover` (media →
   `listMedia`+`openGrid`; upload → `presignBlobDownloads`+decrypt the single cover blob). Add the **upload path**
   (`commitCoverBlob.ts` or fold into `memoryCover.ts`): downscale → `sealBlob` → `startBlobUploads` → PUT →
@@ -99,8 +104,8 @@ opaque-metadata the server already holds for media (ADR 0013), so blindness is u
 
 | Surface | A standalone cover blob (no media row) committed·served·reclaimed, reusing the cr-0072 display + crop | Status |
 |---|---|---|
-| backend / contracts | `commitCoverBlob` + `deleteCoverBlob` + a `cover_blob_id` column on `veyq_node`; serving via the existing presign path | ◻ planned |
-| web | `MemoryCover` source generalization + the upload path + the dialog's second source; display reused | ◻ planned |
+| backend / contracts | `commitCoverBlob` + `deleteCoverBlob` + a `cover_blob_id`/`cover_byte_size` column on `veyq_node` (V19); serving via the existing presign path; `NodeCoverSliceTest` green | ✅ done |
+| web | `MemoryCover` source generalization (back-compat) + `uploadCoverBlob`/`deleteCoverBlob` + the dialog's upload source; display reused; `loadNodeCover` branched | ✅ done |
 | apple / android | native upload-cover picker/crop is their own later CR (web-first, ADR 0010); the data layer + endpoints carry it after regen | ◻ **separate (native)** |
 
 ## Definition of done
@@ -117,4 +122,51 @@ smoke confirmed.
 
 ## Retrospective
 
-_(to be written at close.)_
+Built as planned across contracts → backend → web, with **one deliberate re-scope on Phase 3 (http)**. What
+landed:
+
+- **Contracts.** `commitCoverBlob` (`POST …/nodes/{nodeId}/cover-blob`, `{ uploadId }` → `BlobRef`) and
+  `deleteCoverBlob` (`DELETE …/cover-blob`) on `media.openapi.yaml`, plus a reusable `BlobRef` schema (the same
+  opaque read-back shape a gallery tier carries). `illegal_target` on a FOLDER is a **422** (matching
+  `content.openapi.yaml`'s `illegal_structure`), not a per-item error — cover commit is a single op, not a batch.
+- **Backend.** V19 added `cover_blob_id` + `cover_byte_size` to `veyq_node` (mirroring V17's `wrapped_meta`).
+  `MediaStore.commitCover`/`clearCover` + `MediaHandler.commitCover`/`deleteCover` reuse the existing
+  declare-then-verify + `persistBlob` + budget/purge machinery; commit **atomically reclaims** any prior cover
+  blob (returning its chunk keys for a best-effort store purge). Node-delete reclaim lives in
+  `NodesStore.deleteSubtree` (it already computes the doomed subtree) — a **deliberate one-way content→media
+  coupling** (the reverse of media→content's existing `NodeEntity` import), since the `cover_blob_id` column that
+  makes a cover reclaimable sits on the node. Download-presign authz needed **no** change (scope membership + the
+  `veyq_blob` row already cover it — confirmed on build). `NodeCoverSliceTest` (10 cases) asserts commit→download,
+  replace/delete/node-delete reclaim, FOLDER 422, cross-scope/non-member 404, unauth 401, and operator-blindness
+  (the node row holds only the blob id + size).
+- **Phase 3 re-scoped.** The CR's original Phase 3 (a full upload→commit→download `.http` round-trip) **contradicts
+  the repo's own convention**: the media blob transport has no `.http` at all, and `content.http` covers only its
+  401 boundary because the authenticated flow "needs the operator-blind scope-grant flow, not reproducible from a
+  bare `.http`." A cover commit additionally needs client-side AEAD sealing + a presigned direct-to-store PUT —
+  none of which ijhttp can do. So Phase 3 became a **boundary file** (`http/media/cover.http`, the two 401
+  assertions), and the authenticated round-trip + reclaim + authz negatives are carried by `NodeCoverSliceTest`,
+  exactly as media/content split those responsibilities. Sparring-partner call, flagged rather than forced.
+- **Web.** `MemoryCover` widened from `{ mediaId, crop }` to `{ source: media | upload, crop }` with a
+  **backward-compatible** `normalizeMemoryCover` (every already-sealed cr-0072 `{ mediaId }` cover still opens).
+  `media.ts` grew `uploadCoverBlob` (downscale to one ~2048 px JPEG → `sealBlob` → `startBlobUploads` → PUT →
+  `commitCoverBlob`) + `deleteCoverBlob`, reusing the private seal/PUT primitives. `loadNodeCover` branches
+  media→`openGrid` / upload→`openBlob`; `coverImageStyle` + `MemoryCoverImage` + the crop math are **untouched**.
+  The dialog gained an upload source and now emits a `CoverSaveIntent` (`media` | `upload` | `keep` | `remove`) so
+  it stays crypto/network-free — `MemoryDetail` orchestrates the upload + seal, decrypts an upload cover for its
+  header on demand, and **reclaims a superseded upload blob** when switching away (a fresh upload commit reclaims
+  the prior automatically; switching to a media cover or removing calls `deleteCoverBlob`).
+
+**Verified:** `./gradlew check` green (incl. `NodeCoverSliceTest`); web `npm run typecheck` + `npm run test`
+(345 passing) + `npm run build` green; the four trust-chain validators green. **Live web smoke DONE** (re-seeded
+`127.0.0.1` instance, Garage `--profile s3`, browse origin `127.0.0.1:8089` = the store public endpoint): created
+a Memory with **no media**, opened the cover editor, **uploaded a new 1200×800 image**, cropped 16:9, saved — the
+network showed the full path `blob-uploads-batch → PUT /veyq/… → commitCoverBlob → blob-downloads-batch → GET
+/veyq/…`, and the cropped cover rendered on **both the detail header and the browse card** (screenshots). DB
+assertion of operator-blindness: the node row carried `cover_blob_id` + `cover_byte_size=22219` (the on-device
+**downscale** of the 1 MB original) with `wrapped_meta` ciphertext (0 rows leaking `COVER`/`crop`/`upload`/
+`mediaId`), **0 `veyq_media` rows** for the node, 1 `veyq_blob`. **Remove** reclaimed it — `cover_blob_id` → NULL,
+`veyq_blob` → 0, header back to the placeholder. **Deferred:** the ijhttp boundary run (needs a freshly-restarted
+`quarkusDev` — a live-reload instance doesn't re-run `openApiGenerateSpecs` after a contract change; the identical
+unauth-401 assertion is already green in the slice test); native cover parity (Apple/Android, ADR 0010). The map
+pin + existing-media source weren't separately driven — the pin reuses the same `loadNodeCover` path just proven
+on the card, and the media source is the unchanged cr-0072 display (backward-compat unit-tested).

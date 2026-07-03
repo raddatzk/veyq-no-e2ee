@@ -111,6 +111,7 @@
 .veyq-dialog-action-row {
   justify-content: space-between;
   width: 100%;
+  margin-top: 0.5rem;
 }
 
 .veyq-action-group {

@@ -197,12 +197,12 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div class="dialog-actions">
-        <button type="button" class="memory-location-remove" @click="remove">
-          <span class="pi pi-trash" aria-hidden="true" /> {{ t('memory.place.remove') }}
-        </button>
+      <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
-        <Button type="submit" :label="t('common.save')" icon="pi pi-check" :disabled="!canSave" />
+        <div class="veyq-action-group">
+          <Button type="button" :label="t('memory.place.remove')" icon="pi pi-trash" severity="danger" outlined :disabled="!location" @click="remove" />
+          <Button type="submit" :label="t('common.save')" icon="pi pi-check" :disabled="!canSave" />
+        </div>
       </div>
     </form>
   </Dialog>
@@ -260,27 +260,5 @@ onBeforeUnmount(() => {
   color: var(--app-accent, #6d5ae6);
   cursor: pointer;
   font-size: 0.8rem;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.2rem;
-}
-.memory-location-remove {
-  margin-right: auto;
-  border: 0;
-  background: none;
-  color: var(--app-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.86rem;
-  padding: 0.2rem 0;
-}
-.memory-location-remove:hover {
-  color: var(--p-red-500, #e24b4a);
 }
 </style>

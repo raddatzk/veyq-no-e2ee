@@ -1,29 +1,46 @@
 <script setup lang="ts">
-// The Memory cover editor (cr-0072, uc.memory.cover main flow §1–2). A picker over the Memory's own **decrypted**
-// media, then a fixed **16:9** crop viewport with **drag-to-pan** (pointer events) + a **zoom slider (1–3×)**.
-// **Save** emits the normalized `{ mediaId, crop }` (`0..1` against the source image); **Remove** emits `null`.
-// Reopening an existing cover restores its pan/zoom. Ported component-for-component from the design source's
-// `MemoryCoverDialog` (the file-upload source is deferred to cr-0073) — this component is presentation only: the
-// parent seals the emitted cover under `K_mem`, it never touches crypto or the network. The crop math (base-scale
-// fill, clamp-so-no-empty-corners, normalize back to `0..1`) is the legacy math verbatim.
-import { computed, nextTick, ref } from 'vue'
+// The Memory cover editor (cr-0072 §1–2 + cr-0073). Crops **one** source and emits a [CoverSaveIntent]
+// (`upload` | `keep` | `remove`) — the parent seals it. Sources: a **brand-new uploaded image** (an
+// `<input type=file accept=image/*>`), or the **current cover re-cropped** (`existingSrc`). Using an existing
+// Memory photo as the cover is a one-click action in the gallery lightbox ("Set as cover"), not a step in here —
+// so this dialog has no media picker and scales regardless of photo count. Presentation only: no crypto, no
+// network. The crop math (base-scale fill, clamp-so-no-empty-corners, normalize to `0..1`) is the legacy math.
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import type { CoverCrop, CoverPickItem, MemoryCover } from '../memoryCover'
+import type { CoverCrop, CoverSaveIntent, MemoryCover } from '../memoryCover'
 
 const props = defineProps<{
-  items: CoverPickItem[] // the Memory's decrypted image media (id + thumbnail object URL) — the crop source
-  cover: MemoryCover | null // the current stored cover (restore its media + pan/zoom on open), or null
+  cover: MemoryCover | null // the current stored cover (restore its crop + enable Remove), or null
+  existingSrc: string | null // the current cover's decrypted image URL — the crop source when re-cropping it
+  hasMedia: boolean // whether the Memory has photos — drives the copy's "…or open a photo in the gallery" hint
 }>()
-const emit = defineEmits<{ save: [MemoryCover | null]; close: [] }>()
+const emit = defineEmits<{ save: [CoverSaveIntent]; close: [] }>()
 const { t } = useI18n()
 
-const cropWidth = 320
-const cropHeight = 180
+// The 16:9 crop viewport is **measured** from the rendered cropper (which fills the dialog width) rather than a
+// fixed size, so the editor scales with the dialog + never leaves a gap. The stored crop is normalized 0..1, so
+// the absolute size doesn't affect the result — only the editing surface. Defaults until first measured.
+const cropperEl = ref<HTMLElement | null>(null)
+const cropWidth = ref(320)
+const cropHeight = ref(180)
 
-const selectedMediaId = ref<string | null>(props.cover?.mediaId ?? null)
+/** Measure the cropper's rendered width and derive the 16:9 height (re-run on open + on resize). */
+function measureCropper() {
+  const w = cropperEl.value?.clientWidth
+  if (w && w > 0) {
+    cropWidth.value = w
+    cropHeight.value = Math.round((w * 9) / 16)
+  }
+}
+
+// The active crop source: a freshly uploaded file, or the current cover kept (only the crop moves).
+type Pick = { kind: 'upload'; file: File } | { kind: 'keep' }
+const pick = ref<Pick | null>(null)
 const sourceUrl = ref('')
+const uploadObjectUrl = ref<string | null>(null) // an owned object URL for a freshly picked file (revoke on replace/close)
+const fileInput = ref<HTMLInputElement | null>(null)
 const imageElement = ref<HTMLImageElement | null>(null)
 const naturalWidth = ref(0)
 const naturalHeight = ref(0)
@@ -35,9 +52,10 @@ const initialCrop = ref<CoverCrop | null>(props.cover?.crop ?? null)
 
 const hasSource = computed(() => Boolean(sourceUrl.value))
 const imageLoaded = computed(() => naturalWidth.value > 0 && naturalHeight.value > 0)
+const canSave = computed(() => imageLoaded.value && pick.value !== null)
 const baseScale = computed(() => {
   if (!naturalWidth.value || !naturalHeight.value) return 1
-  return Math.max(cropWidth / naturalWidth.value, cropHeight / naturalHeight.value)
+  return Math.max(cropWidth.value / naturalWidth.value, cropHeight.value / naturalHeight.value)
 })
 const baseImageWidth = computed(() => naturalWidth.value * baseScale.value)
 const baseImageHeight = computed(() => naturalHeight.value * baseScale.value)
@@ -50,25 +68,46 @@ const displayedImageStyle = computed(() => ({
 const dragging = ref(false)
 const dragStart = ref({ pointerId: 0, x: 0, y: 0, offsetX: 0, offsetY: 0 })
 
-// Preselect the current cover's media so the cropper opens on it (its pan/zoom restored once it loads).
-if (props.cover) {
-  const current = props.items.find((item) => item.mediaId === props.cover!.mediaId)
-  if (current) sourceUrl.value = current.url
+// Open re-cropping the current cover (its decrypted image), else empty (upload only). The stored crop is applied
+// once the image's natural size is known (loadImage); `initialCrop` defaults to `props.cover?.crop`.
+if (props.cover && props.existingSrc) {
+  pick.value = { kind: 'keep' }
+  sourceUrl.value = props.existingSrc
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function selectMedia(item: CoverPickItem) {
-  selectedMediaId.value = item.mediaId
-  initialCrop.value = null // a freshly picked media centers full-frame; only a reopened cover restores a crop
+/** Reset the pan/zoom for a freshly picked source (a reopened cover restores its crop instead, via initialCrop). */
+function resetView() {
+  initialCrop.value = null
   naturalWidth.value = 0
   naturalHeight.value = 0
   zoom.value = 1
   offsetX.value = 0
   offsetY.value = 0
-  sourceUrl.value = item.url
+}
+
+function revokeUpload() {
+  if (uploadObjectUrl.value) URL.revokeObjectURL(uploadObjectUrl.value)
+  uploadObjectUrl.value = null
+}
+
+function chooseUpload() {
+  fileInput.value?.click()
+}
+
+function onFilePicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  input.value = '' // allow re-picking the same file
+  if (!file || !file.type.startsWith('image/')) return
+  revokeUpload()
+  pick.value = { kind: 'upload', file }
+  resetView()
+  uploadObjectUrl.value = URL.createObjectURL(file)
+  sourceUrl.value = uploadObjectUrl.value
 }
 
 async function loadImage() {
@@ -77,18 +116,19 @@ async function loadImage() {
   naturalWidth.value = image.naturalWidth
   naturalHeight.value = image.naturalHeight
   await nextTick()
+  measureCropper() // the cropper fills the dialog width by now — measure before computing the crop
   if (initialCrop.value) applyCrop(initialCrop.value)
   else centerImage()
 }
 
 function centerImage() {
-  offsetX.value = (cropWidth - baseImageWidth.value * zoom.value) / 2
-  offsetY.value = (cropHeight - baseImageHeight.value * zoom.value) / 2
+  offsetX.value = (cropWidth.value - baseImageWidth.value * zoom.value) / 2
+  offsetY.value = (cropHeight.value - baseImageHeight.value * zoom.value) / 2
   clampOffset()
 }
 
 function applyCrop(crop: CoverCrop) {
-  const nextZoom = clamp(cropWidth / (crop.width * naturalWidth.value * baseScale.value), 1, 3)
+  const nextZoom = clamp(cropWidth.value / (crop.width * naturalWidth.value * baseScale.value), 1, 3)
   zoom.value = nextZoom
   const scale = baseScale.value * zoom.value
   offsetX.value = -crop.x * naturalWidth.value * scale
@@ -101,8 +141,8 @@ function updateZoom(event: Event) {
   const nextZoom = Number(target.value)
   const previousZoom = zoom.value
   if (!Number.isFinite(nextZoom) || nextZoom <= 0 || previousZoom <= 0) return
-  const centerX = cropWidth / 2
-  const centerY = cropHeight / 2
+  const centerX = cropWidth.value / 2
+  const centerY = cropHeight.value / 2
   offsetX.value = centerX - ((centerX - offsetX.value) / previousZoom) * nextZoom
   offsetY.value = centerY - ((centerY - offsetY.value) / previousZoom) * nextZoom
   zoom.value = nextZoom
@@ -133,8 +173,8 @@ function stopDrag(event: PointerEvent) {
 function clampOffset() {
   const width = baseImageWidth.value * zoom.value
   const height = baseImageHeight.value * zoom.value
-  offsetX.value = clamp(offsetX.value, Math.min(0, cropWidth - width), 0)
-  offsetY.value = clamp(offsetY.value, Math.min(0, cropHeight - height), 0)
+  offsetX.value = clamp(offsetX.value, Math.min(0, cropWidth.value - width), 0)
+  offsetY.value = clamp(offsetY.value, Math.min(0, cropHeight.value - height), 0)
 }
 
 // Normalize the current pan/zoom back to a `0..1` crop rectangle against the source image (the stored shape).
@@ -143,48 +183,62 @@ function currentCoverCrop(): CoverCrop {
   return {
     x: clamp(-offsetX.value / scale / naturalWidth.value, 0, 1),
     y: clamp(-offsetY.value / scale / naturalHeight.value, 0, 1),
-    width: clamp(cropWidth / scale / naturalWidth.value, 0, 1),
-    height: clamp(cropHeight / scale / naturalHeight.value, 0, 1),
+    width: clamp(cropWidth.value / scale / naturalWidth.value, 0, 1),
+    height: clamp(cropHeight.value / scale / naturalHeight.value, 0, 1),
   }
 }
 
 function save() {
-  if (!selectedMediaId.value || !imageLoaded.value) return
-  emit('save', { mediaId: selectedMediaId.value, crop: currentCoverCrop() })
+  const p = pick.value
+  if (!p || !imageLoaded.value) return
+  const crop = currentCoverCrop()
+  if (p.kind === 'upload') emit('save', { kind: 'upload', file: p.file, crop })
+  else emit('save', { kind: 'keep', crop })
   emit('close')
 }
 
 function remove() {
-  emit('save', null)
+  emit('save', { kind: 'remove' })
   emit('close')
 }
+
+// Keep the crop viewport in sync with the dialog width (re-measure + re-clamp the pan so no empty corner shows).
+function onResize() {
+  measureCropper()
+  clampOffset()
+}
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  // A reopened cover shows an already-cached image whose `@load` may not refire — measure the laid-out cropper
+  // and compute the crop here so it fills the width on open, not only after a resize.
+  void nextTick(() => {
+    measureCropper()
+    const img = imageElement.value
+    if (img?.complete && img.naturalWidth > 0) void loadImage()
+  })
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  revokeUpload()
+})
 </script>
 
 <template>
   <Dialog :visible="true" :header="t('memory.cover.choose')" modal @update:visible="emit('close')">
     <div class="veyq-form memory-cover-dialog">
-      <p class="memory-cover-copy">{{ t('memory.cover.copy') }}</p>
+      <p class="memory-cover-copy">{{ hasMedia ? t('memory.cover.copy') : t('memory.cover.copyNoMedia') }}</p>
 
-      <p v-if="!items.length" class="memory-cover-empty">{{ t('memory.cover.empty') }}</p>
-
-      <div v-else class="memory-cover-picker" :aria-label="t('memory.cover.gallery')">
-        <button
-          v-for="item in items"
-          :key="item.mediaId"
-          type="button"
-          class="memory-cover-option"
-          :class="{ 'memory-cover-option-selected': selectedMediaId === item.mediaId }"
-          @click="selectMedia(item)"
-        >
-          <img :src="item.url" :alt="item.name ?? item.mediaId" draggable="false" />
-        </button>
+      <div class="memory-cover-sources">
+        <Button type="button" :label="t('memory.cover.upload')" icon="pi pi-upload" severity="secondary" outlined @click="chooseUpload" />
+        <input ref="fileInput" type="file" accept="image/*" class="memory-cover-file" @change="onFilePicked" />
       </div>
 
       <div v-if="hasSource" class="memory-cover-editor">
         <div
+          ref="cropperEl"
           class="memory-cover-cropper"
           :class="{ 'memory-cover-cropper-dragging': dragging }"
-          :style="{ width: `${cropWidth}px`, aspectRatio: `${cropWidth} / ${cropHeight}` }"
+          style="aspect-ratio: 16 / 9"
           @pointerdown="startDrag"
           @pointermove="drag"
           @pointerup="stopDrag"
@@ -198,19 +252,19 @@ function remove() {
         </label>
       </div>
 
-      <div class="dialog-actions">
+      <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
         <div class="veyq-action-group">
           <Button
             type="button"
             :label="t('memory.cover.remove')"
             icon="pi pi-trash"
-            severity="secondary"
+            severity="danger"
             outlined
             :disabled="!cover"
             @click="remove"
           />
-          <Button type="button" :label="t('memory.cover.save')" icon="pi pi-check" :disabled="!selectedMediaId || !imageLoaded" @click="save" />
+          <Button type="button" :label="t('memory.cover.save')" icon="pi pi-check" :disabled="!canSave" @click="save" />
         </div>
       </div>
     </div>
@@ -219,7 +273,9 @@ function remove() {
 
 <style scoped>
 .memory-cover-dialog {
-  min-width: min(360px, 80vw);
+  /* A fixed, comfortable width so the copy wraps + the full-width cropper stays a sensible size in every state
+     (with/without the media picker) — without it the long copy line + fluid cropper balloon the dialog. */
+  width: min(500px, 92vw);
   gap: 0.85rem;
 }
 .memory-cover-copy {
@@ -227,44 +283,21 @@ function remove() {
   color: var(--app-muted);
   font-size: 0.9rem;
 }
-.memory-cover-empty {
-  margin: 0;
-  color: var(--app-muted);
+.memory-cover-sources {
+  display: flex;
+  gap: 0.5rem;
 }
-.memory-cover-picker {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 0.6rem;
-  max-height: 260px;
-  overflow: auto;
-}
-.memory-cover-option {
-  padding: 0;
-  border: 1px solid var(--app-line);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-on-strong);
-  cursor: pointer;
-  overflow: hidden;
-}
-.memory-cover-option-selected {
-  border-color: var(--app-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 18%, transparent);
-}
-.memory-cover-option img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: var(--app-surface-muted);
-  object-fit: cover;
+.memory-cover-file {
+  display: none;
 }
 .memory-cover-editor {
   display: grid;
-  justify-items: center;
+  justify-items: stretch;
   gap: 0.85rem;
 }
 .memory-cover-cropper {
   position: relative;
-  max-width: 100%;
+  width: 100%;
   overflow: hidden;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius-sm);
@@ -296,21 +329,11 @@ function remove() {
   grid-template-columns: auto minmax(180px, 1fr);
   align-items: center;
   gap: 0.75rem;
-  width: min(320px, 100%);
+  width: 100%;
   color: var(--app-control-text);
   font-size: 0.9rem;
 }
 .memory-cover-zoom input {
   width: 100%;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.veyq-action-group {
-  display: flex;
-  gap: 0.5rem;
 }
 </style>

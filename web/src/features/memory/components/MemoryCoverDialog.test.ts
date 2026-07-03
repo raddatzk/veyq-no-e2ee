@@ -1,9 +1,14 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
-import type { CoverPickItem, MemoryCover } from '../memoryCover'
+import type { CoverSaveIntent, MemoryCover } from '../memoryCover'
+
+// happy-dom has no real object-URL registry; the dialog only needs a stable string + a no-op revoke.
+beforeAll(() => {
+  vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:upload', revokeObjectURL: () => {} })
+})
 
 const i18n = createI18n({
   legacy: false,
@@ -13,16 +18,13 @@ const i18n = createI18n({
       common: { cancel: 'Cancel' },
       memory: {
         zoom: 'Zoom',
-        cover: { choose: 'Choose a cover', copy: 'copy', empty: 'empty', gallery: 'gallery', remove: 'Remove cover', save: 'Save cover' },
+        cover: { choose: 'Choose a cover', copy: 'copy', copyNoMedia: 'copy-no-media', upload: 'Upload a photo', remove: 'Remove cover', save: 'Save cover' },
       },
     },
   },
 })
 
-const items: CoverPickItem[] = [
-  { mediaId: 'm1', url: 'blob:1' },
-  { mediaId: 'm2', url: 'blob:2' },
-]
+const UPLOAD_REF = { blobId: 'b-1', chunkCount: 1, byteSize: 4096, wrappedBlobKey: 'd3JhcA==' }
 
 // Stub the PrimeVue Dialog/Button shells (happy-dom can't drive the overlay) — the crop math + emits are under test.
 const stubs = {
@@ -33,8 +35,12 @@ const stubs = {
   },
 }
 
-async function mountDialog(cover: MemoryCover | null) {
-  return mount(MemoryCoverDialog, { props: { items, cover }, global: { plugins: [i18n], stubs } })
+type Props = { cover?: MemoryCover | null; existingSrc?: string | null; hasMedia?: boolean }
+function mountDialog(p: Props = {}) {
+  return mount(MemoryCoverDialog, {
+    props: { cover: p.cover ?? null, existingSrc: p.existingSrc ?? null, hasMedia: p.hasMedia ?? false },
+    global: { plugins: [i18n], stubs },
+  })
 }
 
 /** The dialog's action buttons keyed by their label (the stub renders the label as text). */
@@ -52,46 +58,68 @@ async function loadCropper(w: ReturnType<typeof mount>, natW: number, natH: numb
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-9
 
 describe('MemoryCoverDialog', () => {
-  it('picking a media + saving emits a normalized cover (crop within 0..1)', async () => {
-    const w = await mountDialog(null)
-    // no cropper until a media is picked
-    expect(w.find('.memory-cover-cropper').exists()).toBe(false)
+  it('has no in-dialog media picker (browsing existing media is the gallery’s job, cr-0073 §gallery)', () => {
+    const w = mountDialog({ hasMedia: true })
+    expect(w.findAll('.memory-cover-option')).toHaveLength(0)
+    expect(w.find('.memory-cover-picker').exists()).toBe(false)
+  })
 
-    await w.findAll('.memory-cover-option')[0].trigger('click')
-    await loadCropper(w, 400, 300) // a 4:3 source, centered full-frame at zoom 1
+  it('picking a new image file + saving emits an upload intent carrying the file', async () => {
+    const w = mountDialog({ hasMedia: false })
+    expect(w.find('.memory-cover-cropper').exists()).toBe(false) // no source yet → upload only
+    const file = new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' })
+    const input = w.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [file] })
+    await input.trigger('change')
+    await loadCropper(w, 800, 450) // a 16:9 upload
 
     await btn(w, 'Save cover').trigger('click')
-    const cover = w.emitted('save')?.[0]?.[0] as MemoryCover
-    expect(cover.mediaId).toBe('m1')
-    // a 16:9 crop of a 4:3 image fills the width and takes 3/4 of the height, vertically centered
-    expect(near(cover.crop.x, 0)).toBe(true)
-    expect(near(cover.crop.width, 1)).toBe(true)
-    expect(near(cover.crop.height, 0.75)).toBe(true)
-    expect(near(cover.crop.y, 0.125)).toBe(true)
-    expect(w.emitted('close')).toBeTruthy()
+    const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
+    expect(intent.kind).toBe('upload')
+    if (intent.kind !== 'upload') throw new Error('expected upload')
+    expect(intent.file.name).toBe('cover.png')
+    expect(intent.file.type).toBe('image/png')
+    expect(near(intent.crop.width, 1)).toBe(true)
+    expect(near(intent.crop.height, 1)).toBe(true)
   })
 
-  it('remove emits null', async () => {
-    const cover: MemoryCover = { mediaId: 'm1', crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 } }
-    const w = await mountDialog(cover)
+  it('remove emits a remove intent', async () => {
+    const cover: MemoryCover = { source: { kind: 'media', mediaId: 'm1' }, crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 } }
+    const w = mountDialog({ cover })
     await btn(w, 'Remove cover').trigger('click')
-    expect(w.emitted('save')?.[0]?.[0]).toBeNull()
+    expect((w.emitted('save')?.[0]?.[0] as CoverSaveIntent).kind).toBe('remove')
     expect(w.emitted('close')).toBeTruthy()
   })
 
-  it('a preset crop round-trips through open → save', async () => {
+  it('re-cropping the current cover from the header restores its crop and emits keep (media OR upload source)', async () => {
     const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 } // achievable 16:9 region of a 3200×1800 source
-    const w = await mountDialog({ mediaId: 'm1', crop })
-    // the current cover's media is preselected → the cropper is already shown
+    // a media cover, re-opened from the header: its decrypted thumbnail is the crop source, kept (only the crop moves)
+    const w = mountDialog({ cover: { source: { kind: 'media', mediaId: 'm1' }, crop }, existingSrc: 'blob:cover-thumb' })
     expect(w.find('.memory-cover-cropper').exists()).toBe(true)
+    expect(w.find('.memory-cover-cropper img').attributes('src')).toBe('blob:cover-thumb')
     await loadCropper(w, 3200, 1800)
 
     await btn(w, 'Save cover').trigger('click')
-    const saved = w.emitted('save')?.[0]?.[0] as MemoryCover
-    expect(saved.mediaId).toBe('m1')
-    expect(near(saved.crop.x, crop.x)).toBe(true)
-    expect(near(saved.crop.y, crop.y)).toBe(true)
-    expect(near(saved.crop.width, crop.width)).toBe(true)
-    expect(near(saved.crop.height, crop.height)).toBe(true)
+    const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
+    expect(intent.kind).toBe('keep')
+    if (intent.kind !== 'keep') throw new Error('expected keep')
+    expect(near(intent.crop.x, crop.x)).toBe(true)
+    expect(near(intent.crop.width, crop.width)).toBe(true)
+  })
+
+  it('reopening an upload cover from the header re-crops the decrypted image and emits a keep intent (no re-upload)', async () => {
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 }
+    const w = mountDialog({ cover: { source: { kind: 'upload', ref: UPLOAD_REF }, crop }, existingSrc: 'blob:existing-cover' })
+    // the current uploaded cover is shown from `existingSrc` → the cropper is already up
+    expect(w.find('.memory-cover-cropper').exists()).toBe(true)
+    expect(w.find('.memory-cover-cropper img').attributes('src')).toBe('blob:existing-cover')
+    await loadCropper(w, 3200, 1800)
+
+    await btn(w, 'Save cover').trigger('click')
+    const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
+    expect(intent.kind).toBe('keep')
+    if (intent.kind !== 'keep') throw new Error('expected keep')
+    expect(near(intent.crop.x, crop.x)).toBe(true)
+    expect(near(intent.crop.width, crop.width)).toBe(true)
   })
 })
