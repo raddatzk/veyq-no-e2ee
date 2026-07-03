@@ -23,7 +23,11 @@
    names** under `K_SC` on device, assembling the tree from the opaque rows (`id`, `parentId`, `kind`).
 3. The **shell** renders: a sidebar (the personal space + profile menu), a **breadcrumb** built
    **client-side** from the local tree (the blind server cannot compute it), and a content area showing the
-   **current level** — its child **folders** and **Memories** as cards, each with a *create* card.
+   **current level**. A toolbar **display toggle** picks how that level is shown — **grid** (cards, the
+   default), **list** (a compact list), or **map** ("Karte": the level's located Memories/Chapters plotted as
+   pins, [uc.memory.place](uc.memory.place.md)) — one **app-wide, persisted** preference. In grid/list the
+   child **folders** and **Memories** render with a *create* card each; in map the subtree's located nodes
+   render as clickable pins (folders are navigated from grid/list).
 4. **Navigate:** clicking a folder drills into it (new level + breadcrumb); clicking a Memory opens it (its
    detail view is a later slice). The breadcrumb walks back up the local tree.
 5. **Organize:** *create folder* / *create Memory* seal the name + blinded slug under `K_SC` and POST only
@@ -58,6 +62,11 @@
   **unlock**, not merely after login.
 - **No media derivatives yet.** Cards show an icon + name; covers/thumbnails land with the media-display
   slice.
+- **Display modes are a facet of browsing.** How the current level is shown — **grid / list / map** — is one
+  app-wide, persisted toggle (`useViewMode`, `ViewModeToggle`), not a separate goal: grid/list shipped with
+  cr-0063, the map view with cr-0071. The **map** stays operator-blind — it plots each node's sealed
+  `location` unsealed on device from what `listNodes` already returns, behind the personal tiles opt-in (ADR
+  0018); there is no locations API. It is **browse-only** (the Chapters-tab grid offers grid/list only).
 
 ## What this means for you / Was das für dich bedeutet
 

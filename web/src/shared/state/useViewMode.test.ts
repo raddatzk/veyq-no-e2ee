@@ -24,4 +24,11 @@ describe('useViewMode', () => {
     setViewMode('grid')
     expect(localStorage.getItem('veyq:view-mode')).toBe('grid')
   })
+
+  it('supports the map mode (cr-0071) and restores it from storage', () => {
+    setViewMode('map')
+    expect(localStorage.getItem('veyq:view-mode')).toBe('map')
+    // a fresh useViewMode() reads the same persisted singleton
+    expect(useViewMode().viewMode.value).toBe('map')
+  })
 })

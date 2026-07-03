@@ -149,6 +149,7 @@ const en = {
     viewMode: 'View',
     viewGrid: 'Grid view',
     viewList: 'List view',
+    viewMap: 'Map view',
     renameTitle: 'Rename',
     nameLabel: 'Name',
     save: 'Save',
@@ -198,6 +199,11 @@ const en = {
       consentBody:
         'To place a Memory on a map, tiles load from a third-party map provider and the framed point is sent to a third-party geocoder for a name — both client-direct, never through the veyq server, which stays blind. You can turn this off anytime.',
       consentEnable: 'Enable maps',
+    },
+    map: {
+      empty: 'No places yet',
+      emptyHint: 'Set a location on a Memory here and it shows up on the map.',
+      places: '{count} places',
     },
   },
   media: {
@@ -388,6 +394,7 @@ const de: typeof en = {
     viewMode: 'Ansicht',
     viewGrid: 'Rasteransicht',
     viewList: 'Listenansicht',
+    viewMap: 'Kartenansicht',
     renameTitle: 'Umbenennen',
     nameLabel: 'Name',
     save: 'Speichern',
@@ -437,6 +444,11 @@ const de: typeof en = {
       consentBody:
         'Um eine Erinnerung auf einer Karte zu platzieren, werden Kacheln von einem Drittanbieter geladen und der eingerahmte Punkt wird für einen Namen an einen Drittanbieter-Geocoder gesendet – beides direkt vom Gerät, nie über den veyq-Server, der blind bleibt. Du kannst das jederzeit deaktivieren.',
       consentEnable: 'Karten aktivieren',
+    },
+    map: {
+      empty: 'Noch keine Orte',
+      emptyHint: 'Lege bei einer Erinnerung hier einen Ort fest, dann erscheint sie auf der Karte.',
+      places: '{count} Orte',
     },
   },
   media: {

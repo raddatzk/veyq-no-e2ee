@@ -9,10 +9,11 @@ import { setViewMode } from '../../../shared/state/useViewMode'
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
-  messages: { en: { memory: { viewMode: 'View', viewGrid: 'Grid view', viewList: 'List view' } } },
+  messages: { en: { memory: { viewMode: 'View', viewGrid: 'Grid view', viewList: 'List view', viewMap: 'Map view' } } },
 })
 
-const mountToggle = () => mount(ViewModeToggle, { global: { plugins: [i18n], directives: { tooltip: {} } } })
+const mountToggle = (props: Record<string, unknown> = {}) =>
+  mount(ViewModeToggle, { props, global: { plugins: [i18n], directives: { tooltip: {} } } })
 
 beforeEach(() => {
   localStorage.clear()
@@ -31,5 +32,20 @@ describe('ViewModeToggle', () => {
     expect(listBtn.attributes('aria-pressed')).toBe('true')
     expect(gridBtn.attributes('aria-pressed')).toBe('false')
     expect(localStorage.getItem('veyq:view-mode')).toBe('list')
+  })
+
+  it('omits the map button by default (Chapters grid), shows it with show-map (browse)', () => {
+    expect(mountToggle().findAll('.view-mode-button')).toHaveLength(2)
+    expect(mountToggle({ showMap: true }).findAll('.view-mode-button')).toHaveLength(3)
+  })
+
+  it('the map button switches to map mode (browse only)', async () => {
+    const w = mountToggle({ showMap: true })
+    const mapBtn = w.findAll('.view-mode-button')[2]
+
+    expect(mapBtn.attributes('aria-pressed')).toBe('false')
+    await mapBtn.trigger('click')
+    expect(mapBtn.attributes('aria-pressed')).toBe('true')
+    expect(localStorage.getItem('veyq:view-mode')).toBe('map')
   })
 })

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-// Grid / list switch for the memory card grid (cr-0063). Two icon buttons over the app-wide `useViewMode`
-// preference (persisted) — used in the browse toolbar and above the Chapters-tab grid; both drive the one value.
+// Grid / list switch for the memory card grid (cr-0063). Icon buttons over the app-wide `useViewMode` preference
+// (persisted) — used in the browse toolbar and above the Chapters-tab grid; both drive the one value. The browse
+// adds a third **Karte** button (`show-map`, cr-0071) — the map is browse-only, so the Chapters grid omits it.
 import { useI18n } from 'vue-i18n'
 import { useViewMode, setViewMode } from '../../../shared/state/useViewMode'
+
+withDefaults(defineProps<{ showMap?: boolean }>(), { showMap: false })
 
 const { viewMode } = useViewMode()
 const { t } = useI18n()
@@ -31,6 +34,18 @@ const { t } = useI18n()
       @click="setViewMode('list')"
     >
       <span class="pi pi-bars" aria-hidden="true" />
+    </button>
+    <button
+      v-if="showMap"
+      v-tooltip.bottom="t('memory.viewMap')"
+      type="button"
+      class="view-mode-button"
+      :class="{ 'is-active': viewMode === 'map' }"
+      :aria-label="t('memory.viewMap')"
+      :aria-pressed="viewMode === 'map'"
+      @click="setViewMode('map')"
+    >
+      <span class="pi pi-map" aria-hidden="true" />
     </button>
   </div>
 </template>

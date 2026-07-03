@@ -4,19 +4,26 @@
 // "create" card) so memory.css styles it identically; only the data is ours — decrypted TreeNodes instead of
 // server Memory/MemoryFolder DTOs, and the breadcrumb/navigation are derived on device (the server is blind).
 // The folder header carries delete (as in the original) plus rename, added in-style.
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
+import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
-import type { TreeNode } from '../tree'
+import { nodeContentKey, type TreeNode } from '../tree'
 import { sortNodesByDate } from '../memoryDate'
+import { nodeById } from '../browse'
+import { treeStore } from '../treeStore'
+import { collectLocatedPins } from '../spaceMap'
+import { loadPinCover } from '../pinCover'
 import { isFavorite } from '../../../app/favoritesStore'
+import { activeSpace } from '../../../app/activeSpace'
 import { useViewMode } from '../../../shared/state/useViewMode'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
+import SpaceMap from './SpaceMap.vue'
 
 // `scopeKey` (K_SC) unseals each Memory's sealed date for the card + the date-sort; null (locked) ⇒ no dates.
 const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; scopeKey?: Uint8Array | null }>()
-defineEmits<{
+const emit = defineEmits<{
   openFolder: [folder: TreeNode]
   openMemory: [memory: TreeNode]
   toggleFavorite: [memory: TreeNode]
@@ -31,12 +38,52 @@ const { viewMode } = useViewMode()
 
 // Memories ordered by their sealed start date (newest first, undated last) — read from wrappedMeta, no media load.
 const datedMemories = computed(() => sortNodesByDate(props.scopeKey ?? null, props.memories))
+
+// The Karte pins: every located node in this folder's subtree (or the whole space at root), unsealed on device
+// from the wrappedMeta `listNodes` already returned (operator-blind — no locations API). Locked ⇒ no pins.
+const pins = computed(() =>
+  props.scopeKey ? collectLocatedPins(props.scopeKey, treeStore.nodes, props.folder?.id ?? null) : [],
+)
+
+/** A pin click carries a node id — resolve it to the TreeNode and open it, exactly like a card click. */
+function onPinOpen(nodeId: string) {
+  const node = nodeById(treeStore.nodes, nodeId)
+  if (node) emit('openMemory', node)
+}
+
+// Pin cover thumbnails (nodeId → object URL), loaded lazily on device only while the map is shown. Kept here (we
+// hold `scopeKey` + `scopeId`); passed read-only to SpaceMap. `nodeContentKey` is resolved off the reactive proxy
+// so K_mem bytes never enter Vue's reactivity (matching activeSpace's key handling).
+const covers = reactive(new Map<string, string>())
+
+function revokeCovers() {
+  for (const url of covers.values()) URL.revokeObjectURL(url)
+  covers.clear()
+}
+
+/** For each map pin without a cover yet, decrypt its thumbnail (best-effort, parallel) and cache the object URL. */
+function syncCovers() {
+  if (viewMode.value !== 'map' || !activeSpace.scopeId || !props.scopeKey) return
+  const scopeId = activeSpace.scopeId
+  const scopeKey = props.scopeKey
+  for (const pin of pins.value) {
+    if (covers.has(pin.node.id)) continue
+    const nodeKey = nodeContentKey(scopeKey, treeStore.nodes, pin.node.id)
+    if (!nodeKey) continue
+    void loadPinCover(scopeId, nodeKey, pin.node.id, pin.location.derived).then((url) => {
+      if (url) covers.set(pin.node.id, url)
+    })
+  }
+}
+
+watch([viewMode, pins], syncCovers, { immediate: true })
+onBeforeUnmount(revokeCovers)
 </script>
 
 <template>
   <div class="memory-route-surface">
     <div class="memory-browse-toolbar">
-      <ViewModeToggle />
+      <ViewModeToggle show-map />
     </div>
     <section v-if="folder" class="veyq-section memory-section">
       <div class="veyq-section-header">
@@ -69,6 +116,11 @@ const datedMemories = computed(() => sortNodesByDate(props.scopeKey ?? null, pro
       </div>
     </section>
 
+    <section v-if="viewMode === 'map'" class="veyq-section memory-section">
+      <SpaceMap :pins="pins" :covers="covers" @open="onPinOpen" />
+    </section>
+
+    <template v-else>
     <section class="veyq-section memory-section">
       <div class="veyq-section-header memory-section-header">
         <h2>{{ t('memory.memories') }}</h2>
@@ -127,6 +179,7 @@ const datedMemories = computed(() => sortNodesByDate(props.scopeKey ?? null, pro
         </button>
       </div>
     </section>
+    </template>
   </div>
 </template>
 

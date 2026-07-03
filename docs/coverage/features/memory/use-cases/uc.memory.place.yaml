@@ -1,13 +1,13 @@
 useCase: uc.memory.place
 feature: memory
 title: Curate a Memory's place — one sealed, named location
-status: planned
-# Refined, not yet built. Place reuses the node's `wrappedMeta` blob (shipped for the date, cr-0067) and adds a
-# `location` sub-object `{ name, nameSource, derived (medoid), derivedMode, nameAnchor{lat,lng,level} }` — sealed
-# under K_mem, set via the same partial updateNode, returned on listNodes. Deliberate set-up (never silent), a
-# mandatory name, position = the MEDOID of the media GPS, reverse-only opt-in geocoding (client-direct, Nominatim
-# reference, ADR 0016), and a tenant-wide map that plots every Memory from listNodes without loading media. Every
-# surface is a gap until the place slices land; the acceptance criteria pin what each slice must satisfy.
+# Web-complete. Place reuses the node's `wrappedMeta` blob (shipped for the date, cr-0067) and adds a `location`
+# sub-object `{ name, nameSource, derived (medoid), derivedMode, nameAnchor{lat,lng,level} }` — sealed under K_mem,
+# set via the same partial updateNode, returned on listNodes. Deliberate set-up (never silent), a mandatory name,
+# position = the MEDOID of the media GPS, reverse-only opt-in geocoding (client-direct, Nominatim reference, ADR
+# 0016), and a per-folder-subtree "Karte" view plotting every located Memory/Chapter from listNodes without loading
+# media (cr-0071). Native place/map UI is each platform's own later CR (web-first, ADR 0010); the group consent
+# state-machine + a blind gazetteer remain prose gaps (own CRs), not unref'd criteria.
 acceptanceCriteria:
   - id: sealed-location-on-node
     text: A MEMORY/CHAPTER node's `wrappedMeta.location` carries ONE named place — name (mandatory, except a pending auto place) + nameSource (geocoded|manual) + derived {lat,lng} + derivedMode (fixed|auto) + nameAnchor {lat,lng,level} — sealed under K_mem in the same client-versioned blob as the date (no contract change), set via the partial updateNode and returned on listNodes. The operator-blind server never sees a coordinate or a place name.
@@ -50,10 +50,18 @@ acceptanceCriteria:
           - src/shared/state/useMapConfig.test.ts
           - src/features/memory/components/MemoryLocationEditor.test.ts
   - id: tenant-map-via-listnodes
-    text: A tenant-root toggle shows every Memory as a pin, read from each node's sealed `location` via listNodes (unsealed client-side, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name. Map tiles are a separate opt-in/self-host seam.
+    text: A "Karte" browse view mode shows every located Memory/Chapter in the current folder's subtree (the whole space at the scope root) as a clickable pin, read from each node's sealed `location` via listNodes (unsealed client-side under its own K_mem, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name; a pending auto place (no `derived`) is not pinned; a pin click opens that Memory. Map tiles are a separate opt-in/self-host seam (ADR 0018), reused from the editor. (cr-0071; per-folder-subtree, more contextual than always space-wide. Native map parity is a separate later CR.)
+    coverage:
+      web:
+        unit:
+          - src/features/memory/spaceMap.test.ts
+          - src/features/memory/pinCover.test.ts
+          - src/features/memory/components/SpaceMap.test.ts
+          - src/features/memory/components/MemoryBrowse.test.ts
+          - src/features/memory/components/ViewModeToggle.test.ts
 gaps:
   backend: "Slice 2a done (cr-0068): GPS is promoted into the always-listed media metadata tier — the two listed tiers (`wrappedLayout` + `wrappedCapturedAt`) are consolidated into one `wrapped_meta` blob (geometry + capture time + GPS) sealed under K_mem (migration V18, no backfill), so the medoid can read GPS list-level without a per-item fetch; round-tripped by MediaSliceTest (complete→list + PUT `/meta`→list). The node's `location` itself round-trips inside the opaque node `wrappedMeta` (cr-0067) — no further backend change. Remaining: nothing at the backend level; the medoid + name are client-side (slice 2b)."
-  web: "Slice 2b done (cr-0069): the node-meta seal is now read-modify-write (shared `nodeMeta.ts` over `{v,date?,location?}`), so setting a location preserves the sibling date (and vice-versa). `memoryLocation.ts` adds the `location` model + the medoid (min summed Haversine, sea-outlier-resistant), `geocode.ts` the reverse-only client-direct seam (off-until-configured), `useMapConfig.ts` the coupled two-stage tiles+geocoding opt-in (ADR 0016/0018, public OSM/Nominatim default, env/localStorage override). UI is intent-first: a Leaflet `MemoryMap` (fixed centre crosshair — move the map, the centre is the place — + faint photo dots), a `MemoryLocationEditor` (opens on the medoid with a follows-your-photos pill; moving the map by hand flips to fixed with a one-tap follow-again; the name is picked from the reverse-geocoded address-hierarchy `level` or typed; quiet remove), a detail-header location chip + open-time/post-upload self-heal (re-medoid + refresh the geocoded name at the stored level), and a create-dialog single opt-in (follows-your-photos toggle arming a pending auto place). All unit-tested with real v1 crypto + a stubbed map/geocode. Remaining slices (own CRs, web-first per ADR 0010): (2c) the tenant map plotting every Memory from listNodes; (deferred) the group consent state-machine + tenant language (ADR 0016), and an on-device blind gazetteer."
+  web: "Slice 2b done (cr-0069): the node-meta seal is now read-modify-write (shared `nodeMeta.ts` over `{v,date?,location?}`), so setting a location preserves the sibling date (and vice-versa). `memoryLocation.ts` adds the `location` model + the medoid (min summed Haversine, sea-outlier-resistant), `geocode.ts` the reverse-only client-direct seam (off-until-configured), `useMapConfig.ts` the coupled two-stage tiles+geocoding opt-in (ADR 0016/0018, public OSM/Nominatim default, env/localStorage override). UI is intent-first: a Leaflet `MemoryMap` (fixed centre crosshair — move the map, the centre is the place — + faint photo dots), a `MemoryLocationEditor` (opens on the medoid with a follows-your-photos pill; moving the map by hand flips to fixed with a one-tap follow-again; the name is picked from the reverse-geocoded address-hierarchy `level` or typed; quiet remove), a detail-header location chip + open-time/post-upload self-heal (re-medoid + refresh the geocoded name at the stored level), and a create-dialog single opt-in (follows-your-photos toggle arming a pending auto place). All unit-tested with real v1 crypto + a stubbed map/geocode. Slice 2c done (cr-0071): a third **Karte** browse view mode (`useViewMode` gains `map`, `ViewModeToggle` a browse-only third button) renders a read-only `SpaceMap` (Leaflet, N clickable pins, `fitBounds`, name tooltips) fed by `spaceMap.collectLocatedPins` — every located MEMORY/CHAPTER in the current folder's subtree (whole space at root), unsealed on device from the `wrappedMeta` listNodes already returns (no locations API), behind the same ADR 0018 tiles opt-in; a pin click opens that Memory. Remaining (deferred, own CRs, web-first per ADR 0010): native map parity; the group consent state-machine + tenant language (ADR 0016); an on-device blind gazetteer."
   apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
   android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
   http: "The `location` folds into the existing createNode / updateNode / listNodes (an extra opaque field in the same node `wrappedMeta`). The listed media metadata tier gaining GPS landed with cr-0068 (the `wrappedMeta` merge; no dedicated http media file exists — the media contract is exercised at the backend integration + web levels). Covered at the contract level once the set-location CR (2b) lands."

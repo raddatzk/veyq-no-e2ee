@@ -22,6 +22,15 @@ acceptanceCriteria:
       web: { unit: [src/features/memory/browse.test.ts, src/features/memory/location.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/MemoryBrowseTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/MemoryBrowseTest.kt] }
+  - id: view-modes
+    text: The current level is shown via one app-wide, persisted display toggle — grid (cards, default) / list / map. Grid/list is the card-grid layout (cr-0063); map ("Karte", browse-only, cr-0071) plots the current folder's subtree of located Memories/Chapters as clickable pins from each node's sealed `location` (unsealed on device from listNodes, no locations API, behind the ADR 0018 tiles opt-in), a pin click opening that Memory. The preference persists across surfaces (localStorage).
+    coverage:
+      web:
+        unit:
+          - src/shared/state/useViewMode.test.ts
+          - src/features/memory/components/ViewModeToggle.test.ts
+          - src/features/memory/components/MemoryBrowse.test.ts
+          - src/features/memory/components/SpaceMap.test.ts
   - id: create-folder-and-memory
     text: Creating a folder/Memory seals the name + blinded slug under K_SC and POSTs only ciphertext (a Memory births its random K_mem).
     coverage:
