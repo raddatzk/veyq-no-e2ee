@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { childrenOf, breadcrumbOf, nodeById } from './browse'
+import { PERSONAL_SCOPE, TENANT_SCOPE } from './location'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
 
@@ -40,16 +41,26 @@ describe('childrenOf', () => {
 })
 
 describe('breadcrumbOf', () => {
-  it('walks root → ancestors → node, each crumb carrying its #fragment', () => {
-    expect(breadcrumbOf(tree, '2025', 'Personal')).toEqual([
+  it('walks root → ancestors → node, each crumb carrying its #fragment in the active scope', () => {
+    expect(breadcrumbOf(tree, '2025', 'Personal', PERSONAL_SCOPE)).toEqual([
       { id: null, name: 'Personal', hash: '#~me' },
       { id: 'trips', name: 'Trips', hash: '#~me/trips' },
       { id: '2025', name: '2025', hash: '#~me/trips/2025' },
     ])
   })
 
+  it('builds token-less fragments in the tenant scope', () => {
+    expect(breadcrumbOf(tree, '2025', 'Family', TENANT_SCOPE)).toEqual([
+      { id: null, name: 'Family', hash: '' },
+      { id: 'trips', name: 'Trips', hash: '#trips' },
+      { id: '2025', name: '2025', hash: '#trips/2025' },
+    ])
+  })
+
   it('is just the root at the top level', () => {
-    expect(breadcrumbOf(tree, null, 'Personal')).toEqual([{ id: null, name: 'Personal', hash: '#~me' }])
+    expect(breadcrumbOf(tree, null, 'Personal', PERSONAL_SCOPE)).toEqual([
+      { id: null, name: 'Personal', hash: '#~me' },
+    ])
   })
 })
 

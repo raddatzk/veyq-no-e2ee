@@ -9,7 +9,8 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, listMyTenants } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, listMyTenants } from './scopes'
+import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
 import * as v1 from '../../shared/crypto/v1'
@@ -76,6 +77,32 @@ describe('openPersonalScope', () => {
   it('returns null when there is no personal scope', async () => {
     mockScopes(vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
     expect(await openPersonalScope()).toBeNull()
+  })
+})
+
+describe('openScope', () => {
+  it('asymUnwraps the TENANT grant back to a 32-byte scope key — open-only, never POSTs (no client birth)', async () => {
+    const scopeKey = v1.randomBytes(32)
+    const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), scopeKey, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const list = vi.fn().mockResolvedValue([
+      { id: 'tn', kind: 'TENANT', tenantId: 't', wrappedGrant: grant },
+      { id: 'p', kind: 'PERSONAL', tenantId: 't', wrappedGrant: 'AQ==' },
+    ])
+    const create = vi.fn()
+    mockScopes(list, create)
+
+    const opened = await openScope(ScopeKind.Tenant)
+    expect(opened).not.toBeNull()
+    expect(opened!.scopeId).toBe('tn')
+    expect(opened!.kind).toBe('TENANT')
+    expect(opened!.key.length).toBe(32)
+    expect(Array.from(opened!.key)).toEqual(Array.from(scopeKey))
+    expect(create).not.toHaveBeenCalled() // the tenant scope is born cold at activation — never minted here
+  })
+
+  it('returns null when the caller holds no scope of that kind (→ the shell falls back to Personal)', async () => {
+    mockScopes(vi.fn().mockResolvedValue([{ id: 'p', kind: 'PERSONAL', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
+    expect(await openScope(ScopeKind.Tenant)).toBeNull()
   })
 })
 

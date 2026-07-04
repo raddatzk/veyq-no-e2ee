@@ -42,25 +42,36 @@ export async function ensurePersonalScope(): Promise<boolean> {
   }
 }
 
+/** An opened scope: its opaque identity + the in-memory scope content key `K_SC` (owned transiently by the caller). */
+export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array }
+
 /**
- * Open the member's personal scope → the in-memory scope key (asymUnwrap our own grant with the vaulted
- * identity), or null if there is none / the vault is locked. The caller owns the returned key transiently.
+ * Open the caller's scope of the given `kind` → its identity + in-memory scope key (asymUnwrap our **own** grant
+ * with the vaulted identity), or null if there is no such scope / the vault is locked. This is **open-only** —
+ * it never mints a scope (the tenant scope is born cold at activation, ADR 0006; only `ensurePersonalScope`
+ * births, and personal-only). The caller owns the returned key transiently.
  */
-export async function openPersonalScope(): Promise<Uint8Array | null> {
+export async function openScope(kind: ScopeKind): Promise<OpenedScope | null> {
   const priv = identityPrivate()
   if (!priv) return null
   try {
-    const personal = (await listMyScopes()).find((s) => s.kind === ScopeKind.Personal)
-    if (!personal) return null
-    return v1.asymUnwrap(
+    const scope = (await listMyScopes()).find((s) => s.kind === kind)
+    if (!scope) return null
+    const key = v1.asymUnwrap(
       v1.hybridSecret(priv),
       v1.hybridPublic(priv),
-      fromB64std(personal.wrappedGrant),
+      fromB64std(scope.wrappedGrant),
       SCOPE_GRANT,
     )
+    return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key }
   } finally {
     zero(priv)
   }
+}
+
+/** Open the member's personal scope → just its key (thin wrapper over {@link openScope}; used by e2e harnesses). */
+export async function openPersonalScope(): Promise<Uint8Array | null> {
+  return (await openScope(ScopeKind.Personal))?.key ?? null
 }
 
 /** Best-effort wipe of the transient identity-private copy the vault handed us. */

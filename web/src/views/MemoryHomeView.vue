@@ -3,17 +3,19 @@
 // lives in the URL **#fragment** (`#~me/reisen-2026/rom`), resolved against the locally-decrypted tree — the
 // operator-blind server computes no navigation and never sees the path. Renders a folder/root level (browse)
 // or a Memory leaf (detail) by the resolved node's kind, and owns the create / rename / delete dialogs.
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { activeSpace, activeScopeKey, enterPersonalSpace } from '../app/activeSpace'
+import { activeSpace, activeScopeKey, enterScope } from '../app/activeSpace'
 import { setBreadcrumb } from '../app/breadcrumb'
 import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
 import { treeStore, loadTree, patchNodeMeta } from '../features/memory/treeStore'
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
 import { nodeContentKey } from '../features/memory/tree'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
+import { listMyTenants } from '../features/spaces/scopes'
 import { NodeKind } from '../api/generated/content'
+import { ScopeKind, type MyTenant } from '../api/generated/scopes'
 import type { TreeNode } from '../features/memory/tree'
 import MemoryBrowse from '../features/memory/components/MemoryBrowse.vue'
 import MemoryDetail from '../features/memory/components/MemoryDetail.vue'
@@ -24,7 +26,9 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-// Position from the #fragment. A slug segment that doesn't resolve (`false`) collapses to the scope root.
+// Position from the #fragment. The leading token selects the scope (token-less = tenant, `~me` = personal —
+// ADR 0019); a slug segment that doesn't resolve (`false`) collapses to the scope root.
+const currentScope = computed(() => parseHash(route.hash).scope)
 const segments = computed(() => parseHash(route.hash).segments)
 const resolved = computed(() => resolveSlugPath(treeStore.nodes, segments.value))
 const currentNodeId = computed(() => (typeof resolved.value === 'string' ? resolved.value : null))
@@ -54,21 +58,41 @@ const mutationNode = ref<TreeNode | null>(null)
 const deleteVisible = ref(false)
 const deleteTarget = ref<TreeNode | null>(null)
 
+// The breadcrumb root label reflects the **active** scope (the tenant's name vs. Personal), not the URL token —
+// a no-grant member sees `Personal` at the token-less `/` because the tenant home fell back to Personal.
+const tenants = ref<MyTenant[]>([])
+onMounted(async () => {
+  try {
+    tenants.value = await listMyTenants()
+  } catch {
+    /* the label tolerates an unknown tenant name */
+  }
+})
+const activeTenantName = computed(
+  () => tenants.value.find((tn) => tn.tenantId === activeSpace.tenantId)?.name ?? '',
+)
+const rootLabel = computed(() =>
+  activeSpace.kind === ScopeKind.Tenant ? activeTenantName.value || t('shell.shared') : t('shell.personal'),
+)
+
 watch(
-  [() => route.hash, () => treeStore.nodes],
-  () => setBreadcrumb(breadcrumbOf(treeStore.nodes, currentNodeId.value, t('shell.personal'))),
+  [() => route.hash, () => treeStore.nodes, rootLabel],
+  () => setBreadcrumb(breadcrumbOf(treeStore.nodes, currentNodeId.value, rootLabel.value, currentScope.value)),
   { immediate: true },
 )
 
-async function ready() {
-  if (activeSpace.status !== 'ready') await enterPersonalSpace()
+// Re-enter the scope when the leading fragment token flips (segment-only moves keep the same token → no
+// re-entry). Entering opens the scope key + resets the tree/favorites (activeSpace.enterScope); we then reload
+// both for the newly active scope.
+async function reenter(scope: string) {
+  await enterScope(scope)
   if (activeSpace.status === 'ready' && !treeStore.loaded) await loadTree()
   const key = activeScopeKey()
   if (activeSpace.status === 'ready' && activeSpace.scopeId && key && !favoritesStore.loaded) {
     await loadFavoritesFor(activeSpace.scopeId, key)
   }
 }
-void ready()
+watch(currentScope, (scope) => void reenter(scope), { immediate: true })
 
 function onToggleFavorite(node: TreeNode) {
   const key = activeScopeKey()
@@ -76,13 +100,13 @@ function onToggleFavorite(node: TreeNode) {
 }
 
 function openFolder(folder: TreeNode) {
-  void router.push({ hash: hashForNode(treeStore.nodes, folder.id) })
+  void router.push({ hash: hashForNode(treeStore.nodes, folder.id, currentScope.value) })
 }
 function openMemory(memory: TreeNode) {
-  void router.push({ hash: hashForNode(treeStore.nodes, memory.id) })
+  void router.push({ hash: hashForNode(treeStore.nodes, memory.id, currentScope.value) })
 }
 function openChapter(chapter: TreeNode) {
-  void router.push({ hash: hashForNode(treeStore.nodes, chapter.id) })
+  void router.push({ hash: hashForNode(treeStore.nodes, chapter.id, currentScope.value) })
 }
 function startCreate(mode: 'create-folder' | 'create-memory' | 'create-chapter') {
   mutationMode.value = mode
@@ -104,7 +128,7 @@ async function onMutationDone() {
 async function onDeleteDone() {
   const parentId = deleteTarget.value?.parentId ?? null
   await loadTree()
-  void router.push({ hash: hashForNode(treeStore.nodes, parentId) })
+  void router.push({ hash: hashForNode(treeStore.nodes, parentId, currentScope.value) })
 }
 </script>
 

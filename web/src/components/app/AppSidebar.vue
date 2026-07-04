@@ -6,7 +6,7 @@
 // Favorites + groups are later slices.
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { listMyTenants } from '../../features/spaces/scopes'
@@ -15,24 +15,37 @@ import { favoritesStore } from '../../app/favoritesStore'
 import { useThemeState } from '../../shared/state/useThemeState'
 import { treeStore } from '../../features/memory/treeStore'
 import { nodeById } from '../../features/memory/browse'
-import { hashForNode } from '../../features/memory/location'
+import { hashForNode, parseHash, TENANT_SCOPE, PERSONAL_SCOPE } from '../../features/memory/location'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from '../../features/memory/tree'
 import type { MyTenant } from '../../api/generated/scopes'
 import ProfileMenu from './ProfileMenu.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 const { resolvedTheme } = useThemeState()
 const tenants = ref<MyTenant[]>([])
 
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
+
+// The active in-tenant space, from the URL's leading fragment token (token-less = the shared tenant space,
+// `~me` = personal — ADR 0019). Drives both which sidebar entry is highlighted and how favorite hashes build.
+const activeScope = computed(() => parseHash(route.hash).scope)
+const tenantActive = computed(() => activeScope.value === TENANT_SCOPE)
+const personalActive = computed(() => activeScope.value === PERSONAL_SCOPE)
+
+// The shared tenant space is labelled with the tenant's own name (membership metadata — no sealed name to
+// decrypt); falls back to a generic "Shared" until the tenant list resolves.
+const tenantLabel = computed(
+  () => tenants.value.find((tn) => tn.tenantId === activeSpace.tenantId)?.name ?? t('shell.shared'),
+)
 
 // The pinned Memories, resolved against the local decrypted tree (a favorite whose node is gone just drops).
 const favoriteMemories = computed(() =>
   [...favoritesStore.ids]
     .map((id) => nodeById(treeStore.nodes, id))
     .filter((n): n is TreeNode => !!n && n.kind === NodeKind.Memory)
-    .map((n) => ({ id: n.id, name: n.name, hash: hashForNode(treeStore.nodes, n.id) })),
+    .map((n) => ({ id: n.id, name: n.name, hash: hashForNode(treeStore.nodes, n.id, activeScope.value) })),
 )
 
 onMounted(async () => {
@@ -60,7 +73,7 @@ function switchTenant(tenant: MyTenant) {
 
 <template>
   <aside class="tenant-sidebar">
-    <RouterLink :to="{ name: 'home', hash: '#~me' }" class="sidebar-brand" aria-label="veyq Home">
+    <RouterLink :to="{ name: 'home', hash: '' }" class="sidebar-brand" aria-label="veyq Home">
       <img class="sidebar-brand-mark" :src="brandLogoUrl" alt="" aria-hidden="true" />
       <span>veyq</span>
     </RouterLink>
@@ -99,10 +112,31 @@ function switchTenant(tenant: MyTenant) {
       </div>
     </section>
 
-    <nav class="sidebar-nav" :aria-label="t('shell.personal')">
-      <RouterLink :to="{ name: 'home', hash: '#~me' }" class="sidebar-nav-link sidebar-personal-link">
-        <span class="pi pi-user" />
-        <span>{{ t('shell.personal') }}</span>
+    <nav class="sidebar-nav" :aria-label="t('shell.spaces')">
+      <!-- Both entries share the `/` path (only the fragment differs), so we drive the active class from the
+           leading token ourselves rather than RouterLink's path-based `router-link-active`. The shared tenant
+           space is the token-less home; Personal rides `#~me`. -->
+      <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: '' }" custom>
+        <a
+          :href="href"
+          class="sidebar-nav-link sidebar-tenant-space-link"
+          :class="{ 'router-link-active': tenantActive }"
+          @click="navigate"
+        >
+          <span class="pi pi-users" />
+          <span>{{ tenantLabel }}</span>
+        </a>
+      </RouterLink>
+      <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: '#~me' }" custom>
+        <a
+          :href="href"
+          class="sidebar-nav-link sidebar-personal-link"
+          :class="{ 'router-link-active': personalActive }"
+          @click="navigate"
+        >
+          <span class="pi pi-user" />
+          <span>{{ t('shell.personal') }}</span>
+        </a>
       </RouterLink>
     </nav>
 

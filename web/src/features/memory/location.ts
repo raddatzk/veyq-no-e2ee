@@ -1,31 +1,40 @@
-// Fragment-based content navigation (cr-0031). The current Memory tree position lives in the URL **#fragment**
-// — e.g. `#~me/reisen-2026/rom` — which the browser never sends to the server, so the operator-blind invariant
-// holds even though the path carries human-readable slugs. Everything here is pure + client-side: the slug path
-// is resolved against the locally-decrypted tree, and reverse-built from it. `~me` is the personal scope; the
-// `@group` form is reserved for the (later) groups slice — parsed, but only `~me` resolves today.
+// Fragment-based content navigation (cr-0031, cr-0075). The current Memory tree position lives in the URL
+// **#fragment** — e.g. `#~me/reisen-2026/rom` — which the browser never sends to the server, so the
+// operator-blind invariant holds even though the path carries human-readable slugs. Everything here is pure +
+// client-side: the slug path is resolved against the locally-decrypted tree, and reverse-built from it.
+//
+// The leading token selects the scope (ADR 0015 + ADR 0019): its **absence** is the shared **tenant** scope
+// (the token-less default home — `/`, `#urlaube`), `~me` is the personal scope, and the `@group` form is
+// reserved for the (later) groups slice — parsed, but only tenant/personal resolve today. `slugify` emits only
+// `[a-z0-9-]`, so a folder slug can never start with `~`/`@` and thus never collides with a scope token.
 import { slugify, type TreeNode } from './tree'
 
 export const PERSONAL_SCOPE = '~me'
+/** The token-less scope marker (ADR 0019): the absence of a leading `~me`/`@` token *is* the tenant selector. */
+export const TENANT_SCOPE = ''
 
 export type ContentLocation = { scope: string; segments: string[] }
 
-/** Parse a `location.hash` into a scope token + slug segments. Empty/`#` → the personal scope root. */
+/** Parse a `location.hash` into a scope token + slug segments. Empty/`#`/token-less → the tenant scope. */
 export function parseHash(hash: string): ContentLocation {
   const parts = hash
     .replace(/^#/, '')
     .split('/')
     .filter(Boolean)
     .map(decodeURIComponent)
-  if (parts.length === 0) return { scope: PERSONAL_SCOPE, segments: [] }
+  if (parts.length === 0) return { scope: TENANT_SCOPE, segments: [] }
   const [head, ...rest] = parts
-  // A leading scope token (`~me` / `@group`) selects the scope; anything else is a bare path under personal.
+  // A leading scope token (`~me` / `@group`) selects the scope; no token → the token-less tenant scope, and
+  // every part is a slug under the tenant root.
   if (head === PERSONAL_SCOPE || head.startsWith('@')) return { scope: head, segments: rest }
-  return { scope: PERSONAL_SCOPE, segments: parts }
+  return { scope: TENANT_SCOPE, segments: parts }
 }
 
-/** Build the fragment for a scope + slug path, e.g. `#~me/reisen-2026/rom`. */
+/** Build the fragment for a scope + slug path. Tenant is token-less (`#urlaube`, `''` at the root); `~me`/`@`
+ *  carry their leading token (`#~me/reisen-2026/rom`). */
 export function buildHash(scope: string, segments: string[]): string {
-  return `#${[scope, ...segments].map(encodeURIComponent).join('/')}`
+  const tokens = scope === TENANT_SCOPE ? segments : [scope, ...segments]
+  return tokens.length ? `#${tokens.map(encodeURIComponent).join('/')}` : ''
 }
 
 /**
@@ -54,7 +63,7 @@ export function slugPathOf(tree: TreeNode[], nodeId: string | null): string[] {
   return segments
 }
 
-/** The personal-scope fragment for a node (`null` → the root `#~me`). */
-export function hashForNode(tree: TreeNode[], nodeId: string | null): string {
-  return buildHash(PERSONAL_SCOPE, slugPathOf(tree, nodeId))
+/** The fragment for a node in the given scope (`null` → the scope root — `''` for tenant, `#~me` for personal). */
+export function hashForNode(tree: TreeNode[], nodeId: string | null, scope: string): string {
+  return buildHash(scope, slugPathOf(tree, nodeId))
 }

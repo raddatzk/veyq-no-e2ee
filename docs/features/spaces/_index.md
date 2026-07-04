@@ -14,7 +14,9 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   birth), [ADR 0009](../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant),
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) (group scopes + governance — private even
   from the tenant owner), [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md) (readable URLs in
-  the `#fragment`).
+  the `#fragment`), [ADR 0019](../../decisions/0019-token-less-tenant-home.md) (token-less tenant home),
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) (grant distribution — wrap a scope key to
+  another member).
 - **Note:** a **scope** is the unit content is keyed on (opaque `scopeId` + `kind`); a **grant** is how a
   member holds its key. The tenant's root scope is born at tenant activation
   ([cr-0010](../../../changes/cr-0010-tenant-activation.md)); this feature adds the **personal** scope and the
@@ -22,6 +24,10 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 
 ## Enablers
 
+- ★ [en.spaces.tenant-scope](enablers/en.spaces.tenant-scope.md) — **refined** (the shared root TENANT scope
+  **opened + entered** on the device — no birth, it already exists from activation; the token-less default home;
+  [ADR 0019](../../decisions/0019-token-less-tenant-home.md), building in
+  [cr-0075](../../../changes/cr-0075-web-enter-tenant-scope.md))
 - ★ [en.spaces.personal-scope](enablers/en.spaces.personal-scope.md) — **built** (the per-tenant PERSONAL
   scope born + opened, client-driven & operator-blind; the keyed container the content flows fill;
   [cr-0026](../../../changes/cr-0026-personal-scope.md))
@@ -32,7 +38,12 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 ## Use-cases
 
 - ★ [List & switch spaces](use-cases/uc.spaces.switch-spaces.md) — **built (web)** (tenant switcher +
-  per-space `#fragment` switching; [cr-0031](../../../changes/cr-0031-memory-shell-polish.md))
-- Create / share with a group — **in progress** (G1 `en.spaces.group-scope` in cr-0032; member-add G2,
-  management G3 — [ADR 0014](../../decisions/0014-group-scopes-and-governance.md))
+  per-space `#fragment` switching; [cr-0031](../../../changes/cr-0031-memory-shell-polish.md),
+  [cr-0075](../../../changes/cr-0075-web-enter-tenant-scope.md) enter-tenant + Personal↔Tenant)
+- ★ [Add a member to the shared tenant space](use-cases/uc.spaces.add-member.md) — **refined** (invite a
+  person, then wrap `K_SC` to their identity — the grant-distribution primitive;
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md); not yet built)
+- Create / share with a group — **in progress** (G1 `en.spaces.group-scope` in cr-0032; member-add G2 reuses
+  the [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) primitive, management G3 —
+  [ADR 0014](../../decisions/0014-group-scopes-and-governance.md))
 - Public share of a subtree — planned (per-share key; least-privilege; the sharing feature)

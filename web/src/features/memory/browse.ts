@@ -22,16 +22,16 @@ export function childrenOf(
 }
 
 /** The breadcrumb from the root down to `nodeId` (null = root): `[root, …ancestors, node]`, each crumb
- *  carrying its `#fragment` so the topbar can link to it. */
-export function breadcrumbOf(tree: TreeNode[], nodeId: string | null, rootName: string): Crumb[] {
+ *  carrying its `#fragment` in the active `scope` so the topbar can link to it. */
+export function breadcrumbOf(tree: TreeNode[], nodeId: string | null, rootName: string, scope: string): Crumb[] {
   const byId = new Map(tree.map((n) => [n.id, n]))
   const trail: Crumb[] = []
   let cur = nodeId ? byId.get(nodeId) ?? null : null
   while (cur) {
-    trail.unshift({ id: cur.id, name: cur.name, hash: hashForNode(tree, cur.id) })
+    trail.unshift({ id: cur.id, name: cur.name, hash: hashForNode(tree, cur.id, scope) })
     cur = cur.parentId ? byId.get(cur.parentId) ?? null : null
   }
-  trail.unshift({ id: null, name: rootName, hash: hashForNode(tree, null) })
+  trail.unshift({ id: null, name: rootName, hash: hashForNode(tree, null, scope) })
   return trail
 }
 

@@ -33,7 +33,9 @@ routes stay history-mode.**
 - The current Memory-tree position is encoded in `location.hash`: `#~me/reisen-2026/rom` (personal scope),
   `#@familie/sommer` (a group scope). The browser **never transmits the fragment** in an HTTP request — so the
   readable, name-derived slugs reach the operator **never**, while the path stays bookmarkable. `~me` is a
-  **constant** (zero leak); `@<group>` + the folder/Memory slugs live only in the fragment.
+  **constant** (zero leak); `@<group>` + the folder/Memory slugs live only in the fragment. **The token-less
+  fragment** (a bare `#urlaube`, and `/` at the root) selects the shared **`TENANT`** space — the default home,
+  pinned by [ADR 0019](0019-token-less-tenant-home.md) (this ADR left the token-less default unspecified).
 - **Resolution is local.** The client walks its **decrypted** tree, re-slugifying each child's name to match a
   segment — exactly the navigation the operator-blind server can't do. The server is never consulted to resolve
   a path; it only serves the per-scope opaque node rows ([ADR 0012](0012-content-key-hierarchy.md)).
