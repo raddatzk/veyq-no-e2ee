@@ -65,6 +65,11 @@ class TenantInviteEntity : PanacheEntityBase {
     @Column(name = "status", nullable = false, length = 16)
     lateinit var status: String
 
+    /** The role this invite grants on acceptance (cr-0077): OWNER cold-births the tenant, MEMBER joins it
+     *  grant-less. Defaults OWNER so pre-cr-0077 rows + the owner-invite flows are unchanged. */
+    @Column(name = "role", nullable = false, length = 16)
+    var role: String = OWNER
+
     @Column(name = "expires_at", nullable = false)
     lateinit var expiresAt: Instant
 
@@ -76,6 +81,10 @@ class TenantInviteEntity : PanacheEntityBase {
         const val SUPERSEDED = "SUPERSEDED"
         const val CONSUMED = "CONSUMED"
         const val EXPIRED = "EXPIRED"
+
+        /** Invite roles (mirror MembershipEntity roles): the role the invite confers on acceptance. */
+        const val OWNER = "OWNER"
+        const val MEMBER = "MEMBER"
 
         /** The terminal states a scheduled purge may physically delete. */
         val TERMINAL = listOf(SUPERSEDED, CONSUMED, EXPIRED)
@@ -109,8 +118,11 @@ class MembershipEntity : PanacheEntityBase {
     @Column(name = "role", nullable = false, length = 16)
     lateinit var role: String
 
-    @Column(name = "wrapped_grant", nullable = false)
-    lateinit var wrappedGrant: String
+    /** The scope key sealed to this member's identity public key — opaque ciphertext the server never opens.
+     *  **Nullable**: a *pending* member (cr-0076) holds a role but no grant yet until a key-holder delivers one
+     *  (grant-delivery job); a grant-less membership is the "hollow" state ADR 0007 blesses. */
+    @Column(name = "wrapped_grant")
+    var wrappedGrant: String? = null
 
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant

@@ -17,7 +17,12 @@ import { activeSpace, clearActiveSpace } from '../../app/activeSpace'
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
-  messages: { en: { shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', favorites: 'Favorites' } } },
+  messages: {
+    en: {
+      shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', favorites: 'Favorites' },
+      members: { awaitingAccess: 'Awaiting access' },
+    },
+  },
 })
 
 function makeRouter(): Router {
@@ -63,5 +68,19 @@ describe('AppSidebar space list', () => {
     const wrapper = await mountAt('#~me')
     expect(wrapper.get('.sidebar-personal-link').classes()).toContain('router-link-active')
     expect(wrapper.get('.sidebar-tenant-space-link').classes()).not.toContain('router-link-active')
+  })
+
+  it('surfaces "awaiting access" on the active tenant when the caller holds no grant yet (cr-0077)', async () => {
+    activeSpace.tenantUnavailable = true // a grant-less member fell back to Personal
+    const wrapper = await mountAt('')
+    const awaiting = wrapper.find('.sidebar-tenant-awaiting')
+    expect(awaiting.exists()).toBe(true)
+    expect(awaiting.text()).toContain('Awaiting access')
+  })
+
+  it('shows the domain (no awaiting badge) once the grant is delivered', async () => {
+    activeSpace.tenantUnavailable = false
+    const wrapper = await mountAt('')
+    expect(wrapper.find('.sidebar-tenant-awaiting').exists()).toBe(false)
   })
 })

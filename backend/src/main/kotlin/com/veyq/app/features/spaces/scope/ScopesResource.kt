@@ -6,6 +6,7 @@ import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MyTenant
 import com.veyq.app.generated.model.ScopeCreated
 import com.veyq.app.generated.model.ScopeKind
+import com.veyq.app.generated.model.ScopeMember
 import com.veyq.app.generated.model.ScopeSummary
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
@@ -55,6 +56,20 @@ class ScopesResource(
                 }).build()
             ListScopesOutcome.NoTenant ->
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
+        }
+
+    override fun listScopeMembers(scopeId: UUID): Response =
+        when (val outcome = handler.listMembers(identity.principal.name, scopeId.toString())) {
+            is ListMembersOutcome.Members -> Response.ok(
+                outcome.rows.map {
+                    ScopeMember(
+                        userId = UUID.fromString(it.userId), displayName = it.displayName, email = it.email,
+                        role = it.role, identityPublicKey = it.identityPublicKey, hasGrant = it.hasGrant,
+                    )
+                },
+            ).build()
+            ListMembersOutcome.Forbidden ->
+                Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_member")).build()
         }
 
     override fun listMyTenants(): Response =

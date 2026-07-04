@@ -1,7 +1,7 @@
 ---
 id: cr-0077
 title: Add a member to the shared Tenant space — invite + onboard (grant delivery via cr-0076)
-status: planned
+status: done
 satisfies: [uc.spaces.add-member]
 adrs: ["0020", "0021", "0007", "0006"]
 invariants: [operator-blind-e2ee]
@@ -43,29 +43,31 @@ Authenticity is **Plain** in v1 (the fingerprint/TOFU seam is documented, not bu
 
 ## Phases
 
-- [ ] 1 contracts — extend the tenant invite with a **`role` (MEMBER)** on mint + accept/register; add a
+- [x] 1 contracts — extend the tenant invite with a **`role` (MEMBER)** on mint + accept/register; add a
   **member directory** read (`GET /api/scopes/{scopeId}/members` → memberships + identity pubkey + grant-present)
   for the owner UI. · Done when: contracts lint green; generated clients build on backend + web.
-- [ ] 2 backend — mint a **MEMBER invite** (owner-gated); **cold-birth registration** as a regular MEMBER (extend
+- [x] 2 backend — mint a **MEMBER invite** (owner-gated); **cold-birth registration** as a regular MEMBER (extend
   `registerAndAccept` with the role) → a **grant-less membership** (which cr-0076 picks up as a `grant-delivery`
   job); the **member directory** query (owner-gated). · Done when: `./gradlew -p backend check` green; tests
   cover an owner minting a MEMBER invite, an invitee registering as a grant-less MEMBER, the `grant-delivery` job
   being enqueued, and the directory listing pending members.
-- [ ] 3 http — a signed end-to-end (`http/spaces/add-member.http`): owner invites (MEMBER) → invitee registers →
-  grant-less membership + job → (cr-0076 worker) delivers → the member holds a grant. · Done when: the `.http`
-  response-handler assertions pass against a fresh instance.
-- [ ] 4 web — the owner's **"add member"** UI (invite by email); the **"awaiting access"** surfacing on the
+- [~] 3 http — **deferred by request.** A bare `.http` cannot cold-birth a real MEMBER (the ML-KEM identity +
+  the scope-grant wrap need the client crypto suite the `_lib` signing harness lacks — the same wall cr-0076 and
+  `content.http` hit). The full owner-invites → invitee-registers → grant-less-membership → delivered loop is
+  proven end-to-end at the integration layer (`MemberAddSliceTest` + `TasksSliceTest`, over the HTTP stack). A
+  scripted `add-member.http` follows if/when the harness gains an ML-KEM wrap.
+- [x] 4 web — the owner's **"add member"** UI (invite by email); the **"awaiting access"** surfacing on the
   Tenant entry for a grant-less member (reuses the cr-0075 Personal fallback + an `unavailable`/`pending` flag);
   the owner's **member directory** view. The member reaching the Tenant once granted is already cr-0075 +
   cr-0076's worker. i18n EN+DE for the new labels. · Done when: `npm run check` green; component tests cover the
   invite form and the awaiting-access surfacing.
-- [ ] 5 coverage — fill the **onboarding criteria** of
+- [x] 5 coverage — fill the **onboarding criteria** of
   [uc.spaces.add-member.yaml](../docs/coverage/features/spaces/use-cases/uc.spaces.add-member.yaml)
   (`member-invite-and-onboard`, `scope-member-directory`, the admission side of `admission-vs-delivery`) with
   backend/http/web refs; with cr-0076's delivery criteria now also filled, **drop `status: planned`**; note
   apple/android as gaps (web-first). · Done when: `validate_coverage.py`, `validate_changes.py`,
   `validate_doc_links.py` green.
-- [ ] 6 verify (browser smoke) — live stack: the **owner** invites a second person by email → they register →
+- [x] 6 verify (browser smoke) — live stack: the **owner** invites a second person by email → they register →
   land in **Personal** (Tenant "awaiting access") → a key-holder's client **auto-delivers** the grant (cr-0076,
   first-online-wins) → they now open the shared **Tenant** space. · Done when: confirmed with 1–2 screenshots.
 
@@ -73,8 +75,8 @@ Authenticity is **Plain** in v1 (the fingerprint/TOFU seam is documented, not bu
 
 | Surface | Invite + onboard a member, surface awaiting-access | Status |
 |---|---|---|
-| backend / http | MEMBER invite + cold-birth membership + member directory | ◻ this CR |
-| web | "add member" UI + awaiting-access + directory view | ◻ this CR |
+| backend / http | MEMBER invite + cold-birth membership + member directory | ☑ backend (http e2e deferred) |
+| web | "add member" UI + awaiting-access + directory view | ☑ this CR |
 | apple / android | native invite/directory UI | ◻ **deferred (web-first; own CRs)** |
 
 ## Definition of done
@@ -89,4 +91,34 @@ confirmed with screenshots.
 
 ## Retrospective
 
-_(to be written at close)_
+Built as specified; the human-facing half of member-add now rides cr-0076's delivery mechanism end-to-end.
+
+- **Endpoint split honours the tenant-vs-group axis.** The MEMBER invite is its own tenant-pathed, tenant-owner-
+  gated endpoint (`POST /api/tenants/{tenantId}/member-invites`) — deliberately **not** folded into create-tenant
+  (Server-Owner) — so the later *group* member-add stays a distinct scope-based `POST …/members` over an existing
+  tenant member (no email onboarding). The member **directory** (`GET /api/scopes/{scopeId}/members`) is scope-
+  generic and reused for both. Admission is owner-gated; the directory is any key-holder's (a uniform 403 for a
+  non-member also avoids scope enumeration).
+- **Accept is role-branched, not duplicated.** `accept` / `registerAndAccept` read the invite's role: OWNER
+  cold-births the scope + requires a grant (unchanged); MEMBER joins the ACTIVE tenant **grant-less** (no scope
+  birth, no grant), which cr-0076 reconciles into a `grant-delivery` job. One correctness fix fell out: the
+  account/email checks now use the **invite's** email, not the tenant owner's — they differ for a member invite.
+- **The worker got wired in.** cr-0076 built `runGrantDeliveryWorker` but never triggered it; `enterScope` now
+  fires it (best-effort) on entering a shared scope, so any key-holder delivers automatically on next entry —
+  the load-bearing glue for first-online-wins.
+- **Live smoke passed end-to-end** (Phase 6): owner logs in → **Members** panel (directory + owner-gated invite)
+  → invites `partner@veyq.test` (backend mints the MEMBER invite) → the invitee opens the link and **cold-
+  registers grant-less** (DB: `MEMBER, grant-less`) → the owner re-enters the Tenant and their client **auto-
+  delivers** (DB: `DELIVERED`, job `02f271ff DONE`) → the owner's directory shows the member **Aktiv** → the
+  member logs in and **opens the shared Tenant space** (no awaiting-access). Screenshots captured. `./gradlew -p
+  backend check` + `npm run check` green; the three validators green.
+
+**Deviations (honest):**
+- **Phase 3 (http) deferred by request** — and blocked anyway by the same ML-KEM wall cr-0076 hit (a bare `.http`
+  can't cold-birth a real member). The full loop is proven by `MemberAddSliceTest` + `TasksSliceTest` over the
+  HTTP stack, and now by the live browser smoke.
+- **Making the accept flow role-aware surfaced a copy gap, now closed:** the join page's crypto path was fixed
+  for a MEMBER (no grant), and its *copy* — which had read owner-flavoured ("take ownership") — is now role-aware
+  too. A `jcopy(base)` helper in `TenantJoinView` picks the `<base>Member` i18n variant when the invite role is
+  MEMBER (EN+DE added for invitedTo / registerSub / join / signinSub / signinReadySub / done / doneNote), so a
+  member reads "join the shared space" and that access is delivered once a member is online.

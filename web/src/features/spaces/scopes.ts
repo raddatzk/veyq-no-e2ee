@@ -8,7 +8,9 @@ import { withRefresh } from '../account/login/login'
 import { identityPrivate } from '../../app/vault'
 import { ScopeKind, type ScopeSummary, type MyTenant } from '../../api/generated/scopes'
 
-const SCOPE_GRANT = 'scope-grant'
+/** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020). Shared with the grant-delivery worker, which
+ *  wraps `K_SC` to a *foreign* identity under the very same context (cr-0076). */
+export const SCOPE_GRANT = 'scope-grant'
 
 /** The caller's scopes in the active tenant (each with their own grant ciphertext). */
 export async function listMyScopes(): Promise<ScopeSummary[]> {

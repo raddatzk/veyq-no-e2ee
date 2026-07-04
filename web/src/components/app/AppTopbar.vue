@@ -10,9 +10,20 @@ import Breadcrumb from 'primevue/breadcrumb'
 import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
 import UploadStatusMenu from '../../features/memory/components/UploadStatusMenu.vue'
+import { useThemeState, setThemePreference, type ThemePreference } from '../../shared/state/useThemeState'
 
 const { t } = useI18n()
 const router = useRouter()
+
+// Theme is a frequent one-tap quick toggle → it lives here in the top bar (cr-0078 follow-up); language, which
+// grows more options, stays in the profile menu + the settings hub, not here. Cycles system → light → dark.
+const { themePreference } = useThemeState()
+const THEME_CYCLE: ThemePreference[] = ['system', 'light', 'dark']
+const themeIcon = computed(
+  () => ({ system: 'pi pi-desktop', light: 'pi pi-sun', dark: 'pi pi-moon' })[themePreference.value],
+)
+const cycleTheme = () =>
+  setThemePreference(THEME_CYCLE[(THEME_CYCLE.indexOf(themePreference.value) + 1) % THEME_CYCLE.length])
 
 const home = computed<MenuItem>(() => ({
   label: breadcrumb.trail[0]?.name,
@@ -37,7 +48,43 @@ const items = computed<MenuItem[]>(() =>
       </label>
     </div>
     <div class="workspace-topbar-actions">
+      <button
+        type="button"
+        class="topbar-icon-button"
+        :aria-label="t('shell.theme')"
+        :title="t('shell.theme')"
+        @click="cycleTheme"
+      >
+        <span :class="themeIcon" />
+      </button>
       <UploadStatusMenu />
+      <button
+        type="button"
+        class="topbar-icon-button"
+        :aria-label="t('settings.title')"
+        :title="t('settings.title')"
+        @click="router.push('/settings')"
+      >
+        <span class="pi pi-cog" />
+      </button>
     </div>
   </header>
 </template>
+
+<style scoped>
+.topbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.topbar-icon-button:hover {
+  background: var(--p-content-hover-background, rgba(127, 127, 127, 0.08));
+}
+</style>

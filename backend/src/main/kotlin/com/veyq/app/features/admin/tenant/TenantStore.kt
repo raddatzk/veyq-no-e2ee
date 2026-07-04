@@ -1,6 +1,7 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.features.spaces.scope.ScopeEntity
+import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -60,6 +61,58 @@ class TenantStore {
         }.persist()
         TenantEntity.update("status = ?1 where id = ?2", TenantEntity.ACTIVE, tenantId)
         TenantInviteEntity.update("status = ?1 where id = ?2", TenantInviteEntity.CONSUMED, inviteId)
+    }
+
+    /**
+     * Join an **already-active** tenant as a grant-less MEMBER (cr-0077): record a hollow membership (role, no
+     * grant) on the existing TENANT scope — **no** scope birth, **no** tenant status change — and consume the
+     * invite. Creating the grant-less membership is what cr-0076 reconciles into a `grant-delivery` job; a
+     * key-holder then wraps `K_SC` to this member. Idempotent-friendly: the caller checks membership first.
+     */
+    @Transactional
+    fun joinAsMember(tenantId: String, userId: String, inviteId: String) {
+        MembershipEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            this.tenantId = tenantId
+            scopeId = tenantId // the TENANT root scope is keyed id == tenantId (cr-0026)
+            role = MembershipEntity.MEMBER
+            wrappedGrant = null // grant-less: delivered later by a key-holder (cr-0076)
+            createdAt = Instant.now()
+        }.persist()
+        TenantInviteEntity.update("status = ?1 where id = ?2", TenantInviteEntity.CONSUMED, inviteId)
+    }
+
+    /** Mark an invite CONSUMED without side effects (the member was already in the tenant — idempotent accept). */
+    @Transactional
+    fun consumeInvite(inviteId: String) {
+        TenantInviteEntity.update("status = ?1 where id = ?2", TenantInviteEntity.CONSUMED, inviteId)
+    }
+
+    /** Whether the user holds any membership in the tenant. */
+    fun hasMembership(userId: String, tenantId: String): Boolean =
+        MembershipEntity.count("userId = ?1 and tenantId = ?2", userId, tenantId) > 0
+
+    /** Whether the user holds the OWNER membership of the tenant (the admission gate for member invites). */
+    fun isOwner(userId: String, tenantId: String): Boolean =
+        MembershipEntity.count(
+            "userId = ?1 and tenantId = ?2 and role = ?3", userId, tenantId, MembershipEntity.OWNER,
+        ) > 0
+
+    /** Whether some account with this email is already a member of the tenant (dedup on member invite). */
+    fun isEmailMember(tenantId: String, email: String): Boolean {
+        val userId = VeyqUser.find("email", email).firstResult()?.id ?: return false
+        return hasMembership(userId, tenantId)
+    }
+
+    /** Mint a single-use MEMBER invite on an active tenant, superseding any prior ACTIVE invite to that email. */
+    @Transactional
+    fun mintMemberInvite(tenantId: String, email: String, tokenHash: String, expiresAt: Instant) {
+        TenantInviteEntity.update(
+            "status = ?1 where tenantId = ?2 and ownerEmail = ?3 and status = ?4",
+            TenantInviteEntity.SUPERSEDED, tenantId, email, TenantInviteEntity.ACTIVE,
+        )
+        mintInvite(tenantId, email, tokenHash, expiresAt, Instant.now(), TenantInviteEntity.MEMBER)
     }
 
     /** Create a PENDING tenant with its first ACTIVE invite. Returns the new tenant id + invite expiry. */
@@ -149,13 +202,17 @@ class TenantStore {
             TenantInviteEntity.TERMINAL, cutoff,
         )
 
-    private fun mintInvite(tenantId: String, ownerEmail: String, tokenHash: String, expiresAt: Instant, now: Instant) {
+    private fun mintInvite(
+        tenantId: String, ownerEmail: String, tokenHash: String, expiresAt: Instant, now: Instant,
+        role: String = TenantInviteEntity.OWNER,
+    ) {
         TenantInviteEntity().apply {
             id = UUID.randomUUID().toString()
             this.tenantId = tenantId
             this.ownerEmail = ownerEmail
             this.tokenHash = tokenHash
             status = TenantInviteEntity.ACTIVE
+            this.role = role
             this.expiresAt = expiresAt
             createdAt = now
         }.persist()

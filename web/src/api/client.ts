@@ -14,6 +14,7 @@ import { Configuration as TenantsConfiguration, TenantsApi } from './generated/t
 import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
 import { ContentApi, FavoritesApi, Configuration as ContentConfiguration } from './generated/content'
 import { MediaApi, Configuration as MediaConfiguration } from './generated/media'
+import { TasksApi, Configuration as TasksConfiguration } from './generated/tasks'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -63,4 +64,8 @@ export function favoritesApi(): FavoritesApi {
 
 export function mediaApi(): MediaApi {
   return new MediaApi(new MediaConfiguration(bearerParams()))
+}
+
+export function tasksApi(): TasksApi {
+  return new TasksApi(new TasksConfiguration(bearerParams()))
 }

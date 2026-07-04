@@ -1,7 +1,7 @@
 ---
 id: cr-0076
 title: Operator-blind background-task mechanism (pull queue + grant-delivery as the first job)
-status: planned
+status: done
 satisfies: []            # cross-cutting infra — realizes docs/crosscutting/background-tasks.md (ADR 0021); no standalone use-case
 adrs: ["0021", "0020"]
 invariants: [operator-blind-e2ee]
@@ -47,12 +47,12 @@ membership**. Transcode/ML job types, the SSE push channel, a presence table, an
 
 ## Phases
 
-- [ ] 1 contracts — a `tasks.openapi.yaml`: the job envelope + **`POST /api/tasks/claim`** (send capability tags
+- [x] 1 contracts — a `tasks.openapi.yaml`: the job envelope + **`POST /api/tasks/claim`** (send capability tags
   → atomically lease one claimable job), **`/heartbeat`** (extend the lease), **`/complete`** (mark done +
   optional `sealedResult`), **`/fail`** (attempts++/dead-letter), and **`/enqueue`** (client-originated jobs).
   The **capability-tag registry** as a shared, versioned artifact under `contracts/` (first tag: `grant-delivery`).
   · Done when: contracts lint green; generated clients build on backend + web.
-- [ ] 2 backend — the **job table** + atomic claim (`SKIP LOCKED`) + lease/TTL/heartbeat + **lazy reclaim**
+- [x] 2 backend — the **job table** + atomic claim (`SKIP LOCKED`) + lease/TTL/heartbeat + **lazy reclaim**
   (`leased ∧ expiry<now` is claimable) + `attempts`/max → **dead-letter**; the blind envelope (cleartext
   `scopeId`/opaque `capabilityTag`/`resourceRef`; sealed body); the **buy-vs-build** decision resolved here; the
   **`grant-delivery` job type** — **origination** (a grant-less TENANT/GROUP membership ⇒ enqueue a job carrying
@@ -60,23 +60,23 @@ membership**. Transcode/ML job types, the SSE push channel, a presence table, an
   membership, **idempotent**). Claim is gated on scope membership; grant completion by **any** member (delivery).
   · Done when: `./gradlew -p backend check` green; tests cover atomic claim, lease-expiry reclaim, dead-letter,
   and `grant-delivery` originated on a **seeded grant-less membership** + completed idempotently by posting a wrap.
-- [ ] 3 http — a signed happy-path (`http/tasks/…`): seed a grant-less membership → a `grant-delivery` job is
+- [x] 3 http — a signed happy-path (`http/tasks/…`): seed a grant-less membership → a `grant-delivery` job is
   claimable → claim → (sign a foreign-identity wrap) → complete → the membership now holds a grant; plus
   heartbeat/fail/dead-letter assertions. · Done when: the `.http` response-handler assertions pass against a
   fresh instance.
-- [ ] 4 web — the **client worker loop**: on scope entry (+ a light poll) the client **claims** `grant-delivery`
+- [x] 4 web — the **client worker loop**: on scope entry (+ a light poll) the client **claims** `grant-delivery`
   jobs for its scopes, unseals, **wraps `K_SC` to the target pubkey** (`asymWrap` to a foreign identity — new in
   the client), and **completes** (idempotent, first-online-wins). Reuses the cr-0075 open scope (the client
   already holds `K_SC`). · Done when: `npm run check` green; unit tests — the worker claims a `grant-delivery`
   job, produces a foreign-identity wrap that `asymUnwrap`s to the same `K_SC`, completes, and no-ops when the
   member is already granted.
-- [ ] 5 coverage — map the delivery tests to the **delivery criteria** of
+- [x] 5 coverage — map the delivery tests to the **delivery criteria** of
   [uc.spaces.add-member](../docs/coverage/features/spaces/use-cases/uc.spaces.add-member.yaml)
   (`wrap-to-foreign-grant`, `additive-async-no-revocation`, and the delivery side of `admission-vs-delivery`);
   keep the onboarding criteria (`member-invite-and-onboard`, `scope-member-directory`) as **gaps → cr-0077**;
   the file stays `status: planned`. · Done when: `validate_coverage.py`, `validate_changes.py`,
   `validate_doc_links.py` green.
-- [ ] 6 verify — the http/backend end-to-end above proves the loop (seed pending membership → job → worker wraps
+- [x] 6 verify — the http/backend end-to-end above proves the loop (seed pending membership → job → worker wraps
   → grant delivered → the member opens). A live web smoke lands with [cr-0077](cr-0077-member-add-onboarding.md).
   · Done when: the seeded flow is confirmed green.
 
@@ -84,8 +84,8 @@ membership**. Transcode/ML job types, the SSE push channel, a presence table, an
 
 | Surface | The mechanism + the grant-delivery worker | Status |
 |---|---|---|
-| backend / http | job store + claim/lease + `grant-delivery` origination & completion | ◻ this CR |
-| web | the client worker loop (claim → wrap `K_SC` → complete) | ◻ this CR |
+| backend / http | job store + claim/lease + `grant-delivery` origination & completion | ☑ this CR |
+| web | the client worker loop (claim → wrap `K_SC` → complete) | ☑ this CR |
 | apple / android | native worker loop | ◻ **deferred (web-first; own CRs)** |
 
 ## Definition of done
@@ -100,4 +100,34 @@ green; the delivery criteria of `uc.spaces.add-member` covered; the three doc va
 
 ## Retrospective
 
-_(to be written at close)_
+Built as specified; two design points were sharpened against the code rather than the plan:
+
+- **Buy-vs-build → the DB's own primitive, not a job framework.** JobRunr / db-scheduler run jobs *on the
+  server*, which a blind veyq server cannot do (it holds no key). The workers are **remote key-holders that pull
+  over HTTP**, so the claim is a portable **compare-and-set on `status`** (read a claimable candidate → guarded
+  `UPDATE … WHERE id=? AND status=<prior>`; first writer wins). It runs identically on the H2 test DB and
+  MariaDB, so `./gradlew check` exercises the real claim path; MariaDB `SKIP LOCKED` stays an optional
+  throughput layer, not a correctness dependency. Recorded in [background-tasks.md](../docs/crosscutting/background-tasks.md#persistence).
+- **grant-delivery has no sealed body; the target rides the claim.** The server *originates* this structural
+  job, so it cannot seal a `K_SC` body — and does not need to: everything the worker needs is server-known
+  operational metadata. `resourceRef` = the target membership id; the claim resolves the target's userId +
+  identity pubkey server-side (no key). `sealedBody` stays the generic extension point for later
+  client-originated content jobs. Origination is **reconcile-on-claim** (a key-holder pulling its scope
+  materialises jobs for grant-less members) with a `@Scheduled` backstop.
+- **Two small enablers the codebase lacked:** `MembershipEntity.wrapped_grant` made **nullable** (the hollow
+  "pending member" state ADR 0007 blesses; V21 rebuilds the table — no portable ALTER-nullability across
+  H2+MariaDB) and `listMine` now skips grant-less memberships (they stay in the Personal fallback); and a
+  `deserializeIdentityPublic` inverse in the web crypto suite, so the client can wrap `K_SC` to a **foreign**
+  identity (the first such wrap). A `scopeId` filter was added to `claim` so a worker holding one opened scope's
+  key is never handed a job for a scope whose key it lacks.
+
+**Deviation from the plan (Phase 3/5, honest):** the CR asked for a full grant-delivery *signed happy-path* in
+`http/` and for `uc.spaces.add-member` to stay `status: planned`. A bare `.http` **cannot** produce a real
+scope grant — that needs the ML-KEM `asymWrap`, which the `_lib` signing harness (Ed25519/X25519 only) lacks —
+the exact wall `content.http` already hit. So, per the repo's established convention, `http/tasks/tasks.http`
+covers the wire-reproducible half (auth boundary, validation, no-grant→204, non-member→403, unknown-job→404,
+**verified green live via ijhttp against a fresh Docker instance**), and the full claim→wrap→deliver loop is
+proven end-to-end by `TasksSliceTest` (seeds the grant-less membership in-tx, drives it over the HTTP stack).
+The coverage file is kept `status: planned` (the onboarding criteria remain gaps → cr-0077) but its **three
+delivery criteria are now mapped** — a partially-covered planned file, which `validate_coverage.py` permits.
+The live web smoke lands with [cr-0077](cr-0077-member-add-onboarding.md).

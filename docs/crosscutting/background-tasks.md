@@ -67,9 +67,18 @@ self-hosted makes it moot). Keyed-per-scope tags remain a seam for future low-fo
 
 ## Persistence
 
-The queue/claim/lease machinery is **bought, not built** — a maintained JVM/DB job library or MariaDB
-`SKIP LOCKED` directly (chosen at CR time). Only the **blind layer** (envelope, key-eligibility, sealed
-body/result, the tag registry) is veyq-specific, kept a thin decoupled module (extraction-ready, not extracted).
+The queue/claim/lease machinery is **bought, not built** — but the "buy" here is the **DB's own atomic
+primitive**, not a job framework. **Resolved (cr-0076):** the workers are *remote key-holders that pull over
+HTTP* (interactive clients + the later agent), so a server-side execution framework (JobRunr, db-scheduler)
+does **not** fit — those run jobs *on the server*, which is exactly what a blind veyq server cannot do (it
+holds no key). The claim is therefore a thin, portable **compare-and-set on `status`** (read a claimable
+candidate → `UPDATE … WHERE id=? AND status=<prior>`; first writer wins, losers retry). It behaves identically
+on the **H2 test DB** and **MariaDB**, so `./gradlew check` exercises the real claim path; MariaDB's
+`FOR UPDATE SKIP LOCKED` (≥10.6) stays available as a throughput optimisation layered on top if contention ever
+warrants it, but is **not** required for correctness. `attempts` is incremented on each (re)claim so a crashed
+worker's job is lazily reclaimed and, once it reaches `max_attempts`, dead-lettered. Only the **blind layer**
+(envelope, key-eligibility, sealed body/result, the tag registry) is veyq-specific, kept a thin decoupled
+module (extraction-ready, not extracted).
 
 ## Consumers
 

@@ -327,6 +327,20 @@ export function fingerprint(pub: Identity['pub']): string {
 export const serializeIdentityPrivate = (id: Identity): Uint8Array =>
   concat(lp(id.priv.kemX), lp(id.priv.mlkemSeed), lp(id.priv.sign))
 
+/** Inverse of serializeIdentityPublic: read three length-prefixed fields → a public identity bundle. Used to
+ *  wrap a scope key to *another* member's published identity (asymWrap to a foreign identity — cr-0076). */
+export function deserializeIdentityPublic(bytes: Uint8Array): Identity['pub'] {
+  let o = 0
+  const next = (): Uint8Array => {
+    const len = new DataView(bytes.buffer, bytes.byteOffset + o, 4).getUint32(0, false)
+    o += 4
+    const v = bytes.slice(o, o + len)
+    o += len
+    return v
+  }
+  return { kemX: next(), kemM: next(), sign: next() }
+}
+
 /** Inverse of serializeIdentityPrivate: read three length-prefixed fields. */
 export function deserializeIdentityPrivate(bytes: Uint8Array): Identity['priv'] {
   let o = 0

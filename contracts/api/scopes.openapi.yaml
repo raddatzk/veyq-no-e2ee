@@ -120,6 +120,63 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_found }
 
+  /api/scopes/{scopeId}/members:
+    get:
+      tags: [scopes]
+      operationId: listScopeMembers
+      summary: List a scope's members with their identity public keys + grant status (the member directory).
+      description: >
+        Returns every membership in the scope — each member's `userId`, `role`, **identity public key**, and
+        whether they already hold a grant (`hasGrant`: granted vs. *pending*). The directory a key-holder uses
+        to add + track members (uc.spaces.add-member, ADR 0020): the pending members are the ones a
+        `grant-delivery` job will wrap `K_SC` to. Operator-blind — the server returns only already-stored
+        operational metadata (pubkeys/roles/grant-present), **never** a scope key; and it is scoped to *this
+        scope's own members*, not a global user search. Any key-holder in the scope may read it (authorization
+        is enforced by code, not this spec, ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scopeId
+          in: path
+          required: true
+          description: Opaque id of the scope whose members to list.
+          schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
+      responses:
+        "200":
+          description: The scope's members.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ScopeMember" }
+              example:
+                - userId: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+                  role: OWNER
+                  identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
+                  hasGrant: true
+                - userId: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
+                  role: MEMBER
+                  identityPublicKey: bWVtYmVyLXB1YmxpYy1rZXk=
+                  hasGrant: false
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not hold a grant in this scope (only a key-holder may list its members).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_scope_member }
+        "404":
+          description: No such scope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: scope_not_found }
+
   /api/scopes/my-tenants:
     get:
       tags: [scopes]
@@ -218,6 +275,44 @@ components:
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
         kind:
           $ref: "#/components/schemas/ScopeKind"
+
+    ScopeMember:
+      type: object
+      required: [userId, displayName, email, role, identityPublicKey, hasGrant]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Opaque id of the member.
+          example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+        displayName:
+          type: string
+          description: The member's display name (server-visible identity metadata) — so the directory is human-readable.
+          maxLength: 100
+          example: Partner
+        email:
+          type: string
+          description: The member's email (server-visible metadata) — lets the owner correlate a pending member to their invite.
+          maxLength: 254
+          example: partner@example.com
+        role:
+          type: string
+          description: The member's role in the scope (OWNER / ADMIN / MEMBER).
+          maxLength: 16
+          example: MEMBER
+        identityPublicKey:
+          type: string
+          description: >
+            The member's identity public key bundle (opaque base64) — a key-holder wraps `K_SC` to it to
+            deliver a grant. Operational metadata the server already stores; exposing it to a fellow member
+            never yields a scope key.
+          contentEncoding: base64
+          maxLength: 8192
+          example: bWVtYmVyLXB1YmxpYy1rZXk=
+        hasGrant:
+          type: boolean
+          description: True if the member already holds a grant (a key-holder); false = pending, awaiting delivery.
+          example: false
 
     ScopeSummary:
       type: object

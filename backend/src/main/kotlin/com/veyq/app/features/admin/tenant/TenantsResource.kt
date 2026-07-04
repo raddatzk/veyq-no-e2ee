@@ -5,7 +5,10 @@ import com.veyq.app.generated.model.AcceptInviteRequest
 import com.veyq.app.generated.model.AcceptPreviewRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.generated.model.InviteRole
 import com.veyq.app.generated.model.InviteStatus
+import com.veyq.app.generated.model.MemberInviteRequest
+import com.veyq.app.generated.model.MemberInviteState
 import com.veyq.app.generated.model.ReassignOwnerRequest
 import com.veyq.app.generated.model.InvitePreview
 import com.veyq.app.generated.model.RegisterAndAcceptRequest
@@ -69,6 +72,21 @@ class TenantsResource(
             RevokeOutcome.NotPending -> conflict("tenant_not_pending")
         }
 
+    // Member invite (cr-0077): NOT Server-Owner — the tenant OWNER admits members. @Authenticated overrides the
+    // class gate; the owner-membership check lives in the handler (403 not_tenant_owner).
+    @Authenticated
+    override fun inviteTenantMember(tenantId: UUID, memberInviteRequest: MemberInviteRequest): Response =
+        when (val outcome = handler.inviteMember(identity.principal.name, tenantId.toString(), memberInviteRequest.email)) {
+            is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc()),
+            ).build()
+            MemberInviteOutcome.NotFound -> notFound()
+            MemberInviteOutcome.NotOwner -> Response.status(Response.Status.FORBIDDEN)
+                .entity(ErrorResponse(code = "not_tenant_owner")).build()
+            MemberInviteOutcome.NotActive -> conflict("tenant_not_active")
+            MemberInviteOutcome.AlreadyMember -> conflict("already_member")
+        }
+
     // --- Slice B (cr-0010): invite acceptance / activation. Method-level annotations override the class
     // @RolesAllowed: preview + register are @PermitAll (secret-gated), accept is @Authenticated (any user;
     // the email-match is a domain check, not the Server-Owner role).
@@ -82,6 +100,7 @@ class TenantsResource(
                     domain = outcome.domain,
                     ownerEmail = outcome.ownerEmail,
                     hasAccount = outcome.hasAccount,
+                    role = InviteRole.valueOf(outcome.role),
                 ),
             ).build()
             PreviewOutcome.NotFound -> inviteNotFound()
@@ -102,6 +121,7 @@ class TenantsResource(
             AcceptOutcome.NotInvitedOwner -> Response.status(Response.Status.FORBIDDEN)
                 .entity(ErrorResponse(code = "not_invited_owner")).build()
             AcceptOutcome.AlreadyActive -> conflict("tenant_not_pending")
+            AcceptOutcome.MissingGrant -> badRequest()
         }
 
     @PermitAll
@@ -125,6 +145,7 @@ class TenantsResource(
             RegisterAcceptOutcome.NotFound -> inviteNotFound()
             RegisterAcceptOutcome.NoLongerValid -> inviteGone()
             RegisterAcceptOutcome.EmailTaken -> conflict("email_taken")
+            RegisterAcceptOutcome.MissingGrant -> badRequest()
         }
     }
 
@@ -156,6 +177,9 @@ class TenantsResource(
 
     private fun notFound() = Response.status(Response.Status.NOT_FOUND)
         .entity(ErrorResponse(code = "tenant_not_found")).build()
+
+    private fun badRequest() = Response.status(Response.Status.BAD_REQUEST)
+        .entity(ErrorResponse(code = "invalid_request")).build()
 
     private fun conflict(code: String) = Response.status(Response.Status.CONFLICT)
         .entity(ErrorResponse(code = code)).build()

@@ -1,0 +1,33 @@
+package com.veyq.app.features.tasks
+
+import jakarta.enterprise.context.ApplicationScoped
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import java.time.Duration
+
+/**
+ * Use-case logic for the background-task pull queue (ADR 0021, cr-0076). Thin over [TasksStore]; it owns the
+ * lease TTL + max-attempts policy (config) and passes them down. Eligibility ("holds the scope key") and the
+ * atomic claim/lease live in the store; operator-blindness is structural — nothing here interprets a body.
+ */
+@ApplicationScoped
+class TasksHandler(
+    private val store: TasksStore,
+    @param:ConfigProperty(name = "veyq.tasks.lease.ttl", defaultValue = "PT5M") private val leaseTtl: Duration,
+    @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
+) {
+
+    fun claim(userId: String, tags: List<String>, scopeFilter: String?): ClaimedJobView? =
+        store.claim(userId, tags, scopeFilter, leaseTtl, maxAttempts)
+
+    fun heartbeat(userId: String, jobId: String): HeartbeatResult =
+        store.heartbeat(userId, jobId, leaseTtl)
+
+    fun complete(userId: String, jobId: String, sealedResult: String?): CompleteResult =
+        store.complete(userId, jobId, sealedResult)
+
+    fun fail(userId: String, jobId: String): FailResult =
+        store.fail(userId, jobId)
+
+    fun enqueue(userId: String, scopeId: String, capabilityTag: String, resourceRef: String?, sealedBody: String?): String? =
+        store.enqueue(userId, scopeId, capabilityTag, resourceRef, sealedBody, maxAttempts)
+}

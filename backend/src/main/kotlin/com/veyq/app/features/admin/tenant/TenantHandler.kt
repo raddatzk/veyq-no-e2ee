@@ -27,6 +27,15 @@ sealed interface RevokeOutcome {
     data object NotPending : RevokeOutcome
 }
 
+/** Result of a tenant owner inviting a member by email (cr-0077). */
+sealed interface MemberInviteOutcome {
+    data class Done(val invite: InviteView) : MemberInviteOutcome
+    data object NotFound : MemberInviteOutcome
+    data object NotOwner : MemberInviteOutcome
+    data object NotActive : MemberInviteOutcome
+    data object AlreadyMember : MemberInviteOutcome
+}
+
 /**
  * Server-Owner tenant administration, structural half (uc.admin.create-tenant Slice A, cr-0009). Purely
  * fachlich: authentication + the Server-Owner gate are central (`@RolesAllowed` on [TenantsResource] →
@@ -78,6 +87,27 @@ class TenantHandler(
         if (tenant.status != TenantEntity.PENDING) return RevokeOutcome.NotPending
         store.deleteTenant(tenantId)
         return RevokeOutcome.Done
+    }
+
+    /**
+     * A tenant **owner** invites a person (by email) into the ACTIVE tenant as a MEMBER (cr-0077 / ADR 0020).
+     * Admission is owner-gated (the caller must hold the tenant's OWNER membership); the invitee onboards via
+     * the same cold-birth accept flow with the invite's MEMBER role. The scope key is delivered afterward by a
+     * key-holder (cr-0076) — this only mints the admission token.
+     */
+    @Transactional
+    fun inviteMember(callerId: String, tenantId: String, email: String): MemberInviteOutcome {
+        val tenant = store.findTenant(tenantId) ?: return MemberInviteOutcome.NotFound
+        if (!store.isOwner(callerId, tenantId)) return MemberInviteOutcome.NotOwner
+        if (tenant.status != TenantEntity.ACTIVE) return MemberInviteOutcome.NotActive
+        val normalizedEmail = email.lowercase()
+        if (store.isEmailMember(tenantId, normalizedEmail)) return MemberInviteOutcome.AlreadyMember
+
+        val token = Tokens.random()
+        val expiresAt = Instant.now().plus(inviteTtl)
+        store.mintMemberInvite(tenantId, normalizedEmail, Tokens.hash(token), expiresAt)
+        mailer.sendInvite(tenant.domain, normalizedEmail, token, expiresAt)
+        return MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt))
     }
 
     private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {

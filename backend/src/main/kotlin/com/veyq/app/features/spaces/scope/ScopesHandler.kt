@@ -15,6 +15,12 @@ sealed interface ListScopesOutcome {
     object NoTenant : ListScopesOutcome
 }
 
+/** Outcome of listing a scope's members (the directory, cr-0077). */
+sealed interface ListMembersOutcome {
+    data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
+    object Forbidden : ListMembersOutcome
+}
+
 /**
  * Use-case logic for a member's scopes (en.spaces.personal-scope, cr-0026). The active tenant is resolved
  * from the request Host; the caller must already belong to it (you get a personal scope in tenants you are a
@@ -37,4 +43,13 @@ class ScopesHandler(private val store: ScopesStore) {
 
     /** Every tenant the caller belongs to (Host-independent) — the space switcher. */
     fun myTenants(userId: String): List<TenantRow> = store.myTenants(userId)
+
+    /**
+     * The member directory of a scope (uc.spaces.add-member, ADR 0020). Only a **key-holder** in the scope may
+     * read it (gating on holding a grant also means a non-member — or a bogus scope id — gets a uniform 403, so
+     * scope existence is not enumerable). Returns operational metadata only (pubkeys/roles/grant-present).
+     */
+    fun listMembers(userId: String, scopeId: String): ListMembersOutcome =
+        if (!store.holdsGrant(userId, scopeId)) ListMembersOutcome.Forbidden
+        else ListMembersOutcome.Members(store.listMembers(scopeId))
 }

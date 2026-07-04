@@ -5,7 +5,7 @@ import { vaultState } from './app/vault'
 import { rememberRoute } from './app/pendingRoute'
 import SetupView from './views/SetupView.vue'
 import LoginView from './views/LoginView.vue'
-import ServerSettingsView from './views/ServerSettingsView.vue'
+import SettingsHubView from './views/SettingsHubView.vue'
 import TenantJoinView from './views/TenantJoinView.vue'
 import MemoryHomeView from './views/MemoryHomeView.vue'
 
@@ -22,8 +22,10 @@ const router = createRouter({
     { path: '/', name: 'home', component: MemoryHomeView, meta: { layout: 'app', requiresUnlock: true } },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/server/settings', name: 'server-settings', component: ServerSettingsView, meta: { layout: 'app' } },
-    { path: '/tenants', redirect: { name: 'server-settings' } },
+    // The settings hub (cr-0078, ADR 0022): one scope-contextual page. `:section?` selects a section (wide shows
+    // the sidebar + that section; narrow drills in). Needs an unlocked vault — sections read the active space,
+    // and each surface (member directory, tenant admin) enforces its own authz server-side (403).
+    { path: '/settings/:section?', name: 'settings', component: SettingsHubView, meta: { layout: 'app', requiresUnlock: true } },
     // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
     // preview/register are public and the existing-owner path signs in within the view (cr-0010).
     { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },
@@ -45,8 +47,6 @@ router.beforeEach((to) => {
       return { name: 'login' }
     }
   }
-  // Authenticated routes need a live session (an access token).
-  if (to.name === 'server-settings' && session.accessToken === null) return { name: 'login' }
   // An already-unlocked session on the login card jumps into the shell. The remembered deep link (if any) is
   // restored by the login view after unlock — it is the single consumer of pendingRoute, so we don't take it
   // here (that would race the view to the one-shot value and drop it).

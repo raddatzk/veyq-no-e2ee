@@ -9,6 +9,7 @@ import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
 import { resetTree } from '../features/memory/treeStore'
 import { clearFavorites } from './favoritesStore'
+import { startGrantDeliveryPolling, stopGrantDeliveryPolling } from '../features/tasks/grantDeliveryPolling'
 
 export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
 
@@ -68,6 +69,11 @@ export async function enterScope(token: string): Promise<void> {
     resetTree() // no stale tree/favorites bleed across scopes — the view reloads for the new scope
     clearFavorites()
     activeSpace.status = 'ready'
+    // As a key-holder, keep delivering the scope key to any pending member (cr-0076/cr-0077, first-online-wins):
+    // deliver on entry and then poll in the background so "awaiting access" closes without a re-entry (cr-0079).
+    // A shared TENANT/GROUP scope may have grant-less members; Personal never does, so it just stops any poll.
+    if (opened.kind !== ScopeKind.Personal) startGrantDeliveryPolling(opened.scopeId, activeScopeKey)
+    else stopGrantDeliveryPolling()
   } catch (err) {
     activeSpace.status = isNoTenant(err) ? 'no-tenant' : 'error'
   }
@@ -75,6 +81,7 @@ export async function enterScope(token: string): Promise<void> {
 
 /** Drop the active space + zero the held key (logout / re-lock). */
 export function clearActiveSpace(): void {
+  stopGrantDeliveryPolling()
   activeSpace.status = 'idle'
   activeSpace.scopeId = null
   activeSpace.tenantId = null

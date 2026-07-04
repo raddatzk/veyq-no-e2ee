@@ -28,6 +28,7 @@ sealed interface PreviewOutcome {
         val domain: String,
         val ownerEmail: String,
         val hasAccount: Boolean,
+        val role: String,
     ) : PreviewOutcome
     data object NotFound : PreviewOutcome
     data object NoLongerValid : PreviewOutcome
@@ -39,6 +40,7 @@ sealed interface AcceptOutcome {
     data object NoLongerValid : AcceptOutcome
     data object NotInvitedOwner : AcceptOutcome
     data object AlreadyActive : AcceptOutcome
+    data object MissingGrant : AcceptOutcome
 }
 
 sealed interface RegisterAcceptOutcome {
@@ -46,6 +48,7 @@ sealed interface RegisterAcceptOutcome {
     data object NotFound : RegisterAcceptOutcome
     data object NoLongerValid : RegisterAcceptOutcome
     data object EmailTaken : RegisterAcceptOutcome
+    data object MissingGrant : RegisterAcceptOutcome
 }
 
 /**
@@ -67,41 +70,56 @@ class TenantAcceptHandler(
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return PreviewOutcome.NotFound
         if (!isLive(invite)) return PreviewOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return PreviewOutcome.NotFound
+        // The invited email is the invite's own — for a MEMBER invite it differs from the tenant owner's.
         return PreviewOutcome.Found(
             tenantId = tenant.id,
             tenantName = tenant.name,
             domain = tenant.domain,
-            ownerEmail = tenant.ownerEmail,
-            hasAccount = accounts.findByEmail(tenant.ownerEmail) != null,
+            ownerEmail = invite.ownerEmail,
+            hasAccount = accounts.findByEmail(invite.ownerEmail) != null,
+            role = invite.role,
         )
     }
 
-    /** Existing-user accept: the caller (resolved from the session) must be the invited owner. */
+    /** Existing-user accept: the caller (resolved from the session) must be the invited person. Role-branched
+     *  (cr-0077): an OWNER accept cold-activates the tenant (grant required); a MEMBER accept joins the ACTIVE
+     *  tenant grant-less (no grant), the key delivered later by a key-holder (cr-0076). */
     @Transactional
-    fun accept(userId: String, bootstrapSecret: String, grant: String): AcceptOutcome {
+    fun accept(userId: String, bootstrapSecret: String, grant: String?): AcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return AcceptOutcome.NotFound
         if (!isLive(invite)) return AcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return AcceptOutcome.NotFound
-        if (tenant.status != TenantEntity.PENDING) return AcceptOutcome.AlreadyActive
 
         val caller = VeyqUser.findById(userId) ?: return AcceptOutcome.NotInvitedOwner
         if (caller.email != invite.ownerEmail) return AcceptOutcome.NotInvitedOwner
 
-        store.activate(tenant.id, userId, grant, invite.id)
-        return AcceptOutcome.Activated(tenant.id)
+        return if (invite.role == TenantInviteEntity.MEMBER) {
+            // A member joins an ACTIVE tenant grant-less; if already a member, just consume the invite.
+            if (store.hasMembership(userId, tenant.id)) store.consumeInvite(invite.id)
+            else store.joinAsMember(tenant.id, userId, invite.id)
+            AcceptOutcome.Activated(tenant.id)
+        } else {
+            if (tenant.status != TenantEntity.PENDING) return AcceptOutcome.AlreadyActive
+            val g = grant ?: return AcceptOutcome.MissingGrant
+            store.activate(tenant.id, userId, g, invite.id)
+            AcceptOutcome.Activated(tenant.id)
+        }
     }
 
-    /** Register-and-accept: the invited email has no account yet — born cold here (email from the invite). */
+    /** Register-and-accept: the invited email has no account yet — born cold here (email from the invite).
+     *  Role-branched like [accept]: OWNER activates (grant required), MEMBER joins grant-less. */
     @Transactional
-    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String): RegisterAcceptOutcome {
+    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String?): RegisterAcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return RegisterAcceptOutcome.NotFound
         if (!isLive(invite)) return RegisterAcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return RegisterAcceptOutcome.NotFound
 
-        if (accounts.findByEmail(tenant.ownerEmail) != null) return RegisterAcceptOutcome.EmailTaken
+        // The account is born for the INVITED email (a MEMBER invite's email differs from the tenant owner's).
+        if (accounts.findByEmail(invite.ownerEmail) != null) return RegisterAcceptOutcome.EmailTaken
+        if (invite.role != TenantInviteEntity.MEMBER && grant == null) return RegisterAcceptOutcome.MissingGrant
 
         val userId = accounts.createAccount(
-            email = tenant.ownerEmail,
+            email = invite.ownerEmail,
             displayName = account.displayName,
             serverRole = ServerRoles.MEMBER,
             suiteId = account.suiteId,
@@ -111,7 +129,8 @@ class TenantAcceptHandler(
             recoveryMasterKeyTag = account.recoveryMasterKeyTag,
             wraps = account.wraps,
         )
-        store.activate(tenant.id, userId, grant, invite.id)
+        if (invite.role == TenantInviteEntity.MEMBER) store.joinAsMember(tenant.id, userId, invite.id)
+        else store.activate(tenant.id, userId, grant!!, invite.id)
         return RegisterAcceptOutcome.Activated(tenant.id, userId)
     }
 

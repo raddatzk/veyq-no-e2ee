@@ -14,6 +14,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { previewInvite, acceptInvite, registerAndAccept, scopeGrant, tenantError } from '../features/admin/createTenant/tenants'
+import { InviteRole } from '../api/generated/tenants'
 import { buildAccount, type BuiltAccount } from '../features/account/register/accountBirth'
 import { login, withRefresh } from '../features/account/login/login'
 import { unlockMasterKey } from '../features/account/unlock/unlock'
@@ -35,6 +36,16 @@ const busy = ref(false)
 const tenantName = ref('')
 const domain = ref('')
 const ownerEmail = ref('')
+// The invite's role (cr-0077): an OWNER cold-births the TENANT scope + seals the first grant; a MEMBER joins
+// grant-less (no scope birth, no grant) and a key-holder delivers the key later (cr-0076).
+const role = ref<InviteRole>(InviteRole.Owner)
+const isMember = computed(() => role.value === InviteRole.Member)
+
+// Role-aware copy: a MEMBER joins the shared space, an OWNER takes ownership. Falls back to the base (owner)
+// key when no `<base>Member` variant exists.
+function jcopy(base: string, params?: Record<string, unknown>): string {
+  return t(`tenant.join.${isMember.value ? `${base}Member` : base}`, params ?? {})
+}
 
 // register form
 const displayName = ref('')
@@ -68,6 +79,7 @@ onMounted(async () => {
     tenantName.value = p.tenantName
     domain.value = p.domain
     ownerEmail.value = p.ownerEmail
+    role.value = p.role
     phase.value = p.hasAccount ? 'signin' : 'register'
   } catch (e) {
     const { status } = await tenantError(e)
@@ -98,7 +110,8 @@ async function finishRegistration() {
   error.value = ''
   busy.value = true
   try {
-    const grant = scopeGrant({ x: built.identity.pub.kemX, m: built.identity.pub.kemM })
+    // A MEMBER joins grant-less (no scope birth); only an OWNER cold-births the TENANT scope + seals a grant.
+    const grant = isMember.value ? undefined : scopeGrant({ x: built.identity.pub.kemX, m: built.identity.pub.kemM })
     await registerAndAccept(secret, displayName.value.trim(), built.material, grant)
     phase.value = 'done'
   } catch (e) {
@@ -118,7 +131,7 @@ async function signInAndAccept() {
     await unlockMasterKey(password.value, secretKey.value.trim())
     const priv = identityPrivate()
     if (!priv) throw new Error('locked')
-    const grant = scopeGrant(hybridPublic(priv))
+    const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
     await acceptInvite(secret, grant)
     phase.value = 'done'
   } catch (e) {
@@ -133,7 +146,7 @@ async function signInAndAccept() {
 async function sealAndAccept() {
   const priv = identityPrivate()
   if (!priv) throw new Error('locked')
-  const grant = scopeGrant(hybridPublic(priv))
+  const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
   await withRefresh(() => acceptInvite(secret, grant))
   password.value = ''
   phase.value = 'done'
@@ -201,8 +214,8 @@ async function mapError(e: unknown): Promise<string> {
       <Message v-else-if="phase === 'expired'" severity="warn" :closable="false">{{ t('tenant.join.expired') }}</Message>
 
       <template v-else-if="phase === 'register'">
-        <p class="veyq-form-copy">{{ t('tenant.join.invitedTo', { tenant: tenantName, domain }) }}</p>
-        <p class="veyq-form-copy">{{ t('tenant.join.registerSub', { email: ownerEmail }) }}</p>
+        <p class="veyq-form-copy">{{ jcopy('invitedTo', { tenant: tenantName, domain }) }}</p>
+        <p class="veyq-form-copy">{{ jcopy('registerSub', { email: ownerEmail }) }}</p>
         <form class="veyq-form" @submit.prevent="prepareRegistration">
           <label>{{ t('tenant.join.displayName') }}<InputText v-model="displayName" autocomplete="name" required /></label>
           <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="join-password" /></label>
@@ -220,11 +233,11 @@ async function mapError(e: unknown): Promise<string> {
           <Checkbox v-model="kitSaved" :binary="true" /><span>{{ t('tenant.join.kitConfirm') }}</span>
         </label>
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-        <Button :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy" :disabled="!kitSaved" @click="finishRegistration" />
+        <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" :disabled="!kitSaved" @click="finishRegistration" />
       </template>
 
       <template v-else-if="phase === 'signin'">
-        <p class="veyq-form-copy">{{ t('tenant.join.invitedTo', { tenant: tenantName, domain }) }}</p>
+        <p class="veyq-form-copy">{{ jcopy('invitedTo', { tenant: tenantName, domain }) }}</p>
 
         <!-- Fast path: this browser already holds the invited owner's unlocked vault → accept in one click,
              or ask for the password only if the session lapsed. Never the Secret Key. -->
@@ -234,33 +247,33 @@ async function mapError(e: unknown): Promise<string> {
             <form class="veyq-form" @submit.prevent="reauthAndAccept">
               <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="reauth-password" /></label>
               <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-              <Button type="submit" :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy"
+              <Button type="submit" :label="jcopy('join')" icon="pi pi-check" :loading="busy"
                       :disabled="password.length === 0" />
             </form>
           </template>
           <template v-else>
-            <p class="veyq-form-copy">{{ t('tenant.join.signinReadySub', { email: ownerEmail }) }}</p>
+            <p class="veyq-form-copy">{{ jcopy('signinReadySub', { email: ownerEmail }) }}</p>
             <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-            <Button :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy" @click="acceptDirect" />
+            <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" @click="acceptDirect" />
           </template>
         </template>
 
         <!-- Cold path: locked vault or a different account signed in → full sign-in + unlock. -->
         <template v-else>
-          <p class="veyq-form-copy">{{ t('tenant.join.signinSub', { email: ownerEmail }) }}</p>
+          <p class="veyq-form-copy">{{ jcopy('signinSub', { email: ownerEmail }) }}</p>
           <form class="veyq-form" @submit.prevent="signInAndAccept">
             <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="signin-password" /></label>
             <label>{{ t('unlock.secretKey') }}<InputText v-model="secretKey" autocomplete="off" required /></label>
             <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-            <Button type="submit" :label="t('tenant.join.join')" icon="pi pi-check" :loading="busy"
+            <Button type="submit" :label="jcopy('join')" icon="pi pi-check" :loading="busy"
                     :disabled="password.length === 0 || secretKey.trim().length === 0" />
           </form>
         </template>
       </template>
 
       <template v-else-if="phase === 'done'">
-        <Message severity="success" :closable="false">{{ t('tenant.join.done', { tenant: tenantName }) }}</Message>
-        <p class="veyq-form-copy">{{ t('tenant.join.doneNote') }}</p>
+        <Message severity="success" :closable="false">{{ jcopy('done', { tenant: tenantName }) }}</Message>
+        <p class="veyq-form-copy">{{ jcopy('doneNote') }}</p>
         <Button :label="t('login.title')" icon="pi pi-sign-in" @click="router.push({ name: 'login' })" />
       </template>
     </template>

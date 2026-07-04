@@ -92,7 +92,13 @@ function switchTenant(tenant: MyTenant) {
             <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
             <span class="sidebar-tenant-text">
               <strong>{{ tenant.name }}</strong>
-              <small>{{ tenant.domain }}</small>
+              <!-- Awaiting access: a grant-less member is on this tenant but has no key yet (cr-0077). The
+                   token-less home fell back to Personal (activeSpace.tenantUnavailable); a key-holder delivers
+                   the grant automatically (cr-0076), then this clears on the next entry. -->
+              <small v-if="activeSpace.tenantUnavailable" class="sidebar-tenant-awaiting">
+                {{ t('members.awaitingAccess') }}
+              </small>
+              <small v-else>{{ tenant.domain }}</small>
             </span>
           </div>
           <button

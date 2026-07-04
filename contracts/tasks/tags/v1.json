@@ -1,0 +1,13 @@
+{
+  "registry": "v1",
+  "note": "The public, versioned capability-tag registry for the operator-blind background-task mechanism (ADR 0021). A capability tag is the OPAQUE token that rides the job envelope and the worker's claim on the wire and in the DB, so a bare database dump sees `02f271ff`, not `grant-delivery`. Each tag value is the first 4 bytes (8 lowercase hex chars) of SHA-256 over `veyq/v1/task-capability/<name>` — deterministic, no central assignment authority, extensible. This keeps gratuitous plaintext semantic labels out of the store (defence vs. a bare dump); it does NOT hide the kind of work from a correlating operator (that residual leak is correlation-bounded, documented in ADR 0021 and docs/crosscutting/background-tasks.md). All surfaces (backend Kotlin, web TS, later native + agent) pin these exact values; a conformance test asserts the shipped constant equals the registry, the same drift-proofing the crypto vectors get.",
+  "tags": {
+    "grant-delivery": {
+      "tag": "02f271ff",
+      "since": "cr-0076",
+      "lease": false,
+      "originator": "server-structural",
+      "description": "Deliver a scope grant to a pending (grant-less) member: any online key-holder wraps K_SC to the target member's identity public key (asymWrap to a foreign identity, context `scope-grant`) and posts the ciphertext as that member's wrappedGrant. Universal tag, no lease needed (idempotent, first-online-wins). The first, trivially-blind consumer of the mechanism (ADR 0020)."
+    }
+  }
+}

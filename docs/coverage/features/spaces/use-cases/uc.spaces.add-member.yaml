@@ -1,35 +1,58 @@
 useCase: uc.spaces.add-member
 feature: spaces
 title: Add a member to the shared Tenant space
-status: planned
-# Refined only (uc.spaces.add-member + ADR 0020) — no surface implements it yet. The reusable primitive:
-# a key-holder wraps K_SC to another member's identity pubkey (asymWrap to a FOREIGN identity — the first such
-# wrap; context `scope-grant`), obtained from a scope-scoped member directory (the first pubkey-lookup surface).
-# Onboarding a new member reuses the owner-invite machinery (cr-0009/cr-0010) with role=MEMBER. ADMISSION (who
-# may invite) is owner-only in v1; DELIVERY (the wrap) is done automatically by ANY online key-holder's device —
-# every member holds K_SC — first-online-wins (no second human action). Two-phase, "awaiting access" until any
-# key-holder is next online. Authenticity is Plain in v1 — the key-substitution gap is documented (self-hosted
-# moot; broadening who-wraps doesn't widen it), the fingerprint/TOFU seam left open. Every surface is a gap;
-# implementation is a later CR (dependency order contracts → backend → http → web → apple → android).
+# DELIVERY built cr-0076 (grant-delivery job), ONBOARDING built cr-0077 (MEMBER invite + cold-birth join + the
+# member directory + the web add-member UI). The reusable primitive: a key-holder wraps K_SC to another
+# member's identity pubkey (asymWrap to a FOREIGN identity; context `scope-grant`). ADMISSION (who may invite)
+# is owner-only; DELIVERY (the wrap) is any online key-holder's device, first-online-wins (no second human
+# action). Two-phase, "awaiting access" until any key-holder is next online. Authenticity is Plain in v1 (the
+# fingerprint/TOFU seam left open). Native invite/directory UI is each native surface's own later CR (web-first,
+# ADR 0010). The full grant-delivery happy-path needs the ML-KEM scope-grant flow not reproducible from a bare
+# .http, so it is proven at the integration layer (TasksSliceTest / MemberAddSliceTest), same as content.http.
 acceptanceCriteria:
   - id: member-invite-and-onboard
     text: The owner mints a single-use MEMBER invite (email, secret hashed) reusing the owner-invite machinery; the invitee cold-registers (identity born on-device, public bundle published) — or accepts on an existing account — becoming a tenant member with NO grant, so they land in the Personal fallback (cr-0075) marked "awaiting access".
-    coverage: {}
+    coverage:
+      backend:
+        integration: [MemberAddSliceTest.ownerMintsMemberInviteNonOwnerIsForbidden, MemberAddSliceTest.memberRegisterJoinsGrantLessAndOwnerClaimOriginatesDelivery, MemberAddSliceTest.existingAccountAcceptsMemberInviteAndJoinsGrantLess]
+      web:
+        unit: [src/features/spaces/InviteMemberDialog.test.ts, src/components/app/AppSidebar.test.ts]
   - id: scope-member-directory
     text: An authorized granter lists a scope's memberships with each member's identity public key + grant status (granted vs pending). The operator-blind server returns only already-stored operational metadata (pubkeys/roles/grant-present) — never a scope key — and the directory is scoped to that scope's members, not a global user search.
-    coverage: {}
+    coverage:
+      backend:
+        integration: [MemberAddSliceTest.memberDirectoryListsMembersWithGrantStatus]
+      web:
+        unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: wrap-to-foreign-grant
     text: Any online key-holder's device (not necessarily the inviter — every member holds K_SC) wraps the tenant scope key to a pending member's identity public key (asymWrap(hybridPublic(member), K_SC, "scope-grant") — the first wrap to a foreign identity), eagerly and automatically (no second human action), and posts it as that member's grant; first-online-wins, the rest no-op. The member opens it with their own identity private on next entry and reaches the shared space. The server stores opaque ciphertext, never the key.
-    coverage: {}
+    # Delivery built as a grant-delivery job on the background-task mechanism (cr-0076). The onboarding that
+    # *produces* the pending member is cr-0077; here the pending (grant-less) membership is seeded.
+    coverage:
+      backend:
+        integration: [TasksSliceTest.grantDeliveryOriginatedOnGrantlessMembershipThenClaimedAndCompletedIdempotently, TasksSliceTest.grantDeliveryCompletionWithoutAWrapIs400]
+      http:
+        e2e: [http/tasks/tasks.http]
+      web:
+        unit: [src/features/tasks/grantDeliveryWorker.test.ts]
   - id: admission-vs-delivery
     text: Admission (minting an invite — who may join) is owner-only in v1; delivery (producing the wrap for an already-admitted, onboarded member) needs no special authority and is done by any key-holder. A non-inviting member cannot admit anyone, only help deliver the key.
-    coverage: {}
+    # Both sides covered: DELIVERY (cr-0076) — eligibility is holding the scope key, so any granted member
+    # delivers and a grant-less member (a target, not a worker) cannot; ADMISSION (cr-0077) — only the tenant
+    # OWNER may mint a member invite, a non-owner is 403 not_tenant_owner.
+    coverage:
+      backend:
+        integration: [TasksSliceTest.grantDeliveryOriginatedOnGrantlessMembershipThenClaimedAndCompletedIdempotently, TasksSliceTest.grantLessWorkerCannotClaim, MemberAddSliceTest.ownerMintsMemberInviteNonOwnerIsForbidden]
+      web:
+        unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: additive-async-no-revocation
     text: Granting is additive and asynchronous — it only adds a grant onto a hollow (role, no grant) membership; the member waits in the Personal fallback until ANY key-holder is next online to wrap (first-online-wins; no server-side wrap). Removal, key rotation, and re-invite are out of scope for this use-case.
-    coverage: {}
+    coverage:
+      backend:
+        integration: [TasksSliceTest.grantDeliveryOriginatedOnGrantlessMembershipThenClaimedAndCompletedIdempotently]
+      web:
+        unit: [src/features/tasks/grantDeliveryWorker.test.ts]
 gaps:
-  backend: "Not built. Needs new contracts + backend: a MEMBER-role invite (extend the cr-0009/cr-0010 tenant invite with a role), a scope member directory returning identity pubkeys + grant status (owner-gated), and a post-grant-for-member endpoint (opaque wrappedGrant onto a target membership; owner-gated; server stores opaque ciphertext, never a key). Own CR."
-  http: "Not built. Signed happy-path (owner invites → invitee registers as MEMBER → owner lists directory → posts a wrap-to-foreign grant → member opens) added when the backend lands."
-  web: "Not built (refined only). Add-member UI (invite by email; member directory with 'awaiting access'; wrap K_SC to a member via asymWrap-to-foreign and post the grant) is the first web CR; reuses the cr-0075 open/enter + Personal-fallback rendering."
-  apple: "Not built. Native add-member is Apple's own later CR (web-first, ADR 0010)."
-  android: "Not built. Native add-member is Android's own later CR (web-first, ADR 0010)."
+  http: "Built where reproducible from a bare .http (cr-0076): http/tasks/tasks.http asserts the tasks auth boundary + validation + no-grant/non-member/unknown-job paths. The full happy-paths that need the ML-KEM scope-grant flow (grant-delivery's claim→wrap→complete, and the member cold-birth register→join) are NOT reproducible from a bare .http (same wall content.http hit) — proven at the integration layer (TasksSliceTest / MemberAddSliceTest, which drive the loop over the HTTP stack). A scripted add-member .http can follow if the harness gains an ML-KEM wrap."
+  apple: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Apple's own later CR (web-first, ADR 0010)."
+  android: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Android's own later CR (web-first, ADR 0010)."

@@ -51,17 +51,19 @@ export function previewInvite(bootstrapSecret: string): Promise<InvitePreview> {
   return tenantsApi().previewTenantInvite({ acceptPreviewRequest: { bootstrapSecret } })
 }
 
-/** Accept as an existing (signed-in) user: activates the tenant with the cold-born grant. */
-export function acceptInvite(bootstrapSecret: string, grant: string): Promise<TenantActivated> {
+/** Accept as an existing (signed-in) user. An OWNER invite carries the cold-born grant; a MEMBER invite omits
+ *  it (the member joins grant-less; a key-holder delivers the key later, cr-0076). */
+export function acceptInvite(bootstrapSecret: string, grant?: string): Promise<TenantActivated> {
   return tenantsApi().acceptTenantInvite({ acceptInviteRequest: { bootstrapSecret, grant } })
 }
 
-/** Register a new owner account cold and accept in one step (public — the email comes from the invite). */
+/** Register a new account cold and accept in one step (public — the email comes from the invite). `grant` is
+ *  set for an OWNER invite (cold-births the TENANT scope) and omitted for a MEMBER invite (grant-less join). */
 export function registerAndAccept(
   bootstrapSecret: string,
   displayName: string,
   material: AccountMaterial,
-  grant: string,
+  grant?: string,
 ): Promise<TenantActivatedWithUser> {
   return tenantsApi().registerAndAcceptTenantInvite({
     registerAndAcceptRequest: {

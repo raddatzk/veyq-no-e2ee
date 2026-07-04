@@ -238,6 +238,71 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_pending }
 
+  /api/tenants/{tenantId}/member-invites:
+    post:
+      tags: [tenants]
+      operationId: inviteTenantMember
+      summary: Invite a person (by email) into an active tenant as a MEMBER.
+      description: >
+        The tenant **owner** admits a new member (uc.spaces.add-member, ADR 0020): mints a single-use,
+        time-limited MEMBER-role invite bound to the email and delivered out-of-band — the *tenant* half of
+        member-add (a maybe-new person is onboarded by email + cold-birth; the *group* half, adding an
+        existing tenant member, is a separate scope-based operation later). Distinct from the Server-Owner
+        tenant admin above: this is gated on the caller holding the **OWNER membership** of `{tenantId}` (a
+        code check, not the Server-Owner role). The tenant must be ACTIVE. Delivery of the scope key is
+        automatic afterward (any online key-holder wraps `K_SC` to the new member — cr-0076); admission here
+        only creates the invite. Operator-blind: only the invite hash + the email (metadata) are stored.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberInviteRequest" }
+            example: { email: partner@example.com }
+      responses:
+        "201":
+          description: A MEMBER invite was minted and sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberInviteState" }
+              example:
+                email: partner@example.com
+                inviteStatus: ACTIVE
+                inviteExpiresAt: 2026-07-11T12:00:00Z
+        "400":
+          description: The request was malformed (missing/invalid email).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not own this tenant (only the tenant owner may invite members).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The email is already a member of this tenant, or the tenant is not ACTIVE.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: already_member }
+
   /api/tenants/{tenantId}:
     delete:
       tags: [tenants]
@@ -594,6 +659,42 @@ components:
       enum: [ACTIVE, SUPERSEDED, CONSUMED, EXPIRED]
       example: ACTIVE
 
+    InviteRole:
+      type: string
+      description: >
+        The role the invite grants on acceptance. OWNER cold-births the TENANT scope + seals the first grant
+        (tenant activation, cr-0010); MEMBER joins an already-active tenant grant-less, the key delivered
+        later by a key-holder (cr-0076/cr-0077).
+      enum: [OWNER, MEMBER]
+      example: MEMBER
+
+    MemberInviteRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email of the person to invite as a tenant member; the invite is bound to it. Server-visible.
+          maxLength: 254
+          example: partner@example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+
+    MemberInviteState:
+      type: object
+      required: [email, inviteStatus, inviteExpiresAt]
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          example: partner@example.com
+        inviteStatus:
+          $ref: "#/components/schemas/InviteStatus"
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          example: 2026-07-11T12:00:00Z
+
     ErrorResponse:
       type: object
       required: [code]
@@ -624,7 +725,7 @@ components:
 
     InvitePreview:
       type: object
-      required: [tenantId, tenantName, domain, ownerEmail, hasAccount]
+      required: [tenantId, tenantName, domain, ownerEmail, hasAccount, role]
       properties:
         tenantId:
           type: string
@@ -640,16 +741,19 @@ components:
           example: family.example.com
         ownerEmail:
           type: string
+          description: The invited email (the field name is historical — it is the invitee's email for any role).
           maxLength: 254
           example: kevin@example.com
         hasAccount:
           type: boolean
           description: True if the invited email already has an account (the client then uses the sign-in accept).
           example: false
+        role:
+          $ref: "#/components/schemas/InviteRole"
 
     AcceptInviteRequest:
       type: object
-      required: [bootstrapSecret, grant]
+      required: [bootstrapSecret]
       properties:
         bootstrapSecret:
           type: string
@@ -658,14 +762,16 @@ components:
           example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
         grant:
-          type: string
+          type: [string, "null"]
           description: >
-            The TENANT scope root key sealed to the caller's own identity public key (the first grant) —
-            opaque base64 ciphertext the server stores verbatim and never interprets.
+            The scope root key sealed to the caller's own identity public key. **Required for an OWNER invite**
+            (the invitee cold-births the TENANT scope and seals the first grant) — opaque base64 the server
+            stores verbatim. **Omitted for a MEMBER invite**: a member joins grant-less and the key is
+            delivered later by a key-holder (cr-0076). The server enforces this per the invite's role.
           contentEncoding: base64
           maxLength: 8192
           example: AQ==
-          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     TenantActivated:
       type: object
@@ -696,7 +802,7 @@ components:
 
     RegisterAndAcceptRequest:
       type: object
-      required: [bootstrapSecret, account, grant]
+      required: [bootstrapSecret, account]
       properties:
         bootstrapSecret:
           type: string
@@ -709,12 +815,16 @@ components:
           # @Valid cascades bean-validation into the cold-birth account material.
           x-field-extra-annotation: '@field:jakarta.validation.Valid'
         grant:
-          type: string
-          description: The TENANT scope root key sealed to the new account's identity public key (opaque base64).
+          type: [string, "null"]
+          description: >
+            The scope root key sealed to the new account's identity public key. **Required for an OWNER
+            invite** (cold-births the TENANT scope); **omitted for a MEMBER invite** (the member joins
+            grant-less; a key-holder delivers the key later, cr-0076). Opaque base64; enforced per the invite's
+            role.
           contentEncoding: base64
           maxLength: 8192
           example: AQ==
-          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     AccountRegistration:
       type: object
