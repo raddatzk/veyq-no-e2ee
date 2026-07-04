@@ -10,12 +10,17 @@ here; the server is blind.
   hand-write the client. Regenerate after a contract change.
 - **Dev credentials come from a seeder — never hardcode or guess them. Two paths, and they are NOT
   interchangeable:**
-  - **`npm run bootstrap:user` (the primary local principal).** Inputs live in **`.run/.env`** (gitignored;
-    template `.run/.env.example`): `VEYQ_EMAIL` / `VEYQ_PASSWORD` / `VEYQ_TENANT` / `VEYQ_TENANT_DOMAIN`, and the
-    seeder writes back `VEYQ_SECRET_KEY` + `VEYQ_WRAPPED_MASTERKEY`. It creates ONE user that is Server Owner AND
-    tenant owner (holds the **TENANT grant** + a personal scope). This is the current dev instance (IntelliJ
-    "Bootstrap User" run config) — the tenant is **`veyq.localhost`** (e.g. "Familie Raddatz"), so **live-verify
-    browses `veyq.localhost:<viteport>`** and logs in with the `.run/.env` creds/secret key.
+  - **`npm run bootstrap:user` (the primary local principal).** Inputs live in **`<repo-root>/.run/.env`**
+    (gitignored — note it is at the **repo root**, not `web/.run/`; template `<repo-root>/.run/.env.example`):
+    `VEYQ_EMAIL` / `VEYQ_PASSWORD` / `VEYQ_TENANT` / `VEYQ_TENANT_DOMAIN`, and the seeder writes back
+    `VEYQ_SECRET_KEY` + `VEYQ_WRAPPED_MASTERKEY`. It creates ONE user that is Server Owner AND tenant owner
+    (holds the **TENANT grant** + a personal scope). This is the current dev instance (IntelliJ "Bootstrap User"
+    run config) — the tenant is **`veyq.localhost`** (e.g. "Familie Raddatz"), so **live-verify browses
+    `veyq.localhost:<viteport>`** and logs in with the `.run/.env` creds/secret key. **Cold start (fresh/empty
+    DB):** the `.run/.env` `SECRET_KEY`/`WRAPPED_MASTERKEY` are stale after a `docker compose … down -v` (they
+    were written against the old DB), so **re-run `npm run bootstrap:user`** against the fresh backend first — it
+    reseeds `veyq.localhost` and rewrites those two keys — then browse `veyq.localhost:<viteport>`. Prefer this
+    over `seed:dev` for a manual smoke: it is one command and needs no dev-invite file.
   - **`npm run seed:dev` (cr-0046, the e2e-test seeder).** Mints a Server Owner + a **`127.0.0.1`** tenant owner
     and writes **`web/scripts/.seed/dev-seed.json`** (gitignored) with creds **and** raw key material; loaded by
     `scripts/devSeed.mts` → `loadDevSeed()` / `vaultFromSeed()` and read automatically by `media.e2e.test.ts`
