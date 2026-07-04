@@ -142,8 +142,9 @@ async function revoke(invite: PendingMemberInvite) {
             @focus="($event.target as HTMLInputElement).select()"
           />
           <Button
-            :label="reissueCopied ? t('members.copied') : t('members.copyLink')"
             :icon="reissueCopied ? 'pi pi-check' : 'pi pi-copy'"
+            :aria-label="t('members.copyLink')"
+            :title="reissueCopied ? t('members.copied') : t('members.copyLink')"
             @click="copyReissueLink"
           />
           <Button

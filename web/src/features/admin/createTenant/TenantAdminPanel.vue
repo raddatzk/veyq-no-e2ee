@@ -218,7 +218,12 @@ async function mintFromEdit(action: () => Promise<{ bootstrapSecret: string }>, 
         <p class="settings-muted">{{ t('members.copyLinkIntro') }}</p>
         <div class="invite-link-row">
           <InputText :model-value="editInviteUrl" readonly class="invite-link-input" @focus="($event.target as HTMLInputElement).select()" />
-          <Button :label="editCopied ? t('members.copied') : t('members.copyLink')" :icon="editCopied ? 'pi pi-check' : 'pi pi-copy'" @click="copyEditLink" />
+          <Button
+            :icon="editCopied ? 'pi pi-check' : 'pi pi-copy'"
+            :aria-label="t('members.copyLink')"
+            :title="editCopied ? t('members.copied') : t('members.copyLink')"
+            @click="copyEditLink"
+          />
         </div>
         <div class="veyq-dialog-action-row">
           <Button type="button" :label="t('common.done')" icon="pi pi-check" @click="editOpen = false" />

@@ -94,7 +94,12 @@ async function copyLink() {
       <p class="field-hint">{{ t('members.copyLinkIntro') }}</p>
       <div class="invite-link-row">
         <InputText :model-value="inviteUrl" readonly class="invite-link-input" @focus="($event.target as HTMLInputElement).select()" />
-        <Button :label="copied ? t('members.copied') : t('members.copyLink')" :icon="copied ? 'pi pi-check' : 'pi pi-copy'" @click="copyLink" />
+        <Button
+          :icon="copied ? 'pi pi-check' : 'pi pi-copy'"
+          :aria-label="t('members.copyLink')"
+          :title="copied ? t('members.copied') : t('members.copyLink')"
+          @click="copyLink"
+        />
       </div>
       <div class="veyq-dialog-action-row">
         <Button type="button" :label="t('common.done')" icon="pi pi-check" @click="visible = false" />
