@@ -179,6 +179,10 @@ server could serve an attacker's key instead (key-substitution / MITM) and read 
   silently holds a copy. Only Key Transparency (or manual out-of-band verification) makes that detectable.
 - **Trust anchors stay client-side:** a client verifies and signs against its own locally-held key,
   never the server's copy.
+- **First consumer:** adding a member to a shared scope ([uc.spaces.add-member](../features/spaces/use-cases/uc.spaces.add-member.md),
+  [ADR 0020](../decisions/0020-grant-distribution-invite-wrap.md)) is the first flow to wrap a scope key to
+  *another* member via this directory. It adopts the stance above as-is — **v1 trusts the returned key** (no
+  pin, no gate; self-hosted makes it moot), and leaves the fingerprint/TOFU/KT hardening as an explicit seam.
 
 ## Recovery — no escrow
 
