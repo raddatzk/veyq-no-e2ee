@@ -37,14 +37,20 @@ class TasksResource(
             else -> Response.ok(job.toDto()).build()
         }
 
-    override fun enqueueTask(enqueueRequest: EnqueueRequest): Response =
-        when (val jobId = handler.enqueue(
+    override fun enqueueTask(enqueueRequest: EnqueueRequest): Response {
+        // Structural tags are server-originated only — reject them at the front door with a clear 400 (the store
+        // enforces this too as defence in depth). A client may only enqueue content-processing jobs.
+        if (enqueueRequest.capabilityTag == CapabilityTags.GRANT_DELIVERY) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(ErrorResponse(code = "invalid_request")).build()
+        }
+        return when (val jobId = handler.enqueue(
             me, enqueueRequest.scopeId.toString(), enqueueRequest.capabilityTag,
             enqueueRequest.resourceRef, enqueueRequest.sealedBody,
         )) {
             null -> Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_member")).build()
             else -> Response.status(Response.Status.CREATED).entity(JobCreated(jobId = UUID.fromString(jobId))).build()
         }
+    }
 
     override fun heartbeatTask(jobId: UUID): Response =
         when (val r = handler.heartbeat(me, jobId.toString())) {

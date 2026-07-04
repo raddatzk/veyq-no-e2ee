@@ -144,9 +144,13 @@ class TasksStore {
         if (job.capabilityTag == CapabilityTags.GRANT_DELIVERY) {
             val grant = sealedResult ?: return CompleteResult.MissingResult
             // Deliver: set the grant only if the target is still grant-less (idempotent, first-online-wins).
+            // The write is bound to the job's OWN scope (`and scopeId = ?3`) — the caller was authorized against
+            // `job.scopeId`, so it may only ever write a grant onto a membership *in that scope*. Without this
+            // an attacker who holds a grant in any scope could target a foreign membership id (cr-0081 hardening).
             job.resourceRef?.let { membershipId ->
                 MembershipEntity.update(
-                    "wrappedGrant = ?1 where id = ?2 and wrappedGrant is null", grant, membershipId,
+                    "wrappedGrant = ?1 where id = ?2 and scopeId = ?3 and wrappedGrant is null",
+                    grant, membershipId, job.scopeId,
                 )
             }
         }
@@ -183,6 +187,9 @@ class TasksStore {
         resourceRef: String?, sealedBody: String?, maxAttempts: Int,
     ): String? {
         if (scopeId !in grantedScopeIds(userId)) return null
+        // Structural tags (grant-delivery) are server-originated only — never forgeable via the client front
+        // door, so a client can't fabricate a delivery job with an arbitrary target (cr-0081 hardening).
+        if (capabilityTag == CapabilityTags.GRANT_DELIVERY) return null
         val jobId = UUID.randomUUID().toString()
         JobEntity().apply {
             id = jobId

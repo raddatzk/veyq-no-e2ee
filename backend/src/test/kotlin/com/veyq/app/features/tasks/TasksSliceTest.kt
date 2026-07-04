@@ -222,6 +222,42 @@ class TasksSliceTest {
     }
 
     @Test
+    fun enqueueRejectsStructuralGrantDeliveryTag() {
+        // Security (cr-0081): a client cannot forge a grant-delivery job — structural tags are server-originated
+        // only, so the enqueue front door rejects them (400) instead of minting an arbitrary-target delivery.
+        val scopeId = seedTenantScope()
+        val worker = seedUser()
+        seedGrantedMembership(worker, scopeId, "grant")
+        given().header("Authorization", bearer(worker)).contentType(ContentType.JSON)
+            .body("""{"scopeId":"$scopeId","capabilityTag":"${CapabilityTags.GRANT_DELIVERY}","sealedBody":"AQ=="}""")
+            .`when`().post("/api/tasks/enqueue")
+            .then().statusCode(400).body("code", equalTo("invalid_request"))
+    }
+
+    @Test
+    fun completeCannotWriteAGrantOntoAMembershipInAnotherScope() {
+        // Security (cr-0081): the grant write is bound to the job's own scope. An attacker holding a grant in
+        // scope A cannot use a grant-delivery job in A to write a wrappedGrant onto a membership in scope B.
+        val scopeA = seedTenantScope()
+        val attacker = seedUser()
+        seedGrantedMembership(attacker, scopeA, "attacker-grant")
+
+        val scopeB = seedTenantScope()
+        val victimMembership = seedGrantlessMembership(seedUser(), scopeB)
+
+        // A grant-delivery job in scope A (attacker's) pointing at the victim's grant-less membership in scope B.
+        val jobId = seedJob(scopeA, CapabilityTags.GRANT_DELIVERY, JobEntity.PENDING, attempts = 0, resourceRef = victimMembership)
+
+        // The attacker completes it (they hold a grant in A) — the job is marked done, but the cross-scope write
+        // is refused: the victim's membership in B stays grant-less.
+        given().header("Authorization", bearer(attacker)).contentType(ContentType.JSON)
+            .body("""{"sealedResult":"YXR0YWNrZXItd3JhcA=="}""")
+            .`when`().post("/api/tasks/$jobId/complete").then().statusCode(204)
+
+        assertNull(grantOf(victimMembership), "a cross-scope resourceRef must not receive a grant")
+    }
+
+    @Test
     fun claimWithoutAuthIs401() {
         given().contentType(ContentType.JSON).body("""{"capabilityTags":["deadbeef"]}""")
             .`when`().post("/api/tasks/claim")
@@ -299,13 +335,13 @@ class TasksSliceTest {
 
     private fun seedJob(
         scopeId: String, tag: String, status: String, attempts: Int, maxAttempts: Int = 5,
-        leaseExpiresAt: Instant? = null,
+        leaseExpiresAt: Instant? = null, resourceRef: String? = null,
     ): String {
         val jobId = UUID.randomUUID().toString()
         QuarkusTransaction.requiringNew().run {
             JobEntity().apply {
                 id = jobId; this.scopeId = scopeId; capabilityTag = tag; this.status = status
-                this.attempts = attempts; this.maxAttempts = maxAttempts
+                this.attempts = attempts; this.maxAttempts = maxAttempts; this.resourceRef = resourceRef
                 this.leaseExpiresAt = leaseExpiresAt; leaseHolder = if (status == JobEntity.LEASED) "crashed" else null
                 createdAt = Instant.now()
             }.persist()
