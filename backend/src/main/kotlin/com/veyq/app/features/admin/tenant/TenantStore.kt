@@ -22,6 +22,9 @@ data class TenantView(
  *  present only on a freshly-minted invite (so the owner can copy the invite link) — never on a list read. */
 data class InviteView(val ownerEmail: String, val status: String, val expiresAt: Instant, val bootstrapSecret: String? = null)
 
+/** A pending member invite in the owner-facing list (cr-0082) — metadata only, never the secret. */
+data class PendingInviteRow(val inviteId: String, val email: String, val status: String, val expiresAt: Instant)
+
 /**
  * Persistence for tenant creation + invite lifecycle (cr-0009). The invite is its own row history; only the
  * SHA-256 token hash is stored (never the token), and transitions are soft (ACTIVE → SUPERSEDED/CONSUMED/
@@ -114,6 +117,26 @@ class TenantStore {
             TenantInviteEntity.SUPERSEDED, tenantId, email, TenantInviteEntity.ACTIVE,
         )
         mintInvite(tenantId, email, tokenHash, expiresAt, Instant.now(), TenantInviteEntity.MEMBER)
+    }
+
+    /** The tenant's pending (ACTIVE + unexpired) MEMBER invites — metadata only, for the owner's tracking list. */
+    fun listPendingMemberInvites(tenantId: String): List<PendingInviteRow> =
+        TenantInviteEntity.find(
+            "tenantId = ?1 and role = ?2 and status = ?3 and expiresAt > ?4",
+            tenantId, TenantInviteEntity.MEMBER, TenantInviteEntity.ACTIVE, Instant.now(),
+        ).list().map { PendingInviteRow(it.id, it.ownerEmail, it.status, it.expiresAt) }
+
+    /** A specific pending (ACTIVE) MEMBER invite of this tenant, or null (unknown / consumed / terminal). */
+    fun findPendingMemberInvite(tenantId: String, inviteId: String): TenantInviteEntity? =
+        TenantInviteEntity.find(
+            "id = ?1 and tenantId = ?2 and role = ?3 and status = ?4",
+            inviteId, tenantId, TenantInviteEntity.MEMBER, TenantInviteEntity.ACTIVE,
+        ).firstResult()
+
+    /** Soft-revoke an invite (→ SUPERSEDED terminal) so its secret replays as no-longer-valid. */
+    @Transactional
+    fun revokeInvite(inviteId: String) {
+        TenantInviteEntity.update("status = ?1 where id = ?2", TenantInviteEntity.SUPERSEDED, inviteId)
     }
 
     /** Create a PENDING tenant with its first ACTIVE invite. Returns the new tenant id + invite expiry. */

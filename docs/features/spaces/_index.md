@@ -40,9 +40,15 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - ★ [List & switch spaces](use-cases/uc.spaces.switch-spaces.md) — **built (web)** (tenant switcher +
   per-space `#fragment` switching; [cr-0031](../../../changes/cr-0031-memory-shell-polish.md),
   [cr-0075](../../../changes/cr-0075-web-enter-tenant-scope.md) enter-tenant + Personal↔Tenant)
-- ★ [Add a member to the shared tenant space](use-cases/uc.spaces.add-member.md) — **refined** (invite a
+- ★ [Add a member to the shared tenant space](use-cases/uc.spaces.add-member.md) — **built (web)** (invite a
   person, then wrap `K_SC` to their identity — the grant-distribution primitive;
-  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md); not yet built)
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md);
+  [cr-0076](../../../changes/cr-0076-background-task-mechanism.md) delivery +
+  [cr-0077](../../../changes/cr-0077-member-add-onboarding.md) onboarding +
+  [cr-0080](../../../changes/cr-0080-invite-link-handoff.md) copyable invite link)
+- [Manage pending member invites](use-cases/uc.spaces.manage-member-invites.md) — **built** (the owner lists /
+  re-issues / revokes the member invites add-member mints; owner-gated, additive-safe;
+  [cr-0082](../../../changes/cr-0082-member-invite-management.md))
 - Create / share with a group — **in progress** (G1 `en.spaces.group-scope` in cr-0032; member-add G2 reuses
   the [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) primitive, management G3 —
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md))

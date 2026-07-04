@@ -4,15 +4,30 @@
 // grant-present) — never a scope key. The actual key DELIVERY runs as a grant-delivery job (cr-0076), not here.
 import { tenantsApi, scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import type { MemberInviteState } from '../../api/generated/tenants'
+import type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
 import type { ScopeMember } from '../../api/generated/scopes'
 
 export type { ScopeMember } from '../../api/generated/scopes'
-export type { MemberInviteState } from '../../api/generated/tenants'
+export type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
 
 /** Invite a person (by email) into the active tenant as a MEMBER — owner-gated (403 `not_tenant_owner`). */
 export function inviteMember(tenantId: string, email: string): Promise<MemberInviteState> {
   return withRefresh(() => tenantsApi().inviteTenantMember({ tenantId, memberInviteRequest: { email } }))
+}
+
+/** List the tenant's pending member invites (invited-but-not-joined) — owner-gated (uc.spaces.manage-member-invites). */
+export function listMemberInvites(tenantId: string): Promise<PendingMemberInvite[]> {
+  return withRefresh(() => tenantsApi().listMemberInvites({ tenantId }))
+}
+
+/** Re-issue a pending member invite: supersede the old secret + mint a fresh copyable link — owner-gated. */
+export function reissueMemberInvite(tenantId: string, inviteId: string): Promise<MemberInviteState> {
+  return withRefresh(() => tenantsApi().reissueMemberInvite({ tenantId, inviteId }))
+}
+
+/** Revoke a pending member invite (soft-terminal; its secret no longer accepts) — owner-gated. */
+export function revokeMemberInvite(tenantId: string, inviteId: string): Promise<void> {
+  return withRefresh(() => tenantsApi().revokeMemberInvite({ tenantId, inviteId }))
 }
 
 /** List a scope's members with their identity pubkeys + grant status (the directory) — key-holder only. */

@@ -302,6 +302,132 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: already_member }
+    get:
+      tags: [tenants]
+      operationId: listMemberInvites
+      summary: List the tenant's pending member invites (owner-gated).
+      description: >
+        Returns the tenant's currently **pending** MEMBER invites — each an opaque `inviteId`, the invited
+        `email`, its status, and expiry — so the owner can track who has been invited but has not joined yet
+        (uc.spaces.manage-member-invites). Consumed/expired/superseded invites are not listed. Gated on the
+        caller holding the tenant **OWNER** membership (a code check). Operator-blind: only invite metadata the
+        server already stores — never a plaintext secret.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: The tenant's pending member invites.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PendingMemberInvite" }
+              example:
+                - inviteId: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+                  email: partner@example.com
+                  inviteStatus: ACTIVE
+                  inviteExpiresAt: 2026-07-11T12:00:00Z
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not own this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
+  /api/tenants/{tenantId}/member-invites/{inviteId}/reissue:
+    post:
+      tags: [tenants]
+      operationId: reissueMemberInvite
+      summary: Re-issue a pending member invite with a fresh secret + link (owner-gated).
+      description: >
+        Supersedes the given pending MEMBER invite and mints a **fresh single-use secret** for the same email
+        (the old link dies), returning the new copyable invite link secret (cr-0080) — for when the invitee
+        lost or ignored the first one. Owner-gated. Same email, new secret + expiry. Works without a mailer.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/InviteId"
+      responses:
+        "200":
+          description: A fresh member invite was minted (the old one superseded).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberInviteState" }
+              example:
+                email: partner@example.com
+                inviteStatus: ACTIVE
+                inviteExpiresAt: 2026-07-11T12:00:00Z
+                bootstrapSecret: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not own this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: No such pending invite for this tenant (unknown, already consumed, or already terminal).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_not_found }
+
+  /api/tenants/{tenantId}/member-invites/{inviteId}:
+    delete:
+      tags: [tenants]
+      operationId: revokeMemberInvite
+      summary: Revoke a pending member invite (owner-gated).
+      description: >
+        Soft-transitions the given pending MEMBER invite to a terminal state, so a later replay of its secret at
+        `accept` is rejected (`invite_no_longer_valid`) and the reserved email is freed to re-invite. Owner-gated.
+        **Additive-safe** — it touches no grant and no already-joined member (removing a *member* is a later
+        slice, ADR 0020).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/InviteId"
+      responses:
+        "204":
+          description: The pending invite was revoked.
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not own this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: No such pending invite for this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invite_not_found }
 
   /api/tenants/{tenantId}:
     delete:
@@ -540,6 +666,15 @@ components:
         type: string
         format: uuid
         example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+    InviteId:
+      name: inviteId
+      in: path
+      required: true
+      description: Opaque id of a member invite.
+      schema:
+        type: string
+        format: uuid
+        example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
 
   schemas:
     CreateTenantRequest:
@@ -683,6 +818,26 @@ components:
           maxLength: 254
           example: partner@example.com
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+
+    PendingMemberInvite:
+      type: object
+      required: [inviteId, email, inviteStatus, inviteExpiresAt]
+      properties:
+        inviteId:
+          type: string
+          format: uuid
+          description: Opaque id of the pending invite (used to re-issue or revoke it).
+          example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
+        email:
+          type: string
+          maxLength: 254
+          example: partner@example.com
+        inviteStatus:
+          $ref: "#/components/schemas/InviteStatus"
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          example: 2026-07-11T12:00:00Z
 
     MemberInviteState:
       type: object

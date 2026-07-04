@@ -9,6 +9,7 @@ import com.veyq.app.generated.model.InviteRole
 import com.veyq.app.generated.model.InviteStatus
 import com.veyq.app.generated.model.MemberInviteRequest
 import com.veyq.app.generated.model.MemberInviteState
+import com.veyq.app.generated.model.PendingMemberInvite
 import com.veyq.app.generated.model.ReassignOwnerRequest
 import com.veyq.app.generated.model.InvitePreview
 import com.veyq.app.generated.model.RegisterAndAcceptRequest
@@ -85,6 +86,40 @@ class TenantsResource(
                 .entity(ErrorResponse(code = "not_tenant_owner")).build()
             MemberInviteOutcome.NotActive -> conflict("tenant_not_active")
             MemberInviteOutcome.AlreadyMember -> conflict("already_member")
+        }
+
+    // Member-invite management (cr-0082) — owner-gated tracking of pending member invites: list / re-issue link /
+    // revoke. All @Authenticated (not Server-Owner); the OWNER-membership check lives in the handler (403).
+    @Authenticated
+    override fun listMemberInvites(tenantId: UUID): Response =
+        when (val outcome = handler.listMemberInvites(identity.principal.name, tenantId.toString())) {
+            is MemberInvitesOutcome.Listed -> Response.ok(
+                outcome.invites.map {
+                    PendingMemberInvite(UUID.fromString(it.inviteId), it.email, InviteStatus.valueOf(it.status), it.expiresAt.utc())
+                },
+            ).build()
+            MemberInvitesOutcome.NotFound -> notFound()
+            MemberInvitesOutcome.NotOwner -> notTenantOwner()
+        }
+
+    @Authenticated
+    override fun reissueMemberInvite(tenantId: UUID, inviteId: UUID): Response =
+        when (val outcome = handler.reissueMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
+            is ReissueOutcome.Done -> Response.ok(
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
+            ).build()
+            ReissueOutcome.NotFound -> notFound()
+            ReissueOutcome.NotOwner -> notTenantOwner()
+            ReissueOutcome.InviteNotFound -> inviteNotFound()
+        }
+
+    @Authenticated
+    override fun revokeMemberInvite(tenantId: UUID, inviteId: UUID): Response =
+        when (handler.revokeMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
+            RevokeMemberInviteOutcome.Done -> Response.noContent().build()
+            RevokeMemberInviteOutcome.NotFound -> notFound()
+            RevokeMemberInviteOutcome.NotOwner -> notTenantOwner()
+            RevokeMemberInviteOutcome.InviteNotFound -> inviteNotFound()
         }
 
     // --- Slice B (cr-0010): invite acceptance / activation. Method-level annotations override the class
@@ -177,6 +212,9 @@ class TenantsResource(
 
     private fun notFound() = Response.status(Response.Status.NOT_FOUND)
         .entity(ErrorResponse(code = "tenant_not_found")).build()
+
+    private fun notTenantOwner() = Response.status(Response.Status.FORBIDDEN)
+        .entity(ErrorResponse(code = "not_tenant_owner")).build()
 
     private fun badRequest() = Response.status(Response.Status.BAD_REQUEST)
         .entity(ErrorResponse(code = "invalid_request")).build()

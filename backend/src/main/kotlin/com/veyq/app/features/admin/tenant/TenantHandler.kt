@@ -36,6 +36,29 @@ sealed interface MemberInviteOutcome {
     data object AlreadyMember : MemberInviteOutcome
 }
 
+/** Result of listing a tenant's pending member invites (cr-0082). */
+sealed interface MemberInvitesOutcome {
+    data class Listed(val invites: List<PendingInviteRow>) : MemberInvitesOutcome
+    data object NotFound : MemberInvitesOutcome
+    data object NotOwner : MemberInvitesOutcome
+}
+
+/** Result of re-issuing a pending member invite (cr-0082). */
+sealed interface ReissueOutcome {
+    data class Done(val invite: InviteView) : ReissueOutcome
+    data object NotFound : ReissueOutcome        // no such tenant
+    data object NotOwner : ReissueOutcome
+    data object InviteNotFound : ReissueOutcome  // no such pending invite for this tenant
+}
+
+/** Result of revoking a pending member invite (cr-0082). */
+sealed interface RevokeMemberInviteOutcome {
+    data object Done : RevokeMemberInviteOutcome
+    data object NotFound : RevokeMemberInviteOutcome
+    data object NotOwner : RevokeMemberInviteOutcome
+    data object InviteNotFound : RevokeMemberInviteOutcome
+}
+
 /**
  * Server-Owner tenant administration, structural half (uc.admin.create-tenant Slice A, cr-0009). Purely
  * fachlich: authentication + the Server-Owner gate are central (`@RolesAllowed` on [TenantsResource] →
@@ -109,6 +132,38 @@ class TenantHandler(
         store.mintMemberInvite(tenantId, normalizedEmail, Tokens.hash(token), expiresAt)
         mailer.sendInvite(tenant.domain, normalizedEmail, token, expiresAt)
         return MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt, token))
+    }
+
+    /** List a tenant's pending member invites — owner-gated (cr-0082). */
+    @Transactional
+    fun listMemberInvites(callerId: String, tenantId: String): MemberInvitesOutcome {
+        store.findTenant(tenantId) ?: return MemberInvitesOutcome.NotFound
+        if (!store.isOwner(callerId, tenantId)) return MemberInvitesOutcome.NotOwner
+        return MemberInvitesOutcome.Listed(store.listPendingMemberInvites(tenantId))
+    }
+
+    /** Re-issue a pending member invite: supersede it + mint a fresh secret for the same email (cr-0082). */
+    @Transactional
+    fun reissueMemberInvite(callerId: String, tenantId: String, inviteId: String): ReissueOutcome {
+        val tenant = store.findTenant(tenantId) ?: return ReissueOutcome.NotFound
+        if (!store.isOwner(callerId, tenantId)) return ReissueOutcome.NotOwner
+        val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return ReissueOutcome.InviteNotFound
+        val token = Tokens.random()
+        val expiresAt = Instant.now().plus(inviteTtl)
+        // mintMemberInvite supersedes the current ACTIVE invite for this email (i.e. the one we found) + mints anew.
+        store.mintMemberInvite(tenantId, invite.ownerEmail, Tokens.hash(token), expiresAt)
+        mailer.sendInvite(tenant.domain, invite.ownerEmail, token, expiresAt)
+        return ReissueOutcome.Done(InviteView(invite.ownerEmail, TenantInviteEntity.ACTIVE, expiresAt, token))
+    }
+
+    /** Revoke a pending member invite (soft-terminal, additive-safe) — owner-gated (cr-0082). */
+    @Transactional
+    fun revokeMemberInvite(callerId: String, tenantId: String, inviteId: String): RevokeMemberInviteOutcome {
+        store.findTenant(tenantId) ?: return RevokeMemberInviteOutcome.NotFound
+        if (!store.isOwner(callerId, tenantId)) return RevokeMemberInviteOutcome.NotOwner
+        val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return RevokeMemberInviteOutcome.InviteNotFound
+        store.revokeInvite(invite.id)
+        return RevokeMemberInviteOutcome.Done
     }
 
     private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {

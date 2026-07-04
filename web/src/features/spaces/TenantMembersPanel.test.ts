@@ -8,12 +8,19 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 
 vi.mock('./members', () => ({
   listScopeMembers: vi.fn(),
+  listMemberInvites: vi.fn(),
+  reissueMemberInvite: vi.fn(),
+  revokeMemberInvite: vi.fn(),
   memberError: vi.fn().mockResolvedValue({ status: 0, code: null }),
 }))
 vi.mock('./scopes', () => ({ listMyTenants: vi.fn() }))
+vi.mock('../../shared/inviteLink', () => ({
+  buildInviteLink: (secret: string) => `https://x.test/tenant/accept#${secret}`,
+  copyText: vi.fn().mockResolvedValue(true),
+}))
 
 import TenantMembersPanel from './TenantMembersPanel.vue'
-import { listScopeMembers } from './members'
+import { listScopeMembers, listMemberInvites, reissueMemberInvite, revokeMemberInvite } from './members'
 import { listMyTenants } from './scopes'
 import { activeSpace, clearActiveSpace } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
@@ -25,17 +32,22 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: {
     en: {
+      common: { done: 'Done' },
       members: {
         title: 'Members', sub: 'sub', invite: 'Invite member', loading: 'Loading…', empty: 'No members',
         loadFailed: 'Failed', notAuthorized: 'Not authorized', statusActive: 'Active', statusAwaiting: 'Awaiting access',
+        pendingTitle: 'Pending invites', pendingSub: 'pending sub', statusInvited: 'Invited', reissue: 'New link',
+        revoke: 'Cancel invite', revokeConfirm: 'Cancel?', inviteReissued: 'Fresh link ready.', inviteRevoked: 'Invite cancelled.',
+        actionFailed: 'Action failed', copyLinkIntro: 'Copy it.', copyLink: 'Copy link', copied: 'Copied',
       },
     },
   },
 })
 
 const stubs = {
-  Button: { props: ['label'], template: '<button>{{ label }}</button>' },
+  Button: { props: ['label', 'icon', 'ariaLabel'], template: '<button :aria-label="ariaLabel">{{ label }}</button>' },
   Message: { template: '<div class="msg"><slot /></div>' },
+  InputText: { props: ['modelValue'], template: '<input :value="modelValue" />' },
   InviteMemberDialog: true,
 }
 
@@ -44,8 +56,11 @@ const MEMBERS = [
   { userId: 'u-pend', displayName: 'Partner', email: 'partner@x.z', role: 'MEMBER', identityPublicKey: 'BB==', hasGrant: false },
 ]
 
-async function mountPanel(role: 'OWNER' | 'MEMBER') {
+const PENDING = [{ inviteId: 'inv-1', email: 'newbie@x.z', inviteStatus: 'ACTIVE', inviteExpiresAt: new Date() }]
+
+async function mountPanel(role: 'OWNER' | 'MEMBER', pending = PENDING) {
   vi.mocked(listScopeMembers).mockResolvedValue(MEMBERS as never)
+  vi.mocked(listMemberInvites).mockResolvedValue(pending as never)
   vi.mocked(listMyTenants).mockResolvedValue([{ tenantId: 't-1', name: 'Fam', domain: '127.0.0.1', role }] as never)
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', name: 'login', component: { template: '<div/>' } }] })
   const wrapper = mount(TenantMembersPanel, { global: { plugins: [router, i18n], stubs } })
@@ -83,5 +98,50 @@ describe('TenantMembersPanel (uc.spaces.add-member, web)', () => {
   it('hides the invite button from a non-owner member (admission is owner-only)', async () => {
     const wrapper = await mountPanel('MEMBER')
     expect(wrapper.text()).not.toContain('Invite member')
+  })
+
+  it('shows the owner the pending invites (invited-but-not-joined) with management actions', async () => {
+    const wrapper = await mountPanel('OWNER')
+    const rows = wrapper.findAll('.invite-row')
+    expect(rows).toHaveLength(1)
+    expect(wrapper.text()).toContain('newbie@x.z')
+    expect(wrapper.text()).toContain('Pending invites')
+    expect(wrapper.find('[aria-label="New link"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Cancel invite"]').exists()).toBe(true)
+  })
+
+  it('never lists pending invites for a non-owner (admission stays owner-only)', async () => {
+    const wrapper = await mountPanel('MEMBER')
+    expect(listMemberInvites).not.toHaveBeenCalled()
+    expect(wrapper.find('.invite-row').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Pending invites')
+  })
+
+  it('re-issues an invite and surfaces the fresh copyable link', async () => {
+    vi.mocked(reissueMemberInvite).mockResolvedValue({ bootstrapSecret: 'fresh-secret' } as never)
+    const wrapper = await mountPanel('OWNER')
+    await wrapper.find('[aria-label="New link"]').trigger('click')
+    await flushPromises()
+    expect(reissueMemberInvite).toHaveBeenCalledWith('t-1', 'inv-1')
+    const link = wrapper.find('.invite-link-input')
+    expect(link.exists()).toBe(true)
+    expect((link.element as HTMLInputElement).value).toContain('fresh-secret')
+  })
+
+  it('revokes an invite after confirmation', async () => {
+    window.confirm = vi.fn().mockReturnValue(true)
+    vi.mocked(revokeMemberInvite).mockResolvedValue(undefined)
+    const wrapper = await mountPanel('OWNER')
+    await wrapper.find('[aria-label="Cancel invite"]').trigger('click')
+    await flushPromises()
+    expect(revokeMemberInvite).toHaveBeenCalledWith('t-1', 'inv-1')
+  })
+
+  it('does not revoke when the confirm is dismissed', async () => {
+    window.confirm = vi.fn().mockReturnValue(false)
+    const wrapper = await mountPanel('OWNER')
+    await wrapper.find('[aria-label="Cancel invite"]').trigger('click')
+    await flushPromises()
+    expect(revokeMemberInvite).not.toHaveBeenCalled()
   })
 })
