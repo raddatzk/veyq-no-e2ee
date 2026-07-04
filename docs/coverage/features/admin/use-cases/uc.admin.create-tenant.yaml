@@ -15,6 +15,11 @@ acceptanceCriteria:
     text: A domain already mapped to a tenant is rejected (409 domain_taken).
     coverage:
       backend: { integration: [TenantsSliceTest.duplicateDomainIs409] }
+  - id: invite-link-handoff
+    text: The owner invite is delivered out-of-band by the Server Owner copying the invite link (the bootstrap secret in the URL fragment) — create/resend/reassign responses return the raw secret to the Server-Owner-gated caller, so tenant onboarding works without any email/SMTP infrastructure (self-hostable by default). (cr-0080.)
+    coverage:
+      web:
+        unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/features/admin/createTenant/TenantAdminPanel.test.ts, src/shared/inviteLink.test.ts]
   - id: list-tenants
     text: A Server Owner lists all tenants with each one's current invite status.
     coverage:

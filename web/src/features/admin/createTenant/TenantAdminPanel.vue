@@ -21,6 +21,7 @@ import {
   tenantError,
   type TenantSummary,
 } from './tenants'
+import { buildInviteLink, copyText } from '../../../shared/inviteLink'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -37,7 +38,11 @@ const createOpen = ref(false)
 const editOpen = ref(false)
 const editId = ref('')
 const editEmail = ref('')
+const editDomain = ref('')
 const editBusy = ref(false)
+// After a resend/reassign, show the fresh invite link to copy (cr-0080 — the owner hands it off, no mailer).
+const editInviteUrl = ref('')
+const editCopied = ref(false)
 
 onMounted(load)
 
@@ -77,7 +82,14 @@ async function runAction(action: () => Promise<unknown>, successKey: string) {
 function openEdit(tenant: TenantSummary) {
   editId.value = tenant.tenantId
   editEmail.value = tenant.ownerEmail
+  editDomain.value = tenant.domain
+  editInviteUrl.value = ''
+  editCopied.value = false
   editOpen.value = true
+}
+
+async function copyEditLink() {
+  editCopied.value = await copyText(editInviteUrl.value)
 }
 
 function revoke(id: string) {
@@ -86,18 +98,31 @@ function revoke(id: string) {
 }
 
 async function resendFromEdit() {
-  editBusy.value = true
-  await runAction(() => resendInvite(editId.value), 'tenant.resent')
-  editBusy.value = false
-  editOpen.value = false
+  await mintFromEdit(() => resendInvite(editId.value), 'tenant.resent')
 }
 
 async function submitReassign() {
   if (editEmail.value.trim().length === 0) return
+  await mintFromEdit(() => reassignInvite(editId.value, editEmail.value.trim()), 'tenant.reassigned')
+}
+
+// Resend/reassign both re-mint the invite → capture the fresh secret and show its link (the dialog stays open
+// so the owner can copy it); reloads the list behind it. 401 → re-login, other failures → an inline error.
+async function mintFromEdit(action: () => Promise<{ bootstrapSecret: string }>, successKey: string) {
   editBusy.value = true
-  await runAction(() => reassignInvite(editId.value, editEmail.value.trim()), 'tenant.reassigned')
-  editBusy.value = false
-  editOpen.value = false
+  actionError.value = ''
+  try {
+    const state = await action()
+    notice.value = t(successKey)
+    editInviteUrl.value = buildInviteLink(state.bootstrapSecret, editDomain.value)
+    await load()
+  } catch (e) {
+    const { status } = await tenantError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value = t('tenant.actionFailed')
+  } finally {
+    editBusy.value = false
+  }
 }
 </script>
 
@@ -164,7 +189,7 @@ async function submitReassign() {
     <CreateTenantDialog v-model:visible="createOpen" @created="onCreated" />
 
     <Dialog v-model:visible="editOpen" :header="t('tenant.reassignTitle')" modal>
-      <form class="veyq-form" @submit.prevent="submitReassign">
+      <form v-if="!editInviteUrl" class="veyq-form" @submit.prevent="submitReassign">
         <label>
           {{ t('tenant.ownerEmail') }}
           <InputText v-model="editEmail" type="email" autocomplete="email" required />
@@ -187,6 +212,18 @@ async function submitReassign() {
           />
         </div>
       </form>
+
+      <div v-else class="veyq-form">
+        <Message severity="success" :closable="false">{{ t('tenant.inviteReissued') }}</Message>
+        <p class="settings-muted">{{ t('members.copyLinkIntro') }}</p>
+        <div class="invite-link-row">
+          <InputText :model-value="editInviteUrl" readonly class="invite-link-input" @focus="($event.target as HTMLInputElement).select()" />
+          <Button :label="editCopied ? t('members.copied') : t('members.copyLink')" :icon="editCopied ? 'pi pi-check' : 'pi pi-copy'" @click="copyEditLink" />
+        </div>
+        <div class="veyq-dialog-action-row">
+          <Button type="button" :label="t('common.done')" icon="pi pi-check" @click="editOpen = false" />
+        </div>
+      </div>
     </Dialog>
   </section>
 </template>
@@ -195,5 +232,16 @@ async function submitReassign() {
 .settings-muted {
   margin: 0;
   color: var(--app-muted);
+}
+.invite-link-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.invite-link-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
 }
 </style>

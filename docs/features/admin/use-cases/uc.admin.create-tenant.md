@@ -23,8 +23,10 @@ keys); the invited owner's act is where the tenant's cryptographic root is **bor
 2. On confirm, the server validates the **domain is free and well-formed**, creates the tenant in
    **`PENDING`** (not yet active — no content is possible yet), stores name + domain + owner email as
    **operational cleartext**, mints a **single-use, time-limited invite token** (a *bootstrap secret*,
-   not a key) **bound to the owner email**, and sends an invite email to that address. The server holds
-   **no keys**.
+   not a key) **bound to the owner email**, and returns it to the Server Owner. Delivery is by email **if a
+   mailer is configured**, or by the Server Owner **copying the invite link** (the bootstrap secret in the URL
+   fragment) — so tenant onboarding works with no SMTP, self-hostable by default
+   ([cr-0080](../../../../changes/cr-0080-invite-link-handoff.md)). The server holds **no keys**.
 
 ### Act 2 — Invited owner activates the tenant (cold scope birth)
 

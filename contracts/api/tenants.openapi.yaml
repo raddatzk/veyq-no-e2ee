@@ -582,7 +582,7 @@ components:
 
     TenantCreated:
       type: object
-      required: [tenantId, status, inviteExpiresAt]
+      required: [tenantId, status, inviteExpiresAt, bootstrapSecret]
       properties:
         tenantId:
           type: string
@@ -596,6 +596,8 @@ components:
           format: date-time
           description: When the minted invite expires (UTC).
           example: 2026-07-03T12:00:00Z
+        bootstrapSecret:
+          $ref: "#/components/schemas/InviteBootstrapSecret"
 
     TenantSummary:
       type: object
@@ -632,7 +634,7 @@ components:
 
     TenantInviteState:
       type: object
-      required: [ownerEmail, inviteStatus, inviteExpiresAt]
+      required: [ownerEmail, inviteStatus, inviteExpiresAt, bootstrapSecret]
       properties:
         ownerEmail:
           type: string
@@ -644,6 +646,8 @@ components:
           type: string
           format: date-time
           example: 2026-07-03T12:00:00Z
+        bootstrapSecret:
+          $ref: "#/components/schemas/InviteBootstrapSecret"
 
     TenantStatus:
       type: string
@@ -682,7 +686,7 @@ components:
 
     MemberInviteState:
       type: object
-      required: [email, inviteStatus, inviteExpiresAt]
+      required: [email, inviteStatus, inviteExpiresAt, bootstrapSecret]
       properties:
         email:
           type: string
@@ -694,6 +698,19 @@ components:
           type: string
           format: date-time
           example: 2026-07-11T12:00:00Z
+        bootstrapSecret:
+          $ref: "#/components/schemas/InviteBootstrapSecret"
+
+    InviteBootstrapSecret:
+      type: string
+      description: >
+        The raw single-use invite secret, returned to the **minting owner** so they can hand the invite off
+        out-of-band by copying the invite link (`/tenant/accept#<bootstrapSecret>`) — which works without any
+        email infrastructure (the mailer is optional). It is the **admission token, not a key** ([ADR 0006](../../docs/decisions/0006-cold-tenant-scope-birth.md));
+        it rides the URL **fragment** on the invitee side and is matched server-side by hash only (never stored
+        plaintext, never echoed in the tenant list — only here at mint time, over TLS to the owner-gated caller).
+      maxLength: 128
+      example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
 
     ErrorResponse:
       type: object

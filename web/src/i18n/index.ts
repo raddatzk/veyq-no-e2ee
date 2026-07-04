@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 export type SupportedLocale = 'en' | 'de'
 
 const en = {
-  common: { email: 'Email', password: 'Password', cancel: 'Cancel', save: 'Save', create: 'Create', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
+  common: { email: 'Email', password: 'Password', cancel: 'Cancel', save: 'Save', create: 'Create', done: 'Done', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
   members: {
     pageTitle: 'Space members',
     pageSub: 'Manage who belongs to this shared space.',
@@ -26,6 +26,10 @@ const en = {
     statusActive: 'Active',
     statusAwaiting: 'Awaiting access',
     awaitingAccess: 'Awaiting access',
+    inviteCreated: 'Invite created.',
+    copyLinkIntro: 'Copy this link and send it to them yourself. Access to the shared space is delivered automatically once they join and a member is online.',
+    copyLink: 'Copy link',
+    copied: 'Copied',
   },
   settings: {
     title: 'Settings',
@@ -48,6 +52,8 @@ const en = {
     ownerEmail: 'Owner email',
     domainTaken: 'That domain is already in use by another tenant.',
     createFailed: 'Could not create the tenant. Please try again.',
+    created: 'Tenant created.',
+    inviteReissued: 'Invite re-issued.',
     inviteSent: 'Tenant created — an owner invite was sent.',
     statusPending: 'Pending',
     statusActive: 'Active',
@@ -309,7 +315,7 @@ const en = {
 }
 
 const de: typeof en = {
-  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', save: 'Speichern', create: 'Erstellen', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
+  common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', save: 'Speichern', create: 'Erstellen', done: 'Fertig', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
   members: {
     pageTitle: 'Mitglieder',
     pageSub: 'Verwalte, wer zu diesem geteilten Bereich gehört.',
@@ -330,6 +336,10 @@ const de: typeof en = {
     statusActive: 'Aktiv',
     statusAwaiting: 'Wartet auf Zugang',
     awaitingAccess: 'Wartet auf Zugang',
+    inviteCreated: 'Einladung erstellt.',
+    copyLinkIntro: 'Kopiere diesen Link und schicke ihn der Person selbst. Der Zugang zum geteilten Bereich wird automatisch ausgeliefert, sobald sie beitritt und ein Mitglied online ist.',
+    copyLink: 'Link kopieren',
+    copied: 'Kopiert',
   },
   settings: {
     title: 'Einstellungen',
@@ -352,6 +362,8 @@ const de: typeof en = {
     ownerEmail: 'Owner-E-Mail',
     domainTaken: 'Diese Domain wird bereits von einem anderen Tenant verwendet.',
     createFailed: 'Tenant konnte nicht angelegt werden. Bitte erneut versuchen.',
+    created: 'Tenant angelegt.',
+    inviteReissued: 'Einladung neu ausgestellt.',
     inviteSent: 'Tenant angelegt — eine Owner-Einladung wurde gesendet.',
     statusPending: 'Ausstehend',
     statusActive: 'Aktiv',

@@ -17,6 +17,13 @@ acceptanceCriteria:
         integration: [MemberAddSliceTest.ownerMintsMemberInviteNonOwnerIsForbidden, MemberAddSliceTest.memberRegisterJoinsGrantLessAndOwnerClaimOriginatesDelivery, MemberAddSliceTest.existingAccountAcceptsMemberInviteAndJoinsGrantLess]
       web:
         unit: [src/features/spaces/InviteMemberDialog.test.ts, src/components/app/AppSidebar.test.ts]
+  - id: invite-link-handoff
+    text: The invite is delivered out-of-band by the owner copying the invite link (the bootstrap secret in the URL fragment) — the mint response returns the raw secret to the owner-gated caller, so member-add works without any email/SMTP infrastructure (self-hostable by default). The returned secret is the real one (it accepts).
+    coverage:
+      backend:
+        integration: [MemberAddSliceTest.mintedMemberInviteReturnsAUsableBootstrapSecretForCopyLinkHandoff]
+      web:
+        unit: [src/features/spaces/InviteMemberDialog.test.ts, src/shared/inviteLink.test.ts]
   - id: scope-member-directory
     text: An authorized granter lists a scope's memberships with each member's identity public key + grant status (granted vs pending). The operator-blind server returns only already-stored operational metadata (pubkeys/roles/grant-present) — never a scope key — and the directory is scoped to that scope's members, not a global user search.
     coverage:

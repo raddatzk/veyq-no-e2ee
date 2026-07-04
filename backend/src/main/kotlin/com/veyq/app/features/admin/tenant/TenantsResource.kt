@@ -51,7 +51,7 @@ class TenantsResource(
             createTenantRequest.ownerEmail,
         )) {
             is CreateTenantOutcome.Created -> Response.status(Response.Status.CREATED)
-                .entity(TenantCreated(UUID.fromString(outcome.tenantId), TenantStatus.PENDING, outcome.expiresAt.utc()))
+                .entity(TenantCreated(UUID.fromString(outcome.tenantId), TenantStatus.PENDING, outcome.expiresAt.utc(), outcome.bootstrapSecret))
                 .build()
             CreateTenantOutcome.DomainTaken -> conflict("domain_taken")
         }
@@ -78,7 +78,7 @@ class TenantsResource(
     override fun inviteTenantMember(tenantId: UUID, memberInviteRequest: MemberInviteRequest): Response =
         when (val outcome = handler.inviteMember(identity.principal.name, tenantId.toString(), memberInviteRequest.email)) {
             is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
-                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc()),
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
             ).build()
             MemberInviteOutcome.NotFound -> notFound()
             MemberInviteOutcome.NotOwner -> Response.status(Response.Status.FORBIDDEN)
@@ -157,7 +157,7 @@ class TenantsResource(
 
     private fun InviteOutcome.toResponse(): Response = when (this) {
         is InviteOutcome.Done -> Response.ok(
-            TenantInviteState(invite.ownerEmail, InviteStatus.valueOf(invite.status), invite.expiresAt.utc()),
+            TenantInviteState(invite.ownerEmail, InviteStatus.valueOf(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!),
         ).build()
         InviteOutcome.NotFound -> notFound()
         InviteOutcome.NotPending -> conflict("tenant_not_pending")

@@ -9,6 +9,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { createTenant, tenantError } from './tenants'
+import { buildInviteLink, copyText } from '../../../shared/inviteLink'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ created: [] }>()
@@ -19,6 +20,8 @@ const domain = ref('')
 const ownerEmail = ref('')
 const error = ref('')
 const loading = ref(false)
+const inviteUrl = ref('') // set on success → switches to the copy-link view (the owner hands the link off)
+const copied = ref(false)
 const canSubmit = computed(
   () => name.value.trim().length > 0 && domain.value.trim().length > 0 && ownerEmail.value.trim().length > 0,
 )
@@ -29,6 +32,8 @@ watch(visible, (isVisible) => {
     name.value = ''
     domain.value = ''
     ownerEmail.value = ''
+    inviteUrl.value = ''
+    copied.value = false
   }
 })
 
@@ -37,8 +42,9 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await createTenant(name.value.trim(), domain.value.trim().toLowerCase(), ownerEmail.value.trim())
-    visible.value = false
+    const normalizedDomain = domain.value.trim().toLowerCase()
+    const created = await createTenant(name.value.trim(), normalizedDomain, ownerEmail.value.trim())
+    inviteUrl.value = buildInviteLink(created.bootstrapSecret, normalizedDomain) // the owner lives on another host
     emit('created')
   } catch (e) {
     const { code } = await tenantError(e)
@@ -47,11 +53,15 @@ async function submit() {
     loading.value = false
   }
 }
+
+async function copyLink() {
+  copied.value = await copyText(inviteUrl.value)
+}
 </script>
 
 <template>
   <Dialog v-model:visible="visible" :header="t('tenant.create')" modal class="tenant-dialog">
-    <form class="veyq-form" @submit.prevent="submit">
+    <form v-if="!inviteUrl" class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('tenant.name') }}
         <InputText v-model="name" autocomplete="off" required />
@@ -78,6 +88,18 @@ async function submit() {
         <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" :disabled="!canSubmit" />
       </div>
     </form>
+
+    <div v-else class="veyq-form">
+      <Message severity="success" :closable="false">{{ t('tenant.created') }}</Message>
+      <p class="field-hint">{{ t('members.copyLinkIntro') }}</p>
+      <div class="invite-link-row">
+        <InputText :model-value="inviteUrl" readonly class="invite-link-input" @focus="($event.target as HTMLInputElement).select()" />
+        <Button :label="copied ? t('members.copied') : t('members.copyLink')" :icon="copied ? 'pi pi-check' : 'pi pi-copy'" @click="copyLink" />
+      </div>
+      <div class="veyq-dialog-action-row">
+        <Button type="button" :label="t('common.done')" icon="pi pi-check" @click="visible = false" />
+      </div>
+    </div>
   </Dialog>
 </template>
 
@@ -85,6 +107,17 @@ async function submit() {
 .field-hint {
   display: block;
   opacity: 0.7;
+  font-size: 0.85em;
+}
+.invite-link-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.invite-link-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.85em;
 }
 </style>

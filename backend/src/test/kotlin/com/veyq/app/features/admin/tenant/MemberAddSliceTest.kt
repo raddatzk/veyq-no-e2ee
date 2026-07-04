@@ -79,6 +79,25 @@ class MemberAddSliceTest {
     }
 
     @Test
+    fun mintedMemberInviteReturnsAUsableBootstrapSecretForCopyLinkHandoff() {
+        // cr-0080: the mint response hands the owner the raw secret so they can copy the invite link (no mailer
+        // needed). Prove it is the *real* token — registering with it actually joins the tenant grant-less.
+        val (tenantId, owner) = seedActiveTenant("copylink.example.com", "owner@copylink.example.com")
+        val secret = given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+            .body("""{"email":"newbie@copylink.example.com"}""")
+            .`when`().post("/api/tenants/$tenantId/member-invites")
+            .then().statusCode(201).body("bootstrapSecret", notNullValue())
+            .extract().path<String>("bootstrapSecret")
+
+        val newUserId = given().contentType(ContentType.JSON).body(memberRegisterBody(secret))
+            .`when`().post("/api/tenants/accept/register")
+            .then().statusCode(201).body("status", equalTo("ACTIVE"))
+            .extract().path<String>("userId")
+        assertEquals("MEMBER", membershipRole(newUserId, tenantId))
+        assertNull(grantOf(newUserId, tenantId))
+    }
+
+    @Test
     fun existingAccountAcceptsMemberInviteAndJoinsGrantLess() {
         // The second onboarding flow (uc.spaces.add-member): the invited email ALREADY has an account, so it
         // signs in and accepts (POST /api/tenants/accept) rather than cold-registering. A member joins grant-

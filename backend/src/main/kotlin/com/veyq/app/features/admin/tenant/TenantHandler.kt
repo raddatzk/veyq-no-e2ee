@@ -9,7 +9,7 @@ import java.time.Instant
 
 /** Result of a create-tenant attempt. */
 sealed interface CreateTenantOutcome {
-    data class Created(val tenantId: String, val expiresAt: Instant) : CreateTenantOutcome
+    data class Created(val tenantId: String, val expiresAt: Instant, val bootstrapSecret: String) : CreateTenantOutcome
     data object DomainTaken : CreateTenantOutcome
 }
 
@@ -61,7 +61,8 @@ class TenantHandler(
         val expiresAt = Instant.now().plus(inviteTtl)
         val (tenantId, expiry) = store.createPendingTenant(name, normalizedDomain, normalizedEmail, Tokens.hash(token), expiresAt)
         mailer.sendInvite(normalizedDomain, normalizedEmail, token, expiry)
-        return CreateTenantOutcome.Created(tenantId, expiry)
+        // Return the raw token so the Server Owner can copy the invite link (works without a mailer, cr-0080).
+        return CreateTenantOutcome.Created(tenantId, expiry, token)
     }
 
     @Transactional
@@ -107,7 +108,7 @@ class TenantHandler(
         val expiresAt = Instant.now().plus(inviteTtl)
         store.mintMemberInvite(tenantId, normalizedEmail, Tokens.hash(token), expiresAt)
         mailer.sendInvite(tenant.domain, normalizedEmail, token, expiresAt)
-        return MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt))
+        return MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt, token))
     }
 
     private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {
@@ -115,7 +116,7 @@ class TenantHandler(
         val expiresAt = Instant.now().plus(inviteTtl)
         val invite = store.supersedeAndMintInvite(tenantId, ownerEmail, Tokens.hash(token), expiresAt)
         mailer.sendInvite(domain, ownerEmail, token, expiresAt)
-        return invite
+        return invite.copy(bootstrapSecret = token)
     }
 
     private inline fun onPendingTenant(tenantId: String, block: (TenantEntity) -> InviteView): InviteOutcome {

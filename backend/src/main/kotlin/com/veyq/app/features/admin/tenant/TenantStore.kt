@@ -18,8 +18,9 @@ data class TenantView(
     val inviteExpiresAt: Instant?,
 )
 
-/** The state of a tenant's current invite after a mint/resend/reassign. */
-data class InviteView(val ownerEmail: String, val status: String, val expiresAt: Instant)
+/** The state of a tenant's current invite after a mint/resend/reassign. `bootstrapSecret` is the raw token,
+ *  present only on a freshly-minted invite (so the owner can copy the invite link) — never on a list read. */
+data class InviteView(val ownerEmail: String, val status: String, val expiresAt: Instant, val bootstrapSecret: String? = null)
 
 /**
  * Persistence for tenant creation + invite lifecycle (cr-0009). The invite is its own row history; only the

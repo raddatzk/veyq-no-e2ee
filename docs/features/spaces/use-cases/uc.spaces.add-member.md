@@ -23,6 +23,9 @@ This use-case is the first consumer of the grant-distribution primitive
 1. The owner opens **"add member,"** enters the person's **email** and `role = MEMBER`. The server mints a
    **single-use member invite** (the secret hashed, never stored plaintext) and delivers it out-of-band —
    reusing the tenant-invite machinery that today mints only the owner ([cr-0009](../../../../changes/cr-0009-create-tenant-structural.md) / cr-0010).
+   Delivery is by email **if a mailer is configured**, or by the owner **copying the invite link** the mint
+   returns (the bootstrap secret in the URL fragment) — so member-add works with no SMTP, self-hostable by
+   default ([cr-0080](../../../../changes/cr-0080-invite-link-handoff.md)).
 2. The invitee opens the invite, previews the tenant (name, domain), and **registers**: their identity is
    **born cold on-device** and its public bundle published, they set their password + master-key wraps, and
    accept. They are now a tenant **member with no grant** — so they land in the **Personal fallback**

@@ -21,11 +21,13 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: {
     en: {
-      common: { cancel: 'Cancel', create: 'Create' },
+      common: { cancel: 'Cancel', create: 'Create', done: 'Done' },
       tenant: {
         create: 'Create a tenant', name: 'Name', domain: 'Domain', domainHint: 'hint',
         ownerEmail: 'Owner email', domainTaken: 'That domain is already taken', createFailed: 'Could not create',
+        created: 'Tenant created',
       },
+      members: { copyLinkIntro: 'copy it', copyLink: 'Copy link', copied: 'Copied' },
     },
   },
 })
@@ -60,15 +62,18 @@ async function fillForm(wrapper: ReturnType<typeof mountDialog>, name: string, d
 describe('CreateTenantDialog (uc.admin.create-tenant, web Slice A)', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('submits a trimmed name/email + lowercased domain, then emits created and closes', async () => {
+  it('submits a trimmed name/email + lowercased domain, then emits created and shows the copy-link view', async () => {
     const wrapper = mountDialog()
     await fillForm(wrapper, '  Acme  ', '  ACME.example  ', '  owner@acme.example  ')
     await wrapper.find('form').trigger('submit.prevent')
     await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
 
     expect(createTenant).toHaveBeenCalledWith('Acme', 'acme.example', 'owner@acme.example')
     expect(wrapper.emitted('created')).toHaveLength(1)
-    expect(wrapper.emitted('update:visible')?.at(-1)).toEqual([false])
+    // Stays open showing the owner-invite link (built with the domain + returned secret) for the owner to copy.
+    expect(wrapper.emitted('update:visible')).toBeUndefined()
+    expect((wrapper.find('.invite-link-input').element as HTMLInputElement).value).toContain('acme.example/tenant/accept#s')
   })
 
   it('does not submit until every field is filled', async () => {
