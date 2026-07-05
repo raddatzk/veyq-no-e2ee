@@ -1,6 +1,7 @@
 package com.veyq.app.features.spaces.scope
 
 import com.veyq.app.generated.api.ScopesApi
+import com.veyq.app.generated.model.CreateGroupRequest
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MyTenant
@@ -45,6 +46,17 @@ class ScopesResource(
                 Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "personal_scope_exists")).build()
         }
 
+    override fun createGroup(createGroupRequest: CreateGroupRequest): Response =
+        when (val outcome = handler.createGroup(
+            identity.principal.name, activeHost(), createGroupRequest.encryptedName, createGroupRequest.wrappedGrant,
+        )) {
+            is CreateGroupOutcome.Created ->
+                Response.status(Response.Status.CREATED)
+                    .entity(ScopeCreated(scopeId = UUID.fromString(outcome.scopeId), kind = ScopeKind.GROUP)).build()
+            CreateGroupOutcome.NoTenant ->
+                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
+        }
+
     override fun listMyScopes(): Response =
         when (val outcome = handler.listMine(identity.principal.name, activeHost())) {
             is ListScopesOutcome.Scopes ->
@@ -52,6 +64,7 @@ class ScopesResource(
                     ScopeSummary(
                         id = UUID.fromString(it.id), kind = ScopeKind.valueOf(it.kind),
                         tenantId = UUID.fromString(it.tenantId), wrappedGrant = it.wrappedGrant,
+                        encryptedName = it.encryptedName,
                     )
                 }).build()
             ListScopesOutcome.NoTenant ->

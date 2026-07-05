@@ -57,10 +57,13 @@ function fnv1a(value: string): string {
   return (hash >>> 0).toString(36)
 }
 
-function sealName(scopeKey: Uint8Array, name: string): string {
+/** Seal a name under a scope content key `K_SC` (the `node-name` construction, ADR 0012). Reused verbatim for a
+ *  group's name (en.spaces.group-scope, cr-0032) — a group name is sealed exactly like a node name. */
+export function sealName(scopeKey: Uint8Array, name: string): string {
   return b64std(v1.symWrap(scopeKey, v1.utf8(name), NAME_CTX, v1.randomBytes(12)))
 }
-function openName(scopeKey: Uint8Array, encryptedName: string): string {
+/** Open a name sealed under `K_SC` (the counterpart to {@link sealName}). */
+export function openName(scopeKey: Uint8Array, encryptedName: string): string {
   return decoder.decode(v1.symUnwrap(scopeKey, fromB64std(encryptedName), NAME_CTX))
 }
 function slugTokenFor(scopeKey: Uint8Array, parentSlot: string, name: string): string {

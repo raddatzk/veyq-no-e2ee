@@ -1,7 +1,7 @@
 ---
 id: cr-0032
 title: Group scope — create, list, switch, browse (G1)
-status: planned
+status: done             # planned → in-progress → done (kept as a record)
 satisfies: [en.spaces.group-scope, uc.spaces.switch-spaces]
 adrs: ["0014", "0015"]
 invariants: [operator-blind-e2ee]
@@ -33,19 +33,22 @@ mostly scope plumbing + the space switcher. Web-only (ADR 0010); native parity i
 
 ## Phases
 
-- [ ] 1 contracts — `POST /api/scopes/groups { encryptedName, wrappedGrant }` → `{ scopeId, kind:GROUP }`; add
+- [x] 1 contracts — `POST /api/scopes/groups { encryptedName, wrappedGrant }` → `{ scopeId, kind:GROUP }`; add
   optional `encryptedName` to the `Scope` list row. · Done when: `openApiGenerateSpecs` + web `generate:api`
   produce the models/api clean.
-- [ ] 2 backend — `createGroup` (Store/Handler/Resource mirroring `createPersonal`: mint GROUP scope + OWNER
+- [x] 2 backend — `createGroup` (Store/Handler/Resource mirroring `createPersonal`: mint GROUP scope + OWNER
   self-membership, store the opaque `encryptedName`); `GET /api/scopes` returns `encryptedName` for group rows.
   Slice test (create → list shows the group with verbatim ciphertext name + the self-grant; non-tenant-member
-  rejected). · Done when: `./gradlew test` green.
-- [ ] 3 web — `createGroup(name)` (gen `K_SC`, seal name, self-grant, POST) + `listMyGroups()` (decrypt names);
-  **generalize `activeSpace` from personal-only to `enterScope(scopeId)`**; sidebar **GRUPPEN** section
-  (vendored `.sidebar-groups-section`); a **create-group** dialog; `@group` fragment resolution (open the group
-  `K_SC`, switch the content host). · Done when: `npm run check` green + live: create a named group → it appears
-  in GRUPPEN → switch in (`#@<slug>`) → browse its empty tree; `pathname` stays `/`.
-- [ ] 4 coverage — extend `uc.spaces.switch-spaces.yaml` with the group create/list criteria (backend
+  rejected). · Done when: `./gradlew test` green. Migration `V24__scope_encrypted_name.sql` (nullable column).
+- [x] 3 web — `createGroup(name)` (gen `K_SC`, seal name, self-grant, POST) + `listMyGroups()` (decrypt names);
+  **generalize `activeSpace` from personal-only to `enterScope(scopeId)`** (added `openScopeById` + the `@<id>`
+  branch); sidebar **GRUPPEN** section (vendored `.sidebar-groups-section`, desktop + compact); a
+  **create-group** dialog (`CreateGroupDialog.vue`); `@group` fragment resolution (open the group `K_SC`, switch
+  the content host). The group content host's **root label** is the decrypted group name (was personal-only).
+  · Done when: `npm run check` green + live: create a named group → it appears in GRUPPEN → switch in
+  (`#@<id>`) → browse its empty tree; `pathname` stays `/`. Live-verified on `veyq.localhost` + operator-blind
+  confirmed at the DB (the `veyq_scope` row carries only ciphertext `encrypted_name`, no plaintext leak).
+- [x] 4 coverage — extend `uc.spaces.switch-spaces.yaml` with the group create/list criteria (backend
   `…SliceTest` group-create/list refs + the web group data-layer test) + the `http/spaces/scopes.http` group
   boundary. · Done when: `python3 scripts/validate_coverage.py` green.
 

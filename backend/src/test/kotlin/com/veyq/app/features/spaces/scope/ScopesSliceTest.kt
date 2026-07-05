@@ -30,6 +30,8 @@ class ScopesSliceTest {
     lateinit var sessions: SessionService
 
     private val personalGrant = "cGVyc29uYWwtc2NvcGUtZ3JhbnQ=" // "personal-scope-grant"
+    private val groupGrant = "Z3JvdXAtc2NvcGUtZ3JhbnQ=" // "group-scope-grant"
+    private val groupName = "c2VhbGVkLWdyb3VwLW5hbWU=" // "sealed-group-name"
 
     @Test
     fun createPersonalScopeThenListReturnsBoth() {
@@ -66,6 +68,43 @@ class ScopesSliceTest {
             .body("""{"wrappedGrant":"$personalGrant"}""")
             .`when`().post("/api/scopes")
             .then().statusCode(409).body("code", equalTo("personal_scope_exists"))
+    }
+
+    @Test
+    fun createGroupThenListShowsItWithSealedNameAndSelfGrant() {
+        val (userId, domain) = seedMember()
+        val scopeId = given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")
+            .header("X-Forwarded-Host", domain).contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$groupName","wrappedGrant":"$groupGrant"}""")
+            .`when`().post("/api/scopes/groups")
+            .then().statusCode(201)
+            .body("kind", equalTo("GROUP"))
+            .body("scopeId", notNullValue())
+            .extract().path<String>("scopeId")
+
+        // The list now carries the GROUP scope with the verbatim ciphertext name + the caller's self-grant —
+        // both are exactly what the client sent (operator-blind: the server stored, never interpreted, them).
+        given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")
+            .header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("kind", hasItems("TENANT", "GROUP"))
+            .body("find { it.id == '$scopeId' }.encryptedName", equalTo(groupName))
+            .body("find { it.id == '$scopeId' }.wrappedGrant", equalTo(groupGrant))
+            // TENANT/PERSONAL scopes carry no sealed name.
+            .body("find { it.kind == 'TENANT' }.encryptedName", equalTo(null))
+    }
+
+    @Test
+    fun createGroupNonMemberIs404() {
+        // A tenant exists, but this caller holds no membership in it → cannot create a group there.
+        val (_, domain) = seedMember()
+        val outsider = seedUser()
+        given().header("Authorization", "Bearer ${sessions.issue(outsider).accessToken}")
+            .header("X-Forwarded-Host", domain).contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$groupName","wrappedGrant":"$groupGrant"}""")
+            .`when`().post("/api/scopes/groups")
+            .then().statusCode(404).body("code", equalTo("tenant_not_found"))
     }
 
     @Test

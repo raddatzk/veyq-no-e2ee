@@ -9,8 +9,15 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.UUID
 
-/** A scope the caller holds, with their own grant ciphertext — the row behind a `ScopeSummary`. */
-data class ScopeRow(val id: String, val kind: String, val tenantId: String, val wrappedGrant: String)
+/** A scope the caller holds, with their own grant ciphertext — the row behind a `ScopeSummary`. `encryptedName`
+ *  is the sealed group name for a GROUP scope (ciphertext), null for TENANT/PERSONAL (ADR 0014). */
+data class ScopeRow(
+    val id: String,
+    val kind: String,
+    val tenantId: String,
+    val wrappedGrant: String,
+    val encryptedName: String?,
+)
 
 /** A tenant the caller belongs to — the row behind a `MyTenant` (the space switcher). */
 data class TenantRow(val tenantId: String, val name: String, val domain: String, val role: String)
@@ -75,13 +82,39 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         return scopeId
     }
 
+    /** Birth a GROUP scope for the caller in this tenant + the OWNER self-membership (en.spaces.group-scope,
+     *  cr-0032). Mirrors [createPersonal] but stores the opaque `encryptedName` (the group name sealed under
+     *  `K_SC`) on the scope row. Group names are not unique — no existence check. */
+    @Transactional
+    fun createGroup(userId: String, tenantId: String, encryptedName: String, wrappedGrant: String): String {
+        val now = Instant.now()
+        val scopeId = UUID.randomUUID().toString()
+        ScopeEntity().apply {
+            id = scopeId
+            this.tenantId = tenantId
+            kind = ScopeEntity.GROUP
+            this.encryptedName = encryptedName
+            createdAt = now
+        }.persist()
+        MembershipEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            this.tenantId = tenantId
+            this.scopeId = scopeId
+            role = MembershipEntity.OWNER
+            this.wrappedGrant = wrappedGrant
+            createdAt = now
+        }.persist()
+        return scopeId
+    }
+
     /** The caller's scopes in this tenant, each with their own grant ciphertext (to open client-side). A
      *  grant-less ("pending") membership is skipped — the member can't open that scope yet, so it never
      *  surfaces as an openable scope (they see the Personal fallback until delivery lands, cr-0076). */
     fun listMine(userId: String, tenantId: String): List<ScopeRow> =
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
-                ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, grant) }
+                ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, grant, it.encryptedName) }
             }
         }
 

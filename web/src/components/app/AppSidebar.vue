@@ -6,12 +6,13 @@
 // Favorites + groups are later slices.
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
-import { listMyTenants } from '../../features/spaces/scopes'
+import { listMyTenants, listMyGroups, type GroupSpace } from '../../features/spaces/scopes'
 import { activeSpace } from '../../app/activeSpace'
+import CreateGroupDialog from '../../features/spaces/CreateGroupDialog.vue'
 import { favoritesStore } from '../../app/favoritesStore'
 import { useThemeState } from '../../shared/state/useThemeState'
 import { treeStore } from '../../features/memory/treeStore'
@@ -25,6 +26,7 @@ import ProfileMenu from './ProfileMenu.vue'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const { resolvedTheme } = useThemeState()
 const tenants = ref<MyTenant[]>([])
 
@@ -35,6 +37,30 @@ const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUr
 const activeScope = computed(() => parseHash(route.hash).scope)
 const tenantActive = computed(() => activeScope.value === TENANT_SCOPE)
 const personalActive = computed(() => isPersonalScope(activeScope.value))
+
+// The member's groups (en.spaces.group-scope, cr-0032): names decrypted on-device (the server only ever stored
+// ciphertext). A group is entered via the `#@<id>` fragment; the active one is highlighted from the leading token.
+const groups = ref<GroupSpace[]>([])
+function groupHash(scopeId: string): string {
+  return `#@${scopeId}`
+}
+function groupActive(scopeId: string): boolean {
+  return activeScope.value === `@${scopeId}`
+}
+async function loadGroups() {
+  try {
+    groups.value = await listMyGroups()
+  } catch {
+    /* the switcher tolerates an empty groups section */
+  }
+}
+
+// Create-group dialog. On success: refresh the list + switch into the new group (`#@<id>`).
+const createGroupOpen = ref(false)
+async function onGroupCreated(scopeId: string) {
+  await loadGroups()
+  void router.push({ name: 'home', hash: groupHash(scopeId) })
+}
 
 // The caller's own per-tenant username builds the Personal link `#~<username>` (ADR 0023); until it resolves (or
 // if there's no profile in this tenant), the `~me` fallback still routes to the personal scope.
@@ -66,6 +92,7 @@ onMounted(async () => {
   } catch {
     /* no profile in this tenant yet → the ~me fallback still routes to the personal scope */
   }
+  await loadGroups()
 })
 
 function tenantInitial(value: string): string {
@@ -181,6 +208,64 @@ function closeMobileMenu() {
       </RouterLink>
     </section>
 
+    <!-- Groups (en.spaces.group-scope, cr-0032). The header + "＋" is always present so the first group is
+         creatable; the group links appear as they land. Desktop renders `.desktop-group-link`; the compact rail
+         renders `.compact-group-nav` (layout.css toggles which is visible). Active class is driven from the
+         leading token (all groups share the `/` path, so RouterLink's path-based active can't distinguish). -->
+    <section class="sidebar-section sidebar-groups-section">
+      <div class="sidebar-section-heading">
+        <p class="sidebar-section-label">{{ t('shell.groups') }}</p>
+        <button
+          class="sidebar-section-action"
+          type="button"
+          :title="t('shell.groupCreate')"
+          :aria-label="t('shell.groupCreate')"
+          @click="createGroupOpen = true"
+        >
+          <span class="pi pi-plus" />
+        </button>
+      </div>
+      <RouterLink
+        v-for="group in groups"
+        :key="group.scopeId"
+        v-slot="{ href, navigate }"
+        :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+        custom
+      >
+        <a
+          :href="href"
+          class="sidebar-scope-link desktop-group-link"
+          :class="{ 'router-link-active': groupActive(group.scopeId) }"
+          @click="navigate"
+        >
+          <span class="sidebar-scope-icon pi pi-users" />
+          <span><strong>{{ group.name }}</strong></span>
+        </a>
+      </RouterLink>
+      <div class="compact-group-nav">
+        <span class="compact-group-divider" aria-hidden="true" />
+        <div class="compact-group-links">
+          <RouterLink
+            v-for="group in groups"
+            :key="group.scopeId"
+            v-slot="{ href, navigate }"
+            :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+            custom
+          >
+            <a
+              :href="href"
+              class="sidebar-scope-link compact-group-link"
+              :class="{ 'router-link-active': groupActive(group.scopeId) }"
+              @click="navigate"
+            >
+              <span class="sidebar-scope-icon pi pi-users" />
+              <span><strong>{{ group.name }}</strong></span>
+            </a>
+          </RouterLink>
+        </div>
+      </div>
+    </section>
+
     <section class="sidebar-section sidebar-profile">
       <ProfileMenu show-name />
     </section>
@@ -232,6 +317,25 @@ function closeMobileMenu() {
           </div>
         </section>
 
+        <section class="mobile-nav-section">
+          <h2>{{ t('shell.groups') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-for="group in groups"
+              :key="group.scopeId"
+              :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+              class="mobile-nav-item"
+              :class="{ 'mobile-nav-item-active': groupActive(group.scopeId) }"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-scope-icon pi pi-users" /><span><strong>{{ group.name }}</strong></span>
+            </RouterLink>
+            <button class="mobile-nav-item" type="button" @click="createGroupOpen = true; closeMobileMenu()">
+              <span class="sidebar-scope-icon pi pi-plus" /><span>{{ t('shell.groupCreate') }}</span>
+            </button>
+          </div>
+        </section>
+
         <section v-if="favoriteMemories.length" class="mobile-nav-section">
           <h2>{{ t('shell.favorites') }}</h2>
           <div class="mobile-nav-list">
@@ -248,5 +352,7 @@ function closeMobileMenu() {
         </section>
       </div>
     </Dialog>
+
+    <CreateGroupDialog v-if="createGroupOpen" @done="onGroupCreated" @close="createGroupOpen = false" />
   </aside>
 </template>

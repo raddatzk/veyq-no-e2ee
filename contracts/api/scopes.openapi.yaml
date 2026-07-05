@@ -120,6 +120,57 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_found }
 
+  /api/scopes/groups:
+    post:
+      tags: [scopes]
+      operationId: createGroup
+      summary: Create a named group scope in the active tenant.
+      description: >
+        Creates a `kind=GROUP` scope for the authenticated caller in the tenant resolved from the `Host`, plus
+        the caller's self-membership (`role=OWNER`). Like the personal scope, birth is **client-driven**: the
+        client generated the scope key `K_SC`, sealed the group name under it (`encryptedName`), and sealed
+        `K_SC` to its own identity public key (`wrappedGrant`). The server stores both ciphertexts verbatim and
+        never sees the key or the name — it only mints the scope id + the self-membership. Group names are **not**
+        unique; a duplicate name is allowed (resolved client-side, ADR 0014). Adding other members is a later,
+        separate operation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGroupRequest" }
+            example:
+              encryptedName: c2VhbGVkLW5hbWU=
+              wrappedGrant: AQ==
+      responses:
+        "201":
+          description: The group scope was created and the caller holds its grant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScopeCreated" }
+              example:
+                scopeId: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+                kind: GROUP
+        "400":
+          description: The request was malformed (missing/invalid name or grant).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the request Host.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
   /api/scopes/{scopeId}/members:
     get:
       tags: [scopes]
@@ -239,6 +290,31 @@ components:
           example: AQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
+    CreateGroupRequest:
+      type: object
+      required: [encryptedName, wrappedGrant]
+      properties:
+        encryptedName:
+          type: string
+          description: >
+            The group's name sealed under the freshly generated scope key `K_SC` (same name-sealing as a node
+            name, ADR 0012) — opaque base64 ciphertext the server stores verbatim and never interprets, so the
+            server sees an **unnamed** group (ADR 0014).
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        wrappedGrant:
+          type: string
+          description: >
+            The freshly generated group scope key `K_SC` sealed to the caller's **own** identity public key
+            (`asymWrap(ownIdentityPub, scopeKey, "scope-grant")`) — opaque base64 ciphertext the server stores
+            verbatim and never interprets.
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
     MyTenant:
       type: object
       required: [tenantId, name, domain, role]
@@ -343,6 +419,15 @@ components:
           format: uuid
           description: The tenant this scope lives in (host-routing context).
           example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        encryptedName:
+          type: [string, "null"]
+          description: >
+            For a `GROUP` scope: the group's name sealed under `K_SC` (opaque base64), decrypted locally so the
+            client can label the group in the switcher (ADR 0014). `null` for `TENANT` / `PERSONAL` scopes, which
+            carry no per-scope sealed name.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
         wrappedGrant:
           type: string
           description: >

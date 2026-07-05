@@ -188,6 +188,8 @@ const en = {
     serverSettingsSub: 'Administer this instance.',
     shared: 'Shared',
     personal: 'Personal',
+    groups: 'Groups',
+    groupCreate: 'New group',
     favorites: 'Favorites',
     menu: 'Navigation',
     menuOpen: 'Open navigation',
@@ -198,6 +200,11 @@ const en = {
     themeSystem: 'System',
     themeLight: 'Light',
     themeDark: 'Dark',
+  },
+  groups: {
+    createTitle: 'New group',
+    nameLabel: 'Group name',
+    createFailed: 'The group could not be created. Please try again.',
   },
   home: {
     loading: 'Opening your space…',
@@ -525,6 +532,8 @@ const de: typeof en = {
     serverSettingsSub: 'Diese Instanz verwalten.',
     shared: 'Gemeinsam',
     personal: 'Persönlich',
+    groups: 'Gruppen',
+    groupCreate: 'Neue Gruppe',
     favorites: 'Favoriten',
     menu: 'Navigation',
     menuOpen: 'Navigation öffnen',
@@ -535,6 +544,11 @@ const de: typeof en = {
     themeSystem: 'System',
     themeLight: 'Hell',
     themeDark: 'Dunkel',
+  },
+  groups: {
+    createTitle: 'Neue Gruppe',
+    nameLabel: 'Gruppenname',
+    createFailed: 'Die Gruppe konnte nicht erstellt werden. Bitte erneut versuchen.',
   },
   home: {
     loading: 'Dein Bereich wird geöffnet…',

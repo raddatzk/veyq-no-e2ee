@@ -9,10 +9,11 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, listMyTenants } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, listMyTenants, createGroup, listMyGroups } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
+import { openName, sealName } from '../memory/tree'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 
@@ -21,10 +22,11 @@ import { b64std, fromB64std } from '../../shared/base64'
 const ID = v1.generateIdentity()
 const copyPriv = () => ({ kemX: ID.priv.kemX.slice(), mlkemSeed: ID.priv.mlkemSeed.slice(), sign: ID.priv.sign.slice() })
 
-function mockScopes(list: ReturnType<typeof vi.fn>, create: ReturnType<typeof vi.fn>) {
+function mockScopes(list: ReturnType<typeof vi.fn>, create: ReturnType<typeof vi.fn>, createGroupFn = vi.fn()) {
   vi.mocked(scopesApi).mockReturnValue({
     listMyScopes: list,
     createPersonalScope: create,
+    createGroup: createGroupFn,
   } as unknown as ReturnType<typeof scopesApi>)
 }
 
@@ -103,6 +105,40 @@ describe('openScope', () => {
   it('returns null when the caller holds no scope of that kind (→ the shell falls back to Personal)', async () => {
     mockScopes(vi.fn().mockResolvedValue([{ id: 'p', kind: 'PERSONAL', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
     expect(await openScope(ScopeKind.Tenant)).toBeNull()
+  })
+})
+
+describe('createGroup', () => {
+  it('posts a self-grant + a name sealed under the SAME fresh K_SC (operator-blind — only ciphertext leaves)', async () => {
+    const list = vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }])
+    const createGroupFn = vi.fn().mockResolvedValue({ scopeId: 'g1', kind: 'GROUP' })
+    mockScopes(list, vi.fn(), createGroupFn)
+
+    const scopeId = await createGroup('Familie')
+    expect(scopeId).toBe('g1')
+    expect(createGroupFn).toHaveBeenCalledTimes(1)
+
+    // Recover K_SC from the posted grant, then the posted encryptedName must decrypt back to the plaintext name
+    // under that very key — proving the name was sealed under the group's own scope key, never sent in the clear.
+    const { encryptedName, wrappedGrant } = createGroupFn.mock.calls[0][0].createGroupRequest
+    const key = v1.asymUnwrap(v1.hybridSecret(copyPriv()), v1.hybridPublic(copyPriv()), fromB64std(wrappedGrant), 'scope-grant')
+    expect(key.length).toBe(32)
+    expect(openName(key, encryptedName)).toBe('Familie')
+  })
+})
+
+describe('listMyGroups', () => {
+  it('decrypts each group’s sealed name on-device (the server row carries only ciphertext)', async () => {
+    const key = v1.randomBytes(32)
+    const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const encryptedName = sealName(key, 'Reise-Crew')
+    const list = vi.fn().mockResolvedValue([
+      { id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' },
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName },
+    ])
+    mockScopes(list, vi.fn())
+
+    expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew' }])
   })
 })
 

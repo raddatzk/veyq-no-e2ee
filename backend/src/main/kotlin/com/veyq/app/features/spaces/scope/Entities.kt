@@ -28,6 +28,10 @@ class ScopeEntity : PanacheEntityBase {
     @Column(name = "kind", nullable = false, length = 16)
     lateinit var kind: String
 
+    /** A GROUP scope's name, sealed under its `K_SC` (ciphertext base64); null for TENANT/PERSONAL (ADR 0014). */
+    @Column(name = "encrypted_name")
+    var encryptedName: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

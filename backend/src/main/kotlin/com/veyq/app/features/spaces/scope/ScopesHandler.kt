@@ -9,6 +9,12 @@ sealed interface CreatePersonalOutcome {
     object AlreadyExists : CreatePersonalOutcome
 }
 
+/** Outcome of creating a group scope. Group names are not unique, so there is no "already exists" case. */
+sealed interface CreateGroupOutcome {
+    data class Created(val scopeId: String) : CreateGroupOutcome
+    object NoTenant : CreateGroupOutcome
+}
+
 /** Outcome of listing the caller's scopes. */
 sealed interface ListScopesOutcome {
     data class Scopes(val rows: List<ScopeRow>) : ListScopesOutcome
@@ -34,6 +40,17 @@ class ScopesHandler(private val store: ScopesStore) {
         if (!store.isMember(userId, tenantId)) return CreatePersonalOutcome.NoTenant
         if (store.personalScopeExists(userId, tenantId)) return CreatePersonalOutcome.AlreadyExists
         return CreatePersonalOutcome.Created(store.createPersonal(userId, tenantId, wrappedGrant))
+    }
+
+    /**
+     * Create a named group scope in the active tenant (en.spaces.group-scope, cr-0032, ADR 0014). The caller
+     * must belong to the tenant; birth is client-driven and operator-blind — the handler persists only the
+     * ciphertext name + the ciphertext self-grant, never the scope key or the plaintext name.
+     */
+    fun createGroup(userId: String, host: String?, encryptedName: String, wrappedGrant: String): CreateGroupOutcome {
+        val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return CreateGroupOutcome.NoTenant
+        if (!store.isMember(userId, tenantId)) return CreateGroupOutcome.NoTenant
+        return CreateGroupOutcome.Created(store.createGroup(userId, tenantId, encryptedName, wrappedGrant))
     }
 
     fun listMine(userId: String, host: String?): ListScopesOutcome {

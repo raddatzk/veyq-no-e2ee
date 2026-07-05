@@ -4,7 +4,7 @@
 // token-less → the shared **tenant** scope, `~me` → **personal**. Entering a scope opens its grant client-side
 // (operator-blind: `K_SC` is derived on-device) and resets the per-scope tree + favorites.
 import { reactive } from 'vue'
-import { ensurePersonalScope, openScope, type OpenedScope } from '../features/spaces/scopes'
+import { ensurePersonalScope, openScope, openScopeById, type OpenedScope } from '../features/spaces/scopes'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
 import { resetTree } from '../features/memory/treeStore'
@@ -32,14 +32,17 @@ export function activeScopeKey(): Uint8Array | null {
 }
 
 /**
- * Enter the scope selected by the URL's leading fragment `token` (`''` = tenant, `~me` = personal). Opens that
- * scope's grant → holds `scopeId` + `K_SC`, then **resets the tree + favorites** so no stale per-scope state
- * bleeds across a switch. Sets `status` to `ready` on success, `no-tenant` when the active tenant can't be
- * resolved from the Host (404), or `error` otherwise. Requires an unlocked vault (the identity opens the grant).
+ * Enter the scope selected by the URL's leading fragment `token` (`''` = tenant, `~me` = personal, `@<id>` =
+ * group). Opens that scope's grant → holds `scopeId` + `K_SC`, then **resets the tree + favorites** so no stale
+ * per-scope state bleeds across a switch. Sets `status` to `ready` on success, `no-tenant` when the active tenant
+ * can't be resolved from the Host (404), or `error` otherwise. Requires an unlocked vault (the identity opens the
+ * grant).
  *
  * **No client birth of the tenant scope** (ADR 0006): the token-less home is *open-only*. When the caller holds
  * no `TENANT` grant (tenant member-invite is unbuilt), it **falls back to Personal** and flags the tenant
- * unavailable (ADR 0019, en.spaces.tenant-scope E1) — never a `POST`. Only Personal auto-births.
+ * unavailable (ADR 0019, en.spaces.tenant-scope E1) — never a `POST`. A `@<id>` group is opened by id against the
+ * caller's own scope list (en.spaces.group-scope, cr-0032); an unopenable one falls back to Personal too. Only
+ * Personal auto-births.
  */
 export async function enterScope(token: string): Promise<void> {
   activeSpace.status = 'loading'
@@ -50,10 +53,11 @@ export async function enterScope(token: string): Promise<void> {
       activeSpace.tenantUnavailable = opened === null
     } else {
       activeSpace.tenantUnavailable = false
+      if (token.startsWith('@')) opened = await openScopeById(token.slice(1)) // `@<id>` → open that group
     }
     if (!opened) {
-      // Personal — the explicit `~me`, an unresolved `@group`, or the no-grant tenant fallback. Personal is
-      // the one birth path (idempotent: a no-op if one already exists).
+      // Personal — the explicit `~me`, an unresolved/unopenable `@group`, or the no-grant tenant fallback.
+      // Personal is the one birth path (idempotent: a no-op if one already exists).
       await ensurePersonalScope()
       opened = await openScope(ScopeKind.Personal)
     }

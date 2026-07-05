@@ -38,3 +38,19 @@ client.test("birth personal scope requires auth", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
 });
 %}
+
+### 4. POST /api/scopes/groups (create group) without a bearer token → 401 (auth is checked before the body)
+# The authenticated group create/list happy-path + the non-member authz path are covered at the integration
+# layer (ScopesSliceTest) + the web client — they need the full operator-blind grant flow (a fresh K_SC, the
+# sealed name + self-grant), not reproducible from a bare .http.
+POST {{host}}/api/scopes/groups
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "encryptedName": "c2VhbGVkLW5hbWU=", "wrappedGrant": "AQ==" }
+
+> {%
+client.test("create group requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
