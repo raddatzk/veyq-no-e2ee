@@ -1,7 +1,7 @@
 ---
 id: cr-0088
 title: Group member management — roles + remove with scope-key rotation (G3a)
-status: planned
+status: in-progress
 satisfies: [uc.spaces.manage-group-members]
 adrs: ["0024", "0014", "0007", "0020", "0021", "0012"]
 invariants: [operator-blind-e2ee]
@@ -82,7 +82,11 @@ after their removal — verified live with a second account + at the DB (new nod
 holds no current-epoch grant), while remaining members read old + new content seamlessly. Operator-blind verified:
 only opaque epoch links / grants / epoch indices reach the server, never a key or a name. Coverage + the three
 trust-chain guards green. **Out of scope (later):** group delete (soft + grace) + the orphan rule (G3b); the
-consent opt-in (G2b); fingerprint verification hardening; native parity.
+consent opt-in (G2b); fingerprint verification hardening; native parity. **v1 rotation scope:** the
+rotation-commit **re-grants every remaining member synchronously** (the client holds all pubkeys from the
+directory), so no member is left stale — the **async stale-epoch grant-delivery backstop** (ADR 0024 §5, for a
+member whose identity is momentarily unwrappable / a very large group) is **deferred**; the reconciler stays
+grant-less-only for now.
 
 ## Notes
 

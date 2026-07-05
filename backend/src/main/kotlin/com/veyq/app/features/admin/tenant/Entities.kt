@@ -124,6 +124,11 @@ class MembershipEntity : PanacheEntityBase {
     @Column(name = "wrapped_grant")
     var wrappedGrant: String? = null
 
+    /** The scope epoch this membership's `wrappedGrant` wraps (ADR 0024, cr-0088). `< scope.currentEpoch` means the
+     *  grant is **stale** (a rotation hasn't re-granted this member yet) — grant-delivery re-grants them. */
+    @Column(name = "granted_epoch", nullable = false)
+    var grantedEpoch: Int = 0
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

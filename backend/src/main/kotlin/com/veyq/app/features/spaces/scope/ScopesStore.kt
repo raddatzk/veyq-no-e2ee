@@ -17,6 +17,8 @@ data class ScopeRow(
     val kind: String,
     val tenantId: String,
     val role: String,
+    val currentEpoch: Int,
+    val grantedEpoch: Int,
     val wrappedGrant: String,
     val encryptedName: String?,
 )
@@ -116,7 +118,9 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     fun listMine(userId: String, tenantId: String): List<ScopeRow> =
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
-                ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, m.role, grant, it.encryptedName) }
+                ScopeEntity.findById(m.scopeId)?.let {
+                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName)
+                }
             }
         }
 
@@ -141,6 +145,63 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     /** Resolve a per-tenant username to a userId within a tenant (cr-0086) — the tenant-scoped resolve. */
     fun resolveUsernameInTenant(tenantId: String, username: String): String? =
         profiles.findUserIdByUsername(tenantId, username)
+
+    // --- member management + rotation (cr-0088) ---
+
+    /** The number of OWNER memberships on a scope — the last-owner guard (ADR 0007). */
+    fun ownerCount(scopeId: String): Long =
+        MembershipEntity.count("scopeId = ?1 and role = ?2", scopeId, MembershipEntity.OWNER)
+
+    /** A member's role in a scope, or null if they hold no membership there. */
+    fun memberRole(userId: String, scopeId: String): String? =
+        MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult()?.role
+
+    /** Set a member's role (promote/demote). No-op if not a member. */
+    @Transactional
+    fun setRole(userId: String, scopeId: String, role: String) {
+        MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult()?.let {
+            it.role = role
+            it.persist()
+        }
+    }
+
+    /** Delete a member's membership (layer-1 removal — the instant access cut). */
+    @Transactional
+    fun removeMembership(userId: String, scopeId: String) {
+        MembershipEntity.delete("userId = ?1 and scopeId = ?2", userId, scopeId)
+    }
+
+    /** The scope's current content-key epoch, or null if there's no such scope. */
+    fun currentEpoch(scopeId: String): Int? = ScopeEntity.findById(scopeId)?.currentEpoch
+
+    /** The epoch-chain links of a scope (ascending), each `epoch → wrappedPrev` (ADR 0024). */
+    fun epochLinks(scopeId: String): List<Pair<Int, String>> =
+        ScopeEpochEntity.find("scopeId", scopeId).list().sortedBy { it.epoch }.map { it.epoch to it.wrappedPrev }
+
+    /** Commit a rotation (ADR 0024): bump the current epoch, store the chain-link, apply the re-grants (each to the
+     *  new epoch). Client-minted; the server stores only ciphertext. Returns the new epoch. */
+    @Transactional
+    fun rotate(scopeId: String, wrappedPrev: String, grants: List<Pair<String, String>>): Int {
+        val scope = ScopeEntity.findById(scopeId)!!
+        val newEpoch = scope.currentEpoch + 1
+        scope.currentEpoch = newEpoch
+        scope.persist()
+        ScopeEpochEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.scopeId = scopeId
+            epoch = newEpoch
+            this.wrappedPrev = wrappedPrev
+            createdAt = Instant.now()
+        }.persist()
+        grants.forEach { (uid, g) ->
+            MembershipEntity.find("userId = ?1 and scopeId = ?2", uid, scopeId).firstResult()?.let {
+                it.wrappedGrant = g
+                it.grantedEpoch = newEpoch
+                it.persist()
+            }
+        }
+        return newEpoch
+    }
 
     /** Admit a member to a scope **grant-less** (role=MEMBER, no grant) — grant-delivery wraps `K_SC` to them
      *  later (cr-0076). Operator-blind: **no key is written here**. */

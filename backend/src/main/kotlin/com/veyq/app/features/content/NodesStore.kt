@@ -18,6 +18,7 @@ data class NodeRow(
     val encryptedName: String,
     val slugToken: String,
     val orderIndex: Int,
+    val epoch: Int,
     val wrappedContentKey: String?,
     val wrappedMeta: String?,
 )
@@ -74,7 +75,7 @@ class NodesStore(
     @Transactional
     fun create(
         scopeId: String, parentSlot: String, kind: String, encryptedName: String,
-        slugToken: String, orderIndex: Int, wrappedContentKey: String?, wrappedMeta: String?,
+        slugToken: String, orderIndex: Int, epoch: Int, wrappedContentKey: String?, wrappedMeta: String?,
     ): String {
         val id = UUID.randomUUID().toString()
         NodeEntity().apply {
@@ -85,6 +86,7 @@ class NodesStore(
             this.encryptedName = encryptedName
             this.slugToken = slugToken
             this.orderIndex = orderIndex
+            this.epoch = epoch
             this.wrappedContentKey = wrappedContentKey
             this.wrappedMeta = wrappedMeta
             createdAt = Instant.now()
@@ -94,7 +96,7 @@ class NodesStore(
 
     fun list(scopeId: String): List<NodeRow> =
         NodeEntity.find("scopeId", scopeId).list().map {
-            NodeRow(it.id, it.parentId, it.kind, it.encryptedName, it.slugToken, it.orderIndex, it.wrappedContentKey, it.wrappedMeta)
+            NodeRow(it.id, it.parentId, it.kind, it.encryptedName, it.slugToken, it.orderIndex, it.epoch, it.wrappedContentKey, it.wrappedMeta)
         }
 
     /** Re-load the node **inside** the transaction (the one the handler validated may be detached) and mutate

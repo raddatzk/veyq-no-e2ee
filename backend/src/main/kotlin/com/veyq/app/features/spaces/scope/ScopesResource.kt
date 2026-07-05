@@ -6,10 +6,14 @@ import com.veyq.app.generated.model.CreateGroupRequest
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MyTenant
+import com.veyq.app.generated.model.RotateScopeRequest
 import com.veyq.app.generated.model.ScopeCreated
+import com.veyq.app.generated.model.ScopeEpochLink
 import com.veyq.app.generated.model.ScopeKind
 import com.veyq.app.generated.model.ScopeMember
+import com.veyq.app.generated.model.ScopeRotated
 import com.veyq.app.generated.model.ScopeSummary
+import com.veyq.app.generated.model.SetMemberRoleRequest
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
@@ -64,8 +68,9 @@ class ScopesResource(
                 Response.ok(outcome.rows.map {
                     ScopeSummary(
                         id = UUID.fromString(it.id), kind = ScopeKind.valueOf(it.kind),
-                        tenantId = UUID.fromString(it.tenantId), role = it.role, wrappedGrant = it.wrappedGrant,
-                        encryptedName = it.encryptedName,
+                        tenantId = UUID.fromString(it.tenantId), role = it.role,
+                        currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
+                        wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName,
                     )
                 }).build()
             ListScopesOutcome.NoTenant ->
@@ -91,6 +96,45 @@ class ScopesResource(
                 Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "already_member")).build()
         }
 
+    override fun setMemberRole(scopeId: UUID, userId: UUID, setMemberRoleRequest: SetMemberRoleRequest): Response =
+        when (val outcome = handler.setMemberRole(identity.principal.name, scopeId.toString(), userId.toString(), setMemberRoleRequest.role.value)) {
+            is SetRoleOutcome.Ok -> Response.ok(
+                ScopeMember(
+                    userId = UUID.fromString(outcome.row.userId), username = outcome.row.username,
+                    sealedName = outcome.row.sealedName, email = outcome.row.email, role = outcome.row.role,
+                    identityPublicKey = outcome.row.identityPublicKey, hasGrant = outcome.row.hasGrant,
+                ),
+            ).build()
+            SetRoleOutcome.NotOwner -> forbidden("not_scope_owner")
+            SetRoleOutcome.ScopeNotFound, SetRoleOutcome.MemberNotFound -> notFound("member_not_found")
+            SetRoleOutcome.LastOwner -> conflict("last_owner")
+        }
+
+    override fun removeMember(scopeId: UUID, userId: UUID): Response =
+        when (handler.removeMember(identity.principal.name, scopeId.toString(), userId.toString())) {
+            RemoveMemberOutcome.Ok -> Response.noContent().build()
+            RemoveMemberOutcome.NotOwner -> forbidden("not_scope_owner")
+            RemoveMemberOutcome.ScopeNotFound, RemoveMemberOutcome.MemberNotFound -> notFound("member_not_found")
+            RemoveMemberOutcome.LastOwner -> conflict("last_owner")
+        }
+
+    override fun rotateScope(scopeId: UUID, rotateScopeRequest: RotateScopeRequest): Response =
+        when (val outcome = handler.rotateScope(
+            identity.principal.name, scopeId.toString(), rotateScopeRequest.wrappedPrev,
+            rotateScopeRequest.grants.map { it.userId.toString() to it.wrappedGrant },
+        )) {
+            is RotateOutcome.Ok -> Response.status(Response.Status.CREATED).entity(ScopeRotated(epoch = outcome.epoch)).build()
+            RotateOutcome.NotOwner -> forbidden("not_scope_owner")
+            RotateOutcome.ScopeNotFound -> notFound("scope_not_found")
+        }
+
+    override fun listScopeEpochs(scopeId: UUID): Response =
+        when (val outcome = handler.listEpochs(identity.principal.name, scopeId.toString())) {
+            is EpochsOutcome.Links -> Response.ok(outcome.links.map { ScopeEpochLink(epoch = it.first, wrappedPrev = it.second) }).build()
+            EpochsOutcome.Forbidden -> forbidden("not_scope_member")
+            EpochsOutcome.ScopeNotFound -> notFound("scope_not_found")
+        }
+
     override fun listScopeMembers(scopeId: UUID): Response =
         when (val outcome = handler.listMembers(identity.principal.name, scopeId.toString())) {
             is ListMembersOutcome.Members -> Response.ok(
@@ -111,6 +155,10 @@ class ScopesResource(
                 MyTenant(tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role)
             },
         ).build()
+
+    private fun forbidden(code: String) = Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = code)).build()
+    private fun notFound(code: String) = Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = code)).build()
+    private fun conflict(code: String) = Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = code)).build()
 
     /** The active tenant's host: the reverse-proxy `X-Forwarded-Host`, else `Host`; first value, port stripped. */
     private fun activeHost(): String? =

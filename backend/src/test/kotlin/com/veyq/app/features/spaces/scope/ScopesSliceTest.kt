@@ -34,6 +34,115 @@ class ScopesSliceTest {
     private val personalGrant = "cGVyc29uYWwtc2NvcGUtZ3JhbnQ=" // "personal-scope-grant"
     private val groupGrant = "Z3JvdXAtc2NvcGUtZ3JhbnQ=" // "group-scope-grant"
     private val groupName = "c2VhbGVkLWdyb3VwLW5hbWU=" // "sealed-group-name"
+    private val rotPrev = "cm90LXByZXY=" // "rot-prev" (symWrap(E1, E0))
+    private val newGrant = "bmV3LWVwb2NoLWdyYW50" // "new-epoch-grant"
+
+    /** Add a seeded tenant member (by username) to a group via the API — returns nothing, the member is grant-less. */
+    private fun addToGroup(owner: String, domain: String, groupId: String, username: String) {
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .header("X-Forwarded-Host", domain).contentType(ContentType.JSON)
+            .body("""{"username":"$username"}""")
+            .`when`().post("/api/scopes/$groupId/members").then().statusCode(201)
+    }
+
+    @Test
+    fun promoteDemoteAndLastOwnerGuard() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner")
+
+        // Promote partner → OWNER (co-owner).
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"role":"OWNER"}""")
+            .`when`().patch("/api/scopes/$groupId/members/$partner")
+            .then().statusCode(200).body("role", equalTo("OWNER"))
+
+        // Demote the original owner → MEMBER (allowed — partner is now an owner too).
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"role":"MEMBER"}""")
+            .`when`().patch("/api/scopes/$groupId/members/$owner")
+            .then().statusCode(200).body("role", equalTo("MEMBER"))
+
+        // partner is now the LAST owner → cannot be demoted (last-owner guard).
+        given().header("Authorization", "Bearer ${token(partner)}").contentType(ContentType.JSON)
+            .body("""{"role":"MEMBER"}""")
+            .`when`().patch("/api/scopes/$groupId/members/$partner")
+            .then().statusCode(409).body("code", equalTo("last_owner"))
+    }
+
+    @Test
+    fun removeMemberThenLastOwnerGuard() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner")
+
+        // A non-owner (partner, a MEMBER) cannot remove anyone.
+        given().header("Authorization", "Bearer ${token(partner)}")
+            .`when`().delete("/api/scopes/$groupId/members/$owner")
+            .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+
+        // The owner removes partner → 204; the directory no longer lists them.
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId/members/$partner")
+            .then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().get("/api/scopes/$groupId/members")
+            .then().statusCode(200).body("find { it.username == 'partner' }", equalTo(null))
+
+        // The last owner cannot be removed (last-owner guard).
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId/members/$owner")
+            .then().statusCode(409).body("code", equalTo("last_owner"))
+    }
+
+    @Test
+    fun rotateBumpsEpochAndReGrantsRemaining() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+
+        // Initial: epoch 0.
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.id == '$groupId' }.currentEpoch", equalTo(0))
+            .body("find { it.id == '$groupId' }.grantedEpoch", equalTo(0))
+
+        // Rotate: owner mints E1 (chain-link) + re-grants self to the new epoch.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"wrappedPrev":"$rotPrev","grants":[{"userId":"$owner","wrappedGrant":"$newGrant"}]}""")
+            .`when`().post("/api/scopes/$groupId/epochs")
+            .then().statusCode(201).body("epoch", equalTo(1))
+
+        // The scope now reports epoch 1, the owner re-granted (grantedEpoch 1 + the new grant).
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.id == '$groupId' }.currentEpoch", equalTo(1))
+            .body("find { it.id == '$groupId' }.grantedEpoch", equalTo(1))
+            .body("find { it.id == '$groupId' }.wrappedGrant", equalTo(newGrant))
+
+        // The epoch-chain link is readable (opaque ciphertext, verbatim).
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().get("/api/scopes/$groupId/epochs")
+            .then().statusCode(200)
+            .body("[0].epoch", equalTo(1))
+            .body("[0].wrappedPrev", equalTo(rotPrev))
+    }
+
+    @Test
+    fun rotateNonOwnerIs403() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner") // partner is a MEMBER, not owner
+
+        given().header("Authorization", "Bearer ${token(partner)}").contentType(ContentType.JSON)
+            .body("""{"wrappedPrev":"$rotPrev","grants":[]}""")
+            .`when`().post("/api/scopes/$groupId/epochs")
+            .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+    }
 
     @Test
     fun createPersonalScopeThenListReturnsBoth() {

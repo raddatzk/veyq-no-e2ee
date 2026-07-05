@@ -70,3 +70,42 @@ client.test("add group member requires auth", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
 });
 %}
+
+### 6. Group member management (cr-0088) without a bearer token → 401 (auth is checked before the body)
+# The owner-gated happy-paths (promote/demote, remove + last-owner guard, rotation-commit + re-grant) are covered
+# at the integration layer (ScopesSliceTest) — they need a seeded group + members + the epoch grant flow, not a
+# bare .http. Here only the unauth boundary of each op.
+PATCH {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/members/9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "role": "OWNER" }
+
+> {%
+client.test("set member role requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 7. DELETE a group member without a bearer token → 401
+DELETE {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/members/9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("remove member requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 8. POST a rotation-commit without a bearer token → 401
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/epochs
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "wrappedPrev": "AQ==", "grants": [] }
+
+> {%
+client.test("rotate scope requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}

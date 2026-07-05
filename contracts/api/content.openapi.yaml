@@ -297,6 +297,15 @@ components:
           format: int32
           description: Ordering among siblings (default 0 / append).
           example: 0
+        epoch:
+          type: integer
+          description: >
+            The scope **content-key epoch** this node's name / slug / `K_mem`-wrap are sealed under (ADR 0024).
+            The client sends the scope's current epoch; omitted/absent = 0 (the pre-rotation baseline). A member
+            reads a node of epoch `k` iff they hold an epoch ≥ `k`.
+          minimum: 0
+          default: 0
+          example: 0
         wrappedContentKey:
           type: [string, "null"]
           description: For a MEMORY or CHAPTER — its random `K_mem` wrapped under the parent's content key (`K_SC` for a top-level Memory, the parent Memory's `K_mem` for a chapter; opaque base64). Absent for folders.
@@ -356,9 +365,14 @@ components:
 
     NodeSummary:
       type: object
-      required: [id, kind, encryptedName, slugToken, orderIndex]
+      required: [id, kind, encryptedName, slugToken, orderIndex, epoch]
       properties:
         id: { type: string, format: uuid, example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d }
+        epoch:
+          type: integer
+          description: The scope content-key epoch this node is sealed under (ADR 0024); 0 for pre-rotation nodes.
+          minimum: 0
+          example: 0
         parentId:
           type: [string, "null"]
           format: uuid

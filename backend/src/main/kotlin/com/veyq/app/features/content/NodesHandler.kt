@@ -43,7 +43,7 @@ class NodesHandler(private val store: NodesStore) {
 
     fun create(
         userId: String, scopeId: String, parentSlotId: String?, kind: String,
-        encryptedName: String, slugToken: String, orderIndex: Int, wrappedContentKey: String?, wrappedMeta: String?,
+        encryptedName: String, slugToken: String, orderIndex: Int, epoch: Int, wrappedContentKey: String?, wrappedMeta: String?,
     ): CreateNodeOutcome {
         if (!store.isMember(userId, scopeId)) return CreateNodeOutcome.NoScope
         val slot = parentSlotId ?: scopeId // null/absent → the scope root (slot = scope id)
@@ -52,7 +52,7 @@ class NodesHandler(private val store: NodesStore) {
         if (!parentAllows(kind, parent)) return CreateNodeOutcome.IllegalStructure
         if (store.slugTaken(slot, slugToken)) return CreateNodeOutcome.SlugTaken
         return CreateNodeOutcome.Created(
-            store.create(scopeId, slot, kind, encryptedName, slugToken, orderIndex, wrappedContentKey, wrappedMeta),
+            store.create(scopeId, slot, kind, encryptedName, slugToken, orderIndex, epoch, wrappedContentKey, wrappedMeta),
         )
     }
 

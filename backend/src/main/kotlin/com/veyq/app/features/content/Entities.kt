@@ -40,6 +40,11 @@ class NodeEntity : PanacheEntityBase {
     @Column(name = "order_index", nullable = false)
     var orderIndex: Int = 0
 
+    /** The scope content-key **epoch** this node's name/slug/`K_mem`-wrap are sealed under (ADR 0024, cr-0088);
+     *  0 = the pre-rotation baseline. A member reads it iff they hold an epoch ≥ this. */
+    @Column(name = "epoch", nullable = false)
+    var epoch: Int = 0
+
     @Column(name = "wrapped_content_key")
     var wrappedContentKey: String? = null
 

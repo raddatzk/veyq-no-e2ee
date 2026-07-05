@@ -28,7 +28,8 @@ class ContentResource(
         val outcome = handler.create(
             identity.principal.name, scopeId.toString(), createNodeRequest.parentId?.toString(),
             createNodeRequest.kind.value, createNodeRequest.encryptedName, createNodeRequest.slugToken,
-            createNodeRequest.orderIndex ?: 0, createNodeRequest.wrappedContentKey, createNodeRequest.wrappedMeta,
+            createNodeRequest.orderIndex ?: 0, createNodeRequest.epoch ?: 0,
+            createNodeRequest.wrappedContentKey, createNodeRequest.wrappedMeta,
         )
         return when (outcome) {
             is CreateNodeOutcome.Created ->
@@ -72,6 +73,7 @@ class ContentResource(
         encryptedName = encryptedName,
         slugToken = slugToken,
         orderIndex = orderIndex,
+        epoch = epoch,
         parentId = if (parentId == scopeId) null else UUID.fromString(parentId),
         wrappedContentKey = wrappedContentKey,
         wrappedMeta = wrappedMeta,

@@ -32,6 +32,11 @@ class ScopeEntity : PanacheEntityBase {
     @Column(name = "encrypted_name")
     var encryptedName: String? = null
 
+    /** The scope's **current content-key epoch** (ADR 0024, cr-0088) — 0 until the first rotation. New content
+     *  seals under this epoch; a removal bumps it. */
+    @Column(name = "current_epoch", nullable = false)
+    var currentEpoch: Int = 0
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
@@ -40,4 +45,31 @@ class ScopeEntity : PanacheEntityBase {
         const val GROUP = "GROUP"
         const val PERSONAL = "PERSONAL"
     }
+}
+
+/**
+ * One epoch-chain link of a scope (ADR 0024, cr-0088). For epoch `n ≥ 1`, `wrappedPrev = symWrap(E_n, E_{n-1})` —
+ * the previous epoch key sealed under this epoch's key (opaque ciphertext). A member holding the latest epoch
+ * (via their grant) peels these links down to `E_0` to read content of any epoch. Operator-blind: no key here.
+ */
+@Entity
+@Table(name = "veyq_scope_epoch")
+class ScopeEpochEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "id", length = 36)
+    lateinit var id: String
+
+    @Column(name = "scope_id", nullable = false, length = 36)
+    lateinit var scopeId: String
+
+    @Column(name = "epoch", nullable = false)
+    var epoch: Int = 0
+
+    @Column(name = "wrapped_prev", nullable = false)
+    lateinit var wrappedPrev: String
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    companion object : PanacheCompanionBase<ScopeEpochEntity, String>
 }

@@ -1,5 +1,6 @@
 package com.veyq.app.features.spaces.scope
 
+import com.veyq.app.features.admin.tenant.MembershipEntity
 import jakarta.enterprise.context.ApplicationScoped
 
 /** Outcome of birthing a personal scope. */
@@ -31,6 +32,38 @@ sealed interface AddGroupMemberOutcome {
 }
 
 /** Outcome of listing a scope's members (the directory, cr-0077). */
+/** Outcome of promote/demote (cr-0088). */
+sealed interface SetRoleOutcome {
+    data class Ok(val row: ScopeMemberRow) : SetRoleOutcome
+    object ScopeNotFound : SetRoleOutcome
+    object NotOwner : SetRoleOutcome
+    object MemberNotFound : SetRoleOutcome
+    object LastOwner : SetRoleOutcome
+}
+
+/** Outcome of removing a member (cr-0088). */
+sealed interface RemoveMemberOutcome {
+    object Ok : RemoveMemberOutcome
+    object ScopeNotFound : RemoveMemberOutcome
+    object NotOwner : RemoveMemberOutcome
+    object MemberNotFound : RemoveMemberOutcome
+    object LastOwner : RemoveMemberOutcome
+}
+
+/** Outcome of a rotation-commit (cr-0088). */
+sealed interface RotateOutcome {
+    data class Ok(val epoch: Int) : RotateOutcome
+    object ScopeNotFound : RotateOutcome
+    object NotOwner : RotateOutcome
+}
+
+/** Outcome of reading the epoch-chain links (cr-0088). */
+sealed interface EpochsOutcome {
+    data class Links(val links: List<Pair<Int, String>>) : EpochsOutcome
+    object Forbidden : EpochsOutcome
+    object ScopeNotFound : EpochsOutcome
+}
+
 sealed interface ListMembersOutcome {
     data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
     object Forbidden : ListMembersOutcome
@@ -84,6 +117,54 @@ class ScopesHandler(private val store: ScopesStore) {
         store.addGrantlessMember(targetId, tenantId, scopeId)
         val row = store.scopeMemberRow(scopeId, targetId) ?: return AddGroupMemberOutcome.MemberNotFound
         return AddGroupMemberOutcome.Added(row.copy(email = null))
+    }
+
+    /**
+     * Promote a member to co-owner or demote a co-owner (uc.spaces.manage-group-members, cr-0088). Owner-gated;
+     * the **last-owner guard** rejects demoting the last OWNER (ADR 0007). A pure role change — no key moves.
+     */
+    fun setMemberRole(callerId: String, scopeId: String, targetId: String, role: String): SetRoleOutcome {
+        if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return SetRoleOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return SetRoleOutcome.NotOwner
+        val current = store.memberRole(targetId, scopeId) ?: return SetRoleOutcome.MemberNotFound
+        if (current == MembershipEntity.OWNER && role == MembershipEntity.MEMBER && store.ownerCount(scopeId) <= 1) {
+            return SetRoleOutcome.LastOwner
+        }
+        store.setRole(targetId, scopeId, role)
+        // Build the response from the role we just set — the same-request read-back can see a stale persistence
+        // context (the DB is committed; the guard checks below run in fresh requests against committed data).
+        val row = store.scopeMemberRow(scopeId, targetId) ?: return SetRoleOutcome.MemberNotFound
+        return SetRoleOutcome.Ok(row.copy(role = role, email = null))
+    }
+
+    /**
+     * Remove a member from a group (cr-0088) — the instant **layer-1** cut (delete the membership). Owner-gated;
+     * the last OWNER cannot be removed. **Layer-2** forward-secrecy is the caller's follow-up rotation.
+     */
+    fun removeMember(callerId: String, scopeId: String, targetId: String): RemoveMemberOutcome {
+        if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return RemoveMemberOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return RemoveMemberOutcome.NotOwner
+        val current = store.memberRole(targetId, scopeId) ?: return RemoveMemberOutcome.MemberNotFound
+        if (current == MembershipEntity.OWNER && store.ownerCount(scopeId) <= 1) return RemoveMemberOutcome.LastOwner
+        store.removeMembership(targetId, scopeId)
+        return RemoveMemberOutcome.Ok
+    }
+
+    /**
+     * Commit a scope-key rotation (cr-0088, ADR 0024): bump the epoch, store the chain-link, re-grant the listed
+     * remaining members. Owner-gated; the client minted the new epoch on-device (the server stores only ciphertext).
+     */
+    fun rotateScope(callerId: String, scopeId: String, wrappedPrev: String, grants: List<Pair<String, String>>): RotateOutcome {
+        if (store.currentEpoch(scopeId) == null) return RotateOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return RotateOutcome.NotOwner
+        return RotateOutcome.Ok(store.rotate(scopeId, wrappedPrev, grants))
+    }
+
+    /** The scope's epoch-chain links — any key-holder in the scope may read them (cr-0088, ADR 0024). */
+    fun listEpochs(callerId: String, scopeId: String): EpochsOutcome {
+        if (store.currentEpoch(scopeId) == null) return EpochsOutcome.ScopeNotFound
+        if (!store.holdsGrant(callerId, scopeId)) return EpochsOutcome.Forbidden
+        return EpochsOutcome.Links(store.epochLinks(scopeId))
     }
 
     /** Every tenant the caller belongs to (Host-independent) — the space switcher. */

@@ -298,6 +298,119 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: already_member }
 
+  /api/scopes/{scopeId}/members/{userId}:
+    patch:
+      tags: [scopes]
+      operationId: setMemberRole
+      summary: Promote a member to co-owner or demote a co-owner (group roles).
+      description: >
+        Sets a group member's role (`OWNER` / `MEMBER`) — the GroupOwner's promote/demote (uc.spaces.manage-group-members,
+        cr-0088, ADR 0014 §4). Owner-gated (`403 not_scope_owner`); the **last-owner guard** rejects demoting the
+        last remaining OWNER (`409 last_owner`, ADR 0007). A pure role change — no key moves (the member already
+        holds the scope key). Enforced by code, not this spec (ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope., schema: { type: string, format: uuid } }
+        - { name: userId, in: path, required: true, description: Opaque id of the member whose role to set., schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetMemberRoleRequest" }
+            example: { role: OWNER }
+      responses:
+        "200":
+          description: The member's role after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScopeMember" }
+        "400": { description: Malformed (invalid role)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } } } }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such scope or member., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: member_not_found } } } }
+        "409": { description: The last remaining OWNER cannot be demoted., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: last_owner } } } }
+    delete:
+      tags: [scopes]
+      operationId: removeMember
+      summary: Remove a member from a group (layer-1 access cut; the caller then rotates the key).
+      description: >
+        Deletes a member's GROUP membership — the instant **layer-1** access cut (a 403 on the scope afterwards)
+        of uc.spaces.manage-group-members (cr-0088). Owner-gated (`403 not_scope_owner`); the **last-owner guard**
+        rejects removing the last OWNER (`409 last_owner`). This is admission only — **layer-2** forward-secrecy is
+        the caller's follow-up **rotation-commit** (`POST /api/scopes/{scopeId}/epochs`, ADR 0024): mint a new
+        epoch, re-grant the remaining members. The server never holds a key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope., schema: { type: string, format: uuid } }
+        - { name: userId, in: path, required: true, description: Opaque id of the member to remove., schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: The member was removed (their grant is gone). }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such scope or member., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: member_not_found } } } }
+        "409": { description: The last remaining OWNER cannot be removed., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: last_owner } } } }
+
+  /api/scopes/{scopeId}/epochs:
+    get:
+      tags: [scopes]
+      operationId: listScopeEpochs
+      summary: The scope's epoch-chain links, so a member peels down to read older epochs.
+      description: >
+        Returns the scope's **epoch-chain links** (ADR 0024): for each epoch `n ≥ 1`, `wrappedPrev` =
+        `symWrap(E_n, E_{n-1})` (opaque base64) — so a member who holds the latest epoch (via their grant) derives
+        every earlier one and reads content of any epoch. Epoch 0 has no predecessor. Operator-blind: opaque
+        ciphertext only, never a key. Any key-holder may read it.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the scope., schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The epoch-chain links (ascending by epoch).
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ScopeEpochLink" } }
+              example:
+                - { epoch: 1, wrappedPrev: AQ== }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller holds no grant in this scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_member } } } }
+        "404": { description: No such scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+    post:
+      tags: [scopes]
+      operationId: rotateScope
+      summary: Commit a scope-key rotation — a new epoch + re-grants to the remaining members.
+      description: >
+        Commits a forward rotation of the scope content key (ADR 0024): bumps the scope's **current epoch** to the
+        next index, stores the chain-link `wrappedPrev` = `symWrap(E_new, E_{prev})`, and applies the `grants`
+        (each remaining member's `wrappedGrant` re-wrapped to the **new** epoch, updating their granted-epoch). The
+        client mints the new epoch on-device; the server stores only ciphertext. Owner-gated (`403`). Grants for
+        members not listed here are delivered afterwards by grant-delivery (stale-epoch reconcile, ADR 0020/0021).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope., schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RotateScopeRequest" }
+            example:
+              wrappedPrev: AQ==
+              grants: [{ userId: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a, wrappedGrant: AQ== }]
+      responses:
+        "201":
+          description: The scope rotated; the new current epoch.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScopeRotated" }
+              example: { epoch: 1 }
+        "400": { description: Malformed (missing/invalid link or grant)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } } } }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+
   /api/scopes/my-tenants:
     get:
       tags: [scopes]
@@ -399,6 +512,78 @@ components:
           example: partner
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
 
+    SetMemberRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          description: The role to set — `OWNER` (co-owner) or `MEMBER`.
+          enum: [OWNER, MEMBER]
+          example: OWNER
+
+    ScopeEpochLink:
+      type: object
+      required: [epoch, wrappedPrev]
+      properties:
+        epoch:
+          type: integer
+          description: The epoch index `n` (≥ 1) this link belongs to.
+          minimum: 1
+          example: 1
+        wrappedPrev:
+          type: string
+          description: >
+            `symWrap(E_n, E_{n-1})` — the previous epoch key sealed under this epoch's key (opaque base64). Lets a
+            holder of `E_n` derive `E_{n-1}`, chaining down to `E_0` (ADR 0024).
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+
+    ScopeGrantEntry:
+      type: object
+      required: [userId, wrappedGrant]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: The member being (re-)granted.
+          example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
+        wrappedGrant:
+          type: string
+          description: The new epoch key sealed to that member's identity public key (`asymWrap`, opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+
+    RotateScopeRequest:
+      type: object
+      required: [wrappedPrev, grants]
+      properties:
+        wrappedPrev:
+          type: string
+          description: >
+            `symWrap(E_new, E_prev)` — the just-superseded epoch key sealed under the freshly-minted one (the new
+            chain-link, opaque base64).
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        grants:
+          type: array
+          description: The remaining members re-granted the new epoch (any not listed are re-granted later by grant-delivery).
+          items: { $ref: "#/components/schemas/ScopeGrantEntry" }
+
+    ScopeRotated:
+      type: object
+      required: [epoch]
+      properties:
+        epoch:
+          type: integer
+          description: The scope's new current epoch after the rotation.
+          minimum: 1
+          example: 1
+
     MyTenant:
       type: object
       required: [tenantId, name, domain, role]
@@ -489,7 +674,7 @@ components:
 
     ScopeSummary:
       type: object
-      required: [id, kind, tenantId, role, wrappedGrant]
+      required: [id, kind, tenantId, role, currentEpoch, grantedEpoch, wrappedGrant]
       properties:
         id:
           type: string
@@ -520,6 +705,20 @@ components:
           contentEncoding: base64
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
+        currentEpoch:
+          type: integer
+          description: >
+            The scope's **current content-key epoch** (ADR 0024) — 0 until the first rotation. New content seals
+            under this epoch; the client peels the epoch-chain (`GET …/epochs`) to read older ones.
+          minimum: 0
+          example: 0
+        grantedEpoch:
+          type: integer
+          description: >
+            The epoch the caller's own `wrappedGrant` wraps. `grantedEpoch < currentEpoch` means the grant is
+            **stale** (a rotation hasn't re-granted this member yet) — grant-delivery re-grants them (ADR 0024).
+          minimum: 0
+          example: 0
         wrappedGrant:
           type: string
           description: >
