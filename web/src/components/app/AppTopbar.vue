@@ -3,10 +3,11 @@
 // .workspace-topbar grid: breadcrumb + a search center + actions) so layout.css styles it identically. Ours
 // only differs in the data: the breadcrumb is built CLIENT-SIDE from the local decrypted tree (the blind
 // server computes none), and global search is a later slice, so the center renders in its disabled state.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Breadcrumb from 'primevue/breadcrumb'
+import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
 import UploadStatusMenu from '../../features/memory/components/UploadStatusMenu.vue'
@@ -15,15 +16,21 @@ import { useThemeState, setThemePreference, type ThemePreference } from '../../s
 const { t } = useI18n()
 const router = useRouter()
 
-// Theme is a frequent one-tap quick toggle → it lives here in the top bar (cr-0078 follow-up); language, which
-// grows more options, stays in the profile menu + the settings hub, not here. Cycles system → light → dark.
+// Theme lives in the top bar (cr-0078 follow-up); language, which grows more options, stays in the profile menu +
+// the settings hub. It's a **labelled dropdown** (cr-0085): the trigger shows the current mode, the popup lists
+// System / Light / Dark with the active one checked — clearer than a mystery cycle-button.
+const THEME_ICON: Record<ThemePreference, string> = { system: 'pi pi-desktop', light: 'pi pi-sun', dark: 'pi pi-moon' }
 const { themePreference } = useThemeState()
-const THEME_CYCLE: ThemePreference[] = ['system', 'light', 'dark']
-const themeIcon = computed(
-  () => ({ system: 'pi pi-desktop', light: 'pi pi-sun', dark: 'pi pi-moon' })[themePreference.value],
+const themeIcon = computed(() => THEME_ICON[themePreference.value])
+const themeMenu = ref<InstanceType<typeof Menu> | null>(null)
+const themeLabel = (p: ThemePreference) => t(`shell.theme${p.charAt(0).toUpperCase()}${p.slice(1)}`)
+const themeMenuItems = computed<MenuItem[]>(() =>
+  (['system', 'light', 'dark'] as ThemePreference[]).map((pref) => ({
+    label: themeLabel(pref),
+    icon: themePreference.value === pref ? 'pi pi-check' : THEME_ICON[pref],
+    command: () => setThemePreference(pref),
+  })),
 )
-const cycleTheme = () =>
-  setThemePreference(THEME_CYCLE[(THEME_CYCLE.indexOf(themePreference.value) + 1) % THEME_CYCLE.length])
 
 const home = computed<MenuItem>(() => ({
   label: breadcrumb.trail[0]?.name,
@@ -50,13 +57,16 @@ const items = computed<MenuItem[]>(() =>
     <div class="workspace-topbar-actions">
       <button
         type="button"
-        class="topbar-icon-button"
+        class="topbar-icon-button topbar-theme-button"
         :aria-label="t('shell.theme')"
         :title="t('shell.theme')"
-        @click="cycleTheme"
+        aria-haspopup="menu"
+        @click="themeMenu?.toggle($event)"
       >
         <span :class="themeIcon" />
+        <span class="pi pi-chevron-down topbar-icon-caret" />
       </button>
+      <Menu ref="themeMenu" :model="themeMenuItems" popup />
       <UploadStatusMenu />
       <button
         type="button"
@@ -86,5 +96,15 @@ const items = computed<MenuItem[]>(() =>
 }
 .topbar-icon-button:hover {
   background: var(--p-content-hover-background, rgba(127, 127, 127, 0.08));
+}
+/* The theme trigger carries a small caret so it reads as a menu, not a mystery toggle (cr-0085). */
+.topbar-theme-button {
+  width: auto;
+  gap: 0.2rem;
+  padding: 0 0.45rem;
+}
+.topbar-icon-caret {
+  font-size: 0.65em;
+  opacity: 0.55;
 }
 </style>

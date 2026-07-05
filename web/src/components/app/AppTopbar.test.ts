@@ -15,10 +15,21 @@ const i18n = createI18n({
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: { en: { shell: { search: 'Search…', theme: 'Theme' }, settings: { title: 'Settings' } } },
+  messages: {
+    en: {
+      shell: { search: 'Search…', theme: 'Theme', themeSystem: 'System', themeLight: 'Light', themeDark: 'Dark' },
+      settings: { title: 'Settings' },
+    },
+  },
 })
 
 const mountTopbar = () => mount(AppTopbar, { global: { plugins: [i18n, PrimeVue] } })
+
+// A pass-through stub for the teleporting PrimeVue Menu: renders its model items as buttons that run `command`.
+const MenuStub = {
+  props: ['model'],
+  template: '<ul><li v-for="(it, i) in model" :key="i"><button class="menu-item" @click="it.command && it.command()">{{ it.label }}</button></li></ul>',
+}
 
 describe('AppTopbar breadcrumb', () => {
   it('renders the client-side breadcrumb trail labels', () => {
@@ -35,18 +46,23 @@ describe('AppTopbar breadcrumb', () => {
   })
 })
 
-describe('AppTopbar theme toggle (cr-0078)', () => {
-  it('cycles the theme preference system → light → dark → system on tap', async () => {
+describe('AppTopbar theme dropdown (cr-0085)', () => {
+  it('offers a labelled System/Light/Dark menu and applies the picked one', async () => {
     setThemePreference('system')
     const { themePreference } = useThemeState()
-    const w = mountTopbar()
-    const themeBtn = w.findAll('.topbar-icon-button')[0] // the theme toggle sits first, beside the search
+    const w = mount(AppTopbar, { global: { plugins: [i18n, PrimeVue], stubs: { Menu: MenuStub } } })
 
-    await themeBtn.trigger('click')
-    expect(themePreference.value).toBe('light')
-    await themeBtn.trigger('click')
+    const items = w.findAll('.menu-item')
+    expect(items.map((i) => i.text())).toEqual(['System', 'Light', 'Dark'])
+
+    await items[2].trigger('click') // Dark
     expect(themePreference.value).toBe('dark')
-    await themeBtn.trigger('click')
+    await items[0].trigger('click') // System
     expect(themePreference.value).toBe('system')
+  })
+
+  it('the trigger is a menu button (aria-haspopup), not a mystery cycle', () => {
+    const w = mount(AppTopbar, { global: { plugins: [i18n, PrimeVue], stubs: { Menu: true } } })
+    expect(w.find('.topbar-theme-button').attributes('aria-haspopup')).toBe('menu')
   })
 })
