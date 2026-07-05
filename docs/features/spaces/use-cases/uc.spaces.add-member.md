@@ -68,8 +68,9 @@ note right of S : server saw invite metadata,\npubkeys, opaque grants — never 
 
 - **A1 — the invitee already has an account on this instance:** they **accept** rather than cold-register
   (the [cr-0010](../../../../changes/cr-0010-tenant-activation.md) accept branch); they still become a
-  grantless member until a key-holder wraps (step 3). *(v1 onboarding targets a new person by email; the
-  existing-account/by-username variant is the natural group-member-add case under [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md).)*
+  grantless member until a key-holder wraps (step 3). *(v1 tenant onboarding targets a new person by email; the
+  existing-member, by-username variant is [uc.spaces.add-group-member](uc.spaces.add-group-member.md) — the group
+  case under [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md).)*
 - **A2 — no key-holder is online when the member joins:** the member stays in the Personal fallback, surfaced as
   *awaiting access* — **not** an error. Only a key-holder can wrap the key; the blind server cannot. Access
   completes as soon as **any** member (the owner or another) is next online (step 3) — not specifically the owner.

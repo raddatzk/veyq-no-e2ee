@@ -10,7 +10,9 @@
   from the tenant owner** ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)). This enabler is
   the scope itself born by its owner; **adding other members** is the next slice.
 - **Serves (use-cases/enablers):** [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) (groups
-  appear in the switcher) — plus the *planned* create-group / share-with-a-group flows. A group holds a
+  appear in the switcher) and [uc.spaces.add-group-member](../use-cases/uc.spaces.add-group-member.md) (bring a
+  fellow tenant member in — the next slice after solo birth) — plus the *planned* share-with-a-group flows. A
+  group holds a
   [Memory](../../memory/_index.md) tree like any scope; that tree is scope-agnostic — it depends on
   *personal-scope* as its first home, not on this enabler.
 - **Depends on:** [en.spaces.personal-scope](en.spaces.personal-scope.md) (generalised scope identity +
@@ -33,10 +35,11 @@ A group reuses the personal scope's machinery — client-driven birth, the hybri
    node name, [ADR 0012](../../../decisions/0012-content-key-hierarchy.md)) — so only members read it; the
    server sees an **unnamed** group ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)).
 2. **Multi-member by design.** A personal scope has exactly one grant (its owner). A group is *built* to carry
-   many — but **this enabler only mints the owner's self-grant**; other members' grants are the member-add slice,
-   which reuses the shared grant-distribution primitive ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)
-   — wrap `K_SC` to an existing tenant member's identity; the GroupOwner is the granter per
-   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)).
+   many — but **this enabler only mints the owner's self-grant**; other members' grants are the member-add slice
+   ([uc.spaces.add-group-member](../use-cases/uc.spaces.add-group-member.md)), which reuses the shared
+   grant-distribution primitive ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md) — wrap
+   `K_SC` to an existing tenant member's identity, picked by username; the GroupOwner admits per
+   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md), any group member delivers).
 3. **Explicit creation (not auto-birth).** A personal scope auto-births after unlock; a group is created on a
    deliberate user action ("new group" + a name).
 
