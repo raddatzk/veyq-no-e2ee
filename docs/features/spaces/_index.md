@@ -16,7 +16,8 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   from the tenant owner), [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md) (readable URLs in
   the `#fragment`), [ADR 0019](../../decisions/0019-token-less-tenant-home.md) (token-less tenant home),
   [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) (grant distribution — wrap a scope key to
-  another member).
+  another member), [ADR 0023](../../decisions/0023-per-tenant-member-identity.md) (per-tenant member identity —
+  username + sealed real names).
 - **Note:** a **scope** is the unit content is keyed on (opaque `scopeId` + `kind`); a **grant** is how a
   member holds its key. The tenant's root scope is born at tenant activation
   ([cr-0010](../../../changes/cr-0010-tenant-activation.md)); this feature adds the **personal** scope and the
@@ -34,6 +35,10 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - ★ [en.spaces.group-scope](enablers/en.spaces.group-scope.md) — **refined** (a shared, **named** GROUP scope
   born by its owner + opened — confidential even from the tenant owner;
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md), building in cr-0032)
+- [en.spaces.member-identity](enablers/en.spaces.member-identity.md) — **refined** (per-tenant `username`
+  unique-in-tenant + `firstName`/`lastName` **sealed** under `K_tenant`; email the only global key, owner-only in
+  the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md), building in
+  [cr-0083](../../../changes/cr-0083-member-identity.md))
 
 ## Use-cases
 
@@ -49,7 +54,13 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - [Manage pending member invites](use-cases/uc.spaces.manage-member-invites.md) — **built** (the owner lists /
   re-issues / revokes the member invites add-member mints; owner-gated, additive-safe;
   [cr-0082](../../../changes/cr-0082-member-invite-management.md))
-- Create / share with a group — **in progress** (G1 `en.spaces.group-scope` in cr-0032; member-add G2 reuses
-  the [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) primitive, management G3 —
-  [ADR 0014](../../decisions/0014-group-scopes-and-governance.md))
+- Create / share with a group — **in progress** ([ADR 0014](../../decisions/0014-group-scopes-and-governance.md)):
+  **G1** create + open + browse (`en.spaces.group-scope`, cr-0032); **G2** member-add — per-tenant username
+  search ([en.spaces.member-identity](enablers/en.spaces.member-identity.md)) + the
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) grant-wrap, direct-add default with an
+  optional consent-first toggle (one-off name-seal for informed consent); **G3** member management (promote/
+  demote, multiple owners + last-owner guard), grace-delete + orphan rule, `K_SC` rotation
+- Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
+  open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
+  on a future per-Memory **participants** tag (sealed `userId`s)
 - Public share of a subtree — planned (per-share key; least-privilege; the sharing feature)

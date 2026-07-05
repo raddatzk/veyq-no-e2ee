@@ -30,12 +30,22 @@ Considered and rejected during refinement:
 **The in-shell content path lives in the URL `#fragment`, resolved entirely client-side; top-level (auth)
 routes stay history-mode.**
 
-- The current Memory-tree position is encoded in `location.hash`: `#~me/reisen-2026/rom` (personal scope),
-  `#@familie/sommer` (a group scope). The browser **never transmits the fragment** in an HTTP request — so the
-  readable, name-derived slugs reach the operator **never**, while the path stays bookmarkable. `~me` is a
-  **constant** (zero leak); `@<group>` + the folder/Memory slugs live only in the fragment. **The token-less
-  fragment** (a bare `#urlaube`, and `/` at the root) selects the shared **`TENANT`** space — the default home,
-  pinned by [ADR 0019](0019-token-less-tenant-home.md) (this ADR left the token-less default unspecified).
+- The current Memory-tree position is encoded in `location.hash`: `#~kevin/reisen-2026/rom` (a **`~username`**
+  personal/profile scope), `#@familie/sommer` (a group scope). The browser **never transmits the fragment** in
+  an HTTP request — so the readable, name-derived slugs (and the username) reach the operator **never**, while
+  the path stays bookmarkable. `~<username>` + `@<group>` + the folder/Memory slugs live only in the fragment.
+  **The token-less fragment** (a bare `#urlaube`, and `/` at the root) selects the shared **`TENANT`** space —
+  the default home, pinned by [ADR 0019](0019-token-less-tenant-home.md) (this ADR left the token-less default
+  unspecified).
+- **`~<username>` is a person route, not a constant.** The old self-token `~me` is **removed**; the personal
+  scope is addressed by the caller's own per-tenant `username` ([ADR 0023](0023-per-tenant-member-identity.md)) —
+  the sidebar builds `#~<own-username>`. Opening your **own** `~username` is your personal scope (as today);
+  opening **another** member's `~username` is the (later) **profile view** — the Memories *you can see* that tag
+  that person. That view is derived **entirely client-side** from the scopes you already decrypt (the server
+  never computes "which Memories is X in" — that social graph would break operator-blindness); it depends on a
+  future per-Memory **participants** tag (sealed `userId`s), so today only your own `~username` resolves to
+  something openable. A `username` change re-slugs your personal path (old bookmarks may miss) — acceptable for a
+  client-side convenience path.
 - **Resolution is local.** The client walks its **decrypted** tree, re-slugifying each child's name to match a
   segment — exactly the navigation the operator-blind server can't do. The server is never consulted to resolve
   a path; it only serves the per-scope opaque node rows ([ADR 0012](0012-content-key-hierarchy.md)).
@@ -59,8 +69,10 @@ routes stay history-mode.**
 - **No server navigation, no server slug for the path.** The server keeps serving opaque per-scope node rows;
   all path semantics are client-side. (The blinded `slug_token` it *does* store is for per-parent uniqueness,
   not navigation.)
-- **`@group` is a routing seam for groups** ([ADR 0014](0014-group-scopes-and-governance.md)) — the parser
-  accepts it ahead of the group feature; only `~me` resolves until group scopes exist.
+- **`@group` is a routing seam for groups** ([ADR 0014](0014-group-scopes-and-governance.md)) and **`~username`
+  for person/profile views** ([ADR 0023](0023-per-tenant-member-identity.md)) — the parser accepts both ahead of
+  their features; today only the caller's **own** `~username` (their personal scope) resolves, foreign profiles
+  arrive with the participants tag.
 - **Limitation:** slugs are lossy + name-derived; the displayed label always comes from the decrypted name, not
   the slug. A name change changes the slug (old bookmarks to a renamed node may miss) — acceptable for a
   client-side convenience path.

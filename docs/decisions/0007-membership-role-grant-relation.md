@@ -18,23 +18,30 @@ membership model must be settled first. Open questions: how do we model the **ma
 public key).
 
 - **Role gates management; grant gates content.** A role without a grant is a hollow title; promoting an
-  existing grant-holder is a pure role change (no key moves).
+  existing grant-holder is a pure role change (no key moves), and demoting one is too.
+- **Ownership cardinality — many owners, never zero.** At **every** level (Server, Tenant, Group) a scope may
+  have **multiple owners** and **must keep at least one**: removing or demoting the **last** owner is rejected (a
+  "last-owner guard"). Orphaning is thus only possible when a sole owner *leaves* — handled by an automatic rule,
+  not an admin power ([ADR 0014](0014-group-scopes-and-governance.md)).
 - **Per scope kind:**
-  - **Server membership is 1-1** — each user has exactly one server role (`OWNER` / `MEMBER`), today
-    `veyq_user.server_role`. Multiple owners are allowed; a flow to mint a second is a later use-case. A
-    server-scope **grant** is added only if the operator domain is later modelled as a server-scope (a
-    separate, parked idea).
+  - **Server role** is a single global column per user (`veyq_user.server_role`, `OWNER` / `MEMBER`) — a user
+    belongs to exactly one server. **Multiple `SERVER_OWNER`s are allowed** (subject to the guard above); a flow
+    to mint a second is a later use-case. A server-scope **grant** is added only if the operator domain is later
+    modelled as a server-scope (a separate, parked idea).
   - **Tenant and Group memberships are n-m** (user × tenant / user × group-within-tenant), each with a
-    role + a grant to that scope's key.
+    role + a grant to that scope's key. Group roles are **OWNER / MEMBER** only — no `ADMIN`
+    ([ADR 0014](0014-group-scopes-and-governance.md)).
   - **Personal** scope is self-held — no membership row beyond the member's own grant.
 - **The first tenant membership (the owner's) is born at activation** (cold `TENANT`-scope birth, cr-0010);
   members extend the same relation later via the invite-wrap.
 - **Reaching a person:** **email** is used only for an **outsider** with no account (the tenant-owner
-  invite); an **existing user** is invited by **username**, fully in-app via the invite-wrap. This keeps
-  person lookup non-enumerable.
+  invite); an **existing user** is reached by **username** — a **per-tenant, unique-within-tenant** handle on the
+  membership ([ADR 0023](0023-per-tenant-member-identity.md)), fully in-app. This keeps person lookup
+  non-enumerable (bounded to the tenant's own members).
 - **Owner-email visibility is a role rule, not crypto:** it is server-visible operational metadata,
-  returned only to roles that need it (a `SERVER_OWNER`, or the tenant's own `OWNER`/`ADMIN`) and omitted
-  for ordinary members.
+  returned only to roles that need it (a `SERVER_OWNER`, or the tenant's own `OWNER`) and omitted for ordinary
+  members — who see each other's per-tenant `username` + sealed real name instead
+  ([ADR 0023](0023-per-tenant-member-identity.md)).
 
 ## Consequences
 

@@ -59,17 +59,34 @@ and which is confidential even from the tenant owner.**
 
    | Role | May |
    |---|---|
-   | **GroupOwner** (`OWNER` on a GROUP scope) | create the group · **add members via username search** · **delete the group with a grace period** |
+   | **GroupOwner** (`OWNER` on a GROUP scope) | create the group · **add members via username search** · **promote a member to co-owner / demote a co-owner** · **delete the group with a grace period** |
    | **Member** (any role with a grant) | read + write the group's content (holds `K_SC`) |
    | **TenantOwner** | **nothing** with respect to groups — groups are **not surfaced** to them, and they cannot delete a group or add themselves |
 
-5. **Adding a member = username search.** The GroupOwner searches by **username** (in-app identity, not email,
-   [ADR 0007](0007-membership-role-grant-relation.md)); the server resolves it to the user's **identity public
-   key**; the client wraps `K_SC` to it. **Threat:** a malicious operator could return a public key it controls
-   (MITM) and read the group. **Defense:** the **safety-number / fingerprint** of that identity
-   ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md); UI deferred). The exact verification stance
-   (TOFU-pin vs. a hard gate before the first grant) is **deferred to the member-add slice (G2)** — proposed:
-   TOFU-pin + surface the fingerprint, hard-gate later.
+   Only two roles — **OWNER / MEMBER** (no `ADMIN`; an admin-over-groups would be surveillance for zero power,
+   above). A group follows the cross-cutting ownership rule ([ADR 0007](0007-membership-role-grant-relation.md)):
+   **multiple owners allowed, at least one required** — the last owner cannot be removed or demoted (the
+   last-owner guard); a sole owner leaving the tenant triggers the orphan rule (§6).
+
+5. **Adding a member = username search + consent.** The GroupOwner searches by **username** — a **per-tenant,
+   unique-within-tenant** handle ([ADR 0023](0023-per-tenant-member-identity.md)), not email; the server resolves
+   it to the target's **identity public key**.
+   - **Default = direct add.** The owner picks the member → the server records a grant-less GROUP membership →
+     grant-delivery ([ADR 0021](0021-operator-blind-background-tasks.md)) wraps `K_SC` to them, first-online-wins
+     ([ADR 0020](0020-grant-distribution-invite-wrap.md)). They simply find themselves in the group.
+   - **Optional consent (a per-user "ask before adding me" toggle) is consent-first, never wrap-then-soft.** A
+     non-auto-join member is *proposed*, held as a **soft, grant-less** membership; grant-delivery **skips** soft
+     memberships, so **`K_SC` never reaches someone who hasn't accepted** (deleting an already-delivered wrap
+     would not un-give the key — so we gate *before* the wrap, not clean up after). To let them decide informed,
+     the owner's device **one-off seals just the group name** to the invitee's identity public key
+     (`asymWrap(inviteePub, name)`) — no standing second key, no second rotation burden. The invitee sees the
+     name + who added them; **Accept** flips the membership eligible → a key-holder wraps `K_SC` (the usual
+     "awaiting access" window); **Decline** drops the soft membership (nothing was ever wrapped).
+   - **Threat:** a malicious operator could return a public key it controls (MITM) and read the group.
+     **Defense:** the **safety-number / fingerprint** of that identity
+     ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md); UI deferred). The exact verification stance
+     (TOFU-pin vs. a hard gate before the first grant) is **deferred to the member-add slice (G2)** — proposed:
+     TOFU-pin + surface the fingerprint, hard-gate later.
 
 6. **Lifecycle.**
    - **Owner delete = soft + grace.** The GroupOwner deletes; the group enters a **pending-deletion** state and

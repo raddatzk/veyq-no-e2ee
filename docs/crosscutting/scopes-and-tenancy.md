@@ -125,8 +125,9 @@ Who you can address depends on whether they already exist on the server:
 - **Outsider (no account yet)** — reached by **email** (the only out-of-band channel). This is the tenant
   **owner** invite: the operator types an email, the server sends an invite, the invitee registers. The
   email is **operational metadata** the server must hold to send mail.
-- **Existing user (already on the server)** — invited by **username**, fully **in-app** via the
-  invite-wrap; no email needed. This is the member / group-invite path and keeps person lookup
+- **Existing user (already on the server)** — invited by **username** — a **per-tenant, unique-within-tenant**
+  handle on the membership ([ADR 0023](../decisions/0023-per-tenant-member-identity.md)) — fully **in-app** via
+  the invite-wrap; no email needed. This is the member / group-invite path and keeps person lookup
   **non-enumerable** (you resolve a username only within scopes you can already see).
 
 **Email visibility is a role rule, not crypto.** The owner email is server-visible operational metadata;
