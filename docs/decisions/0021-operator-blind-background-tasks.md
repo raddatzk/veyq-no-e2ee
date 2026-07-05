@@ -53,8 +53,9 @@ result**.
    `done`; the originator observes it through the normal path. A job-specific output rides an optional
    **`sealedResult`** field (ciphertext, opaque). No generic plaintext result store.
 8. **Origination.** The server may originate only **structural, non-sensitive** jobs it already fully understands
-   (a grant-less membership → a `grant-delivery` job). **Content-processing jobs are originated by a
-   client/agent** and posted ready, so the server never *picks* a content-semantic task type.
+   (a grant-less **or stale-epoch** membership → a `grant-delivery` job — the stale-epoch case is scope-key
+   rotation re-granting existing members, [ADR 0024](0024-scope-key-rotation.md)). **Content-processing jobs are
+   originated by a client/agent** and posted ready, so the server never *picks* a content-semantic task type.
 9. **First consumer = member-add grant delivery** ([ADR 0020](0020-grant-distribution-invite-wrap.md)): a trivial,
    blind body, a universal tag, no lease needed (idempotent, first-online-wins) — it validates the core loop
    end-to-end. Transcode + face-recognition/ML are the **informing** heavy consumers that shaped the

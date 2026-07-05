@@ -40,7 +40,9 @@ key, wraps, or unwraps.** Concretely:
    `asymWrap(hybridPublic(target), K_SC, "scope-grant")` — the *same* hybrid KEM, context, and wire shape as a
    self-grant, only the recipient pubkey is someone else's. The result is posted as the target's
    `MembershipEntity.wrappedGrant`; the target opens it with their **own** identity private on next entry
-   (the existing self-unwrap path, unchanged). No new primitive, no new context string.
+   (the existing self-unwrap path, unchanged). No new primitive, no new context string. (On scope-key rotation
+   the granter wraps the scope's **current epoch key** rather than a single `K_SC` — the same call and context;
+   [ADR 0024](0024-scope-key-rotation.md).)
 
 2. **A key directory — the one new read surface.** An authorized granter can list a scope's memberships
    together with each member's **identity public key** and whether they already hold a grant (granted vs.
@@ -68,7 +70,10 @@ key, wraps, or unwraps.** Concretely:
    on purpose. **Delivery is realized as a `grant-delivery` job on the operator-blind background-task mechanism**
    ([ADR 0021](0021-operator-blind-background-tasks.md)) — this use-case is that mechanism's first, trivially-blind
    consumer (a universal tag, no lease, idempotent). The "pending = grant-less membership, reconciled by any
-   key-holder" discovery is that mechanism's pull/reconcile.
+   key-holder" discovery is that mechanism's pull/reconcile. **Scope-key rotation re-grants existing members the
+   same way** — only the reconcile predicate widens from *grant-less* to *grant-less **or** stale-epoch*
+   ([ADR 0024](0024-scope-key-rotation.md) — a removed member's departure mints a new epoch the remaining members
+   are re-granted).
 
 4. **Authenticity is Plain in v1 — the key-substitution gap is documented, not closed.** The granter trusts the
    identity pubkey the server returns. A malicious operator could substitute its own key and read future wraps;

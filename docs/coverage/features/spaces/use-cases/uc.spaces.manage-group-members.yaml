@@ -1,0 +1,23 @@
+useCase: uc.spaces.manage-group-members
+feature: spaces
+title: Manage a group's members (promote / demote / remove)
+# Refined (G3a) but not yet built — the acceptance criteria are the work order for the G3a CR; test refs land
+# with it, at which point `status: planned` drops and `coverage` fills per criterion.
+status: planned
+acceptanceCriteria:
+  - id: promote-demote
+    text: A GroupOwner promotes a member to co-owner (OWNER) or demotes a co-owner to MEMBER — a pure role change, no key move.
+  - id: last-owner-guard
+    text: The last remaining OWNER cannot be demoted or removed; the action is rejected (a group needs ≥1 owner).
+  - id: remove-member
+    text: A GroupOwner removes a member → the membership is deleted (instant 403). A non-owner caller is rejected.
+  - id: remove-rotates-forward
+    text: Removal rotates the scope content key forward into a new epoch, re-granted only to the remaining members; new content seals under it, so the removed member reads pre-removal content but never post-removal content (even against a malicious operator). Grant-delivery re-grants stale-epoch members, first-online-wins.
+  - id: operator-blind-rotation
+    text: The server sees only role/membership metadata + opaque epoch-chain links, per-member grants, and per-node epoch indices — never a key or a name.
+gaps:
+  backend: "G3a not built — role change + membership delete (owner-gated, last-owner guard) + the epoch/chain-link + granted-epoch/node-epoch columns + the grant-delivery stale-epoch trigger are pending."
+  web: "G3a not built — the group member row actions (promote/demote/remove) + the client-side rotation (mint epoch, re-grant remaining) are pending."
+  http: "G3a not built — the role-change / remove boundary requests are pending."
+  apple: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."
+  android: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."

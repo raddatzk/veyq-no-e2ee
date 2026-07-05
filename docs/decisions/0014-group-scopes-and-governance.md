@@ -93,13 +93,15 @@ and which is confidential even from the tenant owner.**
      is purged by a scheduled job after a **grace period** (restorable by the owner in-window). Mirrors the
      existing scheduled-purge pattern (`TenantInvitePurge` / `SessionPurge`, [cr-0011](../../changes/cr-0011-session-token-purge.md)).
      The grace length + restore UX are settled in the lifecycle slice (G3).
-   - **Orphans = an automatic rule, not an admin power.** When a user is removed from a tenant, the groups they
-     **solely** own are auto-tombstoned (grace) or their ownership transferred — a server rule, so no tenant-owner
-     snooping power is needed (G3).
-   - **Removal → rotation.** A removed member keeps the `K_SC` they already held; confidentiality of **new**
-     content is restored by **rotating `K_SC`** (re-wrap to the remaining members, re-seal new content) per
-     [ADR 0012](0012-content-key-hierarchy.md). "Stop new grants + rotate forward"; already-read content cannot
-     be retracted (a stated limitation). Detail in G3.
+   - **Orphans = an automatic rule, not an admin power.** When a user is removed from a tenant, a group they
+     **solely** own is **transferred** — ownership passes automatically to the **oldest remaining member**
+     (promoted to OWNER); if **no** member remains, it is **grace-tombstoned** (same soft-delete as above). A
+     server rule, so no tenant-owner snooping power is needed (G3).
+   - **Removal → rotation.** A removed member keeps the content key they already held; confidentiality of **new**
+     content is restored by **rotating the scope key forward into a new epoch** — re-grant it to the remaining
+     members, seal new content under it, **nothing existing is re-encrypted** (the epoch chain,
+     [ADR 0024](0024-scope-key-rotation.md)). "Stop new grants + rotate forward"; already-read content cannot be
+     retracted (a stated limitation).
 
 7. **Group favorites are per-user under the identity key, not `K_SC`.** The favorites blob
    ([en.memory.favorites](../features/memory/enablers/en.memory.favorites.md)) seals under `K_SC` for a personal

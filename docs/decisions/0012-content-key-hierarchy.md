@@ -21,11 +21,12 @@ hierarchy + re-wrap-on-move complexity the product doesn't need.)
 
 **Content keys are per Memory — random, and wrapped to many recipients.** Three layers under the scope:
 
-1. **`K_SC` — scope content key (one per scope).** Obtained by a member via their grant (the scope key
-   unwraps it). It is the **navigation root**: node **names** (folder / Memory / chapter titles), paths and
-   the **blinded slug tokens** (`slug_token`) and per-scope **dedup tokens** key off `K_SC`, so a member who
-   holds the scope decrypts the **whole tree's structure + names with one key** — without touching any
-   Memory's content.
+1. **`K_SC` — scope content key (one per scope, rotatable in epochs — [ADR 0024](0024-scope-key-rotation.md)).**
+   Obtained by a member via their grant (the scope key unwraps it). It is the **navigation root**: node **names**
+   (folder / Memory / chapter titles), paths and the **blinded slug tokens** (`slug_token`) key off the scope's
+   **current content-epoch key**, so a member who holds the scope decrypts the **whole tree's structure + names
+   with one key** — without touching any Memory's content. (The per-scope **dedup token** is the one exception: it
+   keys off a **stable, non-rotating** scope sub-key so identical blobs still deduplicate across epochs, [ADR 0024](0024-scope-key-rotation.md).)
 2. **`K_mem` — per-Memory content key (one per Memory, a fresh random 32-byte key).** Wrapped under `K_SC`
    for members. Encrypts that Memory's **content** — chapter bodies, journal, sensitive metadata
    (capture time, location) — and **wraps that Memory's `K_blob`s**. A Memory is the **unit of sharing**
@@ -53,8 +54,9 @@ sharing **cryptographically** enforced:
 
 **Rotation / revocation.** Removing a share record is instant (server-side, no keys). The eventual crypto
 defense is **rotating the affected key**: a single Memory by re-sealing its content under a fresh `K_mem`
-(re-wrapped to members); the whole scope by rotating the scope keypair + `K_SC` (re-wrap to remaining
-members). Already-read content cannot be retracted — a stated limitation.
+(re-wrapped to members); the whole scope by **rotating `K_SC` forward into a new epoch** — re-wrap the new epoch
+to the remaining members, new content seals under it, nothing existing is re-encrypted (the epoch chain,
+[ADR 0024](0024-scope-key-rotation.md)). Already-read content cannot be retracted — a stated limitation.
 
 **Operator-blind, unchanged.** The server stores only ciphertext content + the opaque wraps (`K_mem`-under-
 `K_SC`, share wraps), node ids/parents/kinds/ordering/timestamps, and the blinded slug/dedup tokens. It never
