@@ -7,6 +7,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
+import Dialog from 'primevue/dialog'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { listMyTenants } from '../../features/spaces/scopes'
@@ -79,6 +80,14 @@ function switchTenant(tenant: MyTenant) {
   if (isActive(tenant)) return
   // Each tenant is reached at its own domain (ADR 0002); switching is a full navigation there.
   window.location.assign(`https://${tenant.domain}`)
+}
+
+// Mobile navigation (cr-0084): below the compact threshold the inline nav is hidden, so a hamburger opens a
+// bottom-sheet with the full navigation (tenant switch + Shared/Personal + favorites) — ported from the legacy
+// design source. Groups join it when the groups epic lands.
+const mobileMenuOpen = ref(false)
+function closeMobileMenu() {
+  mobileMenuOpen.value = false
 }
 </script>
 
@@ -175,5 +184,69 @@ function switchTenant(tenant: MyTenant) {
     <section class="sidebar-section sidebar-profile">
       <ProfileMenu show-name />
     </section>
+
+    <!-- Mobile: the inline nav is CSS-hidden below the compact threshold — this hamburger opens the full nav
+         as a bottom sheet (cr-0084, ported from the legacy design source; the styles were already vendored). -->
+    <button class="mobile-navigation-button" type="button" :aria-label="t('shell.menuOpen')" @click="mobileMenuOpen = true">
+      <span class="pi pi-bars" />
+    </button>
+
+    <Dialog v-model:visible="mobileMenuOpen" modal position="bottom" class="tenant-dialog mobile-nav-dialog" :header="t('shell.menu')">
+      <div class="mobile-nav-sheet">
+        <section class="mobile-nav-section">
+          <h2>{{ t('shell.spaces') }}</h2>
+          <div class="mobile-nav-list">
+            <button
+              v-for="tenant in tenants"
+              :key="tenant.tenantId"
+              class="mobile-nav-item"
+              :class="{ 'mobile-nav-item-active': isActive(tenant) }"
+              type="button"
+              @click="switchTenant(tenant); closeMobileMenu()"
+            >
+              <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
+              <span><strong>{{ tenant.name }}</strong><small>{{ tenant.domain }}</small></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="mobile-nav-section">
+          <h2>{{ tenantLabel }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              :to="{ name: 'home', hash: '' }"
+              class="mobile-nav-item"
+              :class="{ 'mobile-nav-item-active': tenantActive }"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-scope-icon pi pi-users" /><span>{{ t('shell.shared') }}</span>
+            </RouterLink>
+            <RouterLink
+              :to="{ name: 'home', hash: personalHash }"
+              class="mobile-nav-item"
+              :class="{ 'mobile-nav-item-active': personalActive }"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-scope-icon pi pi-user" /><span>{{ t('shell.personal') }}</span>
+            </RouterLink>
+          </div>
+        </section>
+
+        <section v-if="favoriteMemories.length" class="mobile-nav-section">
+          <h2>{{ t('shell.favorites') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-for="memory in favoriteMemories"
+              :key="memory.id"
+              :to="{ name: 'home', hash: memory.hash }"
+              class="mobile-nav-item"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-scope-icon pi pi-images" /><span><strong>{{ memory.name }}</strong></span>
+            </RouterLink>
+          </div>
+        </section>
+      </div>
+    </Dialog>
   </aside>
 </template>

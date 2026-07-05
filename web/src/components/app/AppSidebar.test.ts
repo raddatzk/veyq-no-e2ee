@@ -19,7 +19,7 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
-      shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', favorites: 'Favorites' },
+      shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', favorites: 'Favorites', menu: 'Navigation', menuOpen: 'Open navigation' },
       members: { awaitingAccess: 'Awaiting access' },
     },
   },
@@ -82,5 +82,28 @@ describe('AppSidebar space list', () => {
     activeSpace.tenantUnavailable = false
     const wrapper = await mountAt('')
     expect(wrapper.find('.sidebar-tenant-awaiting').exists()).toBe(false)
+  })
+
+  // The mobile bottom-sheet nav (cr-0084): the inline nav is CSS-hidden below the compact threshold, so the
+  // hamburger opens a sheet with the full navigation (tenant switch + Shared + Personal).
+  it('opens a mobile nav sheet with the tenant switch, Shared and Personal', async () => {
+    // Stub the teleporting PrimeVue Dialog with a pass-through that renders its slot when visible.
+    const DialogStub = { props: ['visible'], template: '<div v-if="visible" class="dialog-stub"><slot /></div>' }
+    const router = makeRouter()
+    await router.replace({ name: 'home', hash: '' })
+    await router.isReady()
+    const wrapper = mount(AppSidebar, {
+      global: { plugins: [router, i18n], stubs: { ProfileMenu: true, Dialog: DialogStub } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.mobile-nav-sheet').exists()).toBe(false) // closed initially
+    await wrapper.get('.mobile-navigation-button').trigger('click')
+    await flushPromises()
+
+    const items = wrapper.findAll('.mobile-nav-item').map((i) => i.text())
+    expect(items.some((t) => t.includes('Familie Muster'))).toBe(true) // tenant switch
+    expect(items.some((t) => t.includes('Shared'))).toBe(true)
+    expect(items.some((t) => t.includes('Personal'))).toBe(true)
   })
 })

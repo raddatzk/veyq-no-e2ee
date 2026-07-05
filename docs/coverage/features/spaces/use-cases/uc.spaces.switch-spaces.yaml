@@ -40,6 +40,12 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.unauthenticatedIs401] }
       http: { e2e: [http/spaces/scopes.http] }
+  - id: mobile-nav-sheet
+    # cr-0084: below the compact threshold the inline nav is CSS-hidden, so a hamburger opens a bottom sheet with
+    # the full navigation (ported from the design source; CSS already vendored). Keeps Personal reachable on a phone.
+    text: On a narrow viewport a hamburger opens a bottom-sheet with the full navigation — the tenant switch, the Shared + Personal spaces, and favorites; each item navigates and closes the sheet.
+    coverage:
+      web: { unit: [src/components/app/AppSidebar.test.ts] }
 gaps:
   apple: "Scope data layer covered (ScopesTests); the tenant switcher (my-tenants), per-space UI switching, and the token-less tenant home + Personal ↔ Tenant switching (cr-0075) are web-first — not built natively."
   android: "Scope data layer covered (ScopesTest); the tenant switcher (my-tenants), per-space UI switching, and the token-less tenant home + Personal ↔ Tenant switching (cr-0075) are web-first — not built natively."
