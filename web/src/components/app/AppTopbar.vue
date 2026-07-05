@@ -10,19 +10,11 @@ import Breadcrumb from 'primevue/breadcrumb'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
-import { activeSpace } from '../../app/activeSpace'
-import { ScopeKind } from '../../api/generated/scopes'
 import UploadStatusMenu from '../../features/memory/components/UploadStatusMenu.vue'
-import GroupMembersDialog from '../../features/spaces/GroupMembersDialog.vue'
 import { useThemeState, setThemePreference, type ThemePreference } from '../../shared/state/useThemeState'
 
 const { t } = useI18n()
 const router = useRouter()
-
-// The group members surface (cr-0086): a topbar action shown only while a GROUP is the active space — opens the
-// directory + (for the owner) add-by-username. Keyed by scopeId so it reloads when switching between groups.
-const inGroup = computed(() => activeSpace.kind === ScopeKind.Group)
-const membersOpen = ref(false)
 
 // Theme lives in the top bar (cr-0078 follow-up); language, which grows more options, stays in the profile menu +
 // the settings hub. It's a **labelled dropdown** (cr-0085): the trigger shows the current mode, the popup lists
@@ -77,16 +69,6 @@ const items = computed<MenuItem[]>(() =>
       <Menu ref="themeMenu" :model="themeMenuItems" popup />
       <UploadStatusMenu />
       <button
-        v-if="inGroup"
-        type="button"
-        class="topbar-icon-button"
-        :aria-label="t('groups.members')"
-        :title="t('groups.members')"
-        @click="membersOpen = true"
-      >
-        <span class="pi pi-users" />
-      </button>
-      <button
         type="button"
         class="topbar-icon-button"
         :aria-label="t('settings.title')"
@@ -96,8 +78,6 @@ const items = computed<MenuItem[]>(() =>
         <span class="pi pi-cog" />
       </button>
     </div>
-
-    <GroupMembersDialog v-if="inGroup && activeSpace.scopeId" v-model:visible="membersOpen" :scope-id="activeSpace.scopeId" />
   </header>
 </template>
 

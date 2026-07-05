@@ -63,11 +63,12 @@ is a later increment.
 - [x] 3 http — add the group-member-add boundary to `http/spaces/scopes.http` (unauth `401`; the owner-gated
   happy-path + authz paths stay integration-covered, as the primitive needs the full grant flow). · Done when:
   the file runs against a live instance (or the unauth assertions hold headless).
-- [x] 4 web — `addGroupMember(scopeId, username)` data layer; a **group members** surface reachable from the open
-  group (list current members via the directory + an **add-by-username** dialog, the add action **owner-only**) —
-  ported in-style from `TenantMembersPanel`/`InviteMemberDialog`, data layer swapped to the group scope. No new
-  delivery wiring: `enterScope` already runs grant-delivery polling for a shared scope, so the owner's own device
-  delivers the key after the add. · Done when: `npm run check` green + live (needs a **second account**): owner
+- [x] 4 web — `addGroupMember(scopeId, username)` data layer; a **Group members** section in the **settings hub**
+  (`GroupMembersPanel`, shown when a GROUP is the active scope — mirrors `TenantMembersPanel`): the directory +
+  an inline **add-by-username** form, the add **owner-only**. Members management is scope-contextual — the Tenant
+  members section is gated to the Tenant scope, the Group one to a group. No new delivery wiring: `enterScope`
+  already runs grant-delivery polling for a shared scope, so the owner's own device delivers the key after the
+  add. · Done when: `npm run check` green + live (needs a **second account**): owner
   adds a fellow tenant member by username → they appear in the group directory as *awaiting access* → grant is
   delivered → the added member, on their device, opens the group and browses its tree.
 - [x] 5 coverage — fill `uc.spaces.add-group-member.yaml` (drop `status: planned`): map `resolve-username` /
@@ -94,11 +95,15 @@ member, the last-owner guard, `K_SC` rotation, and the orphan rule (G3); native 
   re-entry forced delivery. This is exactly the kind of preview quirk the memory note already flags; the CR
   should have pre-noted "re-enter the scope to force delivery" in the smoke steps. Root cause: I wrote the smoke
   step from the happy-path mental model, not from how the harness actually observes background work.
-- **Execution — the members dialog doesn't reload on remount.** `GroupMembersDialog` loads its directory on the
-  `visible` *transition* (`watch`, no `immediate`); when I JS-navigated scopes with the dialog flag still set,
-  it remounted already-"open" and showed an empty list until a clean close/reopen. Not reachable through normal
-  UX (the modal blocks sidebar navigation, so you can't switch scopes with it open), so it ships as-is — but it
-  is a latent sharp edge worth a follow-up guard (load on mount when `visible`).
+- **Execution — first shipped the wrong surface (a topbar dialog), then moved it to settings on feedback.** I
+  built member management as a topbar `GroupMembersDialog`; the user rightly wanted it **in the settings hub**
+  like the tenant one (consistent home, no bespoke modal). Re-homing it as `GroupMembersPanel` also surfaced +
+  fixed a latent bug: the Tenant members section was gated on `tenantId` (always set), so it rendered **broken**
+  in a Personal/Group scope (its panel needs the Tenant scope open). Now members management is scope-contextual
+  (Tenant section ↔ Tenant scope, Group section ↔ group). Root cause: I picked the placement without checking the
+  established pattern — the settings hub already documents "each level can hold several sections (Tenant →
+  Mitglieder + …)", i.e. the intended home was written down and I skipped it. (The dialog's remount-reload edge
+  is now moot — the panel loads `onMounted`.)
 - **Process — went well.** Refined state landed before the CR; the three trust-chain guards + both platform
   gates stayed green; coverage was part of the work, not a follow-up; German conversation / English artifacts
   held. Reusing the built directory + grant-delivery kept the new surface to a single endpoint.

@@ -10,8 +10,10 @@ import { useRoute, useRouter } from 'vue-router'
 import AppearancePanel from '../features/settings/AppearancePanel.vue'
 import ProfilePanel from '../features/account/profile/ProfilePanel.vue'
 import TenantMembersPanel from '../features/spaces/TenantMembersPanel.vue'
+import GroupMembersPanel from '../features/spaces/GroupMembersPanel.vue'
 import TenantAdminPanel from '../features/admin/createTenant/TenantAdminPanel.vue'
 import { activeSpace } from '../app/activeSpace'
+import { ScopeKind } from '../api/generated/scopes'
 import { serverRole, probeServerRole } from '../features/admin/serverRole'
 
 type Section = { id: string; group: string; label: string; icon: string; component: Component }
@@ -27,10 +29,17 @@ const sections = computed<Section[]>(() => {
   const list: Section[] = [
     { id: 'appearance', group: t('settings.personal'), label: t('settings.appearance'), icon: 'pi pi-palette', component: AppearancePanel },
   ]
-  // Your per-tenant identity (username + real name) — needs a tenant context (ADR 0023).
+  // Your per-tenant identity (username + real name) — needs any tenant context (ADR 0023).
   if (activeSpace.tenantId) {
     list.push({ id: 'profile', group: t('settings.personal'), label: t('profile.title'), icon: 'pi pi-user', component: ProfilePanel })
+  }
+  // Members management is scope-contextual: the Tenant directory when the shared Tenant scope is active, the
+  // Group directory when a group is active (each panel needs its own scope open to read/decrypt + gate the add).
+  if (activeSpace.kind === ScopeKind.Tenant) {
     list.push({ id: 'tenant-members', group: t('settings.tenant'), label: t('members.title'), icon: 'pi pi-users', component: TenantMembersPanel })
+  }
+  if (activeSpace.kind === ScopeKind.Group) {
+    list.push({ id: 'group-members', group: t('settings.group'), label: t('groups.members'), icon: 'pi pi-users', component: GroupMembersPanel })
   }
   if (serverRole.canManage) {
     list.push({ id: 'server', group: t('settings.server'), label: t('settings.serverTenants'), icon: 'pi pi-server', component: TenantAdminPanel })
@@ -49,8 +58,14 @@ const groups = computed(() => {
   return order.map((name) => ({ name, items: byGroup.get(name)! }))
 })
 
-// Default (wide, no param) opens the current scope's section; narrow with no param shows the list only.
-const defaultId = computed(() => (activeSpace.tenantId ? 'tenant-members' : 'appearance'))
+// Default (wide, no param) opens the current scope's members section (Group / Tenant), else Appearance.
+const defaultId = computed(() =>
+  activeSpace.kind === ScopeKind.Group
+    ? 'group-members'
+    : activeSpace.kind === ScopeKind.Tenant
+      ? 'tenant-members'
+      : 'appearance',
+)
 const activeId = computed(() => (route.params.section as string | undefined) || defaultId.value)
 const active = computed(() => sections.value.find((s) => s.id === activeId.value) ?? sections.value[0])
 const hasSection = computed(() => Boolean(route.params.section))

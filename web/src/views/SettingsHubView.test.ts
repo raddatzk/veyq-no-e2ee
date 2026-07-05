@@ -14,11 +14,13 @@ vi.mock('../features/admin/serverRole', () => ({
 }))
 vi.mock('../features/settings/AppearancePanel.vue', () => ({ default: { template: '<div class="stub-appearance" />' } }))
 vi.mock('../features/spaces/TenantMembersPanel.vue', () => ({ default: { template: '<div class="stub-members" />' } }))
+vi.mock('../features/spaces/GroupMembersPanel.vue', () => ({ default: { template: '<div class="stub-group-members" />' } }))
 vi.mock('../features/admin/createTenant/TenantAdminPanel.vue', () => ({ default: { template: '<div class="stub-admin" />' } }))
 
 import SettingsHubView from './SettingsHubView.vue'
 import { serverRole } from '../features/admin/serverRole'
 import { activeSpace, clearActiveSpace } from '../app/activeSpace'
+import { ScopeKind } from '../api/generated/scopes'
 
 const i18n = createI18n({
   legacy: false,
@@ -28,8 +30,9 @@ const i18n = createI18n({
   messages: {
     en: {
       members: { title: 'Members' },
+      groups: { members: 'Members' },
       settings: {
-        title: 'Settings', back: 'Back', personal: 'Personal', tenant: 'Shared space', server: 'Server',
+        title: 'Settings', back: 'Back', personal: 'Personal', tenant: 'Shared space', group: 'Group', server: 'Server',
         appearance: 'Appearance', appearanceTitle: 'A', appearanceSub: 's', serverTenants: 'Tenants',
       },
     },
@@ -57,8 +60,9 @@ beforeEach(() => {
 })
 
 describe('SettingsHubView — section filtering by scope × role', () => {
-  it('a Server Owner in a tenant sees Personal + Shared space + Server', async () => {
+  it('a Server Owner in the Tenant scope sees Personal + Shared space + Server', async () => {
     activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
     serverRole.canManage = true
     const nav = navText(await mountHub())
     expect(nav).toContain('Personal')
@@ -66,13 +70,24 @@ describe('SettingsHubView — section filtering by scope × role', () => {
     expect(nav).toContain('Tenants')
   })
 
-  it('a plain member (not server owner) sees Personal + Shared space, no Server', async () => {
+  it('a plain member in the Tenant scope sees Personal + Shared space, no Server', async () => {
     activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
     serverRole.canManage = false
     const nav = navText(await mountHub())
     expect(nav).toContain('Personal')
     expect(nav).toContain('Members')
     expect(nav).not.toContain('Tenants')
+  })
+
+  it('members management is scope-contextual: a Group scope shows the Group members section, not the Tenant one', async () => {
+    activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Group
+    activeSpace.scopeId = 'g-1'
+    const w = await mountHub()
+    expect(navText(w)).toContain('Group')
+    expect(w.find('.stub-group-members').exists()).toBe(true) // default section is the group members
+    expect(w.find('.stub-members').exists()).toBe(false) // the Tenant panel is not shown in a group
   })
 
   it('with no tenant context and no server role, only Personal shows', async () => {
@@ -88,6 +103,7 @@ describe('SettingsHubView — section filtering by scope × role', () => {
 describe('SettingsHubView — split view index vs detail', () => {
   it('wide/no param defaults to the current scope section (tenant members) in the detail', async () => {
     activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
     const w = await mountHub('/settings')
     expect(w.find('.stub-members').exists()).toBe(true)
     expect(w.get('.settings-hub').classes()).toContain('is-index')
@@ -95,6 +111,7 @@ describe('SettingsHubView — split view index vs detail', () => {
 
   it('a deep link opens that section and marks the hub as detail', async () => {
     activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
     const w = await mountHub('/settings/appearance')
     expect(w.find('.stub-appearance').exists()).toBe(true)
     expect(w.get('.settings-hub').classes()).toContain('is-detail')
