@@ -64,6 +64,10 @@ a real contract-level verification surface, not docs that rot. CR phases follow 
   fenced block directly in the markdown (IntelliJ renders it in the preview). Diagrams-as-code only —
   no binary image files. Skip diagrams that are mere decoration.
 - **Scripts and utilities in Python.** Bash only for thin CI/hook glue.
+- **Durable state is edited in place — no addendums.** State every doc (ADRs, use-cases, enablers, crosscutting)
+  as it is **now**; when a decision changes, **edit the doc** and let **git** hold the history. Never accrete
+  `Amended: <date>` lines or `## … addendum <date>` sections — a change-log belongs in git, not the doc. Canonical
+  rule: [`../README.md`](../README.md) (§ current-state) + [`../decisions/README.md`](../decisions/README.md).
 - **`legacy/` is read-only reference.** Never edit it. The inbox may point to it as source material,
   but durable state must not depend on or link to it.
 - **Frontends reuse the existing UI/UX — never invent new UI.** Port the design/UX and change only the

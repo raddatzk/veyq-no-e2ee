@@ -21,21 +21,31 @@ menu (which is about *me*), or scattering "settings for the space I'm in" across
 sidebar↔detail split, with sections filtered by the scopes in the caller's current path and by role.
 
 1. **A route, not a popup.** The gear (top bar, beside Uploads) navigates to **`/settings`** — a real page,
-   deep-linkable (`/settings/tenant/members`), back-button-friendly, and bookmarkable. A dropdown holds too
-   much; a modal has no URL and on mobile is a full page anyway. (A desktop *overlay* look is an optional later
-   cosmetic over the same routes — no structural difference.)
+   deep-linkable per entity (`/settings/group-<id>`, `/settings/tenant-<id>`), back-button-friendly, and
+   bookmarkable. A dropdown holds too much; a modal has no URL and on mobile is a full page anyway. (A desktop
+   *overlay* look is an optional later cosmetic over the same routes — no structural difference.) The gear is
+   **context-aware**: with no explicit section it resolves to the caller's **active scope as a concrete entity** —
+   in a group → **that group's** detail page; in the Tenant scope → the Tenant's members; else *Persönlich*.
 2. **`NavigationSplitView` pattern, responsive.** Wide viewports render a persistent section **sidebar +
    detail pane**; narrow viewports collapse to a **list → drill-in** navigation stack (`/settings/<section>`).
    Same routes, one breakpoint. Native parity is literal: Apple `NavigationSplitView`, Android
    `ListDetailPaneScaffold` ([ADR 0010](0010-native-clients-shared-contracts-not-code.md)); the web hub is the
-   blueprint. A third column appears only when a section is itself a list to fan out (e.g. *multiple groups*:
-   Groups → a group → its detail) — that arrives with the groups work, not now.
-3. **Sections = scope-in-path × role.** The section list shows exactly the levels that apply to the caller:
-   **Persönlich** (always), **Gruppe** (only when in a group), **Tenant** (when a tenant member), **Server**
-   (only a Server Owner). A section appears **only if the caller can see or do something there**; inside a
-   section, controls are **role-gated** (manage vs. view-only — e.g. any member reads the member directory,
-   only the owner sees "invite"). This encodes the natural hierarchy: from within a group you see Group **and**
-   Tenant; in the tenant, just Tenant.
+   blueprint. A section that is itself a **collection** to fan out (e.g. *multiple groups*: Groups → a group →
+   its detail) is a **collapsible category in the rail** — expanding it lists its entities, selecting one opens
+   that entity's detail in the same detail pane (`/settings/group-<id>`) — **not** a third column: the split
+   stays two panes (rail ↔ detail), scaling to many entities by scroll/collapse. Narrow keeps the list →
+   drill-in stack (category → entity → detail).
+3. **Sections = scope-in-path × role, with collections as categories.** A section appears **only if the caller
+   can see or do something there**; inside a section, controls are **role-gated** (manage vs. view-only — e.g.
+   any member reads the member directory, only the owner sees "add member"). Two axes:
+   - **Scope-in-path** (contextual): **Persönlich** (always) and the **Tenant**'s members while you are in the
+     Tenant scope — encoding the natural hierarchy (from within a group you see Group **and** Tenant).
+   - **Collections** (a management hub, decoupled from the active scope): a **Gruppen** category lists **every
+     group the caller OWNs**, and **Server → Tenants** lists **every tenant a Server Owner administers** — so you
+     configure any of them without first switching into it. A member-only group has nothing to manage → it is
+     **not** listed, though its detail page stays reachable read-only. Listing "groups I own" needs the caller's
+     **role per scope**, so the scope list surfaces it ([ADR 0007](0007-membership-role-grant-relation.md) — role
+     is already stored; exposing *my own* is operational metadata, operator-blind untouched).
 4. **The load-bearing boundary — configuration vs. content-object.** The hub holds settings that **configure**
    identity, access, and containers: personal preferences, scope membership/governance, server tenants.
    Settings that **manipulate a specific content object** — a **Folder** or a **Memory** (rename, cover, date,
