@@ -11,7 +11,7 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { listScopeMembers, addGroupMember, memberError, type ScopeMember } from './members'
+import { listScopeMembers, addGroupMember, setMemberRole, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
 import { getMyProfile } from '../account/profile/profile'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
@@ -28,6 +28,7 @@ const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const username = ref('')
 const addError = ref('')
 const adding = ref(false)
+const actionError = ref('')
 
 // Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
 const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
@@ -81,6 +82,25 @@ async function submit() {
     adding.value = false
   }
 }
+
+// Promote a member to co-owner or demote a co-owner (cr-0088) — owner-only; the last-owner guard is enforced
+// server-side (409 last_owner). A pure role change; the directory reloads to reflect it.
+async function changeRole(m: ScopeMember, role: SetMemberRoleRequestRoleEnum) {
+  actionError.value = ''
+  try {
+    await setMemberRole(props.scopeId, m.userId, role)
+    members.value = await listScopeMembers(props.scopeId)
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value =
+      code === 'last_owner'
+        ? t('groups.lastOwner')
+        : code === 'not_scope_owner'
+          ? t('members.notOwner')
+          : t('groups.roleChangeFailed')
+  }
+}
 </script>
 
 <template>
@@ -103,6 +123,8 @@ async function submit() {
         <Message v-if="addError" severity="error" :closable="false">{{ addError }}</Message>
       </form>
 
+      <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
+
       <p v-if="loading" class="settings-muted">{{ t('members.loading') }}</p>
       <Message v-else-if="loadError === 'notAuthorized'" severity="warn" :closable="false">
         {{ t('members.notAuthorized') }}
@@ -123,6 +145,28 @@ async function submit() {
                   {{ m.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
                 </span>
               </div>
+            </div>
+            <!-- Owner-only role controls (cr-0088): promote a member to co-owner, or demote a co-owner. The
+                 last-owner guard is enforced server-side. Remove + rotation land in cr-0089. -->
+            <div v-if="isOwner" class="management-actions">
+              <Button
+                v-if="m.role === 'MEMBER'"
+                :label="t('groups.promote')"
+                icon="pi pi-arrow-up"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="changeRole(m, SetMemberRoleRequestRoleEnum.Owner)"
+              />
+              <Button
+                v-else
+                :label="t('groups.demote')"
+                icon="pi pi-arrow-down"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="changeRole(m, SetMemberRoleRequestRoleEnum.Member)"
+              />
             </div>
           </div>
         </div>

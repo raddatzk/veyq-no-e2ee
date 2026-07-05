@@ -215,6 +215,10 @@ const en = {
     usernamePlaceholder: 'username',
     memberNotFound: 'No member of this space has that username.',
     addMemberFailed: 'Could not add the member. Please try again.',
+    promote: 'Make co-owner',
+    demote: 'Remove co-owner',
+    lastOwner: 'A group needs at least one owner.',
+    roleChangeFailed: 'Could not change the role. Please try again.',
   },
   home: {
     loading: 'Opening your space…',
@@ -569,6 +573,10 @@ const de: typeof en = {
     usernamePlaceholder: 'benutzername',
     memberNotFound: 'Kein Mitglied dieses Bereichs hat diesen Benutzernamen.',
     addMemberFailed: 'Das Mitglied konnte nicht hinzugefügt werden. Bitte erneut versuchen.',
+    promote: 'Zum Mit-Owner machen',
+    demote: 'Mit-Owner entfernen',
+    lastOwner: 'Eine Gruppe braucht mindestens eine:n Owner.',
+    roleChangeFailed: 'Die Rolle konnte nicht geändert werden. Bitte erneut versuchen.',
   },
   home: {
     loading: 'Dein Bereich wird geöffnet…',

@@ -5,7 +5,7 @@ vi.mock('../../api/client', () => ({
   tenantsApi: vi.fn(),
 }))
 
-import { addGroupMember, listScopeMembers } from './members'
+import { addGroupMember, listScopeMembers, setMemberRole, SetMemberRoleRequestRoleEnum } from './members'
 import { scopesApi } from '../../api/client'
 
 beforeEach(() => vi.clearAllMocks())
@@ -22,6 +22,19 @@ describe('addGroupMember (cr-0086)', () => {
     expect(addGroupMemberFn).toHaveBeenCalledWith({ scopeId: 'g1', addGroupMemberRequest: { username: 'partner' } })
     expect(result).toEqual(row)
     expect(result.hasGrant).toBe(false)
+  })
+})
+
+describe('setMemberRole (cr-0088)', () => {
+  it('promotes a member by patching the member endpoint with the role', async () => {
+    const row = { userId: 'u1', username: 'partner', role: 'OWNER', identityPublicKey: 'cGs=', hasGrant: true }
+    const setRole = vi.fn().mockResolvedValue(row)
+    vi.mocked(scopesApi).mockReturnValue({ setMemberRole: setRole } as unknown as ReturnType<typeof scopesApi>)
+
+    const result = await setMemberRole('g1', 'u1', SetMemberRoleRequestRoleEnum.Owner)
+
+    expect(setRole).toHaveBeenCalledWith({ scopeId: 'g1', userId: 'u1', setMemberRoleRequest: { role: 'OWNER' } })
+    expect(result.role).toBe('OWNER')
   })
 })
 

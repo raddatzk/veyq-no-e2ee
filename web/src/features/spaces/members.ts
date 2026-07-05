@@ -5,9 +5,10 @@
 import { tenantsApi, scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
-import type { ScopeMember } from '../../api/generated/scopes'
+import { SetMemberRoleRequestRoleEnum, type ScopeMember } from '../../api/generated/scopes'
 
 export type { ScopeMember } from '../../api/generated/scopes'
+export { SetMemberRoleRequestRoleEnum } from '../../api/generated/scopes'
 export type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
 
 /** Invite a person (by email) into the active tenant as a MEMBER — owner-gated (403 `not_tenant_owner`). */
@@ -43,6 +44,15 @@ export function listScopeMembers(scopeId: string): Promise<ScopeMember[]> {
  */
 export function addGroupMember(scopeId: string, username: string): Promise<ScopeMember> {
   return withRefresh(() => scopesApi().addGroupMember({ scopeId, addGroupMemberRequest: { username } }))
+}
+
+/**
+ * Promote a group member to co-owner or demote a co-owner (uc.spaces.manage-group-members, cr-0088) — owner-gated
+ * (`403 not_scope_owner`); the last-owner guard rejects demoting the last OWNER (`409 last_owner`). A pure role
+ * change, no key moves. Returns the member's updated directory row.
+ */
+export function setMemberRole(scopeId: string, userId: string, role: SetMemberRoleRequestRoleEnum): Promise<ScopeMember> {
+  return withRefresh(() => scopesApi().setMemberRole({ scopeId, userId, setMemberRoleRequest: { role } }))
 }
 
 /**
