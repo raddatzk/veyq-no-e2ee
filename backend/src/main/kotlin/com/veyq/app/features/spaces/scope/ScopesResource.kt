@@ -64,7 +64,7 @@ class ScopesResource(
                 Response.ok(outcome.rows.map {
                     ScopeSummary(
                         id = UUID.fromString(it.id), kind = ScopeKind.valueOf(it.kind),
-                        tenantId = UUID.fromString(it.tenantId), wrappedGrant = it.wrappedGrant,
+                        tenantId = UUID.fromString(it.tenantId), role = it.role, wrappedGrant = it.wrappedGrant,
                         encryptedName = it.encryptedName,
                     )
                 }).build()

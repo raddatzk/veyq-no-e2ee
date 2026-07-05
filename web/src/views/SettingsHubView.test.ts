@@ -12,13 +12,19 @@ vi.mock('../features/admin/serverRole', () => ({
   serverRole: reactive({ canManage: false, probed: true }),
   probeServerRole: vi.fn(),
 }))
+vi.mock('../features/spaces/scopes', () => ({ listMyGroups: vi.fn().mockResolvedValue([]) }))
+vi.mock('../features/admin/createTenant/tenants', () => ({ listTenants: vi.fn().mockResolvedValue([]) }))
 vi.mock('../features/settings/AppearancePanel.vue', () => ({ default: { template: '<div class="stub-appearance" />' } }))
 vi.mock('../features/spaces/TenantMembersPanel.vue', () => ({ default: { template: '<div class="stub-members" />' } }))
 vi.mock('../features/spaces/GroupMembersPanel.vue', () => ({ default: { template: '<div class="stub-group-members" />' } }))
-vi.mock('../features/admin/createTenant/TenantAdminPanel.vue', () => ({ default: { template: '<div class="stub-admin" />' } }))
+vi.mock('../features/admin/createTenant/TenantDetailPanel.vue', () => ({ default: { template: '<div class="stub-tenant-detail" />' } }))
+vi.mock('../features/spaces/CreateGroupDialog.vue', () => ({ default: { template: '<div class="stub-create-group" />' } }))
+vi.mock('../features/admin/createTenant/CreateTenantDialog.vue', () => ({ default: { template: '<div class="stub-create-tenant" />' } }))
 
 import SettingsHubView from './SettingsHubView.vue'
 import { serverRole } from '../features/admin/serverRole'
+import { listMyGroups } from '../features/spaces/scopes'
+import { listTenants } from '../features/admin/createTenant/tenants'
 import { activeSpace, clearActiveSpace } from '../app/activeSpace'
 import { ScopeKind } from '../api/generated/scopes'
 
@@ -30,7 +36,9 @@ const i18n = createI18n({
   messages: {
     en: {
       members: { title: 'Members' },
-      groups: { members: 'Members' },
+      groups: { members: 'Members', noneOwned: 'No groups yet' },
+      profile: { title: 'Profile' },
+      shell: { groups: 'Groups', groupCreate: 'New group' },
       settings: {
         title: 'Settings', back: 'Back', personal: 'Personal', tenant: 'Shared space', group: 'Group', server: 'Server',
         appearance: 'Appearance', appearanceTitle: 'A', appearanceSub: 's', serverTenants: 'Tenants',
@@ -57,6 +65,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   clearActiveSpace()
   serverRole.canManage = false
+  vi.mocked(listMyGroups).mockResolvedValue([]) // clearAllMocks keeps impls; reset the defaults per test
+  vi.mocked(listTenants).mockResolvedValue([])
 })
 
 describe('SettingsHubView — section filtering by scope × role', () => {
@@ -80,15 +90,35 @@ describe('SettingsHubView — section filtering by scope × role', () => {
     expect(nav).not.toContain('Tenants')
   })
 
-  it('members management is scope-contextual: a Group scope shows a section headed by the group name, not the Tenant one', async () => {
+  it('a Group scope: the gear opens that group’s detail page, and the Gruppen collection lists owned groups by name', async () => {
+    vi.mocked(listMyGroups).mockResolvedValue([
+      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER' },
+      { scopeId: 'g-2', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER' },
+    ])
     activeSpace.tenantId = 't-1'
     activeSpace.kind = ScopeKind.Group
     activeSpace.scopeId = 'g-1'
-    activeSpace.name = 'Familie Raddatz'
     const w = await mountHub()
-    expect(navText(w)).toContain('Familie Raddatz') // the section is headed by the group's own decrypted name
-    expect(w.find('.stub-group-members').exists()).toBe(true) // default section is the group members
+    expect(navText(w)).toContain('Familie Raddatz') // the Gruppen collection lists owned groups by name
+    expect(navText(w)).toContain('Reise-Crew')
+    expect(w.find('.stub-group-members').exists()).toBe(true) // gear → the active group's own detail page
     expect(w.find('.stub-members').exists()).toBe(false) // the Tenant panel is not shown in a group
+  })
+
+  it('clicking a group in the collection routes to its per-entity detail page', async () => {
+    vi.mocked(listMyGroups).mockResolvedValue([
+      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER' },
+      { scopeId: 'g-9', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER' },
+    ])
+    activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Group
+    activeSpace.scopeId = 'g-1' // the collection is expanded (holds the active group), so both items render
+    const w = await mountHub()
+    const item = w.findAll('.settings-nav-item').find((b) => b.text().includes('Reise-Crew'))!
+    await item.trigger('click')
+    await flushPromises()
+    expect(w.vm.$route.params.section).toBe('group-g-9')
+    expect(w.find('.stub-group-members').exists()).toBe(true)
   })
 
   it('with no tenant context and no server role, only Personal shows', async () => {
@@ -118,14 +148,21 @@ describe('SettingsHubView — split view index vs detail', () => {
     expect(w.get('.settings-hub').classes()).toContain('is-detail')
   })
 
-  it('clicking a nav item navigates to its section route', async () => {
+  it('the Server Tenants collection lists tenants; clicking one opens its detail page', async () => {
+    vi.mocked(listTenants).mockResolvedValue([
+      { tenantId: 'tn-7', name: 'Acme', domain: 'acme.example', ownerEmail: 'o@acme.example', status: 'PENDING' } as never,
+    ])
     activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
     serverRole.canManage = true
     const w = await mountHub('/settings')
-    const serverItem = w.findAll('.settings-nav-item').find((b) => b.text().includes('Tenants'))!
-    await serverItem.trigger('click')
+    // expand the collapsible Tenants category, then open the tenant's detail
+    const toggle = w.findAll('.settings-nav-cat-toggle').find((b) => b.text().includes('Tenants'))!
+    await toggle.trigger('click')
+    const item = w.findAll('.settings-nav-item').find((b) => b.text().includes('Acme'))!
+    await item.trigger('click')
     await flushPromises()
-    expect(w.vm.$route.params.section).toBe('server')
-    expect(w.find('.stub-admin').exists()).toBe(true)
+    expect(w.vm.$route.params.section).toBe('tenant-tn-7')
+    expect(w.find('.stub-tenant-detail').exists()).toBe(true)
   })
 })

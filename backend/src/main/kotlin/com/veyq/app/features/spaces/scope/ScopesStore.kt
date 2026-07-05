@@ -10,11 +10,13 @@ import java.time.Instant
 import java.util.UUID
 
 /** A scope the caller holds, with their own grant ciphertext — the row behind a `ScopeSummary`. `encryptedName`
- *  is the sealed group name for a GROUP scope (ciphertext), null for TENANT/PERSONAL (ADR 0014). */
+ *  is the sealed group name for a GROUP scope (ciphertext), null for TENANT/PERSONAL (ADR 0014). `role` is the
+ *  caller's own role in the scope (OWNER/MEMBER, cr-0087). */
 data class ScopeRow(
     val id: String,
     val kind: String,
     val tenantId: String,
+    val role: String,
     val wrappedGrant: String,
     val encryptedName: String?,
 )
@@ -114,7 +116,7 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     fun listMine(userId: String, tenantId: String): List<ScopeRow> =
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
-                ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, grant, it.encryptedName) }
+                ScopeEntity.findById(m.scopeId)?.let { ScopeRow(it.id, it.kind, it.tenantId, m.role, grant, it.encryptedName) }
             }
         }
 

@@ -9,9 +9,9 @@ acceptanceCriteria:
       web: { unit: [src/features/spaces/scopes.test.ts] }
       http: { e2e: [http/spaces/scopes.http] }
   - id: list-spaces
-    text: GET /api/scopes lists the member's scopes in the active tenant (the TENANT root + their PERSONAL scope).
+    text: GET /api/scopes lists the member's scopes in the active tenant (the TENANT root + their PERSONAL scope), each with the caller's own role (cr-0087 — lets the settings hub list the groups they own).
     coverage:
-      backend: { integration: [ScopesSliceTest.createPersonalScopeThenListReturnsBoth] }
+      backend: { integration: [ScopesSliceTest.createPersonalScopeThenListReturnsBoth, ScopesSliceTest.listMyScopesCarriesTheCallersRole] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/ScopesTests.swift] }
       android: { unit: [android/client/src/test/kotlin/com/veyq/client/ScopesTest.kt] }

@@ -68,8 +68,9 @@ export async function createGroup(name: string): Promise<string> {
   }
 }
 
-/** A group the member holds — the switcher row: opaque id + tenant + the **decrypted** (client-side) name. */
-export type GroupSpace = { scopeId: string; tenantId: string; name: string }
+/** A group the member holds — the switcher/settings row: opaque id + tenant + the **decrypted** (client-side)
+ *  name + the caller's own `role` in it (OWNER/MEMBER, cr-0087 — lets the settings hub list groups I own). */
+export type GroupSpace = { scopeId: string; tenantId: string; name: string; role: string }
 
 /**
  * The member's groups in the active tenant with their names decrypted on-device (en.spaces.group-scope). Each
@@ -88,7 +89,7 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
         try {
           key = unwrapGrant(g, priv)
           const name = g.encryptedName ? openName(key, g.encryptedName) : ''
-          return [{ scopeId: g.id, tenantId: g.tenantId, name }]
+          return [{ scopeId: g.id, tenantId: g.tenantId, name, role: g.role }]
         } catch {
           return []
         } finally {

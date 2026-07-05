@@ -10,7 +10,7 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantsSliceTest.createReturns201Pending] }
       http: { e2e: [http/admin/tenant-authed.http] }
-      web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/features/admin/createTenant/TenantAdminPanel.test.ts] }
+      web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts] }
   - id: reject-duplicate-domain
     text: A domain already mapped to a tenant is rejected (409 domain_taken).
     coverage:
@@ -19,15 +19,15 @@ acceptanceCriteria:
     text: The owner invite is delivered out-of-band by the Server Owner copying the invite link (the bootstrap secret in the URL fragment) — create/resend/reassign responses return the raw secret to the Server-Owner-gated caller, so tenant onboarding works without any email/SMTP infrastructure (self-hostable by default). (cr-0080.)
     coverage:
       web:
-        unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/features/admin/createTenant/TenantAdminPanel.test.ts, src/shared/inviteLink.test.ts]
+        unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts, src/features/admin/createTenant/TenantDetailPanel.test.ts, src/shared/inviteLink.test.ts]
   - id: list-tenants
     text: A Server Owner lists all tenants with each one's current invite status.
     coverage:
       backend: { integration: [TenantsSliceTest.listIncludesCreatedTenantWithActiveInvite] }
       http: { e2e: [http/admin/tenant-authed.http] }
-      # cr-0050: the Server Settings "Manage tenants" rubric lists all tenants; the ProfileMenu entry + the page
-      # are Server-Owner-gated by the backend 403 (no client serverRole yet).
-      web: { unit: [src/features/admin/createTenant/TenantAdminPanel.test.ts] }
+      # cr-0050/cr-0087: the Server → Tenants collection in the settings hub lists all tenants; Server-Owner-gated
+      # by the backend 403 + the client serverRole probe.
+      web: { unit: [src/views/SettingsHubView.test.ts] }
   - id: resend-supersedes-invite
     text: Resend soft-supersedes the current ACTIVE invite and mints a fresh ACTIVE one (one ACTIVE kept).
     coverage:
@@ -103,11 +103,11 @@ acceptanceCriteria:
       backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
       http: { e2e: [http/admin/tenant.http] }
 gaps:
-  web: Slice A is automation-covered (cr-0038, cr-0050) — facade unit tests (tenants.test.ts) + component
-    acceptance for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call; TenantAdminPanel.test.ts
-    is the Server Settings "Manage tenants" rubric — renders the PENDING row + edit/delete actions, confirm-gated
-    revoke, 403 not-authorized, 401-redirect). The rubric + its ProfileMenu entry are Server-Owner-gated by the
-    backend 403. Slice B activation UI (TenantJoinView — register/sign-in accept building the identity + cold
+  web: Slice A is automation-covered (cr-0038, cr-0050, cr-0087) — facade unit tests (tenants.test.ts) + component
+    acceptance for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call). In the settings hub the
+    Server → Tenants **collection** lists tenants (SettingsHubView.test.ts) and each tenant's **detail** page
+    handles resend/reassign/revoke (TenantDetailPanel.test.ts — PENDING invite controls + copyable link,
+    confirm-gated revoke, 403 not-authorized, 401-redirect). All Server-Owner-gated by the backend 403. Slice B activation UI (TenantJoinView — register/sign-in accept building the identity + cold
     grant) is still backend-only here; its component harness is pending.
   apple: not built yet — web-first slice; native parity is a later CR
   android: not built yet — web-first slice; native parity is a later CR

@@ -5,7 +5,7 @@
 // blind: only operational metadata (usernames/roles/grant-present) is shown; the add records a grant-less
 // membership, the key is delivered later by grant-delivery (cr-0076), no crypto here. Real names stay `@username`
 // — they're sealed under K_tenant, which a group owner needn't hold (the active key here is the group's K_SC).
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -13,8 +13,10 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, memberError, type ScopeMember } from './members'
 import { getMyProfile } from '../account/profile/profile'
-import { activeSpace } from '../../app/activeSpace'
-import { ScopeKind } from '../../api/generated/scopes'
+
+// Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
+// active scope; switching between groups in the rail re-loads via the `scopeId` watch.
+const props = defineProps<{ scopeId: string }>()
 
 const { t } = useI18n()
 const router = useRouter()
@@ -27,24 +29,24 @@ const username = ref('')
 const addError = ref('')
 const adding = ref(false)
 
-const inGroup = computed(() => activeSpace.kind === ScopeKind.Group && activeSpace.scopeId !== null)
 // Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
 const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
 
 onMounted(load)
+watch(() => props.scopeId, load)
 
 async function load() {
   loading.value = true
   loadError.value = ''
   addError.value = ''
-  if (!inGroup.value || !activeSpace.scopeId) {
+  if (!props.scopeId) {
     loading.value = false
     loadError.value = 'failed'
     return
   }
   try {
     // My group role isn't the tenant role — derive it from the directory by matching my per-tenant username.
-    const [rows, me] = await Promise.all([listScopeMembers(activeSpace.scopeId), getMyProfile().catch(() => null)])
+    const [rows, me] = await Promise.all([listScopeMembers(props.scopeId), getMyProfile().catch(() => null)])
     members.value = rows
     isOwner.value = !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER')
   } catch (e) {
@@ -57,13 +59,13 @@ async function load() {
 }
 
 async function submit() {
-  if (!canAdd.value || !activeSpace.scopeId) return
+  if (!canAdd.value || !props.scopeId) return
   addError.value = ''
   adding.value = true
   try {
-    await addGroupMember(activeSpace.scopeId, username.value.trim().toLowerCase())
+    await addGroupMember(props.scopeId, username.value.trim().toLowerCase())
     username.value = ''
-    members.value = await listScopeMembers(activeSpace.scopeId) // refresh — the newcomer shows as awaiting access
+    members.value = await listScopeMembers(props.scopeId) // refresh — the newcomer shows as awaiting access
   } catch (e) {
     const { status, code } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })

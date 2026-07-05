@@ -58,6 +58,26 @@ class ScopesSliceTest {
     }
 
     @Test
+    fun listMyScopesCarriesTheCallersRole() {
+        // The scope list surfaces the caller's OWN role per scope (cr-0087) — so the client can list groups it
+        // owns without a directory call. The tenant owner sees OWNER; a seeded plain member sees MEMBER.
+        val (owner, domain) = seedMember()
+        val memberId = seedTenantMember(tenantIdOf(domain), "partner")
+
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.kind == 'TENANT' }.role", equalTo("OWNER"))
+
+        given().header("Authorization", "Bearer ${token(memberId)}")
+            .header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.kind == 'TENANT' }.role", equalTo("MEMBER"))
+    }
+
+    @Test
     fun secondPersonalScopeIs409() {
         val (userId, domain) = seedMember()
         given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")

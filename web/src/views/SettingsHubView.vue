@@ -1,79 +1,148 @@
 <script setup lang="ts">
-// The settings hub (cr-0078, ADR 0022) — one scope-contextual page reached from the top-bar gear. A responsive
-// NavigationSplitView: wide viewports show the section sidebar + detail side by side; narrow viewports collapse
-// to a list that drills into /settings/<section>. Sections are filtered by the caller's scope path + role
-// (Persönlich always; Tenant when in a tenant; Server for a Server Owner). Existing panels are re-homed here,
-// not rewritten. Content-object settings (folders, memories) stay inline on their objects — never in the hub.
-import { computed, onMounted, type Component } from 'vue'
+// The settings hub (cr-0078/cr-0087, ADR 0022) — one scope-contextual page reached from the top-bar gear. A
+// responsive NavigationSplitView: wide viewports show the section rail + detail; narrow collapses to a list that
+// drills into /settings/<section>. The rail mixes two axes (ADR 0022 §3): scope-in-path sections (Persönlich
+// always; Tenant members while in the Tenant scope) and **collection categories** — collapsible groups that fan
+// out to per-entity detail pages (Gruppen → a group I own → its members). The gear is context-aware: with no
+// explicit section it opens the active scope's entity (a group → that group's page).
+import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AppearancePanel from '../features/settings/AppearancePanel.vue'
 import ProfilePanel from '../features/account/profile/ProfilePanel.vue'
 import TenantMembersPanel from '../features/spaces/TenantMembersPanel.vue'
 import GroupMembersPanel from '../features/spaces/GroupMembersPanel.vue'
-import TenantAdminPanel from '../features/admin/createTenant/TenantAdminPanel.vue'
+import TenantDetailPanel from '../features/admin/createTenant/TenantDetailPanel.vue'
+import CreateGroupDialog from '../features/spaces/CreateGroupDialog.vue'
+import CreateTenantDialog from '../features/admin/createTenant/CreateTenantDialog.vue'
 import { activeSpace } from '../app/activeSpace'
 import { ScopeKind } from '../api/generated/scopes'
+import { listMyGroups, type GroupSpace } from '../features/spaces/scopes'
+import { listTenants, type TenantSummary } from '../features/admin/createTenant/tenants'
 import { serverRole, probeServerRole } from '../features/admin/serverRole'
 
-type Section = { id: string; group: string; label: string; icon: string; component: Component }
+type NavItem = { id: string; label: string; icon: string }
+type NavCategory = { key: string; label: string; items: NavItem[]; collapsible: boolean; create?: { label: string; run: () => void } }
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-onMounted(() => void probeServerRole())
+// The groups the caller OWNs — the Gruppen collection (ADR 0022 §3). Names decrypted on-device; a member-only
+// group isn't listed (nothing to manage), though its detail page stays reachable via a direct/gear link.
+const ownedGroups = ref<GroupSpace[]>([])
+const tenants = ref<TenantSummary[]>([])
+const createGroupOpen = ref(false)
+const createTenantOpen = ref(false)
 
-// Scope × role filtered: a section appears only when the caller can see or do something there.
-const sections = computed<Section[]>(() => {
-  const list: Section[] = [
-    { id: 'appearance', group: t('settings.personal'), label: t('settings.appearance'), icon: 'pi pi-palette', component: AppearancePanel },
+onMounted(async () => {
+  await probeServerRole()
+  await Promise.all([loadGroups(), loadTenants()])
+})
+
+async function loadGroups() {
+  try {
+    ownedGroups.value = (await listMyGroups()).filter((g) => g.role === 'OWNER')
+  } catch {
+    /* the rail tolerates an empty groups collection */
+  }
+}
+
+async function loadTenants() {
+  if (!serverRole.canManage) return
+  try {
+    tenants.value = await listTenants()
+  } catch {
+    /* the rail tolerates an empty tenants collection */
+  }
+}
+
+const categories = computed<NavCategory[]>(() => {
+  const cats: NavCategory[] = [
+    {
+      key: 'personal',
+      label: t('settings.personal'),
+      collapsible: false,
+      items: [
+        { id: 'appearance', label: t('settings.appearance'), icon: 'pi pi-palette' },
+        // Per-tenant identity (username + real name) needs any tenant context (ADR 0023).
+        ...(activeSpace.tenantId ? [{ id: 'profile', label: t('profile.title'), icon: 'pi pi-user' }] : []),
+      ],
+    },
   ]
-  // Your per-tenant identity (username + real name) — needs any tenant context (ADR 0023).
-  if (activeSpace.tenantId) {
-    list.push({ id: 'profile', group: t('settings.personal'), label: t('profile.title'), icon: 'pi pi-user', component: ProfilePanel })
-  }
-  // Members management is scope-contextual: the Tenant directory when the shared Tenant scope is active, the
-  // Group directory when a group is active (each panel needs its own scope open to read/decrypt + gate the add).
+  // Tenant members — scope-in-path: managed while the shared Tenant scope is active (needs K_tenant open).
   if (activeSpace.kind === ScopeKind.Tenant) {
-    list.push({ id: 'tenant-members', group: t('settings.tenant'), label: t('members.title'), icon: 'pi pi-users', component: TenantMembersPanel })
+    cats.push({ key: 'tenant', label: t('settings.tenant'), collapsible: false, items: [{ id: 'tenant-members', label: t('members.title'), icon: 'pi pi-users' }] })
   }
-  // The group section is headed by the group's own (decrypted) name — so with several groups it's clear which
-  // one you're configuring (a "<group name> → Members" drill-down); falls back to a generic label until it resolves.
-  if (activeSpace.kind === ScopeKind.Group) {
-    list.push({ id: 'group-members', group: activeSpace.name || t('settings.group'), label: t('groups.members'), icon: 'pi pi-users', component: GroupMembersPanel })
+  // Gruppen collection — every group I own + a create affordance (management hub, decoupled from active scope).
+  if (activeSpace.tenantId) {
+    cats.push({
+      key: 'groups',
+      label: t('shell.groups'),
+      collapsible: true,
+      create: { label: t('shell.groupCreate'), run: () => { createGroupOpen.value = true } },
+      items: ownedGroups.value.map((g) => ({ id: `group-${g.scopeId}`, label: g.name, icon: 'pi pi-users' })),
+    })
   }
+  // Server → Tenants collection — every tenant a Server Owner administers + a create affordance.
   if (serverRole.canManage) {
-    list.push({ id: 'server', group: t('settings.server'), label: t('settings.serverTenants'), icon: 'pi pi-server', component: TenantAdminPanel })
+    cats.push({
+      key: 'server',
+      label: t('settings.serverTenants'),
+      collapsible: true,
+      create: { label: t('tenant.create'), run: () => { createTenantOpen.value = true } },
+      items: tenants.value.map((tn) => ({ id: `tenant-${tn.tenantId}`, label: tn.name, icon: 'pi pi-server' })),
+    })
   }
-  return list
+  return cats
 })
 
-// The nav grouped by scope level (each level can hold several sections later, e.g. Tenant → Mitglieder + …).
-const groups = computed(() => {
-  const order: string[] = []
-  const byGroup = new Map<string, Section[]>()
-  for (const s of sections.value) {
-    if (!byGroup.has(s.group)) { byGroup.set(s.group, []); order.push(s.group) }
-    byGroup.get(s.group)!.push(s)
-  }
-  return order.map((name) => ({ name, items: byGroup.get(name)! }))
-})
+const allItems = computed<NavItem[]>(() => categories.value.flatMap((c) => c.items))
 
-// Default (wide, no param) opens the current scope's members section (Group / Tenant), else Appearance.
+// The gear (no param) opens the active scope's entity: a group → its page, the Tenant scope → its members, else
+// Persönlich. Narrow with no param shows the list only.
 const defaultId = computed(() =>
-  activeSpace.kind === ScopeKind.Group
-    ? 'group-members'
+  activeSpace.kind === ScopeKind.Group && activeSpace.scopeId
+    ? `group-${activeSpace.scopeId}`
     : activeSpace.kind === ScopeKind.Tenant
       ? 'tenant-members'
       : 'appearance',
 )
 const activeId = computed(() => (route.params.section as string | undefined) || defaultId.value)
-const active = computed(() => sections.value.find((s) => s.id === activeId.value) ?? sections.value[0])
 const hasSection = computed(() => Boolean(route.params.section))
+
+// Resolve the active id → the detail component + its props (a group id encodes its scope, ADR 0022 §2).
+const activeView = computed<{ component: Component; props: Record<string, unknown> }>(() => {
+  const id = activeId.value
+  if (id === 'tenant-members') return { component: TenantMembersPanel, props: {} }
+  if (id.startsWith('group-')) return { component: GroupMembersPanel, props: { scopeId: id.slice('group-'.length) } }
+  if (id.startsWith('tenant-')) return { component: TenantDetailPanel, props: { tenantId: id.slice('tenant-'.length) } }
+  if (id === 'profile') return { component: ProfilePanel, props: {} }
+  return { component: AppearancePanel, props: {} }
+})
+
+// Collapse state: a category with the active item is open by default; the user can toggle from there.
+const manualExpanded = reactive<Record<string, boolean | undefined>>({})
+const isExpanded = (c: NavCategory) => manualExpanded[c.key] ?? c.items.some((i) => i.id === activeId.value)
+const toggle = (c: NavCategory) => { manualExpanded[c.key] = !isExpanded(c) }
 
 const open = (id: string) => router.push(`/settings/${id}`)
 const back = () => router.push('/settings')
+
+async function onGroupCreated(scopeId: string) {
+  await loadGroups()
+  manualExpanded.groups = true
+  await router.push(`/settings/group-${scopeId}`)
+}
+
+async function onTenantCreated() {
+  await loadTenants()
+  manualExpanded.server = true
+}
+
+// Reload the tenants collection when the section changes — so a revoke (which routes back here) drops the stale
+// entry from the rail. Cheap + Server-Owner-only; groups reload on create (no delete path until G3).
+watch(() => route.params.section, () => void loadTenants())
 </script>
 
 <template>
@@ -81,19 +150,45 @@ const back = () => router.push('/settings')
     <h1 class="settings-hub-title">{{ t('settings.title') }}</h1>
     <div class="settings-hub" :class="{ 'is-index': !hasSection, 'is-detail': hasSection }">
       <nav class="settings-nav" :aria-label="t('settings.title')">
-        <template v-for="g in groups" :key="g.name">
-          <p class="settings-nav-group">{{ g.name }}</p>
-          <button
-            v-for="s in g.items"
-            :key="s.id"
-            type="button"
-            class="settings-nav-item"
-            :class="{ 'is-active': s.id === active?.id }"
-            @click="open(s.id)"
-          >
-            <i :class="s.icon" aria-hidden="true" />
-            <span>{{ s.label }}</span>
-          </button>
+        <template v-for="c in categories" :key="c.key">
+          <div class="settings-nav-cat">
+            <button
+              v-if="c.collapsible"
+              type="button"
+              class="settings-nav-cat-toggle"
+              :aria-expanded="isExpanded(c)"
+              @click="toggle(c)"
+            >
+              <i class="pi" :class="isExpanded(c) ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true" />
+              <span>{{ c.label }}</span>
+            </button>
+            <p v-else class="settings-nav-cat-label">{{ c.label }}</p>
+            <button
+              v-if="c.create"
+              type="button"
+              class="settings-nav-cat-action"
+              :title="c.create.label"
+              :aria-label="c.create.label"
+              @click="c.create.run()"
+            >
+              <i class="pi pi-plus" aria-hidden="true" />
+            </button>
+          </div>
+
+          <template v-if="!c.collapsible || isExpanded(c)">
+            <button
+              v-for="it in c.items"
+              :key="it.id"
+              type="button"
+              class="settings-nav-item"
+              :class="{ 'is-active': it.id === activeId }"
+              @click="open(it.id)"
+            >
+              <i :class="it.icon" aria-hidden="true" />
+              <span>{{ it.label }}</span>
+            </button>
+            <p v-if="c.collapsible && c.items.length === 0" class="settings-nav-empty">{{ t('groups.noneOwned') }}</p>
+          </template>
         </template>
       </nav>
 
@@ -102,9 +197,12 @@ const back = () => router.push('/settings')
           <i class="pi pi-chevron-left" aria-hidden="true" />
           {{ t('settings.back') }}
         </button>
-        <component :is="active?.component" v-if="active" />
+        <component :is="activeView.component" v-bind="activeView.props" />
       </section>
     </div>
+
+    <CreateGroupDialog v-if="createGroupOpen" @done="onGroupCreated" @close="createGroupOpen = false" />
+    <CreateTenantDialog v-model:visible="createTenantOpen" @created="onTenantCreated" />
   </div>
 </template>
 
@@ -126,11 +224,51 @@ const back = () => router.push('/settings')
   flex-direction: column;
   gap: 2px;
 }
-.settings-nav-group {
-  margin: 0.75rem 0.5rem 0.25rem;
+.settings-nav-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.75rem 0.25rem 0.25rem 0.5rem;
+}
+.settings-nav-cat-label,
+.settings-nav-cat-toggle {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--app-muted, var(--p-text-muted-color));
+  font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
+}
+.settings-nav-cat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.settings-nav-cat-toggle .pi {
+  font-size: 0.7rem;
+}
+.settings-nav-cat-action {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: transparent;
   color: var(--app-muted, var(--p-text-muted-color));
+  cursor: pointer;
+}
+.settings-nav-cat-action:hover {
+  background: var(--p-content-hover-background, rgba(127, 127, 127, 0.08));
+  color: inherit;
+}
+.settings-nav-empty {
+  margin: 0.1rem 0.5rem 0.25rem;
+  color: var(--app-muted, var(--p-text-muted-color));
+  font-size: 0.85rem;
 }
 .settings-nav-item {
   display: flex;

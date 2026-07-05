@@ -489,7 +489,7 @@ components:
 
     ScopeSummary:
       type: object
-      required: [id, kind, tenantId, wrappedGrant]
+      required: [id, kind, tenantId, role, wrappedGrant]
       properties:
         id:
           type: string
@@ -498,6 +498,14 @@ components:
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
         kind:
           $ref: "#/components/schemas/ScopeKind"
+        role:
+          type: string
+          description: >
+            The **caller's own** role in this scope (`OWNER` / `MEMBER`) — so the client can list the scopes it
+            manages (e.g. groups it owns) without a per-scope directory call. Operational metadata the server
+            already stores on the caller's membership (ADR 0007); exposing one's own role reveals no key.
+          maxLength: 16
+          example: OWNER
         tenantId:
           type: string
           format: uuid
