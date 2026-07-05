@@ -54,3 +54,19 @@ client.test("create group requires auth", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
 });
 %}
+
+### 5. POST /api/scopes/{scopeId}/members (add a group member by username) without a bearer token → 401
+# The owner-gated happy-path (admit an existing tenant member by username → grant-less membership) + the authz
+# paths (non-owner 403, unknown username 404, already-member 409) are covered at the integration layer
+# (ScopesSliceTest) — they need a seeded group + a second tenant member, not reproducible from a bare .http.
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/members
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "username": "partner" }
+
+> {%
+client.test("add group member requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}

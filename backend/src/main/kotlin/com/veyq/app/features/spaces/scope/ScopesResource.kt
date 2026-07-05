@@ -1,6 +1,7 @@
 package com.veyq.app.features.spaces.scope
 
 import com.veyq.app.generated.api.ScopesApi
+import com.veyq.app.generated.model.AddGroupMemberRequest
 import com.veyq.app.generated.model.CreateGroupRequest
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
 import com.veyq.app.generated.model.ErrorResponse
@@ -69,6 +70,25 @@ class ScopesResource(
                 }).build()
             ListScopesOutcome.NoTenant ->
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
+        }
+
+    override fun addGroupMember(scopeId: UUID, addGroupMemberRequest: AddGroupMemberRequest): Response =
+        when (val outcome = handler.addGroupMember(identity.principal.name, scopeId.toString(), addGroupMemberRequest.username)) {
+            is AddGroupMemberOutcome.Added -> Response.status(Response.Status.CREATED).entity(
+                ScopeMember(
+                    userId = UUID.fromString(outcome.row.userId), username = outcome.row.username,
+                    sealedName = outcome.row.sealedName, email = outcome.row.email, role = outcome.row.role,
+                    identityPublicKey = outcome.row.identityPublicKey, hasGrant = outcome.row.hasGrant,
+                ),
+            ).build()
+            AddGroupMemberOutcome.NotOwner ->
+                Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_owner")).build()
+            AddGroupMemberOutcome.ScopeNotFound ->
+                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "scope_not_found")).build()
+            AddGroupMemberOutcome.MemberNotFound ->
+                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "member_not_found")).build()
+            AddGroupMemberOutcome.AlreadyMember ->
+                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "already_member")).build()
         }
 
     override fun listScopeMembers(scopeId: UUID): Response =

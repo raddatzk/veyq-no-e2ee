@@ -1,7 +1,7 @@
 ---
 id: cr-0086
 title: Add a member to a group — direct-add by username (G2)
-status: planned
+status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.spaces.add-group-member]
 adrs: ["0014", "0020", "0021", "0023", "0007"]
 invariants: [operator-blind-e2ee]
@@ -48,29 +48,29 @@ is a later increment.
 
 ## Phases
 
-- [ ] 1 contracts — `POST /api/scopes/{scopeId}/members { username }` → `201 { userId }` (records a grant-less
+- [x] 1 contracts — `POST /api/scopes/{scopeId}/members { username }` → `201 { userId }` (records a grant-less
   GROUP membership; owner-gated). Errors: `400` invalid username, `403 not_scope_owner`, `404` (scope or username
   not found in the tenant), `409 already_member` (or idempotent `200` — decide in the op). Reuses the existing
   `ScopeMember` shape for reads (no directory change). · Done when: `openApiGenerateSpecs` + web `generate:api`
   produce the models/api clean.
-- [ ] 2 backend — `addGroupMember` (Store/Handler/Resource): assert the caller **OWNs** the `GROUP` scope; resolve
+- [x] 2 backend — `addGroupMember` (Store/Handler/Resource): assert the caller **OWNs** the `GROUP` scope; resolve
   `username` → userId **within the scope's tenant** (extend the tenant-profile store with a by-username lookup,
   cr-0083); insert a grant-less `GROUP` membership (`role=MEMBER`, `wrapped_grant=null`); idempotent if already a
   member; reject a non-tenant-member username. **Delivery needs no new code** — the grant-delivery originator
   (cr-0076) already reconciles grant-less memberships into jobs. Slice test (owner adds by username → directory
   shows the pending member `hasGrant=false`; non-owner → 403; unknown username → 404; already-member idempotent;
   the group name/`K_SC` never touched). · Done when: `./gradlew test` green.
-- [ ] 3 http — add the group-member-add boundary to `http/spaces/scopes.http` (unauth `401`; the owner-gated
+- [x] 3 http — add the group-member-add boundary to `http/spaces/scopes.http` (unauth `401`; the owner-gated
   happy-path + authz paths stay integration-covered, as the primitive needs the full grant flow). · Done when:
   the file runs against a live instance (or the unauth assertions hold headless).
-- [ ] 4 web — `addGroupMember(scopeId, username)` data layer; a **group members** surface reachable from the open
+- [x] 4 web — `addGroupMember(scopeId, username)` data layer; a **group members** surface reachable from the open
   group (list current members via the directory + an **add-by-username** dialog, the add action **owner-only**) —
   ported in-style from `TenantMembersPanel`/`InviteMemberDialog`, data layer swapped to the group scope. No new
   delivery wiring: `enterScope` already runs grant-delivery polling for a shared scope, so the owner's own device
   delivers the key after the add. · Done when: `npm run check` green + live (needs a **second account**): owner
   adds a fellow tenant member by username → they appear in the group directory as *awaiting access* → grant is
   delivered → the added member, on their device, opens the group and browses its tree.
-- [ ] 5 coverage — fill `uc.spaces.add-group-member.yaml` (drop `status: planned`): map `resolve-username` /
+- [x] 5 coverage — fill `uc.spaces.add-group-member.yaml` (drop `status: planned`): map `resolve-username` /
   `admit-group-member` / `auto-deliver-group-grant` / `operator-blind-group-add` to the backend `…SliceTest`
   refs + the web data-layer test + the `http/spaces/scopes.http` boundary; keep apple/android as gaps. · Done
   when: `python3 scripts/validate_coverage.py` + `validate_changes.py` + `validate_doc_links.py` green.
@@ -84,3 +84,23 @@ grant — never `K_SC`, never the group's plaintext name; the tenant owner gaine
 backend slice test + web check green; live two-account smoke. **Out of scope (later):** the per-user consent
 opt-in — "ask before adding me" + soft membership + accept/decline (G2b); promote/demote a co-owner, remove a
 member, the last-owner guard, `K_SC` rotation, and the orphan rule (G3); native parity.
+
+## Retrospective
+
+- **Planning — the live-smoke delivery step underspecified the local-machine gotcha.** The phase-4 "Done when"
+  called for observing the grant get delivered, but the delivery is *visibility-gated* polling (cr-0079): in the
+  headless preview the tab reports `hidden`, so the 45s interval never ticks. It only worked because
+  `startGrantDeliveryPolling` fires one **ungated** immediate tick on scope entry — so a quick Personal↔group
+  re-entry forced delivery. This is exactly the kind of preview quirk the memory note already flags; the CR
+  should have pre-noted "re-enter the scope to force delivery" in the smoke steps. Root cause: I wrote the smoke
+  step from the happy-path mental model, not from how the harness actually observes background work.
+- **Execution — the members dialog doesn't reload on remount.** `GroupMembersDialog` loads its directory on the
+  `visible` *transition* (`watch`, no `immediate`); when I JS-navigated scopes with the dialog flag still set,
+  it remounted already-"open" and showed an empty list until a clean close/reopen. Not reachable through normal
+  UX (the modal blocks sidebar navigation, so you can't switch scopes with it open), so it ships as-is — but it
+  is a latent sharp edge worth a follow-up guard (load on mount when `visible`).
+- **Process — went well.** Refined state landed before the CR; the three trust-chain guards + both platform
+  gates stayed green; coverage was part of the work, not a follow-up; German conversation / English artifacts
+  held. Reusing the built directory + grant-delivery kept the new surface to a single endpoint.
+- **Next time:** for any CR whose DoD includes delivery/polling/background-task observation, copy the
+  "preview tab is hidden → re-enter to force the immediate tick" note straight into the smoke steps up front.

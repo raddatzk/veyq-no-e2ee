@@ -21,6 +21,15 @@ sealed interface ListScopesOutcome {
     object NoTenant : ListScopesOutcome
 }
 
+/** Outcome of adding a member to a group by username (cr-0086). Admission only — the key is delivered later. */
+sealed interface AddGroupMemberOutcome {
+    data class Added(val row: ScopeMemberRow) : AddGroupMemberOutcome
+    object ScopeNotFound : AddGroupMemberOutcome
+    object NotOwner : AddGroupMemberOutcome
+    object MemberNotFound : AddGroupMemberOutcome
+    object AlreadyMember : AddGroupMemberOutcome
+}
+
 /** Outcome of listing a scope's members (the directory, cr-0077). */
 sealed interface ListMembersOutcome {
     data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
@@ -56,6 +65,25 @@ class ScopesHandler(private val store: ScopesStore) {
     fun listMine(userId: String, host: String?): ListScopesOutcome {
         val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return ListScopesOutcome.NoTenant
         return ListScopesOutcome.Scopes(store.listMine(userId, tenantId))
+    }
+
+    /**
+     * Add an existing tenant member to a **group** by username (en.spaces.add-group-member, cr-0086). Admission
+     * is owner-gated ([ADR 0014](0014) §4 — only a group OWNER; the tenant owner has no say); the username is
+     * resolved **within the scope's own tenant** (ADR 0020 — never a global search). Records a **grant-less**
+     * MEMBER membership — no key crosses the wire; grant-delivery wraps `K_SC` to them afterwards (cr-0076). The
+     * returned row has its `email` nulled (the add response never exposes it).
+     */
+    fun addGroupMember(callerId: String, scopeId: String, username: String): AddGroupMemberOutcome {
+        if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return AddGroupMemberOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return AddGroupMemberOutcome.NotOwner
+        val tenantId = store.scopeTenantId(scopeId) ?: return AddGroupMemberOutcome.ScopeNotFound
+        val targetId = store.resolveUsernameInTenant(tenantId, username) ?: return AddGroupMemberOutcome.MemberNotFound
+        if (!store.isMember(targetId, tenantId)) return AddGroupMemberOutcome.MemberNotFound
+        if (store.isScopeMember(targetId, scopeId)) return AddGroupMemberOutcome.AlreadyMember
+        store.addGrantlessMember(targetId, tenantId, scopeId)
+        val row = store.scopeMemberRow(scopeId, targetId) ?: return AddGroupMemberOutcome.MemberNotFound
+        return AddGroupMemberOutcome.Added(row.copy(email = null))
     }
 
     /** Every tenant the caller belongs to (Host-independent) — the space switcher. */

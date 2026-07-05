@@ -36,6 +36,16 @@ export function listScopeMembers(scopeId: string): Promise<ScopeMember[]> {
 }
 
 /**
+ * Add an existing tenant member to a **group** by username (uc.spaces.add-group-member, cr-0086) — owner-gated
+ * (`403 not_scope_owner`), tenant-scoped resolve (`404 member_not_found`), idempotency (`409 already_member`).
+ * Records a grant-less membership; the key is delivered later by grant-delivery (cr-0076), not here. Returns the
+ * new member's directory row (`hasGrant=false`, awaiting access).
+ */
+export function addGroupMember(scopeId: string, username: string): Promise<ScopeMember> {
+  return withRefresh(() => scopesApi().addGroupMember({ scopeId, addGroupMemberRequest: { username } }))
+}
+
+/**
  * Decode a failed member call into `{ status, code }` for UI mapping (401 → re-login, 403 → not owner /
  * not a member, 409 → already_member / tenant_not_active). Duck-typed so it handles the ResponseError of
  * either generated package. Returns status 0 for a non-HTTP failure (e.g. network).

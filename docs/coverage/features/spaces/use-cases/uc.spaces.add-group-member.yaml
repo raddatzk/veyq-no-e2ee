@@ -1,21 +1,27 @@
 useCase: uc.spaces.add-group-member
 feature: spaces
 title: Add a member to a group
-# Refined (G2, Direct-Add / Plain v1 / add-only) but not yet built — the acceptance criteria are the work order
-# for the G2 CR; test refs land with it, at which point `status: planned` drops and `coverage` fills per criterion.
-status: planned
 acceptanceCriteria:
   - id: resolve-username
     text: A tenant-scoped username resolve returns an existing tenant member's identity public key (not a global user-search); an unknown/foreign handle is a generic not-found.
+    coverage:
+      backend: { integration: [ScopesSliceTest.addGroupMemberUnknownUsernameIs404] }
+      web: { unit: [src/features/spaces/members.test.ts] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: admit-group-member
     text: The GroupOwner adds a resolved member → the server records a grant-less GROUP membership (role=MEMBER); no key crosses the wire, and the group name stays sealed. A non-owner caller is rejected; adding an existing member is a no-op.
+    coverage:
+      backend: { integration: [ScopesSliceTest.addGroupMemberByUsernameRecordsGrantlessMember, ScopesSliceTest.addGroupMemberNonOwnerIs403, ScopesSliceTest.addGroupMemberAlreadyMemberIs409] }
+      web: { unit: [src/features/spaces/members.test.ts] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: auto-deliver-group-grant
-    text: Any group key-holder online after the membership is recorded wraps K_SC to the pending member (first-online-wins, idempotent) via the grant-delivery job; the member then opens the group on next entry.
+    text: The admitted member lands grant-less (hasGrant=false, "awaiting access") in the group directory — the input the grant-delivery reconciler (cr-0076, wrappedGrant-is-null) picks up to wrap K_SC, first-online-wins; the delivery wrap itself is the shared primitive's coverage (cr-0076/0079).
+    coverage:
+      backend: { integration: [ScopesSliceTest.addGroupMemberByUsernameRecordsGrantlessMember] }
   - id: operator-blind-group-add
-    text: The server sees only the membership row, identity public keys, and opaque grant ciphertext — never K_SC, never the group's plaintext name.
+    text: The server sees only the membership row, identity public keys, and opaque grant ciphertext — never K_SC, never the group's plaintext name; the add response never exposes email.
+    coverage:
+      backend: { integration: [ScopesSliceTest.addGroupMemberByUsernameRecordsGrantlessMember] }
 gaps:
-  backend: "G2 not built — the username-resolve endpoint + grant-less GROUP membership admission (owner-gated) are pending; grant-delivery reuses the built primitive (cr-0076)."
-  web: "G2 not built — the group members panel + add-by-username dialog are pending (analogue of TenantMembersPanel/InviteMemberDialog)."
-  http: "G2 not built — the username-resolve + group-member-add boundary requests are pending."
   apple: "Group member-add is web-first — not built natively (own CR later), like the rest of the groups epic."
   android: "Group member-add is web-first — not built natively (own CR later), like the rest of the groups epic."

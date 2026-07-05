@@ -227,6 +227,76 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: scope_not_found }
+    post:
+      tags: [scopes]
+      operationId: addGroupMember
+      summary: Add an existing tenant member to a group by username (admission; the key is delivered later).
+      description: >
+        Admits an existing member of the scope's tenant to a **GROUP** scope, picked by their per-tenant
+        `username` (en.spaces.add-group-member, cr-0086). The server resolves the username **within the scope's
+        own tenant** (never a global user-search, ADR 0020) and records a **grant-less** GROUP membership
+        (`role=MEMBER`, no grant) — admission only. **No key crosses the wire**: `K_SC` is delivered afterwards by
+        any group key-holder's `grant-delivery` job (ADR 0020/0021, cr-0076), so the returned member starts with
+        `hasGrant=false` (*awaiting access*). Only the group **OWNER** may add a member (the tenant owner has no
+        say over groups, ADR 0014 §4) — authorization is enforced by code, not this spec (ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scopeId
+          in: path
+          required: true
+          description: Opaque id of the GROUP scope to add the member to.
+          schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddGroupMemberRequest" }
+            example:
+              username: partner
+      responses:
+        "201":
+          description: The member was admitted (grant-less); their directory row, awaiting delivery.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScopeMember" }
+              example:
+                userId: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
+                username: partner
+                sealedName: c2VhbGVkLW5hbWU=
+                role: MEMBER
+                identityPublicKey: bWVtYmVyLXB1YmxpYy1rZXk=
+                hasGrant: false
+        "400":
+          description: The request was malformed (missing/invalid username).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is not the group's OWNER (only an owner may add a member).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_scope_owner }
+        "404":
+          description: No such scope, or the username resolves to no member of the scope's tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: member_not_found }
+        "409":
+          description: That user is already a member of the group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: already_member }
 
   /api/scopes/my-tenants:
     get:
@@ -314,6 +384,20 @@ components:
           maxLength: 8192
           example: AQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    AddGroupMemberRequest:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          description: >
+            The **per-tenant username** of the member to admit (ADR 0023) — resolved within the scope's own
+            tenant to their identity; trimmed + lowercased server-side. Not an email, not a global handle.
+          minLength: 2
+          maxLength: 32
+          example: partner
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
 
     MyTenant:
       type: object

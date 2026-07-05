@@ -26,6 +26,11 @@ class TenantProfileStore {
     fun find(userId: String, tenantId: String): TenantProfileEntity? =
         TenantProfileEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).firstResult()
 
+    /** Resolve a per-tenant username (case-insensitive) to its userId, or null if no member holds it — the
+     *  tenant-scoped resolve behind group member-add (cr-0086, ADR 0020: never a global user-search). */
+    fun findUserIdByUsername(tenantId: String, username: String): String? =
+        TenantProfileEntity.find("tenantId = ?1 and username = ?2", tenantId, norm(username)).firstResult()?.userId
+
     /** Create the member's tenant profile (username set now; the sealed name is written later via the profile op). */
     @Transactional
     fun create(userId: String, tenantId: String, username: String, sealedName: String? = null): String {

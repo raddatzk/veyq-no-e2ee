@@ -125,6 +125,45 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     /** The tenant a scope lives in (for the directory's per-tenant profile join + owner-email gating). */
     fun scopeTenantId(scopeId: String): String? = ScopeEntity.findById(scopeId)?.tenantId
 
+    /** The kind of a scope (TENANT/GROUP/PERSONAL), or null if there's no such scope. */
+    fun scopeKind(scopeId: String): String? = ScopeEntity.findById(scopeId)?.kind
+
+    /** Whether the caller holds an OWNER membership on this scope (the group-admission gate, ADR 0014 §4). */
+    fun isScopeOwner(userId: String, scopeId: String): Boolean =
+        MembershipEntity.count("userId = ?1 and scopeId = ?2 and role = ?3", userId, scopeId, MembershipEntity.OWNER) > 0
+
+    /** Whether the user already holds any membership on this scope (grant or not) — the idempotency check. */
+    fun isScopeMember(userId: String, scopeId: String): Boolean =
+        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+
+    /** Resolve a per-tenant username to a userId within a tenant (cr-0086) — the tenant-scoped resolve. */
+    fun resolveUsernameInTenant(tenantId: String, username: String): String? =
+        profiles.findUserIdByUsername(tenantId, username)
+
+    /** Admit a member to a scope **grant-less** (role=MEMBER, no grant) — grant-delivery wraps `K_SC` to them
+     *  later (cr-0076). Operator-blind: **no key is written here**. */
+    @Transactional
+    fun addGrantlessMember(userId: String, tenantId: String, scopeId: String) {
+        MembershipEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            this.tenantId = tenantId
+            this.scopeId = scopeId
+            role = MembershipEntity.MEMBER
+            wrappedGrant = null
+            createdAt = Instant.now()
+        }.persist()
+    }
+
+    /** The directory row for one member of a scope (the add response). `email` is included; the handler nulls it. */
+    fun scopeMemberRow(scopeId: String, userId: String): ScopeMemberRow? {
+        val tenantId = ScopeEntity.findById(scopeId)?.tenantId ?: return null
+        val m = MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult() ?: return null
+        val u = VeyqUser.findById(userId) ?: return null
+        val p = profiles.byUserInTenant(tenantId)[userId]
+        return ScopeMemberRow(userId, p?.username ?: "", p?.sealedName, u.email, m.role, u.identityPublicKey, m.wrappedGrant != null)
+    }
+
     /** Whether the user is the tenant's OWNER (gates the owner-only email in the directory). */
     fun isTenantOwner(userId: String, tenantId: String): Boolean =
         MembershipEntity.count(
