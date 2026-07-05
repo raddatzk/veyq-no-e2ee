@@ -1,9 +1,11 @@
 useCase: uc.spaces.manage-group-members
 feature: spaces
 title: Manage a group's members (promote / demote / remove)
-# cr-0088 delivers roles (promote/demote) end-to-end + the remove/rotation backend + slice tests. The web remove
-# UI + the client-side rotation crypto (epoch-aware scope open + tree seal) land in cr-0089 ("remove ships with
-# rotation"), which fills the web/live side of the remove + rotation criteria.
+# cr-0088 delivers roles (promote/demote) end-to-end + the remove/rotation backend + slice tests. cr-0089 lands
+# the web remove UI + the client-side rotation crypto (epoch-aware scope open + tree seal, the epoch chain-peel):
+# `epochs.test.ts` (chain peel), `scopes.test.ts::rotateGroupForRemoval` (mint + chain-link + re-grant, all
+# operator-blind ciphertext), `members.test.ts::removeGroupMember` (membership delete). The two-account
+# forward-secrecy LIVE smoke is tracked in cr-0089's definition of done.
 acceptanceCriteria:
   - id: promote-demote
     text: A GroupOwner promotes a member to co-owner (OWNER) or demotes a co-owner to MEMBER — a pure role change, no key move.
@@ -19,16 +21,19 @@ acceptanceCriteria:
     text: A GroupOwner removes a member → the membership is deleted (instant 403). A non-owner caller is rejected.
     coverage:
       backend: { integration: [ScopesSliceTest.removeMemberThenLastOwnerGuard] }
+      web: { unit: [src/features/spaces/members.test.ts] }
       http: { e2e: [http/spaces/scopes.http] }
   - id: remove-rotates-forward
-    text: Removal rotates the scope content key forward into a new epoch, re-granted only to the remaining members; new content seals under it, so the removed member reads pre-removal content but never post-removal content (even against a malicious operator). (Server side; the client rotation crypto is cr-0089.)
+    text: Removal rotates the scope content key forward into a new epoch, re-granted only to the remaining members; new content seals under it, so the removed member reads pre-removal content but never post-removal content (even against a malicious operator). The client mints the epoch, chain-links the old one, and re-grants the survivors (cr-0089).
     coverage:
       backend: { integration: [ScopesSliceTest.rotateBumpsEpochAndReGrantsRemaining] }
+      web: { unit: [src/features/spaces/scopes.test.ts, src/features/spaces/epochs.test.ts] }
   - id: operator-blind-rotation
-    text: The server sees only role/membership metadata + opaque epoch-chain links, per-member grants, and per-node epoch indices — never a key or a name.
+    text: The server sees only role/membership metadata + opaque epoch-chain links, per-member grants, and per-node epoch indices — never a key or a name. The client posts only ciphertext (the chain-link + per-member grants).
     coverage:
       backend: { integration: [ScopesSliceTest.rotateBumpsEpochAndReGrantsRemaining] }
+      web: { unit: [src/features/spaces/scopes.test.ts] }
 gaps:
-  web: "cr-0088 delivers promote/demote; the remove UI + the client-side rotation crypto (epoch-aware scope open + tree seal, the two-account forward-secrecy smoke) land in cr-0089."
+  web: "Covered: promote/demote (cr-0088) + remove + client rotation crypto (cr-0089), plus a live smoke on the real stack (cr-0089 retro: three real rotations, epoch tagging, a depth-3 cross-epoch read in-browser — which caught + fixed a reactivity bug). Still open (own CR later): a two-account native/e2e pass exercising the removed member's lock-out end-to-end (here the removed half is unit + backend-slice covered)."
   apple: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."
   android: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."

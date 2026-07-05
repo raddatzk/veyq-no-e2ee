@@ -8,6 +8,7 @@ vi.mock('../../api/client', () => ({
 }))
 
 import { listTree, createFolder, createMemory, createChapter, openMemory, openContentKey, nodeContentKey, type TreeNode } from './tree'
+import { epochsOf } from '../spaces/epochsTestUtil'
 import { contentApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std } from '../../shared/base64'
@@ -32,7 +33,7 @@ describe('createMemory', () => {
     const create = vi.fn().mockResolvedValue({ nodeId: 'mem-1' })
     mockContent({ createNode: create })
 
-    const { nodeId, memoryKey } = await createMemory(SCOPE_ID, scopeKey, 'Italien 2026')
+    const { nodeId, memoryKey } = await createMemory(SCOPE_ID, epochsOf(scopeKey), 'Italien 2026')
     expect(nodeId).toBe('mem-1')
     expect(memoryKey.length).toBe(32)
 
@@ -53,7 +54,7 @@ describe('createChapter — recursive K_mem (cr-0060)', () => {
     mockContent({ createNode: create })
     const parentKey = v1.randomBytes(32) // the parent Memory's K_mem
 
-    const { nodeId, chapterKey } = await createChapter(SCOPE_ID, scopeKey, parentKey, 'Tag 1', 'mem-1')
+    const { nodeId, chapterKey } = await createChapter(SCOPE_ID, epochsOf(scopeKey), parentKey, 'Tag 1', 'mem-1')
     expect(nodeId).toBe('chap-1')
 
     const req = create.mock.calls[0][0].createNodeRequest
@@ -75,13 +76,13 @@ describe('nodeContentKey — resolve a chapter key down the chain', () => {
     const chapKey = v1.randomBytes(32)
     const wrap = (kek: Uint8Array, k: Uint8Array) => b64std(v1.symWrap(kek, k, 'content-key', v1.randomBytes(12)))
     const tree: TreeNode[] = [
-      { id: 'fold', parentId: null, kind: 'FOLDER' as TreeNode['kind'], orderIndex: 0, name: 'Trips', wrappedContentKey: null, wrappedMeta: null },
-      { id: 'mem', parentId: 'fold', kind: 'MEMORY' as TreeNode['kind'], orderIndex: 0, name: 'Italy', wrappedContentKey: wrap(scopeKey, memKey), wrappedMeta: null },
-      { id: 'chap', parentId: 'mem', kind: 'CHAPTER' as TreeNode['kind'], orderIndex: 0, name: 'Day 1', wrappedContentKey: wrap(memKey, chapKey), wrappedMeta: null },
+      { id: 'fold', parentId: null, kind: 'FOLDER' as TreeNode['kind'], orderIndex: 0, epoch: 0, name: 'Trips', wrappedContentKey: null, wrappedMeta: null },
+      { id: 'mem', parentId: 'fold', kind: 'MEMORY' as TreeNode['kind'], orderIndex: 0, epoch: 0, name: 'Italy', wrappedContentKey: wrap(scopeKey, memKey), wrappedMeta: null },
+      { id: 'chap', parentId: 'mem', kind: 'CHAPTER' as TreeNode['kind'], orderIndex: 0, epoch: 0, name: 'Day 1', wrappedContentKey: wrap(memKey, chapKey), wrappedMeta: null },
     ]
-    expect(Array.from(nodeContentKey(scopeKey, tree, 'chap')!)).toEqual(Array.from(chapKey))
-    expect(Array.from(nodeContentKey(scopeKey, tree, 'mem')!)).toEqual(Array.from(memKey))
-    expect(nodeContentKey(scopeKey, tree, 'fold')).toBeNull() // a folder has no content key
+    expect(Array.from(nodeContentKey(epochsOf(scopeKey), tree, 'chap')!)).toEqual(Array.from(chapKey))
+    expect(Array.from(nodeContentKey(epochsOf(scopeKey), tree, 'mem')!)).toEqual(Array.from(memKey))
+    expect(nodeContentKey(epochsOf(scopeKey), tree, 'fold')).toBeNull() // a folder has no content key
   })
 })
 
@@ -89,7 +90,7 @@ describe('createFolder', () => {
   it('creates a keyless folder (no wrappedContentKey)', async () => {
     const create = vi.fn().mockResolvedValue({ nodeId: 'f1' })
     mockContent({ createNode: create })
-    await createFolder(SCOPE_ID, scopeKey, 'Trips')
+    await createFolder(SCOPE_ID, epochsOf(scopeKey), 'Trips')
     const req = create.mock.calls[0][0].createNodeRequest
     expect(req.kind).toBe('FOLDER')
     expect(req.wrappedContentKey).toBeUndefined()
@@ -104,7 +105,7 @@ describe('listTree', () => {
         { id: 'f1', parentId: null, kind: 'FOLDER', encryptedName, slugToken: 'x', orderIndex: 0 },
       ]),
     })
-    const tree = await listTree(SCOPE_ID, scopeKey)
+    const tree = await listTree(SCOPE_ID, epochsOf(scopeKey))
     expect(tree).toHaveLength(1)
     expect(tree[0].name).toBe('Trips')
     expect(tree[0].parentId).toBeNull()

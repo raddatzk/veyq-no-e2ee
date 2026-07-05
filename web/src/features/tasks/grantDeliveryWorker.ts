@@ -4,28 +4,18 @@
 // (`asymWrap(hybridPublic(target), K_SC, "scope-grant")` — the first wrap to a foreign identity in the client),
 // and completes; the backend writes the opaque ciphertext onto the target membership, idempotently. Delivery
 // is automatic and first-online-wins — the wrap runs on-device, the server only ever relays ciphertext.
-import * as v1 from '../../shared/crypto/v1'
-import { b64std, fromB64std } from '../../shared/base64'
 import { tasksApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import { SCOPE_GRANT } from '../spaces/scopes'
+import { wrapScopeKeyToMember } from '../spaces/grant'
 import { GRANT_DELIVERY } from './capabilityTags'
 import type { ClaimedJob } from '../../api/generated/tasks'
 
+// The foreign-identity wrap (ADR 0020) now lives in `../spaces/grant` (shared with rotation re-grants, cr-0089);
+// re-exported here so this worker + its test keep their existing import path.
+export { wrapScopeKeyToMember } from '../spaces/grant'
+
 /** Just what the worker needs from a cr-0075 opened scope: its id + the in-memory scope key `K_SC`. */
 export type ScopeKeyHolder = { scopeId: string; key: Uint8Array }
-
-/**
- * Wrap a scope key to another member's **published** identity public key — the one new crypto move (ADR 0020):
- * the same hybrid KEM + context as a self-grant, only the recipient pubkey is someone else's. Returns the
- * opaque base64 ciphertext to post as that member's `wrappedGrant`; the target opens it with their own identity
- * private on next entry (the unchanged self-unwrap path).
- */
-export function wrapScopeKeyToMember(scopeKey: Uint8Array, targetIdentityPublicKeyB64: string): string {
-  const pub = v1.deserializeIdentityPublic(fromB64std(targetIdentityPublicKeyB64))
-  const hybridPub: v1.HybridPublic = { x: pub.kemX, m: pub.kemM }
-  return b64std(v1.asymWrap(hybridPub, scopeKey, SCOPE_GRANT, { nonce: v1.randomBytes(12) }))
-}
 
 /**
  * Drain the grant-delivery jobs claimable for a single opened scope: claim → wrap `K_SC` to the target →

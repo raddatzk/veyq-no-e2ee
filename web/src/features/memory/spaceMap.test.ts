@@ -14,6 +14,7 @@ import { sealNodeMeta } from './nodeMeta'
 import type { MemoryLocation } from './memoryLocation'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
+import { epochsOf } from '../spaces/epochsTestUtil'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std } from '../../shared/base64'
 
@@ -41,11 +42,11 @@ function content(
   const key = v1.randomBytes(32)
   const wrappedContentKey = b64std(v1.symWrap(opts.wrapUnder ?? parentKey, key, KMEM_CTX, v1.randomBytes(12)))
   const wrappedMeta = opts.location ? sealNodeMeta(key, { v: 1, location: opts.location }) : null
-  return { node: { id, kind, parentId, orderIndex: 0, name: id, wrappedContentKey, wrappedMeta }, key }
+  return { node: { id, kind, parentId, orderIndex: 0, epoch: 0, name: id, wrappedContentKey, wrappedMeta }, key }
 }
 
 const folder = (id: string, parentId: string | null = null): TreeNode => ({
-  id, kind: NodeKind.Folder, parentId, orderIndex: 0, name: id, wrappedContentKey: null, wrappedMeta: null,
+  id, kind: NodeKind.Folder, parentId, orderIndex: 0, epoch: 0, name: id, wrappedContentKey: null, wrappedMeta: null,
 })
 
 const ids = (pins: ReturnType<typeof collectLocatedPins>) => pins.map((p) => p.node.id).sort()
@@ -68,11 +69,11 @@ describe('collectLocatedPins', () => {
   const tree: TreeNode[] = [fA, fB, memA.node, chapA.node, memB.node, memRoot.node, memPending.node, memLocked.node]
 
   it('root (null) pins every located MEMORY/CHAPTER across the whole tree', () => {
-    expect(ids(collectLocatedPins(scopeKey, tree, null))).toEqual(['chapA', 'memA', 'memB', 'memRoot'])
+    expect(ids(collectLocatedPins(epochsOf(scopeKey), tree, null))).toEqual(['chapA', 'memA', 'memB', 'memRoot'])
   })
 
   it('carries each pin its unsealed location with the derived position', () => {
-    const pins = collectLocatedPins(scopeKey, tree, null)
+    const pins = collectLocatedPins(epochsOf(scopeKey), tree, null)
     const pin = pins.find((p) => p.node.id === 'chapA')
     expect(pin?.location.derived).toEqual({ lat: 2, lng: 2 })
     expect(pin?.location.name).toBe('place-2')
@@ -80,16 +81,16 @@ describe('collectLocatedPins', () => {
 
   it('scopes to a folder subtree recursively — a sibling folder is excluded', () => {
     // rooted at fA: its Memory + nested chapter; memB (under fB) and the root nodes are out
-    expect(ids(collectLocatedPins(scopeKey, tree, 'fA'))).toEqual(['chapA', 'memA'])
-    expect(ids(collectLocatedPins(scopeKey, tree, 'fB'))).toEqual(['memB'])
+    expect(ids(collectLocatedPins(epochsOf(scopeKey), tree, 'fA'))).toEqual(['chapA', 'memA'])
+    expect(ids(collectLocatedPins(epochsOf(scopeKey), tree, 'fB'))).toEqual(['memB'])
   })
 
   it('skips a pending auto place (no derived ⇒ no pin)', () => {
-    expect(ids(collectLocatedPins(scopeKey, tree, null))).not.toContain('memPending')
+    expect(ids(collectLocatedPins(epochsOf(scopeKey), tree, null))).not.toContain('memPending')
   })
 
   it('skips a node whose key cannot be chained (best-effort, never a broken map)', () => {
-    expect(ids(collectLocatedPins(scopeKey, tree, null))).not.toContain('memLocked')
+    expect(ids(collectLocatedPins(epochsOf(scopeKey), tree, null))).not.toContain('memLocked')
   })
 })
 
@@ -97,7 +98,7 @@ describe('clusterPins', () => {
   // A trivial linear projection: 1 degree = 1 pixel, so pixel distance == degree distance (Leaflet-free).
   const project = (lat: number, lng: number) => ({ x: lng, y: lat })
   const pin = (id: string, lat: number, lng: number): LocatedPin => ({
-    node: { id, kind: NodeKind.Memory, name: id, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null },
+    node: { id, kind: NodeKind.Memory, name: id, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null },
     location: { name: id, nameSource: 'manual', derivedMode: 'fixed', derived: { lat, lng } },
     date: null,
   })
@@ -129,7 +130,7 @@ describe('clusterPins', () => {
 
 describe('sortPinsByStartDate', () => {
   const dated = (id: string, from?: string): LocatedPin => ({
-    node: { id, kind: NodeKind.Memory, name: id, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null },
+    node: { id, kind: NodeKind.Memory, name: id, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null },
     location: { name: id, nameSource: 'manual', derivedMode: 'fixed', derived: { lat: 0, lng: 0 } },
     date: from ? ({ mode: 'single', from, to: from } as MemoryDate) : null,
   })

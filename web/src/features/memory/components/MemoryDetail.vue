@@ -118,8 +118,9 @@ const dateLabel = computed(() => {
   if (d.mode === 'ongoing') return d.from ? t('memory.date.since', { day: formatDay(d.from, locale.value) }) : ''
   return formatClosedRange(d.from, d.to, locale.value)
 })
-// Chapters ordered by their own sealed start date — a chapter's K_mem opens under THIS Memory's K_mem (cr-0067).
-const datedChapters = computed(() => sortNodesByDate(props.memoryKey, props.chapters ?? []))
+// Chapters ordered by their own sealed start date — a chapter's K_mem opens under THIS Memory's K_mem (cr-0067),
+// epoch-independent (only the top-level wrap keys off the epoch), so every chapter resolves under the one memoryKey.
+const datedChapters = computed(() => sortNodesByDate(() => props.memoryKey, props.chapters ?? []))
 
 /** Save an edited date: re-seal under K_mem, PATCH via updateNode, and let the host update the tree. */
 async function onDateSave(date: MemoryDate) {

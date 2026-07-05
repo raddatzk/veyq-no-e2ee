@@ -70,7 +70,7 @@ const stubs = {
 }
 
 const pin = (id: string, name: string, lat: number, lng: number): LocatedPin => ({
-  node: { id, name, kind: NodeKind.Memory, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null },
+  node: { id, name, kind: NodeKind.Memory, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null },
   location: { name: `${name} place`, nameSource: 'manual', derivedMode: 'fixed', derived: { lat, lng } },
   date: null,
 })

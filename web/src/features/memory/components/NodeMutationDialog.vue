@@ -15,6 +15,7 @@ import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import { createFolder, createMemory, createChapter, renameNode, type TreeNode } from '../tree'
+import type { EpochKeys } from '../../spaces/epochs'
 import { useMapConfig } from '../../../shared/state/useMapConfig'
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
@@ -23,7 +24,7 @@ type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 const props = defineProps<{
   mode: Mode
   scopeId: string
-  scopeKey: Uint8Array
+  epochs: EpochKeys // the scope's epoch key set (ADR 0024): create seals under the write epoch, rename under the node's own
   parentId?: string | null // create: the parent (null = root)
   parentKey?: Uint8Array | null // create-chapter: the parent node's K_mem (wraps the new chapter's K_mem)
   node?: TreeNode | null // rename: the node being renamed
@@ -57,15 +58,15 @@ async function submit() {
   try {
     const trimmed = name.value.trim()
     if (props.mode === 'create-folder') {
-      await createFolder(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null)
+      await createFolder(props.scopeId, props.epochs, trimmed, props.parentId ?? null)
     } else if (props.mode === 'create-memory') {
       const location = showLocationStep.value && wantsLocation.value ? { name: '', nameSource: 'geocoded' as const, derivedMode: 'auto' as const } : null
-      await createMemory(props.scopeId, props.scopeKey, trimmed, props.parentId ?? null, location)
+      await createMemory(props.scopeId, props.epochs, trimmed, props.parentId ?? null, location)
     } else if (props.mode === 'create-chapter') {
       if (!props.parentId || !props.parentKey) throw new Error('chapter_parent_missing')
-      await createChapter(props.scopeId, props.scopeKey, props.parentKey, trimmed, props.parentId)
+      await createChapter(props.scopeId, props.epochs, props.parentKey, trimmed, props.parentId)
     } else if (props.node) {
-      await renameNode(props.scopeId, props.scopeKey, { id: props.node.id, parentId: props.node.parentId }, trimmed)
+      await renameNode(props.scopeId, props.epochs, { id: props.node.id, parentId: props.node.parentId, epoch: props.node.epoch }, trimmed)
     }
     emit('done')
     emit('close')

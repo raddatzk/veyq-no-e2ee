@@ -2,7 +2,7 @@
 // plaintext node names (decrypted on device) — never key material (K_SC lives in app/activeSpace). Mutations
 // (create/rename/delete) call `loadTree()` to refresh.
 import { reactive } from 'vue'
-import { activeSpace, activeScopeKey } from '../../app/activeSpace'
+import { activeSpace, activeEpochKeys } from '../../app/activeSpace'
 import { listTree, type TreeNode } from './tree'
 
 export const treeStore = reactive({
@@ -13,10 +13,10 @@ export const treeStore = reactive({
 
 /** (Re)load the active scope's tree. No-op if no space is open. */
 export async function loadTree(): Promise<void> {
-  const key = activeScopeKey()
-  if (!activeSpace.scopeId || !key) return
+  const epochs = activeEpochKeys()
+  if (!activeSpace.scopeId || !epochs) return
   try {
-    treeStore.nodes = await listTree(activeSpace.scopeId, key)
+    treeStore.nodes = await listTree(activeSpace.scopeId, epochs)
     treeStore.loaded = true
     treeStore.error = false
   } catch {

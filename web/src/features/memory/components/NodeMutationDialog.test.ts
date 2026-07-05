@@ -13,6 +13,7 @@ vi.mock('../geocode', () => ({ reverseGeocode: vi.fn() }))
 
 import NodeMutationDialog from './NodeMutationDialog.vue'
 import { createFolder, createMemory, renameNode } from '../tree'
+import { epochsOf } from '../../spaces/epochsTestUtil'
 import { setMapsConsent, setTileUrl, setGeocoderUrl } from '../../../shared/state/useMapConfig'
 
 const i18n = createI18n({
@@ -48,10 +49,11 @@ const stubs = {
 
 const SCOPE = '11111111-1111-1111-1111-111111111111'
 const KEY = new Uint8Array(32).fill(7)
+const EPOCHS = epochsOf(KEY)
 
 function mountDialog(props: Record<string, unknown>) {
   return mount(NodeMutationDialog, {
-    props: { scopeId: SCOPE, scopeKey: KEY, ...props } as never,
+    props: { scopeId: SCOPE, epochs: EPOCHS, ...props } as never,
     global: { plugins: [i18n], stubs },
   })
 }
@@ -70,7 +72,7 @@ describe('NodeMutationDialog', () => {
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
 
-    expect(createFolder).toHaveBeenCalledWith(SCOPE, KEY, 'Trips', 'parent-1')
+    expect(createFolder).toHaveBeenCalledWith(SCOPE, EPOCHS, 'Trips', 'parent-1')
     expect(wrapper.emitted('done')).toBeTruthy()
     expect(wrapper.emitted('close')).toBeTruthy()
   })
@@ -81,17 +83,17 @@ describe('NodeMutationDialog', () => {
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
     // maps opt-in is off in this test's i18n/config → no location step shown, location arg is null
-    expect(createMemory).toHaveBeenCalledWith(SCOPE, KEY, 'Italy', null, null)
+    expect(createMemory).toHaveBeenCalledWith(SCOPE, EPOCHS, 'Italy', null, null)
   })
 
   it('rename calls renameNode with the node id + parent', async () => {
-    const node = { id: 'n9', parentId: 'p1', kind: 'FOLDER', name: 'Old', orderIndex: 0, wrappedContentKey: null, wrappedMeta: null }
+    const node = { id: 'n9', parentId: 'p1', kind: 'FOLDER', name: 'Old', orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null }
     const wrapper = mountDialog({ mode: 'rename', node })
     expect((wrapper.find('input').element as HTMLInputElement).value).toBe('Old') // prefilled
     await wrapper.find('input').setValue('New')
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
-    expect(renameNode).toHaveBeenCalledWith(SCOPE, KEY, { id: 'n9', parentId: 'p1' }, 'New')
+    expect(renameNode).toHaveBeenCalledWith(SCOPE, EPOCHS, { id: 'n9', parentId: 'p1', epoch: 0 }, 'New')
   })
 
   it('the maps opt-in arms a PENDING auto location (position + name land with the first media)', async () => {
@@ -102,7 +104,7 @@ describe('NodeMutationDialog', () => {
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
 
-    expect(createMemory).toHaveBeenCalledWith(SCOPE, KEY, 'Climbing 2026', null, AUTO_PENDING)
+    expect(createMemory).toHaveBeenCalledWith(SCOPE, EPOCHS, 'Climbing 2026', null, AUTO_PENDING)
   })
 
   it('leaving the opt-in unchecked creates the Memory with no location', async () => {
@@ -112,7 +114,7 @@ describe('NodeMutationDialog', () => {
     await wrapper.find('form').trigger('submit')
     await Promise.resolve()
 
-    expect(createMemory).toHaveBeenCalledWith(SCOPE, KEY, 'Trip', null, null)
+    expect(createMemory).toHaveBeenCalledWith(SCOPE, EPOCHS, 'Trip', null, null)
   })
 
   it('maps a 409 to the slug-taken message and stays open', async () => {

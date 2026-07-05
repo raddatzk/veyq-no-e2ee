@@ -6,7 +6,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { activeSpace, activeScopeKey, enterScope } from '../app/activeSpace'
+import { activeSpace, activeEpochKeys, enterScope } from '../app/activeSpace'
 import { setBreadcrumb } from '../app/breadcrumb'
 import { isFavorite, toggleFavorite, loadFavoritesFor, favoritesStore } from '../app/favoritesStore'
 import { treeStore, loadTree, patchNodeMeta } from '../features/memory/treeStore'
@@ -41,13 +41,16 @@ const currentFolder = computed(() =>
   currentNode.value && currentNode.value.kind === NodeKind.Folder ? currentNode.value : null,
 )
 const level = computed(() => childrenOf(treeStore.nodes, currentNodeId.value))
-// Depend on the reactive status so the computed re-evaluates once the key is set (the key fn isn't reactive).
-const scopeKey = computed(() => (activeSpace.status === 'ready' ? activeScopeKey() : null))
-// The open node's K_mem, resolved by walking the content-key chain from K_SC (a chapter's key is wrapped under
-// its parent Memory's K_mem, recursive K_mem; held on device — the server is blind).
+// The full **epoch key set** (ADR 0024) — a read opens each node under its own epoch, new content seals under the
+// write epoch. Threaded through the browse + mutation children in place of a single scope key. `activeEpochKeys()`
+// isn't reactive, so depend on BOTH `status` (keys set on scope entry) and `epoch` (keys swapped on a rotation
+// without a status flip, `refreshActiveScope`) — else a post-rotation create would seal under the stale/zeroed key.
+const epochs = computed(() => (activeSpace.status === 'ready' && activeSpace.epoch >= 0 ? activeEpochKeys() : null))
+// The open node's K_mem, resolved by walking the content-key chain (the top-level Memory opens under its own
+// epoch's K_SC, a chapter under its parent Memory's K_mem, recursive K_mem; held on device — the server is blind).
 const memoryKey = computed(() =>
-  isOpenable.value && currentNodeId.value && scopeKey.value
-    ? nodeContentKey(scopeKey.value, treeStore.nodes, currentNodeId.value)
+  isOpenable.value && currentNodeId.value && epochs.value
+    ? nodeContentKey(epochs.value, treeStore.nodes, currentNodeId.value)
     : null,
 )
 
@@ -93,16 +96,16 @@ watch(
 async function reenter(scope: string) {
   await enterScope(scope)
   if (activeSpace.status === 'ready' && !treeStore.loaded) await loadTree()
-  const key = activeScopeKey()
-  if (activeSpace.status === 'ready' && activeSpace.scopeId && key && !favoritesStore.loaded) {
-    await loadFavoritesFor(activeSpace.scopeId, key)
+  const eks = activeEpochKeys()
+  if (activeSpace.status === 'ready' && activeSpace.scopeId && eks && !favoritesStore.loaded) {
+    await loadFavoritesFor(activeSpace.scopeId, eks)
   }
 }
 watch(currentScope, (scope) => void reenter(scope), { immediate: true })
 
 function onToggleFavorite(node: TreeNode) {
-  const key = activeScopeKey()
-  if (activeSpace.scopeId && key) void toggleFavorite(node.id, activeSpace.scopeId, key)
+  const eks = activeEpochKeys()
+  if (activeSpace.scopeId && eks) void toggleFavorite(node.id, activeSpace.scopeId, eks)
 }
 
 function openFolder(folder: TreeNode) {
@@ -170,7 +173,7 @@ async function onDeleteDone() {
         :folder="currentFolder"
         :folders="level.folders"
         :memories="level.memories"
-        :scope-key="scopeKey"
+        :epochs="epochs"
         @open-folder="openFolder"
         @open-memory="openMemory"
         @toggle-favorite="onToggleFavorite"
@@ -182,10 +185,10 @@ async function onDeleteDone() {
     </template>
 
     <NodeMutationDialog
-      v-if="mutationVisible && scopeKey && activeSpace.scopeId"
+      v-if="mutationVisible && epochs && activeSpace.scopeId"
       :mode="mutationMode"
       :scope-id="activeSpace.scopeId"
-      :scope-key="scopeKey"
+      :epochs="epochs"
       :parent-id="currentNodeId"
       :parent-key="memoryKey"
       :node="mutationNode"
@@ -193,7 +196,7 @@ async function onDeleteDone() {
       @close="mutationVisible = false"
     />
     <DeleteNodeDialog
-      v-if="deleteVisible && scopeKey && activeSpace.scopeId && deleteTarget"
+      v-if="deleteVisible && epochs && activeSpace.scopeId && deleteTarget"
       :scope-id="activeSpace.scopeId"
       :node="deleteTarget"
       @done="onDeleteDone"

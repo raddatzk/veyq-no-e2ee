@@ -5,10 +5,11 @@
 // (operator-blind: `K_SC` is derived on-device) and resets the per-scope tree + favorites.
 import { reactive } from 'vue'
 import { ensurePersonalScope, openScope, openScopeById, type OpenedScope } from '../features/spaces/scopes'
+import { zeroEpochKeys, type EpochKeys } from '../features/spaces/epochs'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
-import { resetTree } from '../features/memory/treeStore'
-import { clearFavorites } from './favoritesStore'
+import { resetTree, loadTree } from '../features/memory/treeStore'
+import { clearFavorites, loadFavoritesFor } from './favoritesStore'
 import { startGrantDeliveryPolling, stopGrantDeliveryPolling } from '../features/tasks/grantDeliveryPolling'
 
 export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
@@ -21,16 +22,28 @@ export const activeSpace = reactive({
   kind: null as ScopeKind | null,
   // The active scope's decrypted display name — a GROUP's name (cr-0032); null for the anonymous tenant/personal.
   name: null as string | null,
+  // The write epoch (ADR 0024): a **reactive** mirror of `activeEpochKeys().current`. The key bytes stay outside
+  // reactivity, but views need a reactive signal to re-read the keys after a rotation (`refreshActiveScope`) that
+  // doesn't flip `status` — a `computed` over `activeEpochKeys()` must depend on THIS so it recomputes on rotate.
+  epoch: 0,
   // The token-less tenant home resolved to Personal because the caller holds no TENANT grant (ADR 0019, E1).
   tenantUnavailable: false,
 })
 
-// K_SC is held outside the reactive proxy on purpose — key material must not flow through Vue reactivity.
+// The scope's epoch keys are held outside the reactive proxy on purpose — key material must not flow through Vue
+// reactivity. `scopeKey` is the **write key** (E_current); `epochKeys` carries the full peeled chain for reads.
 let scopeKey: Uint8Array | null = null
+let epochKeys: EpochKeys | null = null
 
-/** The active scope content key `K_SC`, or null when no space is open. The caller must not mutate it. */
+/** The active scope's **write key** `E_current` (seals new content), or null when no space is open. Don't mutate. */
 export function activeScopeKey(): Uint8Array | null {
   return scopeKey
+}
+
+/** The active scope's full **epoch key set** (ADR 0024) — a per-epoch lookup so a read opens a node under its own
+ *  epoch key. Null when no space is open. The caller must not mutate or zero it (activeSpace owns its lifetime). */
+export function activeEpochKeys(): EpochKeys | null {
+  return epochKeys
 }
 
 /**
@@ -67,8 +80,10 @@ export async function enterScope(token: string): Promise<void> {
       activeSpace.status = 'error'
       return
     }
-    scopeKey?.fill(0) // zero the key we held for the scope we're leaving
-    scopeKey = opened.key
+    if (epochKeys) zeroEpochKeys(epochKeys) // zero every epoch key we held for the scope we're leaving (incl. the write key)
+    epochKeys = opened.epochs
+    scopeKey = opened.key // the write key = E_current, a reference into `epochKeys` (zeroed together above)
+    activeSpace.epoch = opened.epochs.current // reactive signal so key-reading computeds re-run for the new scope
     activeSpace.scopeId = opened.scopeId
     activeSpace.tenantId = opened.tenantId
     activeSpace.kind = opened.kind
@@ -86,6 +101,28 @@ export async function enterScope(token: string): Promise<void> {
   }
 }
 
+/**
+ * Re-open the **currently active** scope's grant to pick up a fresh epoch (ADR 0024, cr-0089). Call after a
+ * rotation of the active scope (e.g. the owner removed a member): the caller's grant now carries `E_{n+1}`, so
+ * this swaps in the new epoch keys — new content then seals under `E_{n+1}`, not the stale `E_n` — and reloads the
+ * tree + favorites. No-op when no scope is open or the re-open fails (the stale keys are kept rather than dropped).
+ */
+export async function refreshActiveScope(): Promise<void> {
+  if (!activeSpace.scopeId) return
+  const opened = await openScopeById(activeSpace.scopeId)
+  if (!opened) return
+  if (epochKeys) zeroEpochKeys(epochKeys)
+  epochKeys = opened.epochs
+  scopeKey = opened.key
+  activeSpace.epoch = opened.epochs.current // bump the reactive signal → key-reading computeds re-run under E_{n+1}
+  activeSpace.name = opened.name ?? null
+  resetTree()
+  clearFavorites()
+  await loadTree()
+  const eks = activeEpochKeys()
+  if (eks) await loadFavoritesFor(activeSpace.scopeId, eks)
+}
+
 /** Drop the active space + zero the held key (logout / re-lock). */
 export function clearActiveSpace(): void {
   stopGrantDeliveryPolling()
@@ -94,8 +131,10 @@ export function clearActiveSpace(): void {
   activeSpace.tenantId = null
   activeSpace.kind = null
   activeSpace.name = null
+  activeSpace.epoch = 0
   activeSpace.tenantUnavailable = false
-  scopeKey?.fill(0)
+  if (epochKeys) zeroEpochKeys(epochKeys)
+  epochKeys = null
   scopeKey = null
   clearFavorites()
 }

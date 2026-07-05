@@ -4,6 +4,7 @@ import { session } from '../../app/session'
 import { login } from '../account/login/login'
 import { unlockMasterKey } from '../account/unlock/unlock'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../spaces/scopes'
+import { epochsOf } from '../spaces/epochsTestUtil'
 import { createMemory } from './tree'
 import { addMedia, listMedia, openOriginal } from './media'
 import { ScopeKind } from '../../api/generated/scopes'
@@ -51,7 +52,7 @@ describe.skipIf(!process.env.VEYQ_E2E)('media e2e (live, direct-to-store)', () =
     const scopeKey = (await openPersonalScope())!
     expect(scopeKey).toBeTruthy()
 
-    const { nodeId, memoryKey } = await createMemory(scopeId, scopeKey, `E2E media ${Date.now()}`)
+    const { nodeId, memoryKey } = await createMemory(scopeId, epochsOf(scopeKey), `E2E media ${Date.now()}`)
 
     const data = new Uint8Array(300 * 1024)
     for (let i = 0; i < data.length; i++) data[i] = (i * 17 + 3) & 0xff

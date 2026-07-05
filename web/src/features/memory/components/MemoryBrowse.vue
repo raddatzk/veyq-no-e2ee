@@ -9,6 +9,7 @@ import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import { nodeContentKey, type TreeNode } from '../tree'
+import { keyAt, type EpochKeys } from '../../spaces/epochs'
 import { sortNodesByDate } from '../memoryDate'
 import { nodeById } from '../browse'
 import { treeStore } from '../treeStore'
@@ -21,8 +22,9 @@ import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import SpaceMap from './SpaceMap.vue'
 
-// `scopeKey` (K_SC) unseals each Memory's sealed date for the card + the date-sort; null (locked) ⇒ no dates.
-const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; scopeKey?: Uint8Array | null }>()
+// `epochs` (the scope's epoch key set, ADR 0024) unseals each Memory's sealed date/cover/pins under its own epoch's
+// K_SC — a rotated scope mixes epochs across the grid; null (locked) ⇒ no dates/covers/pins.
+const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; epochs?: EpochKeys | null }>()
 const emit = defineEmits<{
   openFolder: [folder: TreeNode]
   openMemory: [memory: TreeNode]
@@ -36,13 +38,16 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { viewMode } = useViewMode()
 
-// Memories ordered by their sealed start date (newest first, undated last) — read from wrappedMeta, no media load.
-const datedMemories = computed(() => sortNodesByDate(props.scopeKey ?? null, props.memories))
+// Memories ordered by their sealed start date (newest first, undated last) — each opened under its own epoch's
+// K_SC (a top-level Memory's K_mem wraps under E_{node.epoch}); read from wrappedMeta, no media load.
+const datedMemories = computed(() =>
+  sortNodesByDate((node) => (props.epochs ? keyAt(props.epochs, node.epoch) : null), props.memories),
+)
 
 // The Karte pins: every located node in this folder's subtree (or the whole space at root), unsealed on device
 // from the wrappedMeta `listNodes` already returned (operator-blind — no locations API). Locked ⇒ no pins.
 const pins = computed(() =>
-  props.scopeKey ? collectLocatedPins(props.scopeKey, treeStore.nodes, props.folder?.id ?? null) : [],
+  props.epochs ? collectLocatedPins(props.epochs, treeStore.nodes, props.folder?.id ?? null) : [],
 )
 
 /** A pin click carries a node id — resolve it to the TreeNode and open it, exactly like a card click. */
@@ -67,13 +72,13 @@ function revokeCovers() {
 /** Resolve the chosen cover for the currently-visible nodes — the card grid's Memories, or the map's pins —
  *  decrypting the chosen media's thumbnail on device (best-effort, parallel), cached so a settled node isn't redone. */
 function syncCovers() {
-  if (!activeSpace.scopeId || !props.scopeKey) return
+  if (!activeSpace.scopeId || !props.epochs) return
   const scopeId = activeSpace.scopeId
-  const scopeKey = props.scopeKey
+  const epochs = props.epochs
   const nodes = viewMode.value === 'map' ? pins.value.map((pin) => pin.node) : props.memories
   for (const node of nodes) {
     if (coverTried.has(node.id)) continue
-    const nodeKey = nodeContentKey(scopeKey, treeStore.nodes, node.id)
+    const nodeKey = nodeContentKey(epochs, treeStore.nodes, node.id)
     if (!nodeKey) continue // K_mem not openable yet (e.g. still unlocking) — leave un-tried so a later pass retries
     coverTried.add(node.id)
     void loadNodeCover(scopeId, nodeKey, node).then((cover) => {

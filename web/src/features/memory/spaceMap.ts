@@ -9,6 +9,7 @@
 // first upload materializes it. Folders carry no location and are never pinned.
 import { NodeKind } from '../../api/generated/content'
 import { nodeContentKey, type TreeNode } from './tree'
+import type { EpochKeys } from '../spaces/epochs'
 import { unsealMemoryLocation, type MemoryLocation } from './memoryLocation'
 import { unsealMemoryDate, type MemoryDate } from './memoryDate'
 
@@ -69,11 +70,12 @@ function inSubtree(byId: Map<string, TreeNode>, nodeId: string, rootFolderId: st
 /**
  * Collect the located pins for the subtree of `rootFolderId` (or the whole tree at the scope root, `null`): every
  * MEMORY/CHAPTER in that subtree whose `location` unseals to a `derived` position, each opened under its own
- * `nodeContentKey(scopeKey, tree, id)`. Best-effort — a node with no meta, an unresolvable key, or a pending
- * (`derived`-less) location is skipped. The result feeds `SpaceMap.vue` (a marker per pin, click → open the node).
+ * `nodeContentKey(epochs, tree, id)` (which resolves the top-level Memory under its epoch's `K_SC`, ADR 0024).
+ * Best-effort — a node with no meta, an unresolvable key, or a pending (`derived`-less) location is skipped. The
+ * result feeds `SpaceMap.vue` (a marker per pin, click → open the node).
  */
 export function collectLocatedPins(
-  scopeKey: Uint8Array,
+  epochs: EpochKeys,
   tree: TreeNode[],
   rootFolderId: string | null,
 ): LocatedPin[] {
@@ -87,7 +89,7 @@ export function collectLocatedPins(
     let location: MemoryLocation | null
     let date: MemoryDate | null = null
     try {
-      const nodeKey = nodeContentKey(scopeKey, tree, node.id)
+      const nodeKey = nodeContentKey(epochs, tree, node.id)
       if (!nodeKey) continue // unchainable key — skip, never break the map
       location = unsealMemoryLocation(nodeKey, node)
       date = unsealMemoryDate(nodeKey, node) // same K_mem, same blob — free alongside the location

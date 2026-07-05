@@ -14,6 +14,7 @@ import { setViewMode } from '../../../shared/state/useViewMode'
 import { sealNodeMeta } from '../nodeMeta'
 import type { MemoryLocation } from '../memoryLocation'
 import type { TreeNode } from '../tree'
+import { epochsOf } from '../../spaces/epochsTestUtil'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64std } from '../../../shared/base64'
 
@@ -33,7 +34,7 @@ const SpaceMapStub = {
 }
 
 const node = (id: string, kind: NodeKind, name: string): TreeNode => ({
-  id, kind, name, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null,
+  id, kind, name, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null,
 })
 
 const scopeKey = v1.randomBytes(32)
@@ -43,7 +44,7 @@ const located = (lat: number, lng: number): MemoryLocation => ({ name: `p-${lat}
 function locatedMemory(id: string, parentId: string | null, loc: MemoryLocation): TreeNode {
   const key = v1.randomBytes(32)
   return {
-    id, kind: NodeKind.Memory, name: id, parentId, orderIndex: 0,
+    id, kind: NodeKind.Memory, name: id, parentId, orderIndex: 0, epoch: 0,
     wrappedContentKey: b64std(v1.symWrap(scopeKey, key, 'content-key', v1.randomBytes(12))),
     wrappedMeta: sealNodeMeta(key, { v: 1, location: loc }),
   }
@@ -86,7 +87,7 @@ describe('MemoryBrowse', () => {
     treeStore.nodes = [node('fA', NodeKind.Folder, 'A'), memInA, memRoot]
     setViewMode('map')
 
-    const wrapper = mountBrowse({ folder: null, folders: [], memories: [memRoot], scopeKey })
+    const wrapper = mountBrowse({ folder: null, folders: [], memories: [memRoot], epochs: epochsOf(scopeKey) })
 
     // the card grids are gone, the map is shown
     expect(wrapper.find('.memory-card-grid').exists()).toBe(false)
@@ -102,7 +103,7 @@ describe('MemoryBrowse', () => {
     treeStore.nodes = [fA, node('fB', NodeKind.Folder, 'B'), memInA, memInB]
     setViewMode('map')
 
-    const wrapper = mountBrowse({ folder: fA, folders: [], memories: [], scopeKey })
+    const wrapper = mountBrowse({ folder: fA, folders: [], memories: [], epochs: epochsOf(scopeKey) })
     const map = wrapper.findComponent(SpaceMapStub)
     expect((map.props('pins') as { node: TreeNode }[]).map((p) => p.node.id)).toEqual(['memInA'])
   })
@@ -112,7 +113,7 @@ describe('MemoryBrowse', () => {
     treeStore.nodes = [memRoot]
     setViewMode('map')
 
-    const wrapper = mountBrowse({ folder: null, folders: [], memories: [memRoot], scopeKey })
+    const wrapper = mountBrowse({ folder: null, folders: [], memories: [memRoot], epochs: epochsOf(scopeKey) })
     wrapper.findComponent(SpaceMapStub).vm.$emit('open', 'memRoot')
     await wrapper.vm.$nextTick()
 

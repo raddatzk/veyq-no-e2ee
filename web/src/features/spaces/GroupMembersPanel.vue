@@ -11,7 +11,9 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { listScopeMembers, addGroupMember, setMemberRole, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
+import { listScopeMembers, addGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
+import { rotateGroupForRemoval } from './scopes'
+import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
@@ -23,12 +25,15 @@ const router = useRouter()
 
 const members = ref<ScopeMember[]>([])
 const isOwner = ref(false)
+const myUsername = ref('')
 const loading = ref(true)
 const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const username = ref('')
 const addError = ref('')
 const adding = ref(false)
 const actionError = ref('')
+const pendingRemove = ref<string | null>(null) // userId shown in inline "remove?" confirm (destructive → rotates)
+const removing = ref(false)
 
 // Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
 const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
@@ -49,6 +54,7 @@ async function load() {
     // My group role isn't the tenant role — derive it from the directory by matching my per-tenant username.
     const [rows, me] = await Promise.all([listScopeMembers(props.scopeId), getMyProfile().catch(() => null)])
     members.value = rows
+    myUsername.value = me?.username ?? ''
     isOwner.value = !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER')
   } catch (e) {
     const { status } = await memberError(e)
@@ -101,6 +107,34 @@ async function changeRole(m: ScopeMember, role: SetMemberRoleRequestRoleEnum) {
           : t('groups.roleChangeFailed')
   }
 }
+
+// Remove a member (cr-0089) — the cryptographic removal: delete the membership, then **rotate the scope key
+// forward** and re-grant the remaining members (ADR 0024), so the ex-member reads pre-removal content but never
+// post-removal content. Owner-only; last-owner guarded server-side. If the rotated group is the active browsing
+// scope, refresh its epoch keys so the owner's next new content seals under the fresh epoch, not the stale one.
+async function removeMember(m: ScopeMember) {
+  actionError.value = ''
+  removing.value = true
+  try {
+    await removeGroupMember(props.scopeId, m.userId)
+    const remaining = await listScopeMembers(props.scopeId)
+    await rotateGroupForRemoval(props.scopeId, remaining)
+    members.value = remaining
+    if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value =
+      code === 'last_owner'
+        ? t('groups.lastOwner')
+        : code === 'not_scope_owner'
+          ? t('members.notOwner')
+          : t('groups.removeMemberFailed')
+  } finally {
+    removing.value = false
+    pendingRemove.value = null
+  }
+}
 </script>
 
 <template>
@@ -146,9 +180,29 @@ async function changeRole(m: ScopeMember, role: SetMemberRoleRequestRoleEnum) {
                 </span>
               </div>
             </div>
-            <!-- Owner-only role controls (cr-0088): promote a member to co-owner, or demote a co-owner. The
-                 last-owner guard is enforced server-side. Remove + rotation land in cr-0089. -->
-            <div v-if="isOwner" class="management-actions">
+            <!-- Owner-only controls (cr-0088/0089): promote a member to co-owner, demote a co-owner, or remove a
+                 member. Remove is destructive (rotates the scope key forward) so it takes an inline confirm. The
+                 last-owner guard is enforced server-side. You can't remove yourself here. -->
+            <div v-if="isOwner && pendingRemove === m.userId" class="management-actions">
+              <span class="settings-muted remove-confirm-label">{{ t('groups.removeConfirm') }}</span>
+              <Button
+                :label="t('groups.removeConfirmYes')"
+                icon="pi pi-user-minus"
+                severity="danger"
+                size="small"
+                :loading="removing"
+                @click="removeMember(m)"
+              />
+              <Button
+                :label="t('common.cancel')"
+                severity="secondary"
+                outlined
+                size="small"
+                :disabled="removing"
+                @click="pendingRemove = null"
+              />
+            </div>
+            <div v-else-if="isOwner" class="management-actions">
               <Button
                 v-if="m.role === 'MEMBER'"
                 :label="t('groups.promote')"
@@ -166,6 +220,15 @@ async function changeRole(m: ScopeMember, role: SetMemberRoleRequestRoleEnum) {
                 outlined
                 size="small"
                 @click="changeRole(m, SetMemberRoleRequestRoleEnum.Member)"
+              />
+              <Button
+                v-if="m.username !== myUsername"
+                :label="t('groups.remove')"
+                icon="pi pi-user-minus"
+                severity="danger"
+                outlined
+                size="small"
+                @click="pendingRemove = m.userId"
               />
             </div>
           </div>

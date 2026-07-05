@@ -4,6 +4,7 @@ import { session } from '../../app/session'
 import { login } from '../account/login/login'
 import { unlockMasterKey } from '../account/unlock/unlock'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../spaces/scopes'
+import { epochsOf } from '../spaces/epochsTestUtil'
 import { ScopeKind } from '../../api/generated/scopes'
 import { createMemory, listTree } from './tree'
 import { setMemoryDate, unsealMemoryDate } from './memoryDate'
@@ -47,11 +48,11 @@ describe.skipIf(!process.env.VEYQ_E2E)('memory cover e2e (live, operator-blind r
     const scopeKey = (await openPersonalScope())!
     expect(scopeKey).toBeTruthy()
 
-    const { nodeId, memoryKey } = await createMemory(scopeId, scopeKey, `Cover smoke ${Date.now()}`)
+    const { nodeId, memoryKey } = await createMemory(scopeId, epochsOf(scopeKey), `Cover smoke ${Date.now()}`)
 
     // Read back the node's SERVER-persisted wrappedMeta (operator-blind — decrypted here under K_mem).
     const readBack = async () => {
-      const node = (await listTree(scopeId, scopeKey)).find((n) => n.id === nodeId)
+      const node = (await listTree(scopeId, epochsOf(scopeKey))).find((n) => n.id === nodeId)
       expect(node).toBeDefined()
       return node!
     }

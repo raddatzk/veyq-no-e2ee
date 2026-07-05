@@ -4,6 +4,7 @@ import { session } from '../../app/session'
 import { login } from '../account/login/login'
 import { unlockMasterKey } from '../account/unlock/unlock'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../spaces/scopes'
+import { epochsOf } from '../spaces/epochsTestUtil'
 import { createMemory, listTree, openContentKey } from './tree'
 import { setMemoryDate, unsealMemoryDate } from './memoryDate'
 import { setMemoryLocation, unsealMemoryLocation, computeMedoid } from './memoryLocation'
@@ -48,7 +49,7 @@ describe.skipIf(!process.env.VEYQ_E2E)('memory location e2e (live, operator-blin
     const scopeKey = (await openPersonalScope())!
 
     // --- a Memory with a date, then a location set on it ---
-    const { nodeId, memoryKey } = await createMemory(scopeId, scopeKey, `E2E place ${Date.now()}`)
+    const { nodeId, memoryKey } = await createMemory(scopeId, epochsOf(scopeKey), `E2E place ${Date.now()}`)
     const date = { mode: 'range' as const, from: '2026-05-01', to: '2026-05-09' }
     let meta = await setMemoryDate(scopeId, nodeId, memoryKey, date, null)
 
@@ -75,7 +76,7 @@ describe.skipIf(!process.env.VEYQ_E2E)('memory location e2e (live, operator-blin
     }, meta)
 
     // re-fetch from the server: the location AND the date both unseal (RMW kept the sibling)
-    const fetched = (await listTree(scopeId, scopeKey)).find((n) => n.id === nodeId)!
+    const fetched = (await listTree(scopeId, epochsOf(scopeKey))).find((n) => n.id === nodeId)!
     const key = openContentKey(scopeKey, fetched)!
     expect(unsealMemoryLocation(key, fetched)?.name).toBe(name)
     expect(unsealMemoryDate(key, fetched)).toEqual(date)
@@ -92,10 +93,10 @@ describe.skipIf(!process.env.VEYQ_E2E)('memory location e2e (live, operator-blin
     expect(unsealMemoryDate(memoryKey, { wrappedMeta: removed })).toEqual(date)
 
     // --- pre-arm an auto location at creation (no derived yet) ---
-    const born = await createMemory(scopeId, scopeKey, `E2E prearm ${Date.now()}`, null, {
+    const born = await createMemory(scopeId, epochsOf(scopeKey), `E2E prearm ${Date.now()}`, null, {
       name: 'Boulder gym', nameSource: 'manual', derivedMode: 'auto',
     })
-    const bornNode = (await listTree(scopeId, scopeKey)).find((n) => n.id === born.nodeId)!
+    const bornNode = (await listTree(scopeId, epochsOf(scopeKey))).find((n) => n.id === born.nodeId)!
     const bornLoc = unsealMemoryLocation(born.memoryKey, bornNode)
     expect(bornLoc).toEqual({ name: 'Boulder gym', nameSource: 'manual', derivedMode: 'auto', derived: undefined, nameAnchor: undefined })
   })

@@ -7,15 +7,28 @@ import { scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { identityPrivate } from '../../app/vault'
 import { sealName, openName } from '../memory/tree'
-import { ScopeKind, type ScopeSummary, type MyTenant } from '../../api/generated/scopes'
+import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type EpochKeys } from './epochs'
+import { SCOPE_GRANT, wrapScopeKeyToMember } from './grant'
+import { ScopeKind, type ScopeSummary, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 
-/** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020). Shared with the grant-delivery worker, which
- *  wraps `K_SC` to a *foreign* identity under the very same context (cr-0076). */
-export const SCOPE_GRANT = 'scope-grant'
+/** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020), re-exported for back-compat — its home is now
+ *  {@link ./grant}, shared with the grant-delivery worker (cr-0076) + rotation re-grants (cr-0089). */
+export { SCOPE_GRANT } from './grant'
 
 /** The caller's scopes in the active tenant (each with their own grant ciphertext). */
 export async function listMyScopes(): Promise<ScopeSummary[]> {
   return withRefresh(() => scopesApi().listMyScopes())
+}
+
+/** A scope's epoch-chain links (ADR 0024, cr-0089) — so a member peels the chain to read older epochs. */
+export async function listScopeEpochs(scopeId: string): Promise<{ epoch: number; wrappedPrev: string }[]> {
+  return withRefresh(() => scopesApi().listScopeEpochs({ scopeId }))
+}
+
+/** Peel the scope's epoch chain from the caller's grant key down to E_0 (ADR 0024). No fetch when unrotated. */
+async function epochKeysFor(scope: ScopeSummary, grantKey: Uint8Array): Promise<EpochKeys> {
+  const links = scope.grantedEpoch > 0 ? await listScopeEpochs(scope.id) : []
+  return deriveEpochKeys(grantKey, scope.grantedEpoch, links)
 }
 
 /** Every tenant the caller belongs to — the sidebar space switcher (Host-independent). */
@@ -82,75 +95,79 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
   const priv = identityPrivate()
   if (!priv) return []
   try {
-    return (await listMyScopes())
-      .filter((s) => s.kind === ScopeKind.Group)
-      .flatMap((g) => {
-        let key: Uint8Array | null = null
+    const groups = (await listMyScopes()).filter((s) => s.kind === ScopeKind.Group)
+    const rows = await Promise.all(
+      groups.map(async (g): Promise<GroupSpace | null> => {
+        let epochs: EpochKeys | null = null
         try {
-          key = unwrapGrant(g, priv)
-          const name = g.encryptedName ? openName(key, g.encryptedName) : ''
-          return [{ scopeId: g.id, tenantId: g.tenantId, name, role: g.role }]
+          // The name is sealed under E_0 — peel the chain so a rotated group still decrypts its name.
+          epochs = await epochKeysFor(g, unwrapGrant(g, priv))
+          const name = g.encryptedName ? openName(keyAt(epochs, 0), g.encryptedName) : ''
+          return { scopeId: g.id, tenantId: g.tenantId, name, role: g.role }
         } catch {
-          return []
+          return null
         } finally {
-          key?.fill(0)
+          if (epochs) zeroEpochKeys(epochs)
         }
-      })
+      }),
+    )
+    return rows.filter((r): r is GroupSpace => r !== null)
   } finally {
     zero(priv)
   }
 }
 
-/** An opened scope: its opaque identity + the in-memory scope content key `K_SC` (owned transiently by the
- *  caller) + the decrypted display `name` for a named scope (a GROUP; undefined for the anonymous tenant/personal). */
-export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; name?: string }
+/** An opened scope: its opaque identity + the in-memory **epoch keys** (owned transiently by the caller; `key` is
+ *  the write key = the current epoch) + the decrypted display `name` for a named scope (a GROUP; undefined else). */
+export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; epochs: EpochKeys; name?: string }
 
-/** asymUnwrap our **own** grant on a scope row with the vaulted identity → the in-memory `K_SC`. Caller owns it. */
+/** asymUnwrap our **own** grant on a scope row with the vaulted identity → the in-memory epoch key. Caller owns it. */
 function unwrapGrant(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Uint8Array {
   return v1.asymUnwrap(v1.hybridSecret(priv), v1.hybridPublic(priv), fromB64std(scope.wrappedGrant), SCOPE_GRANT)
 }
 
+/** Open a scope summary → its epoch keys + (for a GROUP) its decrypted name. The name is sealed under **E_0**
+ *  (sealed at creation, never re-sealed on rotation), so it decrypts under the base epoch of the peeled chain. */
+async function toOpenedScope(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Promise<OpenedScope> {
+  const grantKey = unwrapGrant(scope, priv)
+  const epochs = await epochKeysFor(scope, grantKey)
+  let name: string | undefined
+  if (scope.kind === ScopeKind.Group && scope.encryptedName) {
+    try {
+      name = openName(keyAt(epochs, 0), scope.encryptedName)
+    } catch {
+      name = undefined // a name that won't open (E2) is non-fatal — the scope still opens, just unlabelled
+    }
+  }
+  return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: writeKey(epochs), epochs, name }
+}
+
 /**
- * Open the caller's scope of the given `kind` → its identity + in-memory scope key (asymUnwrap our **own** grant
- * with the vaulted identity), or null if there is no such scope / the vault is locked. This is **open-only** —
- * it never mints a scope (the tenant scope is born cold at activation, ADR 0006; only `ensurePersonalScope`
- * births, and personal-only). The caller owns the returned key transiently.
+ * Open the caller's scope of the given `kind` → its identity + in-memory epoch keys (asymUnwrap our **own** grant
+ * with the vaulted identity, then peel the epoch chain), or null if there is no such scope / the vault is locked.
+ * This is **open-only** — it never mints a scope. The caller owns the returned keys transiently.
  */
 export async function openScope(kind: ScopeKind): Promise<OpenedScope | null> {
   const priv = identityPrivate()
   if (!priv) return null
   try {
     const scope = (await listMyScopes()).find((s) => s.kind === kind)
-    if (!scope) return null
-    return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: unwrapGrant(scope, priv) }
+    return scope ? await toOpenedScope(scope, priv) : null
   } finally {
     zero(priv)
   }
 }
 
 /**
- * Open a specific scope by its opaque id → its identity + in-memory scope key, or null if the caller holds no
- * such scope / the vault is locked / the grant won't open. Used to enter a group from the `#@<id>` fragment
- * (en.spaces.group-scope, cr-0032): the id is resolved against the caller's **own** scope list, client-side.
+ * Open a specific scope by its opaque id → its identity + in-memory epoch keys, or null if the caller holds no
+ * such scope / the vault is locked. Used to enter a group from the `#@<id>` fragment (en.spaces.group-scope).
  */
 export async function openScopeById(scopeId: string): Promise<OpenedScope | null> {
   const priv = identityPrivate()
   if (!priv) return null
   try {
     const scope = (await listMyScopes()).find((s) => s.id === scopeId)
-    if (!scope) return null
-    const key = unwrapGrant(scope, priv)
-    // Decrypt the display name for a named (GROUP) scope so the shell can label it; a name that won't open
-    // (E2) is non-fatal — the scope still opens, just unlabelled.
-    let name: string | undefined
-    if (scope.kind === ScopeKind.Group && scope.encryptedName) {
-      try {
-        name = openName(key, scope.encryptedName)
-      } catch {
-        name = undefined
-      }
-    }
-    return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key, name }
+    return scope ? await toOpenedScope(scope, priv) : null
   } finally {
     zero(priv)
   }
@@ -159,6 +176,33 @@ export async function openScopeById(scopeId: string): Promise<OpenedScope | null
 /** Open the member's personal scope → just its key (thin wrapper over {@link openScope}; used by e2e harnesses). */
 export async function openPersonalScope(): Promise<Uint8Array | null> {
   return (await openScope(ScopeKind.Personal))?.key ?? null
+}
+
+/**
+ * Rotate a group's content key forward after a member was removed (ADR 0024, cr-0089) — the crypto half of the
+ * remove: mint a fresh epoch key `E_{n+1}`, chain-link it to the current `E_n` (`symWrap(E_{n+1}, E_n)`), and
+ * re-grant `E_{n+1}` to **every remaining member** (`asymWrap` to each directory pubkey), then POST the
+ * rotation-commit. New content thereafter seals under `E_{n+1}`, which the removed member never holds — so they
+ * read pre-removal content but never post-removal content, even against a malicious operator. Operator-blind:
+ * only the opaque chain-link + per-member grants are posted. Returns the new epoch index.
+ *
+ * `remaining` is the directory **after** the removal (the removed member excluded); the caller passes it so this
+ * grants exactly the surviving set. Requires an unlocked vault (opens the caller's own grant to derive `E_n`).
+ */
+export async function rotateGroupForRemoval(scopeId: string, remaining: ScopeMember[]): Promise<number> {
+  const opened = await openScopeById(scopeId) // our grant → the current epoch keys (E_n = the write key)
+  if (!opened) throw new Error('cannot open scope to rotate')
+  const prevKey = writeKey(opened.epochs)
+  const newKey = v1.randomBytes(32)
+  try {
+    const wrappedPrev = b64std(v1.symWrap(newKey, prevKey, EPOCH_LINK, v1.randomBytes(12)))
+    const grants = remaining.map((m) => ({ userId: m.userId, wrappedGrant: wrapScopeKeyToMember(newKey, m.identityPublicKey) }))
+    const rotated = await withRefresh(() => scopesApi().rotateScope({ scopeId, rotateScopeRequest: { wrappedPrev, grants } }))
+    return rotated.epoch
+  } finally {
+    newKey.fill(0)
+    zeroEpochKeys(opened.epochs)
+  }
 }
 
 /** Best-effort wipe of the transient identity-private copy the vault handed us. */

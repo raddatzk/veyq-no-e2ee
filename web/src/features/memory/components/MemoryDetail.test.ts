@@ -85,7 +85,7 @@ const i18n = createI18n({
 })
 
 const node = (name: string, wrappedMeta: string | null = null): TreeNode => ({
-  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta,
+  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta,
 })
 
 /** A stub deriver: a tiny "JPEG" tagged by the requested maxEdge so each tier's bytes are distinct. */
@@ -262,7 +262,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
     const chapters: TreeNode[] = [
-      { id: 'c1', kind: NodeKind.Chapter, name: 'Day 1', parentId: NODE_ID, orderIndex: 0, wrappedContentKey: 'd3JhcA==', wrappedMeta: null },
+      { id: 'c1', kind: NodeKind.Chapter, name: 'Day 1', parentId: NODE_ID, orderIndex: 0, epoch: 0, wrappedContentKey: 'd3JhcA==', wrappedMeta: null },
     ]
 
     const wrapper = mountDetail(v1.randomBytes(32), { chapters })

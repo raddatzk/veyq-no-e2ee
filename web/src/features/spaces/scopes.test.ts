@@ -9,7 +9,7 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
@@ -162,6 +162,47 @@ describe('openScopeById', () => {
   it('returns null when the caller holds no scope with that id', async () => {
     mockScopes(vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
     expect(await openScopeById('missing')).toBeNull()
+  })
+})
+
+describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)', () => {
+  it('mints a fresh epoch, chain-links the old one under it, and re-grants it to every remaining member', async () => {
+    // The caller holds the group at epoch 0 (E_0). rotateGroupForRemoval opens that grant to derive E_0.
+    const e0 = v1.randomBytes(32)
+    const grant0 = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), e0, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const list = vi.fn().mockResolvedValue([{ id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant0, grantedEpoch: 0 }])
+    const rotate = vi.fn().mockResolvedValue({ epoch: 1 })
+    vi.mocked(scopesApi).mockReturnValue({ listMyScopes: list, rotateScope: rotate } as unknown as ReturnType<typeof scopesApi>)
+
+    // Two surviving members with real identities (the removed one is simply absent from this list).
+    const memberA = v1.generateIdentity()
+    const memberB = v1.generateIdentity()
+    const remaining = [
+      { userId: 'a', username: 'a', role: 'OWNER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberA.pub)), hasGrant: true },
+      { userId: 'b', username: 'b', role: 'MEMBER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberB.pub)), hasGrant: true },
+    ]
+
+    const newEpoch = await rotateGroupForRemoval('g1', remaining)
+    expect(newEpoch).toBe(1)
+    expect(rotate).toHaveBeenCalledTimes(1)
+
+    const payload = rotate.mock.calls[0][0].rotateScopeRequest
+    expect(payload.grants.map((g: { userId: string }) => g.userId)).toEqual(['a', 'b'])
+
+    // Each member's grant opens (with their OWN identity) to the same fresh epoch key E_1 — operator-blind: only
+    // ciphertext was posted, and every remaining member can read forward.
+    const e1a = v1.asymUnwrap(v1.hybridSecret(memberA.priv), v1.hybridPublic(memberA.priv), fromB64std(payload.grants[0].wrappedGrant), 'scope-grant')
+    const e1b = v1.asymUnwrap(v1.hybridSecret(memberB.priv), v1.hybridPublic(memberB.priv), fromB64std(payload.grants[1].wrappedGrant), 'scope-grant')
+    expect(e1a.length).toBe(32)
+    expect(Array.from(e1a)).toEqual(Array.from(e1b))
+
+    // The chain-link wraps the OLD epoch key under the new one: symUnwrap(E_1, wrappedPrev, 'scope-epoch') === E_0,
+    // so a member can still peel down to read pre-rotation content.
+    const peeledE0 = v1.symUnwrap(e1a, fromB64std(payload.wrappedPrev), 'scope-epoch')
+    expect(Array.from(peeledE0)).toEqual(Array.from(e0))
+
+    // Forward-confidentiality: the new epoch differs from the old, so content sealed under E_1 is unreadable with E_0.
+    expect(Array.from(e1a)).not.toEqual(Array.from(e0))
   })
 })
 

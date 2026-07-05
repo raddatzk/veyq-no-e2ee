@@ -117,12 +117,17 @@ export function unsealNodeDate(parentKey: Uint8Array | null, node: TreeNode): Me
 
 /**
  * Order memory/chapter nodes for the card grid: by **start day, newest first, undated last** (stable within a
- * group). Each node's date is unsealed under `parentKey`; the result pairs every node with its date so the card
- * can show the range without a second unseal. Reads only `wrappedMeta` — never a Memory's media.
+ * group). Each node's date is unsealed under the key `keyFor(node)` returns — a **per-node** resolver so a browse
+ * grid spanning several epochs opens each top-level Memory under its own epoch's `K_SC` (ADR 0024), while a
+ * Memory's chapters all resolve under that Memory's single `K_mem`. The result pairs every node with its date so
+ * the card can show the range without a second unseal. Reads only `wrappedMeta` — never a Memory's media.
  */
-export function sortNodesByDate(parentKey: Uint8Array | null, nodes: TreeNode[]): { node: TreeNode; date: MemoryDate | null }[] {
+export function sortNodesByDate(
+  keyFor: (node: TreeNode) => Uint8Array | null,
+  nodes: TreeNode[],
+): { node: TreeNode; date: MemoryDate | null }[] {
   return nodes
-    .map((node, i) => ({ node, i, date: unsealNodeDate(parentKey, node) }))
+    .map((node, i) => ({ node, i, date: unsealNodeDate(keyFor(node), node) }))
     .sort((a, b) => {
       const da = a.date?.from
       const db = b.date?.from

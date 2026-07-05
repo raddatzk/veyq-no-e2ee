@@ -219,6 +219,10 @@ const en = {
     demote: 'Remove co-owner',
     lastOwner: 'A group needs at least one owner.',
     roleChangeFailed: 'Could not change the role. Please try again.',
+    remove: 'Remove',
+    removeConfirm: 'Remove and rotate the key?',
+    removeConfirmYes: 'Remove',
+    removeMemberFailed: 'Could not remove the member. Please try again.',
   },
   home: {
     loading: 'Opening your space…',
@@ -577,6 +581,10 @@ const de: typeof en = {
     demote: 'Mit-Owner entfernen',
     lastOwner: 'Eine Gruppe braucht mindestens eine:n Owner.',
     roleChangeFailed: 'Die Rolle konnte nicht geändert werden. Bitte erneut versuchen.',
+    remove: 'Entfernen',
+    removeConfirm: 'Entfernen und Schlüssel rotieren?',
+    removeConfirmYes: 'Entfernen',
+    removeMemberFailed: 'Das Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.',
   },
   home: {
     loading: 'Dein Bereich wird geöffnet…',

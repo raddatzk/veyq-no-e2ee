@@ -62,7 +62,7 @@ const i18n = createI18n({
 })
 
 const node = (name: string): TreeNode => ({
-  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null,
+  id: NODE_ID, kind: NodeKind.Memory, name, parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null,
 })
 
 function stubDeriver(): MediaDeriver {

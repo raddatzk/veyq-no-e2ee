@@ -5,7 +5,7 @@ vi.mock('../../api/client', () => ({
   tenantsApi: vi.fn(),
 }))
 
-import { addGroupMember, listScopeMembers, setMemberRole, SetMemberRoleRequestRoleEnum } from './members'
+import { addGroupMember, listScopeMembers, setMemberRole, removeGroupMember, SetMemberRoleRequestRoleEnum } from './members'
 import { scopesApi } from '../../api/client'
 
 beforeEach(() => vi.clearAllMocks())
@@ -35,6 +35,17 @@ describe('setMemberRole (cr-0088)', () => {
 
     expect(setRole).toHaveBeenCalledWith({ scopeId: 'g1', userId: 'u1', setMemberRoleRequest: { role: 'OWNER' } })
     expect(result.role).toBe('OWNER')
+  })
+})
+
+describe('removeGroupMember (cr-0089)', () => {
+  it('deletes the membership via the member endpoint (the rotation is a separate call the caller makes next)', async () => {
+    const removeFn = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(scopesApi).mockReturnValue({ removeMember: removeFn } as unknown as ReturnType<typeof scopesApi>)
+
+    await removeGroupMember('g1', 'u1')
+
+    expect(removeFn).toHaveBeenCalledWith({ scopeId: 'g1', userId: 'u1' })
   })
 })
 

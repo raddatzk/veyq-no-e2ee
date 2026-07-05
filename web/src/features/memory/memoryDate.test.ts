@@ -147,6 +147,7 @@ describe('unsealNodeDate / sortNodesByDate (browse card grid, cr-0067)', () => {
       parentId: null,
       kind: NodeKind.Memory,
       orderIndex: 0,
+      epoch: 0,
       name: id,
       wrappedContentKey,
       wrappedMeta: date ? sealMemoryDate(memKey, date) : null,
@@ -166,7 +167,7 @@ describe('unsealNodeDate / sortNodesByDate (browse card grid, cr-0067)', () => {
     const c = memoryNode('c', null) // undated
     const d = memoryNode('d', { mode: 'ongoing', from: '2026-05-01' })
     const e = memoryNode('e', null) // undated — keeps input order among undated
-    const ordered = sortNodesByDate(scopeKey, [a, b, c, d, e]).map((x) => x.node.id)
+    const ordered = sortNodesByDate(() => scopeKey, [a, b, c, d, e]).map((x) => x.node.id)
     expect(ordered).toEqual(['b', 'd', 'a', 'c', 'e'])
   })
 })

@@ -12,7 +12,7 @@ const i18n = createI18n({
   messages: { en: { memory: { favorite: 'Favorite', unfavorite: 'Remove favorite', date: { since: 'Since {day}' } } } },
 })
 
-const memory: TreeNode = { id: 'm1', kind: NodeKind.Memory, name: 'Rom', parentId: null, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null }
+const memory: TreeNode = { id: 'm1', kind: NodeKind.Memory, name: 'Rom', parentId: null, orderIndex: 0, epoch: 0, wrappedContentKey: null, wrappedMeta: null }
 
 const mountCard = (favorite: boolean) =>
   mount(MemoryCard, { props: { memory, favorite }, global: { plugins: [i18n] } })
