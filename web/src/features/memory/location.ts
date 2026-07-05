@@ -9,8 +9,16 @@
 // `[a-z0-9-]`, so a folder slug can never start with `~`/`@` and thus never collides with a scope token.
 import { slugify, type TreeNode } from './tree'
 
-export const PERSONAL_SCOPE = '~me'
-/** The token-less scope marker (ADR 0019): the absence of a leading `~me`/`@` token *is* the tenant selector. */
+/** A personal/profile scope token is `~<username>` (ADR 0023) — your own opens your personal scope, a foreign
+ *  one is the later profile view. `~me` remains a valid fallback token (it also starts with `~`). */
+export function isPersonalScope(token: string): boolean {
+  return token.startsWith('~')
+}
+/** Build the personal-scope token for a username (`~kevin`); falls back to `~me` when the handle is unknown. */
+export function personalScope(username?: string): string {
+  return `~${username || 'me'}`
+}
+/** The token-less scope marker (ADR 0019): the absence of a leading `~<username>`/`@` token *is* the tenant selector. */
 export const TENANT_SCOPE = ''
 
 export type ContentLocation = { scope: string; segments: string[] }
@@ -24,9 +32,9 @@ export function parseHash(hash: string): ContentLocation {
     .map(decodeURIComponent)
   if (parts.length === 0) return { scope: TENANT_SCOPE, segments: [] }
   const [head, ...rest] = parts
-  // A leading scope token (`~me` / `@group`) selects the scope; no token → the token-less tenant scope, and
-  // every part is a slug under the tenant root.
-  if (head === PERSONAL_SCOPE || head.startsWith('@')) return { scope: head, segments: rest }
+  // A leading scope token (`~<username>` / `@group`) selects the scope; no token → the token-less tenant scope,
+  // and every part is a slug under the tenant root.
+  if (isPersonalScope(head) || head.startsWith('@')) return { scope: head, segments: rest }
   return { scope: TENANT_SCOPE, segments: parts }
 }
 

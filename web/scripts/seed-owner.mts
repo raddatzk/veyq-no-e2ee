@@ -12,7 +12,6 @@ import { writeOwner, materializeKeys } from './devSeed.mts'
 
 const BASE = process.env.VEYQ_BASE ?? 'http://localhost:8080'
 const email = process.env.VEYQ_EMAIL ?? 'kevin@veyq.test'
-const displayName = process.env.VEYQ_NAME ?? 'Kevin'
 const password = process.env.VEYQ_PASSWORD ?? 'correct horse battery staple'
 
 const status = await (await fetch(`${BASE}/api/setup`)).json()
@@ -26,7 +25,6 @@ const built = buildAccount(email, password, instanceSalt)
 const { material, emergencyKit } = built
 const body = {
   email,
-  displayName,
   suiteId: material.suiteId,
   identityPublicKey: material.identityPublicKey,
   wrappedIdentityPrivateKey: material.wrappedIdentityPrivateKey,

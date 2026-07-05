@@ -3,6 +3,7 @@ package com.veyq.app.features.admin.tenant
 import com.veyq.app.shared.crypto.Tokens
 import com.veyq.app.shared.identity.AccountStore
 import com.veyq.app.shared.identity.ServerRoles
+import com.veyq.app.shared.identity.TenantProfileStore
 import com.veyq.app.shared.identity.VeyqUser
 import com.veyq.app.shared.identity.WrapData
 import jakarta.enterprise.context.ApplicationScoped
@@ -10,9 +11,9 @@ import jakarta.transaction.Transactional
 import org.jboss.logging.Logger
 import java.time.Instant
 
-/** Cold-birth account material for the register-and-accept path (the email comes from the invite). */
+/** Cold-birth account material for the register-and-accept path (the email comes from the invite). No display
+ *  name — identity is the per-tenant `username` (threaded separately) + the sealed name set later (ADR 0023). */
 data class NewAccount(
-    val displayName: String,
     val suiteId: String,
     val identityPublicKey: String,
     val wrappedIdentityPrivateKey: String,
@@ -41,6 +42,7 @@ sealed interface AcceptOutcome {
     data object NotInvitedOwner : AcceptOutcome
     data object AlreadyActive : AcceptOutcome
     data object MissingGrant : AcceptOutcome
+    data object UsernameTaken : AcceptOutcome
 }
 
 sealed interface RegisterAcceptOutcome {
@@ -49,6 +51,7 @@ sealed interface RegisterAcceptOutcome {
     data object NoLongerValid : RegisterAcceptOutcome
     data object EmailTaken : RegisterAcceptOutcome
     data object MissingGrant : RegisterAcceptOutcome
+    data object UsernameTaken : RegisterAcceptOutcome
 }
 
 /**
@@ -62,6 +65,7 @@ sealed interface RegisterAcceptOutcome {
 class TenantAcceptHandler(
     private val store: TenantStore,
     private val accounts: AccountStore,
+    private val profiles: TenantProfileStore,
 ) {
     private val log = Logger.getLogger(TenantAcceptHandler::class.java)
 
@@ -85,7 +89,7 @@ class TenantAcceptHandler(
      *  (cr-0077): an OWNER accept cold-activates the tenant (grant required); a MEMBER accept joins the ACTIVE
      *  tenant grant-less (no grant), the key delivered later by a key-holder (cr-0076). */
     @Transactional
-    fun accept(userId: String, bootstrapSecret: String, grant: String?): AcceptOutcome {
+    fun accept(userId: String, bootstrapSecret: String, grant: String?, username: String): AcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return AcceptOutcome.NotFound
         if (!isLive(invite)) return AcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return AcceptOutcome.NotFound
@@ -94,14 +98,22 @@ class TenantAcceptHandler(
         if (caller.email != invite.ownerEmail) return AcceptOutcome.NotInvitedOwner
 
         return if (invite.role == TenantInviteEntity.MEMBER) {
-            // A member joins an ACTIVE tenant grant-less; if already a member, just consume the invite.
-            if (store.hasMembership(userId, tenant.id)) store.consumeInvite(invite.id)
-            else store.joinAsMember(tenant.id, userId, invite.id)
+            // A member joins an ACTIVE tenant grant-less; if already a member, just consume the invite (their
+            // tenant profile already exists — the username is only chosen on a fresh join).
+            if (store.hasMembership(userId, tenant.id)) {
+                store.consumeInvite(invite.id)
+            } else {
+                if (profiles.usernameTaken(tenant.id, username)) return AcceptOutcome.UsernameTaken
+                store.joinAsMember(tenant.id, userId, invite.id)
+                profiles.create(userId, tenant.id, username)
+            }
             AcceptOutcome.Activated(tenant.id)
         } else {
             if (tenant.status != TenantEntity.PENDING) return AcceptOutcome.AlreadyActive
             val g = grant ?: return AcceptOutcome.MissingGrant
+            if (profiles.usernameTaken(tenant.id, username)) return AcceptOutcome.UsernameTaken
             store.activate(tenant.id, userId, g, invite.id)
+            profiles.create(userId, tenant.id, username)
             AcceptOutcome.Activated(tenant.id)
         }
     }
@@ -109,7 +121,7 @@ class TenantAcceptHandler(
     /** Register-and-accept: the invited email has no account yet — born cold here (email from the invite).
      *  Role-branched like [accept]: OWNER activates (grant required), MEMBER joins grant-less. */
     @Transactional
-    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String?): RegisterAcceptOutcome {
+    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String?, username: String): RegisterAcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return RegisterAcceptOutcome.NotFound
         if (!isLive(invite)) return RegisterAcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return RegisterAcceptOutcome.NotFound
@@ -117,10 +129,10 @@ class TenantAcceptHandler(
         // The account is born for the INVITED email (a MEMBER invite's email differs from the tenant owner's).
         if (accounts.findByEmail(invite.ownerEmail) != null) return RegisterAcceptOutcome.EmailTaken
         if (invite.role != TenantInviteEntity.MEMBER && grant == null) return RegisterAcceptOutcome.MissingGrant
+        if (profiles.usernameTaken(tenant.id, username)) return RegisterAcceptOutcome.UsernameTaken
 
         val userId = accounts.createAccount(
             email = invite.ownerEmail,
-            displayName = account.displayName,
             serverRole = ServerRoles.MEMBER,
             suiteId = account.suiteId,
             identityPublicKey = account.identityPublicKey,
@@ -131,6 +143,9 @@ class TenantAcceptHandler(
         )
         if (invite.role == TenantInviteEntity.MEMBER) store.joinAsMember(tenant.id, userId, invite.id)
         else store.activate(tenant.id, userId, grant!!, invite.id)
+        // The per-tenant identity: the plaintext handle now; the sealed real name is written later via the
+        // profile op (once the member holds K_tenant — immediately for the owner, post-delivery for a member).
+        profiles.create(userId, tenant.id, username)
         return RegisterAcceptOutcome.Activated(tenant.id, userId)
     }
 

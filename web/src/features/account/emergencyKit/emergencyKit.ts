@@ -81,7 +81,7 @@ export async function importKitFromFile(file: File): Promise<KitData | null> {
 }
 
 /** Build + download the Emergency Kit PDF: human text + QR + an embedded payload (in the PDF metadata). */
-export async function downloadKitPdf(data: KitData, displayName: string): Promise<void> {
+export async function downloadKitPdf(data: KitData): Promise<void> {
   const [{ jsPDF }, QRCode] = await Promise.all([import('jspdf'), import('qrcode').then((m) => m.default)])
   const payload = kitPayload(data)
   const qr = await QRCode.toDataURL(payload, { margin: 1, width: 320 })
@@ -98,7 +98,6 @@ export async function downloadKitPdf(data: KitData, displayName: string): Promis
   doc.setTextColor(20)
   doc.setFontSize(12)
   const rows: [string, string][] = [
-    ['Name', displayName],
     ['Email', data.email],
   ]
   let y = 140

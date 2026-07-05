@@ -58,7 +58,6 @@ paths:
             schema: { $ref: "#/components/schemas/CreateServerOwnerRequest" }
             example:
               email: kevin@example.com
-              displayName: Kevin
               suiteId: v1
               identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
               wrappedIdentityPrivateKey: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
@@ -163,7 +162,6 @@ components:
       type: object
       required:
         - email
-        - displayName
         - suiteId
         - identityPublicKey
         - wrappedIdentityPrivateKey
@@ -177,12 +175,6 @@ components:
           maxLength: 254
           example: kevin@example.com
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
-        displayName:
-          type: string
-          description: The owner's human display name (server-visible identity metadata). Trimmed on input.
-          maxLength: 100
-          example: Kevin
-          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
         suiteId:
           type: string
           description: Crypto suite the client used to produce the wrapped material.

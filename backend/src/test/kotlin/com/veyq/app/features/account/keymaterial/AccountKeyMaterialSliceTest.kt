@@ -77,7 +77,6 @@ class AccountKeyMaterialSliceTest {
                 VeyqUser().apply {
                     id = userId
                     email = "bogus-keymat@example.com"
-                    displayName = "Bogus Method Test"
                     serverRole = "SERVER_OWNER"
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="
@@ -140,7 +139,6 @@ class AccountKeyMaterialSliceTest {
                 VeyqUser().apply {
                     id = userId
                     this.email = email
-                    displayName = "Key Material Test"
                     serverRole = "SERVER_OWNER"
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

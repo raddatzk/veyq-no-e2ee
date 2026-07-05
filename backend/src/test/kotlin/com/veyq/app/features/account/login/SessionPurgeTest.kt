@@ -30,7 +30,6 @@ class SessionPurgeTest {
                 VeyqUser().apply {
                     id = PURGE_USER
                     email = "purge-user@example.com"
-                    displayName = "Purge Test"
                     serverRole = "MEMBER"
                     suiteId = "v1"
                     identityPublicKey = "aWQ="

@@ -171,7 +171,7 @@ class NodesSliceTest {
         val userId = UUID.randomUUID().toString()
         QuarkusTransaction.requiringNew().run {
             VeyqUser().apply {
-                id = userId; email = "u-$userId@example.com"; displayName = "Nodes Test"; serverRole = "MEMBER"
+                id = userId; email = "u-$userId@example.com"; serverRole = "MEMBER"
                 suiteId = "v1"; identityPublicKey = "aWQ="; wrappedIdentityPrivateKey = "aXA="
                 authPublicKey = "YXA="; createdAt = Instant.now()
             }.persist()

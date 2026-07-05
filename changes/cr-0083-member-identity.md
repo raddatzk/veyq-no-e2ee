@@ -1,7 +1,7 @@
 ---
 id: cr-0083
 title: Member identity — per-tenant username + sealed real names, drop account displayName
-status: planned
+status: done
 satisfies: [en.spaces.member-identity]
 adrs: ["0023", "0007"]
 invariants: [operator-blind-e2ee]

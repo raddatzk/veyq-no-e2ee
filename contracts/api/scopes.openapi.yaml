@@ -278,26 +278,39 @@ components:
 
     ScopeMember:
       type: object
-      required: [userId, displayName, email, role, identityPublicKey, hasGrant]
+      required: [userId, username, role, identityPublicKey, hasGrant]
       properties:
         userId:
           type: string
           format: uuid
           description: Opaque id of the member.
           example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
-        displayName:
+        username:
           type: string
-          description: The member's display name (server-visible identity metadata) — so the directory is human-readable.
-          maxLength: 100
-          example: Partner
+          description: >
+            The member's per-tenant handle (plaintext, unique within the tenant, ADR 0023) — every tenant member
+            sees it. The directory's stable, human-readable label.
+          maxLength: 32
+          example: partner
+        sealedName:
+          type: [string, "null"]
+          description: >
+            The member's real name (first + last) **sealed under `K_tenant`** (opaque base64), decrypted locally
+            by any tenant member. `null` when not yet sealed (a grant-less "awaiting access" member has no
+            `K_tenant` yet). The server never sees the plaintext name.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
         email:
-          type: string
-          description: The member's email (server-visible metadata) — lets the owner correlate a pending member to their invite.
+          type: [string, "null"]
+          description: >
+            The member's email — **owner-only**: present only when the caller is the tenant `OWNER` (to correlate
+            a pending member to their invite), omitted (`null`) for ordinary members (ADR 0007/0023).
           maxLength: 254
           example: partner@example.com
         role:
           type: string
-          description: The member's role in the scope (OWNER / ADMIN / MEMBER).
+          description: The member's role in the scope (OWNER / MEMBER).
           maxLength: 16
           example: MEMBER
         identityPublicKey:

@@ -148,6 +148,7 @@ class TenantsResource(
             identity.principal.name,
             acceptInviteRequest.bootstrapSecret,
             acceptInviteRequest.grant,
+            acceptInviteRequest.username,
         )) {
             is AcceptOutcome.Activated ->
                 Response.ok(TenantActivated(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE)).build()
@@ -156,6 +157,7 @@ class TenantsResource(
             AcceptOutcome.NotInvitedOwner -> Response.status(Response.Status.FORBIDDEN)
                 .entity(ErrorResponse(code = "not_invited_owner")).build()
             AcceptOutcome.AlreadyActive -> conflict("tenant_not_pending")
+            AcceptOutcome.UsernameTaken -> conflict("username_taken")
             AcceptOutcome.MissingGrant -> badRequest()
         }
 
@@ -163,7 +165,6 @@ class TenantsResource(
     override fun registerAndAcceptTenantInvite(registerAndAcceptRequest: RegisterAndAcceptRequest): Response {
         val a = registerAndAcceptRequest.account
         val account = NewAccount(
-            displayName = a.displayName,
             suiteId = a.suiteId.value,
             identityPublicKey = a.identityPublicKey,
             wrappedIdentityPrivateKey = a.wrappedIdentityPrivateKey,
@@ -173,6 +174,7 @@ class TenantsResource(
         )
         return when (val outcome = acceptHandler.registerAndAccept(
             registerAndAcceptRequest.bootstrapSecret, account, registerAndAcceptRequest.grant,
+            registerAndAcceptRequest.username,
         )) {
             is RegisterAcceptOutcome.Activated -> Response.status(Response.Status.CREATED)
                 .entity(TenantActivatedWithUser(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE, UUID.fromString(outcome.userId)))
@@ -180,6 +182,7 @@ class TenantsResource(
             RegisterAcceptOutcome.NotFound -> inviteNotFound()
             RegisterAcceptOutcome.NoLongerValid -> inviteGone()
             RegisterAcceptOutcome.EmailTaken -> conflict("email_taken")
+            RegisterAcceptOutcome.UsernameTaken -> conflict("username_taken")
             RegisterAcceptOutcome.MissingGrant -> badRequest()
         }
     }

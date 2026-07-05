@@ -108,7 +108,7 @@ class MemberAddSliceTest {
         val existing = seedUser("existing@existing.example.com") // already registered before the invite
 
         given().header("Authorization", bearer(existing)).contentType(ContentType.JSON)
-            .body("""{"bootstrapSecret":"$secret"}""") // no grant — an existing-account member joins grant-less
+            .body("""{"bootstrapSecret":"$secret","username":"existingmbr"}""") // no grant — an existing-account member joins grant-less
             .`when`().post("/api/tenants/accept")
             .then().statusCode(200).body("status", equalTo("ACTIVE"))
 
@@ -186,7 +186,7 @@ class MemberAddSliceTest {
         val userId = UUID.randomUUID().toString()
         QuarkusTransaction.requiringNew().run {
             VeyqUser().apply {
-                id = userId; this.email = email; displayName = "Member Test"; serverRole = "MEMBER"
+                id = userId; this.email = email; serverRole = "MEMBER"
                 suiteId = "v1"; identityPublicKey = pubkey; wrappedIdentityPrivateKey = "aWRlbnRpdHktcHJpdg=="
                 authPublicKey = "YXV0aC1wdWJsaWMta2V5"; createdAt = Instant.now()
             }.persist()
@@ -206,8 +206,8 @@ class MemberAddSliceTest {
 
     /** A cold-birth register body with NO grant (a MEMBER joins grant-less). */
     private fun memberRegisterBody(secret: String) = """
-        {"bootstrapSecret":"$secret",
-         "account":{"displayName":"New Member","suiteId":"v1",
+        {"bootstrapSecret":"$secret","username":"newmember",
+         "account":{"suiteId":"v1",
            "identityPublicKey":"bWVtYmVyLXB1YmxpYy1rZXk=",
            "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
            "authPublicKey":"ZWQyNTUxOS1hdXRoLXB1Yg==",

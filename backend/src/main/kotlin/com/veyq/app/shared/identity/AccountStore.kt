@@ -23,7 +23,6 @@ class AccountStore {
     @Transactional
     fun createAccount(
         email: String,
-        displayName: String,
         serverRole: String,
         suiteId: String,
         identityPublicKey: String,
@@ -36,7 +35,6 @@ class AccountStore {
         VeyqUser().apply {
             id = userId
             this.email = email
-            this.displayName = displayName
             this.serverRole = serverRole
             this.suiteId = suiteId
             this.identityPublicKey = identityPublicKey

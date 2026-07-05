@@ -9,7 +9,7 @@ import {
   SessionApi,
   TokenApi,
 } from './generated/auth'
-import { AccountApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
+import { AccountApi, AccountProfileApi, AccountWrapsApi, Configuration as AccountConfiguration } from './generated/account'
 import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
 import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
 import { ContentApi, FavoritesApi, Configuration as ContentConfiguration } from './generated/content'
@@ -44,6 +44,10 @@ export function accountApi(): AccountApi {
 
 export function accountWrapsApi(): AccountWrapsApi {
   return new AccountWrapsApi(new AccountConfiguration(bearerParams()))
+}
+
+export function accountProfileApi(): AccountProfileApi {
+  return new AccountProfileApi(new AccountConfiguration(bearerParams()))
 }
 
 export function tenantsApi(): TenantsApi {

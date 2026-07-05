@@ -50,7 +50,7 @@ class TenantAcceptSliceTest {
         val id = seedPendingTenant("acc.example.com", "owner2@example.com", secret)
         val userId = seedUser("owner2@example.com")
         given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")
-            .contentType(ContentType.JSON).body("""{"bootstrapSecret":"$secret","grant":"AQ=="}""")
+            .contentType(ContentType.JSON).body("""{"bootstrapSecret":"$secret","username":"accowner","grant":"AQ=="}""")
             .`when`().post("/api/tenants/accept")
             .then().statusCode(200).body("status", equalTo("ACTIVE"))
         assert(store.findTenant(id)?.status == TenantEntity.ACTIVE)
@@ -87,7 +87,7 @@ class TenantAcceptSliceTest {
         seedPendingTenant("mm.example.com", "intended@example.com", secret)
         val otherId = seedUser("other@example.com")
         given().header("Authorization", "Bearer ${sessions.issue(otherId).accessToken}")
-            .contentType(ContentType.JSON).body("""{"bootstrapSecret":"$secret","grant":"AQ=="}""")
+            .contentType(ContentType.JSON).body("""{"bootstrapSecret":"$secret","username":"accowner","grant":"AQ=="}""")
             .`when`().post("/api/tenants/accept")
             .then().statusCode(403).body("code", equalTo("not_invited_owner"))
     }
@@ -120,7 +120,7 @@ class TenantAcceptSliceTest {
 
     @Test
     fun unauthenticatedAcceptIs401() {
-        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"x","grant":"AQ=="}""")
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"x","username":"anyone","grant":"AQ=="}""")
             .`when`().post("/api/tenants/accept")
             .then().statusCode(401).body("code", equalTo("authentication_failed"))
     }
@@ -138,7 +138,6 @@ class TenantAcceptSliceTest {
             VeyqUser().apply {
                 id = userId
                 this.email = email
-                displayName = "Accept Test"
                 serverRole = role
                 suiteId = "v1"
                 identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="
@@ -159,8 +158,8 @@ class TenantAcceptSliceTest {
         QuarkusTransaction.requiringNew().call { VeyqUser.find("email", email).firstResult()?.serverRole }
 
     private fun registerBody(secret: String) = """
-        {"bootstrapSecret":"$secret",
-         "account":{"displayName":"New Owner","suiteId":"v1",
+        {"bootstrapSecret":"$secret","username":"newowner",
+         "account":{"suiteId":"v1",
            "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
            "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
            "authPublicKey":"ZWQyNTUxOS1hdXRoLXB1Yg==",

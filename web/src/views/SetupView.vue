@@ -19,7 +19,6 @@ import { useServerState } from '../shared/state/useServerState'
 const router = useRouter()
 const { t } = useI18n()
 const { setSetupCompleted } = useServerState()
-const displayName = ref('')
 const email = ref('')
 const password = ref('')
 const { breachCount } = usePwnedWarning(password)
@@ -36,11 +35,7 @@ async function submit() {
   error.value = ''
   busy.value = true
   try {
-    const { emergencyKit } = await registerServerOwner(
-      email.value,
-      displayName.value,
-      password.value,
-    )
+    const { emergencyKit } = await registerServerOwner(email.value, password.value)
     kitEmail = email.value
     secretKey.value = emergencyKit.secretKey
     kitDownloadTriggered.value = false
@@ -69,7 +64,7 @@ async function downloadKit() {
   if (!secretKey.value) return
   error.value = ''
   try {
-    await downloadKitPdf({ email: kitEmail, secretKey: secretKey.value }, displayName.value)
+    await downloadKitPdf({ email: kitEmail, secretKey: secretKey.value })
     kitDownloadTriggered.value = true
   } catch {
     error.value = t('kit.downloadFailed')
@@ -85,12 +80,8 @@ async function downloadKit() {
         <p class="veyq-form-copy">{{ t('setup.sub') }}</p>
         <form class="veyq-form" @submit.prevent="submit">
           <label>
-            {{ t('setup.displayName') }}
-            <InputText v-model="displayName" type="text" required autofocus />
-          </label>
-          <label>
             {{ t('common.email') }}
-            <InputText v-model="email" type="email" autocomplete="username" required />
+            <InputText v-model="email" type="email" autocomplete="username" required autofocus />
           </label>
           <label>
             {{ t('common.password') }}

@@ -5,11 +5,13 @@ import {
   resolveSlugPath,
   slugPathOf,
   hashForNode,
-  PERSONAL_SCOPE,
   TENANT_SCOPE,
 } from './location'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
+
+// A concrete personal token — any `~<username>` parses as personal (ADR 0023); `~me` is the fallback.
+const PERSONAL_SCOPE = '~me'
 
 const node = (id: string, name: string, parentId: string | null, kind: NodeKind = NodeKind.Folder): TreeNode => ({
   id, name, parentId, kind, orderIndex: 0, wrappedContentKey: null, wrappedMeta: null,

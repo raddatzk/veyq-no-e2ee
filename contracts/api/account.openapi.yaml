@@ -28,6 +28,9 @@ tags:
   - name: account-wraps
     description: Add / remove Master Key wraps (device trust). Separate tag so it generates its own resource
       interface (one path per tag avoids the greedy class-level @Path that would otherwise shadow siblings).
+  - name: account-profile
+    description: The caller's per-tenant identity profile (username + sealed real name) in the tenant resolved
+      from the Host (ADR 0023). Separate tag → its own resource interface.
 
 paths:
   /api/account/key-material:
@@ -98,6 +101,85 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: too_many_devices }
+
+  /api/account/profile:
+    get:
+      tags: [account-profile]
+      operationId: getMyProfile
+      summary: Fetch the caller's identity profile in the active tenant.
+      description: >
+        Returns the authenticated caller's per-tenant profile — their `username` (plaintext) + `sealedName`
+        (their real name sealed under `K_tenant`, or null if not yet sealed) — in the tenant resolved from the
+        Host (ADR 0023). Only the caller's own profile; no id/email in the request.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's profile in the active tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberProfile" }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the Host, or the caller has no profile there.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: profile_not_found }
+    put:
+      tags: [account-profile]
+      operationId: updateMyProfile
+      summary: Update the caller's username and/or sealed real name in the active tenant.
+      description: >
+        Updates the caller's per-tenant profile in the Host tenant: change the `username` (re-checked unique in
+        the tenant → `409 username_taken`) and/or store the `sealedName` blob (real name sealed under `K_tenant`,
+        opaque ciphertext). Either field may be omitted to leave it unchanged. Operator-blind: the server never
+        sees the plaintext name.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdateRequest" }
+            example:
+              username: kevin
+              sealedName: c2VhbGVkLW5hbWU=
+      responses:
+        "200":
+          description: The updated profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberProfile" }
+        "400":
+          description: The request was malformed (invalid username shape or name ciphertext).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the Host, or the caller has no profile there.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: profile_not_found }
+        "409":
+          description: The chosen username is already taken in this tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: username_taken }
 
   /api/account/wraps/{id}:
     delete:
@@ -242,6 +324,50 @@ components:
           contentEncoding: base64
           maxLength: 8192
           example: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
+
+    MemberProfile:
+      type: object
+      description: The caller's per-tenant identity — a plaintext handle + the sealed real name (ADR 0023).
+      required: [username]
+      properties:
+        username:
+          type: string
+          description: The caller's per-tenant handle (plaintext, unique within the tenant).
+          maxLength: 32
+          example: kevin
+        sealedName:
+          type: [string, "null"]
+          description: >
+            The caller's real name (first + last) sealed under `K_tenant` (opaque base64), or null when not yet
+            sealed. Decrypted only on-device.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
+
+    ProfileUpdateRequest:
+      type: object
+      description: >
+        A profile change — set the `username` (re-checked unique in the tenant) and/or the `sealedName` blob.
+        Omit a field to leave it unchanged.
+      properties:
+        username:
+          type: string
+          description: >
+            The new per-tenant handle (plaintext; trimmed + lowercased server-side; unique in the tenant →
+            `409 username_taken`). Omit to keep the current one.
+          minLength: 2
+          maxLength: 32
+          example: kevin
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
+        sealedName:
+          type: string
+          description: >
+            The real name (first + last) sealed under `K_tenant` (opaque base64 ciphertext the server stores
+            verbatim). Omit to leave the current name unchanged.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     ErrorResponse:
       type: object

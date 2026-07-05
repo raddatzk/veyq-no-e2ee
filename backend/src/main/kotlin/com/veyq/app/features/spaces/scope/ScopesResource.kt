@@ -63,8 +63,8 @@ class ScopesResource(
             is ListMembersOutcome.Members -> Response.ok(
                 outcome.rows.map {
                     ScopeMember(
-                        userId = UUID.fromString(it.userId), displayName = it.displayName, email = it.email,
-                        role = it.role, identityPublicKey = it.identityPublicKey, hasGrant = it.hasGrant,
+                        userId = UUID.fromString(it.userId), username = it.username, sealedName = it.sealedName,
+                        email = it.email, role = it.role, identityPublicKey = it.identityPublicKey, hasGrant = it.hasGrant,
                     )
                 },
             ).build()

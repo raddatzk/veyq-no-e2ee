@@ -570,7 +570,9 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: invite_not_found }
         "409":
-          description: The tenant is already active (the invite was already accepted).
+          description: >
+            A conflict — the tenant is already active (`tenant_not_pending`), or the chosen `username` is already
+            taken in this tenant (`username_taken`). The specific case is in the response `code`.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -600,8 +602,8 @@ paths:
             schema: { $ref: "#/components/schemas/RegisterAndAcceptRequest" }
             example:
               bootstrapSecret: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+              username: kevin
               account:
-                displayName: Kevin
                 suiteId: v1
                 identityPublicKey: aWRlbnRpdHktcHVibGljLWtleQ==
                 wrappedIdentityPrivateKey: d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==
@@ -635,7 +637,9 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: invite_not_found }
         "409":
-          description: The invited email already has an account (use the sign-in accept instead).
+          description: >
+            A conflict — the invited email already has an account (`email_taken`, use the sign-in accept), or the
+            chosen `username` is already taken in this tenant (`username_taken`). The specific case is in `code`.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -925,7 +929,7 @@ components:
 
     AcceptInviteRequest:
       type: object
-      required: [bootstrapSecret]
+      required: [bootstrapSecret, username]
       properties:
         bootstrapSecret:
           type: string
@@ -933,6 +937,16 @@ components:
           maxLength: 128
           example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
+        username:
+          type: string
+          description: >
+            The caller's chosen handle **in the tenant they are joining** — per-tenant, unique within it,
+            plaintext (not a login credential; email is, ADR 0023). Trimmed + lowercased server-side; a clash in
+            the target tenant is `409 username_taken`. Real names are sealed separately via the profile op.
+          minLength: 2
+          maxLength: 32
+          example: kevin
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
         grant:
           type: [string, "null"]
           description: >
@@ -974,7 +988,7 @@ components:
 
     RegisterAndAcceptRequest:
       type: object
-      required: [bootstrapSecret, account]
+      required: [bootstrapSecret, username, account]
       properties:
         bootstrapSecret:
           type: string
@@ -982,6 +996,16 @@ components:
           maxLength: 128
           example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 128)'
+        username:
+          type: string
+          description: >
+            The new account's chosen handle **in the tenant it is joining** — per-tenant, unique within it,
+            plaintext (not a login credential; email is, ADR 0023). Trimmed + lowercased server-side; a clash in
+            the target tenant is `409 username_taken`. Real names are sealed separately via the profile op.
+          minLength: 2
+          maxLength: 32
+          example: kevin
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
         account:
           $ref: "#/components/schemas/AccountRegistration"
           # @Valid cascades bean-validation into the cold-birth account material.
@@ -1002,15 +1026,11 @@ components:
       type: object
       description: >
         Cold-birth material for a new account (operator-blind, same shape as setup's owner registration minus
-        the email, which is taken from the invite). All key material is ciphertext or a public key.
-      required: [displayName, suiteId, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authPublicKey]
+        the email, which is taken from the invite). All key material is ciphertext or a public key. The account
+        carries **no** display name — identity is the per-tenant `username` (on the request) + the sealed real
+        name set via the profile op (ADR 0023).
+      required: [suiteId, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authPublicKey]
       properties:
-        displayName:
-          type: string
-          description: The new owner's human display name (server-visible identity metadata). Trimmed on input.
-          maxLength: 100
-          example: Kevin
-          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 100)'
         suiteId:
           type: string
           description: Crypto suite the client used to produce the wrapped material.

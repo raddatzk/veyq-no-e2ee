@@ -18,7 +18,6 @@ class SetupStore(private val accounts: AccountStore) {
     fun persistOwner(registration: OwnerRegistration): String {
         val userId = accounts.createAccount(
             email = registration.email,
-            displayName = registration.displayName,
             serverRole = ServerRoles.SERVER_OWNER,
             suiteId = registration.suiteId,
             identityPublicKey = registration.identityPublicKey,

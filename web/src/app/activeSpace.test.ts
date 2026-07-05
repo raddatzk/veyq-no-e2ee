@@ -8,7 +8,9 @@ vi.mock('../features/spaces/scopes', () => ({
 import { activeSpace, activeScopeKey, enterScope, clearActiveSpace } from './activeSpace'
 import { ensurePersonalScope, openScope } from '../features/spaces/scopes'
 import { ScopeKind } from '../api/generated/scopes'
-import { TENANT_SCOPE, PERSONAL_SCOPE } from '../features/memory/location'
+import { TENANT_SCOPE } from '../features/memory/location'
+
+const PERSONAL_SCOPE = '~me'
 import { treeStore, resetTree } from '../features/memory/treeStore'
 import { favoritesStore, clearFavorites } from './favoritesStore'
 import type { TreeNode } from '../features/memory/tree'

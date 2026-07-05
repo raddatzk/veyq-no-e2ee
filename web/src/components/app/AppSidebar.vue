@@ -15,7 +15,8 @@ import { favoritesStore } from '../../app/favoritesStore'
 import { useThemeState } from '../../shared/state/useThemeState'
 import { treeStore } from '../../features/memory/treeStore'
 import { nodeById } from '../../features/memory/browse'
-import { hashForNode, parseHash, TENANT_SCOPE, PERSONAL_SCOPE } from '../../features/memory/location'
+import { hashForNode, parseHash, TENANT_SCOPE, isPersonalScope, personalScope } from '../../features/memory/location'
+import { getMyProfile } from '../../features/account/profile/profile'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from '../../features/memory/tree'
 import type { MyTenant } from '../../api/generated/scopes'
@@ -32,7 +33,12 @@ const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUr
 // `~me` = personal — ADR 0019). Drives both which sidebar entry is highlighted and how favorite hashes build.
 const activeScope = computed(() => parseHash(route.hash).scope)
 const tenantActive = computed(() => activeScope.value === TENANT_SCOPE)
-const personalActive = computed(() => activeScope.value === PERSONAL_SCOPE)
+const personalActive = computed(() => isPersonalScope(activeScope.value))
+
+// The caller's own per-tenant username builds the Personal link `#~<username>` (ADR 0023); until it resolves (or
+// if there's no profile in this tenant), the `~me` fallback still routes to the personal scope.
+const myUsername = ref('')
+const personalHash = computed(() => `#${personalScope(myUsername.value)}`)
 
 // The shared tenant space is labelled with the tenant's own name (membership metadata — no sealed name to
 // decrypt); falls back to a generic "Shared" until the tenant list resolves.
@@ -53,6 +59,11 @@ onMounted(async () => {
     tenants.value = await listMyTenants()
   } catch {
     /* the sidebar tolerates an empty switcher */
+  }
+  try {
+    myUsername.value = (await getMyProfile()).username
+  } catch {
+    /* no profile in this tenant yet → the ~me fallback still routes to the personal scope */
   }
 })
 
@@ -133,7 +144,7 @@ function switchTenant(tenant: MyTenant) {
           <span>{{ tenantLabel }}</span>
         </a>
       </RouterLink>
-      <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: '#~me' }" custom>
+      <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: personalHash }" custom>
         <a
           :href="href"
           class="sidebar-nav-link sidebar-personal-link"

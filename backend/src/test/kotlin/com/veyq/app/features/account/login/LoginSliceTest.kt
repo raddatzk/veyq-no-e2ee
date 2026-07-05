@@ -35,7 +35,6 @@ class LoginSliceTest {
                 VeyqUser().apply {
                     id = "login-test-user"
                     email = EMAIL
-                    displayName = "Login Test"
                     serverRole = "SERVER_OWNER"
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

@@ -301,7 +301,7 @@ class TasksSliceTest {
         val userId = UUID.randomUUID().toString()
         QuarkusTransaction.requiringNew().run {
             VeyqUser().apply {
-                id = userId; email = "u-$userId@example.com"; displayName = "Tasks Test"
+                id = userId; email = "u-$userId@example.com"
                 serverRole = "MEMBER"; suiteId = "v1"; identityPublicKey = pubkey
                 wrappedIdentityPrivateKey = "aWRlbnRpdHktcHJpdg=="; authPublicKey = "YXV0aC1wdWJsaWMta2V5"
                 createdAt = Instant.now()

@@ -96,7 +96,7 @@ if (!setup.setupRequired) fail('instance already set up — wipe it first (Boots
 const built = buildAccount(email, password, fromB64std(setup.instanceSalt))
 const m = built.material
 const ownerRes = await post('/api/setup/owner', {
-  email, displayName: username,
+  email,
   suiteId: m.suiteId, identityPublicKey: m.identityPublicKey, wrappedIdentityPrivateKey: m.wrappedIdentityPrivateKey,
   authPublicKey: m.authPublicKey, masterKeyWraps: m.masterKeyWraps, recoveryMasterKeyTag: m.recoveryMasterKeyTag,
 })
@@ -120,7 +120,7 @@ if (numeric) {
     '-e', `UPDATE veyq_tenant SET domain='${domain}' WHERE id='${tenantId}'`], { stdio: 'inherit' })
 }
 const tenantGrant = b64std(v1.asymWrap(v1.hybridPublic(built.identity.priv), v1.randomBytes(32), 'scope-grant', { nonce: v1.randomBytes(12) }))
-const accepted = await tenant('POST', '/api/tenants/accept', token, domain, { bootstrapSecret, grant: tenantGrant })
+const accepted = await tenant('POST', '/api/tenants/accept', token, domain, { bootstrapSecret, username, grant: tenantGrant })
 if (accepted.status >= 300) fail(`accept failed: ${accepted.status} ${JSON.stringify(accepted.body)}`)
 console.log(`tenant: ${domain} created + accepted`)
 

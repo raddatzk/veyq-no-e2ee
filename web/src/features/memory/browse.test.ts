@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { childrenOf, breadcrumbOf, nodeById } from './browse'
-import { PERSONAL_SCOPE, TENANT_SCOPE } from './location'
+import { TENANT_SCOPE } from './location'
 import { NodeKind } from '../../api/generated/content'
 import type { TreeNode } from './tree'
+
+const PERSONAL_SCOPE = '~me'
 
 function node(over: Partial<TreeNode> & Pick<TreeNode, 'id' | 'kind'>): TreeNode {
   return { parentId: null, orderIndex: 0, name: over.id, wrappedContentKey: null, wrappedMeta: null, ...over }

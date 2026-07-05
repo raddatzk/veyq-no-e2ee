@@ -16,14 +16,13 @@ const INSTANCE_SALT = new Uint8Array(16).fill(7)
 describe('setupServer — Model B request (uc.admin.setup-server)', () => {
   const { request, emergencyKit } = buildCreateServerOwnerRequest(
     'Owner@Example.com ',
-    'Kevin',
     'correct horse battery',
     INSTANCE_SALT,
   )
 
   it('carries the contract metadata', () => {
     expect(request.email).toBe('Owner@Example.com ')
-    expect(request.displayName).toBe('Kevin')
+    // The account carries no display name — identity is the per-tenant username (ADR 0023).
     expect(request.suiteId).toBe('v1')
   })
 
@@ -82,7 +81,7 @@ describe('registerServerOwner — API error propagation', () => {
       createServerOwner: () => Promise.reject(new Error('setup_already_complete')),
     } as unknown as ReturnType<typeof setupApi>)
     await expect(
-      registerServerOwner('owner@example.com', 'Kevin', 'correct horse battery'),
+      registerServerOwner('owner@example.com', 'correct horse battery'),
     ).rejects.toThrow('setup_already_complete')
   })
 })

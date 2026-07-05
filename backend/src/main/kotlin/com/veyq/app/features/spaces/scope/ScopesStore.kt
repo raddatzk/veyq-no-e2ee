@@ -2,6 +2,7 @@ package com.veyq.app.features.spaces.scope
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.admin.tenant.TenantEntity
+import com.veyq.app.shared.identity.TenantProfileStore
 import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -15,11 +16,14 @@ data class ScopeRow(val id: String, val kind: String, val tenantId: String, val 
 data class TenantRow(val tenantId: String, val name: String, val domain: String, val role: String)
 
 /** A member of a scope — the row behind a `ScopeMember` (the member directory, cr-0077). `hasGrant=false` is a
- *  pending member awaiting delivery. `identityPublicKey` is a key-holder's `asymWrap` target — never a key. */
+ *  pending member awaiting delivery. `identityPublicKey` is a key-holder's `asymWrap` target — never a key.
+ *  `username` + `sealedName` come from the member's per-tenant profile (ADR 0023); `email` is owner-only — the
+ *  handler nulls it for non-owner callers. */
 data class ScopeMemberRow(
     val userId: String,
-    val displayName: String,
-    val email: String,
+    val username: String,
+    val sealedName: String?,
+    val email: String?,
     val role: String,
     val identityPublicKey: String,
     val hasGrant: Boolean,
@@ -30,7 +34,7 @@ data class ScopeMemberRow(
  * ciphertext grant on the membership; never a scope key. The active tenant is resolved by domain (Host).
  */
 @ApplicationScoped
-class ScopesStore {
+class ScopesStore(private val profiles: TenantProfileStore) {
 
     /** The tenant id for a Host/domain, or null if no tenant claims it. */
     fun findTenantIdByDomain(domain: String): String? =
@@ -85,13 +89,30 @@ class ScopesStore {
     fun holdsGrant(userId: String, scopeId: String): Boolean =
         MembershipEntity.count("userId = ?1 and scopeId = ?2 and wrappedGrant is not null", userId, scopeId) > 0
 
-    /** Every member of a scope with their identity pubkey + grant-present flag (the directory, owner UI). */
-    fun listMembers(scopeId: String): List<ScopeMemberRow> =
-        MembershipEntity.find("scopeId", scopeId).list().mapNotNull { m ->
+    /** The tenant a scope lives in (for the directory's per-tenant profile join + owner-email gating). */
+    fun scopeTenantId(scopeId: String): String? = ScopeEntity.findById(scopeId)?.tenantId
+
+    /** Whether the user is the tenant's OWNER (gates the owner-only email in the directory). */
+    fun isTenantOwner(userId: String, tenantId: String): Boolean =
+        MembershipEntity.count(
+            "userId = ?1 and tenantId = ?2 and role = ?3", userId, tenantId, MembershipEntity.OWNER,
+        ) > 0
+
+    /** Every member of a scope: identity (per-tenant username + sealed name), pubkey, grant-present, email. The
+     *  email is included on every row here; the handler nulls it for non-owner callers (ADR 0023). */
+    fun listMembers(scopeId: String): List<ScopeMemberRow> {
+        val tenantId = ScopeEntity.findById(scopeId)?.tenantId ?: return emptyList()
+        val profileByUser = profiles.byUserInTenant(tenantId)
+        return MembershipEntity.find("scopeId", scopeId).list().mapNotNull { m ->
             VeyqUser.findById(m.userId)?.let { u ->
-                ScopeMemberRow(m.userId, u.displayName, u.email, m.role, u.identityPublicKey, m.wrappedGrant != null)
+                val p = profileByUser[m.userId]
+                ScopeMemberRow(
+                    m.userId, p?.username ?: "", p?.sealedName, u.email, m.role,
+                    u.identityPublicKey, m.wrappedGrant != null,
+                )
             }
         }
+    }
 
     /** Every tenant the caller belongs to (one row per tenant, name+domain joined) — the space switcher. */
     fun myTenants(userId: String): List<TenantRow> =

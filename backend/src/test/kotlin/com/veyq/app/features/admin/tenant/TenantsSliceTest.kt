@@ -194,7 +194,6 @@ class TenantsSliceTest {
                 VeyqUser().apply {
                     id = userId
                     this.email = email
-                    displayName = "Tenant Test"
                     serverRole = role
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

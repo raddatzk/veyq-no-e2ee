@@ -124,7 +124,6 @@ class FavoritesSliceTest {
             VeyqUser().apply {
                 id = userId
                 email = "u-$userId@example.com"
-                displayName = "Favorites Test"
                 serverRole = "MEMBER"
                 suiteId = "v1"
                 identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

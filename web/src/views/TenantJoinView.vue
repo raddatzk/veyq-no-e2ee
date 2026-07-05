@@ -47,8 +47,9 @@ function jcopy(base: string, params?: Record<string, unknown>): string {
   return t(`tenant.join.${isMember.value ? `${base}Member` : base}`, params ?? {})
 }
 
-// register form
-const displayName = ref('')
+// register + signin form: the per-tenant handle chosen on join (ADR 0023); the real name is set later in
+// profile settings (once the member holds K_tenant to seal it).
+const username = ref('')
 const password = ref('')
 const secretKeyDisplay = ref('')
 const kitSaved = ref(false)
@@ -89,7 +90,7 @@ onMounted(async () => {
 
 /** Register step 1: build the account on-device and show its Emergency Kit before activating. */
 async function prepareRegistration() {
-  if (!displayName.value.trim() || password.value.length === 0) return
+  if (!username.value.trim() || password.value.length === 0) return
   error.value = ''
   busy.value = true
   try {
@@ -112,7 +113,7 @@ async function finishRegistration() {
   try {
     // A MEMBER joins grant-less (no scope birth); only an OWNER cold-births the TENANT scope + seals a grant.
     const grant = isMember.value ? undefined : scopeGrant({ x: built.identity.pub.kemX, m: built.identity.pub.kemM })
-    await registerAndAccept(secret, displayName.value.trim(), built.material, grant)
+    await registerAndAccept(secret, username.value.trim().toLowerCase(), built.material, grant)
     phase.value = 'done'
   } catch (e) {
     error.value = await mapError(e)
@@ -132,7 +133,7 @@ async function signInAndAccept() {
     const priv = identityPrivate()
     if (!priv) throw new Error('locked')
     const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
-    await acceptInvite(secret, grant)
+    await acceptInvite(secret, username.value.trim().toLowerCase(), grant)
     phase.value = 'done'
   } catch (e) {
     error.value = await mapError(e)
@@ -147,7 +148,7 @@ async function sealAndAccept() {
   const priv = identityPrivate()
   if (!priv) throw new Error('locked')
   const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
-  await withRefresh(() => acceptInvite(secret, grant))
+  await withRefresh(() => acceptInvite(secret, username.value.trim().toLowerCase(), grant))
   password.value = ''
   phase.value = 'done'
 }
@@ -199,6 +200,7 @@ async function mapError(e: unknown): Promise<string> {
   if (status === 410) return t('tenant.join.expired')
   if (status === 404) return t('tenant.join.invalid')
   if (code === 'email_taken') return t('tenant.join.emailTaken')
+  if (code === 'username_taken') return t('tenant.join.usernameTaken')
   if (code === 'not_invited_owner') return t('tenant.join.wrongOwner')
   return t('tenant.join.failed')
 }
@@ -217,11 +219,14 @@ async function mapError(e: unknown): Promise<string> {
         <p class="veyq-form-copy">{{ jcopy('invitedTo', { tenant: tenantName, domain }) }}</p>
         <p class="veyq-form-copy">{{ jcopy('registerSub', { email: ownerEmail }) }}</p>
         <form class="veyq-form" @submit.prevent="prepareRegistration">
-          <label>{{ t('tenant.join.displayName') }}<InputText v-model="displayName" autocomplete="name" required /></label>
+          <label>{{ t('tenant.join.username') }}
+            <InputText v-model="username" name="username" autocomplete="username" required />
+            <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
+          </label>
           <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="join-password" /></label>
           <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
           <Button type="submit" :label="t('tenant.join.continue')" icon="pi pi-arrow-right" :loading="busy"
-                  :disabled="!displayName.trim() || password.length === 0" />
+                  :disabled="!username.trim() || password.length === 0" />
         </form>
       </template>
 
@@ -239,6 +244,12 @@ async function mapError(e: unknown): Promise<string> {
       <template v-else-if="phase === 'signin'">
         <p class="veyq-form-copy">{{ jcopy('invitedTo', { tenant: tenantName, domain }) }}</p>
 
+        <!-- The per-tenant handle (ADR 0023): an existing account still picks a username for THIS tenant. -->
+        <label class="veyq-form-field">{{ t('tenant.join.username') }}
+          <InputText v-model="username" name="username" autocomplete="username" required />
+          <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
+        </label>
+
         <!-- Fast path: this browser already holds the invited owner's unlocked vault → accept in one click,
              or ask for the password only if the session lapsed. Never the Secret Key. -->
         <template v-if="alreadyUnlocked">
@@ -248,13 +259,13 @@ async function mapError(e: unknown): Promise<string> {
               <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="reauth-password" /></label>
               <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
               <Button type="submit" :label="jcopy('join')" icon="pi pi-check" :loading="busy"
-                      :disabled="password.length === 0" />
+                      :disabled="!username.trim() || password.length === 0" />
             </form>
           </template>
           <template v-else>
             <p class="veyq-form-copy">{{ jcopy('signinReadySub', { email: ownerEmail }) }}</p>
             <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-            <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" @click="acceptDirect" />
+            <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" :disabled="!username.trim()" @click="acceptDirect" />
           </template>
         </template>
 
@@ -266,7 +277,7 @@ async function mapError(e: unknown): Promise<string> {
             <label>{{ t('unlock.secretKey') }}<InputText v-model="secretKey" autocomplete="off" required /></label>
             <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
             <Button type="submit" :label="jcopy('join')" icon="pi pi-check" :loading="busy"
-                    :disabled="password.length === 0 || secretKey.trim().length === 0" />
+                    :disabled="!username.trim() || password.length === 0 || secretKey.trim().length === 0" />
           </form>
         </template>
       </template>

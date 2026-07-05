@@ -45,7 +45,6 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
 
 private fun CreateServerOwnerRequest.toRegistration() = OwnerRegistration(
     email = email.lowercase(),
-    displayName = displayName,
     suiteId = suiteId.value,
     identityPublicKey = identityPublicKey,
     wrappedIdentityPrivateKey = wrappedIdentityPrivateKey,

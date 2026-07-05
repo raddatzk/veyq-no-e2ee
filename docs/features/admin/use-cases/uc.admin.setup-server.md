@@ -13,8 +13,9 @@
 1. On first run the client checks setup status; the setup flow is reachable **only** while setup is
    incomplete.
 2. The Server Owner chooses an auth method — **password + Secret Key** (the mandatory floor) and optionally
-   a **passkey** — and enters their **display name**. (No instance name is collected: the instance is
-   identified by its host, and tenant identity is a per-tenant concern — see Quality notes.)
+   a **passkey** — and enters their **email**. (No display name is collected: the account carries only email +
+   keys; a name/handle is a **per-tenant** concern set when joining a tenant — [ADR 0023](../../../decisions/0023-per-tenant-member-identity.md).
+   No instance name either: the instance is identified by its host — see Quality notes.)
 3. The client generates, **cold** (no invite, no temp-wrap — this is the root of the owner's own key
    tree): the **identity keypair**, the **Master Key** with one wrap per chosen unlock method, and the
    **Emergency Kit** (Secret Key + recovery code), then forces the owner to confirm they saved the kit.
@@ -33,11 +34,11 @@ participant "Server\n(blind)" as S
 
 C -> S : GET setup status
 S --> C : setupRequired = true
-O -> C : auth method, display name
+O -> C : auth method, email
 C -> C : generate cold —\nidentity keypair, Master Key + wraps,\nEmergency Kit (Secret Key + recovery code)
 C -> O : show Emergency Kit
 O -> C : confirm saved
-C -> S : POST setup/owner\n{ identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId, displayName }
+C -> S : POST setup/owner\n{ email, identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId }
 S -> S : store ciphertext only;\nmark setup complete (single-owner lock)
 S --> C : Server Owner created
 @enduml

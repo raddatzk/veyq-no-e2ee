@@ -88,6 +88,10 @@ note right of S : server saw invite metadata,\npubkeys, opaque grants — never 
 - **Operator-blind.** The member directory returns only **operational metadata** the server already stores
   (identity public keys, roles, grant-present flags); the wrap is **client-side**; the server stores the grant
   as opaque ciphertext. No scope key ever crosses the wire.
+- **Member identity ([en.spaces.member-identity](../enablers/en.spaces.member-identity.md), cr-0083).** Each
+  member shows a per-tenant **`username`** (plaintext handle, chosen at join, unique in the tenant) and their
+  **real name sealed under `K_tenant`** — decrypted on-device by any member, never seen by the server;
+  **`email` is owner-only** ([ADR 0023](../../../decisions/0023-per-tenant-member-identity.md)).
 - **Auth ≠ content.** Onboarding makes someone a *member* (a role); it grants **no content**. Only the
   identity-unwrapped grant yields the key — a role without a grant is deliberately hollow
   ([ADR 0007](../../../decisions/0007-membership-role-grant-relation.md)), which is exactly the *awaiting

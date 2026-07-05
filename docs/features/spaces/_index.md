@@ -35,9 +35,9 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - ★ [en.spaces.group-scope](enablers/en.spaces.group-scope.md) — **refined** (a shared, **named** GROUP scope
   born by its owner + opened — confidential even from the tenant owner;
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md), building in cr-0032)
-- [en.spaces.member-identity](enablers/en.spaces.member-identity.md) — **refined** (per-tenant `username`
+- [en.spaces.member-identity](enablers/en.spaces.member-identity.md) — **built** (per-tenant `username`
   unique-in-tenant + `firstName`/`lastName` **sealed** under `K_tenant`; email the only global key, owner-only in
-  the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md), building in
+  the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md);
   [cr-0083](../../../changes/cr-0083-member-identity.md))
 
 ## Use-cases

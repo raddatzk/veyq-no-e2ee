@@ -51,25 +51,26 @@ export function previewInvite(bootstrapSecret: string): Promise<InvitePreview> {
   return tenantsApi().previewTenantInvite({ acceptPreviewRequest: { bootstrapSecret } })
 }
 
-/** Accept as an existing (signed-in) user. An OWNER invite carries the cold-born grant; a MEMBER invite omits
- *  it (the member joins grant-less; a key-holder delivers the key later, cr-0076). */
-export function acceptInvite(bootstrapSecret: string, grant?: string): Promise<TenantActivated> {
-  return tenantsApi().acceptTenantInvite({ acceptInviteRequest: { bootstrapSecret, grant } })
+/** Accept as an existing (signed-in) user, choosing a `username` for this tenant (ADR 0023). An OWNER invite
+ *  carries the cold-born grant; a MEMBER invite omits it (grant-less; a key-holder delivers the key, cr-0076). */
+export function acceptInvite(bootstrapSecret: string, username: string, grant?: string): Promise<TenantActivated> {
+  return tenantsApi().acceptTenantInvite({ acceptInviteRequest: { bootstrapSecret, username, grant } })
 }
 
-/** Register a new account cold and accept in one step (public — the email comes from the invite). `grant` is
- *  set for an OWNER invite (cold-births the TENANT scope) and omitted for a MEMBER invite (grant-less join). */
+/** Register a new account cold and accept in one step (public — the email comes from the invite). `username` is
+ *  the caller's per-tenant handle; the real name is sealed later via the profile op (ADR 0023). `grant` is set
+ *  for an OWNER invite (cold-births the TENANT scope) and omitted for a MEMBER invite (grant-less join). */
 export function registerAndAccept(
   bootstrapSecret: string,
-  displayName: string,
+  username: string,
   material: AccountMaterial,
   grant?: string,
 ): Promise<TenantActivatedWithUser> {
   return tenantsApi().registerAndAcceptTenantInvite({
     registerAndAcceptRequest: {
       bootstrapSecret,
+      username,
       account: {
-        displayName,
         suiteId: material.suiteId,
         identityPublicKey: material.identityPublicKey,
         wrappedIdentityPrivateKey: material.wrappedIdentityPrivateKey,

@@ -47,9 +47,14 @@ class ScopesHandler(private val store: ScopesStore) {
     /**
      * The member directory of a scope (uc.spaces.add-member, ADR 0020). Only a **key-holder** in the scope may
      * read it (gating on holding a grant also means a non-member — or a bogus scope id — gets a uniform 403, so
-     * scope existence is not enumerable). Returns operational metadata only (pubkeys/roles/grant-present).
+     * scope existence is not enumerable). Returns each member's per-tenant identity (username + sealed name),
+     * pubkey + grant-present; **email is owner-only** — nulled for a non-owner caller (ADR 0023).
      */
-    fun listMembers(userId: String, scopeId: String): ListMembersOutcome =
-        if (!store.holdsGrant(userId, scopeId)) ListMembersOutcome.Forbidden
-        else ListMembersOutcome.Members(store.listMembers(scopeId))
+    fun listMembers(userId: String, scopeId: String): ListMembersOutcome {
+        if (!store.holdsGrant(userId, scopeId)) return ListMembersOutcome.Forbidden
+        val tenantId = store.scopeTenantId(scopeId) ?: return ListMembersOutcome.Forbidden
+        val owner = store.isTenantOwner(userId, tenantId)
+        val rows = store.listMembers(scopeId).map { if (owner) it else it.copy(email = null) }
+        return ListMembersOutcome.Members(rows)
+    }
 }

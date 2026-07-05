@@ -156,7 +156,7 @@ class MemberInviteManagementSliceTest {
         val userId = UUID.randomUUID().toString()
         QuarkusTransaction.requiringNew().run {
             VeyqUser().apply {
-                id = userId; this.email = email; displayName = "Member Test"; serverRole = "MEMBER"
+                id = userId; this.email = email; serverRole = "MEMBER"
                 suiteId = "v1"; identityPublicKey = pubkey; wrappedIdentityPrivateKey = "aWRlbnRpdHktcHJpdg=="
                 authPublicKey = "YXV0aC1wdWJsaWMta2V5"; createdAt = Instant.now()
             }.persist()
@@ -166,8 +166,8 @@ class MemberInviteManagementSliceTest {
 
     /** A cold-birth register body with NO grant (a MEMBER joins grant-less). */
     private fun memberRegisterBody(secret: String) = """
-        {"bootstrapSecret":"$secret",
-         "account":{"displayName":"New Member","suiteId":"v1",
+        {"bootstrapSecret":"$secret","username":"newmember",
+         "account":{"suiteId":"v1",
            "identityPublicKey":"bWVtYmVyLXB1YmxpYy1rZXk=",
            "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
            "authPublicKey":"ZWQyNTUxOS1hdXRoLXB1Yg==",

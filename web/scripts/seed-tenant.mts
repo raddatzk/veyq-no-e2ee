@@ -30,7 +30,6 @@ const ownerPassword = process.env.VEYQ_OWNER_PASSWORD ?? 'correct horse battery 
 const domain = process.env.VEYQ_DOMAIN ?? '127.0.0.1'
 const tenantOwnerEmail = process.env.VEYQ_TENANT_OWNER_EMAIL ?? 'owner@veyq.test'
 const tenantOwnerPassword = process.env.VEYQ_TENANT_OWNER_PASSWORD ?? 'correct horse battery staple'
-const tenantOwnerName = process.env.VEYQ_TENANT_OWNER_NAME ?? 'Tenant Owner'
 const tenantName = process.env.VEYQ_TENANT_NAME ?? 'local'
 // The mailer's dev-invite file (veyq.tenant.invite.dev-file), default the backend's build/ path (cr-0046).
 const inviteFile = process.env.VEYQ_INVITE_FILE ?? fileURLToPath(new URL('../../backend/build/dev-invites.jsonl', import.meta.url))
@@ -68,8 +67,8 @@ const idPub = { x: built.identity.pub.kemX, m: built.identity.pub.kemM }
 const grant = b64std(v1.asymWrap(idPub, scopeRootKey, 'scope-grant', { nonce: v1.randomBytes(12) }))
 const accepted = await post('/api/tenants/accept/register', {
   bootstrapSecret,
+  username: (process.env.VEYQ_TENANT_OWNER_USERNAME ?? tenantOwnerEmail.split('@')[0]).toLowerCase(),
   account: {
-    displayName: tenantOwnerName,
     suiteId: built.material.suiteId,
     identityPublicKey: built.material.identityPublicKey,
     wrappedIdentityPrivateKey: built.material.wrappedIdentityPrivateKey,

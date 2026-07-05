@@ -16,11 +16,10 @@ class SetupServerSliceTest {
 
     private fun ownerBody(
         email: String = "kevin@example.com",
-        displayName: String = "Kevin",
         authPublicKey: String = "ZWQyNTUxOS1hdXRoLXB1Yg==",
         kdfParams: String = "AAAAAwAAgAAAAAABAAAAIHNhbHQtZXhhbXBsZS0xNmJ5dGVz",
     ) = """
-        {"email":"$email","displayName":"$displayName","suiteId":"v1",
+        {"email":"$email","suiteId":"v1",
          "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
          "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
          "authPublicKey":"$authPublicKey",
@@ -37,13 +36,6 @@ class SetupServerSliceTest {
             .body("suites[0]", equalTo("v1"))
     }
 
-    @Test
-    @Order(2)
-    fun rejectsBlankDisplayName() {
-        given().contentType(ContentType.JSON).body(ownerBody(displayName = "   "))
-            .`when`().post("/api/setup/owner")
-            .then().statusCode(400)
-    }
 
     @Test
     @Order(3)
@@ -107,13 +99,6 @@ class SetupServerSliceTest {
             .then().statusCode(400)
     }
 
-    @Test
-    @Order(10)
-    fun rejectsOversizedDisplayName() {
-        given().contentType(ContentType.JSON).body(ownerBody(displayName = "K".repeat(101)))
-            .`when`().post("/api/setup/owner")
-            .then().statusCode(400)
-    }
 
     @Test
     @Order(11)
@@ -147,7 +132,7 @@ class SetupServerSliceTest {
     @Order(14)
     fun rejectsMissingAuthPublicKey() {
         val body = """
-            {"email":"kevin@example.com","displayName":"Kevin","suiteId":"v1",
+            {"email":"kevin@example.com","suiteId":"v1",
              "identityPublicKey":"aWRlbnRpdHktcHVibGljLWtleQ==",
              "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
              "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5"}]}

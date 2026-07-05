@@ -18,14 +18,14 @@ class SetupRequestSanitizationTest {
     @Test
     fun trimsNameFields() {
         val json = """
-            {"email":"  kev@example.com  ","displayName":"  Kevin  ","suiteId":"v1",
+            {"email":"  kev@example.com  ","suiteId":"v1",
              "identityPublicKey":"YQ==","wrappedIdentityPrivateKey":"YQ==","authPublicKey":"YQ==",
              "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"YQ=="}]}
         """.trimIndent()
 
         val req = mapper.readValue(json, CreateServerOwnerRequest::class.java)
 
+        // The account carries no display name (identity is the per-tenant username, ADR 0023); email is trimmed.
         assertEquals("kev@example.com", req.email)
-        assertEquals("Kevin", req.displayName)
     }
 }

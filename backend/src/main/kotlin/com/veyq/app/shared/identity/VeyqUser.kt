@@ -20,8 +20,8 @@ class VeyqUser : PanacheEntityBase {
     @Column(name = "email", nullable = false, length = 254)
     lateinit var email: String
 
-    @Column(name = "display_name", nullable = false, length = 100)
-    lateinit var displayName: String
+    // No display name on the account — identity is a per-tenant `username` + sealed real name on
+    // veyq_tenant_profile (ADR 0023). The account carries only email + keys + server role.
 
     @Column(name = "server_role", nullable = false, length = 32)
     lateinit var serverRole: String

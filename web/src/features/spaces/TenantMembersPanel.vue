@@ -21,14 +21,17 @@ import {
   type ScopeMember,
 } from './members'
 import { listMyTenants } from './scopes'
-import { activeSpace } from '../../app/activeSpace'
+import { activeSpace, activeScopeKey } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
+import { unsealName, type MemberName } from '../account/profile/profile'
 
 const { t } = useI18n()
 const router = useRouter()
 
 const members = ref<ScopeMember[]>([])
+// Locally-decrypted real names (first+last) keyed by userId — the sealed blob opened with K_tenant on-device.
+const names = ref<Record<string, MemberName | null>>({})
 const pendingInvites = ref<PendingMemberInvite[]>([])
 const loading = ref(true)
 const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
@@ -43,6 +46,12 @@ const reissueCopied = ref(false)
 
 const inTenant = computed(() => activeSpace.kind === ScopeKind.Tenant && activeSpace.scopeId !== null)
 
+/** The member's decrypted "First Last", or '' when not yet sealed (awaiting access) / unreadable. */
+function fullName(userId: string): string {
+  const n = names.value[userId]
+  return n ? `${n.firstName} ${n.lastName}`.trim() : ''
+}
+
 onMounted(load)
 
 async function load() {
@@ -55,6 +64,12 @@ async function load() {
   }
   try {
     members.value = await listScopeMembers(activeSpace.scopeId)
+    // Decrypt each member's sealed real name with the active tenant key (K_tenant) — on-device, operator-blind.
+    // A grant-less "awaiting access" member has no sealed name yet → null (the row shows only the @username).
+    const kTenant = activeScopeKey()
+    names.value = kTenant
+      ? Object.fromEntries(members.value.map((m) => [m.userId, unsealName(kTenant, m.sealedName)]))
+      : {}
     const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
     isOwner.value = mine?.role === 'OWNER'
     // Only the owner may read the pending-invite list (the backend 403s any non-owner).
@@ -171,8 +186,11 @@ async function revoke(invite: PendingMemberInvite) {
         <div class="veyq-list management-list-items">
           <div v-for="member in members" :key="member.userId" class="veyq-list-row member-row">
             <div class="veyq-row-main">
-              <strong class="veyq-row-title">{{ member.displayName }}</strong>
-              <span class="veyq-row-subtitle">{{ member.email }} · {{ member.role }}</span>
+              <strong class="veyq-row-title">{{ fullName(member.userId) || '@' + member.username }}</strong>
+              <span class="veyq-row-subtitle">
+                <span v-if="fullName(member.userId)">@{{ member.username }} · </span>
+                <span v-if="member.email">{{ member.email }} · </span>{{ member.role }}
+              </span>
               <div class="veyq-row-meta">
                 <span class="veyq-badge" :class="member.hasGrant ? 'success' : 'warning'">
                   {{ member.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}

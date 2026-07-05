@@ -159,7 +159,6 @@ class ScopesSliceTest {
             VeyqUser().apply {
                 id = userId
                 email = "u-$userId@example.com"
-                displayName = "Scopes Test"
                 serverRole = "MEMBER"
                 suiteId = "v1"
                 identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

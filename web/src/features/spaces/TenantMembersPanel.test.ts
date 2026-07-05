@@ -51,9 +51,10 @@ const stubs = {
   InviteMemberDialog: true,
 }
 
+// sealedName is null here (no K_tenant in the test → names stay sealed) so the rows show the @username.
 const MEMBERS = [
-  { userId: 'u-own', displayName: 'Owner', email: 'owner@x.z', role: 'OWNER', identityPublicKey: 'AA==', hasGrant: true },
-  { userId: 'u-pend', displayName: 'Partner', email: 'partner@x.z', role: 'MEMBER', identityPublicKey: 'BB==', hasGrant: false },
+  { userId: 'u-own', username: 'owner', sealedName: null, email: 'owner@x.z', role: 'OWNER', identityPublicKey: 'AA==', hasGrant: true },
+  { userId: 'u-pend', username: 'partner', sealedName: null, email: 'partner@x.z', role: 'MEMBER', identityPublicKey: 'BB==', hasGrant: false },
 ]
 
 const PENDING = [{ inviteId: 'inv-1', email: 'newbie@x.z', inviteStatus: 'ACTIVE', inviteExpiresAt: new Date() }]
@@ -81,8 +82,8 @@ describe('TenantMembersPanel (uc.spaces.add-member, web)', () => {
     const wrapper = await mountPanel('OWNER')
     const rows = wrapper.findAll('.member-row')
     expect(rows).toHaveLength(2)
-    expect(wrapper.text()).toContain('Owner')
-    expect(wrapper.text()).toContain('Partner')
+    expect(wrapper.text()).toContain('@owner')
+    expect(wrapper.text()).toContain('@partner')
     // The pending member shows "Awaiting access"; the granted one shows "Active".
     const badges = wrapper.findAll('.veyq-badge').map((b) => b.text())
     expect(badges).toContain('Active')

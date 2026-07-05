@@ -15,7 +15,6 @@ data class SetupState(
 /** The owner registration payload, mapped from the API request at the resource boundary. */
 data class OwnerRegistration(
     val email: String,
-    val displayName: String,
     val suiteId: String,
     val identityPublicKey: String,
     val wrappedIdentityPrivateKey: String,

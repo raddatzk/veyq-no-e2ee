@@ -208,7 +208,6 @@ class AccountWrapsSliceTest {
                 VeyqUser().apply {
                     id = userId
                     this.email = email
-                    displayName = "Wraps Test"
                     serverRole = "SERVER_OWNER"
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="

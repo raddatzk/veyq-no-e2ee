@@ -17,11 +17,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [SetupServerSliceTest.rejectsSecondOwner] }
       http: { e2e: [http/admin/setup.http] }
-  - id: reject-blank-name
-    text: A blank/whitespace display name is rejected at the boundary (400).
-    coverage:
-      backend: { integration: [SetupServerSliceTest.rejectsBlankDisplayName] }
-      http: { e2e: [http/admin/setup.http] }
   - id: reject-non-base64-key
     text: Non-base64 key material is rejected (400).
     coverage:
@@ -31,8 +26,8 @@ acceptanceCriteria:
     text: A malformed email is rejected at the boundary (400).
     coverage:
       backend: { integration: [SetupServerSliceTest.rejectsInvalidEmail] }
-  - id: trim-name-fields
-    text: Email and display name are trimmed before validation and storage.
+  - id: trim-email-field
+    text: The email is trimmed before validation and storage (the account carries no display name — identity is a per-tenant username, ADR 0023).
     coverage:
       backend: { unit: [SetupRequestSanitizationTest.trimsNameFields] }
 gaps:

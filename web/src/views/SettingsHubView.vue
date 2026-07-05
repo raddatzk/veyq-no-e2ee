@@ -8,6 +8,7 @@ import { computed, onMounted, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AppearancePanel from '../features/settings/AppearancePanel.vue'
+import ProfilePanel from '../features/account/profile/ProfilePanel.vue'
 import TenantMembersPanel from '../features/spaces/TenantMembersPanel.vue'
 import TenantAdminPanel from '../features/admin/createTenant/TenantAdminPanel.vue'
 import { activeSpace } from '../app/activeSpace'
@@ -26,7 +27,9 @@ const sections = computed<Section[]>(() => {
   const list: Section[] = [
     { id: 'appearance', group: t('settings.personal'), label: t('settings.appearance'), icon: 'pi pi-palette', component: AppearancePanel },
   ]
+  // Your per-tenant identity (username + real name) — needs a tenant context (ADR 0023).
   if (activeSpace.tenantId) {
+    list.push({ id: 'profile', group: t('settings.personal'), label: t('profile.title'), icon: 'pi pi-user', component: ProfilePanel })
     list.push({ id: 'tenant-members', group: t('settings.tenant'), label: t('members.title'), icon: 'pi pi-users', component: TenantMembersPanel })
   }
   if (serverRole.canManage) {

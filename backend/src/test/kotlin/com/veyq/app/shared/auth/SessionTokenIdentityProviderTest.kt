@@ -90,7 +90,6 @@ class SessionTokenIdentityProviderTest {
                 VeyqUser().apply {
                     id = userId
                     this.email = email
-                    displayName = "IdP Test"
                     serverRole = role
                     suiteId = "v1"
                     identityPublicKey = "aWRlbnRpdHktcHVibGljLWtleQ=="
