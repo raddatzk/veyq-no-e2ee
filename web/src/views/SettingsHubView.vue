@@ -38,8 +38,10 @@ const sections = computed<Section[]>(() => {
   if (activeSpace.kind === ScopeKind.Tenant) {
     list.push({ id: 'tenant-members', group: t('settings.tenant'), label: t('members.title'), icon: 'pi pi-users', component: TenantMembersPanel })
   }
+  // The group section is headed by the group's own (decrypted) name — so with several groups it's clear which
+  // one you're configuring (a "<group name> → Members" drill-down); falls back to a generic label until it resolves.
   if (activeSpace.kind === ScopeKind.Group) {
-    list.push({ id: 'group-members', group: t('settings.group'), label: t('groups.members'), icon: 'pi pi-users', component: GroupMembersPanel })
+    list.push({ id: 'group-members', group: activeSpace.name || t('settings.group'), label: t('groups.members'), icon: 'pi pi-users', component: GroupMembersPanel })
   }
   if (serverRole.canManage) {
     list.push({ id: 'server', group: t('settings.server'), label: t('settings.serverTenants'), icon: 'pi pi-server', component: TenantAdminPanel })

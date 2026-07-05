@@ -9,7 +9,7 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, listMyTenants, createGroup, listMyGroups } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
@@ -139,6 +139,29 @@ describe('listMyGroups', () => {
     mockScopes(list, vi.fn())
 
     expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew' }])
+  })
+})
+
+describe('openScopeById', () => {
+  it('opens a scope by id and decrypts a GROUP’s display name from encryptedName', async () => {
+    const key = v1.randomBytes(32)
+    const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const encryptedName = sealName(key, 'Reise-Crew')
+    const list = vi.fn().mockResolvedValue([
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName },
+    ])
+    mockScopes(list, vi.fn())
+
+    const opened = await openScopeById('g1')
+    expect(opened).not.toBeNull()
+    expect(opened!.kind).toBe('GROUP')
+    expect(opened!.name).toBe('Reise-Crew')
+    expect(Array.from(opened!.key)).toEqual(Array.from(key))
+  })
+
+  it('returns null when the caller holds no scope with that id', async () => {
+    mockScopes(vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
+    expect(await openScopeById('missing')).toBeNull()
   })
 })
 

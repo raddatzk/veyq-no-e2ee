@@ -19,6 +19,8 @@ export const activeSpace = reactive({
   scopeId: null as string | null,
   tenantId: null as string | null,
   kind: null as ScopeKind | null,
+  // The active scope's decrypted display name — a GROUP's name (cr-0032); null for the anonymous tenant/personal.
+  name: null as string | null,
   // The token-less tenant home resolved to Personal because the caller holds no TENANT grant (ADR 0019, E1).
   tenantUnavailable: false,
 })
@@ -70,6 +72,7 @@ export async function enterScope(token: string): Promise<void> {
     activeSpace.scopeId = opened.scopeId
     activeSpace.tenantId = opened.tenantId
     activeSpace.kind = opened.kind
+    activeSpace.name = opened.name ?? null
     resetTree() // no stale tree/favorites bleed across scopes — the view reloads for the new scope
     clearFavorites()
     activeSpace.status = 'ready'
@@ -90,6 +93,7 @@ export function clearActiveSpace(): void {
   activeSpace.scopeId = null
   activeSpace.tenantId = null
   activeSpace.kind = null
+  activeSpace.name = null
   activeSpace.tenantUnavailable = false
   scopeKey?.fill(0)
   scopeKey = null

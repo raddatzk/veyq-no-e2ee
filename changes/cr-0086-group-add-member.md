@@ -66,7 +66,9 @@ is a later increment.
 - [x] 4 web — `addGroupMember(scopeId, username)` data layer; a **Group members** section in the **settings hub**
   (`GroupMembersPanel`, shown when a GROUP is the active scope — mirrors `TenantMembersPanel`): the directory +
   an inline **add-by-username** form, the add **owner-only**. Members management is scope-contextual — the Tenant
-  members section is gated to the Tenant scope, the Group one to a group. No new delivery wiring: `enterScope`
+  members section is gated to the Tenant scope, the Group one to a group, and the Group section is **headed by the
+  group's own decrypted name** (`activeSpace.name`, resolved once at scope entry) so it's clear which group you're
+  configuring. No new delivery wiring: `enterScope`
   already runs grant-delivery polling for a shared scope, so the owner's own device delivers the key after the
   add. · Done when: `npm run check` green + live (needs a **second account**): owner
   adds a fellow tenant member by username → they appear in the group directory as *awaiting access* → grant is

@@ -100,8 +100,9 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
   }
 }
 
-/** An opened scope: its opaque identity + the in-memory scope content key `K_SC` (owned transiently by the caller). */
-export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array }
+/** An opened scope: its opaque identity + the in-memory scope content key `K_SC` (owned transiently by the
+ *  caller) + the decrypted display `name` for a named scope (a GROUP; undefined for the anonymous tenant/personal). */
+export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; name?: string }
 
 /** asymUnwrap our **own** grant on a scope row with the vaulted identity → the in-memory `K_SC`. Caller owns it. */
 function unwrapGrant(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Uint8Array {
@@ -137,7 +138,18 @@ export async function openScopeById(scopeId: string): Promise<OpenedScope | null
   try {
     const scope = (await listMyScopes()).find((s) => s.id === scopeId)
     if (!scope) return null
-    return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: unwrapGrant(scope, priv) }
+    const key = unwrapGrant(scope, priv)
+    // Decrypt the display name for a named (GROUP) scope so the shell can label it; a name that won't open
+    // (E2) is non-fatal — the scope still opens, just unlabelled.
+    let name: string | undefined
+    if (scope.kind === ScopeKind.Group && scope.encryptedName) {
+      try {
+        name = openName(key, scope.encryptedName)
+      } catch {
+        name = undefined
+      }
+    }
+    return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key, name }
   } finally {
     zero(priv)
   }

@@ -13,7 +13,7 @@ import { treeStore, loadTree, patchNodeMeta } from '../features/memory/treeStore
 import { childrenOf, breadcrumbOf, nodeById } from '../features/memory/browse'
 import { nodeContentKey } from '../features/memory/tree'
 import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/location'
-import { listMyTenants, listMyGroups } from '../features/spaces/scopes'
+import { listMyTenants } from '../features/spaces/scopes'
 import { NodeKind } from '../api/generated/content'
 import { ScopeKind, type MyTenant } from '../api/generated/scopes'
 import type { TreeNode } from '../features/memory/tree'
@@ -71,29 +71,13 @@ onMounted(async () => {
 const activeTenantName = computed(
   () => tenants.value.find((tn) => tn.tenantId === activeSpace.tenantId)?.name ?? '',
 )
-// A GROUP scope's root label is its **decrypted** name (en.spaces.group-scope, cr-0032) — re-resolved on every
-// scope switch (so a freshly-created group labels correctly too); `Gruppen` shows until the name decrypts.
-const groupName = ref('')
-watch(
-  () => [activeSpace.kind, activeSpace.scopeId],
-  async () => {
-    if (activeSpace.kind !== ScopeKind.Group || !activeSpace.scopeId) {
-      groupName.value = ''
-      return
-    }
-    try {
-      groupName.value = (await listMyGroups()).find((g) => g.scopeId === activeSpace.scopeId)?.name ?? ''
-    } catch {
-      groupName.value = ''
-    }
-  },
-  { immediate: true },
-)
+// A GROUP scope's root label is its **decrypted** name (en.spaces.group-scope, cr-0032) — resolved once at scope
+// entry and held on `activeSpace` (shared with the settings hub); `Gruppen` shows if a name won't decrypt.
 const rootLabel = computed(() =>
   activeSpace.kind === ScopeKind.Tenant
     ? activeTenantName.value || t('shell.shared')
     : activeSpace.kind === ScopeKind.Group
-      ? groupName.value || t('shell.groups')
+      ? activeSpace.name || t('shell.groups')
       : t('shell.personal'),
 )
 

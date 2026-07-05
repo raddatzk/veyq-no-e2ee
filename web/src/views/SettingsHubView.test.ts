@@ -80,12 +80,13 @@ describe('SettingsHubView — section filtering by scope × role', () => {
     expect(nav).not.toContain('Tenants')
   })
 
-  it('members management is scope-contextual: a Group scope shows the Group members section, not the Tenant one', async () => {
+  it('members management is scope-contextual: a Group scope shows a section headed by the group name, not the Tenant one', async () => {
     activeSpace.tenantId = 't-1'
     activeSpace.kind = ScopeKind.Group
     activeSpace.scopeId = 'g-1'
+    activeSpace.name = 'Familie Raddatz'
     const w = await mountHub()
-    expect(navText(w)).toContain('Group')
+    expect(navText(w)).toContain('Familie Raddatz') // the section is headed by the group's own decrypted name
     expect(w.find('.stub-group-members').exists()).toBe(true) // default section is the group members
     expect(w.find('.stub-members').exists()).toBe(false) // the Tenant panel is not shown in a group
   })

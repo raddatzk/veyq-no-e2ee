@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../features/spaces/scopes', () => ({
   ensurePersonalScope: vi.fn(),
   openScope: vi.fn(),
+  openScopeById: vi.fn(),
 }))
 
 import { activeSpace, activeScopeKey, enterScope, clearActiveSpace } from './activeSpace'
-import { ensurePersonalScope, openScope } from '../features/spaces/scopes'
+import { ensurePersonalScope, openScope, openScopeById } from '../features/spaces/scopes'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
 
@@ -40,6 +41,7 @@ describe('enterScope — tenant', () => {
     expect(activeSpace.status).toBe('ready')
     expect(activeSpace.scopeId).toBe(TENANT_SCOPE_ID)
     expect(activeSpace.kind).toBe(ScopeKind.Tenant)
+    expect(activeSpace.name).toBeNull() // the tenant scope is anonymous — no per-scope name
     expect(activeSpace.tenantUnavailable).toBe(false)
     expect(activeScopeKey()).toBe(key)
   })
@@ -91,6 +93,35 @@ describe('enterScope — personal', () => {
   })
 })
 
+describe('enterScope — group', () => {
+  it('opens a group by id (@<id>) → ready, holding its decrypted name on activeSpace', async () => {
+    const key = new Uint8Array(32).fill(3)
+    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key, name: 'Familie Raddatz' })
+
+    await enterScope('@g-1')
+
+    expect(openScopeById).toHaveBeenCalledWith('g-1')
+    expect(ensurePersonalScope).not.toHaveBeenCalled() // a resolvable group never falls back to Personal
+    expect(activeSpace.status).toBe('ready')
+    expect(activeSpace.kind).toBe(ScopeKind.Group)
+    expect(activeSpace.scopeId).toBe('g-1')
+    expect(activeSpace.name).toBe('Familie Raddatz')
+    expect(activeScopeKey()).toBe(key)
+  })
+
+  it('falls back to Personal when the @<id> group cannot be opened', async () => {
+    vi.mocked(openScopeById).mockResolvedValue(null)
+    vi.mocked(ensurePersonalScope).mockResolvedValue(false)
+    vi.mocked(openScope).mockResolvedValue(opened(PERSONAL_SCOPE_ID, ScopeKind.Personal, new Uint8Array(32).fill(2)))
+
+    await enterScope('@missing')
+
+    expect(ensurePersonalScope).toHaveBeenCalledOnce()
+    expect(activeSpace.kind).toBe(ScopeKind.Personal)
+    expect(activeSpace.name).toBeNull()
+  })
+})
+
 describe('enterScope — re-entry resets per-scope state', () => {
   it('clears the tree + favorites so nothing bleeds across a scope switch', async () => {
     // Seed stale per-scope state as if a previous scope was loaded.
@@ -123,6 +154,7 @@ describe('clearActiveSpace', () => {
     expect(activeSpace.status).toBe('idle')
     expect(activeSpace.scopeId).toBeNull()
     expect(activeSpace.kind).toBeNull()
+    expect(activeSpace.name).toBeNull()
     expect(activeScopeKey()).toBeNull()
     expect(Array.from(key)).toEqual(Array(32).fill(0)) // zeroed in place
   })
