@@ -93,6 +93,47 @@ class TasksSliceTest {
             .then().statusCode(400).body("code", equalTo("invalid_request"))
     }
 
+    @Test
+    fun grantDeliveryIntoARotatedScopeRecordsTheDeliveredEpoch() {
+        // A member added to an ALREADY-ROTATED scope: the worker wraps E_current (here E_1), so the membership must
+        // be recorded at the current epoch — else the client peels the chain from the wrong base (treats E_1 as E_0)
+        // and cannot read post-rotation content (cr-0093).
+        val scopeId = seedTenantScope()
+        setScopeEpoch(scopeId, 1) // the scope has rotated to E_1
+        val worker = seedUser()
+        seedGrantedMembershipRow(worker, scopeId, "owner-grant", grantedEpoch = 1) // current → not itself behind
+        val target = seedUser(pubkey = "dGFyZ2V0LXB1YmtleQ==")
+        val targetMembership = seedGrantlessMembership(target, scopeId) // grantedEpoch defaults to 0
+
+        val jobId = claimGrantDelivery(worker)
+        given().header("Authorization", bearer(worker)).contentType(ContentType.JSON)
+            .body("""{"sealedResult":"d3JhcC1FMQ=="}""")
+            .`when`().post("/api/tasks/$jobId/complete").then().statusCode(204)
+
+        assertEquals(1, grantedEpochOf(targetMembership), "grant-delivery must record the delivered (current) epoch")
+    }
+
+    @Test
+    fun staleMemberIsReconciledAndReDeliveredAtTheCurrentEpoch() {
+        // A remaining member left stale by a rotation (grant present but grantedEpoch < currentEpoch — e.g. their
+        // re-wrap failed at rotation time, en.spaces.scope-key-rotation §E2) is re-originated by reconcile and
+        // re-delivered at the current epoch, instead of being stranded on "awaiting access" (cr-0093).
+        val scopeId = seedTenantScope()
+        setScopeEpoch(scopeId, 2)
+        val worker = seedUser()
+        seedGrantedMembershipRow(worker, scopeId, "owner-grant", grantedEpoch = 2) // current → not itself behind
+        val stale = seedUser(pubkey = "c3RhbGUtcHVia2V5")
+        val staleMembership = seedGrantedMembershipRow(stale, scopeId, "old-grant", grantedEpoch = 1) // holds E_1, scope at E_2
+
+        val jobId = claimGrantDelivery(worker) // reconcile-on-claim originates a delivery for the stale member
+        given().header("Authorization", bearer(worker)).contentType(ContentType.JSON)
+            .body("""{"sealedResult":"d3JhcC1FMg=="}""")
+            .`when`().post("/api/tasks/$jobId/complete").then().statusCode(204)
+
+        assertEquals(2, grantedEpochOf(staleMembership), "the stale member is re-granted at the current epoch")
+        assertEquals("d3JhcC1FMg==", grantOf(staleMembership), "the stale grant is overwritten with the current wrap")
+    }
+
     // --- the generic mechanism: claim / reclaim / dead-letter / heartbeat / fail / enqueue -------------------
 
     @Test
@@ -354,4 +395,24 @@ class TasksSliceTest {
 
     private fun statusOf(jobId: String): String =
         QuarkusTransaction.requiringNew().call { JobEntity.findById(jobId)!!.status }
+
+    /** Simulate a rotated scope: bump its current content-key epoch (cr-0093). */
+    private fun setScopeEpoch(scopeId: String, epoch: Int) =
+        QuarkusTransaction.requiringNew().run { ScopeEntity.findById(scopeId)!!.apply { currentEpoch = epoch }.persist() }
+
+    private fun grantedEpochOf(membershipId: String): Int =
+        QuarkusTransaction.requiringNew().call { MembershipEntity.findById(membershipId)!!.grantedEpoch }
+
+    /** A granted membership with a known id + explicit grantedEpoch — to seed a *stale* member (cr-0093). */
+    private fun seedGrantedMembershipRow(userId: String, scopeId: String, grant: String, grantedEpoch: Int): String {
+        val membershipId = UUID.randomUUID().toString()
+        QuarkusTransaction.requiringNew().run {
+            MembershipEntity().apply {
+                id = membershipId; this.userId = userId; tenantId = scopeId; this.scopeId = scopeId
+                role = MembershipEntity.OWNER; wrappedGrant = grant; this.grantedEpoch = grantedEpoch
+                createdAt = Instant.now()
+            }.persist()
+        }
+        return membershipId
+    }
 }

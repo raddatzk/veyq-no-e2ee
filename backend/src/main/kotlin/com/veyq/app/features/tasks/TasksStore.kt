@@ -1,6 +1,7 @@
 package com.veyq.app.features.tasks
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -143,14 +144,19 @@ class TasksStore {
 
         if (job.capabilityTag == CapabilityTags.GRANT_DELIVERY) {
             val grant = sealedResult ?: return CompleteResult.MissingResult
-            // Deliver: set the grant only if the target is still grant-less (idempotent, first-online-wins).
-            // The write is bound to the job's OWN scope (`and scopeId = ?3`) — the caller was authorized against
-            // `job.scopeId`, so it may only ever write a grant onto a membership *in that scope*. Without this
-            // an attacker who holds a grant in any scope could target a foreign membership id (cr-0081 hardening).
+            // The worker wrapped E_current, so record grantedEpoch = the scope's current epoch — else the client
+            // peels the chain from the wrong base (treats E_current as E_0) and can't read post-rotation content
+            // (cr-0093). Deliver onto any membership that is BEHIND: grant-less OR stale (grantedEpoch < current —
+            // e.g. a rotation re-wrap that failed, §E2). Idempotent + first-online-wins: a no-op once the member is
+            // already at the current epoch. The write is bound to the job's OWN scope (`and scopeId = ?4`) — the
+            // caller was authorized against `job.scopeId`, so it may only ever write onto a membership *in that
+            // scope*; without this an attacker holding a grant in any scope could target a foreign id (cr-0081).
+            val epoch = ScopeEntity.findById(job.scopeId)?.currentEpoch ?: 0
             job.resourceRef?.let { membershipId ->
                 MembershipEntity.update(
-                    "wrappedGrant = ?1 where id = ?2 and scopeId = ?3 and wrappedGrant is null",
-                    grant, membershipId, job.scopeId,
+                    "wrappedGrant = ?1, grantedEpoch = ?2 where id = ?3 and scopeId = ?4 " +
+                        "and (wrappedGrant is null or grantedEpoch < ?2)",
+                    grant, epoch, membershipId, job.scopeId,
                 )
             }
         }
@@ -240,15 +246,18 @@ class TasksStore {
     // --- grant-delivery structural origination + dead-letter sweep -------------------------------------------
 
     /**
-     * Ensure every grant-less membership in these scopes has a PENDING grant-delivery job (server-structural
-     * origination — the server already understands "a role without a grant means deliver a key"). Idempotent:
-     * skips memberships that already have a live (PENDING/LEASED) grant-delivery job. Runs on the pull path
-     * (reconcile-on-claim) and from a scheduled backstop.
+     * Ensure every **behind** membership in these scopes has a PENDING grant-delivery job (server-structural
+     * origination — the server already understands "a role without the current key means deliver it"). A member is
+     * behind when they are grant-less (never delivered) OR **stale** (`grantedEpoch < the scope's currentEpoch` —
+     * e.g. a rotation re-wrap failed for them, §E2; cr-0093). Idempotent: skips memberships that already have a live
+     * (PENDING/LEASED) grant-delivery job. Runs on the pull path (reconcile-on-claim) and from a scheduled backstop.
      */
     @Transactional
     fun reconcileGrantDelivery(scopeIds: Set<String>, maxAttempts: Int): Int {
         if (scopeIds.isEmpty()) return 0
-        val pending = MembershipEntity.find("scopeId in ?1 and wrappedGrant is null", scopeIds).list()
+        val epochByScope = ScopeEntity.find("id in ?1", scopeIds).list().associate { it.id to it.currentEpoch }
+        val pending = MembershipEntity.find("scopeId in ?1", scopeIds).list()
+            .filter { it.wrappedGrant == null || it.grantedEpoch < (epochByScope[it.scopeId] ?: 0) }
         var created = 0
         for (m in pending) {
             val live = JobEntity.count(
@@ -271,11 +280,14 @@ class TasksStore {
         return created
     }
 
-    /** The scheduled backstop: reconcile grant-delivery across every scope that has a grant-less membership. */
+    /** The scheduled backstop: reconcile grant-delivery across every scope that has a **behind** membership — one
+     *  that is grant-less, or stale in a rotated scope (`grantedEpoch < currentEpoch`; cr-0093). `reconcileGrantDelivery`
+     *  then filters each scope down to its actually-behind members. */
     @Transactional
     fun reconcileAllGrantDelivery(maxAttempts: Int): Int {
-        val scopeIds = MembershipEntity.find("wrappedGrant is null").list().map { it.scopeId }.toSet()
-        return reconcileGrantDelivery(scopeIds, maxAttempts)
+        val grantless = MembershipEntity.find("wrappedGrant is null").list().map { it.scopeId }.toSet()
+        val rotated = ScopeEntity.find("currentEpoch > 0").list().map { it.id }.toSet()
+        return reconcileGrantDelivery(grantless + rotated, maxAttempts)
     }
 
     /** Lazily dead-letter expired-lease jobs that have exhausted their attempts (a crashed poison worker). */

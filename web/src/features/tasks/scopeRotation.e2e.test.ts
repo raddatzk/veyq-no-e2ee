@@ -27,6 +27,7 @@ import { setupApi, tasksApi } from '../../api/client'
 import { createTenant, acceptInvite, registerAndAccept, scopeGrant } from '../admin/createTenant/tenants'
 import { inviteMember, addGroupMember, listScopeMembers, removeTenantMember } from '../spaces/members'
 import { createGroup, listMyScopes, listScopeEpochs, openScopeById } from '../spaces/scopes'
+import { createMemory, listTree } from '../memory/tree'
 import { runGrantDeliveryWorker } from './grantDeliveryWorker'
 import { runScopeRotationWorker } from './scopeRotationWorker'
 import { SCOPE_ROTATION } from './capabilityTags'
@@ -129,5 +130,30 @@ describe.skipIf(!process.env.VEYQ_E2E)('cr-0092 async rotation backstop (live, r
 
     // The job is DONE — idempotent + coalescing: nothing more is claimable.
     expect(await runScopeRotationWorker(), 'the rotation job is cleared').toBe(0)
-  }, 180_000)
+
+    // --- cr-0093: a member added AFTER the rotation reads post-rotation content (grantedEpoch recorded right) ---
+    // B (key-holder at E_1) writes a memory sealed under E_1, tagged epoch 1.
+    await become(B)
+    const openedForWrite = await openScopeById(gG)
+    await createMemory(gG, openedForWrite!.epochs, 'Post-rotation memo')
+
+    // Onboard D and add them to the ALREADY-ROTATED group; grant-delivery wraps the current key E_1 to D.
+    const D = mkActor('d')
+    D.built = buildAccount(D.email, D.password, salt)
+    await become(A)
+    const inviteD = await inviteMember(tenant.tenantId, D.email)
+    D.userId = (await registerAndAccept(inviteD.bootstrapSecret, D.username, D.built.material)).userId
+    await become(B)
+    await addGroupMember(gG, D.username)
+    const openedForDelivery = await openScopeById(gG)
+    await runGrantDeliveryWorker({ scopeId: gG, key: openedForDelivery!.key })
+
+    // D must be recorded at the CURRENT epoch (not 0) and therefore read the post-rotation memo. Before cr-0093,
+    // complete left grantedEpoch=0, so D's client peeled E_1 as E_0 and listTree would fail on the epoch-1 node.
+    await become(D)
+    expect((await listMyScopes()).find((s) => s.id === gG)?.grantedEpoch, 'D granted at the current epoch').toBe(1)
+    const openedD = await openScopeById(gG)
+    const treeD = await listTree(gG, openedD!.epochs)
+    expect(treeD.some((n) => n.name === 'Post-rotation memo'), 'D reads post-rotation content').toBe(true)
+  }, 240_000)
 })

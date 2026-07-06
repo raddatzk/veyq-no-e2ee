@@ -68,7 +68,11 @@ note right of X : holds only ≤ E_n → cannot derive E_{n+1} → cannot read i
   co-shared group, [uc.spaces.remove-tenant-member](../use-cases/uc.spaces.remove-tenant-member.md) A4); when the
   remover *is* a key-holder the rotation runs synchronously (cr-0088/0089). Not a hole.
 - **E2 — a remaining member's grant can't be re-wrapped** (rotated identity, corrupt pubkey): that member's grant
-  stays stale → they fall to *awaiting access* until re-granted; the scope is not wiped.
+  stays stale (they hold `E_n` while the scope is at `E_{n+1}`) → they fall to *awaiting access*, but are
+  **auto-re-granted** by the grant-delivery **stale-epoch trigger** (cr-0093): the reconciler treats
+  `grantedEpoch < currentEpoch` like a grant-less member and queues a delivery, so the next online key-holder
+  re-wraps `E_current` to them and records `grantedEpoch = currentEpoch`. The scope is not wiped; no manual
+  intervention needed.
 
 ## Quality notes
 
