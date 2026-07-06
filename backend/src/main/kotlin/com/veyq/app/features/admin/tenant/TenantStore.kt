@@ -103,6 +103,11 @@ class TenantStore {
             "userId = ?1 and tenantId = ?2 and role = ?3", userId, tenantId, MembershipEntity.OWNER,
         ) > 0
 
+    /** The number of OWNER memberships on the tenant root scope (`scopeId == tenantId`) — the tenant last-owner
+     *  guard (ADR 0007): the last tenant OWNER may not be removed (cr-0091). */
+    fun tenantOwnerCount(tenantId: String): Long =
+        MembershipEntity.count("scopeId = ?1 and role = ?2", tenantId, MembershipEntity.OWNER)
+
     /** Whether some account with this email is already a member of the tenant (dedup on member invite). */
     fun isEmailMember(tenantId: String, email: String): Boolean {
         val userId = VeyqUser.find("email", email).firstResult()?.id ?: return false

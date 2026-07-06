@@ -37,6 +37,18 @@ export function listScopeMembers(scopeId: string): Promise<ScopeMember[]> {
 }
 
 /**
+ * Remove a member from the **tenant** (uc.spaces.remove-tenant-member, cr-0091) — owner-gated (`403
+ * not_tenant_owner`); the last-owner guard rejects removing the last tenant OWNER (`409 last_owner`), `404
+ * member_not_found`. The server runs the whole ACL-revoke cascade (cut their tenant + co-shared group access,
+ * transfer/tombstone groups they solely owned, grace-tombstone their own scopes with read kept). Operator-blind:
+ * no key crosses the wire and the tenant key is NOT rotated (ADR 0025). Distinct from {@link removeGroupMember}
+ * (a single group membership + a caller-driven rotation).
+ */
+export function removeTenantMember(tenantId: string, userId: string): Promise<void> {
+  return withRefresh(() => tenantsApi().removeTenantMember({ tenantId, userId }))
+}
+
+/**
  * Add an existing tenant member to a **group** by username (uc.spaces.add-group-member, cr-0086) — owner-gated
  * (`403 not_scope_owner`), tenant-scoped resolve (`404 member_not_found`), idempotency (`409 already_member`).
  * Records a grant-less membership; the key is delivered later by grant-delivery (cr-0076), not here. Returns the

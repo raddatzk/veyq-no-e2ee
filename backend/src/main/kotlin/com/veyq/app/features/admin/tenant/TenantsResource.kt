@@ -122,6 +122,17 @@ class TenantsResource(
             RevokeMemberInviteOutcome.InviteNotFound -> inviteNotFound()
         }
 
+    // Remove a member (cr-0091): the ACL-revoke cascade + orphan rule. @Authenticated (not Server-Owner); the
+    // owner-gate + last-owner guard live in the handler (403 not_tenant_owner / 409 last_owner).
+    @Authenticated
+    override fun removeTenantMember(tenantId: UUID, userId: UUID): Response =
+        when (handler.removeMember(identity.principal.name, tenantId.toString(), userId.toString())) {
+            RemoveTenantMemberOutcome.Ok -> Response.noContent().build()
+            RemoveTenantMemberOutcome.NotOwner -> notTenantOwner()
+            RemoveTenantMemberOutcome.MemberNotFound -> memberNotFound()
+            RemoveTenantMemberOutcome.LastOwner -> conflict("last_owner")
+        }
+
     // --- Slice B (cr-0010): invite acceptance / activation. Method-level annotations override the class
     // @RolesAllowed: preview + register are @PermitAll (secret-gated), accept is @Authenticated (any user;
     // the email-match is a domain check, not the Server-Owner role).
@@ -218,6 +229,9 @@ class TenantsResource(
 
     private fun notTenantOwner() = Response.status(Response.Status.FORBIDDEN)
         .entity(ErrorResponse(code = "not_tenant_owner")).build()
+
+    private fun memberNotFound() = Response.status(Response.Status.NOT_FOUND)
+        .entity(ErrorResponse(code = "member_not_found")).build()
 
     private fun badRequest() = Response.status(Response.Status.BAD_REQUEST)
         .entity(ErrorResponse(code = "invalid_request")).build()

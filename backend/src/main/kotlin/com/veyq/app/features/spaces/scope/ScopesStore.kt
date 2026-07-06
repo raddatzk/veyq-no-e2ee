@@ -226,6 +226,27 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     fun listPurgeable(cutoff: Instant): List<String> =
         ScopeEntity.find("deletedAt is not null and deletedAt < ?1", cutoff).list().map { it.id }
 
+    // --- tenant-member removal cascade (cr-0091) ---
+
+    /** One of a user's memberships within a tenant, tagged with its scope kind + the total member count on that
+     *  scope — a row of the `removeTenantMember` worklist (cr-0091). */
+    data class TenantMembershipRow(val scopeId: String, val kind: String, val role: String, val memberCount: Long)
+
+    /** Every scope the user is a member of in this tenant, each tagged with the scope kind + its member count —
+     *  the input to the per-kind removal cascade (delete shared, orphan-transfer, soft-delete own, cr-0091). */
+    fun membershipsInTenant(userId: String, tenantId: String): List<TenantMembershipRow> =
+        MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
+            ScopeEntity.findById(m.scopeId)?.let { s ->
+                TenantMembershipRow(m.scopeId, s.kind, m.role, MembershipEntity.count("scopeId", m.scopeId))
+            }
+        }
+
+    /** The earliest-joined **other** member of a scope (min `createdAt`), or null if the user is alone — the
+     *  orphan rule's deterministic successor owner (cr-0091, ADR 0014 §6). */
+    fun oldestOtherMember(scopeId: String, exceptUserId: String): String? =
+        MembershipEntity.find("scopeId = ?1 and userId <> ?2 order by createdAt asc", scopeId, exceptUserId)
+            .firstResult()?.userId
+
     /** Admit a member to a scope **grant-less** (role=MEMBER, no grant) — grant-delivery wraps `K_SC` to them
      *  later (cr-0076). Operator-blind: **no key is written here**. */
     @Transactional

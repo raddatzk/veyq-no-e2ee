@@ -16,6 +16,7 @@ import {
   listScopeMembers,
   memberError,
   reissueMemberInvite,
+  removeTenantMember,
   revokeMemberInvite,
   type PendingMemberInvite,
   type ScopeMember,
@@ -109,6 +110,25 @@ async function copyReissueLink() {
   reissueCopied.value = await copyText(reissueUrl.value)
 }
 
+// Remove a member from the tenant (uc.spaces.remove-tenant-member, cr-0091) — owner-only, inline confirm. The
+// server runs the whole cascade; here we just fire it and refresh the directory (the ex-member drops out). Not
+// offered on OWNER rows (owners are managed via co-ownership, not removed from the roster here).
+async function remove(member: ScopeMember) {
+  if (!window.confirm(t('members.removeConfirm'))) return
+  actionError.value = ''
+  notice.value = ''
+  reissueUrl.value = ''
+  try {
+    await removeTenantMember(activeSpace.tenantId!, member.userId)
+    notice.value = t('members.removed')
+    await load()
+  } catch (e) {
+    const { status } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value = t('members.actionFailed')
+  }
+}
+
 async function revoke(invite: PendingMemberInvite) {
   if (!window.confirm(t('members.revokeConfirm'))) return
   actionError.value = ''
@@ -196,6 +216,17 @@ async function revoke(invite: PendingMemberInvite) {
                   {{ member.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
                 </span>
               </div>
+            </div>
+            <div v-if="isOwner && member.role !== 'OWNER'" class="management-actions">
+              <Button
+                icon="pi pi-user-minus"
+                severity="danger"
+                outlined
+                size="small"
+                :aria-label="t('members.remove')"
+                :title="t('members.remove')"
+                @click="remove(member)"
+              />
             </div>
           </div>
         </div>

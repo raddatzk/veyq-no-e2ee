@@ -1,0 +1,42 @@
+useCase: uc.spaces.remove-tenant-member
+feature: spaces
+title: Remove a member from a tenant (with the group orphan rule)
+# cr-0091 delivers the removal cascade end-to-end: backend (the removeTenantMember handler + store cascade —
+# enumerate the target's tenant footprint, delete shared, orphan transfer-else-tombstone, soft-delete their own
+# scopes with membership kept, the tenant last-owner guard) + the web remove action/data layer. Reuses the
+# cr-0090 soft-delete/grace/ScopePurge for the target's own scopes. The two-account LIVE smoke (the removed
+# member's read-only grace on their own space across two accounts) is tracked in the CR; the owner→member
+# remove→drop-out round-trip was verified live (web → real backend → MariaDB).
+acceptanceCriteria:
+  - id: remove-shared-access
+    text: A TenantOwner removes a member → their tenant-scope + co-shared group memberships are deleted (instant 403 on shared content); the tenant content key is NOT rotated (ADR 0025). Owner-gated (403 not_tenant_owner), 404 for a non-member.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.nonOwnerForbiddenAndUnknownMemberNotFound] }
+      web: { unit: [src/features/spaces/members.test.ts] }
+      http: { e2e: [http/admin/tenant.http] }
+  - id: orphan-transfer
+    text: A group the removed member solely owned that still has other members auto-transfers OWNER to the oldest remaining member (earliest createdAt); the group carries on, the tenant owner never gains access.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.soleOwnedGroupWithMembersTransfersToOldestRemaining] }
+  - id: orphan-tombstone
+    text: A group the removed member was the only member of is grace-tombstoned (cr-0090 soft-delete → scheduled purge), like a deleted group.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.soloGroupIsGraceTombstonedWithMembershipKept] }
+  - id: own-scope-grace-read
+    text: The removed member's personal scope (and any solo group) is grace-tombstoned but their membership is KEPT — they retain read-only access to read/export their own memories for the grace window, then ScopePurge erases them.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.scopePurgeErasesTheGraceTombstonedOwnScope] }
+  - id: last-owner-guard
+    text: The last tenant OWNER cannot be removed (a tenant keeps ≥1 owner); the action is rejected (409 last_owner).
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.lastTenantOwnerCannotBeRemoved] }
+      http: { e2e: [http/admin/tenant.http] }
+  - id: operator-blind
+    text: The server only deletes/soft-deletes opaque rows + flips a lifecycle timestamp — never a key or a name; the tenant key is not rotated.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.scopePurgeErasesTheGraceTombstonedOwnScope] }
+gaps:
+  web: "The remove action + data layer are delivered (cr-0091) and the owner→member remove→drop-out round-trip was verified live; the deeper two-account LIVE smoke (the removed member signs in and still reads their own grace-tombstoned space read-only) is verified interactively, not in CI."
+  http: "The removeTenantMember unauth boundary is covered headless; the owner-gated cascade + 403/404/409 boundaries need a signed owner session and are covered by MemberRemoveSliceTest."
+  apple: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."
+  android: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."

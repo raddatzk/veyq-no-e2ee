@@ -5,8 +5,15 @@ vi.mock('../../api/client', () => ({
   tenantsApi: vi.fn(),
 }))
 
-import { addGroupMember, listScopeMembers, setMemberRole, removeGroupMember, SetMemberRoleRequestRoleEnum } from './members'
-import { scopesApi } from '../../api/client'
+import {
+  addGroupMember,
+  listScopeMembers,
+  setMemberRole,
+  removeGroupMember,
+  removeTenantMember,
+  SetMemberRoleRequestRoleEnum,
+} from './members'
+import { scopesApi, tenantsApi } from '../../api/client'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -46,6 +53,19 @@ describe('removeGroupMember (cr-0089)', () => {
     await removeGroupMember('g1', 'u1')
 
     expect(removeFn).toHaveBeenCalledWith({ scopeId: 'g1', userId: 'u1' })
+  })
+})
+
+describe('removeTenantMember (cr-0091)', () => {
+  it('deletes the member via the tenant members endpoint (the server runs the whole cascade)', async () => {
+    // A tenant-level cascade (cut shared, orphan rule, own-scope grace) — distinct from removeGroupMember. No
+    // key crosses the wire; the tenant key is not rotated (ADR 0025). The client just fires it by (tenant, user).
+    const removeFn = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(tenantsApi).mockReturnValue({ removeTenantMember: removeFn } as unknown as ReturnType<typeof tenantsApi>)
+
+    await removeTenantMember('t1', 'u1')
+
+    expect(removeFn).toHaveBeenCalledWith({ tenantId: 't1', userId: 'u1' })
   })
 })
 

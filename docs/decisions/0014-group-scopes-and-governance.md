@@ -101,10 +101,13 @@ and which is confidential even from the tenant owner.**
      unlike removal's key rotation.
    - **Orphans = an automatic rule, not an admin power.** When a user is removed from a tenant, a group they
      **solely** own is **transferred** — ownership passes automatically to the **oldest remaining member**
-     (promoted to OWNER); if **no** member remains, it is **grace-tombstoned** (same soft-delete as above). A
-     server rule, so no tenant-owner snooping power is needed. **Deferred with tenant member-removal**
-     ([ADR 0025](0025-forward-secrecy-policy-per-scope.md) — the trigger is tenant removal, which is future work),
-     so the orphan rule lands **with** it, not in the owner-initiated G3b slice.
+     (the **oldest remaining member** by membership `createdAt`, promoted to OWNER); if **no** member remains, it is
+     **grace-tombstoned** (same soft-delete as above). A server rule, so no tenant-owner snooping power is needed.
+     Its trigger is **tenant member-removal** ([uc.spaces.remove-tenant-member](../features/spaces/use-cases/uc.spaces.remove-tenant-member.md)):
+     removing a member cuts their **shared** access at once (ADR 0025 — no tenant rotation), but their **own** scopes
+     (personal + any solo group) are **grace-tombstoned with read access kept**, so they can read/export their own
+     memories for the window before erasure — their stuff isn't taken the instant they leave. The rotation of groups
+     they merely co-shared is client-driven and completed later by a remaining member (the async backstop).
    - **Removal → rotation.** A removed member keeps the content key they already held; confidentiality of **new**
      content is restored by **rotating the scope key forward into a new epoch** — re-grant it to the remaining
      members, seal new content under it, **nothing existing is re-encrypted** (the epoch chain,

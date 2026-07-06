@@ -38,6 +38,10 @@ const en = {
     revokeConfirm: 'Cancel this invite? Its link stops working.',
     inviteReissued: 'A fresh invite link is ready to copy.',
     inviteRevoked: 'Invite cancelled.',
+    remove: 'Remove member',
+    removeConfirm:
+      'Remove this member? They lose access to everything shared right away. Their own memories stay readable to them for 30 days, then are erased. This can’t be undone.',
+    removed: 'Member removed.',
     actionFailed: 'That action failed. Please try again.',
   },
   settings: {
@@ -410,6 +414,10 @@ const de: typeof en = {
     revokeConfirm: 'Diese Einladung zurückziehen? Ihr Link wird ungültig.',
     inviteReissued: 'Ein frischer Einladungslink liegt zum Kopieren bereit.',
     inviteRevoked: 'Einladung zurückgezogen.',
+    remove: 'Mitglied entfernen',
+    removeConfirm:
+      'Dieses Mitglied entfernen? Es verliert sofort den Zugriff auf alles Geteilte. Seine eigenen Erinnerungen bleiben ihm 30 Tage lang lesbar und werden dann gelöscht. Das lässt sich nicht rückgängig machen.',
+    removed: 'Mitglied entfernt.',
     actionFailed: 'Die Aktion ist fehlgeschlagen. Bitte erneut versuchen.',
   },
   settings: {

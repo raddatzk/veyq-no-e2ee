@@ -1,5 +1,7 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.features.spaces.scope.ScopeEntity
+import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -59,6 +61,14 @@ sealed interface RevokeMemberInviteOutcome {
     data object InviteNotFound : RevokeMemberInviteOutcome
 }
 
+/** Result of a tenant owner removing a member — the ACL-revoke cascade + orphan rule (cr-0091). */
+sealed interface RemoveTenantMemberOutcome {
+    data object Ok : RemoveTenantMemberOutcome
+    data object NotOwner : RemoveTenantMemberOutcome       // caller is not the tenant OWNER
+    data object MemberNotFound : RemoveTenantMemberOutcome  // target holds no tenant-scope membership
+    data object LastOwner : RemoveTenantMemberOutcome       // target is the last tenant OWNER
+}
+
 /**
  * Server-Owner tenant administration, structural half (uc.admin.create-tenant Slice A, cr-0009). Purely
  * fachlich: authentication + the Server-Owner gate are central (`@RolesAllowed` on [TenantsResource] →
@@ -70,6 +80,7 @@ sealed interface RevokeMemberInviteOutcome {
 @ApplicationScoped
 class TenantHandler(
     private val store: TenantStore,
+    private val scopes: ScopesStore,
     private val mailer: TenantInviteMailer,
     @param:ConfigProperty(name = "veyq.tenant.invite.ttl", defaultValue = "P7D") private val inviteTtl: Duration,
 ) {
@@ -164,6 +175,50 @@ class TenantHandler(
         val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return RevokeMemberInviteOutcome.InviteNotFound
         store.revokeInvite(invite.id)
         return RevokeMemberInviteOutcome.Done
+    }
+
+    /**
+     * A tenant **owner** removes a member (uc.spaces.remove-tenant-member, ADR 0014 §6 / ADR 0025). Owner-gated;
+     * the tenant **last-owner guard** rejects removing the last tenant OWNER (ADR 0007). Then the cascade, per
+     * scope the target belongs to in this tenant:
+     *  - **TENANT** + a **shared GROUP** → **delete** the membership (instant layer-1 cut on shared content; the
+     *    tenant key is **not** rotated, ADR 0025 — ACL-revoke; co-shared groups rotate later on a key-holder's
+     *    device, Fork 1b).
+     *  - a shared **GROUP the target solely owned** (OWNER, no other owner) → promote the **oldest** remaining
+     *    member to OWNER (the orphan rule — a server rule, the tenant owner never gains access), then delete.
+     *  - the target's **own** scopes — their **PERSONAL** scope + any **solo GROUP** (they are the only member) →
+     *    **soft-delete** (cr-0090 grace + read-only + purge) but **keep** their membership, so they retain read-only
+     *    access to read/export their own memories during grace before `ScopePurge` erases them.
+     * Operator-blind: only membership deletions + a lifecycle timestamp — never a key.
+     */
+    @Transactional
+    fun removeMember(callerId: String, tenantId: String, targetId: String): RemoveTenantMemberOutcome {
+        if (!store.isOwner(callerId, tenantId)) return RemoveTenantMemberOutcome.NotOwner
+        val memberships = scopes.membershipsInTenant(targetId, tenantId)
+        val tenantMembership = memberships.firstOrNull { it.scopeId == tenantId }
+            ?: return RemoveTenantMemberOutcome.MemberNotFound
+        if (tenantMembership.role == MembershipEntity.OWNER && store.tenantOwnerCount(tenantId) <= 1) {
+            return RemoveTenantMemberOutcome.LastOwner
+        }
+        val now = Instant.now()
+        for (m in memberships) {
+            when {
+                // The target's own scopes: grace-tombstone, keep the membership (read-only grace, then purge).
+                m.kind == ScopeEntity.PERSONAL -> scopes.softDelete(m.scopeId, now)
+                m.kind == ScopeEntity.GROUP && m.memberCount <= 1 -> scopes.softDelete(m.scopeId, now)
+                // Shared content: instant layer-1 cut. First hand over a group they solely owned (orphan rule).
+                else -> {
+                    if (m.kind == ScopeEntity.GROUP && m.role == MembershipEntity.OWNER &&
+                        scopes.ownerCount(m.scopeId) <= 1
+                    ) {
+                        scopes.oldestOtherMember(m.scopeId, targetId)
+                            ?.let { scopes.setRole(it, m.scopeId, MembershipEntity.OWNER) }
+                    }
+                    scopes.removeMembership(targetId, m.scopeId)
+                }
+            }
+        }
+        return RemoveTenantMemberOutcome.Ok
     }
 
     private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {
