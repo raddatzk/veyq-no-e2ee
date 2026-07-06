@@ -8,6 +8,7 @@ import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.GroupInvitation
 import com.veyq.app.generated.model.MyTenant
 import com.veyq.app.generated.model.ResolvedGroupCandidate
+import com.veyq.app.generated.model.RenameGroupRequest
 import com.veyq.app.generated.model.RotateScopeRequest
 import com.veyq.app.generated.model.ScopeCreated
 import com.veyq.app.generated.model.ScopeEpochLink
@@ -181,6 +182,17 @@ class ScopesResource(
             DeleteGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
             DeleteGroupOutcome.NotGroup -> conflict("not_group")
             DeleteGroupOutcome.AlreadyDeleted -> conflict("scope_already_deleted")
+        }
+
+    override fun renameGroup(scopeId: UUID, renameGroupRequest: RenameGroupRequest): Response =
+        when (handler.renameGroup(
+            identity.principal.name, scopeId.toString(), renameGroupRequest.encryptedName, renameGroupRequest.nameEpoch,
+        )) {
+            RenameGroupOutcome.Ok -> Response.noContent().build()
+            RenameGroupOutcome.NotOwner -> forbidden("not_scope_owner")
+            RenameGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
+            RenameGroupOutcome.PendingDeletion -> conflict("scope_pending_deletion")
+            RenameGroupOutcome.StaleEpoch -> conflict("stale_epoch")
         }
 
     override fun restoreGroup(scopeId: UUID): Response =

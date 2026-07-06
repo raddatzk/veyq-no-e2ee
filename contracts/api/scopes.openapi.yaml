@@ -539,6 +539,39 @@ paths:
         "404": { description: No such scope (or already hard-purged)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
         "409": { description: The group is not in pending-deletion., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_deleted } } } }
 
+  /api/scopes/{scopeId}/name:
+    post:
+      tags: [scopes]
+      operationId: renameGroup
+      summary: Rename a group — re-seal the name under the current epoch (forward-secret).
+      description: >
+        Renames a GROUP scope (uc.spaces.rename-group, cr-0097, ADR 0027). The client re-seals the new name under
+        `K_name` derived from the scope's **current** content-key epoch (`K_name = HKDF(E_currentEpoch,
+        "group-name-key")`) and posts the opaque `encryptedName` + the `nameEpoch` it sealed under. The server
+        overwrites the scope's `encrypted_name` + `name_epoch` — **only** when `nameEpoch == currentEpoch` (else
+        `409 stale_epoch`: a concurrent rotation advanced the epoch under the caller, refetch + retry) and the group
+        is active (else `409 scope_pending_deletion`: a name-write is blocked during the grace period). Sealing under
+        the **current** epoch makes the rename **forward-secret** — a member removed at an earlier epoch cannot
+        derive the new `K_name`. **Name-only**: no `K_SC` rotation, no re-grant. Owner-gated (`403 not_scope_owner`;
+        ADR 0014 §4). Operator-blind — the server never sees a key or the plaintext name (enforced by code, ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope to rename., schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RenameGroupRequest" }
+            example: { encryptedName: c2VhbGVkLW5hbWU=, nameEpoch: 0 }
+      responses:
+        "204": { description: The group was renamed (the row's encrypted_name + name_epoch were overwritten). }
+        "400": { description: Malformed request (blank/oversized/invalid encryptedName)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } } } }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such GROUP scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+        "409": { description: "The submitted `nameEpoch` is stale (a concurrent rotation moved the epoch — `stale_epoch`, refetch + retry), or the group is pending-deletion (`scope_pending_deletion`).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: stale_epoch } } } }
+
   /api/scopes/my-tenants:
     get:
       tags: [scopes]
@@ -707,6 +740,30 @@ components:
           maxLength: 8192
           example: AQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    RenameGroupRequest:
+      type: object
+      required: [encryptedName, nameEpoch]
+      properties:
+        encryptedName:
+          type: string
+          description: >
+            The new group name sealed under `K_name` derived from the scope's **current** content-key epoch
+            (cr-0097/ADR 0027): `K_name = HKDF(E_currentEpoch, "veyq/v1/group-name-key")`, then `symEncrypt(K_name,
+            newName)` (same node-name seal) — opaque base64 the server stores verbatim and never interprets. Sealing
+            under the current epoch is what makes the rename forward-secret.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        nameEpoch:
+          type: integer
+          description: >
+            The content-key epoch the client sealed `encryptedName` under — must equal the scope's **current** epoch
+            (the server rejects a stale value with `409 stale_epoch`). The server writes it to the scope's
+            `name_epoch` so members peel to it and derive `K_name` (cr-0097/ADR 0027).
+          minimum: 0
+          example: 0
 
     AddGroupMemberRequest:
       type: object

@@ -198,3 +198,20 @@ client.test("list group invitations requires auth", function () {
     client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
 });
 %}
+
+### 16. Rename a group (cr-0097): the owner-gated rename boundary without a bearer token → 401
+# A rename (encryptedName re-sealed under K_name of the current epoch + nameEpoch) is auth-checked before the
+# body. The owner-gate + the stale-epoch (409) / pending-deletion (409) guards + the forward-secret name-epoch
+# tracking are covered at the integration layer (ScopesSliceTest.rename*).
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/name
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "encryptedName": "cmVuYW1lZC1uYW1l", "nameEpoch": 0 }
+
+> {%
+client.test("group rename requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}

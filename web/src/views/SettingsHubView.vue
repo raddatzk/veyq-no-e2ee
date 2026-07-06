@@ -116,7 +116,10 @@ const hasSection = computed(() => Boolean(route.params.section))
 const activeView = computed<{ component: Component; props: Record<string, unknown> }>(() => {
   const id = activeId.value
   if (id === 'tenant-members') return { component: TenantMembersPanel, props: {} }
-  if (id.startsWith('group-')) return { component: GroupMembersPanel, props: { scopeId: id.slice('group-'.length) } }
+  if (id.startsWith('group-')) {
+    const scopeId = id.slice('group-'.length)
+    return { component: GroupMembersPanel, props: { scopeId, name: ownedGroups.value.find((g) => g.scopeId === scopeId)?.name ?? '' } }
+  }
   if (id.startsWith('tenant-')) return { component: TenantDetailPanel, props: { tenantId: id.slice('tenant-'.length) } }
   if (id === 'profile') return { component: ProfilePanel, props: {} }
   return { component: AppearancePanel, props: {} }

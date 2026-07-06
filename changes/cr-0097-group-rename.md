@@ -1,7 +1,7 @@
 ---
 id: cr-0097
 title: Rename a group — re-seal the name under the current epoch (forward-secret, owner-gated)
-status: planned
+status: done               # planned → in-progress → done (kept as a record)
 satisfies: [uc.spaces.rename-group]
 adrs: ["0027", "0024", "0014"]
 invariants: [operator-blind-e2ee]
@@ -33,21 +33,21 @@ crypto** — reuses cr-0096's `K_name` derivation + the `node-name` seal, so **n
 
 ## Phases
 
-- [ ] 1 contracts — API: add `RenameGroupRequest { encryptedName, nameEpoch }` (both opaque; `encryptedName`
+- [x] 1 contracts — API: add `RenameGroupRequest { encryptedName, nameEpoch }` (both opaque; `encryptedName`
   base64 `@NotBlank`/`@Size`/`@Pattern` as `CreateGroupRequest`, `nameEpoch` integer `minimum: 0`) + the endpoint
   **`POST /api/scopes/{scopeId}/name`** → `204`, errors `403 not_scope_owner`, `404 scope_not_found`,
   `409 stale_epoch`, `409 scope_pending_deletion`, `400` (blank/oversized). No crypto-vector changes (reuses
   cr-0096's `K_name`). · Done when: `openApiGenerateSpecs` + web `generate:api` clean.
-- [ ] 2 backend — `ScopesStore.renameGroup(scopeId, encryptedName, nameEpoch)` updates `encrypted_name` +
+- [x] 2 backend — `ScopesStore.renameGroup(scopeId, encryptedName, nameEpoch)` updates `encrypted_name` +
   `name_epoch` **only when** `nameEpoch == currentEpoch` and the group is active; a `RenameGroupOutcome`
   (`Ok` / `NotOwner` / `ScopeNotFound` / `StaleEpoch` / `PendingDeletion`) in the handler (owner-gate + GROUP-only +
   not pending-deletion); the resource maps them. Slice test: owner rename updates the row + bumps `nameEpoch`;
   non-owner → 403; `nameEpoch != currentEpoch` → 409; pending-deletion → 409; a **forward-secrecy** assertion
   (a rename after a rotation seals under the new epoch, unreadable at the old). · Done when: `./gradlew test` green.
-- [ ] 3 http — add the rename boundary to `http/spaces/scopes.http` with response-handler assertions (the
+- [x] 3 http — add the rename boundary to `http/spaces/scopes.http` with response-handler assertions (the
   owner-gated happy path is auth-checked; the crypto happy-path + guards are slice-covered). · Done when: the
   `.http` assertions pass against a seeded instance (parity surface).
-- [ ] 4 web — a **rename** action in the group settings (`GroupMembersPanel` / the group settings hub): open the
+- [x] 4 web — a **rename** action in the group settings (`GroupMembersPanel` / the group settings hub): open the
   scope → derive `K_name` for `currentEpoch` (the write key) → `sealName(K_name, newName)` → `POST …/name
   { encryptedName, nameEpoch: currentEpoch }`; on `409 stale_epoch` refetch the scope + retry once; refresh the
   switcher label. Reuse the existing rename UI/UX pattern (node rename), never invent new UI. Unit test: the rename
@@ -66,4 +66,22 @@ fingerprint/TOFU authenticity seam (stays deferred, ADR 0014 §5); a rename hist
 
 ## Retrospective
 
-_(to be filled at close)_
+Landed web-first exactly as scoped. A GroupOwner renames a group; the new name re-seals under `K_name` of the
+**current** epoch and `name_epoch` tracks it, so a member removed at an earlier epoch can't derive the new key —
+forward-secret, consistent with node names. Name-only: no `K_SC` rotation, no re-grant.
+
+- **No crypto changes** — reused cr-0096's `K_name` derivation + the `node-name` seal, so no vector work. The whole
+  CR is a thin write path over the read cr-0096 already shipped.
+- **Stale-epoch as the FS guard, not a common path.** The client always seals under its **write key** (the highest
+  epoch it holds) and sends that epoch; the server enforces `nameEpoch == currentEpoch`. A caller who is current
+  succeeds; a stale caller (only the multi-owner concurrent-rotation TOCTOU, or a not-yet-re-granted owner) gets
+  `409 stale_epoch` and the client refetches + retries once. This keeps the FS promise without a wrong-key footgun
+  (a stale seal is rejected, never stored).
+- **UI:** an owner-only inline rename on the group's own name at the top of `GroupMembersPanel` (the group settings
+  panel), name flowed in from the hub's already-decrypted nav label + emitted back on save so the switcher + nav
+  relabel. Reused the existing inline-edit pattern; no new UI concept.
+- **Coverage first-of-its-kind refined→implemented flip:** `uc.spaces.rename-group.yaml` was the repo's first
+  `status: planned` coverage file (during the refine); this CR dropped the status and filled real test refs.
+- **Deferred, unchanged:** native parity (apple/android), the fingerprint/TOFU seam, a rename history/audit log.
+- **Guards:** `openApiGenerateSpecs` + web `generate:api` clean; `./gradlew test` green (5 new rename slice tests);
+  `npm run check` green (457 pass, 3 new rename unit tests); coverage/changes/doc-link validators green.

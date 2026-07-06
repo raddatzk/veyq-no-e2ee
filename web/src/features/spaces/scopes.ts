@@ -233,6 +233,45 @@ export async function wrapGroupNameKeyForInvitee(scopeId: string, inviteeIdentit
 }
 
 /**
+ * Rename a group (uc.spaces.rename-group, cr-0097/ADR 0027) — operator-blind: re-seal the new name under `K_name`
+ * derived from the caller's **write key** (the highest epoch they hold) and POST `{ encryptedName, nameEpoch }`.
+ * The server accepts it only when `nameEpoch == currentEpoch`, so a caller who holds the current epoch reseals the
+ * name forward-secretly; a stale caller (a rotation moved the epoch under them) gets `409 stale_epoch`. We refetch
+ * + retry **once** — grant-delivery may have re-granted us to the current epoch between the two attempts. Requires
+ * an unlocked vault + OWNER on the group (enforced server-side). Throws on a persistent failure.
+ */
+export async function renameGroup(scopeId: string, newName: string): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const opened = await openScopeById(scopeId)
+    if (!opened) throw new Error('cannot open group to rename')
+    const nameEpoch = opened.epochs.current // seal under the highest epoch we hold; the server gates it == current
+    const nameKey = deriveGroupNameKey(writeKey(opened.epochs))
+    try {
+      const encryptedName = sealName(nameKey, newName)
+      await withRefresh(() => scopesApi().renameGroup({ scopeId, renameGroupRequest: { encryptedName, nameEpoch } }))
+      return
+    } catch (e) {
+      if (attempt === 0 && (await isStaleEpoch(e))) continue // a concurrent rotation — refetch the epoch + retry once
+      throw e
+    } finally {
+      nameKey.fill(0)
+      zeroEpochKeys(opened.epochs)
+    }
+  }
+}
+
+/** Whether a failed call is a `409 stale_epoch` (a concurrent rotation advanced the epoch under a rename). */
+async function isStaleEpoch(e: unknown): Promise<boolean> {
+  const res = (e as { response?: Response })?.response
+  if (!res || res.status !== 409) return false
+  try {
+    return ((await res.clone().json()) as { code?: string })?.code === 'stale_epoch'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Rotate a group's content key forward after a member was removed (ADR 0024, cr-0089) — the crypto half of the
  * remove: mint a fresh epoch key `E_{n+1}`, chain-link it to the current `E_n` (`symWrap(E_{n+1}, E_n)`), and
  * re-grant `E_{n+1}` to **every remaining member** (`asymWrap` to each directory pubkey), then POST the

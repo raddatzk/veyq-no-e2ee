@@ -1,27 +1,39 @@
 useCase: uc.spaces.rename-group
 feature: spaces
 title: Rename a group
-status: planned
-# Refined (ADR 0027 defines the crypto: re-seal the group name under K_name derived from the CURRENT epoch key and
-# bump name_epoch, so a rename is forward-secret). Not yet built — cr-0097 will land contracts -> backend -> http ->
-# web. Owner-gated, name-only (no K_SC rotation / re-grant), server rejects a stale nameEpoch (409) and a rename on
-# a pending-deletion group. Every surface is an explicit gap until cr-0097 lands its tests; native is web-first.
+# Web-complete (cr-0097). ADR 0027's rename mechanism: the owner re-seals the group name under K_name derived from
+# the scope's CURRENT content-key epoch and bumps name_epoch, so the rename is forward-secret (a removed member
+# holding only an earlier epoch can't derive the new K_name). Owner-gated, name-only (no K_SC rotation / re-grant),
+# server rejects a stale nameEpoch (409) and a rename on a pending-deletion group (409). Native (apple/android) is
+# web-first — a later CR, an explicit gap.
 acceptanceCriteria:
   - id: reseal-under-current-epoch
     text: A GroupOwner rename re-seals the group name under K_name = HKDF(E_e, "group-name-key") for e = the scope's CURRENT content-key epoch, and sets nameEpoch := e on the scope row. POST /api/scopes/{id}/name carries { encryptedName, nameEpoch } as two opaque values; the blind server overwrites encrypted_name + name_epoch and never derives a key or reads the name. Members read the new name by peeling to nameEpoch and deriving K_name.
+    coverage:
+      backend: { integration: [ScopesSliceTest.renameGroupUpdatesEncryptedNameAndNameEpoch] }
+      web: { unit: [src/features/spaces/scopes.test.ts] }
   - id: forward-secret-name
-    text: Because the new name seals under the current epoch, a member removed at an earlier epoch (holding <= E_{n-1}) cannot derive the new K_name and never reads the post-removal name — the name is forward-secret, consistent with node names (ADR 0024 sec.2). A plain rotation does NOT change the name (it keeps its epoch); only a rename bumps nameEpoch.
+    text: Because the new name seals under the current epoch, a member removed at an earlier epoch (holding <= E_{n-1}) cannot derive the new K_name and never reads the post-removal name — the name is forward-secret, consistent with node names (ADR 0024 sec.2). A plain rotation does NOT change the name (it keeps its epoch); only a rename bumps nameEpoch to the current epoch.
+    coverage:
+      backend: { integration: [ScopesSliceTest.renameAfterRotationSealsUnderTheNewEpoch] }
   - id: stale-epoch-rejected
-    text: The server rejects a rename whose nameEpoch != currentEpoch with 409 stale_epoch (a concurrent rotation advanced the epoch under the caller); the client refetches the current epoch, re-seals, and retries. A single-owner group never races; the guard is for the multi-owner read-then-write TOCTOU.
+    text: The server rejects a rename whose nameEpoch != currentEpoch with 409 stale_epoch (a concurrent rotation advanced the epoch under the caller); the client refetches the current epoch, re-seals, and retries once (grant-delivery may have re-granted it). A single-owner group never races; the guard is for the multi-owner read-then-write TOCTOU.
+    coverage:
+      backend: { integration: [ScopesSliceTest.renameStaleEpochIs409AndLeavesTheNameUnchanged] }
+      web: { unit: [src/features/spaces/scopes.test.ts] }
   - id: owner-gated-and-active
-    text: Only a GROUP OWNER may rename (403 not_scope_owner for a MEMBER; ADR 0014 sec.4 — the owner is the name authority). A rename on a pending-deletion group is rejected (409, name-write blocked during the grace period, uc.spaces.delete-group A4). A blank/oversized name is rejected at the contract boundary (400).
+    text: Only a GROUP OWNER may rename (403 not_scope_owner for a MEMBER; ADR 0014 sec.4 — the owner is the name authority). A rename on a pending-deletion group is rejected (409 scope_pending_deletion, name-write blocked during the grace period, uc.spaces.delete-group A4). The unauthenticated boundary is 401 before the body.
+    coverage:
+      backend: { integration: [ScopesSliceTest.renameNonOwnerIs403, ScopesSliceTest.renamePendingDeletionIs409] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: name-only-no-rotation
-    text: A rename is name-only — it does NOT rotate K_SC and re-grants no member (unlike a removal). It overwrites two fields on one scope row; no epoch-chain link, no per-member wrap. Operator-blind — the server sees new opaque ciphertext + a bumped small integer, never the name or a key.
+    text: A rename is name-only — it does NOT rotate K_SC and re-grants no member (unlike a removal). It overwrites two fields on one scope row; no epoch-chain link, no per-member wrap (currentEpoch is unchanged by a rename). Operator-blind — the server sees new opaque ciphertext + a bumped small integer, never the name or a key.
+    coverage:
+      backend: { integration: [ScopesSliceTest.renameGroupUpdatesEncryptedNameAndNameEpoch] }
   - id: rename-invite-failsafe
-    text: A rename between a consent-invite and its accept leaves the pending invitee's sealedNameKey (for the old name epoch) unable to open the new encryptedName -> the preview shows "unnamed"; they can still accept and then see the current name. Already handled by uc.spaces.consent-group-add (cr-0096); the rename only realizes the edge.
+    text: A rename between a consent-invite and its accept leaves the pending invitee's sealedNameKey (for the old name epoch) unable to open the new encryptedName -> the preview shows "unnamed"; they can still accept and then see the current name. The mechanism (a key that does not open the served ciphertext yields null, non-fatally) is the same one cr-0096 ships; the rename only realizes the edge.
+    coverage:
+      web: { unit: [src/features/spaces/inviteName.test.ts] }
 gaps:
-  backend: "Not yet built — cr-0097 phase 2 (owner-gate + stale-epoch guard + name_epoch update on the scope row)."
-  http: "Not yet built — cr-0097 phase 3 (the rename boundary + response-handler assertions)."
-  web: "Not yet built — cr-0097 phase 4 (settings rename action: derive K_name for the current epoch, re-seal, POST)."
   apple: "Group rename is web-first — a later native CR, like the rest of the groups epic."
   android: "Group rename is web-first — a later native CR, like the rest of the groups epic."

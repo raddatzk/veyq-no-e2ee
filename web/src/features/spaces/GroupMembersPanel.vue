@@ -12,13 +12,14 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
-import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee } from './scopes'
+import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup } from './scopes'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
-// active scope; switching between groups in the rail re-loads via the `scopeId` watch.
-const props = defineProps<{ scopeId: string }>()
+// active scope; switching between groups in the rail re-loads via the `scopeId` watch. `name` is the group's
+// decrypted display name (the hub already opened it for the nav label); it flows back updated after a rename.
+const props = defineProps<{ scopeId: string; name?: string }>()
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -36,6 +37,12 @@ const adding = ref(false)
 const actionError = ref('')
 const pendingRemove = ref<string | null>(null) // userId shown in inline "remove?" confirm (destructive → rotates)
 const removing = ref(false)
+// Group rename (cr-0097) — owner-only inline edit of the group's own name; re-seals under the current epoch.
+const renaming = ref(false)
+const nameDraft = ref('')
+const renameBusy = ref(false)
+const renameError = ref('')
+const displayName = computed(() => props.name ?? '')
 // Group lifecycle (cr-0090): the group's own pending-deletion state + the danger-zone controls.
 const purgeAfter = ref<Date | null>(null)
 const isPending = computed(() => purgeAfter.value !== null)
@@ -200,6 +207,41 @@ async function onDelete() {
   }
 }
 
+// Rename the group (cr-0097) — owner-only. Re-seal the new name under K_name of the current epoch (renameGroup);
+// on success refresh the active scope (the switcher label) if it's this group + let the hub re-label its group list.
+function startRename() {
+  nameDraft.value = displayName.value
+  renameError.value = ''
+  renaming.value = true
+}
+
+async function saveRename() {
+  const next = nameDraft.value.trim()
+  if (!next || next === displayName.value) {
+    renaming.value = false
+    return
+  }
+  renameBusy.value = true
+  renameError.value = ''
+  try {
+    await renameGroup(props.scopeId, next)
+    if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
+    emit('lifecycleChanged') // the hub reloads its owned-groups list → the nav label + our `name` prop update
+    renaming.value = false
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    renameError.value =
+      code === 'not_scope_owner'
+        ? t('members.notOwner')
+        : code === 'stale_epoch'
+          ? t('groups.renameStale')
+          : t('groups.renameFailed')
+  } finally {
+    renameBusy.value = false
+  }
+}
+
 /** Restore the group from pending-deletion (owner-only, in-window). */
 async function onRestore() {
   lifecycleError.value = ''
@@ -222,6 +264,26 @@ async function onRestore() {
 <template>
   <section class="veyq-surface settings-panel">
     <section class="settings-form">
+      <!-- The group's own name (cr-0097): owner-only inline rename (re-seals under the current epoch, forward-secret). -->
+      <div class="group-name-header">
+        <template v-if="renaming">
+          <InputText
+            v-model="nameDraft"
+            class="group-name-input"
+            autocomplete="off"
+            :placeholder="t('groups.renamePlaceholder')"
+            @keyup.enter="saveRename"
+          />
+          <Button :label="t('common.save')" icon="pi pi-check" size="small" :loading="renameBusy" @click="saveRename" />
+          <Button :label="t('common.cancel')" severity="secondary" outlined size="small" :disabled="renameBusy" @click="renaming = false" />
+        </template>
+        <template v-else>
+          <h1 class="group-name-title">{{ displayName || t('groups.untitled') }}</h1>
+          <Button v-if="isOwner" :label="t('groups.rename')" icon="pi pi-pencil" text size="small" @click="startRename" />
+        </template>
+      </div>
+      <Message v-if="renameError" severity="error" :closable="false">{{ renameError }}</Message>
+
       <div class="settings-section-header">
         <div>
           <h2>{{ t('groups.members') }}</h2>
@@ -378,6 +440,22 @@ async function onRestore() {
 }
 .danger-row :deep(.p-message) {
   margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.group-name-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.group-name-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.group-name-input {
   flex: 1;
   min-width: 0;
 }

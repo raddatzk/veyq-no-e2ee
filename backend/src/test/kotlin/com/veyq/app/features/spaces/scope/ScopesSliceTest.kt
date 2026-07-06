@@ -45,6 +45,7 @@ class ScopesSliceTest {
     private val groupName = "c2VhbGVkLWdyb3VwLW5hbWU=" // "sealed-group-name"
     private val rotPrev = "cm90LXByZXY=" // "rot-prev" (symWrap(E1, E0))
     private val newGrant = "bmV3LWVwb2NoLWdyYW50" // "new-epoch-grant"
+    private val renamedName = "cmVuYW1lZC1uYW1l" // "renamed-name" — re-sealed under K_name of the current epoch (cr-0097)
 
     /** Add a seeded tenant member (by username) to a group via the API — returns nothing, the member is grant-less. */
     private fun addToGroup(owner: String, domain: String, groupId: String, username: String) {
@@ -151,6 +152,103 @@ class ScopesSliceTest {
             .body("""{"wrappedPrev":"$rotPrev","grants":[]}""")
             .`when`().post("/api/scopes/$groupId/epochs")
             .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+    }
+
+    // --- rename a group (uc.spaces.rename-group, cr-0097) ---
+
+    @Test
+    fun renameGroupUpdatesEncryptedNameAndNameEpoch() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+
+        // Born at name-epoch 0 with the creation name.
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.id == '$groupId' }.encryptedName", equalTo(groupName))
+            .body("find { it.id == '$groupId' }.nameEpoch", equalTo(0))
+
+        // Owner renames at the current epoch (0) → 204.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/name")
+            .then().statusCode(204)
+
+        // The row now carries the new sealed name, still at name-epoch 0.
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.id == '$groupId' }.encryptedName", equalTo(renamedName))
+            .body("find { it.id == '$groupId' }.nameEpoch", equalTo(0))
+    }
+
+    @Test
+    fun renameNonOwnerIs403() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner") // a MEMBER, not the name authority
+
+        given().header("Authorization", "Bearer ${token(partner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/name")
+            .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+    }
+
+    @Test
+    fun renameStaleEpochIs409AndLeavesTheNameUnchanged() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+
+        // currentEpoch is 0; a rename claiming epoch 1 is stale → 409 stale_epoch.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":1}""")
+            .`when`().post("/api/scopes/$groupId/name")
+            .then().statusCode(409).body("code", equalTo("stale_epoch"))
+
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200).body("find { it.id == '$groupId' }.encryptedName", equalTo(groupName))
+    }
+
+    @Test
+    fun renameAfterRotationSealsUnderTheNewEpoch() {
+        // Forward-secrecy (metadata level): after a rotation to E1 the rename must carry nameEpoch=1 (the old
+        // epoch 0 is now stale) and the row's name_epoch tracks the current epoch — so a member removed at E0
+        // (holding only E0) cannot derive K_name of E1 for the new name (the crypto FS itself is asserted web-side).
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"wrappedPrev":"$rotPrev","grants":[{"userId":"$owner","wrappedGrant":"$newGrant"}]}""")
+            .`when`().post("/api/scopes/$groupId/epochs").then().statusCode(201).body("epoch", equalTo(1))
+
+        // A rename at the OLD epoch 0 is now stale.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/name").then().statusCode(409).body("code", equalTo("stale_epoch"))
+
+        // A rename at the CURRENT epoch 1 succeeds and the row's name_epoch advances to 1.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":1}""")
+            .`when`().post("/api/scopes/$groupId/name").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes")
+            .then().statusCode(200)
+            .body("find { it.id == '$groupId' }.encryptedName", equalTo(renamedName))
+            .body("find { it.id == '$groupId' }.nameEpoch", equalTo(1))
+    }
+
+    @Test
+    fun renamePendingDeletionIs409() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(204) // enters the grace period
+
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"encryptedName":"$renamedName","nameEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/name")
+            .then().statusCode(409).body("code", equalTo("scope_pending_deletion"))
     }
 
     @Test

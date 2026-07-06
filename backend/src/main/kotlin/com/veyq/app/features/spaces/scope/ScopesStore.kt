@@ -133,6 +133,18 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         return scopeId
     }
 
+    /** Rename a GROUP (uc.spaces.rename-group, cr-0097): overwrite the scope's `encrypted_name` (re-sealed under
+     *  `K_name` of the current epoch) + `name_epoch`. Name-only — no rotation, no re-grant. The caller (handler)
+     *  has already gated owner + active + `nameEpoch == currentEpoch`; this just persists the two opaque values. */
+    @Transactional
+    fun renameGroup(scopeId: String, encryptedName: String, nameEpoch: Int) {
+        ScopeEntity.findById(scopeId)?.let {
+            it.encryptedName = encryptedName
+            it.nameEpoch = nameEpoch
+            it.persist()
+        }
+    }
+
     /** The caller's scopes in this tenant, each with their own grant ciphertext (to open client-side). A
      *  grant-less ("pending") membership is skipped — the member can't open that scope yet, so it never
      *  surfaces as an openable scope (they see the Personal fallback until delivery lands, cr-0076). */

@@ -86,6 +86,15 @@ sealed interface EpochsOutcome {
     object ScopeNotFound : EpochsOutcome
 }
 
+/** Outcome of renaming a group (cr-0097). Owner-gated, GROUP-only, active-only, current-epoch-only. */
+sealed interface RenameGroupOutcome {
+    object Ok : RenameGroupOutcome
+    object ScopeNotFound : RenameGroupOutcome
+    object NotOwner : RenameGroupOutcome
+    object PendingDeletion : RenameGroupOutcome
+    object StaleEpoch : RenameGroupOutcome
+}
+
 /** Outcome of soft-deleting a group (cr-0090). */
 sealed interface DeleteGroupOutcome {
     object Ok : DeleteGroupOutcome
@@ -137,6 +146,23 @@ class ScopesHandler(private val store: ScopesStore) {
     fun listMine(userId: String, host: String?): ListScopesOutcome {
         val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return ListScopesOutcome.NoTenant
         return ListScopesOutcome.Scopes(store.listMine(userId, tenantId))
+    }
+
+    /**
+     * Rename a GROUP (uc.spaces.rename-group, cr-0097, ADR 0027). Owner-gated ([ADR 0014](0014) §4 — the name
+     * authority); GROUP-only; rejected while pending-deletion (a name-write during the grace period). The client
+     * sealed the new name under `K_name` of the **current** epoch and sends that epoch back; the server enforces
+     * `nameEpoch == currentEpoch` (`StaleEpoch` on a concurrent rotation) so the name stays forward-secret, then
+     * overwrites the row's ciphertext name + name-epoch. Name-only — no `K_SC` rotation, no re-grant. Operator-blind:
+     * the server never sees a key or the plaintext name.
+     */
+    fun renameGroup(callerId: String, scopeId: String, encryptedName: String, nameEpoch: Int): RenameGroupOutcome {
+        if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return RenameGroupOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return RenameGroupOutcome.NotOwner
+        if (store.deletedAt(scopeId) != null) return RenameGroupOutcome.PendingDeletion
+        if (store.currentEpoch(scopeId) != nameEpoch) return RenameGroupOutcome.StaleEpoch
+        store.renameGroup(scopeId, encryptedName, nameEpoch)
+        return RenameGroupOutcome.Ok
     }
 
     /**

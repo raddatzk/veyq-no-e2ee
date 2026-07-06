@@ -9,7 +9,7 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, deleteGroup, restoreGroup } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
@@ -205,6 +205,49 @@ describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)',
 
     // Forward-confidentiality: the new epoch differs from the old, so content sealed under E_1 is unreadable with E_0.
     expect(Array.from(e1a)).not.toEqual(Array.from(e0))
+  })
+})
+
+describe('renameGroup (cr-0097 — re-seal the name under the current epoch)', () => {
+  function mockGroupForRename(rename: ReturnType<typeof vi.fn>, currentEpoch = 0, grantedEpoch = 0) {
+    const key = v1.randomBytes(32) // E_grantedEpoch = the write key the caller holds
+    const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const list = vi.fn().mockResolvedValue([
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName: sealName(deriveGroupNameKey(key), 'Alt'), nameEpoch: 0, grantedEpoch, currentEpoch },
+    ])
+    vi.mocked(scopesApi).mockReturnValue({ listMyScopes: list, renameGroup: rename } as unknown as ReturnType<typeof scopesApi>)
+    return key
+  }
+
+  it('seals the new name under K_name of the write-key epoch and posts { encryptedName, nameEpoch }', async () => {
+    const rename = vi.fn().mockResolvedValue(undefined)
+    const key = mockGroupForRename(rename)
+
+    await renameGroup('g1', 'Neu')
+
+    expect(rename).toHaveBeenCalledTimes(1)
+    const req = rename.mock.calls[0][0].renameGroupRequest
+    expect(req.nameEpoch).toBe(0)
+    // The posted ciphertext decrypts under K_name derived from the epoch key back to the NEW plaintext.
+    expect(openName(deriveGroupNameKey(key), req.encryptedName)).toBe('Neu')
+  })
+
+  it('retries once on 409 stale_epoch (a concurrent rotation), then succeeds', async () => {
+    const stale = { response: new Response(JSON.stringify({ code: 'stale_epoch' }), { status: 409 }) }
+    const rename = vi.fn().mockRejectedValueOnce(stale).mockResolvedValueOnce(undefined)
+    mockGroupForRename(rename)
+
+    await renameGroup('g1', 'Neu')
+    expect(rename).toHaveBeenCalledTimes(2) // refetch + retry once
+  })
+
+  it('does not retry on a non-stale failure (e.g. 403) — it propagates', async () => {
+    const forbidden = { response: new Response(JSON.stringify({ code: 'not_scope_owner' }), { status: 403 }) }
+    const rename = vi.fn().mockRejectedValue(forbidden)
+    mockGroupForRename(rename)
+
+    await expect(renameGroup('g1', 'Neu')).rejects.toBe(forbidden)
+    expect(rename).toHaveBeenCalledTimes(1)
   })
 })
 
