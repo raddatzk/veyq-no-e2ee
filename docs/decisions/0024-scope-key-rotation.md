@@ -78,9 +78,11 @@ membership → 403) is the instant first layer for everything future.
   recorded there too.
 - **Grant-delivery gains a second trigger** (stale epoch), noted in [ADR 0020](0020-grant-distribution-invite-wrap.md)
   / [ADR 0021](0021-operator-blind-background-tasks.md).
-- **Scope-generic, group-first.** The mechanism is not group-specific (a tenant scope could rotate the same way),
-  but its first consumer is group member-removal (G3, [uc.spaces.manage-group-members](../features/spaces/use-cases/uc.spaces.manage-group-members.md)).
-  Personal scopes never rotate (one member).
+- **Scope-generic mechanism; the *policy* is per scope type** ([ADR 0025](0025-forward-secrecy-policy-per-scope.md)).
+  This ADR is only the mechanism; *when* to apply it is decided there: **groups always rotate on removal** (its
+  first consumer, G3, [uc.spaces.manage-group-members](../features/spaces/use-cases/uc.spaces.manage-group-members.md));
+  the **tenant** (the primary, potentially large content home) revokes via ACL by default and rotates only on an
+  explicit re-key, because removal-rotation is inherently `O(N)` re-grants; **personal** scopes never rotate (one member).
 - **Rejected — full re-encryption** (re-seal the tree + re-encrypt every blob): gigabytes re-keyed per leave for a
   gain (existing-unopened content vs a malicious operator) that is both narrow and outside veyq's defended threat
   model. **Rejected — a flat key-set** (hold every epoch key independently): `O(epochs)` wraps to onboard each new

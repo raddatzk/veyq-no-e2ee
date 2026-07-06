@@ -202,12 +202,22 @@ Losing **all** paths is the documented, accepted residual loss.
 1. **Server-side access invalidation — instant, no keys.** The server stops honoring the revoked share
    token / membership and serves no further blobs. This is access control, which the server is allowed
    to do (it reads no content). Effective immediately, no client required.
-2. **Content-key rotation — eventual, by a key-holder.** A client rotates the (sub)content key and
-   re-wraps to the remaining parties — defense-in-depth against a revoked party who cached ciphertext.
-   May be queued until a key-holder is online; not a hole, because layer 1 already blocks new fetches.
+2. **Content-key rotation — eventual, by a key-holder.** A client mints a new content-key **epoch** and
+   re-wraps it to the remaining parties ([ADR 0024](../decisions/0024-scope-key-rotation.md)) — defense-in-depth
+   against a revoked party who cached ciphertext *and* a **malicious operator** who would feed them post-removal
+   ciphertext (an honest operator is already stopped by layer 1). May be queued until a key-holder is online; not a
+   hole, because layer 1 already blocks new fetches.
 
-**Honest limit:** content the revoked party already downloaded and decrypted cannot be retracted —
-rotation protects only future content.
+**Whether layer 2 fires is a per-scope policy** ([ADR 0025](../decisions/0025-forward-secrecy-policy-per-scope.md)),
+because rotation re-grants **every** remaining member (`O(N)`): **groups** rotate automatically on removal (small,
+sensitive sharing); the **tenant** (the primary, potentially large content home) uses layer 1 alone by default and
+rotates only on an **explicit re-key** for the compromise case; **personal** never rotates. Layer 1 is unconditional
+for all three.
+
+**Honest limit:** content the revoked party already downloaded and decrypted cannot be retracted — rotation
+protects only future content. Where layer 2 is policy-deferred (the tenant default), a revoked member who **both**
+hoarded the key/ciphertext **and** colludes with a malicious operator retains that narrow residual until an explicit
+re-key — the same posture 1Password takes for shared vaults.
 
 ## Deletion & erasure
 
