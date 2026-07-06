@@ -12,4 +12,13 @@ package com.veyq.app.features.tasks
 object CapabilityTags {
     /** grant-delivery (cr-0076 / ADR 0020): wrap K_SC to a pending member's identity — the first consumer. */
     const val GRANT_DELIVERY = "02f271ff"
+
+    /**
+     * scope-rotation (cr-0092 / ADR 0025): complete a **queued group-key rotation** after a co-shared member was
+     * cut with no key-holder online to rotate synchronously. The next online remaining key-holder claims it,
+     * mints `E_{n+1}` + re-grants the survivors on-device (the cr-0089 rotation-commit), then completes. Unlike
+     * grant-delivery this is **not** reconcilable from DB state (a removal cut advances no epoch), so it is
+     * originated **explicitly** on the removal (`resourceRef == scopeId`); one live job per scope coalesces.
+     */
+    const val SCOPE_ROTATION = "663157d8"
 }

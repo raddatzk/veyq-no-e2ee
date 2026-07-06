@@ -19,4 +19,12 @@ class CapabilityTagRegistryTest {
         val fromRegistry = root.path("tags").path("grant-delivery").path("tag").asText()
         assertEquals(fromRegistry, CapabilityTags.GRANT_DELIVERY, "shipped tag drifted from the registry")
     }
+
+    @Test
+    fun scopeRotationTagMatchesTheRegistry() {
+        val registry = File("../contracts/tasks/tags/v1.json")
+        val root = ObjectMapper().readTree(registry)
+        val fromRegistry = root.path("tags").path("scope-rotation").path("tag").asText()
+        assertEquals(fromRegistry, CapabilityTags.SCOPE_ROTATION, "shipped tag drifted from the registry")
+    }
 }

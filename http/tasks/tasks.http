@@ -174,3 +174,33 @@ client.test("fail unknown job ⇒ 404", function () {
     client.assert(response.body.code === "job_not_found", "expected job_not_found");
 });
 %}
+
+### The second consumer — scope-rotation (cr-0092). Same blind boundary: auth before anything, and a non-
+### key-holder never gets a rotation job (the happy path is a signed key-holder flow, covered at the slice +
+### web-worker layers; a bare .http can't mint the ML-KEM re-grants). `663157d8` = scope-rotation.
+
+### 12. scope-rotation claim without a bearer token → generic 401 (auth before anything)
+POST {{host}}/api/tasks/claim
+Content-Type: application/json
+
+{ "capabilityTags": ["663157d8"] }
+
+> {%
+client.test("scope-rotation claim requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 13. authenticated scope-rotation claim, but the owner holds NO group grant (non-key-holder) → 204
+POST {{host}}/api/tasks/claim
+Authorization: Bearer {{at}}
+Content-Type: application/json
+
+{ "capabilityTags": ["663157d8"] }
+
+> {%
+client.test("non-key-holder ⇒ no rotation claimable", function () {
+    client.assert(response.status === 204, "expected 204, got " + response.status);
+});
+%}

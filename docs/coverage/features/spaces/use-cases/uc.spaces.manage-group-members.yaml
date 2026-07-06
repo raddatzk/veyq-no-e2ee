@@ -28,6 +28,17 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.rotateBumpsEpochAndReGrantsRemaining] }
       web: { unit: [src/features/spaces/scopes.test.ts, src/features/spaces/epochs.test.ts] }
+  - id: queued-rotation-backstop
+    text: >
+      A2 (no key-holder online to rotate): when the remover isn't a key-holder able to rotate synchronously, the
+      rotation is queued as a SCOPE_ROTATION job on the operator-blind task queue and the next online remaining
+      key-holder completes it on-device (mint E_{n+1} + re-grant survivors), idempotent + coalescing + first-online-
+      wins. The identical async backstop serves uc.spaces.remove-tenant-member A4 (a tenant owner cutting a co-shared
+      group they don't hold) — one mechanism, cr-0092.
+    coverage:
+      backend: { integration: [MemberRemoveSliceTest.removalQueuesRotationOnlyForCoSharedGroupsNotOwnScopesOrTenant, MemberRemoveSliceTest.queuedRotationClaimableByRemainingKeyHolderOnlyThenCompletionClearsIt, MemberRemoveSliceTest.secondRemovalCoalescesIntoTheOneLiveRotationJob] }
+      web: { unit: [src/features/tasks/scopeRotationWorker.test.ts], e2e: [src/features/tasks/scopeRotation.e2e.test.ts] }
+      http: { e2e: [http/tasks/tasks.http] }
   - id: operator-blind-rotation
     text: The server sees only role/membership metadata + opaque epoch-chain links, per-member grants, and per-node epoch indices — never a key or a name. The client posts only ciphertext (the chain-link + per-member grants).
     coverage:

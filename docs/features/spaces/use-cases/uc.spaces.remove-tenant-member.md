@@ -44,12 +44,15 @@
 - **A2 — a non-owner attempts a removal:** rejected — tenant-owner-gated (`403 not_tenant_owner`, enforced by code,
   [ADR 0008](../../../decisions/0008-centralized-http-auth.md)).
 - **A3 — the target is not a tenant member:** `404 member_not_found`.
-- **A4 — co-shared groups need rotation (deferred, Fork 1b).** For a group the target merely **co-shared**, the
-  layer-1 cut (deleted membership → 403) is immediate, but the group's forward-secrecy **rotation** must run on a
-  key-holder's device (client-driven — the removing tenant owner isn't necessarily even in that group). It is
-  completed later by a remaining group member (the **async rotation backstop**, a follow-up slice). Not a hole:
-  layer-1 already blocks new fetches; until rotation, the ex-member's old grant reads only pre-departure epochs
-  (the "rotation queued until a key-holder is online" limit already accepted for group removal).
+- **A4 — co-shared groups rotate via the async backstop (cr-0092).** For a group the target merely **co-shared**,
+  the layer-1 cut (deleted membership → 403) is immediate, but the group's forward-secrecy **rotation** must run on
+  a key-holder's device (client-driven — the removing tenant owner isn't necessarily even in that group). The
+  removal **queues a `SCOPE_ROTATION` job** on the operator-blind task queue
+  ([ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md)); the next online remaining key-holder
+  mints `E_{n+1}` + re-grants the survivors and completes it (reusing the cr-0089 rotation crypto). One live job
+  per scope **coalesces** multiple removals; idempotent + first-online-wins. Not a hole: layer-1 already blocks new
+  fetches; until rotation, the ex-member's old grant reads only pre-departure epochs (the "rotation queued until a
+  key-holder is online" limit accepted for group removal, [en.spaces.scope-key-rotation](../enablers/en.spaces.scope-key-rotation.md) §E1).
 - **E1 — already-downloaded content:** the target keeps whatever they saved locally — **not retractable** by any
   design. Removal (and the grace purge) erase the **server** copy, not what already left it.
 

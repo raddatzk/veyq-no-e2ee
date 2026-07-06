@@ -60,8 +60,13 @@ note right of X : holds only ≤ E_n → cannot derive E_{n+1} → cannot read i
 
 ## Alternate / exception flows
 
-- **E1 — no key-holder online:** rotation is *queued* (the removed membership is already deleted → layer-1 403
-  blocks their fetches meanwhile); the next online key-holder completes the mint + re-grant. Not a hole.
+- **E1 — no key-holder online:** rotation is *queued* as a `SCOPE_ROTATION` job on the operator-blind task queue
+  ([ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md), cr-0092) — the removed membership is
+  already deleted → layer-1 403 blocks their fetches meanwhile; the next online key-holder claims it, completes the
+  mint + re-grant on-device, and closes the job. One live job per scope coalesces multiple removals; idempotent +
+  first-online-wins. This is the async fallback when the remover isn't a key-holder (e.g. a tenant owner cutting a
+  co-shared group, [uc.spaces.remove-tenant-member](../use-cases/uc.spaces.remove-tenant-member.md) A4); when the
+  remover *is* a key-holder the rotation runs synchronously (cr-0088/0089). Not a hole.
 - **E2 — a remaining member's grant can't be re-wrapped** (rotated identity, corrupt pubkey): that member's grant
   stays stale → they fall to *awaiting access* until re-granted; the scope is not wiped.
 

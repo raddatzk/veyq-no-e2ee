@@ -205,6 +205,38 @@ class TasksStore {
         return jobId
     }
 
+    // --- scope-rotation event origination (cr-0092) ---------------------------------------------------------
+
+    /**
+     * Originate a **scope-rotation** job for a GROUP whose co-shared membership was just cut, when no key-holder
+     * was online to rotate synchronously (cr-0092, ADR 0025 — groups rotate). Unlike grant-delivery this can
+     * **not** be reconciled from DB state: a removal cut advances no epoch and leaves no stale-epoch mismatch, so
+     * the pending-rotation state has no structural trace — it must be recorded **explicitly** here, at the moment
+     * of the cut. Idempotent + **coalescing**: skips when a live (PENDING/LEASED) rotation job already exists for
+     * the scope, so multiple removals collapse into one rotation that re-grants the whole surviving set. The job
+     * carries only the opaque tag + `scopeId` (also mirrored into `resourceRef`) — never a key. Returns whether a
+     * job was created.
+     */
+    @Transactional
+    fun originateScopeRotation(scopeId: String, maxAttempts: Int): Boolean {
+        val live = JobEntity.count(
+            "scopeId = ?1 and capabilityTag = ?2 and status in ?3",
+            scopeId, CapabilityTags.SCOPE_ROTATION, listOf(JobEntity.PENDING, JobEntity.LEASED),
+        )
+        if (live > 0) return false
+        JobEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.scopeId = scopeId
+            capabilityTag = CapabilityTags.SCOPE_ROTATION
+            resourceRef = scopeId
+            status = JobEntity.PENDING
+            attempts = 0
+            this.maxAttempts = maxAttempts
+            createdAt = Instant.now()
+        }.persist()
+        return true
+    }
+
     // --- grant-delivery structural origination + dead-letter sweep -------------------------------------------
 
     /**

@@ -33,7 +33,10 @@
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) / [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4).
   The action is rejected; the caller must first promote another member or delete the group.
 - **A2 — no key-holder online to rotate.** Removal's layer-1 (deleted membership → 403) is immediate; the crypto
-  rotation is *queued* until a remaining key-holder is next online ([en.spaces.scope-key-rotation](../enablers/en.spaces.scope-key-rotation.md) E1).
+  rotation is *queued* as a `SCOPE_ROTATION` job on the operator-blind task queue until a remaining key-holder is
+  next online, who mints `E_{n+1}` + re-grants the survivors on-device and completes it (the **async rotation
+  backstop**, cr-0092; the same mechanism serves [uc.spaces.remove-tenant-member](uc.spaces.remove-tenant-member.md)
+  A4). Idempotent + first-online-wins ([en.spaces.scope-key-rotation](../enablers/en.spaces.scope-key-rotation.md) §E1).
   Not a hole.
 - **A3 — a non-owner attempts an action:** rejected (owner-gated, enforced by code, [ADR 0008](../../../decisions/0008-centralized-http-auth.md)).
 - **E1 — already-read content:** a removed member keeps whatever they already decrypted — **not retractable** by

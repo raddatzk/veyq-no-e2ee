@@ -3,12 +3,16 @@ package com.veyq.app.features.admin.tenant
 import com.veyq.app.features.account.login.SessionService
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.features.spaces.scope.ScopePurge
+import com.veyq.app.features.tasks.CapabilityTags
+import com.veyq.app.features.tasks.JobEntity
 import com.veyq.app.shared.identity.VeyqUser
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
+import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.equalTo
+import org.hamcrest.CoreMatchers.nullValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -132,9 +136,97 @@ class MemberRemoveSliceTest {
         assertFalse(hasMembership(member, personal), "and its kept membership is gone with it")
     }
 
+    // --- cr-0092: the async group-key-rotation backstop (SCOPE_ROTATION on the blind task queue) --------------
+
+    @Test
+    fun removalQueuesRotationOnlyForCoSharedGroupsNotOwnScopesOrTenant() {
+        val (tenantId, owner) = seedTenant("rm-rot1.example.com", "owner@rm-rot1.example.com")
+        val keyholder = seedTenantMember(tenantId, "kh@rm-rot1.example.com")
+        val member = seedTenantMember(tenantId, "m@rm-rot1.example.com")
+        val coShared = seedGroup(tenantId, keyholder) // owned by a remaining key-holder, not the removing owner
+        addMember(tenantId, coShared, member)         // the member co-shares it
+        val solo = seedGroup(tenantId, member)        // the member's own solo group → soft-deleted, not rotated
+        val personal = seedPersonal(tenantId, member) // own scope → soft-deleted, not rotated
+
+        given().header("Authorization", bearer(owner))
+            .`when`().delete("/api/tenants/$tenantId/members/$member")
+            .then().statusCode(204)
+
+        assertEquals(1L, liveRotationJobs(coShared), "one rotation job queued for the co-shared group")
+        assertEquals(0L, liveRotationJobs(solo), "a soft-deleted solo group is not rotated")
+        assertEquals(0L, liveRotationJobs(personal), "a personal scope is not rotated")
+        assertEquals(0L, liveRotationJobs(tenantId), "the tenant scope is ACL-revoke only, never rotated (ADR 0025)")
+    }
+
+    @Test
+    fun queuedRotationClaimableByRemainingKeyHolderOnlyThenCompletionClearsIt() {
+        val (tenantId, owner) = seedTenant("rm-rot2.example.com", "owner@rm-rot2.example.com")
+        val keyholder = seedTenantMember(tenantId, "kh@rm-rot2.example.com")
+        val member = seedTenantMember(tenantId, "m@rm-rot2.example.com")
+        val group = seedGroup(tenantId, keyholder)
+        addMember(tenantId, group, member)
+
+        given().header("Authorization", bearer(owner))
+            .`when`().delete("/api/tenants/$tenantId/members/$member").then().statusCode(204)
+
+        // The removing tenant owner is NOT a key-holder of the group → nothing claimable for them (the whole
+        // point of the async backstop). The removed member no longer holds the group grant → cannot claim either.
+        claimRotation(owner).then().statusCode(204)
+        claimRotation(member).then().statusCode(204)
+
+        // The remaining key-holder claims it — the cleartext envelope only (no grant-delivery target, no key).
+        val jobId = claimRotation(keyholder)
+            .then().statusCode(200)
+            .body("capabilityTag", equalTo(CapabilityTags.SCOPE_ROTATION))
+            .body("scopeId", equalTo(group))
+            .body("grantDelivery", nullValue())
+            .extract().path<String>("jobId")
+
+        // Completing (the on-device rotation-commit already advanced the epoch) clears the job; none re-claimable.
+        given().header("Authorization", bearer(keyholder)).contentType(ContentType.JSON).body("{}")
+            .`when`().post("/api/tasks/$jobId/complete").then().statusCode(204)
+        assertEquals(0L, liveRotationJobs(group), "a completed rotation job is no longer live")
+        claimRotation(keyholder).then().statusCode(204)
+    }
+
+    @Test
+    fun secondRemovalCoalescesIntoTheOneLiveRotationJob() {
+        val (tenantId, owner) = seedTenant("rm-rot3.example.com", "owner@rm-rot3.example.com")
+        val keyholder = seedTenantMember(tenantId, "kh@rm-rot3.example.com")
+        val first = seedTenantMember(tenantId, "a@rm-rot3.example.com")
+        val second = seedTenantMember(tenantId, "b@rm-rot3.example.com")
+        val group = seedGroup(tenantId, keyholder)
+        addMember(tenantId, group, first)
+        addMember(tenantId, group, second)
+
+        given().header("Authorization", bearer(owner))
+            .`when`().delete("/api/tenants/$tenantId/members/$first").then().statusCode(204)
+        assertEquals(1L, liveRotationJobs(group), "the first removal queues a rotation")
+
+        // A second removal from the same group before a key-holder is online collapses into the one live job —
+        // a single rotation re-grants the surviving set regardless of how many removals coalesced.
+        given().header("Authorization", bearer(owner))
+            .`when`().delete("/api/tenants/$tenantId/members/$second").then().statusCode(204)
+        assertEquals(1L, liveRotationJobs(group), "the second removal coalesces into the one live job")
+    }
+
     // --- helpers ---
 
     private fun bearer(userId: String) = "Bearer ${sessions.issue(userId).accessToken}"
+
+    private fun claimRotation(userId: String) =
+        given().header("Authorization", bearer(userId)).contentType(ContentType.JSON)
+            .body("""{"capabilityTags":["${CapabilityTags.SCOPE_ROTATION}"]}""")
+            .`when`().post("/api/tasks/claim")
+
+    /** Count the live (PENDING/LEASED) SCOPE_ROTATION jobs for a scope — the coalescing / origination assertion. */
+    private fun liveRotationJobs(scopeId: String): Long =
+        QuarkusTransaction.requiringNew().call {
+            JobEntity.count(
+                "scopeId = ?1 and capabilityTag = ?2 and status in ?3",
+                scopeId, CapabilityTags.SCOPE_ROTATION, listOf(JobEntity.PENDING, JobEntity.LEASED),
+            )
+        }
 
     /** An ACTIVE tenant + its TENANT scope + a granted OWNER. Returns (tenantId, ownerUserId). */
     private fun seedTenant(domain: String, ownerEmail: String): Pair<String, String> {

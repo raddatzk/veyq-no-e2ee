@@ -2,6 +2,7 @@ package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.features.spaces.scope.ScopesStore
+import com.veyq.app.features.tasks.TasksStore
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -81,8 +82,10 @@ sealed interface RemoveTenantMemberOutcome {
 class TenantHandler(
     private val store: TenantStore,
     private val scopes: ScopesStore,
+    private val tasks: TasksStore,
     private val mailer: TenantInviteMailer,
     @param:ConfigProperty(name = "veyq.tenant.invite.ttl", defaultValue = "P7D") private val inviteTtl: Duration,
+    @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
 ) {
 
     @Transactional
@@ -182,8 +185,9 @@ class TenantHandler(
      * the tenant **last-owner guard** rejects removing the last tenant OWNER (ADR 0007). Then the cascade, per
      * scope the target belongs to in this tenant:
      *  - **TENANT** + a **shared GROUP** → **delete** the membership (instant layer-1 cut on shared content; the
-     *    tenant key is **not** rotated, ADR 0025 — ACL-revoke; co-shared groups rotate later on a key-holder's
-     *    device, Fork 1b).
+     *    tenant key is **not** rotated, ADR 0025 — ACL-revoke). A co-shared GROUP additionally **queues a
+     *    `SCOPE_ROTATION` job** (cr-0092, Fork 1b) so the next online remaining key-holder rotates it forward for
+     *    layer-2 forward secrecy — the removing owner need not hold that group's key.
      *  - a shared **GROUP the target solely owned** (OWNER, no other owner) → promote the **oldest** remaining
      *    member to OWNER (the orphan rule — a server rule, the tenant owner never gains access), then delete.
      *  - the target's **own** scopes — their **PERSONAL** scope + any **solo GROUP** (they are the only member) →
@@ -215,6 +219,11 @@ class TenantHandler(
                             ?.let { scopes.setRole(it, m.scopeId, MembershipEntity.OWNER) }
                     }
                     scopes.removeMembership(targetId, m.scopeId)
+                    // Layer-2 forward secrecy for a co-shared GROUP: the removing owner isn't necessarily a
+                    // key-holder here, so queue an async rotation for the next online remaining key-holder to
+                    // complete on-device (cr-0092, Fork 1b). Idempotent + coalescing. The TENANT scope is NOT
+                    // rotated — ACL-revoke only (ADR 0025), so it falls through with no job.
+                    if (m.kind == ScopeEntity.GROUP) tasks.originateScopeRotation(m.scopeId, maxAttempts)
                 }
             }
         }

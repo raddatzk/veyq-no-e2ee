@@ -11,6 +11,8 @@ import { TENANT_SCOPE } from '../features/memory/location'
 import { resetTree, loadTree } from '../features/memory/treeStore'
 import { clearFavorites, loadFavoritesFor } from './favoritesStore'
 import { startGrantDeliveryPolling, stopGrantDeliveryPolling } from '../features/tasks/grantDeliveryPolling'
+import { startScopeRotationPolling, stopScopeRotationPolling } from '../features/tasks/scopeRotationPolling'
+import { isUnlocked } from './vault'
 
 export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
 
@@ -102,6 +104,10 @@ export async function enterScope(token: string): Promise<void> {
     // A shared TENANT/GROUP scope may have grant-less members; Personal never does, so it just stops any poll.
     if (opened.kind !== ScopeKind.Personal) startGrantDeliveryPolling(opened.scopeId, activeScopeKey)
     else stopGrantDeliveryPolling()
+    // Also drain any queued group-key rotations (cr-0092): unlike grant-delivery this is scope-agnostic — a
+    // remaining key-holder completes a queued rotation for ANY group they hold, without opening it. Session-level
+    // (restarted on each entry, stopped on logout/re-lock in clearActiveSpace), gated on an unlocked vault.
+    startScopeRotationPolling(isUnlocked)
   } catch (err) {
     activeSpace.status = isNoTenant(err) ? 'no-tenant' : 'error'
   }
@@ -134,6 +140,7 @@ export async function refreshActiveScope(): Promise<void> {
 /** Drop the active space + zero the held key (logout / re-lock). */
 export function clearActiveSpace(): void {
   stopGrantDeliveryPolling()
+  stopScopeRotationPolling()
   activeSpace.status = 'idle'
   activeSpace.scopeId = null
   activeSpace.tenantId = null

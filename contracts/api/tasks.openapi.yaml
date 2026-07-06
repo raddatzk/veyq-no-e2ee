@@ -27,6 +27,16 @@ info:
     delivery target (the member's userId + identity public key, operational metadata the server already holds)
     so the worker need not look it up separately.
 
+    **Second consumer — `scope-rotation` (cr-0092, ADR 0025).** A tenant-member removal that cuts a co-shared
+    GROUP membership needs the group rotated forward for forward secrecy, but the removing owner is not
+    necessarily a key-holder there and so cannot mint the new epoch. The backend originates a `scope-rotation`
+    job (its `scopeId` **is** the group to rotate; no sealed body, no key) and the next online remaining
+    key-holder claims it, mints `E_{n+1}` + re-grants the surviving members on-device via the rotation-commit
+    (`POST /api/scopes/{scopeId}/epochs`, cr-0089), then completes — closing the job with no `sealedResult`
+    (the rotation is already committed). The claimed job carries only the cleartext envelope (no `grantDelivery`
+    target); the worker reads the member directory + epoch links it already has endpoints for. Idempotent +
+    first-online-wins; one live job per scope coalesces multiple removals.
+
     Every operation requires an authenticated caller; authorization (scope membership) is enforced by code, not
     this spec (ADR 0008). Field validation is declared here via `x-field-extra-annotation`, so malformed input
     is rejected at the boundary (400) before any handler runs.
