@@ -74,13 +74,17 @@ name under `K_name` from birth (epoch 0) and the backend needs **no** dual-shape
   `K_name` wrapped `symWrap(K_SC, K_name)`* — a needless extra column + ciphertext; (e) *bind the one-off seal to
   `encryptedName`* — unverifiable pre-accept without a name key, i.e. it collapses into this decision.
 
-## Open questions for the CR
+## Resolved / still open
 
-- The exact HKDF `salt`/`info` and the two AAD contexts (`asymWrap` of `K_name`; the name's `symEncrypt`) —
-  pinned as conformance vectors (native byte-identical, [ADR 0009](0009-native-crypto-per-platform-vectors.md)),
-  even though native group parity is deferred.
-- A **rename** endpoint (re-seal under the current epoch + bump the name-epoch index) is the mechanism the index
-  enables, but is a **separate feature** — cr-0096 lands the epoch-indexed name (at epoch 0 from birth, FS-ready)
-  and the invite-name change; whether rename ships in the same CR or later is a scoping call.
-- Whether to fold in the deferred **fingerprint/TOFU** authenticity seam (ADR 0014 §5) now or keep it deferred
-  (leaning: **keep deferred** — orthogonal to the name-binding, and cr-0094 kept authenticity Plain).
+- **Resolved (cr-0096).** The HKDF `salt`/`info` and the AAD contexts are pinned as conformance vectors (native
+  byte-identical, [ADR 0009](0009-native-crypto-per-platform-vectors.md)): `K_name = HKDF-SHA256(E_e, salt="",
+  info=utf8("veyq/v1/group-name-key"), 32)`; the name seals with the existing **`node-name`** `symEncrypt` context
+  (a group name is a name — domain separation lives in the key derivation) and `K_name` wraps under the distinct
+  **`group-name-key`** `asymWrap` context (`group_name_key` / `sym_group_name` / `asym_group_name_key` vectors).
+- **Resolved (refined → cr-0097).** The **rename** endpoint (re-seal under the **current** epoch + bump the
+  name-epoch index) is its own feature — [uc.spaces.rename-group](../features/spaces/use-cases/uc.spaces.rename-group.md),
+  owner-gated, name-only (no `K_SC` rotation), server rejects a stale `nameEpoch` (`409`). cr-0096 landed the
+  epoch-indexed name at epoch 0 (FS-ready) + the invite-name change; cr-0097 lands rename.
+- **Still deferred.** The **fingerprint/TOFU** authenticity seam (ADR 0014 §5) stays out — orthogonal to the
+  name-binding (it closes an operator-key MITM, not the modified-owner name-lie), and cr-0094/0096 keep
+  authenticity Plain.

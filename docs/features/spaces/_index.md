@@ -66,6 +66,10 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   **canonical** name — so `K_SC` is gated **before** the wrap and the owner can't show a divergent name; accept
   delivers, decline drops silently; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §5,
   [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Native parity is a later CR)
+- [Rename a group](use-cases/uc.spaces.rename-group.md) — **refined → planned (cr-0097)** (owner re-seals the name
+  under `K_name` from the **current** epoch and bumps `nameEpoch`, so a rename is **forward-secret** — a removed
+  member can't read the new name; name-only, no `K_SC` rotation; server rejects a stale `nameEpoch`;
+  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Web-first, native later)
 - Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
   open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
   on a future per-Memory **participants** tag (sealed `userId`s)
