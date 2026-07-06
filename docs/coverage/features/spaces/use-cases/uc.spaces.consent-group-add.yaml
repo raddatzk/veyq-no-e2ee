@@ -1,0 +1,29 @@
+useCase: uc.spaces.consent-group-add
+feature: spaces
+title: Consent before being added to a group
+status: planned
+# Refined (ADR 0014 §5 → this use-case): the optional consent opt-in for group-add. Consent-first (K_SC gated
+# BEFORE the wrap — grant-delivery skips soft memberships), a one-off name-seal so the invitee decides informed,
+# account-global toggle, silent-drop decline, owner-only pending visibility. Not yet built — a later CR turns this
+# target picture into contracts + backend + web (native web-first, own CR after, like the rest of the groups epic).
+acceptanceCriteria:
+  - id: consent-toggle
+    text: A person turns on an account-global "ask before adding me to groups" preference (default off); a server-visible boolean (operational metadata, no key/content). With it off, add is the direct-add of uc.spaces.add-group-member.
+  - id: soft-membership-gates-key
+    text: With consent on, a GroupOwner's add records a SOFT (pendingConsent) grant-less membership; grant-delivery SKIPS soft memberships, so K_SC is never wrapped to a pending invitee (consent-first, never wrap-then-soft).
+  - id: one-off-name-seal
+    text: The owner's device seals just the group name to the invitee's identity public key (asymWrap, one-off ciphertext) so the invitee sees the group's name + who added them, informed — without ever receiving K_SC or the plaintext name reaching the server.
+  - id: accept-delivers
+    text: Accept clears pendingConsent → the proposal becomes a normal grant-less membership → ordinary grant-delivery wraps K_SC (awaiting access → Active), identical to direct-add from there.
+  - id: decline-silent-drop
+    text: Decline deletes the soft membership with no trace (no "declined" state); nothing was ever wrapped. A re-invite later is allowed (a fresh proposal). The owner may also rescind before acceptance.
+  - id: owner-only-pending
+    text: A pendingConsent invitee is visible in the group's member directory as "invited — awaiting consent" to OWNERS only; ordinary members see them only after they accept.
+  - id: operator-blind-consent
+    text: The server stores only a membership row + one opaque sealed-name ciphertext + relays pubkeys — never K_SC, never the plaintext name; authenticity stays Plain (the fingerprint/TOFU seam is unchanged).
+gaps:
+  backend: "Planned — the pendingConsent membership + the consent toggle + accept/decline/rescind endpoints + the grant-delivery skip are not built yet (a later CR)."
+  web: "Planned — the consent setting, the owner's proposal flow, and the invitee's 'group invitations' view are not built yet (a later CR)."
+  http: "Planned — the signed accept/decline boundary + the consent-gated add will get .http assertions where reproducible from a bare .http; the crypto happy-path is slice/live-covered."
+  apple: "Not built — web-first, native is its own later CR like the rest of the groups epic."
+  android: "Not built — web-first, native is its own later CR like the rest of the groups epic."

@@ -76,9 +76,11 @@ note right of S : server saw the membership row,\npubkeys, opaque grant — neve
 - **A2 — no group key-holder is online when the member is added:** the member stays pending, surfaced as
   *awaiting access* — **not** an error. Only a key-holder can wrap `K_SC`; the blind server cannot. Access
   completes as soon as **any** group member is next online (step 3).
-- **A3 — the target opted into consent ("ask before adding me"):** **out of scope for this slice.** Direct-add
-  admits immediately; the per-user consent opt-in (a *soft*, grant-less membership that delivery skips until the
-  invitee accepts, with the group name one-off-sealed to them) is the **next slice** ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5).
+- **A3 — the target opted into consent ("ask before adding me"):** the add diverts into a **proposal** instead of
+  admitting immediately — a *soft*, grant-less membership that delivery **skips** until the invitee accepts, with
+  the group name one-off-sealed to them. That is its own use-case, [uc.spaces.consent-group-add](uc.spaces.consent-group-add.md)
+  (refined per [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5; a later CR builds it). **This**
+  use-case is the direct-add default — consent **off**.
 - **E1 — the username doesn't resolve in this tenant:** a generic *not-found*. The resolve is **tenant-scoped** —
   a non-member (or a handle in another tenant) is not reachable, and the server never runs a global search
   ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
@@ -108,9 +110,10 @@ note right of S : server saw the membership row,\npubkeys, opaque grant — neve
   declared threat model — veyq does not defend an *actively malicious* operator before key transparency, and
   self-hosted makes it moot ([security-model](../../../crosscutting/security-model.md)). The fingerprint /
   safety-number derivation is the explicit seam for a later hardening slice.
-- **Additive only.** This use-case only **adds** a grant. **Consent** (per-user "ask before adding me", soft
-  membership) is the next slice; **promote/demote a co-owner, remove a member, the last-owner guard, `K_SC`
-  rotation, and the orphan rule** are the group-lifecycle slice ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4/§6).
+- **Additive only.** This use-case only **adds** a grant. **Consent** (the account-global "ask before adding me"
+  opt-in, soft membership) is [uc.spaces.consent-group-add](uc.spaces.consent-group-add.md) (refined); **promote/
+  demote a co-owner, remove a member, the last-owner guard, `K_SC` rotation, and the orphan rule** are the
+  group-lifecycle slice ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4/§6).
 
 ## What this means for you / Was das für dich bedeutet
 
