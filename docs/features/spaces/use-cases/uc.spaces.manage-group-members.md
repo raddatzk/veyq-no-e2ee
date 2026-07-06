@@ -39,10 +39,11 @@
 - **E1 — already-read content:** a removed member keeps whatever they already decrypted — **not retractable** by
   any design (the stated limit). Removal protects **future** content only.
 
-> **Sibling — group lifecycle (G3b):** deleting a group (soft + grace-period purge) and the **orphan rule** (when
-> a sole owner leaves the tenant, ownership auto-transfers to the **oldest remaining member**, else grace-tombstone)
-> are the lifecycle slice, decided in [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §6 — a
-> separate use-case when built.
+> **Sibling — group lifecycle (G3b):** deleting a group (soft-delete + 30-day grace + restore, then a scheduled
+> hard-purge) is [uc.spaces.delete-group](uc.spaces.delete-group.md). The **orphan rule** (when a sole owner leaves
+> the tenant, ownership auto-transfers to the **oldest remaining member**, else grace-tombstone,
+> [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §6) rides with **tenant** member-removal
+> ([ADR 0025](../../../decisions/0025-forward-secrecy-policy-per-scope.md)), which is future work.
 
 ## Quality notes
 

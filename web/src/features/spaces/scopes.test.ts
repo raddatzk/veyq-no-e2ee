@@ -9,7 +9,7 @@ vi.mock('../../api/client', () => ({
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, deleteGroup, restoreGroup } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
@@ -138,7 +138,7 @@ describe('listMyGroups', () => {
     ])
     mockScopes(list, vi.fn())
 
-    expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew' }])
+    expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew', deletedAt: null, purgeAfter: null }])
   })
 })
 
@@ -203,6 +203,20 @@ describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)',
 
     // Forward-confidentiality: the new epoch differs from the old, so content sealed under E_1 is unreadable with E_0.
     expect(Array.from(e1a)).not.toEqual(Array.from(e0))
+  })
+})
+
+describe('deleteGroup / restoreGroup (cr-0090 — group lifecycle data layer)', () => {
+  it('posts a soft-delete then a restore to the scope lifecycle endpoints', async () => {
+    const deleteFn = vi.fn().mockResolvedValue(undefined)
+    const restoreFn = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(scopesApi).mockReturnValue({ deleteGroup: deleteFn, restoreGroup: restoreFn } as unknown as ReturnType<typeof scopesApi>)
+
+    await deleteGroup('g1')
+    expect(deleteFn).toHaveBeenCalledWith({ scopeId: 'g1' })
+
+    await restoreGroup('g1')
+    expect(restoreFn).toHaveBeenCalledWith({ scopeId: 'g1' })
   })
 })
 

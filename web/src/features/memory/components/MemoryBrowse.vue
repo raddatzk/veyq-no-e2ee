@@ -24,7 +24,9 @@ import SpaceMap from './SpaceMap.vue'
 
 // `epochs` (the scope's epoch key set, ADR 0024) unseals each Memory's sealed date/cover/pins under its own epoch's
 // K_SC — a rotated scope mixes epochs across the grid; null (locked) ⇒ no dates/covers/pins.
-const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; epochs?: EpochKeys | null }>()
+// `readonly` (cr-0090): the scope is in pending-deletion → hide create/rename/delete affordances (writes are
+// server-rejected during the grace window; view + download stay open).
+const props = defineProps<{ folder?: TreeNode | null; folders: TreeNode[]; memories: TreeNode[]; epochs?: EpochKeys | null; readonly?: boolean }>()
 const emit = defineEmits<{
   openFolder: [folder: TreeNode]
   openMemory: [memory: TreeNode]
@@ -101,7 +103,7 @@ onBeforeUnmount(revokeCovers)
         <div class="veyq-card memory-folder-card memory-folder-overview-card">
           <span class="pi pi-folder" />
           <h2>{{ folder.name }}</h2>
-          <div class="memory-folder-overview-actions">
+          <div v-if="!readonly" class="memory-folder-overview-actions">
             <Button
               type="button"
               class="veyq-icon-button veyq-prime-icon-button memory-folder-overview-action memory-action-inline memory-action-collapsible"
@@ -153,6 +155,7 @@ onBeforeUnmount(revokeCovers)
           @toggle-favorite="$emit('toggleFavorite', $event)"
         />
         <button
+          v-if="!readonly"
           class="veyq-card veyq-card-interactive memory-create-card memory-create-card-memory"
           type="button"
           @click="$emit('createMemory')"
@@ -183,6 +186,7 @@ onBeforeUnmount(revokeCovers)
           <strong>{{ child.name }}</strong>
         </button>
         <button
+          v-if="!readonly"
           class="veyq-card veyq-card-interactive memory-create-card"
           type="button"
           @click="$emit('createFolder')"

@@ -64,6 +64,23 @@ sealed interface EpochsOutcome {
     object ScopeNotFound : EpochsOutcome
 }
 
+/** Outcome of soft-deleting a group (cr-0090). */
+sealed interface DeleteGroupOutcome {
+    object Ok : DeleteGroupOutcome
+    object ScopeNotFound : DeleteGroupOutcome
+    object NotGroup : DeleteGroupOutcome
+    object NotOwner : DeleteGroupOutcome
+    object AlreadyDeleted : DeleteGroupOutcome
+}
+
+/** Outcome of restoring a soft-deleted group (cr-0090). */
+sealed interface RestoreGroupOutcome {
+    object Ok : RestoreGroupOutcome
+    object ScopeNotFound : RestoreGroupOutcome
+    object NotOwner : RestoreGroupOutcome
+    object NotDeleted : RestoreGroupOutcome
+}
+
 sealed interface ListMembersOutcome {
     data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
     object Forbidden : ListMembersOutcome
@@ -158,6 +175,32 @@ class ScopesHandler(private val store: ScopesStore) {
         if (store.currentEpoch(scopeId) == null) return RotateOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RotateOutcome.NotOwner
         return RotateOutcome.Ok(store.rotate(scopeId, wrappedPrev, grants))
+    }
+
+    /**
+     * Soft-delete a group (uc.spaces.delete-group, cr-0090, ADR 0014 §6) — set the `deletedAt` marker so the
+     * group enters its grace period (read-only + restorable). Owner-gated; GROUP-only; idempotent (a group already
+     * pending-deletion is rejected). Memberships/grants are untouched, so a restore is trivial.
+     */
+    fun deleteGroup(callerId: String, scopeId: String): DeleteGroupOutcome {
+        val kind = store.scopeKind(scopeId) ?: return DeleteGroupOutcome.ScopeNotFound
+        if (kind != ScopeEntity.GROUP) return DeleteGroupOutcome.NotGroup
+        if (!store.isScopeOwner(callerId, scopeId)) return DeleteGroupOutcome.NotOwner
+        if (store.deletedAt(scopeId) != null) return DeleteGroupOutcome.AlreadyDeleted
+        store.softDelete(scopeId, java.time.Instant.now())
+        return DeleteGroupOutcome.Ok
+    }
+
+    /**
+     * Restore a group from pending-deletion (cr-0090) — clear the marker, active again for everyone. Owner-gated;
+     * `409` if the group is not pending-deletion; a hard-purged scope is simply gone (404 from `scopeKind`).
+     */
+    fun restoreGroup(callerId: String, scopeId: String): RestoreGroupOutcome {
+        if (store.scopeKind(scopeId) == null) return RestoreGroupOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return RestoreGroupOutcome.NotOwner
+        if (store.deletedAt(scopeId) == null) return RestoreGroupOutcome.NotDeleted
+        store.restore(scopeId)
+        return RestoreGroupOutcome.Ok
     }
 
     /** The scope's epoch-chain links — any key-holder in the scope may read them (cr-0088, ADR 0024). */

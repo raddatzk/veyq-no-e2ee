@@ -37,6 +37,11 @@ class ScopeEntity : PanacheEntityBase {
     @Column(name = "current_epoch", nullable = false)
     var currentEpoch: Int = 0
 
+    /** When a GROUP was **soft-deleted** (uc.spaces.delete-group, cr-0090); null = active. While set, the group is
+     *  in a grace period — readable but read-only, and the scheduled purge hard-erases it after the retention. */
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

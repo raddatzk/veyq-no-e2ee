@@ -12,7 +12,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
-import { rotateGroupForRemoval } from './scopes'
+import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle } from './scopes'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 
@@ -20,8 +20,9 @@ import { getMyProfile } from '../account/profile/profile'
 // active scope; switching between groups in the rail re-loads via the `scopeId` watch.
 const props = defineProps<{ scopeId: string }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
+const emit = defineEmits<{ lifecycleChanged: [] }>()
 
 const members = ref<ScopeMember[]>([])
 const isOwner = ref(false)
@@ -34,6 +35,13 @@ const adding = ref(false)
 const actionError = ref('')
 const pendingRemove = ref<string | null>(null) // userId shown in inline "remove?" confirm (destructive → rotates)
 const removing = ref(false)
+// Group lifecycle (cr-0090): the group's own pending-deletion state + the danger-zone controls.
+const purgeAfter = ref<Date | null>(null)
+const isPending = computed(() => purgeAfter.value !== null)
+const confirmingDelete = ref(false)
+const lifecycleBusy = ref(false)
+const lifecycleError = ref('')
+const purgeDay = computed(() => (purgeAfter.value ? purgeAfter.value.toLocaleDateString(locale.value) : ''))
 
 // Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
 const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
@@ -52,10 +60,13 @@ async function load() {
   }
   try {
     // My group role isn't the tenant role — derive it from the directory by matching my per-tenant username.
-    const [rows, me] = await Promise.all([listScopeMembers(props.scopeId), getMyProfile().catch(() => null)])
+    const [rows, me, lifecycle] = await Promise.all([
+      listScopeMembers(props.scopeId), getMyProfile().catch(() => null), scopeLifecycle(props.scopeId).catch(() => null),
+    ])
     members.value = rows
     myUsername.value = me?.username ?? ''
     isOwner.value = !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER')
+    purgeAfter.value = lifecycle?.purgeAfter ?? null
   } catch (e) {
     const { status } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })
@@ -133,6 +144,45 @@ async function removeMember(m: ScopeMember) {
   } finally {
     removing.value = false
     pendingRemove.value = null
+  }
+}
+
+// Soft-delete the group (cr-0090) — enters the 30-day grace period (owner-only, inline confirm). The group stays
+// readable but read-only + marked; any owner can restore it in-window. Refresh the active scope if it's this group
+// (so its banner/read-only state shows) and let the settings hub re-badge its group list.
+async function onDelete() {
+  lifecycleError.value = ''
+  lifecycleBusy.value = true
+  try {
+    await deleteGroup(props.scopeId)
+    if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
+    await load()
+    emit('lifecycleChanged')
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    lifecycleError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.deleteFailed')
+  } finally {
+    lifecycleBusy.value = false
+    confirmingDelete.value = false
+  }
+}
+
+/** Restore the group from pending-deletion (owner-only, in-window). */
+async function onRestore() {
+  lifecycleError.value = ''
+  lifecycleBusy.value = true
+  try {
+    await restoreGroup(props.scopeId)
+    if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
+    await load()
+    emit('lifecycleChanged')
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    lifecycleError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.restoreFailed')
+  } finally {
+    lifecycleBusy.value = false
   }
 }
 </script>
@@ -234,6 +284,33 @@ async function removeMember(m: ScopeMember) {
           </div>
         </div>
       </div>
+
+      <!-- Danger zone (cr-0090): owner-only group lifecycle. Active → delete (30-day grace, inline confirm);
+           pending-deletion → a countdown + restore. Deletion is soft + reversible in-window, so it's not a hard
+           destructive action here. -->
+      <section v-if="isOwner && !loading && loadError === ''" class="settings-form danger-zone">
+        <div class="settings-section-header">
+          <div>
+            <h2>{{ t('groups.dangerZone') }}</h2>
+            <p class="settings-muted">{{ isPending ? t('groups.pendingSub') : t('groups.deleteSub') }}</p>
+          </div>
+        </div>
+
+        <Message v-if="lifecycleError" severity="error" :closable="false">{{ lifecycleError }}</Message>
+
+        <div v-if="isPending" class="danger-row">
+          <Message severity="warn" :closable="false">{{ t('groups.pendingDeletion', { day: purgeDay }) }}</Message>
+          <Button :label="t('groups.restore')" icon="pi pi-undo" :loading="lifecycleBusy" @click="onRestore" />
+        </div>
+        <div v-else-if="confirmingDelete" class="danger-row">
+          <span class="settings-muted">{{ t('groups.deleteConfirm') }}</span>
+          <Button :label="t('groups.deleteConfirmYes')" icon="pi pi-trash" severity="danger" :loading="lifecycleBusy" @click="onDelete" />
+          <Button :label="t('common.cancel')" severity="secondary" outlined :disabled="lifecycleBusy" @click="confirmingDelete = false" />
+        </div>
+        <div v-else class="danger-row">
+          <Button :label="t('groups.deleteGroup')" icon="pi pi-trash" severity="danger" outlined @click="confirmingDelete = true" />
+        </div>
+      </section>
     </section>
   </section>
 </template>
@@ -242,6 +319,22 @@ async function removeMember(m: ScopeMember) {
 .settings-muted {
   margin: 0;
   color: var(--app-muted);
+}
+.danger-zone {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--app-border, rgba(128, 128, 128, 0.25));
+}
+.danger-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.danger-row :deep(.p-message) {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
 }
 .group-add-form {
   display: flex;

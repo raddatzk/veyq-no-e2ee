@@ -47,6 +47,9 @@ class NodesStore(
 
     fun scopeExists(scopeId: String): Boolean = ScopeEntity.findById(scopeId) != null
 
+    /** Whether the scope is in pending-deletion (cr-0090) — content is **read-only** during the grace window. */
+    fun isPendingDeletion(scopeId: String): Boolean = ScopeEntity.findById(scopeId)?.deletedAt != null
+
     /** Resolve a parent slot within the scope: the scope id (root), a node in the same scope, or missing. */
     fun parentSlot(scopeId: String, parentSlot: String): ParentSlot {
         if (parentSlot == scopeId) return ParentSlot.Root

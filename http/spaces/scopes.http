@@ -109,3 +109,25 @@ client.test("rotate scope requires auth", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
 });
 %}
+
+### 9. DELETE a group (soft-delete) without a bearer token → 401 (cr-0090)
+DELETE {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("delete group requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 10. POST a group restore without a bearer token → 401 (cr-0090)
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/restore
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("restore group requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}

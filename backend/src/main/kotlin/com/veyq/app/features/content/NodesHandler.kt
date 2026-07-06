@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 sealed interface CreateNodeOutcome {
     data class Created(val nodeId: String) : CreateNodeOutcome
     object NoScope : CreateNodeOutcome
+    object ScopeDeleting : CreateNodeOutcome
     object IllegalStructure : CreateNodeOutcome
     object SlugTaken : CreateNodeOutcome
 }
@@ -17,6 +18,7 @@ sealed interface ListNodesOutcome {
 sealed interface UpdateNodeOutcome {
     object Updated : UpdateNodeOutcome
     object NotFound : UpdateNodeOutcome
+    object ScopeDeleting : UpdateNodeOutcome
     object IllegalStructure : UpdateNodeOutcome
     object SlugTaken : UpdateNodeOutcome
 }
@@ -24,6 +26,7 @@ sealed interface UpdateNodeOutcome {
 sealed interface DeleteNodeOutcome {
     object Deleted : DeleteNodeOutcome
     object NoScope : DeleteNodeOutcome
+    object ScopeDeleting : DeleteNodeOutcome
 }
 
 /**
@@ -46,6 +49,7 @@ class NodesHandler(private val store: NodesStore) {
         encryptedName: String, slugToken: String, orderIndex: Int, epoch: Int, wrappedContentKey: String?, wrappedMeta: String?,
     ): CreateNodeOutcome {
         if (!store.isMember(userId, scopeId)) return CreateNodeOutcome.NoScope
+        if (store.isPendingDeletion(scopeId)) return CreateNodeOutcome.ScopeDeleting // read-only during grace (cr-0090)
         val slot = parentSlotId ?: scopeId // null/absent → the scope root (slot = scope id)
         val parent = store.parentSlot(scopeId, slot)
         if (parent is ParentSlot.Missing) return CreateNodeOutcome.IllegalStructure
@@ -66,6 +70,7 @@ class NodesHandler(private val store: NodesStore) {
         encryptedName: String?, slugToken: String?, newParentSlotId: String?, orderIndex: Int?, wrappedMeta: String?,
     ): UpdateNodeOutcome {
         if (!store.isMember(userId, scopeId)) return UpdateNodeOutcome.NotFound
+        if (store.isPendingDeletion(scopeId)) return UpdateNodeOutcome.ScopeDeleting // read-only during grace (cr-0090)
         val node = store.findInScope(scopeId, nodeId) ?: return UpdateNodeOutcome.NotFound
 
         var moveSlot: String? = null
@@ -88,6 +93,7 @@ class NodesHandler(private val store: NodesStore) {
 
     fun delete(userId: String, scopeId: String, nodeId: String): DeleteNodeOutcome {
         if (!store.isMember(userId, scopeId)) return DeleteNodeOutcome.NoScope
+        if (store.isPendingDeletion(scopeId)) return DeleteNodeOutcome.ScopeDeleting // read-only during grace (cr-0090)
         store.deleteSubtree(scopeId, nodeId)
         return DeleteNodeOutcome.Deleted
     }

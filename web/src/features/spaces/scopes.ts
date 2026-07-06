@@ -25,6 +25,22 @@ export async function listScopeEpochs(scopeId: string): Promise<{ epoch: number;
   return withRefresh(() => scopesApi().listScopeEpochs({ scopeId }))
 }
 
+/** Soft-delete a group (uc.spaces.delete-group, cr-0090) — enters the grace period (owner-gated). */
+export async function deleteGroup(scopeId: string): Promise<void> {
+  await withRefresh(() => scopesApi().deleteGroup({ scopeId }))
+}
+
+/** Restore a soft-deleted group in-window (cr-0090) — clears the pending-deletion marker (owner-gated). */
+export async function restoreGroup(scopeId: string): Promise<void> {
+  await withRefresh(() => scopesApi().restoreGroup({ scopeId }))
+}
+
+/** A scope's pending-deletion state (cr-0090) — null when the caller holds no such scope. No name decryption. */
+export async function scopeLifecycle(scopeId: string): Promise<{ deletedAt: Date | null; purgeAfter: Date | null } | null> {
+  const s = (await listMyScopes()).find((x) => x.id === scopeId)
+  return s ? { deletedAt: s.deletedAt ?? null, purgeAfter: s.purgeAfter ?? null } : null
+}
+
 /** Peel the scope's epoch chain from the caller's grant key down to E_0 (ADR 0024). No fetch when unrotated. */
 async function epochKeysFor(scope: ScopeSummary, grantKey: Uint8Array): Promise<EpochKeys> {
   const links = scope.grantedEpoch > 0 ? await listScopeEpochs(scope.id) : []
@@ -83,7 +99,7 @@ export async function createGroup(name: string): Promise<string> {
 
 /** A group the member holds — the switcher/settings row: opaque id + tenant + the **decrypted** (client-side)
  *  name + the caller's own `role` in it (OWNER/MEMBER, cr-0087 — lets the settings hub list groups I own). */
-export type GroupSpace = { scopeId: string; tenantId: string; name: string; role: string }
+export type GroupSpace = { scopeId: string; tenantId: string; name: string; role: string; deletedAt: Date | null; purgeAfter: Date | null }
 
 /**
  * The member's groups in the active tenant with their names decrypted on-device (en.spaces.group-scope). Each
@@ -103,7 +119,7 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
           // The name is sealed under E_0 — peel the chain so a rotated group still decrypts its name.
           epochs = await epochKeysFor(g, unwrapGrant(g, priv))
           const name = g.encryptedName ? openName(keyAt(epochs, 0), g.encryptedName) : ''
-          return { scopeId: g.id, tenantId: g.tenantId, name, role: g.role }
+          return { scopeId: g.id, tenantId: g.tenantId, name, role: g.role, deletedAt: g.deletedAt ?? null, purgeAfter: g.purgeAfter ?? null }
         } catch {
           return null
         } finally {
@@ -119,7 +135,7 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
 
 /** An opened scope: its opaque identity + the in-memory **epoch keys** (owned transiently by the caller; `key` is
  *  the write key = the current epoch) + the decrypted display `name` for a named scope (a GROUP; undefined else). */
-export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; epochs: EpochKeys; name?: string }
+export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; epochs: EpochKeys; name?: string; deletedAt: Date | null; purgeAfter: Date | null }
 
 /** asymUnwrap our **own** grant on a scope row with the vaulted identity → the in-memory epoch key. Caller owns it. */
 function unwrapGrant(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Uint8Array {
@@ -139,7 +155,10 @@ async function toOpenedScope(scope: ScopeSummary, priv: { kemX: Uint8Array; mlke
       name = undefined // a name that won't open (E2) is non-fatal — the scope still opens, just unlabelled
     }
   }
-  return { scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: writeKey(epochs), epochs, name }
+  return {
+    scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: writeKey(epochs), epochs, name,
+    deletedAt: scope.deletedAt ?? null, purgeAfter: scope.purgeAfter ?? null,
+  }
 }
 
 /**

@@ -3,6 +3,7 @@ package com.veyq.app.features.spaces.scope
 import com.veyq.app.features.account.login.SessionService
 import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.admin.tenant.TenantEntity
+import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.shared.identity.TenantProfileEntity
 import com.veyq.app.shared.identity.VeyqUser
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -14,8 +15,13 @@ import org.hamcrest.CoreMatchers.equalTo
 import org.hamcrest.CoreMatchers.hasItems
 import org.hamcrest.CoreMatchers.notNullValue
 import org.hamcrest.CoreMatchers.nullValue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 
 /**
@@ -30,6 +36,9 @@ class ScopesSliceTest {
 
     @Inject
     lateinit var sessions: SessionService
+
+    @Inject
+    lateinit var purge: ScopePurge
 
     private val personalGrant = "cGVyc29uYWwtc2NvcGUtZ3JhbnQ=" // "personal-scope-grant"
     private val groupGrant = "Z3JvdXAtc2NvcGUtZ3JhbnQ=" // "group-scope-grant"
@@ -351,9 +360,92 @@ class ScopesSliceTest {
             .then().statusCode(200).body("size()", equalTo(0))
     }
 
+    @Test
+    fun deleteGroupSoftThenRestoreWithReadOnlyGrace() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        createNodeIn(owner, groupId, "n1") // a write, allowed while active
+
+        // Owner soft-deletes → 204; the scope stays listed but now carries deletedAt + purgeAfter (pending-deletion).
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.deletedAt", notNullValue())
+            .body("find { it.id == '$groupId' }.purgeAfter", notNullValue())
+
+        // Read-only during grace: a content write is rejected 409 scope_deleting.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body(nodeBody("n2")).`when`().post("/api/scopes/$groupId/nodes")
+            .then().statusCode(409).body("code", equalTo("scope_deleting"))
+
+        // Restore → 204; the marker clears and writes work again.
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().post("/api/scopes/$groupId/restore").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.deletedAt", equalTo(null))
+        createNodeIn(owner, groupId, "n3") // write allowed again
+    }
+
+    @Test
+    fun deleteRestoreGuards() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner") // partner = MEMBER
+
+        // A non-owner cannot delete; restoring an active group is 409 not_deleted; deleting the TENANT scope is 409 not_group.
+        given().header("Authorization", "Bearer ${token(partner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(403).body("code", equalTo("not_scope_owner"))
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().post("/api/scopes/$groupId/restore").then().statusCode(409).body("code", equalTo("not_deleted"))
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/${tenantIdOf(domain)}").then().statusCode(409).body("code", equalTo("not_group"))
+
+        // Soft-delete, then a second delete → 409 scope_already_deleted.
+        given().header("Authorization", "Bearer ${token(owner)}").`when`().delete("/api/scopes/$groupId").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(409).body("code", equalTo("scope_already_deleted"))
+    }
+
+    @Test
+    fun purgeErasesExpiredScopeAndContentButKeepsFreshOnes() {
+        val (owner, domain) = seedMember()
+        val expired = createGroupAs(owner, domain)
+        createNodeIn(owner, expired, "doomed")
+        val fresh = createGroupAs(owner, domain)
+
+        // Soft-delete both; backdate the "expired" one past the 30-day retention window.
+        listOf(expired, fresh).forEach { given().header("Authorization", "Bearer ${token(owner)}").`when`().delete("/api/scopes/$it").then().statusCode(204) }
+        QuarkusTransaction.requiringNew().run {
+            ScopeEntity.findById(expired)!!.apply { deletedAt = Instant.now().minus(Duration.ofDays(31)) }.persist()
+        }
+
+        // The scheduled sweep hard-erases the expired group + its content; the fresh (in-window) one survives.
+        purge.run()
+
+        QuarkusTransaction.requiringNew().run {
+            assertNull(ScopeEntity.findById(expired), "expired group hard-purged")
+            assertEquals(0, NodeEntity.count("scopeId", expired), "its nodes erased")
+            assertEquals(0, MembershipEntity.count("scopeId", expired), "its memberships erased")
+            assertNotNull(ScopeEntity.findById(fresh), "fresh group still in its grace window")
+        }
+    }
+
     // --- helpers ---
 
     private fun token(userId: String) = sessions.issue(userId).accessToken
+
+    /** A minimal FOLDER-node create body; `slug` becomes a base64 slug token (unique per parent). */
+    private fun nodeBody(slug: String) =
+        """{"kind":"FOLDER","encryptedName":"$groupName","slugToken":"${Base64.getEncoder().encodeToString(slug.toByteArray())}","orderIndex":0}"""
+
+    /** Create a FOLDER node in a scope (a write) → the new nodeId. */
+    private fun createNodeIn(owner: String, scopeId: String, slug: String): String =
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body(nodeBody(slug)).`when`().post("/api/scopes/$scopeId/nodes")
+            .then().statusCode(201).extract().path("nodeId")
 
     /** The tenantId encoded in a domain seeded by [seedMember] (`t-<tenantId>.example.com`). */
     private fun tenantIdOf(domain: String) = domain.removePrefix("t-").removeSuffix(".example.com")

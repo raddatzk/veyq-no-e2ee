@@ -19,6 +19,10 @@ import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import java.time.Duration
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -33,6 +37,8 @@ import java.util.UUID
 class ScopesResource(
     private val handler: ScopesHandler,
     private val identity: SecurityIdentity,
+    // The grace window (cr-0090) — used to derive `purgeAfter = deletedAt + retention` for a pending-deletion group.
+    @param:ConfigProperty(name = "veyq.scope.delete.retention", defaultValue = "P30D") private val deleteRetention: Duration,
 ) : ScopesApi {
 
     @Context
@@ -71,6 +77,8 @@ class ScopesResource(
                         tenantId = UUID.fromString(it.tenantId), role = it.role,
                         currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
                         wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName,
+                        deletedAt = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d, ZoneOffset.UTC) },
+                        purgeAfter = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d.plus(deleteRetention), ZoneOffset.UTC) },
                     )
                 }).build()
             ListScopesOutcome.NoTenant ->
@@ -133,6 +141,23 @@ class ScopesResource(
             is EpochsOutcome.Links -> Response.ok(outcome.links.map { ScopeEpochLink(epoch = it.first, wrappedPrev = it.second) }).build()
             EpochsOutcome.Forbidden -> forbidden("not_scope_member")
             EpochsOutcome.ScopeNotFound -> notFound("scope_not_found")
+        }
+
+    override fun deleteGroup(scopeId: UUID): Response =
+        when (handler.deleteGroup(identity.principal.name, scopeId.toString())) {
+            DeleteGroupOutcome.Ok -> Response.noContent().build()
+            DeleteGroupOutcome.NotOwner -> forbidden("not_scope_owner")
+            DeleteGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
+            DeleteGroupOutcome.NotGroup -> conflict("not_group")
+            DeleteGroupOutcome.AlreadyDeleted -> conflict("scope_already_deleted")
+        }
+
+    override fun restoreGroup(scopeId: UUID): Response =
+        when (handler.restoreGroup(identity.principal.name, scopeId.toString())) {
+            RestoreGroupOutcome.Ok -> Response.noContent().build()
+            RestoreGroupOutcome.NotOwner -> forbidden("not_scope_owner")
+            RestoreGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
+            RestoreGroupOutcome.NotDeleted -> conflict("not_deleted")
         }
 
     override fun listScopeMembers(scopeId: UUID): Response =

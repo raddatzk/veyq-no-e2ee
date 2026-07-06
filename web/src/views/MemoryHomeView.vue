@@ -17,6 +17,7 @@ import { listMyTenants } from '../features/spaces/scopes'
 import { NodeKind } from '../api/generated/content'
 import { ScopeKind, type MyTenant } from '../api/generated/scopes'
 import type { TreeNode } from '../features/memory/tree'
+import Message from 'primevue/message'
 import MemoryBrowse from '../features/memory/components/MemoryBrowse.vue'
 import MemoryDetail from '../features/memory/components/MemoryDetail.vue'
 import NodeMutationDialog from '../features/memory/components/NodeMutationDialog.vue'
@@ -24,7 +25,14 @@ import DeleteNodeDialog from '../features/memory/components/DeleteNodeDialog.vue
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// Pending-deletion (cr-0090): the active GROUP is being deleted — the shell shows a banner and the browse hides
+// its create affordances (writes are server-rejected during the grace window anyway).
+const isPendingDeletion = computed(() => activeSpace.deletedAt !== null)
+const pendingPurgeDay = computed(() =>
+  activeSpace.purgeAfter ? new Date(activeSpace.purgeAfter).toLocaleDateString(locale.value) : '',
+)
 
 // Position from the #fragment. The leading token selects the scope (token-less = tenant, `~me` = personal —
 // ADR 0019); a slug segment that doesn't resolve (`false`) collapses to the scope root.
@@ -154,6 +162,9 @@ async function onDeleteDone() {
       <p>{{ t('home.error') }}</p>
     </div>
     <template v-else>
+      <Message v-if="isPendingDeletion" severity="warn" :closable="false" class="pending-delete-banner">
+        {{ t('groups.pendingDeletion', { day: pendingPurgeDay }) }}
+      </Message>
       <MemoryDetail
         v-if="isOpenable && currentNode && activeSpace.scopeId"
         :node="currentNode"
@@ -174,6 +185,7 @@ async function onDeleteDone() {
         :folders="level.folders"
         :memories="level.memories"
         :epochs="epochs"
+        :readonly="isPendingDeletion"
         @open-folder="openFolder"
         @open-memory="openMemory"
         @toggle-favorite="onToggleFavorite"

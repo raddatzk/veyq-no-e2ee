@@ -26,6 +26,10 @@ export const activeSpace = reactive({
   // reactivity, but views need a reactive signal to re-read the keys after a rotation (`refreshActiveScope`) that
   // doesn't flip `status` — a `computed` over `activeEpochKeys()` must depend on THIS so it recomputes on rotate.
   epoch: 0,
+  // Pending-deletion state (cr-0090): when a GROUP is soft-deleted it stays enterable but read-only + marked; the
+  // shell shows a banner + hides write affordances until `purgeAfter`. Null for an active scope.
+  deletedAt: null as Date | null,
+  purgeAfter: null as Date | null,
   // The token-less tenant home resolved to Personal because the caller holds no TENANT grant (ADR 0019, E1).
   tenantUnavailable: false,
 })
@@ -84,6 +88,8 @@ export async function enterScope(token: string): Promise<void> {
     epochKeys = opened.epochs
     scopeKey = opened.key // the write key = E_current, a reference into `epochKeys` (zeroed together above)
     activeSpace.epoch = opened.epochs.current // reactive signal so key-reading computeds re-run for the new scope
+    activeSpace.deletedAt = opened.deletedAt
+    activeSpace.purgeAfter = opened.purgeAfter
     activeSpace.scopeId = opened.scopeId
     activeSpace.tenantId = opened.tenantId
     activeSpace.kind = opened.kind
@@ -115,6 +121,8 @@ export async function refreshActiveScope(): Promise<void> {
   epochKeys = opened.epochs
   scopeKey = opened.key
   activeSpace.epoch = opened.epochs.current // bump the reactive signal → key-reading computeds re-run under E_{n+1}
+  activeSpace.deletedAt = opened.deletedAt
+  activeSpace.purgeAfter = opened.purgeAfter
   activeSpace.name = opened.name ?? null
   resetTree()
   clearFavorites()
@@ -132,6 +140,8 @@ export function clearActiveSpace(): void {
   activeSpace.kind = null
   activeSpace.name = null
   activeSpace.epoch = 0
+  activeSpace.deletedAt = null
+  activeSpace.purgeAfter = null
   activeSpace.tenantUnavailable = false
   if (epochKeys) zeroEpochKeys(epochKeys)
   epochKeys = null

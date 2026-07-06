@@ -81,7 +81,8 @@ const categories = computed<NavCategory[]>(() => {
       label: t('shell.groups'),
       collapsible: true,
       create: { label: t('shell.groupCreate'), run: () => { createGroupOpen.value = true } },
-      items: ownedGroups.value.map((g) => ({ id: `group-${g.scopeId}`, label: g.name, icon: 'pi pi-users' })),
+      // A group in pending-deletion (cr-0090) is badged with a trash icon so the roster shows it's on its way out.
+      items: ownedGroups.value.map((g) => ({ id: `group-${g.scopeId}`, label: g.name, icon: g.deletedAt ? 'pi pi-trash' : 'pi pi-users' })),
     })
   }
   // Server → Tenants collection — every tenant a Server Owner administers + a create affordance.
@@ -197,7 +198,7 @@ watch(() => route.params.section, () => void loadTenants())
           <i class="pi pi-chevron-left" aria-hidden="true" />
           {{ t('settings.back') }}
         </button>
-        <component :is="activeView.component" v-bind="activeView.props" />
+        <component :is="activeView.component" v-bind="activeView.props" @lifecycle-changed="loadGroups" />
       </section>
     </div>
 

@@ -411,6 +411,51 @@ paths:
         "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
         "404": { description: No such scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
 
+  /api/scopes/{scopeId}:
+    delete:
+      tags: [scopes]
+      operationId: deleteGroup
+      summary: Soft-delete a group — enter a grace period, then a scheduled hard-purge.
+      description: >
+        Soft-deletes a GROUP scope (uc.spaces.delete-group, cr-0090, ADR 0014 §6): sets the scope's `deletedAt`
+        marker, so it enters a **grace period** (`purgeAfter = deletedAt + retention`, 30 days). During grace the
+        group stays listed + readable but **read-only** and marked as deleting; a scheduled job hard-erases it
+        (nodes + blob objects + memberships + epoch links + the scope) after `purgeAfter`. Grants/memberships are
+        untouched, so **any owner** may {@link restoreGroup} in-window. Owner-gated (`403 not_scope_owner`);
+        **GROUP-only** and idempotent (`409`). Enforced by code, not this spec (ADR 0008). Erasure only — the
+        server needs no key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope to delete., schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: The group entered pending-deletion (grace period started). }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+        "409": { description: Not a GROUP or already pending-deletion., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_already_deleted } } } }
+
+  /api/scopes/{scopeId}/restore:
+    post:
+      tags: [scopes]
+      operationId: restoreGroup
+      summary: Restore a group from pending-deletion (undo the soft-delete, in-window).
+      description: >
+        Restores a GROUP scope that is in **pending-deletion** and still within its grace window (uc.spaces.delete-group,
+        cr-0090): clears `deletedAt`/`purgeAfter`, so the group is fully active again for everyone (grants/memberships
+        were never touched). Owner-gated (`403 not_scope_owner`). `409` if the group is not pending-deletion; once the
+        scheduled hard-purge has run the scope is gone (`404 scope_not_found`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the pending-deletion GROUP scope., schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: The group was restored (active again). }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is not the group's OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: No such scope (or already hard-purged)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+        "409": { description: The group is not in pending-deletion., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_deleted } } } }
+
   /api/scopes/my-tenants:
     get:
       tags: [scopes]
@@ -727,6 +772,22 @@ components:
           contentEncoding: base64
           maxLength: 8192
           example: AQ==
+        deletedAt:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            For a `GROUP` scope in **pending-deletion** (uc.spaces.delete-group, cr-0090): when the owner
+            soft-deleted it. `null` = active. While set, the group stays listed + readable but is **read-only** and
+            clearly marked as deleting; any owner may restore it until `purgeAfter`. Operational metadata (a
+            lifecycle timestamp), no key.
+          example: null
+        purgeAfter:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            When the scheduled job will **hard-erase** a pending-deletion group (`deletedAt + retention`, derived).
+            `null` when active. After this instant the group is gone (restore → 404).
+          example: null
 
     ErrorResponse:
       type: object

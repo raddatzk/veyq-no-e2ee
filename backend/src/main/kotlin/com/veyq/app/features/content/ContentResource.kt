@@ -35,6 +35,7 @@ class ContentResource(
             is CreateNodeOutcome.Created ->
                 Response.status(Response.Status.CREATED).entity(NodeCreated(nodeId = UUID.fromString(outcome.nodeId))).build()
             CreateNodeOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            CreateNodeOutcome.ScopeDeleting -> error(Response.Status.CONFLICT, "scope_deleting")
             CreateNodeOutcome.IllegalStructure -> error(422, "illegal_structure")
             CreateNodeOutcome.SlugTaken -> error(Response.Status.CONFLICT, "slug_taken")
         }
@@ -56,6 +57,7 @@ class ContentResource(
         )) {
             UpdateNodeOutcome.Updated -> Response.noContent().build()
             UpdateNodeOutcome.NotFound -> error(Response.Status.NOT_FOUND, "node_not_found")
+            UpdateNodeOutcome.ScopeDeleting -> error(Response.Status.CONFLICT, "scope_deleting")
             UpdateNodeOutcome.IllegalStructure -> error(422, "illegal_structure")
             UpdateNodeOutcome.SlugTaken -> error(Response.Status.CONFLICT, "slug_taken")
         }
@@ -64,6 +66,7 @@ class ContentResource(
         when (handler.delete(identity.principal.name, scopeId.toString(), nodeId.toString())) {
             DeleteNodeOutcome.Deleted -> Response.noContent().build()
             DeleteNodeOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            DeleteNodeOutcome.ScopeDeleting -> error(Response.Status.CONFLICT, "scope_deleting")
         }
 
     /** Map a stored row to the API shape: the root's parent slot (= scope id) surfaces as `parentId = null`. */

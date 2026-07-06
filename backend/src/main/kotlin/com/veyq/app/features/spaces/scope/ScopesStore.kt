@@ -21,6 +21,8 @@ data class ScopeRow(
     val grantedEpoch: Int,
     val wrappedGrant: String,
     val encryptedName: String?,
+    /** When a GROUP is in pending-deletion (cr-0090); null = active. The client marks + (for owners) restores it. */
+    val deletedAt: Instant?,
 )
 
 /** A tenant the caller belongs to — the row behind a `MyTenant` (the space switcher). */
@@ -119,7 +121,7 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
                 ScopeEntity.findById(m.scopeId)?.let {
-                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName)
+                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName, it.deletedAt)
                 }
             }
         }
@@ -202,6 +204,27 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         }
         return newEpoch
     }
+
+    // --- group lifecycle: soft-delete + grace + purge (cr-0090) ---
+
+    /** When a scope was soft-deleted (`deletedAt`), or null if active / no such scope. */
+    fun deletedAt(scopeId: String): Instant? = ScopeEntity.findById(scopeId)?.deletedAt
+
+    /** Soft-delete a group: set `deletedAt = now` (enters the grace period). */
+    @Transactional
+    fun softDelete(scopeId: String, now: Instant) {
+        ScopeEntity.findById(scopeId)?.let { it.deletedAt = now; it.persist() }
+    }
+
+    /** Restore a soft-deleted group: clear `deletedAt` (active again). */
+    @Transactional
+    fun restore(scopeId: String) {
+        ScopeEntity.findById(scopeId)?.let { it.deletedAt = null; it.persist() }
+    }
+
+    /** The ids of GROUP scopes whose grace period has elapsed (`deletedAt < cutoff`) — the purge worklist. */
+    fun listPurgeable(cutoff: Instant): List<String> =
+        ScopeEntity.find("deletedAt is not null and deletedAt < ?1", cutoff).list().map { it.id }
 
     /** Admit a member to a scope **grant-less** (role=MEMBER, no grant) — grant-delivery wraps `K_SC` to them
      *  later (cr-0076). Operator-blind: **no key is written here**. */
