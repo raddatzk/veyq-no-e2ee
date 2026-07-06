@@ -108,6 +108,11 @@ end
   invitations view is theirs alone.
 - **Additive, reversible cheaply.** Accept flips one flag → the existing grant-delivery does the rest; Decline /
   Rescind is a single row delete. No rotation, no re-seal, no second standing key.
+- **Consent's strength tracks the client tier ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** The
+  gate is enforced by the key-holders' clients not wrapping `K_SC` to a soft member — so it is a real, crypto-grade
+  guarantee on a **trusted** client (native / trusted-web: an active operator can't make it wrap), and
+  **honest-operator-only** on operator-served web (a tampered client could wrap regardless) — the same tier as all
+  veyq E2EE, no consent-specific weakness.
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -136,4 +141,5 @@ wird der Schlüssel zur Gruppe **nie** herausgegeben — nichts aus der Gruppe e
 - Decisions: [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5 (the consent opt-in — consent-first,
   one-off name-seal), [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md) (the grant-wrap +
   Plain-authenticity seam), [ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md) (grant-delivery,
-  which skips soft memberships), [ADR 0023](../../../decisions/0023-per-tenant-member-identity.md) (per-tenant username)
+  which skips soft memberships), [ADR 0023](../../../decisions/0023-per-tenant-member-identity.md) (per-tenant username),
+  [ADR 0026](../../../decisions/0026-client-trust-tiers.md) (the client trust tier the consent guarantee rides on)

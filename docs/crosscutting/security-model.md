@@ -184,6 +184,29 @@ server could serve an attacker's key instead (key-substitution / MITM) and read 
   *another* member via this directory. It adopts the stance above as-is — **v1 trusts the returned key** (no
   pin, no gate; self-hosted makes it moot), and leaves the fingerprint/TOFU/KT hardening as an explicit seam.
 
+## Client integrity & trust tiers — what a malicious operator can do
+
+Confidentiality (Layer 2 below) is enforced by the **client**, so it holds against an *actively* malicious
+operator **only on a client whose code the operator cannot silently alter**. This splits by client, and we state
+it plainly ([ADR 0026](../decisions/0026-client-trust-tiers.md)):
+
+- **Native (store-signed):** the operator cannot alter it → confidentiality holds against an active operator;
+  residual = the *detectable* key-substitution above. **The high-assurance primary** (committed target: native on
+  every platform).
+- **Operator-served web:** the operator serves the code each load → an active operator can serve tampered code
+  that captures keys/plaintext. **Protects against a *passive* operator only** (honest serving + at-rest). The
+  **convenience tier**, honestly labelled and surfaced in-client — never claimed operator-proof.
+- **Trusted central / attested web** (code from an origin the operator does *not* control, reproducibly built —
+  SaaS-era): restores the native-level guarantee in the browser, for the no-install flows (a public-share/upload
+  viewer). An **operator-owned** domain is *always* operator-served — it owns its DNS, so it controls delivery.
+- **Self-hosted, single user:** operator = user → moot.
+
+Constant on every tier: the server can **never** read already-stored content (no keys); it **always** sees
+operational metadata, can deny/alter access, and can *attempt* key-substitution on new exchanges (detectable,
+above). **The honest boundary: passive operator → protected everywhere; active operator → protected on
+native / trusted-web, passive-only on operator-served web.** Stating this precisely is a trust asset, as it is
+for Signal (native-only) and Proton (open-source + native).
+
 ## Recovery — no escrow
 
 A memories product must not turn "forgot password" into permanent loss, yet there is **no escrow** — the
@@ -198,6 +221,9 @@ same property that stops the operator reading data stops it rescuing data. Indep
 Losing **all** paths is the documented, accepted residual loss.
 
 ## Revocation — two layers
+
+These are the two general **enforcement layers** ([ADR 0026](../decisions/0026-client-trust-tiers.md) — L1 access
+control, honest-operator; L2 crypto, the only real operator boundary), here applied to revocation:
 
 1. **Server-side access invalidation — instant, no keys.** The server stops honoring the revoked share
    token / membership and serves no further blobs. This is access control, which the server is allowed
