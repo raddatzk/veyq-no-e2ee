@@ -27,19 +27,23 @@ class AccountProfileResource(
 
     override fun getMyProfile(): Response =
         when (val outcome = handler.get(identity.principal.name, activeHost())) {
-            is ProfileOutcome.Found -> Response.ok(MemberProfile(username = outcome.username, sealedName = outcome.sealedName)).build()
+            is ProfileOutcome.Found -> Response.ok(memberProfile(outcome)).build()
             else -> profileNotFound()
         }
 
     override fun updateMyProfile(profileUpdateRequest: ProfileUpdateRequest): Response =
         when (val outcome = handler.update(
             identity.principal.name, activeHost(), profileUpdateRequest.username, profileUpdateRequest.sealedName,
+            profileUpdateRequest.requireGroupAddConsent,
         )) {
-            is ProfileOutcome.Found -> Response.ok(MemberProfile(username = outcome.username, sealedName = outcome.sealedName)).build()
+            is ProfileOutcome.Found -> Response.ok(memberProfile(outcome)).build()
             ProfileOutcome.NoTenant -> profileNotFound()
             ProfileOutcome.UsernameTaken -> Response.status(Response.Status.CONFLICT)
                 .entity(ErrorResponse(code = "username_taken")).build()
         }
+
+    private fun memberProfile(o: ProfileOutcome.Found) =
+        MemberProfile(username = o.username, requireGroupAddConsent = o.requireGroupAddConsent, sealedName = o.sealedName)
 
     private fun profileNotFound() = Response.status(Response.Status.NOT_FOUND)
         .entity(ErrorResponse(code = "profile_not_found")).build()

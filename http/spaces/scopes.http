@@ -131,3 +131,70 @@ client.test("restore group requires auth", function () {
     client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
 });
 %}
+
+### 11. Consent group-add (cr-0094): resolve a candidate without a bearer token → 401
+# The owner-gated happy-path (resolve → { identityPublicKey, requiresConsent }, then a consent-gated add that
+# seals the group name to the invitee) is a signed key-holder flow covered at the integration layer
+# (ConsentGroupAddSliceTest) + the web client — the name-seal needs a real identity + the opened group key, not
+# reproducible from a bare .http. Here only the unauth boundary.
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/members/resolve
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "username": "partner" }
+
+> {%
+client.test("resolve group member requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 12. Consent group-add (cr-0096): the consent-gated add boundary without a bearer token → 401
+# A consent proposal add (username + sealedNameKey, the wrapped derived name-key K_name) is still auth-checked
+# before the body. The consent branch itself (a requiresConsent target → soft pendingConsent row, grant-delivery
+# skips it; no name-key → 400 consent_required) is covered at the integration layer (ConsentGroupAddSliceTest).
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/members
+Content-Type: application/json
+X-Forwarded-Host: 127.0.0.1
+
+{ "username": "partner", "sealedNameKey": "c2VhbGVkLW5hbWUta2V5" }
+
+> {%
+client.test("consent-gated add requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+});
+%}
+
+### 13. Consent group-add (cr-0094): accept a proposal without a bearer token → 401 (invitee-gated)
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/invitations/accept
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("accept invitation requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 14. Consent group-add (cr-0094): decline a proposal without a bearer token → 401 (invitee-gated)
+POST {{host}}/api/scopes/7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c/invitations/decline
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("decline invitation requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 15. Consent group-add (cr-0094): list my group invitations without a bearer token → 401
+GET {{host}}/api/scopes/invitations
+X-Forwarded-Host: 127.0.0.1
+
+> {%
+client.test("list group invitations requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}

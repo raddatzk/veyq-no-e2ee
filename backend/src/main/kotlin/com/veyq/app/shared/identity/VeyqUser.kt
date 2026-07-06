@@ -41,6 +41,13 @@ class VeyqUser : PanacheEntityBase {
     @Column(name = "recovery_master_key_tag")
     var recoveryMasterKeyTag: String? = null
 
+    /** The account-global "ask before adding me to groups" preference (uc.spaces.consent-group-add, cr-0094,
+     *  ADR 0014 §5) — default false. When true, a GroupOwner's add becomes a consent proposal (a soft
+     *  `pendingConsent` membership) instead of a direct-add. Low-sensitivity server-visible operational
+     *  metadata — never a key or content. */
+    @Column(name = "require_group_add_consent", nullable = false)
+    var requireGroupAddConsent: Boolean = false
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

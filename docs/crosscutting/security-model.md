@@ -64,8 +64,11 @@ request the **user** turned on, straight to the chosen provider.
   metadata — titles, captions, descriptions, places, people/faces, participant relationships, tags;
   track and playlist details; GPS and capture time (sealed client-side, never read off the file).
 - **Server-visible (low-sensitivity operational metadata):** existence and IDs of memories, media and
-  shares; scope and membership (who belongs to which tenant/group); coarse timestamps for ordering;
-  sizes; MIME type; job-queue and op-log offsets; presence facts; per-parent blinded tokens.
+  shares; scope and membership (who belongs to which tenant/group); a member's **per-tenant username,
+  identity public key, and group-add-consent flag** — visible to, and effectively **enumerable by**, any
+  fellow tenant member (anyone can create a group to run the member-resolve, [ADR 0014](../decisions/0014-group-scopes-and-governance.md) §5);
+  coarse timestamps for ordering; sizes; MIME type; job-queue and op-log offsets; presence facts; per-parent
+  blinded tokens.
 
 These operational fields are exactly what lets the server **sort, paginate, route, authorize and
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"

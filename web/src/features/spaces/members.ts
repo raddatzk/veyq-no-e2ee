@@ -5,9 +5,9 @@
 import { tenantsApi, scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
-import { SetMemberRoleRequestRoleEnum, type ScopeMember } from '../../api/generated/scopes'
+import { SetMemberRoleRequestRoleEnum, type ScopeMember, type ResolvedGroupCandidate, type GroupInvitation } from '../../api/generated/scopes'
 
-export type { ScopeMember } from '../../api/generated/scopes'
+export type { ScopeMember, ResolvedGroupCandidate, GroupInvitation } from '../../api/generated/scopes'
 export { SetMemberRoleRequestRoleEnum } from '../../api/generated/scopes'
 export type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
 
@@ -53,9 +53,39 @@ export function removeTenantMember(tenantId: string, userId: string): Promise<vo
  * (`403 not_scope_owner`), tenant-scoped resolve (`404 member_not_found`), idempotency (`409 already_member`).
  * Records a grant-less membership; the key is delivered later by grant-delivery (cr-0076), not here. Returns the
  * new member's directory row (`hasGrant=false`, awaiting access).
+ *
+ * Consent (cr-0096): when the target has "ask before adding me to groups" on, pass `sealedNameKey` (the group's
+ * derived name-key `K_name` wrapped to their identity, see {@link ./scopes#wrapGroupNameKeyForInvitee}) — the add
+ * becomes a soft `pendingConsent` proposal grant-delivery skips until they accept. Omitting it for a consent-on
+ * target is rejected `400 consent_required` (resolve first to learn whether it is required).
  */
-export function addGroupMember(scopeId: string, username: string): Promise<ScopeMember> {
-  return withRefresh(() => scopesApi().addGroupMember({ scopeId, addGroupMemberRequest: { username } }))
+export function addGroupMember(scopeId: string, username: string, sealedNameKey?: string): Promise<ScopeMember> {
+  return withRefresh(() => scopesApi().addGroupMember({ scopeId, addGroupMemberRequest: { username, sealedNameKey } }))
+}
+
+/**
+ * Resolve a per-tenant username to a group-add candidate (uc.spaces.consent-group-add, cr-0094) — records
+ * nothing. Owner-gated; returns the candidate's `identityPublicKey` (to seal the group name to) + whether their
+ * consent is required (`requiresConsent`). The owner calls this before {@link addGroupMember} to decide whether
+ * to seal a name-proposal (consent on) or direct-add (consent off).
+ */
+export function resolveGroupMember(scopeId: string, username: string): Promise<ResolvedGroupCandidate> {
+  return withRefresh(() => scopesApi().resolveGroupMember({ scopeId, addGroupMemberRequest: { username } }))
+}
+
+/** The caller's pending group-consent proposals in the active tenant (cr-0094) — the invitee's Accept/Decline inbox. */
+export function listMyGroupInvitations(): Promise<GroupInvitation[]> {
+  return withRefresh(() => scopesApi().listMyGroupInvitations())
+}
+
+/** Accept a group-consent proposal (cr-0094) — become a grant-less member; grant-delivery then wraps `K_SC`. */
+export function acceptGroupInvitation(scopeId: string): Promise<void> {
+  return withRefresh(() => scopesApi().acceptGroupInvitation({ scopeId }))
+}
+
+/** Decline a group-consent proposal (cr-0094) — a silent drop; nothing was wrapped, no rotation. Idempotent. */
+export function declineGroupInvitation(scopeId: string): Promise<void> {
+  return withRefresh(() => scopesApi().declineGroupInvitation({ scopeId }))
 }
 
 /**

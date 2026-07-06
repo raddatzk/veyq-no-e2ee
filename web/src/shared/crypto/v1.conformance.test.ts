@@ -101,6 +101,40 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(recovered)).toBe(a.plaintext)
   })
 
+  it('group name-key derivation from the name epoch key (cr-0096, ADR 0027)', () => {
+    const g = vectors.group_name_key
+    // K_name = HKDF-SHA256(E_e, salt="", info=utf8("veyq/v1/group-name-key"), 32).
+    expect(hex(v1.hkdfSha256(unhex(g.epoch_key), unhex(g.salt), unhex(g.info), g.length))).toBe(g.okm)
+  })
+
+  it('symmetric wrap of the group name under K_name (node-name context, cr-0096)', () => {
+    const w = vectors.wrap.sym_group_name
+    // The canonical encryptedName: the group name sealed under its derived name-key (reusing the node-name seal).
+    expect(hex(v1.symWrap(unhex(w.kek), unhex(w.plaintext), w.context, unhex(w.nonce)))).toBe(w.blob)
+    expect(hex(v1.symUnwrap(unhex(w.kek), unhex(w.blob), w.context))).toBe(w.plaintext)
+  })
+
+  it('asymmetric wrap of K_name with the group-name-key context (cr-0096 invite name-key)', () => {
+    const a = vectors.wrap.asym_group_name_key
+    const d = vectors.kem_v1.decap_kat
+    const recovered = v1.asymUnwrap(
+      { x: unhex(d.sk_x25519), m: unhex(d.sk_mlkem) },
+      { x: unhex(a.pk_x25519), m: unhex(a.pk_mlkem) },
+      unhex(a.blob),
+      a.context,
+    )
+    expect(hex(recovered)).toBe(a.plaintext) // unwraps to the 32-byte K_name
+    // domain separation: the same blob must NOT open under the scope-grant context (distinct AAD).
+    expect(() =>
+      v1.asymUnwrap(
+        { x: unhex(d.sk_x25519), m: unhex(d.sk_mlkem) },
+        { x: unhex(a.pk_x25519), m: unhex(a.pk_mlkem) },
+        unhex(a.blob),
+        'scope-grant',
+      ),
+    ).toThrow()
+  })
+
   it('blinded slug token (AD-26)', () => {
     const s = vectors.slug_token
     expect(hex(v1.slugToken(unhex(s.contentKey), s.parentSlot, s.slug))).toBe(s.token)

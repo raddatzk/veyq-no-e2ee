@@ -58,12 +58,14 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   **G1** create + open + browse (`en.spaces.group-scope`, cr-0032); **G2** member-add — per-tenant username
   search ([en.spaces.member-identity](enablers/en.spaces.member-identity.md)) + the
   [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) grant-wrap, direct-add default with an
-  optional consent-first toggle (one-off name-seal for informed consent); **G3** member management (promote/
+  optional consent-first toggle (derived name-key for verifiable informed consent, ADR 0027); **G3** member management (promote/
   demote, multiple owners + last-owner guard), grace-delete + orphan rule, `K_SC` rotation
-- [Consent before being added to a group](use-cases/uc.spaces.consent-group-add.md) — **refined, not built** (the
+- [Consent before being added to a group](use-cases/uc.spaces.consent-group-add.md) — **web done (cr-0094, cr-0096)** (the
   optional account-global "ask before adding me" opt-in: an add becomes a proposal — a soft membership
-  grant-delivery **skips** + a one-off name-seal — so `K_SC` is gated **before** the wrap; accept delivers,
-  decline drops silently; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §5)
+  grant-delivery **skips** + a wrapped **derived name-key** (`group-name-key` context) so the invitee reads the
+  **canonical** name — so `K_SC` is gated **before** the wrap and the owner can't show a divergent name; accept
+  delivers, decline drops silently; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §5,
+  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Native parity is a later CR)
 - Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
   open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
   on a future per-Memory **participants** tag (sealed `userId`s)

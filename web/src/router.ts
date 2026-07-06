@@ -8,6 +8,7 @@ import LoginView from './views/LoginView.vue'
 import SettingsHubView from './views/SettingsHubView.vue'
 import TenantJoinView from './views/TenantJoinView.vue'
 import MemoryHomeView from './views/MemoryHomeView.vue'
+import GroupInvitationsView from './views/GroupInvitationsView.vue'
 
 // Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /server/settings
 // is the Server-Owner instance-administration page (cr-0050; tenant administration lives there, cr-0009) — it
@@ -26,6 +27,9 @@ const router = createRouter({
     // the sidebar + that section; narrow drills in). Needs an unlocked vault — sections read the active space,
     // and each surface (member directory, tenant admin) enforces its own authz server-side (403).
     { path: '/settings/:section?', name: 'settings', component: SettingsHubView, meta: { layout: 'app', requiresUnlock: true } },
+    // The invitee's pending group-consent proposals inbox (uc.spaces.consent-group-add, cr-0094). Needs an
+    // unlocked vault — each proposal's group name is sealed to the caller's identity and decrypted on-device.
+    { path: '/invitations', name: 'invitations', component: GroupInvitationsView, meta: { layout: 'app', requiresUnlock: true } },
     // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
     // preview/register are public and the existing-owner path signs in within the view (cr-0010).
     { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },

@@ -2,12 +2,14 @@ package com.veyq.app.features.account.profile
 
 import com.veyq.app.features.admin.tenant.TenantEntity
 import com.veyq.app.shared.identity.TenantProfileStore
+import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
-/** Result of a profile read/update (cr-0083). */
+/** Result of a profile read/update (cr-0083). `requireGroupAddConsent` is the account-global consent preference
+ *  (cr-0094) surfaced here — the caller's own settings surface. */
 sealed interface ProfileOutcome {
-    data class Found(val username: String, val sealedName: String?) : ProfileOutcome
+    data class Found(val username: String, val sealedName: String?, val requireGroupAddConsent: Boolean) : ProfileOutcome
     data object NoTenant : ProfileOutcome        // no tenant for the Host, or no profile there → 404
     data object UsernameTaken : ProfileOutcome   // the new handle is taken by someone else in this tenant → 409
 }
@@ -23,11 +25,14 @@ class AccountProfileHandler(private val profiles: TenantProfileStore) {
     fun get(userId: String, host: String?): ProfileOutcome {
         val tenantId = host?.let(::tenantIdByDomain) ?: return ProfileOutcome.NoTenant
         val profile = profiles.find(userId, tenantId) ?: return ProfileOutcome.NoTenant
-        return ProfileOutcome.Found(profile.username, profile.sealedName)
+        val consent = VeyqUser.findById(userId)?.requireGroupAddConsent ?: false
+        return ProfileOutcome.Found(profile.username, profile.sealedName, consent)
     }
 
     @Transactional
-    fun update(userId: String, host: String?, username: String?, sealedName: String?): ProfileOutcome {
+    fun update(
+        userId: String, host: String?, username: String?, sealedName: String?, requireGroupAddConsent: Boolean?,
+    ): ProfileOutcome {
         val tenantId = host?.let(::tenantIdByDomain) ?: return ProfileOutcome.NoTenant
         val existing = profiles.find(userId, tenantId) ?: return ProfileOutcome.NoTenant
         // A username change to a handle another member already holds is rejected; keeping (or re-setting) your
@@ -37,8 +42,11 @@ class AccountProfileHandler(private val profiles: TenantProfileStore) {
             if (norm != existing.username && profiles.usernameTaken(tenantId, norm)) return ProfileOutcome.UsernameTaken
         }
         profiles.update(userId, tenantId, username, sealedName)
+        // The consent preference is account-global (cr-0094) — it lives on the user, not the per-tenant profile.
+        if (requireGroupAddConsent != null) VeyqUser.findById(userId)?.let { it.requireGroupAddConsent = requireGroupAddConsent }
         val updated = profiles.find(userId, tenantId)!!
-        return ProfileOutcome.Found(updated.username, updated.sealedName)
+        val consent = VeyqUser.findById(userId)?.requireGroupAddConsent ?: false
+        return ProfileOutcome.Found(updated.username, updated.sealedName, consent)
     }
 
     private fun tenantIdByDomain(host: String): String? =

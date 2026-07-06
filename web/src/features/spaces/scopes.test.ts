@@ -14,6 +14,7 @@ import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { identityPrivate } from '../../app/vault'
 import { openName, sealName } from '../memory/tree'
+import { deriveGroupNameKey } from './inviteName'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 
@@ -109,7 +110,7 @@ describe('openScope', () => {
 })
 
 describe('createGroup', () => {
-  it('posts a self-grant + a name sealed under the SAME fresh K_SC (operator-blind — only ciphertext leaves)', async () => {
+  it('posts a self-grant + a name sealed under K_name_0 derived from the birth K_SC (operator-blind — only ciphertext leaves)', async () => {
     const list = vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }])
     const createGroupFn = vi.fn().mockResolvedValue({ scopeId: 'g1', kind: 'GROUP' })
     mockScopes(list, vi.fn(), createGroupFn)
@@ -118,23 +119,24 @@ describe('createGroup', () => {
     expect(scopeId).toBe('g1')
     expect(createGroupFn).toHaveBeenCalledTimes(1)
 
-    // Recover K_SC from the posted grant, then the posted encryptedName must decrypt back to the plaintext name
-    // under that very key — proving the name was sealed under the group's own scope key, never sent in the clear.
+    // Recover K_SC (= E_0) from the posted grant; the posted encryptedName must decrypt back to the plaintext name
+    // under K_name_0 = HKDF(E_0) (cr-0096), NOT under K_SC directly — proving the derived-name-key seal.
     const { encryptedName, wrappedGrant } = createGroupFn.mock.calls[0][0].createGroupRequest
     const key = v1.asymUnwrap(v1.hybridSecret(copyPriv()), v1.hybridPublic(copyPriv()), fromB64std(wrappedGrant), 'scope-grant')
     expect(key.length).toBe(32)
-    expect(openName(key, encryptedName)).toBe('Familie')
+    expect(openName(deriveGroupNameKey(key), encryptedName)).toBe('Familie')
+    expect(() => openName(key, encryptedName)).toThrow() // NOT sealed under K_SC directly
   })
 })
 
 describe('listMyGroups', () => {
-  it('decrypts each group’s sealed name on-device (the server row carries only ciphertext)', async () => {
-    const key = v1.randomBytes(32)
+  it('decrypts each group’s name via K_name (from the name-epoch key) on-device (the row carries only ciphertext)', async () => {
+    const key = v1.randomBytes(32) // E_0
     const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
-    const encryptedName = sealName(key, 'Reise-Crew')
+    const encryptedName = sealName(deriveGroupNameKey(key), 'Reise-Crew') // sealed under K_name_0
     const list = vi.fn().mockResolvedValue([
       { id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' },
-      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName },
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName, nameEpoch: 0, grantedEpoch: 0 },
     ])
     mockScopes(list, vi.fn())
 
@@ -143,12 +145,12 @@ describe('listMyGroups', () => {
 })
 
 describe('openScopeById', () => {
-  it('opens a scope by id and decrypts a GROUP’s display name from encryptedName', async () => {
+  it('opens a scope by id and decrypts a GROUP’s display name from encryptedName (via K_name)', async () => {
     const key = v1.randomBytes(32)
     const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
-    const encryptedName = sealName(key, 'Reise-Crew')
+    const encryptedName = sealName(deriveGroupNameKey(key), 'Reise-Crew')
     const list = vi.fn().mockResolvedValue([
-      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName },
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName, nameEpoch: 0, grantedEpoch: 0 },
     ])
     mockScopes(list, vi.fn())
 

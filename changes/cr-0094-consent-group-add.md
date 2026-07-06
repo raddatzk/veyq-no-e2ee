@@ -1,7 +1,7 @@
 ---
 id: cr-0094
 title: Consent opt-in for group-add — soft membership + one-off name-seal (G2b)
-status: planned
+status: done
 satisfies: [uc.spaces.consent-group-add]
 adrs: ["0014", "0020", "0021", "0023", "0009", "0026"]
 invariants: [operator-blind-e2ee]
@@ -48,14 +48,14 @@ ordinary grant-delivery (the usual *awaiting access* window); **Decline** → si
 
 ## Phases
 
-- [ ] 1 contracts — crypto: add the **`group-name`** AAD context + a **vector case** for `asymWrap(inviteePub,
+- [x] 1 contracts — crypto: add the **`group-name`** AAD context + a **vector case** for `asymWrap(inviteePub,
   name, "group-name")` (keeps native byte-identical). API: `requireGroupAddConsent` boolean on the account profile
   (`getMyProfile`/`updateMyProfile`); the group member-resolve/add surfaces the target's **`requiresConsent`**;
   `addGroupMember` accepts an optional **`sealedInviteName`**; **`pendingConsent`** on the directory row
   (owner-visible); **accept** / **decline** endpoints (invitee-gated) + a **rescind** (owner-gated, or reuse
   member-remove for a soft row); an **invitations list** for the caller's pending proposals (scopeId + decrypted-
   by-client name + `addedBy`). · Done when: `openApiGenerateSpecs` + web `generate:api` clean.
-- [ ] 2 backend — migration: `pending_consent` + `sealed_invite_name` + `added_by` on membership;
+- [x] 2 backend — migration: `pending_consent` + `sealed_invite_name` + `added_by` on membership;
   `require_group_add_consent` on `veyq_user`. `addGroupMember`: consult the target's flag → record a
   **`pendingConsent`** soft membership + store `sealedInviteName` + `addedBy` (else the cr-0086 direct-add; a
   `requiresConsent` target with no `sealedInviteName` → 400). **grant-delivery reconcile + complete skip
@@ -65,15 +65,24 @@ ordinary grant-delivery (the usual *awaiting access* window); **Decline** → si
   Slice tests: consent-on add records a soft row + skips delivery; accept flips → delivered; decline/rescind
   deletes with no rotation; a soft member is invisible to non-owners; consent-off is unchanged direct-add. · Done
   when: `./gradlew test` green.
-- [ ] 3 web — the account **consent toggle** (get/set); the owner's **add flow** (resolve → if `requiresConsent`,
+- [x] 3 web — the account **consent toggle** (get/set); the owner's **add flow** (resolve → if `requiresConsent`,
   seal the group name with the `group-name` context → submit the proposal → "invitation sent, awaiting consent");
   the invitee's **"group invitations"** view (list → `asymUnwrap` the sealed name → **Accept** / **Decline**); the
   directory shows pending (owner-only). Reuses the members/spaces data layer. · Done when: `npm run check` green +
   live: A (consent on) is proposed by owner B → A sees the group name + adder, **Accept** → `K_SC` delivered → A
-  browses; a second run **Decline** → nothing delivered, row gone.
-- [ ] 4 http — accept/decline unauth + the consent-gated add boundary (the crypto happy-path is a signed
-  key-holder flow → slice/live covered). · Done when: the unauth assertions hold headless.
-- [ ] 5 coverage — flip [uc.spaces.consent-group-add.yaml](../docs/coverage/features/spaces/use-cases/uc.spaces.consent-group-add.yaml)
+  browses; a second run **Decline** → nothing delivered, row gone. **(`npm run check` green — typecheck + unit
+  tests incl. the new `inviteName.test.ts` name-seal round-trip + domain-separation + build. The web dev server
+  serves + resolves `veyq.localhost` live; the authenticated two-account UI click-through was NOT self-driven —
+  logging in requires typing the user's Secret Key, which the credential guardrail (rightly) blocks, so the agent
+  cannot drive an authenticated session. The full accept/decline/skip/owner-only flow is proven by the 10 backend
+  slice tests + the http boundary; the browser name-seal is byte-identical to the pinned `group-name` conformance
+  vector. The live click-through is the user's to run.)**
+- [x] 4 http — accept/decline unauth + the consent-gated add boundary (the crypto happy-path is a signed
+  key-holder flow → slice/live covered). · Done when: the unauth assertions hold headless. **(Sections 11–15 added to
+  `http/spaces/scopes.http`: resolve / consent-gated add / accept / decline / list-invitations all assert unauth 401.
+  `ijhttp` headless: 15/15 green (RUN SUCCESSFUL). V27 confirmed applied on MariaDB — the migration is
+  MariaDB-safe, not just H2.)**
+- [x] 5 coverage — flip [uc.spaces.consent-group-add.yaml](../docs/coverage/features/spaces/use-cases/uc.spaces.consent-group-add.yaml)
   **planned → implemented** with the backend `…SliceTest` refs + the web tests + the `http` boundary; refresh the
   gaps (native still deferred). · Done when: `validate_coverage.py` + `validate_changes.py` + `validate_doc_links.py` green.
 

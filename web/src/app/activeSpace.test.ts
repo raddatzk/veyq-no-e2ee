@@ -26,7 +26,7 @@ const PERSONAL_SCOPE_ID = '11111111-1111-1111-1111-111111111111'
 
 // An unrotated OpenedScope: the write key IS E_0, so `key` is the same buffer the epoch map holds (zeroed together).
 const epochsOf = (key: Uint8Array) => ({ current: 0, keys: new Map([[0, key]]) })
-const opened = (scopeId: string, kind: ScopeKind, key: Uint8Array) => ({ scopeId, tenantId: TENANT_ID, kind, key, epochs: epochsOf(key), deletedAt: null, purgeAfter: null })
+const opened = (scopeId: string, kind: ScopeKind, key: Uint8Array) => ({ scopeId, tenantId: TENANT_ID, kind, key, epochs: epochsOf(key), nameEpoch: 0, deletedAt: null, purgeAfter: null })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -102,7 +102,7 @@ describe('enterScope — personal', () => {
 describe('enterScope — group', () => {
   it('opens a group by id (@<id>) → ready, holding its decrypted name on activeSpace', async () => {
     const key = new Uint8Array(32).fill(3)
-    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key, epochs: epochsOf(key), name: 'Familie Raddatz', deletedAt: null, purgeAfter: null })
+    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key, epochs: epochsOf(key), nameEpoch: 0, name: 'Familie Raddatz', deletedAt: null, purgeAfter: null })
 
     await enterScope('@g-1')
 
@@ -159,7 +159,7 @@ describe('refreshActiveScope — reactive epoch swap after a rotation (cr-0089)'
     // A rotation bumped the scope to epoch 2 — the re-opened grant now carries E_2 (+ the peeled chain E_1/E_0).
     const e2 = new Uint8Array(32).fill(8)
     const peeled = { current: 2, keys: new Map([[2, e2], [1, new Uint8Array(32).fill(7)], [0, new Uint8Array(32).fill(4)]]) }
-    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key: e2, epochs: peeled, deletedAt: null, purgeAfter: null })
+    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key: e2, epochs: peeled, nameEpoch: 0, deletedAt: null, purgeAfter: null })
     await refreshActiveScope()
 
     // The reactive signal moved forward (view computeds depend on it) AND the write key is now E_2, so the owner's

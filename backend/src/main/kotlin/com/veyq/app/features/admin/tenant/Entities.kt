@@ -129,6 +129,26 @@ class MembershipEntity : PanacheEntityBase {
     @Column(name = "granted_epoch", nullable = false)
     var grantedEpoch: Int = 0
 
+    /** A **soft consent proposal** the target has not yet accepted (uc.spaces.consent-group-add, cr-0094, ADR 0014
+     *  §5). While true this is a grant-less membership grant-delivery **skips** — `K_SC` is gated **before** the
+     *  wrap — until the invitee accepts (clears the flag) or declines (deletes the row). Default false = an
+     *  ordinary membership (the pre-consent behaviour). */
+    @Column(name = "pending_consent", nullable = false)
+    var pendingConsent: Boolean = false
+
+    /** For a `pendingConsent` proposal (cr-0096, ADR 0027): the group's **derived name-key `K_name`** sealed to
+     *  the invitee's identity public key (`asymWrap(inviteePub, K_name, "group-name-key")`) — opaque ciphertext the
+     *  server stores verbatim. Handed to the invitee so they open the scope's **canonical** `encrypted_name` (not
+     *  a private name copy) and see the group-consistent name. Null for an ordinary membership; cleared on accept. */
+    @Column(name = "sealed_name_key")
+    var sealedNameKey: String? = null
+
+    /** For a `pendingConsent` proposal (cr-0094): the userId of the GroupOwner who proposed the add ("who added
+     *  you"), resolved to their per-tenant username in the invitee's invitations view. Null for an ordinary
+     *  membership; cleared on accept. */
+    @Column(name = "added_by", length = 36)
+    var addedBy: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

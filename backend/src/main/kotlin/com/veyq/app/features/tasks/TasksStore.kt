@@ -155,7 +155,7 @@ class TasksStore {
             job.resourceRef?.let { membershipId ->
                 MembershipEntity.update(
                     "wrappedGrant = ?1, grantedEpoch = ?2 where id = ?3 and scopeId = ?4 " +
-                        "and (wrappedGrant is null or grantedEpoch < ?2)",
+                        "and (wrappedGrant is null or grantedEpoch < ?2) and pendingConsent = false",
                     grant, epoch, membershipId, job.scopeId,
                 )
             }
@@ -256,8 +256,10 @@ class TasksStore {
     fun reconcileGrantDelivery(scopeIds: Set<String>, maxAttempts: Int): Int {
         if (scopeIds.isEmpty()) return 0
         val epochByScope = ScopeEntity.find("id in ?1", scopeIds).list().associate { it.id to it.currentEpoch }
+        // A soft `pendingConsent` proposal (cr-0094) is grant-less but NEVER a delivery target: the consent gate is
+        // "no `K_SC` wrap before the invitee accepts", so it is skipped until Accept clears the flag.
         val pending = MembershipEntity.find("scopeId in ?1", scopeIds).list()
-            .filter { it.wrappedGrant == null || it.grantedEpoch < (epochByScope[it.scopeId] ?: 0) }
+            .filter { !it.pendingConsent && (it.wrappedGrant == null || it.grantedEpoch < (epochByScope[it.scopeId] ?: 0)) }
         var created = 0
         for (m in pending) {
             val live = JobEntity.count(

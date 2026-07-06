@@ -1,29 +1,48 @@
 useCase: uc.spaces.consent-group-add
 feature: spaces
 title: Consent before being added to a group
-status: planned
-# Refined (ADR 0014 §5 → this use-case): the optional consent opt-in for group-add. Consent-first (K_SC gated
-# BEFORE the wrap — grant-delivery skips soft memberships), a one-off name-seal so the invitee decides informed,
-# account-global toggle, silent-drop decline, owner-only pending visibility. Not yet built — a later CR turns this
-# target picture into contracts + backend + web (native web-first, own CR after, like the rest of the groups epic).
+# cr-0094 delivered the optional consent opt-in (ADR 0014 §5): consent-first (K_SC gated BEFORE the wrap —
+# grant-delivery skips soft pendingConsent memberships), an account-global toggle, a silent-drop decline, and
+# owner-only pending visibility. cr-0096 (ADR 0027) replaces the informed-consent name mechanism: instead of a
+# one-off owner name-seal, the owner hands the invitee the group's DERIVED name-key K_name (from the name's epoch
+# key) so the invitee opens the SAME canonical encryptedName the members read — a modified owner cannot show a
+# divergent name. Backend slice tests + a web name-key unit test + the http unauth boundary; the crypto happy-path
+# (signed key-holder add/accept, live K_SC delivery) is slice + live-covered. Native web-first.
 acceptanceCriteria:
   - id: consent-toggle
     text: A person turns on an account-global "ask before adding me to groups" preference (default off); a server-visible boolean (operational metadata, no key/content). With it off, add is the direct-add of uc.spaces.add-group-member.
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.accountConsentToggleRoundTrips, ConsentGroupAddSliceTest.consentOffIsUnchangedDirectAdd] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: soft-membership-gates-key
-    text: With consent on, a GroupOwner's add records a SOFT (pendingConsent) grant-less membership; grant-delivery SKIPS soft memberships, so K_SC is never wrapped to a pending invitee (consent-first, never wrap-then-soft).
-  - id: one-off-name-seal
-    text: The owner's device seals just the group name to the invitee's identity public key (asymWrap, one-off ciphertext) so the invitee sees the group's name + who added them, informed — without ever receiving K_SC or the plaintext name reaching the server.
+    text: With consent on, a GroupOwner's add records a SOFT (pendingConsent) grant-less membership; grant-delivery SKIPS soft memberships, so K_SC is never wrapped to a pending invitee (consent-first, never wrap-then-soft). The gate holds on the ROTATION path too — a scope-key rotation never (re-)grants a pendingConsent row (cr-0095). A consent-on target added without a wrapped name-key is rejected (consent_required).
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.consentOnAddRecordsSoftRowAndGrantDeliverySkipsIt, ConsentGroupAddSliceTest.consentRequiredWithoutSealIs400, ConsentGroupAddSliceTest.rotationNeverGrantsAPendingProposal] }
+      http: { e2e: [http/spaces/scopes.http] }
+  - id: derived-name-key
+    text: The owner's device derives the group's name-key K_name = HKDF(E_e, "group-name-key") from the name's content-epoch key and wraps IT (not a name copy) to the invitee's identity (asymWrap under the distinct `group-name-key` AAD context). The invitee unwraps K_name and opens the scope's CANONICAL encryptedName — the SAME ciphertext the members read — so a modified owner cannot privately show a divergent name (ADR 0027). Domain-separated from `scope-grant` (a name-key wrap can never open as a key-grant); K_name leaks the name and nothing else (HKDF one-way — not E_e, not K_SC). The invitee never receives K_SC and no plaintext name reaches the server.
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.acceptFlipsToDeliverableAndClearsTheInvitation] }
+      web: { unit: [src/features/spaces/inviteName.test.ts] }
   - id: accept-delivers
-    text: Accept clears pendingConsent → the proposal becomes a normal grant-less membership → ordinary grant-delivery wraps K_SC (awaiting access → Active), identical to direct-add from there.
+    text: Accept clears pendingConsent → the proposal becomes a normal grant-less membership → ordinary grant-delivery wraps K_SC (awaiting access → Active), identical to direct-add from there. Re-accept is an idempotent no-op.
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.acceptFlipsToDeliverableAndClearsTheInvitation] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: decline-silent-drop
-    text: Decline deletes the soft membership with no trace (no "declined" state); nothing was ever wrapped. A re-invite later is allowed (a fresh proposal). The owner may also rescind before acceptance.
+    text: Decline deletes the soft membership with no trace (no "declined" state) and no rotation; nothing was ever wrapped. A re-invite later is allowed (a fresh proposal). Decline with no open proposal is still a silent 204 (no enumeration); accept with none is 404.
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.declineDropsTheSoftRowWithNoTraceAndNoRotation, ConsentGroupAddSliceTest.acceptWithNoProposalIs404] }
+      http: { e2e: [http/spaces/scopes.http] }
   - id: owner-only-pending
-    text: A pendingConsent invitee is visible in the group's member directory as "invited — awaiting consent" to OWNERS only; ordinary members see them only after they accept.
+    text: A pendingConsent invitee is visible in the group's member directory as "awaiting consent" to group OWNERS only; ordinary key-holders in the group do not see them until they accept.
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.pendingProposalIsOwnerVisibleOnly] }
   - id: operator-blind-consent
-    text: The server stores only a membership row + one opaque sealed-name ciphertext + relays pubkeys — never K_SC, never the plaintext name; authenticity stays Plain (the fingerprint/TOFU seam is unchanged).
+    text: The server stores only a membership row + one opaque wrapped name-key + relays pubkeys and the already-stored encryptedName ciphertext to the invitee — never K_SC, never a name-key it can use, never the plaintext name; authenticity stays Plain (the fingerprint/TOFU seam is unchanged).
+    coverage:
+      backend: { integration: [ConsentGroupAddSliceTest.consentOnAddRecordsSoftRowAndGrantDeliverySkipsIt] }
+      web: { unit: [src/features/spaces/inviteName.test.ts] }
 gaps:
-  backend: "Planned — the pendingConsent membership + the consent toggle + accept/decline/rescind endpoints + the grant-delivery skip are not built yet (a later CR)."
-  web: "Planned — the consent setting, the owner's proposal flow, and the invitee's 'group invitations' view are not built yet (a later CR)."
-  http: "Planned — the signed accept/decline boundary + the consent-gated add will get .http assertions where reproducible from a bare .http; the crypto happy-path is slice/live-covered."
-  apple: "Not built — web-first, native is its own later CR like the rest of the groups epic."
-  android: "Not built — web-first, native is its own later CR like the rest of the groups epic."
+  apple: "Group-add consent is web-first — not built natively (own CR later), like the rest of the groups epic."
+  android: "Group-add consent is web-first — not built natively (own CR later), like the rest of the groups epic."

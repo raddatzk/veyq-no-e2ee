@@ -28,9 +28,16 @@ class ScopeEntity : PanacheEntityBase {
     @Column(name = "kind", nullable = false, length = 16)
     lateinit var kind: String
 
-    /** A GROUP scope's name, sealed under its `K_SC` (ciphertext base64); null for TENANT/PERSONAL (ADR 0014). */
+    /** A GROUP scope's name, sealed under its **derived name-key `K_name`** (ciphertext base64, cr-0096/ADR 0027);
+     *  null for TENANT/PERSONAL (ADR 0014). The server never opens it (no key); it only relays the ciphertext. */
     @Column(name = "encrypted_name")
     var encryptedName: String? = null
+
+    /** For a GROUP: the content-key epoch the `encryptedName` was sealed under (cr-0096/ADR 0027) — 0 at birth,
+     *  bumped only by a rename (a plain rotation leaves the name on its epoch). Members peel the chain to this
+     *  epoch's key and derive `K_name` from it; a pending invitee is handed `K_name` directly. */
+    @Column(name = "name_epoch", nullable = false)
+    var nameEpoch: Int = 0
 
     /** The scope's **current content-key epoch** (ADR 0024, cr-0088) — 0 until the first rotation. New content
      *  seals under this epoch; a removal bumps it. */

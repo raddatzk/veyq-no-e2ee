@@ -28,8 +28,13 @@ export function getMyProfile(): Promise<MemberProfile> {
   return withRefresh(() => accountProfileApi().getMyProfile())
 }
 
-/** Update the caller's username and/or sealed name in the active tenant (either may be omitted). */
-export function updateMyProfile(update: { username?: string; sealedName?: string }): Promise<MemberProfile> {
+/** Update the caller's username, sealed name, and/or the account-global group-add consent preference (cr-0094) —
+ *  each may be omitted to leave it unchanged. */
+export function updateMyProfile(update: {
+  username?: string
+  sealedName?: string
+  requireGroupAddConsent?: boolean
+}): Promise<MemberProfile> {
   return withRefresh(() => accountProfileApi().updateMyProfile({ profileUpdateRequest: update }))
 }
 

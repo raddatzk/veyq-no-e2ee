@@ -328,7 +328,7 @@ components:
     MemberProfile:
       type: object
       description: The caller's per-tenant identity — a plaintext handle + the sealed real name (ADR 0023).
-      required: [username]
+      required: [username, requireGroupAddConsent]
       properties:
         username:
           type: string
@@ -343,12 +343,21 @@ components:
           contentEncoding: base64
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
+        requireGroupAddConsent:
+          type: boolean
+          description: >
+            The caller's **account-global** "ask before adding me to groups" preference (uc.spaces.consent-group-add,
+            ADR 0014 §5) — default `false`. Account-scoped (applies in every tenant the caller belongs to), surfaced
+            here because this is the caller's own settings surface. Low-sensitivity server-visible operational
+            metadata (never a key or content): a GroupOwner attempting an add learns *that* the caller wants to be
+            asked, and their add becomes a consent proposal instead of a direct-add.
+          example: false
 
     ProfileUpdateRequest:
       type: object
       description: >
-        A profile change — set the `username` (re-checked unique in the tenant) and/or the `sealedName` blob.
-        Omit a field to leave it unchanged.
+        A profile change — set the `username` (re-checked unique in the tenant), the `sealedName` blob, and/or
+        the account-global `requireGroupAddConsent` preference. Omit a field to leave it unchanged.
       properties:
         username:
           type: string
@@ -368,6 +377,13 @@ components:
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        requireGroupAddConsent:
+          type: [boolean, "null"]
+          description: >
+            The account-global "ask before adding me to groups" preference (uc.spaces.consent-group-add). `true`
+            turns a GroupOwner's add into a consent proposal; `false` restores the default direct-add. Omit
+            (`null`) to leave it unchanged.
+          example: true
 
     ErrorResponse:
       type: object

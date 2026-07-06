@@ -22,13 +22,35 @@ sealed interface ListScopesOutcome {
     object NoTenant : ListScopesOutcome
 }
 
-/** Outcome of adding a member to a group by username (cr-0086). Admission only — the key is delivered later. */
+/** Outcome of adding a member to a group by username (cr-0086). Admission only — the key is delivered later.
+ *  `ConsentRequired` (cr-0096): the target has consent on but no `sealedNameKey` was supplied. */
 sealed interface AddGroupMemberOutcome {
     data class Added(val row: ScopeMemberRow) : AddGroupMemberOutcome
     object ScopeNotFound : AddGroupMemberOutcome
     object NotOwner : AddGroupMemberOutcome
     object MemberNotFound : AddGroupMemberOutcome
     object AlreadyMember : AddGroupMemberOutcome
+    object ConsentRequired : AddGroupMemberOutcome
+}
+
+/** Outcome of resolving a per-tenant username to a group-add candidate (cr-0094) — records nothing. */
+sealed interface ResolveCandidateOutcome {
+    data class Ok(val row: ResolvedCandidateRow) : ResolveCandidateOutcome
+    object ScopeNotFound : ResolveCandidateOutcome
+    object NotOwner : ResolveCandidateOutcome
+    object MemberNotFound : ResolveCandidateOutcome
+}
+
+/** Outcome of accepting a consent proposal (cr-0094). Decline is unconditionally idempotent, so it has no outcome. */
+sealed interface AcceptInvitationOutcome {
+    object Ok : AcceptInvitationOutcome
+    object NotFound : AcceptInvitationOutcome
+}
+
+/** Outcome of listing the caller's pending group invitations (cr-0094). */
+sealed interface ListInvitationsOutcome {
+    data class Invitations(val rows: List<GroupInvitationRow>) : ListInvitationsOutcome
+    object NoTenant : ListInvitationsOutcome
 }
 
 /** Outcome of listing a scope's members (the directory, cr-0077). */
@@ -124,16 +146,72 @@ class ScopesHandler(private val store: ScopesStore) {
      * MEMBER membership — no key crosses the wire; grant-delivery wraps `K_SC` to them afterwards (cr-0076). The
      * returned row has its `email` nulled (the add response never exposes it).
      */
-    fun addGroupMember(callerId: String, scopeId: String, username: String): AddGroupMemberOutcome {
+    fun addGroupMember(callerId: String, scopeId: String, username: String, sealedNameKey: String?): AddGroupMemberOutcome {
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return AddGroupMemberOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return AddGroupMemberOutcome.NotOwner
         val tenantId = store.scopeTenantId(scopeId) ?: return AddGroupMemberOutcome.ScopeNotFound
         val targetId = store.resolveUsernameInTenant(tenantId, username) ?: return AddGroupMemberOutcome.MemberNotFound
         if (!store.isMember(targetId, tenantId)) return AddGroupMemberOutcome.MemberNotFound
         if (store.isScopeMember(targetId, scopeId)) return AddGroupMemberOutcome.AlreadyMember
-        store.addGrantlessMember(targetId, tenantId, scopeId)
+        // Consent-first (cr-0096, ADR 0027): if the target asked to be consulted, record a soft `pendingConsent`
+        // membership grant-delivery skips — so `K_SC` is gated **before** the wrap — carrying the wrapped name-key
+        // `K_name`. The owner must have derived + sealed it (learned consent is required from the prior resolve);
+        // no name-key → ConsentRequired.
+        if (store.requiresGroupAddConsent(targetId)) {
+            if (sealedNameKey == null) return AddGroupMemberOutcome.ConsentRequired
+            store.addSoftPendingMember(targetId, tenantId, scopeId, sealedNameKey, callerId)
+        } else {
+            store.addGrantlessMember(targetId, tenantId, scopeId)
+        }
         val row = store.scopeMemberRow(scopeId, targetId) ?: return AddGroupMemberOutcome.MemberNotFound
         return AddGroupMemberOutcome.Added(row.copy(email = null))
+    }
+
+    /**
+     * Resolve a per-tenant username to a group-add candidate (uc.spaces.consent-group-add, cr-0094) — records
+     * nothing. Owner-gated (the same gate as the add). This gate is convenience, **not** a confidentiality barrier:
+     * any tenant member can create a group and become its owner in O(1), so username → identity-public-key →
+     * consent-flag are effectively enumerable by every tenant member. That is within the metadata model (per-tenant
+     * usernames + identity pubkeys are tenant-visible, ADR 0023/0014 §5), not a leak — don't read the gate as one.
+     * Returns the candidate's identity public key (to seal the derived group name-key to) + whether consent is required.
+     */
+    fun resolveGroupMember(callerId: String, scopeId: String, username: String): ResolveCandidateOutcome {
+        if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return ResolveCandidateOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return ResolveCandidateOutcome.NotOwner
+        val tenantId = store.scopeTenantId(scopeId) ?: return ResolveCandidateOutcome.ScopeNotFound
+        val targetId = store.resolveUsernameInTenant(tenantId, username) ?: return ResolveCandidateOutcome.MemberNotFound
+        if (!store.isMember(targetId, tenantId)) return ResolveCandidateOutcome.MemberNotFound
+        val pubkey = store.identityPublicKeyOf(targetId) ?: return ResolveCandidateOutcome.MemberNotFound
+        return ResolveCandidateOutcome.Ok(
+            ResolvedCandidateRow(targetId, username.trim().lowercase(), pubkey, store.requiresGroupAddConsent(targetId)),
+        )
+    }
+
+    /**
+     * Accept a consent proposal (cr-0094): clear the caller's own `pendingConsent` flag, so it becomes an ordinary
+     * grant-less membership and grant-delivery wraps `K_SC` to them. Invitee-gated (acts only on the caller's
+     * membership); idempotent — an already-accepted membership is a no-op Ok; no membership at all is NotFound.
+     */
+    fun acceptInvitation(callerId: String, scopeId: String): AcceptInvitationOutcome =
+        when {
+            store.clearPendingConsent(callerId, scopeId) > 0 -> AcceptInvitationOutcome.Ok
+            store.consentState(callerId, scopeId) == ConsentState.ACTIVE -> AcceptInvitationOutcome.Ok // already accepted
+            else -> AcceptInvitationOutcome.NotFound
+        }
+
+    /**
+     * Decline (invitee) / rescind (owner reuses this via member-remove) a consent proposal (cr-0094): delete the
+     * caller's own soft membership. Nothing was wrapped, so **no rotation**; no `declined` marker is kept.
+     * Idempotent — always succeeds (no open proposal is still a silent no-op, so it is no enumeration oracle).
+     */
+    fun declineInvitation(callerId: String, scopeId: String) {
+        store.deletePendingMembership(callerId, scopeId)
+    }
+
+    /** The caller's pending group invitations in the active tenant (cr-0094) — the invitee's Accept/Decline view. */
+    fun listInvitations(userId: String, host: String?): ListInvitationsOutcome {
+        val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return ListInvitationsOutcome.NoTenant
+        return ListInvitationsOutcome.Invitations(store.listInvitations(userId, tenantId))
     }
 
     /**
@@ -222,8 +300,13 @@ class ScopesHandler(private val store: ScopesStore) {
     fun listMembers(userId: String, scopeId: String): ListMembersOutcome {
         if (!store.holdsGrant(userId, scopeId)) return ListMembersOutcome.Forbidden
         val tenantId = store.scopeTenantId(scopeId) ?: return ListMembersOutcome.Forbidden
-        val owner = store.isTenantOwner(userId, tenantId)
-        val rows = store.listMembers(scopeId).map { if (owner) it else it.copy(email = null) }
+        val tenantOwner = store.isTenantOwner(userId, tenantId)
+        // Pending consent proposals (cr-0094) are visible to **group owners** only — ordinary members see a proposed
+        // person only once they accept. Email stays tenant-owner-only (ADR 0023), as before.
+        val scopeOwner = store.isScopeOwner(userId, scopeId)
+        val rows = store.listMembers(scopeId)
+            .filter { scopeOwner || !it.pendingConsent }
+            .map { if (tenantOwner) it else it.copy(email = null) }
         return ListMembersOutcome.Members(rows)
     }
 }

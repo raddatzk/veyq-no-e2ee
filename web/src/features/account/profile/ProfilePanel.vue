@@ -7,6 +7,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { getMyProfile, updateMyProfile, sealName, unsealName, openTenantKey } from './profile'
@@ -18,6 +19,8 @@ const router = useRouter()
 const username = ref('')
 const firstName = ref('')
 const lastName = ref('')
+// Account-global "ask before adding me to groups" preference (cr-0094) — a server-visible boolean, not a key.
+const requireGroupAddConsent = ref(false)
 const loading = ref(true)
 const loadError = ref(false)
 const saving = ref(false)
@@ -30,6 +33,7 @@ onMounted(async () => {
   try {
     const profile = await getMyProfile()
     username.value = profile.username
+    requireGroupAddConsent.value = profile.requireGroupAddConsent
     tenantKey = await openTenantKey()
     if (tenantKey) {
       const name = unsealName(tenantKey, profile.sealedName)
@@ -57,7 +61,11 @@ async function save() {
       tenantKey && (firstName.value.trim() || lastName.value.trim())
         ? sealName(tenantKey, { firstName: firstName.value, lastName: lastName.value })
         : undefined
-    await updateMyProfile({ username: username.value.trim().toLowerCase(), sealedName })
+    await updateMyProfile({
+      username: username.value.trim().toLowerCase(),
+      sealedName,
+      requireGroupAddConsent: requireGroupAddConsent.value,
+    })
     notice.value = t('profile.saved')
   } catch (e) {
     const { status, code } = await memberError(e)
@@ -93,6 +101,15 @@ async function save() {
         </div>
         <small v-if="!tenantKey" class="field-hint">{{ t('profile.noNameYet') }}</small>
 
+        <!-- Account-global consent preference (cr-0094). Applies in every space you belong to. -->
+        <div class="consent-row">
+          <Checkbox v-model="requireGroupAddConsent" input-id="require-group-add-consent" binary />
+          <label class="consent-label" for="require-group-add-consent">
+            <span>{{ t('profile.consentGroupAdd') }}</span>
+            <small class="field-hint">{{ t('profile.consentGroupAddHint') }}</small>
+          </label>
+        </div>
+
         <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <div class="veyq-dialog-action-row">
@@ -115,5 +132,16 @@ async function save() {
 .name-row label {
   flex: 1;
   min-width: 0;
+}
+.consent-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.consent-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
 }
 </style>

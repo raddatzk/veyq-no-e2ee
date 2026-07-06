@@ -9,6 +9,7 @@ import { identityPrivate } from '../../app/vault'
 import { sealName, openName } from '../memory/tree'
 import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type EpochKeys } from './epochs'
 import { SCOPE_GRANT, wrapScopeKeyToMember } from './grant'
+import { deriveGroupNameKey, wrapNameKeyToInvitee } from './inviteName'
 import { ScopeKind, type ScopeSummary, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 
 /** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020), re-exported for back-compat — its home is now
@@ -76,16 +77,18 @@ export async function ensurePersonalScope(): Promise<boolean> {
 
 /**
  * Create a named GROUP scope in the active tenant (en.spaces.group-scope, cr-0032) — operator-blind: generate a
- * random `K_SC`, **seal the name under it**, seal `K_SC` to our **own** identity (the self-grant), and POST only
- * the two ciphertexts. The server mints the scope + our OWNER self-membership and never sees the key or the name.
- * Requires an unlocked vault. Returns the new scope id (so the caller can switch into `#@<id>`).
+ * random `K_SC`, **seal the name under its derived name-key `K_name_0`** (from the birth epoch `E_0 = K_SC`,
+ * cr-0096/ADR 0027), seal `K_SC` to our **own** identity (the self-grant), and POST only the two ciphertexts. The
+ * server mints the scope (at name-epoch 0) + our OWNER self-membership and never sees a key or the name. Requires
+ * an unlocked vault. Returns the new scope id (so the caller can switch into `#@<id>`).
  */
 export async function createGroup(name: string): Promise<string> {
   const priv = identityPrivate()
   if (!priv) throw new Error('vault is locked — cannot create a group')
   const scopeKey = v1.randomBytes(32)
+  const nameKey = deriveGroupNameKey(scopeKey) // K_name_0 = HKDF(E_0), name-epoch 0
   try {
-    const encryptedName = sealName(scopeKey, name)
+    const encryptedName = sealName(nameKey, name)
     const grant = b64std(v1.asymWrap(v1.hybridPublic(priv), scopeKey, SCOPE_GRANT, { nonce: v1.randomBytes(12) }))
     const created = await withRefresh(() =>
       scopesApi().createGroup({ createGroupRequest: { encryptedName, wrappedGrant: grant } }),
@@ -93,7 +96,19 @@ export async function createGroup(name: string): Promise<string> {
     return created.scopeId
   } finally {
     scopeKey.fill(0)
+    nameKey.fill(0)
     zero(priv)
+  }
+}
+
+/** The group's display name from its epoch keys: derive `K_name` from the name-epoch key, open the canonical
+ *  `encryptedName` under it (cr-0096/ADR 0027). Members read the same blob a pending invitee is handed the key for. */
+function openGroupName(epochs: EpochKeys, nameEpoch: number, encryptedName: string): string {
+  const nameKey = deriveGroupNameKey(keyAt(epochs, nameEpoch))
+  try {
+    return openName(nameKey, encryptedName)
+  } finally {
+    nameKey.fill(0)
   }
 }
 
@@ -116,9 +131,10 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
       groups.map(async (g): Promise<GroupSpace | null> => {
         let epochs: EpochKeys | null = null
         try {
-          // The name is sealed under E_0 — peel the chain so a rotated group still decrypts its name.
+          // The name is sealed under K_name (from the name-epoch key) — peel the chain so a rotated group still
+          // derives that epoch's key and decrypts its name.
           epochs = await epochKeysFor(g, unwrapGrant(g, priv))
-          const name = g.encryptedName ? openName(keyAt(epochs, 0), g.encryptedName) : ''
+          const name = g.encryptedName ? openGroupName(epochs, g.nameEpoch, g.encryptedName) : ''
           return { scopeId: g.id, tenantId: g.tenantId, name, role: g.role, deletedAt: g.deletedAt ?? null, purgeAfter: g.purgeAfter ?? null }
         } catch {
           return null
@@ -135,28 +151,28 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
 
 /** An opened scope: its opaque identity + the in-memory **epoch keys** (owned transiently by the caller; `key` is
  *  the write key = the current epoch) + the decrypted display `name` for a named scope (a GROUP; undefined else). */
-export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; epochs: EpochKeys; name?: string; deletedAt: Date | null; purgeAfter: Date | null }
+export type OpenedScope = { scopeId: string; tenantId: string; kind: ScopeKind; key: Uint8Array; epochs: EpochKeys; nameEpoch: number; name?: string; deletedAt: Date | null; purgeAfter: Date | null }
 
 /** asymUnwrap our **own** grant on a scope row with the vaulted identity → the in-memory epoch key. Caller owns it. */
 function unwrapGrant(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Uint8Array {
   return v1.asymUnwrap(v1.hybridSecret(priv), v1.hybridPublic(priv), fromB64std(scope.wrappedGrant), SCOPE_GRANT)
 }
 
-/** Open a scope summary → its epoch keys + (for a GROUP) its decrypted name. The name is sealed under **E_0**
- *  (sealed at creation, never re-sealed on rotation), so it decrypts under the base epoch of the peeled chain. */
+/** Open a scope summary → its epoch keys + (for a GROUP) its decrypted name. The name is sealed under `K_name`
+ *  derived from its **name-epoch** key (cr-0096/ADR 0027), so it decrypts under that epoch of the peeled chain. */
 async function toOpenedScope(scope: ScopeSummary, priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }): Promise<OpenedScope> {
   const grantKey = unwrapGrant(scope, priv)
   const epochs = await epochKeysFor(scope, grantKey)
   let name: string | undefined
   if (scope.kind === ScopeKind.Group && scope.encryptedName) {
     try {
-      name = openName(keyAt(epochs, 0), scope.encryptedName)
+      name = openGroupName(epochs, scope.nameEpoch, scope.encryptedName)
     } catch {
       name = undefined // a name that won't open (E2) is non-fatal — the scope still opens, just unlabelled
     }
   }
   return {
-    scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: writeKey(epochs), epochs, name,
+    scopeId: scope.id, tenantId: scope.tenantId, kind: scope.kind, key: writeKey(epochs), epochs, nameEpoch: scope.nameEpoch, name,
     deletedAt: scope.deletedAt ?? null, purgeAfter: scope.purgeAfter ?? null,
   }
 }
@@ -198,6 +214,25 @@ export async function openPersonalScope(): Promise<Uint8Array | null> {
 }
 
 /**
+ * Derive a group's current name-key `K_name` (from its name-epoch key) and wrap it to a pending invitee's identity
+ * (uc.spaces.consent-group-add, cr-0096/ADR 0027) → the `sealedNameKey` to post with the consent proposal. The
+ * invitee unwraps it to open the **same canonical `encryptedName`** the members read — so a modified owner cannot
+ * privately show a divergent name. Returns null if the caller can't open the scope (vault locked / no grant).
+ * Requires an unlocked vault; the transient epoch keys + `K_name` are zeroed before returning.
+ */
+export async function wrapGroupNameKeyForInvitee(scopeId: string, inviteeIdentityPublicKeyB64: string): Promise<string | null> {
+  const opened = await openScopeById(scopeId)
+  if (!opened) return null
+  const nameKey = deriveGroupNameKey(keyAt(opened.epochs, opened.nameEpoch))
+  try {
+    return wrapNameKeyToInvitee(nameKey, inviteeIdentityPublicKeyB64)
+  } finally {
+    nameKey.fill(0)
+    zeroEpochKeys(opened.epochs)
+  }
+}
+
+/**
  * Rotate a group's content key forward after a member was removed (ADR 0024, cr-0089) — the crypto half of the
  * remove: mint a fresh epoch key `E_{n+1}`, chain-link it to the current `E_n` (`symWrap(E_{n+1}, E_n)`), and
  * re-grant `E_{n+1}` to **every remaining member** (`asymWrap` to each directory pubkey), then POST the
@@ -215,7 +250,12 @@ export async function rotateGroupForRemoval(scopeId: string, remaining: ScopeMem
   const newKey = v1.randomBytes(32)
   try {
     const wrappedPrev = b64std(v1.symWrap(newKey, prevKey, EPOCH_LINK, v1.randomBytes(12)))
-    const grants = remaining.map((m) => ({ userId: m.userId, wrappedGrant: wrapScopeKeyToMember(newKey, m.identityPublicKey) }))
+    // Never re-grant a soft consent proposal (cr-0095): a `pendingConsent` row is grant-gated until the invitee
+    // accepts, so it must stay out of the rotation's re-grant set (the server enforces this too; this avoids the
+    // useless wrap + keeps the client honest). The directory hands owners the pending rows, so filter here.
+    const grants = remaining
+      .filter((m) => !m.pendingConsent)
+      .map((m) => ({ userId: m.userId, wrappedGrant: wrapScopeKeyToMember(newKey, m.identityPublicKey) }))
     const rotated = await withRefresh(() => scopesApi().rotateScope({ scopeId, rotateScopeRequest: { wrappedPrev, grants } }))
     return rotated.epoch
   } finally {

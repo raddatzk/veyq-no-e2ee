@@ -9,18 +9,20 @@
 - Preconditions: The target is **already a tenant member** with a published identity public key
   ([en.spaces.member-identity](../enablers/en.spaces.member-identity.md)). The target has turned **"ask before
   adding me to groups"** on (an **account-global** preference, default **off**). The GroupOwner holds the group
-  grant (so their device can read the group name and seal it).
+  grant (so their device can derive the group's name-key `K_name` and wrap it to the invitee).
 - Postconditions (success on **Accept**): the proposal becomes a normal **grant-less** membership; grant-delivery
   wraps `K_SC` to the newcomer (the usual *awaiting access* window, [uc.spaces.add-group-member](uc.spaces.add-group-member.md)),
   and the group opens for them. On **Decline**: the soft membership is dropped — **nothing was ever wrapped**, no
   trace kept. Operator-blind throughout: the server saw a membership row, identity public keys, and opaque
-  ciphertext (the sealed name, then the grant) — never `K_SC` and never the plaintext name.
+  ciphertext (the wrapped name-key, the already-stored canonical name it opens, then the grant) — never `K_SC`, and
+  never the plaintext name.
 
-This use-case realizes the **optional consent opt-in** of [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5.
+This use-case realizes the **optional consent opt-in** of [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5,
+with the invitee's name-preview mechanism defined by [ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md).
 It is **consent-first, never wrap-then-soft**: `K_SC` is gated **before** the wrap, because a delivered key can't
 be un-given. It builds directly on [uc.spaces.add-group-member](uc.spaces.add-group-member.md) (the default
-direct-add) — the only additions are the **soft membership**, a **one-off name-seal** so the invitee can decide
-informed, and the **accept/decline** step.
+direct-add) — the only additions are the **soft membership**, a **wrapped name-key** that lets the invitee read the
+group's **canonical** name (not an owner-typed claim), and the **accept/decline** step.
 
 ## Main flow
 
@@ -32,13 +34,16 @@ informed, and the **accept/decline** step.
    direct-add and picks them. The server sees the preference is **on**, so instead of a grant-less membership it
    records a **soft, grant-less membership** (`pendingConsent`) — *proposed*, not yet a member. **grant-delivery
    skips soft memberships**, so no key-holder ever wraps `K_SC` to a pending invitee.
-3. **The one-off name-seal.** The owner's device — a key-holder — seals **just the group name** to the invitee's
-   identity public key: `asymWrap(hybridPublic(invitee), name, "group-name")`, posted as the proposal's sealed
-   name. No standing second key, no rotation burden — a **single** ciphertext, readable only by the invitee, so
-   they can see *what* they are being asked to join. The group's real name stays sealed under `K_SC` as always.
-4. **The invitee decides.** In a **"group invitations"** view the invitee unwraps the sealed name with their own
-   identity private key and sees **the group's name + who added them** (the owner's per-tenant username, already
-   visible to them) + the tenant.
+3. **The wrapped name-key.** The owner's device — a key-holder — derives the group's **name-key**
+   `K_name = HKDF(E_e, "group-name-key")` from the key of the epoch the name was sealed under, and wraps **the key
+   bytes** (not a name copy) to the invitee's identity: `asymWrap(hybridPublic(invitee), K_name, "group-name-key")`,
+   posted as the proposal's `sealedNameKey`. The server returns the scope's **canonical** `encryptedName` in the
+   invitation. Handing the *key* — not a name — is the crux of [ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md):
+   the invitee opens the **same** ciphertext the members hold, so a modified owner **cannot** privately show a
+   divergent name. `K_name` is one-way from `E_e` (HKDF), so it leaks the name and nothing else — not `E_e`, not `K_SC`.
+4. **The invitee decides.** In a **"group invitations"** view the invitee unwraps `sealedNameKey` with their own
+   identity private key → `K_name`, decrypts the canonical `encryptedName` under it, and sees **the group's
+   (group-consistent) name + who added them** (the owner's per-tenant username, already visible to them) + the tenant.
    - **Accept** → the server clears `pendingConsent`; the proposal is now a normal grant-less membership, and the
      ordinary directory-driven grant-delivery wraps `K_SC` to them (first-online-wins, *awaiting access* →
      Active). From here it is identical to direct-add step 3+.
@@ -61,9 +66,9 @@ actor "Any key-holder\n(online)" as M
 O -> S : resolve username → { userId, identityPublicKey }
 O -> S : add → server sees consent=on → record SOFT membership (pendingConsent)
 note right of S : grant-delivery SKIPS soft memberships\n→ no wrap of K_SC yet
-O -> O : seal group name: asymWrap(inviteePub, name, "group-name")
-O -> S : POST proposal's sealed name (opaque ciphertext)
-I -> CI : open invitations → asymUnwrap sealed name → see name + who added
+O -> O : derive K_name = HKDF(E_e); wrap it: asymWrap(inviteePub, K_name, "group-name-key")
+O -> S : POST proposal's sealedNameKey (opaque ciphertext)
+I -> CI : open invitations → unwrap K_name → open CANONICAL encryptedName → see real name + who added
 alt Accept
   I -> S : accept → clear pendingConsent (now a normal grant-less member)
   M -> M : (next online) grant = asymWrap(inviteePub, K_SC, "scope-grant") — first-online-wins
@@ -87,10 +92,12 @@ end
   rate-limit/mute is a deferred polish, not a v1 gate.)
 - **E1 — the username doesn't resolve in this tenant:** a generic *not-found*, tenant-scoped resolve — identical
   to direct-add E1.
-- **E2 — key-substitution by a malicious operator:** the name-seal (and later the grant) wraps to the pubkey the
+- **E2 — key-substitution by a malicious operator:** the name-key wrap (and later the grant) wraps to the pubkey the
   server returns — **v1 is *Plain*** (no TOFU-pin, no hard-gate), consistent with direct-add E2 and the shared
   primitive. Consent gates the *human's* agreement, not key authenticity; the fingerprint / safety-number remains
   the explicit hardening seam ([security-model](../../../crosscutting/security-model.md), [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
+  Note ADR 0027 closes a **different** attack — a *modified-owner* private name-lie — orthogonal to this
+  operator-key seam, which stays deferred.
 
 ## Quality notes
 
@@ -98,8 +105,9 @@ end
   so `K_SC` never reaches someone who hasn't accepted. Deleting an already-delivered wrap would not un-give the
   key — so we never deliver it in the first place ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5).
 - **Operator-blind — no new leak beyond direct-add.** The server stores a membership row (`pendingConsent`) + one
-  opaque sealed-name ciphertext, and relays identity public keys. It already stores membership rows + sealed names
-  for direct-add; the plaintext name and `K_SC` never appear. The **consent boolean is account-global and
+  opaque wrapped name-key, and relays identity public keys + the already-stored canonical `encryptedName` to the
+  invitee. It already stores membership rows + sealed names for direct-add; the plaintext name and `K_SC` never
+  appear, and the name-key it relays is one it cannot use. The **consent boolean is account-global and
   server-visible** — a deliberate, honest exception: a GroupOwner attempting an add learns *that* the person wants
   to be asked (the add returns "proposal sent" instead of "added"). Low-sensitivity operational metadata, no key
   or content — the standing trade for a one-setting preference over a per-tenant one.
@@ -118,15 +126,17 @@ end
 
 **EN —** By default, a friend can add you to a shared group and you'll just find yourself in it — quick, but not
 everyone wants that. So there's a switch: **"ask before adding me to groups."** Turn it on and an add becomes an
-invitation instead. You'll see the group's **name** and **who added you** — sealed to you alone, so even the server
-can't read it — and you decide: **Accept** and the group's key is handed to you the usual way; **Decline** and it's
-as if it never happened — nothing was shared with you, and no record of the "no" is kept. Until you accept, the key
-to the group is **never** handed out, so nothing of the group ever reaches you without your say-so.
+invitation instead. You'll see the group's **real name** — the very same name everyone already in the group sees,
+so the person adding you can't quietly show you a nicer-sounding one — and **who added you**, all unreadable to the
+server, and you decide: **Accept** and the group's key is handed to you the usual way; **Decline** and it's as if it
+never happened — nothing was shared with you, and no record of the "no" is kept. Until you accept, the key to the
+group is **never** handed out, so nothing of the group ever reaches you without your say-so.
 
 **DE —** Standardmäßig kann dich ein:e Freund:in zu einer geteilten Gruppe hinzufügen, und du findest dich einfach
 darin wieder — schnell, aber nicht jede:r will das. Darum gibt es einen Schalter: **„frag mich, bevor du mich zu
-Gruppen hinzufügst."** Ist er an, wird ein Hinzufügen zu einer Einladung. Du siehst den **Namen** der Gruppe und
-**wer dich hinzugefügt hat** — nur an dich versiegelt, sodass nicht einmal der Server es lesen kann — und du
+Gruppen hinzufügst."** Ist er an, wird ein Hinzufügen zu einer Einladung. Du siehst den **echten Namen** der Gruppe
+— genau den Namen, den alle in der Gruppe schon sehen, sodass die Person, die dich hinzufügt, dir keinen
+schöner klingenden vorgaukeln kann — und **wer dich hinzugefügt hat**, für den Server unlesbar, und du
 entscheidest: **Annehmen**, und der Schlüssel zur Gruppe wird dir wie üblich übergeben; **Ablehnen**, und es ist,
 als wäre es nie passiert — nichts wurde mit dir geteilt, und das „Nein" wird nirgends festgehalten. Bis du annimmst,
 wird der Schlüssel zur Gruppe **nie** herausgegeben — nichts aus der Gruppe erreicht dich ohne dein Einverständnis.
@@ -137,9 +147,10 @@ wird der Schlüssel zur Gruppe **nie** herausgegeben — nichts aus der Gruppe e
 - Use-cases: [uc.spaces.add-group-member](uc.spaces.add-group-member.md) (the default direct-add this gates),
   [uc.spaces.manage-group-members](uc.spaces.manage-group-members.md) (how an accepted member later leaves)
 - Enablers: [en.spaces.group-scope](../enablers/en.spaces.group-scope.md) (the group + its sealed name),
-  [en.spaces.member-identity](../enablers/en.spaces.member-identity.md) (the identity pubkey the name is sealed to)
-- Decisions: [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5 (the consent opt-in — consent-first,
-  one-off name-seal), [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md) (the grant-wrap +
+  [en.spaces.member-identity](../enablers/en.spaces.member-identity.md) (the identity pubkey the name-key is wrapped to)
+- Decisions: [ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md) (the derived name-key the invitee
+  reads the canonical name with — supersedes the one-off seal), [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)
+  §5 (the consent opt-in — consent-first), [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md) (the grant-wrap +
   Plain-authenticity seam), [ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md) (grant-delivery,
   which skips soft memberships), [ADR 0023](../../../decisions/0023-per-tenant-member-identity.md) (per-tenant username),
   [ADR 0026](../../../decisions/0026-client-trust-tiers.md) (the client trust tier the consent guarantee rides on)

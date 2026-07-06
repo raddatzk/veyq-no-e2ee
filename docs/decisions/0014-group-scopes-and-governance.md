@@ -71,6 +71,12 @@ and which is confidential even from the tenant owner.**
 5. **Adding a member = username search + consent.** The GroupOwner searches by **username** — a **per-tenant,
    unique-within-tenant** handle ([ADR 0023](0023-per-tenant-member-identity.md)), not email; the server resolves
    it to the target's **identity public key**.
+   - **The resolve is owner-gated, but that is not an enumeration barrier.** Any tenant member can create a group
+     and become its owner in O(1), so the username → identity-public-key → consent-flag resolve is effectively
+     available to *every* tenant member. This is deliberate and within the metadata model (per-tenant usernames +
+     identity pubkeys are tenant-visible, [ADR 0023](0023-per-tenant-member-identity.md); the consent flag is the
+     one honest low-sensitivity exception). The owner-gate is convenience, not confidentiality — code and contract
+     must not present it as the latter.
    - **Default = direct add.** The owner picks the member → the server records a grant-less GROUP membership →
      grant-delivery ([ADR 0021](0021-operator-blind-background-tasks.md)) wraps `K_SC` to them, first-online-wins
      ([ADR 0020](0020-grant-distribution-invite-wrap.md)). They simply find themselves in the group.
@@ -78,10 +84,14 @@ and which is confidential even from the tenant owner.**
      non-auto-join member is *proposed*, held as a **soft, grant-less** membership; grant-delivery **skips** soft
      memberships, so **`K_SC` never reaches someone who hasn't accepted** (deleting an already-delivered wrap
      would not un-give the key — so we gate *before* the wrap, not clean up after). To let them decide informed,
-     the owner's device **one-off seals just the group name** to the invitee's identity public key
-     (`asymWrap(inviteePub, name)`) — no standing second key, no second rotation burden. The invitee sees the
-     name + who added them; **Accept** flips the membership eligible → a key-holder wraps `K_SC` (the usual
-     "awaiting access" window); **Decline** drops the soft membership (nothing was ever wrapped).
+     the owner's device hands the invitee the group's **derived name-key `K_name`** (wrapped to their identity,
+     `asymWrap(inviteePub, K_name, "group-name-key")`) so the invitee opens the scope's **canonical** sealed name —
+     the same ciphertext the members read — and **cannot** be shown a divergent, owner-typed name. This replaces the
+     original **one-off name-seal** (an unverifiable owner-supplied name a modified owner client could make diverge);
+     the derivation, the forward-secrecy, and the rejected alternatives are settled in
+     [ADR 0027](0027-group-invite-name-shared-key.md). The invitee sees the (group-consistent) name + who added them;
+     **Accept** flips the membership eligible → a key-holder wraps `K_SC` (the usual "awaiting access" window);
+     **Decline** drops the soft membership (nothing was ever wrapped).
    - **Threat:** a malicious operator could return a public key it controls (MITM) and read the group.
      **Defense:** the **safety-number / fingerprint** of that identity
      ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md); UI deferred). The exact verification stance

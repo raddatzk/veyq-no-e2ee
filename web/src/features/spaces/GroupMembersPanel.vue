@@ -11,8 +11,8 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { listScopeMembers, addGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
-import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle } from './scopes'
+import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
+import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee } from './scopes'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 
@@ -31,6 +31,7 @@ const loading = ref(true)
 const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const username = ref('')
 const addError = ref('')
+const addNotice = ref('')
 const adding = ref(false)
 const actionError = ref('')
 const pendingRemove = ref<string | null>(null) // userId shown in inline "remove?" confirm (destructive → rotates)
@@ -76,14 +77,31 @@ async function load() {
   }
 }
 
+// Add a member (cr-0086) — with the consent opt-in (cr-0096). First resolve the username (records nothing): if
+// the target asked to be consulted, derive this group's name-key `K_name` and wrap it to their identity
+// (`group-name-key` context), and submit a **proposal** (a soft pendingConsent add grant-delivery skips until they
+// accept). Handing the key — not a name copy — lets them open the SAME canonical name; a modified owner cannot show
+// a divergent one. Otherwise it is the ordinary direct-add. The directory then reloads (newcomer = awaiting access,
+// or a pending proposal — owner-visible only).
 async function submit() {
   if (!canAdd.value || !props.scopeId) return
   addError.value = ''
+  addNotice.value = ''
   adding.value = true
   try {
-    await addGroupMember(props.scopeId, username.value.trim().toLowerCase())
+    const uname = username.value.trim().toLowerCase()
+    const candidate = await resolveGroupMember(props.scopeId, uname)
+    if (candidate.requiresConsent) {
+      // Wrap the group's name-key to the invitee so they open the canonical name — K_SC stays gated until they accept.
+      const sealedNameKey = await wrapGroupNameKeyForInvitee(props.scopeId, candidate.identityPublicKey)
+      if (!sealedNameKey) throw new Error('cannot open the group to seal the invite name-key')
+      await addGroupMember(props.scopeId, uname, sealedNameKey)
+      addNotice.value = t('groups.invitationSent')
+    } else {
+      await addGroupMember(props.scopeId, uname)
+    }
     username.value = ''
-    members.value = await listScopeMembers(props.scopeId) // refresh — the newcomer shows as awaiting access
+    members.value = await listScopeMembers(props.scopeId) // refresh — awaiting access, or the pending proposal
   } catch (e) {
     const { status, code } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })
@@ -97,6 +115,20 @@ async function submit() {
             : t('groups.addMemberFailed')
   } finally {
     adding.value = false
+  }
+}
+
+// Rescind a pending consent proposal (cr-0094) — owner withdraws before acceptance. It is the same delete as a
+// member-remove, but a soft proposal was never keyed, so there is **no rotation** (unlike removeMember).
+async function rescind(m: ScopeMember) {
+  actionError.value = ''
+  try {
+    await removeGroupMember(props.scopeId, m.userId)
+    members.value = await listScopeMembers(props.scopeId)
+  } catch (e) {
+    const { status, code } = await memberError(e)
+    if (status === 401) return void router.push({ name: 'login' })
+    actionError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.rescindFailed')
   }
 }
 
@@ -205,6 +237,7 @@ async function onRestore() {
           <Button type="submit" :label="t('groups.addMember')" icon="pi pi-user-plus" :loading="adding" :disabled="!canAdd" />
         </div>
         <Message v-if="addError" severity="error" :closable="false">{{ addError }}</Message>
+        <Message v-if="addNotice" severity="success" :closable="false">{{ addNotice }}</Message>
       </form>
 
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
@@ -225,8 +258,8 @@ async function onRestore() {
               <strong class="veyq-row-title">@{{ m.username }}</strong>
               <span class="veyq-row-subtitle">{{ m.role }}</span>
               <div class="veyq-row-meta">
-                <span class="veyq-badge" :class="m.hasGrant ? 'success' : 'warning'">
-                  {{ m.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
+                <span class="veyq-badge" :class="m.pendingConsent ? 'muted' : m.hasGrant ? 'success' : 'warning'">
+                  {{ m.pendingConsent ? t('members.statusPendingConsent') : m.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
                 </span>
               </div>
             </div>
@@ -250,6 +283,18 @@ async function onRestore() {
                 size="small"
                 :disabled="removing"
                 @click="pendingRemove = null"
+              />
+            </div>
+            <!-- A pending consent proposal (cr-0094): the only owner action is to rescind (withdraw). No promote/
+                 demote/remove — they are not yet a real member, and nothing was keyed, so rescind never rotates. -->
+            <div v-else-if="isOwner && m.pendingConsent" class="management-actions">
+              <Button
+                :label="t('groups.rescind')"
+                icon="pi pi-times"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="rescind(m)"
               />
             </div>
             <div v-else-if="isOwner" class="management-actions">

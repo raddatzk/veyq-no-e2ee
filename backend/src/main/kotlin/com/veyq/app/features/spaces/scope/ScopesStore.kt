@@ -21,6 +21,8 @@ data class ScopeRow(
     val grantedEpoch: Int,
     val wrappedGrant: String,
     val encryptedName: String?,
+    /** The epoch the group name was sealed under (cr-0096/ADR 0027) — the client derives `K_name` from its key. */
+    val nameEpoch: Int,
     /** When a GROUP is in pending-deletion (cr-0090); null = active. The client marks + (for owners) restores it. */
     val deletedAt: Instant?,
 )
@@ -40,7 +42,24 @@ data class ScopeMemberRow(
     val role: String,
     val identityPublicKey: String,
     val hasGrant: Boolean,
+    /** A soft consent proposal awaiting the target's Accept (cr-0094) — owner-visible only in the directory. */
+    val pendingConsent: Boolean = false,
 )
+
+/** The result of resolving a per-tenant username to a group-add candidate (cr-0094) — records nothing. */
+data class ResolvedCandidateRow(
+    val userId: String,
+    val username: String,
+    val identityPublicKey: String,
+    val requiresConsent: Boolean,
+)
+
+/** A pending consent proposal from the invitee's point of view (cr-0096): the group + who proposed + the wrapped
+ *  name-key `K_name` (`sealedNameKey`) + the scope's canonical `encryptedName` the key opens (ADR 0027). */
+data class GroupInvitationRow(val scopeId: String, val addedByUsername: String, val sealedNameKey: String, val encryptedName: String)
+
+/** The caller's membership state on a scope (cr-0094) — drives idempotent accept/decline + 404. */
+enum class ConsentState { PENDING, ACTIVE, NONE }
 
 /**
  * Persistence for a member's scopes (cr-0026). Operator-blind: stores only the opaque scope row + the
@@ -89,8 +108,8 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     }
 
     /** Birth a GROUP scope for the caller in this tenant + the OWNER self-membership (en.spaces.group-scope,
-     *  cr-0032). Mirrors [createPersonal] but stores the opaque `encryptedName` (the group name sealed under
-     *  `K_SC`) on the scope row. Group names are not unique — no existence check. */
+     *  cr-0032). Mirrors [createPersonal] but stores the opaque `encryptedName` (the group name sealed under its
+     *  derived name-key `K_name`, cr-0096) on the scope row, at name-epoch 0. Group names are not unique — no existence check. */
     @Transactional
     fun createGroup(userId: String, tenantId: String, encryptedName: String, wrappedGrant: String): String {
         val now = Instant.now()
@@ -121,7 +140,7 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
                 ScopeEntity.findById(m.scopeId)?.let {
-                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName, it.deletedAt)
+                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName, it.nameEpoch, it.deletedAt)
                 }
             }
         }
@@ -196,7 +215,11 @@ class ScopesStore(private val profiles: TenantProfileStore) {
             createdAt = Instant.now()
         }.persist()
         grants.forEach { (uid, g) ->
-            MembershipEntity.find("userId = ?1 and scopeId = ?2", uid, scopeId).firstResult()?.let {
+            // Never (re-)grant a soft `pendingConsent` proposal (cr-0094/cr-0095): `K_SC` stays gated **before** the
+            // wrap on the rotation path too, exactly as grant-delivery's `complete()` enforces (§ pendingConsent = false).
+            // Without this, an ordinary member-removal rotation that re-grants the whole directory (which, for an owner,
+            // includes the owner-visible pending proposals) would silently deliver `K_SC` to someone who never accepted.
+            MembershipEntity.find("userId = ?1 and scopeId = ?2 and pendingConsent = false", uid, scopeId).firstResult()?.let {
                 it.wrappedGrant = g
                 it.grantedEpoch = newEpoch
                 it.persist()
@@ -262,13 +285,73 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         }.persist()
     }
 
+    /** Whether a user's account-global "ask before adding me to groups" preference is on (cr-0094). */
+    fun requiresGroupAddConsent(userId: String): Boolean =
+        VeyqUser.findById(userId)?.requireGroupAddConsent ?: false
+
+    /** A user's identity public key bundle (opaque base64), or null — the owner's device wraps the group name-key to it. */
+    fun identityPublicKeyOf(userId: String): String? = VeyqUser.findById(userId)?.identityPublicKey
+
+    /** Admit a member as a **soft consent proposal** (cr-0096): a grant-less, `pendingConsent` MEMBER membership
+     *  carrying the wrapped group name-key `K_name` (`sealedNameKey`) + who proposed. grant-delivery SKIPS it — no
+     *  `K_SC` wrap — until the invitee accepts. Operator-blind: only ciphertext + operational metadata is written. */
+    @Transactional
+    fun addSoftPendingMember(userId: String, tenantId: String, scopeId: String, sealedNameKey: String, addedBy: String) {
+        MembershipEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.userId = userId
+            this.tenantId = tenantId
+            this.scopeId = scopeId
+            role = MembershipEntity.MEMBER
+            wrappedGrant = null
+            pendingConsent = true
+            this.sealedNameKey = sealedNameKey
+            this.addedBy = addedBy
+            createdAt = Instant.now()
+        }.persist()
+    }
+
+    /** The caller's membership state on a scope (cr-0094): a live pending proposal, an ordinary member, or none. */
+    fun consentState(userId: String, scopeId: String): ConsentState =
+        MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult()
+            ?.let { if (it.pendingConsent) ConsentState.PENDING else ConsentState.ACTIVE } ?: ConsentState.NONE
+
+    /** Accept a proposal (cr-0096): clear `pendingConsent` (and the now-moot wrapped name-key / addedBy) on the
+     *  caller's own soft membership, so ordinary grant-delivery picks it up. Returns rows updated (0 if none was pending). */
+    @Transactional
+    fun clearPendingConsent(userId: String, scopeId: String): Int =
+        MembershipEntity.update(
+            "pendingConsent = false, sealedNameKey = null, addedBy = null " +
+                "where userId = ?1 and scopeId = ?2 and pendingConsent = true",
+            userId, scopeId,
+        )
+
+    /** Decline / rescind a proposal (cr-0094): delete the caller's soft membership. Guarded to `pendingConsent`
+     *  rows only — never deletes a real (accepted) membership. Nothing was ever wrapped, so no rotation. */
+    @Transactional
+    fun deletePendingMembership(userId: String, scopeId: String): Int =
+        MembershipEntity.delete("userId = ?1 and scopeId = ?2 and pendingConsent = true", userId, scopeId).toInt()
+
+    /** The caller's pending group invitations in a tenant (cr-0096): each with the wrapped name-key `K_name`, the
+     *  scope's canonical `encryptedName` the key opens, and the proposer's per-tenant username. Skips rows missing a
+     *  wrapped name-key or a scope name (never happens for a proposal, defensive). */
+    fun listInvitations(userId: String, tenantId: String): List<GroupInvitationRow> {
+        val profileByUser = profiles.byUserInTenant(tenantId)
+        return MembershipEntity.find("userId = ?1 and tenantId = ?2 and pendingConsent = true", userId, tenantId).list()
+            .mapNotNull { m ->
+                val sealedNameKey = m.sealedNameKey ?: return@mapNotNull null
+                val encryptedName = ScopeEntity.findById(m.scopeId)?.encryptedName ?: return@mapNotNull null
+                GroupInvitationRow(m.scopeId, m.addedBy?.let { profileByUser[it]?.username } ?: "", sealedNameKey, encryptedName)
+            }
+    }
+
     /** The directory row for one member of a scope (the add response). `email` is included; the handler nulls it. */
     fun scopeMemberRow(scopeId: String, userId: String): ScopeMemberRow? {
         val tenantId = ScopeEntity.findById(scopeId)?.tenantId ?: return null
         val m = MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult() ?: return null
         val u = VeyqUser.findById(userId) ?: return null
         val p = profiles.byUserInTenant(tenantId)[userId]
-        return ScopeMemberRow(userId, p?.username ?: "", p?.sealedName, u.email, m.role, u.identityPublicKey, m.wrappedGrant != null)
+        return ScopeMemberRow(userId, p?.username ?: "", p?.sealedName, u.email, m.role, u.identityPublicKey, m.wrappedGrant != null, m.pendingConsent)
     }
 
     /** Whether the user is the tenant's OWNER (gates the owner-only email in the directory). */
@@ -287,7 +370,7 @@ class ScopesStore(private val profiles: TenantProfileStore) {
                 val p = profileByUser[m.userId]
                 ScopeMemberRow(
                     m.userId, p?.username ?: "", p?.sealedName, u.email, m.role,
-                    u.identityPublicKey, m.wrappedGrant != null,
+                    u.identityPublicKey, m.wrappedGrant != null, m.pendingConsent,
                 )
             }
         }

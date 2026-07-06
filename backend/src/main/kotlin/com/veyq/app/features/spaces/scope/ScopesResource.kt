@@ -5,7 +5,9 @@ import com.veyq.app.generated.model.AddGroupMemberRequest
 import com.veyq.app.generated.model.CreateGroupRequest
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
 import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.generated.model.GroupInvitation
 import com.veyq.app.generated.model.MyTenant
+import com.veyq.app.generated.model.ResolvedGroupCandidate
 import com.veyq.app.generated.model.RotateScopeRequest
 import com.veyq.app.generated.model.ScopeCreated
 import com.veyq.app.generated.model.ScopeEpochLink
@@ -76,7 +78,7 @@ class ScopesResource(
                         id = UUID.fromString(it.id), kind = ScopeKind.valueOf(it.kind),
                         tenantId = UUID.fromString(it.tenantId), role = it.role,
                         currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
-                        wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName,
+                        wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName, nameEpoch = it.nameEpoch,
                         deletedAt = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d, ZoneOffset.UTC) },
                         purgeAfter = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d.plus(deleteRetention), ZoneOffset.UTC) },
                     )
@@ -86,14 +88,10 @@ class ScopesResource(
         }
 
     override fun addGroupMember(scopeId: UUID, addGroupMemberRequest: AddGroupMemberRequest): Response =
-        when (val outcome = handler.addGroupMember(identity.principal.name, scopeId.toString(), addGroupMemberRequest.username)) {
-            is AddGroupMemberOutcome.Added -> Response.status(Response.Status.CREATED).entity(
-                ScopeMember(
-                    userId = UUID.fromString(outcome.row.userId), username = outcome.row.username,
-                    sealedName = outcome.row.sealedName, email = outcome.row.email, role = outcome.row.role,
-                    identityPublicKey = outcome.row.identityPublicKey, hasGrant = outcome.row.hasGrant,
-                ),
-            ).build()
+        when (val outcome = handler.addGroupMember(
+            identity.principal.name, scopeId.toString(), addGroupMemberRequest.username, addGroupMemberRequest.sealedNameKey,
+        )) {
+            is AddGroupMemberOutcome.Added -> Response.status(Response.Status.CREATED).entity(scopeMember(outcome.row)).build()
             AddGroupMemberOutcome.NotOwner ->
                 Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_owner")).build()
             AddGroupMemberOutcome.ScopeNotFound ->
@@ -102,17 +100,50 @@ class ScopesResource(
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "member_not_found")).build()
             AddGroupMemberOutcome.AlreadyMember ->
                 Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "already_member")).build()
+            AddGroupMemberOutcome.ConsentRequired ->
+                Response.status(Response.Status.BAD_REQUEST).entity(ErrorResponse(code = "consent_required")).build()
+        }
+
+    override fun resolveGroupMember(scopeId: UUID, addGroupMemberRequest: AddGroupMemberRequest): Response =
+        when (val outcome = handler.resolveGroupMember(identity.principal.name, scopeId.toString(), addGroupMemberRequest.username)) {
+            is ResolveCandidateOutcome.Ok -> Response.ok(
+                ResolvedGroupCandidate(
+                    userId = UUID.fromString(outcome.row.userId), username = outcome.row.username,
+                    identityPublicKey = outcome.row.identityPublicKey, requiresConsent = outcome.row.requiresConsent,
+                ),
+            ).build()
+            ResolveCandidateOutcome.NotOwner -> forbidden("not_scope_owner")
+            ResolveCandidateOutcome.ScopeNotFound -> notFound("scope_not_found")
+            ResolveCandidateOutcome.MemberNotFound -> notFound("member_not_found")
+        }
+
+    override fun acceptGroupInvitation(scopeId: UUID): Response =
+        when (handler.acceptInvitation(identity.principal.name, scopeId.toString())) {
+            AcceptInvitationOutcome.Ok -> Response.noContent().build()
+            AcceptInvitationOutcome.NotFound -> notFound("invitation_not_found")
+        }
+
+    override fun declineGroupInvitation(scopeId: UUID): Response {
+        handler.declineInvitation(identity.principal.name, scopeId.toString()) // idempotent silent drop
+        return Response.noContent().build()
+    }
+
+    override fun listMyGroupInvitations(): Response =
+        when (val outcome = handler.listInvitations(identity.principal.name, activeHost())) {
+            is ListInvitationsOutcome.Invitations -> Response.ok(
+                outcome.rows.map {
+                    GroupInvitation(
+                        scopeId = UUID.fromString(it.scopeId), addedBy = it.addedByUsername,
+                        sealedNameKey = it.sealedNameKey, encryptedName = it.encryptedName,
+                    )
+                },
+            ).build()
+            ListInvitationsOutcome.NoTenant -> notFound("tenant_not_found")
         }
 
     override fun setMemberRole(scopeId: UUID, userId: UUID, setMemberRoleRequest: SetMemberRoleRequest): Response =
         when (val outcome = handler.setMemberRole(identity.principal.name, scopeId.toString(), userId.toString(), setMemberRoleRequest.role.value)) {
-            is SetRoleOutcome.Ok -> Response.ok(
-                ScopeMember(
-                    userId = UUID.fromString(outcome.row.userId), username = outcome.row.username,
-                    sealedName = outcome.row.sealedName, email = outcome.row.email, role = outcome.row.role,
-                    identityPublicKey = outcome.row.identityPublicKey, hasGrant = outcome.row.hasGrant,
-                ),
-            ).build()
+            is SetRoleOutcome.Ok -> Response.ok(scopeMember(outcome.row)).build()
             SetRoleOutcome.NotOwner -> forbidden("not_scope_owner")
             SetRoleOutcome.ScopeNotFound, SetRoleOutcome.MemberNotFound -> notFound("member_not_found")
             SetRoleOutcome.LastOwner -> conflict("last_owner")
@@ -162,14 +193,7 @@ class ScopesResource(
 
     override fun listScopeMembers(scopeId: UUID): Response =
         when (val outcome = handler.listMembers(identity.principal.name, scopeId.toString())) {
-            is ListMembersOutcome.Members -> Response.ok(
-                outcome.rows.map {
-                    ScopeMember(
-                        userId = UUID.fromString(it.userId), username = it.username, sealedName = it.sealedName,
-                        email = it.email, role = it.role, identityPublicKey = it.identityPublicKey, hasGrant = it.hasGrant,
-                    )
-                },
-            ).build()
+            is ListMembersOutcome.Members -> Response.ok(outcome.rows.map { scopeMember(it) }).build()
             ListMembersOutcome.Forbidden ->
                 Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_member")).build()
         }
@@ -180,6 +204,13 @@ class ScopesResource(
                 MyTenant(tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role)
             },
         ).build()
+
+    /** Map a directory row to the wire DTO — carries `pendingConsent` (cr-0094); the handler already gated its visibility. */
+    private fun scopeMember(row: ScopeMemberRow) = ScopeMember(
+        userId = UUID.fromString(row.userId), username = row.username, sealedName = row.sealedName,
+        email = row.email, role = row.role, identityPublicKey = row.identityPublicKey,
+        hasGrant = row.hasGrant, pendingConsent = row.pendingConsent,
+    )
 
     private fun forbidden(code: String) = Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = code)).build()
     private fun notFound(code: String) = Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = code)).build()

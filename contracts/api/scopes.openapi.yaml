@@ -128,8 +128,9 @@ paths:
       description: >
         Creates a `kind=GROUP` scope for the authenticated caller in the tenant resolved from the `Host`, plus
         the caller's self-membership (`role=OWNER`). Like the personal scope, birth is **client-driven**: the
-        client generated the scope key `K_SC`, sealed the group name under it (`encryptedName`), and sealed
-        `K_SC` to its own identity public key (`wrappedGrant`). The server stores both ciphertexts verbatim and
+        client generated the scope key `K_SC`, sealed the group name under its derived name-key `K_name_0`
+        (`encryptedName`, cr-0096/ADR 0027), and sealed `K_SC` to its own identity public key (`wrappedGrant`,
+        born at name-epoch 0). The server stores both ciphertexts verbatim and
         never sees the key or the name — it only mints the scope id + the self-membership. Group names are **not**
         unique; a duplicate name is allowed (resolved client-side, ADR 0014). Adding other members is a later,
         separate operation.
@@ -239,6 +240,14 @@ paths:
         any group key-holder's `grant-delivery` job (ADR 0020/0021, cr-0076), so the returned member starts with
         `hasGrant=false` (*awaiting access*). Only the group **OWNER** may add a member (the tenant owner has no
         say over groups, ADR 0014 §4) — authorization is enforced by code, not this spec (ADR 0008).
+
+
+        **Consent (uc.spaces.consent-group-add, cr-0096/ADR 0027):** if the target turned on "ask before adding me
+        to groups", the add must carry `sealedNameKey` (the group's derived name-key `K_name` sealed to their
+        identity, which opens the canonical `encryptedName`) and is recorded as a **soft `pendingConsent`**
+        membership — grant-delivery skips it, so `K_SC` is gated **before** the wrap — until the invitee accepts
+        (`…/invitations/accept`). The owner learns consent is required from the prior member-resolve; a
+        `requiresConsent` target added **without** `sealedNameKey` is rejected `400 consent_required`.
       security:
         - bearerAuth: []
       parameters:
@@ -256,7 +265,10 @@ paths:
               username: partner
       responses:
         "201":
-          description: The member was admitted (grant-less); their directory row, awaiting delivery.
+          description: >
+            The member was admitted. For a direct-add: grant-less, `hasGrant=false`, awaiting delivery. For a
+            consent proposal (`sealedNameKey` sent to a `requiresConsent` target): a soft `pendingConsent=true`
+            row, gated before any key wrap.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ScopeMember" }
@@ -267,12 +279,16 @@ paths:
                 role: MEMBER
                 identityPublicKey: bWVtYmVyLXB1YmxpYy1rZXk=
                 hasGrant: false
+                pendingConsent: false
         "400":
-          description: The request was malformed (missing/invalid username).
+          description: >
+            The request was malformed (missing/invalid username), or the target has consent on but no
+            `sealedNameKey` was supplied (`consent_required` — resolve the member first, derive + seal the group
+            name-key, then re-submit).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-              example: { code: invalid_request }
+              example: { code: consent_required }
         "401":
           description: Generic authentication failure.
           content:
@@ -292,11 +308,78 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: member_not_found }
         "409":
-          description: That user is already a member of the group.
+          description: That user is already a member of the group (or already has an open proposal).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: already_member }
+
+  /api/scopes/{scopeId}/members/resolve:
+    post:
+      tags: [scopes]
+      operationId: resolveGroupMember
+      summary: Resolve a per-tenant username to a group-add candidate (records nothing).
+      description: >
+        Resolves a per-tenant `username` to a candidate for a GROUP add (uc.spaces.consent-group-add, cr-0094)
+        **without recording anything**. Returns the candidate's `userId`, `identityPublicKey` (so the owner's
+        device can seal the group name), and `requiresConsent` (whether the target's account-global consent
+        preference is on). The owner then either direct-adds (consent off) or seals the group name and submits a
+        proposal (consent on). Resolved **within the scope's own tenant** (never a global user-search, ADR 0020).
+        Only the group **OWNER** may resolve a candidate (the same gate as the add); enforced by code, not this
+        spec (ADR 0008). This owner-gate is convenience, **not** a confidentiality barrier: any tenant member can
+        create a group and become its owner, so a member's username → identity public key → consent flag are
+        effectively enumerable tenant-wide. That is within the metadata model (per-tenant usernames + pubkeys are
+        tenant-visible, ADR 0023) — not a leak, but the gate must not be read as one.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scopeId
+          in: path
+          required: true
+          description: Opaque id of the GROUP scope to resolve a candidate for.
+          schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddGroupMemberRequest" }
+            example:
+              username: partner
+      responses:
+        "200":
+          description: The resolved candidate (nothing was recorded).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResolvedGroupCandidate" }
+              example:
+                userId: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
+                username: partner
+                identityPublicKey: bWVtYmVyLXB1YmxpYy1rZXk=
+                requiresConsent: true
+        "400":
+          description: The request was malformed (missing/invalid username).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is not the group's OWNER (only an owner may resolve a candidate).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_scope_owner }
+        "404":
+          description: No such scope, or the username resolves to no member of the scope's tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: member_not_found }
 
   /api/scopes/{scopeId}/members/{userId}:
     patch:
@@ -489,6 +572,87 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
 
+  /api/scopes/invitations:
+    get:
+      tags: [scopes]
+      operationId: listMyGroupInvitations
+      summary: List the caller's pending group-consent proposals in the active tenant.
+      description: >
+        Returns the caller's **pending consent proposals** — groups a GroupOwner proposed to add them to, awaiting
+        their Accept/Decline (uc.spaces.consent-group-add, cr-0096/ADR 0027) — in the tenant resolved from the
+        `Host`. Each carries the `scopeId`, the `sealedNameKey` (the group's derived name-key `K_name` sealed to the
+        caller's identity) + the canonical `encryptedName` it opens (both decrypted on-device to the group-consistent
+        name), and `addedBy` (the owner's per-tenant username). The caller's own view of their invitations; no
+        `K_SC` is ever returned (a soft member holds no scope key — only the name-key, which leaks the name and
+        nothing else). Empty array when there are none.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's pending group invitations in the active tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GroupInvitation" }
+              example:
+                - scopeId: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+                  addedBy: kevin
+                  sealedNameKey: Z3JvdXAtbmFtZS1rZXktc2VhbGVkLXRvLWludml0ZWU=
+                  encryptedName: c2VhbGVkLW5hbWU=
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant resolves from the request Host.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
+  /api/scopes/{scopeId}/invitations/accept:
+    post:
+      tags: [scopes]
+      operationId: acceptGroupInvitation
+      summary: Accept a pending group-consent proposal — become a grant-less member (key delivered next).
+      description: >
+        The invitee accepts the consent proposal for this GROUP scope (uc.spaces.consent-group-add, cr-0094):
+        clears the `pendingConsent` flag on **their own** soft membership, so it becomes an ordinary grant-less
+        membership and the usual `grant-delivery` wraps `K_SC` to them (first-online-wins, *awaiting access* →
+        Active). Acts only on the caller's own proposal (invitee-gated); a scope where the caller has no open
+        proposal is `404 invitation_not_found`. Idempotent-safe: a re-accept of an already-accepted membership
+        is a no-op `204`. Enforced by code, not this spec (ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope proposed., schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: "The proposal was accepted (now a grant-less member; key delivered next)." }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "404": { description: The caller has no pending proposal in this scope., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invitation_not_found } } } }
+
+  /api/scopes/{scopeId}/invitations/decline:
+    post:
+      tags: [scopes]
+      operationId: declineGroupInvitation
+      summary: Decline a pending group-consent proposal — silent drop, nothing was wrapped.
+      description: >
+        The invitee declines the consent proposal for this GROUP scope (uc.spaces.consent-group-add, cr-0094):
+        **deletes** their soft `pendingConsent` membership. Nothing was ever wrapped, so no key is retracted and
+        **no rotation** occurs; no `declined` state is kept (a silent drop — the owner may propose again later).
+        Acts only on the caller's own proposal (invitee-gated); **idempotent** — a scope where the caller has no
+        open proposal is still `204` (no enumeration). Enforced by code, not this spec (ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the GROUP scope proposed., schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: "The proposal is gone (declined, or there was no open proposal of yours)." }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -525,9 +689,10 @@ components:
         encryptedName:
           type: string
           description: >
-            The group's name sealed under the freshly generated scope key `K_SC` (same name-sealing as a node
-            name, ADR 0012) — opaque base64 ciphertext the server stores verbatim and never interprets, so the
-            server sees an **unnamed** group (ADR 0014).
+            The group's name sealed under its **derived name-key `K_name_0`** at birth (cr-0096/ADR 0027):
+            `K_name_0 = HKDF(E_0, "veyq/v1/group-name-key")` from the birth epoch key, then `symEncrypt(K_name_0,
+            name)` (same node-name seal) — opaque base64 the server stores verbatim and never interprets, so the
+            server sees an **unnamed** group (ADR 0014). Born at name-epoch 0 (forward-secret-ready).
           contentEncoding: base64
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
@@ -556,6 +721,23 @@ components:
           maxLength: 32
           example: partner
           x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(min = 2, max = 32) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9_.-]+")'
+        sealedNameKey:
+          type: string
+          description: >
+            **Required only when the target has consent on** (uc.spaces.consent-group-add, cr-0096, ADR 0027): the
+            group's **derived name-key `K_name`** sealed to the target's identity public key
+            (`asymWrap(inviteePub, K_name, "group-name-key")`, opaque base64), where `K_name =
+            HKDF(E_e, "veyq/v1/group-name-key")` for the name's current epoch. Handing the invitee the key — not a
+            name copy — lets them open the **same canonical `encryptedName`** the members read, so a modified owner
+            cannot privately show a divergent name. When present, the add is recorded as a **soft, grant-less
+            `pendingConsent`** membership — grant-delivery skips it, so `K_SC` is gated **before** the wrap — until
+            the invitee accepts. Omit for the default direct-add (target consent off). The owner learns whether it
+            is required from the prior member-resolve (`requiresConsent`); a `requiresConsent` target added
+            **without** this field is rejected `400 consent_required`.
+          contentEncoding: base64
+          maxLength: 8192
+          example: Z3JvdXAtbmFtZS1rZXktc2VhbGVkLXRvLWludml0ZWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     SetMemberRoleRequest:
       type: object
@@ -716,10 +898,91 @@ components:
           type: boolean
           description: True if the member already holds a grant (a key-holder); false = pending, awaiting delivery.
           example: false
+        pendingConsent:
+          type: boolean
+          description: >
+            True if this is a **soft consent proposal** the target has not yet accepted (uc.spaces.consent-group-add,
+            cr-0094): a grant-less membership that grant-delivery **skips** (no `K_SC` wrap) until the invitee
+            accepts. **Owner-visible only** — the directory omits `pendingConsent` rows for non-owners, so ordinary
+            members see a proposed person only once they accept. `false`/absent for an ordinary member.
+          example: false
+
+    ResolvedGroupCandidate:
+      type: object
+      description: >
+        The result of resolving a per-tenant username to a candidate for a GROUP add (uc.spaces.consent-group-add,
+        cr-0096) — records nothing; it only tells the owner who the username is, their identity public key (so the
+        owner's device can seal the derived group name-key to it), and whether their consent is required.
+      required: [userId, username, identityPublicKey, requiresConsent]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Opaque id of the resolved tenant member.
+          example: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
+        username:
+          type: string
+          description: The member's per-tenant handle (echoed back, normalized).
+          maxLength: 32
+          example: partner
+        identityPublicKey:
+          type: string
+          description: >
+            The member's identity public key bundle (opaque base64) — the owner's device wraps the group's derived
+            name-key `K_name` and later `K_SC` to it. Operational metadata the server already stores.
+          contentEncoding: base64
+          maxLength: 8192
+          example: bWVtYmVyLXB1YmxpYy1rZXk=
+        requiresConsent:
+          type: boolean
+          description: >
+            True if the target turned on the account-global "ask before adding me to groups" preference — so the
+            add must be a consent **proposal** (send `sealedNameKey`), not a direct-add. Low-sensitivity
+            operational metadata (ADR 0014 §5): the owner learns *that* the person wants to be asked, never a key.
+          example: true
+
+    GroupInvitation:
+      type: object
+      description: >
+        A pending consent proposal to join a GROUP, from the **invitee's** point of view (uc.spaces.consent-group-add,
+        cr-0096, ADR 0027). The client `asymUnwrap`s `sealedNameKey` locally with its identity private key to recover
+        the derived name-key `K_name`, then `symUnwrap`s `encryptedName` (the scope's **canonical** sealed name) under
+        it to show the group's name — the same blob the members hold, so a modified owner cannot show a divergent name.
+        `addedBy` is the owner's per-tenant username (already visible to the invitee).
+      required: [scopeId, addedBy, sealedNameKey, encryptedName]
+      properties:
+        scopeId:
+          type: string
+          format: uuid
+          description: Opaque id of the GROUP scope the caller is proposed to join (used to accept / decline).
+          example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
+        addedBy:
+          type: string
+          description: The per-tenant username of the GroupOwner who proposed the add ("who added you").
+          maxLength: 32
+          example: kevin
+        sealedNameKey:
+          type: string
+          description: >
+            The group's **derived name-key `K_name`** sealed to the caller's identity public key
+            (`asymWrap(..., "group-name-key")`, opaque base64) — unwrapped only on-device. It opens the canonical
+            `encryptedName` (not a private name copy), so the invitee sees exactly what the members see.
+          contentEncoding: base64
+          maxLength: 8192
+          example: Z3JvdXAtbmFtZS1rZXktc2VhbGVkLXRvLWludml0ZWU=
+        encryptedName:
+          type: string
+          description: >
+            The scope's **canonical** sealed group name (`symEncrypt(K_name, name)`, opaque base64) — the same
+            ciphertext the members read, surfaced to the pending invitee so they open it with the `sealedNameKey`.
+            The blind server only relays already-stored ciphertext; it holds no key and never sees the name.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
 
     ScopeSummary:
       type: object
-      required: [id, kind, tenantId, role, currentEpoch, grantedEpoch, wrappedGrant]
+      required: [id, kind, tenantId, role, currentEpoch, grantedEpoch, nameEpoch, wrappedGrant]
       properties:
         id:
           type: string
@@ -744,12 +1007,21 @@ components:
         encryptedName:
           type: [string, "null"]
           description: >
-            For a `GROUP` scope: the group's name sealed under `K_SC` (opaque base64), decrypted locally so the
-            client can label the group in the switcher (ADR 0014). `null` for `TENANT` / `PERSONAL` scopes, which
-            carry no per-scope sealed name.
+            For a `GROUP` scope: the group's name sealed under its **derived name-key `K_name`** (opaque base64,
+            cr-0096/ADR 0027), decrypted locally so the client can label the group in the switcher. The client
+            derives `K_name = HKDF(E_e, "veyq/v1/group-name-key")` from the key of the name's epoch (`nameEpoch`,
+            peeled from the chain). `null` for `TENANT` / `PERSONAL` scopes, which carry no per-scope sealed name.
           contentEncoding: base64
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
+        nameEpoch:
+          type: integer
+          description: >
+            For a `GROUP` scope: the content-key epoch the `encryptedName` was sealed under (cr-0096/ADR 0027) — 0
+            at birth, bumped only by a rename (a plain rotation leaves the name on its epoch). The client peels the
+            epoch-chain to that epoch's key and derives `K_name` from it. 0 for `TENANT` / `PERSONAL` scopes.
+          minimum: 0
+          example: 0
         currentEpoch:
           type: integer
           description: >
