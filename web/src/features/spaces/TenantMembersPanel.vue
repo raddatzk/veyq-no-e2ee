@@ -26,6 +26,8 @@ import { activeSpace, activeScopeKey } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
 import { unsealName, type MemberName } from '../account/profile/profile'
+import { trustStates, type TrustState } from '../account/identityPins'
+import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -40,6 +42,12 @@ const notice = ref('')
 const actionError = ref('')
 const isOwner = ref(false)
 const inviteOpen = ref(false)
+// Identity trust (cr-0099): per-member trust state from the sealed pin store. Only the `changed` state is surfaced
+// (a key differing from the pin); verified/recognized are intentionally not shown (proactive verify returns gated
+// behind scope-wide strict-mode, cr-0100). Drives the changed-key review dialog.
+const trust = ref<Record<string, TrustState>>({})
+const reviewTarget = ref<ScopeMember | null>(null)
+const reviewOpen = ref(false)
 
 // After a re-issue, show the fresh invite link to copy (cr-0080) — the owner hands it off again, no mailer.
 const reissueUrl = ref('')
@@ -75,6 +83,7 @@ async function load() {
     isOwner.value = mine?.role === 'OWNER'
     // Only the owner may read the pending-invite list (the backend 403s any non-owner).
     pendingInvites.value = isOwner.value ? await listMemberInvites(activeSpace.tenantId) : []
+    await refreshTrust()
   } catch (e) {
     const { status } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })
@@ -87,6 +96,21 @@ async function load() {
 async function onInvited() {
   notice.value = t('members.inviteSent')
   await load()
+}
+
+// Read every member's trust state from the sealed pin store in one fetch (cr-0099) — used only to flag `changed`
+// keys. Vault-gated: degrade to no flags rather than break the directory if the store/identity is unavailable.
+async function refreshTrust() {
+  try {
+    trust.value = await trustStates(members.value.map((m) => ({ userId: m.userId, directoryKey: m.identityPublicKey })))
+  } catch {
+    trust.value = {}
+  }
+}
+
+function openReview(member: ScopeMember) {
+  reviewTarget.value = member
+  reviewOpen.value = true
 }
 
 async function reissue(invite: PendingMemberInvite) {
@@ -215,10 +239,27 @@ async function revoke(invite: PendingMemberInvite) {
                 <span class="veyq-badge" :class="member.hasGrant ? 'success' : 'warning'">
                   {{ member.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
                 </span>
+                <!-- Changed-identity warning (cr-0099): the ONLY trust surface — the directory key differs from the
+                     pin (a rotation or an operator substitution). Verified/recognized are intentionally not shown. -->
+                <span v-if="trust[member.userId] === 'changed'" class="veyq-badge changed">
+                  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>{{ t('verify.badgeChanged') }}
+                </span>
               </div>
             </div>
-            <div v-if="isOwner && member.role !== 'OWNER'" class="management-actions">
+            <div class="management-actions">
+              <!-- Review a changed key (cr-0099), available to ANY member: compare expected-vs-current out-of-band,
+                   then accept (re-pin) or refuse (leave blocked). -->
               <Button
+                v-if="trust[member.userId] === 'changed'"
+                :label="t('verify.review')"
+                icon="pi pi-exclamation-triangle"
+                severity="warn"
+                text
+                size="small"
+                @click="openReview(member)"
+              />
+              <Button
+                v-if="isOwner && member.role !== 'OWNER'"
                 icon="pi pi-user-minus"
                 severity="danger"
                 outlined
@@ -283,6 +324,9 @@ async function revoke(invite: PendingMemberInvite) {
       :tenant-id="activeSpace.tenantId"
       @invited="onInvited"
     />
+
+    <!-- Review a changed identity key (cr-0099) — the only verify surface until scope-wide strict-mode (cr-0100). -->
+    <ChangedKeyReviewDialog v-if="reviewTarget" v-model:visible="reviewOpen" :member="reviewTarget" @accepted="refreshTrust" />
   </section>
 </template>
 

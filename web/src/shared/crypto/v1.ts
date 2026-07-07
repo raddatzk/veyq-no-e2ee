@@ -285,6 +285,15 @@ export const hybridPublic = (priv: Identity['priv']): HybridPublic => ({
   m: ml_kem768.keygen(priv.mlkemSeed).publicKey,
 })
 
+/** The full identity PUBLIC bundle re-derived from a stored private bundle — kemX, kemM (from the ML-KEM seed)
+ *  and the Ed25519 signing key. For rendering one's OWN safety-number / QR in the verify ceremony (cr-0099)
+ *  without re-fetching from the directory. Mirrors [hybridPublic] but also carries the signing key. */
+export const identityPublicFromPrivate = (priv: Identity['priv']): Identity['pub'] => ({
+  kemX: x25519.getPublicKey(priv.kemX),
+  kemM: ml_kem768.keygen(priv.mlkemSeed).publicKey,
+  sign: ed25519.getPublicKey(priv.sign),
+})
+
 export function generateIdentity(): Identity {
   const kemX = randomBytes(32)
   const mlkemSeed = randomBytes(64)

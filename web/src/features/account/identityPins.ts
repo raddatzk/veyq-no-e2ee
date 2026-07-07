@@ -12,13 +12,17 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { accountIdentityPinsApi } from '../../api/client'
 import { withRefresh } from './login/login'
-import { masterKey } from '../../app/vault'
+import { masterKey, identityPrivate } from '../../app/vault'
 
 /** The AAD context binding the pin-store seal (ADR 0009, vector-pinned `sym_identity_pins`). */
 export const IDENTITY_PINS = 'identity-pins'
 
-/** A pin's trust state. `verified` (out-of-band safety-number compare) is the follow-up CR; this one only pins. */
+/** A pin's trust state. `pinned` = trust-on-first-use; `verified` = an out-of-band safety-number compare
+ *  succeeded (the human ceremony, cr-0099). `verified` rides inside the same Master-Key-sealed blob. */
 export type PinState = 'pinned' | 'verified'
+
+/** The trust a contact reads as, folding the pin state against their *current* directory key (the badge read). */
+export type TrustState = 'verified' | 'pinned' | 'changed' | 'unpinned'
 
 /** One pinned contact: their full identity public bundle (serialized, base64), the trust state, and first-seen. */
 export interface Pin {
@@ -48,6 +52,18 @@ export class IdentityChangedError extends Error {
   constructor(public readonly userId: string) {
     super(`identity key changed for ${userId}`)
     this.name = 'IdentityChangedError'
+  }
+}
+
+/**
+ * Thrown by {@link markVerified} when the pinned key no longer equals the key the human just compared out-of-band
+ * — the contact's key moved (a rotation, or a concurrent-device accept) *between* the compare and the write. The
+ * ceremony must not stamp `verified` onto a key nobody actually checked; the caller re-runs the compare.
+ */
+export class IdentityMovedError extends Error {
+  constructor(public readonly userId: string) {
+    super(`identity key moved for ${userId} — re-verify`)
+    this.name = 'IdentityMovedError'
   }
 }
 
@@ -167,4 +183,76 @@ export async function acceptKeyChange(userId: string, identityPublicKeyB64: stri
 export async function getPin(userId: string): Promise<Pin | null> {
   const store = await loadStore()
   return store.pins[userId] ?? null
+}
+
+/**
+ * The out-of-band **safety number** ("6×5 digits") for a serialized identity public bundle — what two members
+ * read aloud / scan to compare. Pure and vault-free: `fingerprint(deserializeIdentityPublic(...))` (ADR 0009,
+ * vector-pinned). The input is the same base64 identity bundle the directory returns and the pin store holds.
+ */
+export function safetyNumber(identityPublicKeyB64: string): string {
+  return v1.fingerprint(v1.deserializeIdentityPublic(fromB64std(identityPublicKeyB64)))
+}
+
+/**
+ * My OWN identity public bundle (base64) — reconstructed from the unlocked vault's private key, so the ceremony
+ * can render *my* safety-number + a QR of it for the other person to scan, without trusting a directory round-trip
+ * for my own key. Requires an unlocked vault. The private copy is zeroed after derivation.
+ */
+export function myIdentityPublicKeyB64(): string {
+  const priv = identityPrivate()
+  if (!priv) throw new Error('identity verify requires an unlocked vault')
+  try {
+    return b64std(v1.serializeIdentityPublic(v1.identityPublicFromPrivate(priv)))
+  } finally {
+    priv.kemX.fill(0)
+    priv.mlkemSeed.fill(0)
+    priv.sign.fill(0)
+  }
+}
+
+/**
+ * Elevate a contact's pin `→ verified` after a successful out-of-band safety-number compare (the human half of
+ * ADR 0028). Guarded twice: only stamps `verified` if the **current** pin key still equals `verifiedKey` (the key
+ * the human actually compared) — both at load and after any 409 re-base — else throws {@link IdentityMovedError}
+ * (the key moved under the compare; nothing is written). `verified` wins a same-contact merge: the re-applied
+ * upgrade re-asserts `verified` on top of a concurrent device's `pinned`. Requires an unlocked vault.
+ */
+export async function markVerified(userId: string, verifiedKey: string): Promise<void> {
+  const store = await loadStore()
+  await mutateAndSave(store, (pins) => {
+    const prior = pins[userId]
+    if (!prior || prior.key !== verifiedKey) throw new IdentityMovedError(userId)
+    pins[userId] = { ...prior, state: 'verified' }
+  })
+}
+
+/**
+ * The **badge read** — fold one pin against a contact's *current* directory key.
+ * - no pin → `unpinned`
+ * - pin key ≠ directory key → `changed` (surfaced-not-trusted; wrap/delivery stays gated until reviewed)
+ * - pin key = directory key → `verified` if the pin was verified out-of-band, else `pinned`
+ */
+function foldTrust(pin: Pin | undefined, directoryKey: string): TrustState {
+  if (!pin) return 'unpinned'
+  if (pin.key !== directoryKey) return 'changed'
+  return pin.state === 'verified' ? 'verified' : 'pinned'
+}
+
+/** The badge read for a single contact (pure, no write). */
+export async function trustState(userId: string, directoryKey: string): Promise<TrustState> {
+  return foldTrust((await getPin(userId)) ?? undefined, directoryKey)
+}
+
+/**
+ * Batch badge read for a whole member directory in **one** store fetch — folds every contact against the key the
+ * directory currently returns for them. Keyed by userId. Pure, no write; requires an unlocked vault.
+ */
+export async function trustStates(
+  contacts: ReadonlyArray<{ userId: string; directoryKey: string }>,
+): Promise<Record<string, TrustState>> {
+  const store = await loadStore()
+  const out: Record<string, TrustState> = {}
+  for (const c of contacts) out[c.userId] = foldTrust(store.pins[c.userId], c.directoryKey)
+  return out
 }

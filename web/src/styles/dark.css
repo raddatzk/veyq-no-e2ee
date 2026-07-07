@@ -437,7 +437,8 @@
     color: var(--app-success-text);
   }
 
-  .veyq-badge.warning {
+  .veyq-badge.warning,
+  .veyq-badge.changed {
     border-color: var(--app-warning-line);
     background: var(--app-warning-soft);
     color: var(--app-warning-text);

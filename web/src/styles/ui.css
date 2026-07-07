@@ -329,6 +329,19 @@
   color: var(--app-muted);
 }
 
+/* Changed-identity warning badge (cr-0099): the directory key differs from the pin (a rotation or a substitution)
+   and needs review. The only trust surface shown by default — verified/recognized states are not surfaced. */
+.veyq-badge.changed {
+  border-color: var(--app-warning-line);
+  background: var(--app-warning-soft);
+  color: var(--app-warning-text);
+}
+
+.veyq-badge .pi {
+  margin-right: 0.3rem;
+  font-size: 0.85em;
+}
+
 .veyq-text-button,
 .veyq-dialog-button {
   display: inline-flex;

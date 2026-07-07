@@ -45,6 +45,19 @@ const en = {
     removed: 'Member removed.',
     actionFailed: 'That action failed. Please try again.',
   },
+  verify: {
+    badgeChanged: 'Key changed',
+    review: 'Review key',
+    reviewTitle: "Review {name}'s changed key",
+    reviewIntro:
+      "This member's security key differs from the one you trusted before. Compare both numbers out-of-band. Accept only once you've confirmed the new key is really theirs — otherwise refuse and leave sharing blocked.",
+    expectedLabel: 'Expected — what you trusted',
+    currentLabel: 'Current — shown now',
+    accept: 'Accept new key',
+    refuse: 'Refuse',
+    accepted: 'New key accepted.',
+    acceptFailed: 'Could not accept the key. Please try again.',
+  },
   settings: {
     title: 'Settings',
     back: 'Back',
@@ -446,6 +459,19 @@ const de: typeof en = {
       'Dieses Mitglied entfernen? Es verliert sofort den Zugriff auf alles Geteilte. Seine eigenen Erinnerungen bleiben ihm 30 Tage lang lesbar und werden dann gelöscht. Das lässt sich nicht rückgängig machen.',
     removed: 'Mitglied entfernt.',
     actionFailed: 'Die Aktion ist fehlgeschlagen. Bitte erneut versuchen.',
+  },
+  verify: {
+    badgeChanged: 'Schlüssel geändert',
+    review: 'Schlüssel prüfen',
+    reviewTitle: 'Geänderten Schlüssel von {name} prüfen',
+    reviewIntro:
+      'Der Sicherheitsschlüssel dieses Mitglieds unterscheidet sich von dem, dem du zuvor vertraut hast. Vergleicht beide Zahlen außerhalb der App. Akzeptiere erst, wenn du bestätigt hast, dass der neue Schlüssel wirklich ihrer ist — andernfalls lehne ab und lass das Teilen blockiert.',
+    expectedLabel: 'Erwartet — dein vertrauter',
+    currentLabel: 'Aktuell — jetzt gezeigt',
+    accept: 'Neuen Schlüssel akzeptieren',
+    refuse: 'Ablehnen',
+    accepted: 'Neuer Schlüssel akzeptiert.',
+    acceptFailed: 'Der Schlüssel konnte nicht akzeptiert werden. Bitte erneut versuchen.',
   },
   settings: {
     title: 'Einstellungen',

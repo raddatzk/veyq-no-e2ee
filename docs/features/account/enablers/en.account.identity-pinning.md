@@ -48,7 +48,15 @@ you verified in one space is verified everywhere.
      the server + raise a human-review flag. A change is *attack or a legitimate identity rotation* — resolved by
      a human, never auto-trusted.
 3. **Verification** ([uc.spaces.verify-identity](../../spaces/use-cases/uc.spaces.verify-identity.md)) elevates a
-   pin `pinned → verified` and is the path to accept a legitimately rotated key.
+   pin `pinned → verified` and is the path to accept a legitimately rotated key. The pin-store primitives exist on
+   web (`markVerified`, `safetyNumber` — cr-0099, unit-tested), and `markVerified` stamps `verified` **only** if the
+   pinned key still equals the compared key (else it aborts). But the **proactive verify ceremony is intentionally
+   not surfaced in the UI** (cr-0099): a per-member "verified" state is advisory noise for the normal user, and it
+   only pays off under a **scope-wide strict mode** (verified-before-share), which is a deferred, still-to-be-designed
+   follow-up (cr-0100, ADR 0028 §4 — note that a *per-account* strict toggle can't protect shared-scope content,
+   since any co-member can key an unverified identity). Today's UI surfaces only the **change response**: a changed
+   key opens a side-by-side review; **accept** re-pins as `pinned` (`acceptKeyChange`), **refuse** leaves it blocked.
+   So `verified` is currently reachable only via the data layer, awaiting the strict-mode entry point.
 
 ```plantuml
 @startuml

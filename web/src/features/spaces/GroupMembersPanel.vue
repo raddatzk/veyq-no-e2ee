@@ -13,9 +13,10 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
 import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup } from './scopes'
-import { acceptKeyChange, IdentityChangedError } from '../account/identityPins'
+import { acceptKeyChange, IdentityChangedError, trustStates, type TrustState } from '../account/identityPins'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
+import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
 // active scope; switching between groups in the rail re-loads via the `scopeId` watch. `name` is the group's
@@ -29,6 +30,12 @@ const emit = defineEmits<{ lifecycleChanged: [] }>()
 const members = ref<ScopeMember[]>([])
 const isOwner = ref(false)
 const myUsername = ref('')
+// Identity trust (cr-0099) — the per-member trust state from the sealed pin store. Only the `changed` state is
+// surfaced (a key that differs from the pin — a rotation or a substitution); verified/recognized are intentionally
+// not shown (proactive verification returns gated behind scope-wide strict-mode, cr-0100). Drives the review dialog.
+const trust = ref<Record<string, TrustState>>({})
+const reviewTarget = ref<ScopeMember | null>(null)
+const reviewOpen = ref(false)
 const loading = ref(true)
 const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const username = ref('')
@@ -79,6 +86,7 @@ async function load() {
     myUsername.value = me?.username ?? ''
     isOwner.value = !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER')
     purgeAfter.value = lifecycle?.purgeAfter ?? null
+    await refreshTrust()
   } catch (e) {
     const { status } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })
@@ -86,6 +94,21 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+// Read every member's trust state from the sealed pin store in one fetch (cr-0099) — used only to flag `changed`
+// keys. Vault-gated: if the store/identity is unavailable, degrade to no flags rather than break the directory.
+async function refreshTrust() {
+  try {
+    trust.value = await trustStates(members.value.map((m) => ({ userId: m.userId, directoryKey: m.identityPublicKey })))
+  } catch {
+    trust.value = {}
+  }
+}
+
+function openReview(m: ScopeMember) {
+  reviewTarget.value = m
+  reviewOpen.value = true
 }
 
 // Add a member (cr-0086) — with the consent opt-in (cr-0096). First resolve the username (records nothing): if
@@ -117,6 +140,7 @@ async function submit() {
     username.value = ''
     pendingKeyChange.value = null
     members.value = await listScopeMembers(props.scopeId) // refresh — awaiting access, or the pending proposal
+    await refreshTrust()
   } catch (e) {
     if (e instanceof IdentityChangedError && candidate) {
       // The invitee's security key changed since we last pinned it (a legitimate rotation, or an operator MITM).
@@ -367,7 +391,17 @@ async function onRestore() {
                 <span class="veyq-badge" :class="m.pendingConsent ? 'muted' : m.hasGrant ? 'success' : 'warning'">
                   {{ m.pendingConsent ? t('members.statusPendingConsent') : m.hasGrant ? t('members.statusActive') : t('members.statusAwaiting') }}
                 </span>
+                <!-- Changed-identity warning (cr-0099): the ONLY trust surface — the directory key differs from the
+                     pin (a rotation or an operator substitution). Verified/recognized are intentionally not shown. -->
+                <span v-if="trust[m.userId] === 'changed'" class="veyq-badge changed">
+                  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>{{ t('verify.badgeChanged') }}
+                </span>
               </div>
+            </div>
+            <!-- Review a changed key (cr-0099), available to ANY member: compare expected-vs-current out-of-band,
+                 then accept (re-pin) or refuse (leave blocked). -->
+            <div v-if="trust[m.userId] === 'changed'" class="trust-actions">
+              <Button :label="t('verify.review')" icon="pi pi-exclamation-triangle" severity="warn" text size="small" @click="openReview(m)" />
             </div>
             <!-- Owner-only controls (cr-0088/0089): promote a member to co-owner, demote a co-owner, or remove a
                  member. Remove is destructive (rotates the scope key forward) so it takes an inline confirm. The
@@ -463,6 +497,9 @@ async function onRestore() {
         </div>
       </section>
     </section>
+
+    <!-- Review a changed identity key (cr-0099) — the only verify surface until scope-wide strict-mode (cr-0100). -->
+    <ChangedKeyReviewDialog v-if="reviewTarget" v-model:visible="reviewOpen" :member="reviewTarget" @accepted="refreshTrust" />
   </section>
 </template>
 
@@ -475,6 +512,11 @@ async function onRestore() {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--app-border, rgba(128, 128, 128, 0.25));
+}
+.trust-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 .danger-row {
   display: flex;
