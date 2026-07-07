@@ -92,12 +92,13 @@ end
   rate-limit/mute is a deferred polish, not a v1 gate.)
 - **E1 — the username doesn't resolve in this tenant:** a generic *not-found*, tenant-scoped resolve — identical
   to direct-add E1.
-- **E2 — key-substitution by a malicious operator:** the name-key wrap (and later the grant) wraps to the pubkey the
-  server returns — **v1 is *Plain*** (no TOFU-pin, no hard-gate), consistent with direct-add E2 and the shared
-  primitive. Consent gates the *human's* agreement, not key authenticity; the fingerprint / safety-number remains
-  the explicit hardening seam ([security-model](../../../crosscutting/security-model.md), [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
-  Note ADR 0027 closes a **different** attack — a *modified-owner* private name-lie — orthogonal to this
-  operator-key seam, which stays deferred.
+- **E2 — key-substitution by a malicious operator:** the name-key wrap (and later the grant) wraps to the pubkey
+  the server returns, consistent with direct-add E2 and the shared primitive. Consent gates the *human's*
+  agreement, not key authenticity; that is governed by [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md)
+  (**TOFU-pin** on first use, a **changed** key surfaced/refused, out-of-band **safety-number verification** via
+  [uc.spaces.verify-identity](uc.spaces.verify-identity.md), opt-in strict). Until that slice ships the wrap is
+  still Plain ([security-model](../../../crosscutting/security-model.md)). Note ADR 0027 closes a **different**
+  attack — a *modified-owner* private name-lie — orthogonal to this operator-key seam.
 
 ## Quality notes
 

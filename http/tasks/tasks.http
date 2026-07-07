@@ -1,13 +1,15 @@
 ### Background-task pull queue — signed boundary + authenticated no-grant/non-member paths (ADR 0021, cr-0076)
 # What a bare .http CAN prove over the wire against a fresh instance: the auth boundary (401 before anything),
 # request validation (400), and the authenticated semantics that need NO scope key — "no grant ⇒ nothing
-# claimable" (204), "enqueue onto a scope you don't hold ⇒ 403", and "act on an unknown job ⇒ 404". The FULL
-# grant-delivery happy-path (seed a grant-less membership → claim → wrap K_SC to a foreign identity → complete
-# → the membership holds the grant) needs the operator-blind scope-grant flow — a real ML-KEM wrap the client
-# crypto suite produces, not reproducible from a bare .http (same wall content.http hit). It is covered
-# end-to-end at the integration layer (backend TasksSliceTest, which seeds the grant-less membership in-tx and
-# drives claim→complete→deliver over the HTTP stack) and by the web worker loop (cr-0076 phase 4); a live web
-# smoke lands with member onboarding (cr-0077).
+# claimable" (204), "enqueue onto a scope you don't hold ⇒ 403", and "act on an unknown job ⇒ 404" (incl. the
+# cr-0098 grant-delivery **decline**). The FULL grant-delivery happy-path (seed a grant-less membership → claim →
+# wrap K_SC to a foreign identity → complete → the membership holds the grant) needs the operator-blind
+# scope-grant flow — a real ML-KEM wrap the client crypto suite produces, not reproducible from a bare .http
+# (same wall content.http hit). It is covered end-to-end at the integration layer (backend TasksSliceTest, which
+# seeds the grant-less membership in-tx and drives claim→complete→deliver over the HTTP stack) and by the web
+# worker loop (cr-0076 phase 4); a live web smoke lands with member onboarding (cr-0077). The decline's
+# **leased** paths (release-to-others + the per-worker exclusion + the 409 not_lease_holder) likewise need a
+# leased job across two seeded workers → covered at the slice layer (TasksSliceTest, cr-0098).
 #
 # PRECONDITION: a FRESH instance — request 1 self-seeds the owner and setup is single-owner-locked. Wipe first:
 # docker compose -f infra/docker-compose.yml down -v && up -d. SEED is a NON-SECRET test key.
@@ -202,5 +204,37 @@ Content-Type: application/json
 > {%
 client.test("non-key-holder ⇒ no rotation claimable", function () {
     client.assert(response.status === 204, "expected 204, got " + response.status);
+});
+%}
+
+### The third seam — the grant-delivery **decline** (cr-0098, ADR 0028). A worker holding a DIFFERENT identity
+### pin refuses a grant-delivery job (release-to-others + this-worker exclusion). The blind boundaries provable
+### over the wire: auth before anything, and a decline of an unknown job is a plain 404 (no lease adjudication
+### leaks). The leased happy-path (release + per-worker exclusion + 409 not_lease_holder) is at the slice layer.
+
+### 14. decline without a bearer token → generic 401 (auth before anything)
+POST {{host}}/api/tasks/11111111-1111-1111-1111-111111111111/decline
+Content-Type: application/json
+
+{ "reason": "identity_changed" }
+
+> {%
+client.test("decline requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 15. decline an unknown job (authed) → 404 job_not_found (no leak of whether it was leased/by whom)
+POST {{host}}/api/tasks/11111111-1111-1111-1111-111111111111/decline
+Authorization: Bearer {{at}}
+Content-Type: application/json
+
+{ "reason": "identity_changed" }
+
+> {%
+client.test("decline unknown job ⇒ 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "job_not_found", "expected job_not_found");
 });
 %}

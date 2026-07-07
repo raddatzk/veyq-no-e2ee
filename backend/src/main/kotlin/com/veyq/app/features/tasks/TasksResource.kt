@@ -4,6 +4,7 @@ import com.veyq.app.generated.api.TasksApi
 import com.veyq.app.generated.model.ClaimRequest
 import com.veyq.app.generated.model.ClaimedJob
 import com.veyq.app.generated.model.CompleteRequest
+import com.veyq.app.generated.model.DeclineRequest
 import com.veyq.app.generated.model.EnqueueRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.FailRequest
@@ -76,6 +77,15 @@ class TasksResource(
             is FailResult.Recorded -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
             FailResult.NotFound ->
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
+        }
+
+    override fun declineTask(jobId: UUID, declineRequest: DeclineRequest?): Response =
+        when (val r = handler.decline(me, jobId.toString(), declineRequest?.reason)) {
+            is DeclineResult.Released -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
+            DeclineResult.NotFound ->
+                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
+            DeclineResult.NotHolder ->
+                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "not_lease_holder")).build()
         }
 
     private fun ClaimedJobView.toDto() = ClaimedJob(

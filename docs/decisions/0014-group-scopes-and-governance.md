@@ -94,9 +94,11 @@ and which is confidential even from the tenant owner.**
      **Decline** drops the soft membership (nothing was ever wrapped).
    - **Threat:** a malicious operator could return a public key it controls (MITM) and read the group.
      **Defense:** the **safety-number / fingerprint** of that identity
-     ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md); UI deferred). The exact verification stance
-     (TOFU-pin vs. a hard gate before the first grant) is **deferred to the member-add slice (G2)** — proposed:
-     TOFU-pin + surface the fingerprint, hard-gate later.
+     ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md)). The verification stance is settled in
+     [ADR 0028](0028-identity-authenticity-tofu-verification.md): **TOFU-pin on first use**, a **change** is a UI
+     notice (accept → re-pin) or a **hard block for the human-less grant-delivery worker**, and out-of-band
+     **safety-number verification** (QR compare) elevates *pinned* → *verified*; a **hard gate** before the first
+     grant is available as an **opt-in strict mode**. The pin store is client-side + sealed (operator-blind).
 
 6. **Lifecycle.** Settled in the lifecycle slice ([uc.spaces.delete-group](../features/spaces/use-cases/uc.spaces.delete-group.md), G3b):
    - **Owner delete = soft + grace.** Any GroupOwner deletes; the group enters **pending-deletion** (`deletedAt`

@@ -1,0 +1,170 @@
+// Identity pinning — the operator-blind, cross-device TOFU pin store (en.account.identity-pinning, cr-0098,
+// ADR 0028). A client remembers each contact's identity public key the first time it wraps to them, so a later
+// *changed* key (an active operator's MITM, or a legitimate rotation) is surfaced, never silently trusted.
+//
+// The store is ONE blob sealed under the Master Key (`symWrap(masterKey, blob, "identity-pins")`) and synced with
+// the account: the server relays one opaque ciphertext + a monotonic `version` for optimistic concurrency, and
+// never sees a userId, a pinned key, or the count. The sealed plaintext is `{ pins: { <userId>: { key, state,
+// firstSeenAt } } }`; `version` is the cleartext wire counter (the server's authority for concurrency — the
+// enabler's `{ version, pins }` shows both halves conceptually). Account-global: identity is one keypair per
+// account across tenants (ADR 0023), so there is one pin per contact everywhere.
+import * as v1 from '../../shared/crypto/v1'
+import { b64std, fromB64std } from '../../shared/base64'
+import { accountIdentityPinsApi } from '../../api/client'
+import { withRefresh } from './login/login'
+import { masterKey } from '../../app/vault'
+
+/** The AAD context binding the pin-store seal (ADR 0009, vector-pinned `sym_identity_pins`). */
+export const IDENTITY_PINS = 'identity-pins'
+
+/** A pin's trust state. `verified` (out-of-band safety-number compare) is the follow-up CR; this one only pins. */
+export type PinState = 'pinned' | 'verified'
+
+/** One pinned contact: their full identity public bundle (serialized, base64), the trust state, and first-seen. */
+export interface Pin {
+  key: string
+  state: PinState
+  firstSeenAt: number
+}
+
+type PinMap = Record<string, Pin>
+
+/** The opened store: the server's current `version` (for the next guarded write) + the decrypted pin map. */
+interface OpenedStore {
+  version: number
+  pins: PinMap
+}
+
+/** The TOFU outcome of checking a contact's directory key against the pin store. */
+export type CheckResult = 'firstUse' | 'match' | 'changed'
+
+/**
+ * Thrown by a **UI-path** wrap site (e.g. the group invite name-key) when a contact's directory key differs from
+ * the pin — the caller must surface a notice and let the human accept (→ {@link acceptKeyChange}) rather than
+ * silently wrap to a possibly-substituted key. The human-less grant-delivery worker does not throw this; it
+ * declines the job instead.
+ */
+export class IdentityChangedError extends Error {
+  constructor(public readonly userId: string) {
+    super(`identity key changed for ${userId}`)
+    this.name = 'IdentityChangedError'
+  }
+}
+
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+
+/** Bounds the re-read/merge/retry loop on a `409 stale_version` — a real conflict is a concurrent device write. */
+const MAX_WRITE_ATTEMPTS = 5
+
+/** Decrypt the pin map from a sealed blob; an unreadable/absent blob is treated as an empty store (never throws). */
+function unsealPins(mk: Uint8Array, blobB64: string | null): PinMap {
+  if (!blobB64) return {}
+  try {
+    const json = decoder.decode(v1.symUnwrap(mk, fromB64std(blobB64), IDENTITY_PINS))
+    const parsed = JSON.parse(json) as { pins?: unknown }
+    return parsed && typeof parsed.pins === 'object' && parsed.pins !== null ? (parsed.pins as PinMap) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** Seal a pin map under the Master Key with a fresh nonce → the opaque base64 blob to PUT. */
+function sealPins(mk: Uint8Array, pins: PinMap): string {
+  const json = encoder.encode(JSON.stringify({ pins }))
+  return b64std(v1.symWrap(mk, json, IDENTITY_PINS, v1.randomBytes(12)))
+}
+
+/** Fetch + open the caller's pin store (born-empty → `{ version: 0, pins: {} }`). Requires an unlocked vault. */
+async function loadStore(): Promise<OpenedStore> {
+  const mk = masterKey()
+  if (!mk) throw new Error('identity pin store requires an unlocked vault')
+  try {
+    const res = await withRefresh(() => accountIdentityPinsApi().getIdentityPins())
+    return { version: res.version, pins: unsealPins(mk, res.blob) }
+  } finally {
+    mk.fill(0)
+  }
+}
+
+/** Whether a failed call is a `409 stale_version` (a concurrent device advanced the store under our write). */
+async function isStaleVersion(e: unknown): Promise<boolean> {
+  const res = (e as { response?: Response })?.response
+  if (!res || res.status !== 409) return false
+  try {
+    return ((await res.clone().json()) as { code?: string })?.code === 'stale_version'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Apply a change to the pin map and store it, version-guarded. On a `409 stale_version` (another device wrote
+ * first) re-read the server's current store, **re-apply the same change on top of it** (client-side union-merge —
+ * `apply` is written to be additive/idempotent, so a concurrent pin for another contact is preserved), and retry.
+ * Starts from an already-loaded `base` to avoid a redundant GET on the common no-conflict path.
+ */
+async function mutateAndSave(base: OpenedStore, apply: (pins: PinMap) => void): Promise<void> {
+  let store = base
+  for (let attempt = 0; ; attempt++) {
+    const next: PinMap = { ...store.pins }
+    apply(next)
+    const mk = masterKey()
+    if (!mk) throw new Error('identity pin store requires an unlocked vault')
+    try {
+      const blob = sealPins(mk, next)
+      await withRefresh(() =>
+        accountIdentityPinsApi().putIdentityPins({ identityPinsUpdate: { blob, version: store.version } }),
+      )
+      return
+    } catch (e) {
+      if (attempt + 1 < MAX_WRITE_ATTEMPTS && (await isStaleVersion(e))) {
+        store = await loadStore() // re-base on the server's current store, then re-apply + retry
+        continue
+      }
+      throw e
+    } finally {
+      mk.fill(0)
+    }
+  }
+}
+
+/**
+ * TOFU check before a foreign-identity wrap: compare the directory-returned `identityPublicKeyB64` for `userId`
+ * against the pin store.
+ * - **no pin** → pin it (`state: pinned`) and return `firstUse` — the caller proceeds with the wrap (trust-on-first-use).
+ * - **pin matches** → return `match` — proceed.
+ * - **pin differs** → return `changed` — the caller must NOT silently wrap (the worker declines the job; a UI path
+ *   surfaces a notice + accept → re-pin). The store is left untouched.
+ * Requires an unlocked vault.
+ */
+export async function checkAndPin(userId: string, identityPublicKeyB64: string): Promise<CheckResult> {
+  const store = await loadStore()
+  const existing = store.pins[userId]
+  if (existing) return existing.key === identityPublicKeyB64 ? 'match' : 'changed'
+  await mutateAndSave(store, (pins) => {
+    // Additive union-merge: only claim the slot if still unpinned after a possible re-base (first-online-wins;
+    // a concurrent device that pinned this same contact first keeps its pin).
+    if (!pins[userId]) pins[userId] = { key: identityPublicKeyB64, state: 'pinned', firstSeenAt: Date.now() }
+  })
+  return 'firstUse'
+}
+
+/**
+ * Accept a **changed** key for a contact (ADR 0028 human path): re-pin `userId := new key`, preserving the
+ * original `firstSeenAt`. Drops back to `state: pinned` (the `verified` elevation via the QR safety-number compare
+ * is the follow-up CR). Overwrites unconditionally — the human explicitly accepted this key.
+ */
+export async function acceptKeyChange(userId: string, identityPublicKeyB64: string): Promise<void> {
+  const store = await loadStore()
+  await mutateAndSave(store, (pins) => {
+    const prior = pins[userId]
+    pins[userId] = { key: identityPublicKeyB64, state: 'pinned', firstSeenAt: prior?.firstSeenAt ?? Date.now() }
+  })
+}
+
+/** Read a contact's current pin (or null), for a UI surface that shows trust state. No write. */
+export async function getPin(userId: string): Promise<Pin | null> {
+  const store = await loadStore()
+  return store.pins[userId] ?? null
+}

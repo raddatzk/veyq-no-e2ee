@@ -195,6 +195,49 @@ class TasksSliceTest {
     }
 
     @Test
+    fun declineReleasesJobToOtherWorkersButNeverBackToTheDecliner() {
+        // cr-0098 / ADR 0028: a worker that refuses a job (a conflicting identity pin) releases it back to
+        // PENDING — still claimable by OTHER workers — but is itself never re-offered it (per-device, not a
+        // global veto). The declined attempt is rolled back, so a legitimate decline never dead-letters the job.
+        val scopeId = seedTenantScope()
+        val workerA = seedUser()
+        val workerB = seedUser()
+        seedGrantedMembership(workerA, scopeId, "a-grant")
+        seedGrantedMembership(workerB, scopeId, "b-grant")
+        val tag = "deadbeef"
+        val jobId = seedJob(scopeId, tag, JobEntity.PENDING, attempts = 0)
+
+        claim(workerA, tag).then().statusCode(200).body("jobId", equalTo(jobId)).body("attempts", equalTo(1))
+        // A declines → back to pending, attempt rolled back to 0 (not a failed attempt).
+        given().header("Authorization", bearer(workerA)).contentType(ContentType.JSON)
+            .body("""{"reason":"identity_changed"}""")
+            .`when`().post("/api/tasks/$jobId/decline")
+            .then().statusCode(200).body("status", equalTo("pending")).body("attempts", equalTo(0))
+
+        // A is excluded from its own decline → nothing claimable for A.
+        claim(workerA, tag).then().statusCode(204)
+        // B has no conflicting decline → the job is still delivered to B (attempts freshly 1).
+        claim(workerB, tag).then().statusCode(200).body("jobId", equalTo(jobId)).body("attempts", equalTo(1))
+    }
+
+    @Test
+    fun declineRequiresTheLease() {
+        val scopeId = seedTenantScope()
+        val holder = seedUser()
+        val other = seedUser()
+        seedGrantedMembership(holder, scopeId, "holder-grant")
+        seedGrantedMembership(other, scopeId, "other-grant")
+        val tag = "deadbeef"
+        val jobId = seedJob(scopeId, tag, JobEntity.PENDING, attempts = 0)
+        claim(holder, tag).then().statusCode(200)
+
+        // A key-holder in the scope who does NOT hold the lease cannot decline it → 409.
+        given().header("Authorization", bearer(other)).contentType(ContentType.JSON).body("{}")
+            .`when`().post("/api/tasks/$jobId/decline")
+            .then().statusCode(409).body("code", equalTo("not_lease_holder"))
+    }
+
+    @Test
     fun heartbeatExtendsTheLeaseForTheHolderOnly() {
         val scopeId = seedTenantScope()
         val worker = seedUser()
@@ -260,6 +303,8 @@ class TasksSliceTest {
             .`when`().post("/api/tasks/$ghost/heartbeat").then().statusCode(404).body("code", equalTo("job_not_found"))
         given().header("Authorization", bearer(worker)).contentType(ContentType.JSON).body("{}")
             .`when`().post("/api/tasks/$ghost/fail").then().statusCode(404).body("code", equalTo("job_not_found"))
+        given().header("Authorization", bearer(worker)).contentType(ContentType.JSON).body("{}")
+            .`when`().post("/api/tasks/$ghost/decline").then().statusCode(404).body("code", equalTo("job_not_found"))
     }
 
     @Test

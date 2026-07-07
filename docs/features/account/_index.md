@@ -19,6 +19,9 @@ holds only **public** keys and ciphertext, never the password and never a conten
 - ★ [en.account.passwordless-unlock](enablers/en.account.passwordless-unlock.md) — the **L2/L3
   passwordless-unlock** orchestration (two-layer split, native per platform; the single security-reviewer
   reference).
+- [en.account.identity-pinning](enablers/en.account.identity-pinning.md) — the operator-blind, cross-device
+  **TOFU pin store** (one Master-Key-sealed blob) that remembers each contact's identity key, so a substituted
+  key is caught on change (**web built, cr-0098**).
 
 ## Use-cases
 

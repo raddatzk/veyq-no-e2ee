@@ -9,6 +9,7 @@ import { identityPrivate } from '../../app/vault'
 import { sealName, openName } from '../memory/tree'
 import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type EpochKeys } from './epochs'
 import { SCOPE_GRANT, wrapScopeKeyToMember } from './grant'
+import { checkAndPin, IdentityChangedError } from '../account/identityPins'
 import { deriveGroupNameKey, wrapNameKeyToInvitee } from './inviteName'
 import { ScopeKind, type ScopeSummary, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 
@@ -220,7 +221,17 @@ export async function openPersonalScope(): Promise<Uint8Array | null> {
  * privately show a divergent name. Returns null if the caller can't open the scope (vault locked / no grant).
  * Requires an unlocked vault; the transient epoch keys + `K_name` are zeroed before returning.
  */
-export async function wrapGroupNameKeyForInvitee(scopeId: string, inviteeIdentityPublicKeyB64: string): Promise<string | null> {
+export async function wrapGroupNameKeyForInvitee(
+  scopeId: string,
+  inviteeUserId: string,
+  inviteeIdentityPublicKeyB64: string,
+): Promise<string | null> {
+  // TOFU gate (cr-0098, ADR 0028): this is the invite's first wrap to the invitee's *foreign* identity — pin it on
+  // first sight, proceed on a match, but on a CHANGED key surface it (this is a human/UI path) rather than sealing
+  // K_name to a possibly-substituted key. The caller catches IdentityChangedError → a notice + accept → re-pin.
+  if ((await checkAndPin(inviteeUserId, inviteeIdentityPublicKeyB64)) === 'changed') {
+    throw new IdentityChangedError(inviteeUserId)
+  }
   const opened = await openScopeById(scopeId)
   if (!opened) return null
   const nameKey = deriveGroupNameKey(keyAt(opened.epochs, opened.nameEpoch))
@@ -292,9 +303,18 @@ export async function rotateGroupForRemoval(scopeId: string, remaining: ScopeMem
     // Never re-grant a soft consent proposal (cr-0095): a `pendingConsent` row is grant-gated until the invitee
     // accepts, so it must stay out of the rotation's re-grant set (the server enforces this too; this avoids the
     // useless wrap + keeps the client honest). The directory hands owners the pending rows, so filter here.
-    const grants = remaining
-      .filter((m) => !m.pendingConsent)
-      .map((m) => ({ userId: m.userId, wrappedGrant: wrapScopeKeyToMember(newKey, m.identityPublicKey) }))
+    //
+    // TOFU gate (cr-0098, ADR 0028): pin each remaining member on first sight, proceed on a match, but never
+    // re-grant the fresh epoch to a CHANGED identity key — exclude that member (they stay awaiting-access, a
+    // visible anomaly, until a human accepts the change; grant-delivery likewise declines for them). The rotation
+    // itself must still proceed — forward secrecy against the *removed* member cannot hinge on a surviving
+    // member's changed key. Sequential so the pin store's version-guarded writes don't race each other.
+    const grants: { userId: string; wrappedGrant: string }[] = []
+    for (const m of remaining) {
+      if (m.pendingConsent) continue
+      if ((await checkAndPin(m.userId, m.identityPublicKey)) === 'changed') continue
+      grants.push({ userId: m.userId, wrappedGrant: wrapScopeKeyToMember(newKey, m.identityPublicKey) })
+    }
     const rotated = await withRefresh(() => scopesApi().rotateScope({ scopeId, rotateScopeRequest: { wrappedPrev, grants } }))
     return rotated.epoch
   } finally {

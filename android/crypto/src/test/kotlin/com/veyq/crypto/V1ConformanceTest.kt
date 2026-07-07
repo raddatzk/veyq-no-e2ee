@@ -60,7 +60,7 @@ class V1ConformanceTest {
     }
 
     @Test fun symWrap() {
-        for (key in listOf("sym_master_key", "session_token")) {
+        for (key in listOf("sym_master_key", "session_token", "sym_identity_pins")) {
             val v = vectors.getJSONObject("wrap").getJSONObject(key)
             val blob = V1.symWrap(hex(v, "kek"), hex(v, "plaintext"), v.getString("context"), hex(v, "nonce"))
             assertContentEquals(hex(v, "blob"), blob, "symWrap vector $key")

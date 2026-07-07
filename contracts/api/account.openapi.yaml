@@ -31,6 +31,10 @@ tags:
   - name: account-profile
     description: The caller's per-tenant identity profile (username + sealed real name) in the tenant resolved
       from the Host (ADR 0023). Separate tag → its own resource interface.
+  - name: account-identity-pins
+    description: The caller's operator-blind identity-pin store — one Master-Key-sealed blob remembering each
+      contact's identity key for TOFU change-detection (ADR 0028, en.account.identity-pinning). Separate tag →
+      its own resource interface.
 
 paths:
   /api/account/key-material:
@@ -180,6 +184,77 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: username_taken }
+
+  /api/account/identity-pins:
+    get:
+      tags: [account-identity-pins]
+      operationId: getIdentityPins
+      summary: Fetch the caller's sealed identity-pin store.
+      description: >
+        Returns the authenticated caller's identity-pin store — one opaque blob sealed under the Master Key
+        (`symWrap(masterKey, blob, "identity-pins")`, ADR 0028 / en.account.identity-pinning) plus its
+        monotonic `version` for optimistic concurrency. The server stores + relays the ciphertext verbatim and
+        never interprets it (no `userId`, no key, no count). Born empty: an account that has never written the
+        store gets `{ blob: null, version: 0 }`. Keyed off the bearer token — only the caller's own store.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's sealed pin store (ciphertext only) + its version. `blob` is null when never written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityPins" }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+    put:
+      tags: [account-identity-pins]
+      operationId: putIdentityPins
+      summary: Store the caller's sealed identity-pin store (optimistic concurrency).
+      description: >
+        Replaces the caller's sealed pin-store blob. `version` is the version the client last read; the write
+        succeeds only if it still matches the server's stored version, which is then bumped and returned. If the
+        stored version moved since the client read (another device wrote), the server responds `409
+        stale_version` and the client re-reads, union-merges, and retries (en.account.identity-pinning §Sync).
+        The first write of a born-empty store sends `version: 0`. Operator-blind: the server never sees the
+        plaintext pins.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IdentityPinsUpdate" }
+            example:
+              blob: c2VhbGVkLXBpbi1zdG9yZQ==
+              version: 3
+      responses:
+        "200":
+          description: The store was written; the new (bumped) version is returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityPins" }
+        "400":
+          description: The request was malformed (missing/invalid blob or version).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure (missing, invalid, expired, or revoked access token).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "409":
+          description: The stored version moved since the client read it — re-read, union-merge, and retry.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: stale_version }
 
   /api/account/wraps/{id}:
     delete:
@@ -384,6 +459,57 @@ components:
             turns a GroupOwner's add into a consent proposal; `false` restores the default direct-add. Omit
             (`null`) to leave it unchanged.
           example: true
+
+    IdentityPins:
+      type: object
+      description: >
+        The caller's sealed identity-pin store + its version. `blob` is one opaque ciphertext
+        (`symWrap(masterKey, blob, "identity-pins")`) the server relays verbatim; `version` is the monotonic
+        optimistic-concurrency counter. A born-empty store is `{ blob: null, version: 0 }`.
+      required: [blob, version]
+      properties:
+        blob:
+          type: [string, "null"]
+          description: >
+            The pin-store plaintext sealed under the Master Key (opaque base64), or null when the store has
+            never been written. The server never interprets it (no `userId`, key, or count).
+          contentEncoding: base64
+          maxLength: 1048576
+          example: c2VhbGVkLXBpbi1zdG9yZQ==
+        version:
+          type: integer
+          format: int64
+          description: >
+            Monotonic version for optimistic concurrency. `0` for a born-empty store; bumped by one on every
+            successful write. A `PUT` must send the version it last read.
+          minimum: 0
+          example: 3
+
+    IdentityPinsUpdate:
+      type: object
+      description: >
+        A new sealed pin-store blob to store, guarded by the `version` the client last read (optimistic
+        concurrency → `409 stale_version` on a mismatch).
+      required: [blob, version]
+      properties:
+        blob:
+          type: string
+          description: >
+            The pin-store plaintext sealed under the Master Key (opaque base64 ciphertext the server stores
+            verbatim).
+          contentEncoding: base64
+          maxLength: 1048576
+          example: c2VhbGVkLXBpbi1zdG9yZQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 1048576) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        version:
+          type: integer
+          format: int64
+          description: >
+            The version the client last read (the write succeeds only if it still matches the stored version).
+            `0` for the first write of a born-empty store.
+          minimum: 0
+          example: 3
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Min(0)'
 
     ErrorResponse:
       type: object

@@ -47,6 +47,13 @@ sealed interface FailResult {
     object NotFound : FailResult
 }
 
+/** Outcome of a decline — the job released back to pending, or the caller wasn't its lease-holder. */
+sealed interface DeclineResult {
+    data class Released(val status: String, val attempts: Int) : DeclineResult
+    object NotFound : DeclineResult
+    object NotHolder : DeclineResult
+}
+
 /**
  * Persistence + the atomic claim/lease machinery for the operator-blind background-task queue (ADR 0021,
  * cr-0076). Workers are remote key-holders that pull over HTTP, so the claim is a portable **compare-and-set**
@@ -83,10 +90,13 @@ class TasksStore {
 
         // Claimable candidates (auto-flush picks up the reconciled inserts). Managed entities, but never
         // mutated — we CAS via a bulk update and build the view from known values, so nothing dirties at flush.
+        // Exclude jobs this worker has DECLINED (cr-0098): a worker that refused a job (a conflicting identity pin)
+        // must never be re-offered it — but it stays claimable by other workers (per-device, not a global veto).
         val candidates = JobEntity.find(
             "scopeId in ?1 and capabilityTag in ?2 and attempts < maxAttempts and " +
-                "(status = ?3 or (status = ?4 and leaseExpiresAt < ?5)) order by createdAt",
-            scopeIds, tags, JobEntity.PENDING, JobEntity.LEASED, now,
+                "(status = ?3 or (status = ?4 and leaseExpiresAt < ?5)) and " +
+                "id not in (select d.jobId from JobDeclineEntity d where d.workerId = ?6) order by createdAt",
+            scopeIds, tags, JobEntity.PENDING, JobEntity.LEASED, now, userId,
         ).list()
 
         for (c in candidates) {
@@ -184,6 +194,39 @@ class TasksStore {
         if (rows == 1) return FailResult.Recorded(newStatus, job.attempts)
         JobEntity.getEntityManager().refresh(job)
         return FailResult.Recorded(job.status, job.attempts)
+    }
+
+    /**
+     * A worker **declines** a job it holds (cr-0098, ADR 0028): release the lease back to PENDING — claimable by
+     * OTHER workers — and record a `(job, worker)` decline so this worker is never re-offered it (the exclusion in
+     * [claim]'s candidate query). Unlike [fail], the claim's attempt increment is **rolled back** (`attempts - 1`),
+     * so a legitimately-declined job is never dead-lettered by declines alone. Only the lease-holder may decline
+     * (`and leaseHolder = ?`), else [DeclineResult.NotHolder] → 409. The job must be in a scope the caller holds a
+     * grant in, else [DeclineResult.NotFound] → 404. Per-device, not a global veto: the blind server never
+     * adjudicates the crypto claim, it only removes this worker from the candidate set.
+     */
+    @Transactional
+    fun decline(userId: String, jobId: String, reason: String?): DeclineResult {
+        val job = JobEntity.findById(jobId) ?: return DeclineResult.NotFound
+        if (job.scopeId !in grantedScopeIds(userId)) return DeclineResult.NotFound
+        val rows = JobEntity.update(
+            "status = ?1, leaseHolder = null, leaseExpiresAt = null, attempts = attempts - 1 " +
+                "where id = ?2 and leaseHolder = ?3 and status = ?4",
+            JobEntity.PENDING, jobId, userId, JobEntity.LEASED,
+        )
+        if (rows != 1) return DeclineResult.NotHolder
+        // Record the decline once (idempotent — the unique (job, worker) index also guards it). After this the
+        // worker can no longer claim the job, so a second decline can't occur in normal operation.
+        if (JobDeclineEntity.count("jobId = ?1 and workerId = ?2", jobId, userId) == 0L) {
+            JobDeclineEntity().apply {
+                id = UUID.randomUUID().toString()
+                this.jobId = jobId
+                this.workerId = userId
+                this.reason = reason
+                declinedAt = Instant.now()
+            }.persist()
+        }
+        return DeclineResult.Released(JobEntity.PENDING, job.attempts - 1)
     }
 
     /** Enqueue a client-originated job onto a scope the caller holds a grant for. Returns the jobId, or null. */

@@ -137,6 +137,14 @@
       "nonce": "0a0b0c0d0e0f101112131415",
       "plaintext": "726566726573682d746f6b656e2d30313233343536373839",
       "blob": "020a0b0c0d0e0f101112131415ebadf9d978e2a05283ca0170ca2e4dc7dc12e3f6e8931e45eeb0ab738cd239052c0fd3f4bb344bc7"
+    },
+    "sym_identity_pins": {
+      "note": "cr-0098 (ADR 0028): the operator-blind identity-pin store sealed under the Master Key with the 'identity-pins' context (en.account.identity-pinning). One opaque blob the server relays verbatim (no userId, key, or count). Pins each contact's identity public key for TOFU change-detection at the foreign-wrap sites. kek = sym_master_key.kek (the Master Key seals it); plaintext = utf8('{\"version\":1,\"pins\":{}}') (a born-empty store).",
+      "kek": "aea8086000d1cee65ee4521561e6489492f67bf220ebc35dcac5a43d40c03542",
+      "context": "identity-pins",
+      "nonce": "0a0b0c0d0e0f101112131415",
+      "plaintext": "7b2276657273696f6e223a312c2270696e73223a7b7d7d",
+      "blob": "020a0b0c0d0e0f101112131415e2eae9ce6fe2a1109987502488210d9f8052f5f9a5d95b622b6db6450a34ca8c2561e8268b8a44"
     }
   },
   "group_name_key": {

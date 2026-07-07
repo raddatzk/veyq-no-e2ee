@@ -3,10 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../../api/client', () => ({ tasksApi: vi.fn() }))
 // withRefresh just runs the call once in these unit tests (no token refresh under test).
 vi.mock('../account/login/login', () => ({ withRefresh: (f: () => unknown) => f() }))
+// The TOFU pin store is exercised in its own test; here we drive checkAndPin's outcome directly.
+vi.mock('../account/identityPins', () => ({ checkAndPin: vi.fn() }))
 
 import { runGrantDeliveryWorker, wrapScopeKeyToMember } from './grantDeliveryWorker'
 import { GRANT_DELIVERY } from './capabilityTags'
 import { tasksApi } from '../../api/client'
+import { checkAndPin } from '../account/identityPins'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 
@@ -15,11 +18,22 @@ import { b64std, fromB64std } from '../../shared/base64'
 const target = v1.generateIdentity()
 const targetPubB64 = b64std(v1.serializeIdentityPublic(target.pub))
 
-function mockTasks(claimTask: ReturnType<typeof vi.fn>, completeTask: ReturnType<typeof vi.fn>, failTask = vi.fn()) {
-  vi.mocked(tasksApi).mockReturnValue({ claimTask, completeTask, failTask } as unknown as ReturnType<typeof tasksApi>)
+function mockTasks(
+  claimTask: ReturnType<typeof vi.fn>,
+  completeTask: ReturnType<typeof vi.fn>,
+  failTask = vi.fn(),
+  declineTask = vi.fn(),
+) {
+  vi.mocked(tasksApi).mockReturnValue(
+    { claimTask, completeTask, failTask, declineTask } as unknown as ReturnType<typeof tasksApi>,
+  )
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  // Default: the target is new or unchanged → the worker proceeds with the wrap (TOFU). Overridden per test.
+  vi.mocked(checkAndPin).mockResolvedValue('firstUse')
+})
 
 describe('runGrantDeliveryWorker', () => {
   it('claims for the opened scope, wraps K_SC to the foreign identity, and completes; the wrap opens back to K_SC', async () => {
@@ -48,6 +62,30 @@ describe('runGrantDeliveryWorker', () => {
       v1.hybridSecret(target.priv), v1.hybridPublic(target.priv), fromB64std(wrap), 'scope-grant',
     )
     expect(Array.from(opened)).toEqual(Array.from(K_SC))
+  })
+
+  it('declines the job (does not wrap) when the target identity key CHANGED — TOFU block (cr-0098)', async () => {
+    // The pin store holds a DIFFERENT key for this contact → the human-less worker must NOT seal K_SC to the
+    // possibly-substituted key. It declines the job (release to others + never re-offer to this worker) and moves on.
+    vi.mocked(checkAndPin).mockResolvedValue('changed')
+    const claimTask = vi
+      .fn()
+      .mockResolvedValueOnce({
+        jobId: 'j1', scopeId: 's1', capabilityTag: GRANT_DELIVERY, attempts: 1,
+        grantDelivery: { targetUserId: 'u1', targetMembershipId: 'm1', identityPublicKey: targetPubB64 },
+      })
+      .mockResolvedValueOnce(null)
+    const completeTask = vi.fn()
+    const declineTask = vi.fn().mockResolvedValue(undefined)
+    mockTasks(claimTask, completeTask, vi.fn(), declineTask)
+
+    const delivered = await runGrantDeliveryWorker({ scopeId: 's1', key: v1.randomBytes(32) })
+
+    expect(delivered).toBe(0)
+    expect(completeTask).not.toHaveBeenCalled() // never wrapped to the changed key
+    expect(declineTask).toHaveBeenCalledTimes(1)
+    expect(declineTask.mock.calls[0][0].jobId).toBe('j1')
+    expect(declineTask.mock.calls[0][0].declineRequest.reason).toBe('identity_changed')
   })
 
   it('is a no-op when the member is already granted — nothing is claimable, no completion', async () => {

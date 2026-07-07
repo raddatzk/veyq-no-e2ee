@@ -28,6 +28,9 @@ class TasksHandler(
     fun fail(userId: String, jobId: String): FailResult =
         store.fail(userId, jobId)
 
+    fun decline(userId: String, jobId: String, reason: String?): DeclineResult =
+        store.decline(userId, jobId, reason)
+
     fun enqueue(userId: String, scopeId: String, capabilityTag: String, resourceRef: String?, sealedBody: String?): String? =
         store.enqueue(userId, scopeId, capabilityTag, resourceRef, sealedBody, maxAttempts)
 }

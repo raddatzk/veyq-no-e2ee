@@ -8,10 +8,21 @@ vi.mock('../../api/client', () => ({
   accountApi: vi.fn(),
 }))
 vi.mock('../../app/vault', () => ({ identityPrivate: vi.fn() }))
+// The TOFU pin store is exercised in identityPins.test.ts; here we drive checkAndPin's outcome directly so the
+// rotation re-grant's per-member gate is under our control (default: first-use → proceed).
+vi.mock('../account/identityPins', () => ({
+  checkAndPin: vi.fn(),
+  IdentityChangedError: class IdentityChangedError extends Error {
+    constructor(public userId: string) {
+      super(`identity key changed for ${userId}`)
+    }
+  },
+}))
 
 import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
+import { checkAndPin } from '../account/identityPins'
 import { identityPrivate } from '../../app/vault'
 import { openName, sealName } from '../memory/tree'
 import { deriveGroupNameKey } from './inviteName'
@@ -34,6 +45,8 @@ function mockScopes(list: ReturnType<typeof vi.fn>, create: ReturnType<typeof vi
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(identityPrivate).mockImplementation(() => copyPriv())
+  // Default: every contact is new/unchanged → the rotation re-grants them (TOFU). Overridden per test.
+  vi.mocked(checkAndPin).mockResolvedValue('firstUse')
 })
 
 describe('ensurePersonalScope', () => {
@@ -205,6 +218,31 @@ describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)',
 
     // Forward-confidentiality: the new epoch differs from the old, so content sealed under E_1 is unreadable with E_0.
     expect(Array.from(e1a)).not.toEqual(Array.from(e0))
+  })
+
+  it('excludes a member whose identity key CHANGED from the re-grant, but still rotates for the others (cr-0098)', async () => {
+    // TOFU at the rotation site: a surviving member whose directory key differs from the pin is NOT re-granted the
+    // fresh epoch (never silently wrap to a possibly-substituted key). The rotation still proceeds — forward secrecy
+    // against the removed member must not hinge on one contact's changed key. The excluded member stays awaiting-access.
+    const e0 = v1.randomBytes(32)
+    const grant0 = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), e0, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const list = vi.fn().mockResolvedValue([{ id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant0, grantedEpoch: 0 }])
+    const rotate = vi.fn().mockResolvedValue({ epoch: 1 })
+    vi.mocked(scopesApi).mockReturnValue({ listMyScopes: list, rotateScope: rotate } as unknown as ReturnType<typeof scopesApi>)
+
+    const memberA = v1.generateIdentity()
+    const memberB = v1.generateIdentity()
+    const remaining = [
+      { userId: 'a', username: 'a', role: 'OWNER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberA.pub)), hasGrant: true },
+      { userId: 'b', username: 'b', role: 'MEMBER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberB.pub)), hasGrant: true },
+    ]
+    // b's key changed since it was pinned → exclude b, keep a.
+    vi.mocked(checkAndPin).mockImplementation(async (userId: string) => (userId === 'b' ? 'changed' : 'match'))
+
+    const newEpoch = await rotateGroupForRemoval('g1', remaining)
+    expect(newEpoch).toBe(1)
+    const payload = rotate.mock.calls[0][0].rotateScopeRequest
+    expect(payload.grants.map((g: { userId: string }) => g.userId)).toEqual(['a']) // b excluded, a still re-granted
   })
 })
 

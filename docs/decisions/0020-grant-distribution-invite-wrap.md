@@ -75,14 +75,15 @@ key, wraps, or unwraps.** Concretely:
    ([ADR 0024](0024-scope-key-rotation.md) — a removed member's departure mints a new epoch the remaining members
    are re-granted).
 
-4. **Authenticity is Plain in v1 — the key-substitution gap is documented, not closed.** The granter trusts the
-   identity pubkey the server returns. A malicious operator could substitute its own key and read future wraps;
-   veyq **already states it does not defend an actively malicious operator before key transparency exists**, and
-   in the default **self-hosted** deployment the operator is the user, so the gap is moot
-   ([security-model](../crosscutting/security-model.md)). v1 therefore does **not** pin keys (TOFU) or hard-gate
-   a grant behind manual verification. **The seam is left open:** the identity **fingerprint / safety-number** is
-   a deterministic digest of the pubkey (near-free to derive), and a later slice adds surfacing it for optional
-   out-of-band compare, then TOFU-pinning, then Key Transparency — without reshaping this flow.
+4. **Authenticity: this flow wraps to the server-returned key; the trust decision is layered on by
+   [ADR 0028](0028-identity-authenticity-tofu-verification.md), not here.** A malicious operator could substitute
+   its own key and read future wraps; in the default **self-hosted** deployment the operator is the user, so the
+   gap is moot ([security-model](../crosscutting/security-model.md)). The grant-distribution *mechanism* is
+   unchanged by authenticity — the granter still `asymWrap`s to a directory pubkey — but **which** key it trusts is
+   now governed by **TOFU pinning + safety-number verification** (ADR 0028): a first-seen key is pinned + used, a
+   changed key is a UI notice / a worker-block, and the **fingerprint / safety-number** (a near-free digest of the
+   pubkey) is compared out-of-band to elevate to *verified*. Key Transparency remains the end-state. This flow
+   inherits that model without reshaping.
 
 5. **Admission and delivery are separate concerns.** *Admission* — who may invite a new member at all — is the
    real policy gate and stays **owner-only** in v1: only the tenant OWNER mints invites. *Delivery* — producing
@@ -111,9 +112,11 @@ key, wraps, or unwraps.** Concretely:
 - **The active-operator gap is real but bounded (cost, stated honestly).** Trusting the server-returned pubkey
   means a malicious operator *can* key-substitute. Broadening *delivery* from owner-only to any key-holder does
   **not** widen this: it already only took one honest device (the owner's) to auto-wrap a server-injected member;
-  more eligible wrappers is a negligible amplification, and moot for an honest/self-hosted operator. Accepted for
-  v1 because it matches the already-declared threat model, and the fingerprint/TOFU/KT hardening seam — which
-  reintroduces a human checkpoint only on a *changed* key — is left explicit. Not hidden.
+  more eligible wrappers is a negligible amplification, and moot for an honest/self-hosted operator. The hardening
+  that reintroduces a human checkpoint only on a *changed* key is now defined by
+  [ADR 0028](0028-identity-authenticity-tofu-verification.md) (TOFU pinning + safety-number verification); note
+  the first-online-wins fan-out means one pinning key-holder's refusal is a per-device signal, not a global veto
+  (ADR 0028 § Consequences). Key Transparency remains the end-state. Not hidden.
 - **Revocation & rotation are out of scope.** Removing a member, rotating `K_SC` so a removed member can't read
   future content, and re-inviting after removal are a later slice (as [ADR 0014](0014-group-scopes-and-governance.md)
   already defers for groups). Adding a grant is strictly additive here.

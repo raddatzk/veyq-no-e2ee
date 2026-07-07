@@ -166,26 +166,38 @@ server-blind tokens make this work without the server ever seeing content:
 - **Consequently:** private (unshared) content is **unscannable** by design; public shares are
   decryptable-on-report — notice-and-takedown works exactly where content is distributed.
 
-## Key-directory trust — the active-operator gap (stated honestly)
+## Key-directory trust — TOFU pinning + out-of-band verification ([ADR 0028](../decisions/0028-identity-authenticity-tofu-verification.md))
 
-Wrapping a content key to "Bob" needs Bob's public key from the server's key directory. A malicious
-server could serve an attacker's key instead (key-substitution / MITM) and read future wraps.
+Wrapping a content key to "Bob" needs Bob's identity public key, which the operator-blind server relays
+from its directory. A malicious server could serve an attacker's key instead (key-substitution / MITM)
+and read what is wrapped to it. The defense is **trust-on-first-use pinning + safety-number verification**:
 
-- The building block is the **identity fingerprint / safety number** — a deterministic digest of a
-  contact's identity public key. Two users compare it out-of-band (read aloud / QR); a mismatch reveals
-  a substituted key. **This is manual**, so it protects only those who actually compare.
-- **Automatic key-pinning (TOFU)** — clients remember a contact's key and warn on change — and
-  **Key Transparency** — an append-only verifiable key log — are the target hardening. Until they exist
-  there is **no automatic warning** on a key change.
-- **The first-use gap:** even with TOFU, if the operator substitutes Bob's key *before* Alice ever saw
-  the real one — and re-wraps content to Bob's genuine key too — nothing looks wrong while the operator
-  silently holds a copy. Only Key Transparency (or manual out-of-band verification) makes that detectable.
-- **Trust anchors stay client-side:** a client verifies and signs against its own locally-held key,
-  never the server's copy.
+- **Pin on first use (TOFU).** The first time a client wraps to Bob's identity key it **pins** the full
+  identity public bundle (`kemX` X25519 + `kemM` ML-KEM-768 + `sign` Ed25519), keyed by `userId`, and
+  proceeds (*pinned, unverified*). The **pin store is client-side, synced across the user's devices, and
+  sealed under the master key** — the server never sees a pin or the who-trusts-whom graph (operator-blind).
+- **A key change is surfaced, split by whether a human is present.** A key ≠ pin is "**attack OR a
+  legitimate identity rotation**" (post-compromise recovery), indistinguishable on-wire. In the **UI** it is
+  a **notice** (not a lock-out); the user reviews and, on **accept**, re-pins. The **automated grant-delivery
+  worker** (no human) **blocks** — it will not wrap `K_SC` to a changed key (delivery is irreversible) — and
+  **declines the job** back to the server + flags it for human review.
+- **Verification** is the **identity fingerprint / safety number** — a deterministic digest of the identity
+  public bundle. Two users compare it out-of-band; the ergonomic form is **QR** (scan the other device's
+  fingerprint → the app compares it against the pin → feedback). It elevates *pinned* → *verified* and is how
+  a **legitimately rotated** key is accepted.
+- **Opt-in strict mode** turns the change-notice into a **hard block** and requires *verified*-before-share;
+  the worker then skips unverified members (they stay *awaiting access*) until a human verifies them.
+- **The first-use gap (honest, unchanged):** if the operator substitutes Bob's key *before* Alice ever
+  pinned the real one — and re-wraps genuine content too — nothing looks wrong until **manual verification**
+  or **Key Transparency** (the eventual end-state). TOFU cannot detect a lie told before first sight.
+- **First-online-wins is a per-device honesty measure, not a global veto:** a key-holder who pinned the old
+  key refuses + flags, but a *different* key-holder who never saw Bob has no conflicting pin and TOFU-accepts.
+  Deliberate — the blind server must not adjudicate a crypto claim, and a global quarantine on one worker's
+  say-so would be a DoS. The value is raised detection.
+- **Trust anchors stay client-side:** a client verifies against its own sealed pin, never the server's copy.
 - **First consumer:** adding a member to a shared scope ([uc.spaces.add-member](../features/spaces/use-cases/uc.spaces.add-member.md),
   [ADR 0020](../decisions/0020-grant-distribution-invite-wrap.md)) is the first flow to wrap a scope key to
-  *another* member via this directory. It adopts the stance above as-is — **v1 trusts the returned key** (no
-  pin, no gate; self-hosted makes it moot), and leaves the fingerprint/TOFU/KT hardening as an explicit seam.
+  *another* member via this directory; it adopts the model above.
 
 ## Client integrity & trust tiers — what a malicious operator can do
 

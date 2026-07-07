@@ -89,6 +89,12 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.symUnwrap(unhex(w.kek), unhex(w.blob), w.context))).toBe(w.plaintext)
   })
 
+  it('symmetric wrap with the identity-pins context (cr-0098, ADR 0028)', () => {
+    const w = vectors.wrap.sym_identity_pins
+    expect(hex(v1.symWrap(unhex(w.kek), unhex(w.plaintext), w.context, unhex(w.nonce)))).toBe(w.blob)
+    expect(hex(v1.symUnwrap(unhex(w.kek), unhex(w.blob), w.context))).toBe(w.plaintext)
+  })
+
   it('asymmetric wrap round-trip (unwrap a recorded blob)', () => {
     const a = vectors.wrap.asym_scope_grant
     const d = vectors.kem_v1.decap_kat

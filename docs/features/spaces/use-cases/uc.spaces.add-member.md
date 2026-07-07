@@ -76,10 +76,12 @@ note right of S : server saw invite metadata,\npubkeys, opaque grants — never 
   completes as soon as **any** member (the owner or another) is next online (step 3) — not specifically the owner.
 - **E1 — the invite is expired / already consumed:** a generic failure; the secret is single-use.
 - **E2 — key-substitution by a malicious operator:** the wrapping key-holder trusts the identity pubkey the
-  server returns (v1 is *Plain*), so a malicious operator could substitute its own key and join the scope.
-  Documented, bounded (self-hosted makes it moot; broadening *who* wraps doesn't widen it — one honest device
-  would already have wrapped), and left with a hardening seam — see the quality note and
-  [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md).
+  server returns, so a malicious operator could substitute its own key. The stance is
+  [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md): **TOFU-pin** the key on first
+  use, **surface a change** (UI notice / worker block), and elevate via out-of-band **safety-number verification**
+  ([uc.spaces.verify-identity](uc.spaces.verify-identity.md)); opt-in **strict mode** hard-gates. Until that slice
+  ships the wrap is still Plain — bounded, self-hosted makes it moot; broadening *who* wraps doesn't widen it (one
+  honest device would already have wrapped).
 - **E3 — the member's grant won't unwrap** (corrupt / identity rotated without re-wrap): the member can't open
   the tenant → surfaced as an error; the scope row is **not** self-deleted (a blind operator must not force a
   wipe), matching [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md) E3.
@@ -101,7 +103,7 @@ note right of S : server saw invite metadata,\npubkeys, opaque grants — never 
   delivers the *key* (automatic, first-online-wins) — because every member already holds `K_SC`. A non-inviting
   member can't admit anyone; they only help hand the key to someone the owner already admitted. So access isn't
   bottlenecked on the owner, and no one is asked to confirm the same person twice (a second human checkpoint
-  returns only if fingerprint verification is switched on later — [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
+  returns only under the opt-in **strict mode** of [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md), where an unverified member is not auto-delivered until verified).
 - **The active-operator gap, stated honestly.** v1 trusts the server-returned pubkey (no TOFU-pin, no
   hard-gate). This matches the declared threat model — veyq does not defend an *actively malicious* operator
   before key transparency, and self-hosted makes it moot ([security-model](../../../crosscutting/security-model.md)).

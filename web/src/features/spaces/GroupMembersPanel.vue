@@ -13,6 +13,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
 import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup } from './scopes'
+import { acceptKeyChange, IdentityChangedError } from '../account/identityPins'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 
@@ -34,6 +35,9 @@ const username = ref('')
 const addError = ref('')
 const addNotice = ref('')
 const adding = ref(false)
+// A pending add blocked because the invitee's identity key CHANGED since we last pinned it (cr-0098, ADR 0028) —
+// the human accepts (re-pin) then the add retries. Never silently sealed to the new key.
+const pendingKeyChange = ref<{ userId: string; key: string; username: string } | null>(null)
 const actionError = ref('')
 const pendingRemove = ref<string | null>(null) // userId shown in inline "remove?" confirm (destructive → rotates)
 const removing = ref(false)
@@ -95,12 +99,15 @@ async function submit() {
   addError.value = ''
   addNotice.value = ''
   adding.value = true
+  const uname = username.value.trim().toLowerCase()
+  let candidate: Awaited<ReturnType<typeof resolveGroupMember>> | null = null
   try {
-    const uname = username.value.trim().toLowerCase()
-    const candidate = await resolveGroupMember(props.scopeId, uname)
+    candidate = await resolveGroupMember(props.scopeId, uname)
     if (candidate.requiresConsent) {
-      // Wrap the group's name-key to the invitee so they open the canonical name — K_SC stays gated until they accept.
-      const sealedNameKey = await wrapGroupNameKeyForInvitee(props.scopeId, candidate.identityPublicKey)
+      // Wrap the group's name-key to the invitee so they open the canonical name — K_SC stays gated until they
+      // accept. This is the invite's first wrap to the invitee's identity, so it is TOFU-gated (cr-0098): a
+      // CHANGED key throws IdentityChangedError below rather than silently sealing to a possibly-substituted key.
+      const sealedNameKey = await wrapGroupNameKeyForInvitee(props.scopeId, candidate.userId, candidate.identityPublicKey)
       if (!sealedNameKey) throw new Error('cannot open the group to seal the invite name-key')
       await addGroupMember(props.scopeId, uname, sealedNameKey)
       addNotice.value = t('groups.invitationSent')
@@ -108,8 +115,16 @@ async function submit() {
       await addGroupMember(props.scopeId, uname)
     }
     username.value = ''
+    pendingKeyChange.value = null
     members.value = await listScopeMembers(props.scopeId) // refresh — awaiting access, or the pending proposal
   } catch (e) {
+    if (e instanceof IdentityChangedError && candidate) {
+      // The invitee's security key changed since we last pinned it (a legitimate rotation, or an operator MITM).
+      // Surface a notice + an explicit accept — never silently trust the new key (ADR 0028, the human path).
+      pendingKeyChange.value = { userId: candidate.userId, key: candidate.identityPublicKey, username: uname }
+      addError.value = t('groups.identityChanged')
+      return
+    }
     const { status, code } = await memberError(e)
     if (status === 401) return void router.push({ name: 'login' })
     addError.value =
@@ -123,6 +138,23 @@ async function submit() {
   } finally {
     adding.value = false
   }
+}
+
+// Accept a changed invitee key (re-pin) and retry the add. Minimal human path (cr-0098) — the out-of-band
+// safety-number verification that would elevate this to *verified* is the follow-up CR; here accept trusts + re-pins.
+async function acceptChangedKeyAndRetry() {
+  const pk = pendingKeyChange.value
+  if (!pk) return
+  try {
+    await acceptKeyChange(pk.userId, pk.key)
+  } catch {
+    addError.value = t('groups.addMemberFailed')
+    return
+  }
+  pendingKeyChange.value = null
+  addError.value = ''
+  username.value = pk.username
+  await submit() // the pin now matches → the add proceeds
 }
 
 // Rescind a pending consent proposal (cr-0094) — owner withdraws before acceptance. It is the same delete as a
@@ -300,6 +332,18 @@ async function onRestore() {
         </div>
         <Message v-if="addError" severity="error" :closable="false">{{ addError }}</Message>
         <Message v-if="addNotice" severity="success" :closable="false">{{ addNotice }}</Message>
+        <!-- Changed-identity notice (cr-0098): accept re-pins the new key and retries the add (human path). -->
+        <div v-if="pendingKeyChange" class="group-key-change">
+          <Button
+            type="button"
+            severity="warn"
+            size="small"
+            :label="t('groups.acceptKeyChange')"
+            icon="pi pi-shield"
+            :loading="adding"
+            @click="acceptChangedKeyAndRetry"
+          />
+        </div>
       </form>
 
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>

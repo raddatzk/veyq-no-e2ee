@@ -66,7 +66,7 @@ final class V1ConformanceTests: XCTestCase {
     }
 
     func testSymWrap() throws {
-        for key in ["sym_master_key", "session_token"] {
+        for key in ["sym_master_key", "session_token", "sym_identity_pins"] {
             let v = sub(["wrap", key])
             let blob = V1.symWrap(kek: hex(v["kek"]), targetKey: hex(v["plaintext"]), context: v["context"] as! String, nonce: hex(v["nonce"]))
             XCTAssertEqual(blob, hex(v["blob"]), "symWrap vector \(key)")

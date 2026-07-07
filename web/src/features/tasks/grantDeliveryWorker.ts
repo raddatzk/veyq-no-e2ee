@@ -6,6 +6,7 @@
 // is automatic and first-online-wins — the wrap runs on-device, the server only ever relays ciphertext.
 import { tasksApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
+import { checkAndPin } from '../account/identityPins'
 import { wrapScopeKeyToMember } from '../spaces/grant'
 import { GRANT_DELIVERY } from './capabilityTags'
 import type { ClaimedJob } from '../../api/generated/tasks'
@@ -34,6 +35,15 @@ export async function runGrantDeliveryWorker(scope: ScopeKeyHolder): Promise<num
       await failJob(job.jobId, 'not-grant-delivery')
       continue
     }
+    // TOFU gate (cr-0098, ADR 0028): pin the target's identity key on first sight, proceed on a match, but on a
+    // CHANGED key never seal K_SC to a possibly-substituted key. This worker is human-less, so it BLOCKS +
+    // DECLINES the job (release to other key-holders + never re-offer it to this worker) instead of wrapping — a
+    // human resolves the change in the UI. Per-device, not a global veto: a key-holder without a conflicting pin
+    // still TOFU-delivers.
+    if ((await checkAndPin(target.targetUserId, target.identityPublicKey)) === 'changed') {
+      await declineJob(job.jobId, 'identity_changed')
+      continue
+    }
     const wrap = wrapScopeKeyToMember(scope.key, target.identityPublicKey)
     await completeJob(job.jobId, wrap)
     delivered++
@@ -54,4 +64,10 @@ async function completeJob(jobId: string, sealedResult: string): Promise<void> {
 
 async function failJob(jobId: string, reason: string): Promise<void> {
   await withRefresh(() => tasksApi().failTask({ jobId, failRequest: { reason } }))
+}
+
+/** Decline a job back to the queue without a failed attempt (cr-0098): release it to other workers + never
+ *  re-offer it to this one. Used when the target's identity key changed (this worker refuses to wrap to it). */
+async function declineJob(jobId: string, reason: string): Promise<void> {
+  await withRefresh(() => tasksApi().declineTask({ jobId, declineRequest: { reason } }))
 }

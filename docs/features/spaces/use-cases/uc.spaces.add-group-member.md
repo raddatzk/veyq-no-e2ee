@@ -85,10 +85,12 @@ note right of S : server saw the membership row,\npubkeys, opaque grant — neve
   a non-member (or a handle in another tenant) is not reachable, and the server never runs a global search
   ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
 - **E2 — key-substitution by a malicious operator:** the wrapping key-holder trusts the identity pubkey the
-  server returns — **v1 is *Plain*** (no TOFU-pin, no hard-gate). Documented, bounded (self-hosted makes it moot),
-  and left with a hardening seam (the identity fingerprint / safety-number). The exact verification stance was
-  deferred to this slice and is **held at Plain for v1**, consistent with the shared primitive
-  ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §5, [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
+  server returns. The verification stance is settled by [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md):
+  **TOFU-pin on first use**, a **changed** key is a UI notice / a hard block for the grant-delivery worker, and
+  out-of-band **safety-number verification** ([uc.spaces.verify-identity](uc.spaces.verify-identity.md)) elevates a
+  contact to *verified*; an opt-in **strict mode** hard-gates on unverified. The pinning + ceremony are a pending
+  slice ([en.account.identity-pinning](../../account/enablers/en.account.identity-pinning.md)) — **until it lands
+  the wrap is still Plain** (bounded, self-hosted makes it moot).
 - **E3 — the member's grant won't unwrap** (corrupt / identity rotated without re-wrap): the member can't open the
   group → surfaced as an error; the scope row is **not** self-deleted (a blind operator must not force a wipe),
   matching [en.spaces.group-scope](../enablers/en.spaces.group-scope.md) E2.
@@ -106,10 +108,11 @@ note right of S : server saw the membership row,\npubkeys, opaque grant — neve
   **inside the caller's own tenant** — the bounded variant [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)
   reserved for the group case. Usernames are already visible to every tenant member (cr-0083), so exposing them to
   a fellow member yields no scope key and no new enumeration surface beyond the tenant.
-- **The active-operator gap, stated honestly.** v1 trusts the server-returned pubkey (Plain). This matches the
-  declared threat model — veyq does not defend an *actively malicious* operator before key transparency, and
-  self-hosted makes it moot ([security-model](../../../crosscutting/security-model.md)). The fingerprint /
-  safety-number derivation is the explicit seam for a later hardening slice.
+- **The active-operator gap — the closing stance.** The add wraps to the server-returned pubkey; **which** key is
+  trusted is governed by **TOFU pinning + safety-number verification** ([ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md),
+  [security-model](../../../crosscutting/security-model.md)) — a first-seen key is pinned, a changed key is
+  surfaced (UI) or refused (worker), and verification elevates to *verified*. Until that slice ships the wrap is
+  still Plain (self-hosted makes it moot); Key Transparency remains the end-state.
 - **Additive only.** This use-case only **adds** a grant. **Consent** (the account-global "ask before adding me"
   opt-in, soft membership) is [uc.spaces.consent-group-add](uc.spaces.consent-group-add.md) (refined); **promote/
   demote a co-owner, remove a member, the last-owner guard, `K_SC` rotation, and the orphan rule** are the

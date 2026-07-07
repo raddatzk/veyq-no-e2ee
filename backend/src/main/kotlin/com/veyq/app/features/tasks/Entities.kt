@@ -70,3 +70,33 @@ class JobEntity : PanacheEntityBase {
         const val FAILED = "FAILED"
     }
 }
+
+/**
+ * A per-worker decline of a job (cr-0098, ADR 0028 §Consequences). Recorded when a grant-delivery worker refuses
+ * a job because it holds a DIFFERENT pin for the target's identity key: it releases the claim back to PENDING (the
+ * job stays claimable by OTHER workers) and writes this row so the claim/reconcile machinery never re-offers THIS
+ * job to THIS worker again. Per-device, not a global veto — the blind server never adjudicates the crypto claim.
+ * Operational metadata only (no key, no trust graph); surrogate id + a unique (job, worker) index.
+ */
+@Entity
+@Table(name = "veyq_job_decline")
+class JobDeclineEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "id", length = 36)
+    lateinit var id: String
+
+    @Column(name = "job_id", nullable = false, length = 36)
+    lateinit var jobId: String
+
+    /** The declining worker's opaque id (the `SecurityIdentity` principal / lease holder). */
+    @Column(name = "worker_id", nullable = false, length = 36)
+    lateinit var workerId: String
+
+    @Column(name = "reason", length = 256)
+    var reason: String? = null
+
+    @Column(name = "declined_at", nullable = false)
+    lateinit var declinedAt: Instant
+
+    companion object : PanacheCompanionBase<JobDeclineEntity, String>
+}
