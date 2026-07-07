@@ -39,6 +39,12 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   unique-in-tenant + `firstName`/`lastName` **sealed** under `K_tenant`; email the only global key, owner-only in
   the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md);
   [cr-0083](../../../changes/cr-0083-member-identity.md))
+- [en.spaces.scope-key-rotation](enablers/en.spaces.scope-key-rotation.md) — **built** (rotate a scope's content
+  key **forward into a new epoch**, granting it only to the remaining members, so a removed member reads
+  pre-removal content but never post-removal — no re-encryption; the substrate member-removal builds on;
+  [ADR 0024](../../decisions/0024-scope-key-rotation.md); [cr-0089](../../../changes/cr-0089-scope-key-rotation-web.md),
+  [cr-0092](../../../changes/cr-0092-async-group-rotation-backstop.md),
+  [cr-0093](../../../changes/cr-0093-grant-delivery-epoch-aware.md))
 
 ## Use-cases
 
@@ -54,12 +60,20 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - [Manage pending member invites](use-cases/uc.spaces.manage-member-invites.md) — **built** (the owner lists /
   re-issues / revokes the member invites add-member mints; owner-gated, additive-safe;
   [cr-0082](../../../changes/cr-0082-member-invite-management.md))
+- [Remove a member from a tenant](use-cases/uc.spaces.remove-tenant-member.md) — **web done (cr-0091)** (TenantOwner
+  cuts a member's access to shared + group content immediately, applies the **group orphan rule** (hand over or
+  wind down the groups they leave), and gives them a grace window to read their own memories before erase;
+  co-shared groups rotate `K_SC` via any remaining key-holder; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §4)
 - Create / share with a group — **in progress** ([ADR 0014](../../decisions/0014-group-scopes-and-governance.md)):
   **G1** create + open + browse (`en.spaces.group-scope`, cr-0032); **G2** member-add — per-tenant username
   search ([en.spaces.member-identity](enablers/en.spaces.member-identity.md)) + the
   [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md) grant-wrap, direct-add default with an
   optional consent-first toggle (derived name-key for verifiable informed consent, ADR 0027); **G3** member management (promote/
   demote, multiple owners + last-owner guard), grace-delete + orphan rule, `K_SC` rotation
+- [Add a member to a group](use-cases/uc.spaces.add-group-member.md) — **web done (cr-0086)** (GroupOwner adds an
+  existing tenant member by **username**; a **grant-less** membership is recorded and `K_SC` is delivered later by
+  grant-delivery — direct-add is the default; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §4/§5,
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md))
 - [Consent before being added to a group](use-cases/uc.spaces.consent-group-add.md) — **web done (cr-0094, cr-0096)** (the
   optional account-global "ask before adding me" opt-in: an add becomes a proposal — a soft membership
   grant-delivery **skips** + a wrapped **derived name-key** (`group-name-key` context) so the invitee reads the
@@ -70,6 +84,19 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   `K_name` from the **current** epoch and bumps `nameEpoch`, so a rename is **forward-secret** — a removed member
   can't read the new name; name-only, no `K_SC` rotation; server rejects a stale `nameEpoch`;
   [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Native parity is a later CR)
+- [Manage a group's members](use-cases/uc.spaces.manage-group-members.md) — **web done (cr-0088, cr-0089)** (the
+  GroupOwner runs the roster: **promote/demote** co-owners (multiple owners + a last-owner guard) and **remove** a
+  member — removal rotates the content key forward ([en.spaces.scope-key-rotation](enablers/en.spaces.scope-key-rotation.md))
+  so they lose access to new content; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §4)
+- [Delete a group](use-cases/uc.spaces.delete-group.md) — **web done (cr-0090)** (owner soft-deletes into a
+  **grace period** (clearly marked, still readable, any owner can restore); a scheduled operator-blind job then
+  hard-purges the ciphertext + files; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §4/§6)
+- [Verify a member's identity](use-cases/uc.spaces.verify-identity.md) — **web: TOFU foundation built (cr-0098)**
+  (a client **pins** each contact's identity key on first wrap — operator-blind, cross-device; a **changed** key
+  is never silently trusted: the grant-delivery worker **declines**, the UI surfaces a notice + accept → re-pin,
+  rotation excludes the member; [ADR 0028](../../decisions/0028-identity-authenticity-tofu-verification.md),
+  [en.account.identity-pinning](../account/enablers/en.account.identity-pinning.md). The out-of-band **QR
+  safety-number** ceremony, the *verified* badge, and strict-mode are the follow-up CR; native later)
 - Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
   open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
   on a future per-Memory **participants** tag (sealed `userId`s)

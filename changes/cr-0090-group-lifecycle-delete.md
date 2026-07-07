@@ -1,7 +1,7 @@
 ---
 id: cr-0090
 title: Group lifecycle — soft-delete with grace + restore + scheduled hard-purge (G3b)
-status: planned
+status: done             # planned → in-progress → done (kept as a record)
 satisfies: [uc.spaces.delete-group]
 adrs: ["0014", "0013", "0008"]
 invariants: [operator-blind-e2ee]

@@ -11,9 +11,9 @@
   here (below).
 - **Serves (use-cases/enablers):** [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) — the
   tenant space becomes the **token-less default home** ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md))
-  and a switchable entry beside Personal — plus the [Memory](../../memory/_index.md) tree/browse
-  ([uc.memory.browse](../../memory/use-cases/uc.memory.browse.md), [en.memory.tree](../../memory/enablers/en.memory.tree.md))
-  that lives in *any* scope, the tenant included.
+  and a switchable entry beside Personal. The [Memory](../../memory/_index.md) tree/browse then fills it, but it is
+  a **generic scope consumer** (it lives in *any* scope — personal, tenant, or group), not something built on the
+  tenant scope specifically, so it is not a `Serves` target here.
 - **Depends on:** [en.spaces.personal-scope](en.spaces.personal-scope.md) (the generalised **scope identity**
   `scopeId + kind` and the client-side **open-by-unwrap**), `uc.account.unlock` (the identity that opens the
   grant), and [cr-0010](../../../../changes/cr-0010-tenant-activation.md) (the `TENANT` scope + the owner's
