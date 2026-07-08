@@ -13,7 +13,8 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
-import { previewInvite, acceptInvite, registerAndAccept, scopeGrant, tenantError } from '../features/admin/createTenant/tenants'
+import { previewInvite, acceptInvite, registerAndAccept, bornTenantScope, tenantError } from '../features/admin/createTenant/tenants'
+import { sealName } from '../features/account/profile/profile'
 import { InviteRole } from '../api/generated/tenants'
 import { buildAccount, type BuiltAccount } from '../features/account/register/accountBirth'
 import { login, withRefresh } from '../features/account/login/login'
@@ -47,9 +48,12 @@ function jcopy(base: string, params?: Record<string, unknown>): string {
   return t(`tenant.join.${isMember.value ? `${base}Member` : base}`, params ?? {})
 }
 
-// register + signin form: the per-tenant handle chosen on join (ADR 0023); the real name is set later in
-// profile settings (once the member holds K_tenant to seal it).
+// register + signin form: the per-tenant handle chosen on join (ADR 0023), plus an OPTIONAL real name. For an
+// OWNER accept the client cold-births K_tenant here, so it can seal the name at join (cr-0106); a grant-less
+// MEMBER has no key yet, so its name field is hidden and the name is added later in profile settings.
 const username = ref('')
+const firstName = ref('')
+const lastName = ref('')
 const password = ref('')
 const secretKeyDisplay = ref('')
 const kitSaved = ref(false)
@@ -105,15 +109,29 @@ async function prepareRegistration() {
   }
 }
 
+/** Seal the OPTIONAL real name under the freshly-born K_tenant, or undefined when both fields are empty. Only
+ *  called on the OWNER path (which holds K_tenant at accept); a grant-less MEMBER never reaches it. */
+function sealedNameFor(scopeRootKey: Uint8Array): string | undefined {
+  if (!firstName.value.trim() && !lastName.value.trim()) return undefined
+  return sealName(scopeRootKey, { firstName: firstName.value, lastName: lastName.value })
+}
+
 /** Register step 2: cold-birth the scope grant to the new identity and register-and-accept. */
 async function finishRegistration() {
   if (!built || !kitSaved.value) return
   error.value = ''
   busy.value = true
   try {
-    // A MEMBER joins grant-less (no scope birth); only an OWNER cold-births the TENANT scope + seals a grant.
-    const grant = isMember.value ? undefined : scopeGrant({ x: built.identity.pub.kemX, m: built.identity.pub.kemM })
-    await registerAndAccept(secret, username.value.trim().toLowerCase(), built.material, grant)
+    // A MEMBER joins grant-less (no scope birth, no name); only an OWNER cold-births the TENANT scope + seals a
+    // grant — and, holding K_tenant here, can seal the optional real name at join (cr-0106).
+    let grant: string | undefined
+    let sealedName: string | undefined
+    if (!isMember.value) {
+      const born = bornTenantScope({ x: built.identity.pub.kemX, m: built.identity.pub.kemM })
+      grant = born.grant
+      sealedName = sealedNameFor(born.scopeRootKey)
+    }
+    await registerAndAccept(secret, username.value.trim().toLowerCase(), built.material, grant, sealedName)
     phase.value = 'done'
   } catch (e) {
     error.value = await mapError(e)
@@ -132,8 +150,14 @@ async function signInAndAccept() {
     await unlockMasterKey(password.value, secretKey.value.trim())
     const priv = identityPrivate()
     if (!priv) throw new Error('locked')
-    const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
-    await acceptInvite(secret, username.value.trim().toLowerCase(), grant)
+    let grant: string | undefined
+    let sealedName: string | undefined
+    if (!isMember.value) {
+      const born = bornTenantScope(hybridPublic(priv))
+      grant = born.grant
+      sealedName = sealedNameFor(born.scopeRootKey)
+    }
+    await acceptInvite(secret, username.value.trim().toLowerCase(), grant, sealedName)
     phase.value = 'done'
   } catch (e) {
     error.value = await mapError(e)
@@ -147,8 +171,14 @@ async function signInAndAccept() {
 async function sealAndAccept() {
   const priv = identityPrivate()
   if (!priv) throw new Error('locked')
-  const grant = isMember.value ? undefined : scopeGrant(hybridPublic(priv))
-  await withRefresh(() => acceptInvite(secret, username.value.trim().toLowerCase(), grant))
+  let grant: string | undefined
+  let sealedName: string | undefined
+  if (!isMember.value) {
+    const born = bornTenantScope(hybridPublic(priv))
+    grant = born.grant
+    sealedName = sealedNameFor(born.scopeRootKey)
+  }
+  await withRefresh(() => acceptInvite(secret, username.value.trim().toLowerCase(), grant, sealedName))
   password.value = ''
   phase.value = 'done'
 }
@@ -223,6 +253,15 @@ async function mapError(e: unknown): Promise<string> {
             <InputText v-model="username" name="username" autocomplete="username" required />
             <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
           </label>
+          <template v-if="!isMember">
+            <label>{{ t('profile.firstName') }}
+              <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
+            </label>
+            <label>{{ t('profile.lastName') }}
+              <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
+              <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
+            </label>
+          </template>
           <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="join-password" /></label>
           <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
           <Button type="submit" :label="t('tenant.join.continue')" icon="pi pi-arrow-right" :loading="busy"
@@ -249,6 +288,15 @@ async function mapError(e: unknown): Promise<string> {
           <InputText v-model="username" name="username" autocomplete="username" required />
           <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
         </label>
+        <template v-if="!isMember">
+          <label class="veyq-form-field">{{ t('profile.firstName') }}
+            <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
+          </label>
+          <label class="veyq-form-field">{{ t('profile.lastName') }}
+            <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
+            <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
+          </label>
+        </template>
 
         <!-- Fast path: this browser already holds the invited owner's unlocked vault → accept in one click,
              or ask for the password only if the session lapsed. Never the Secret Key. -->

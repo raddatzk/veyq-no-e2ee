@@ -105,6 +105,27 @@ class MemberIdentitySliceTest {
     }
 
     @Test
+    fun registerAndAcceptSealsTheOptionalNameAtJoin() {
+        val (tenantId, owner) = seedActiveTenant("id-join.example.com", "owner@id-join.example.com")
+        seedProfile(owner, tenantId, "theowner")
+        seedMemberInvite(tenantId, "named@id-join.example.com", "sname")
+        seedMemberInvite(tenantId, "plain@id-join.example.com", "splain")
+
+        // A joins WITH a sealed name at accept (cr-0106); B joins with none (username only).
+        given().contentType(ContentType.JSON).body(memberRegisterBody("sname", "named", sealedName = "c2VhbGVkLW5hbWU="))
+            .`when`().post("/api/tenants/accept/register").then().statusCode(201)
+        given().contentType(ContentType.JSON).body(memberRegisterBody("splain", "plain"))
+            .`when`().post("/api/tenants/accept/register").then().statusCode(201)
+
+        // The directory carries the opaque blob for A verbatim, null for B — the server never saw a name.
+        given().header("Authorization", bearer(owner))
+            .`when`().get("/api/scopes/$tenantId/members")
+            .then().statusCode(200)
+            .body("find { it.username == 'named' }.sealedName", equalTo("c2VhbGVkLW5hbWU="))
+            .body("find { it.username == 'plain' }.sealedName", nullValue())
+    }
+
+    @Test
     fun changingToATakenUsernameIs409() {
         val (tenantId, owner) = seedActiveTenant("id-chg.example.com", "owner@id-chg.example.com")
         seedProfile(owner, tenantId, "owner-handle")
@@ -175,13 +196,16 @@ class MemberIdentitySliceTest {
         return userId
     }
 
-    private fun memberRegisterBody(secret: String, username: String) = """
-        {"bootstrapSecret":"$secret","username":"$username",
-         "account":{"suiteId":"v1",
-           "identityPublicKey":"bWVtYmVyLXB1YmxpYy1rZXk=",
-           "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
-           "authPublicKey":"ZWQyNTUxOS1hdXRoLXB1Yg==",
-           "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5","kdfParams":"a2RmLXBhcmFtcw=="}],
-           "recoveryMasterKeyTag":"cmVjb3ZlcnktdGFn"}}
-    """.trimIndent()
+    private fun memberRegisterBody(secret: String, username: String, sealedName: String? = null): String {
+        val nameField = sealedName?.let { ""","sealedName":"$it"""" } ?: ""
+        return """
+            {"bootstrapSecret":"$secret","username":"$username"$nameField,
+             "account":{"suiteId":"v1",
+               "identityPublicKey":"bWVtYmVyLXB1YmxpYy1rZXk=",
+               "wrappedIdentityPrivateKey":"d3JhcHBlZC1pZGVudGl0eS1wcml2YXRlLWtleQ==",
+               "authPublicKey":"ZWQyNTUxOS1hdXRoLXB1Yg==",
+               "masterKeyWraps":[{"method":"PASSWORD","wrappedKey":"d3JhcHBlZC1tYXN0ZXIta2V5","kdfParams":"a2RmLXBhcmFtcw=="}],
+               "recoveryMasterKeyTag":"cmVjb3ZlcnktdGFn"}}
+        """.trimIndent()
+    }
 }

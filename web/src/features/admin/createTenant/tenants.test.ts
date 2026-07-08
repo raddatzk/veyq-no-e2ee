@@ -11,6 +11,8 @@ import {
   resendInvite,
   revokeTenant,
   tenantError,
+  acceptInvite,
+  registerAndAccept,
 } from './tenants'
 import { tenantsApi } from '../../../api/client'
 import { ResponseError } from '../../../api/generated/tenants'
@@ -22,6 +24,8 @@ describe('tenants facade (uc.admin.create-tenant, web Slice A)', () => {
     resendTenantInvite: vi.fn().mockResolvedValue({}),
     reassignTenantInvite: vi.fn().mockResolvedValue({}),
     revokeTenant: vi.fn().mockResolvedValue(undefined),
+    acceptTenantInvite: vi.fn().mockResolvedValue({ tenantId: 't1', status: 'ACTIVE' }),
+    registerAndAcceptTenantInvite: vi.fn().mockResolvedValue({ tenantId: 't1', status: 'ACTIVE', userId: 'u1' }),
   }
 
   beforeEach(() => {
@@ -57,6 +61,26 @@ describe('tenants facade (uc.admin.create-tenant, web Slice A)', () => {
   it('revoke passes the tenant id', async () => {
     await revokeTenant('t1')
     expect(api.revokeTenant).toHaveBeenCalledWith({ tenantId: 't1' })
+  })
+
+  it('acceptInvite threads the optional sealedName onto the accept request (cr-0106)', async () => {
+    await acceptInvite('secret', 'kevin', 'AQ==', 'c2VhbGVkLW5hbWU=')
+    expect(api.acceptTenantInvite).toHaveBeenCalledWith({
+      acceptInviteRequest: { bootstrapSecret: 'secret', username: 'kevin', grant: 'AQ==', sealedName: 'c2VhbGVkLW5hbWU=' },
+    })
+  })
+
+  it('registerAndAccept threads the sealedName; undefined when the name is skipped (cr-0106)', async () => {
+    const material = {
+      suiteId: 'v1', identityPublicKey: 'aQ==', wrappedIdentityPrivateKey: 'aQ==',
+      authPublicKey: 'aQ==', masterKeyWraps: [], recoveryMasterKeyTag: 'aQ==',
+    }
+    await registerAndAccept('secret', 'kevin', material as never, 'AQ==') // grant set, no name
+    expect(api.registerAndAcceptTenantInvite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        registerAndAcceptRequest: expect.objectContaining({ username: 'kevin', grant: 'AQ==', sealedName: undefined }),
+      }),
+    )
   })
 
   it('tenantError decodes the HTTP status and the body code', async () => {

@@ -34,12 +34,12 @@ acceptanceCriteria:
   - id: member-identity
     # Built by cr-0083 (en.spaces.member-identity, ADR 0023): the directory's identity layer. A member's
     # per-tenant username is chosen at join (unique in the tenant); the real name is sealed under K_tenant.
-    text: Each member carries a per-tenant `username` (plaintext handle, unique within the tenant — a clash at join or rename is `409 username_taken`, and the same handle is free in another tenant) and a `firstName`/`lastName` **sealed under `K_tenant`** (decrypted on-device by any member; the server never sees the plaintext name). In the directory `email` is **owner-only** — nulled for a non-owner caller. The real name is set/edited via the profile op after the member holds their grant.
+    text: Each member carries a per-tenant `username` (plaintext handle, unique within the tenant — a clash at join or rename is `409 username_taken`, and the same handle is free in another tenant) and a `firstName`/`lastName` **sealed under `K_tenant`** (decrypted on-device by any member; the server never sees the plaintext name). In the directory `email` is **owner-only** — nulled for a non-owner caller. The optional real name is sealed **at the join** when the invitee already holds `K_tenant` at accept (owner cold-birth, cr-0106), otherwise set/edited via the profile op after the member holds their grant.
     coverage:
       backend:
-        integration: [MemberIdentitySliceTest.twoMembersCannotShareAUsernameInOneTenant, MemberIdentitySliceTest.theSameUsernameIsFreeInAnotherTenant, MemberIdentitySliceTest.directoryShowsUsernameAndOwnerOnlyEmail, MemberIdentitySliceTest.profileOpRoundTripsUsernameAndSealedName, MemberIdentitySliceTest.changingToATakenUsernameIs409]
+        integration: [MemberIdentitySliceTest.twoMembersCannotShareAUsernameInOneTenant, MemberIdentitySliceTest.theSameUsernameIsFreeInAnotherTenant, MemberIdentitySliceTest.directoryShowsUsernameAndOwnerOnlyEmail, MemberIdentitySliceTest.profileOpRoundTripsUsernameAndSealedName, MemberIdentitySliceTest.changingToATakenUsernameIs409, MemberIdentitySliceTest.registerAndAcceptSealsTheOptionalNameAtJoin, TenantAcceptSliceTest.existingOwnerAcceptSealsTheOptionalNameAtJoin]
       web:
-        unit: [src/features/account/profile/profile.test.ts, src/features/spaces/TenantMembersPanel.test.ts]
+        unit: [src/features/account/profile/profile.test.ts, src/features/spaces/TenantMembersPanel.test.ts, src/features/admin/createTenant/tenants.test.ts]
   - id: wrap-to-foreign-grant
     text: Any online key-holder's device (not necessarily the inviter — every member holds K_SC) wraps the tenant scope key to a pending member's identity public key (asymWrap(hybridPublic(member), K_SC, "scope-grant") — the first wrap to a foreign identity), eagerly and automatically (no second human action), and posts it as that member's grant; first-online-wins, the rest no-op. The member opens it with their own identity private on next entry and reaches the shared space. The server stores opaque ciphertext, never the key.
     # Delivery built as a grant-delivery job on the background-task mechanism (cr-0076). The onboarding that

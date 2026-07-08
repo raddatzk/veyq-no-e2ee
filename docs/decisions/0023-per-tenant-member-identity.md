@@ -1,7 +1,7 @@
 # ADR 0023 — Member identity: per-tenant username + sealed real names, email is the global key
 
 - Status: Accepted
-- Date: 2026-07-05
+- Date: 2026-07-08
 
 ## Context
 
@@ -59,7 +59,11 @@ a tenant.**
   tenant-profile row** as the username. The real name is content, not operational metadata: it is **ciphertext**
   the server never decrypts. Every tenant member holds `K_tenant`, so each can decrypt any member's sealed name
   **locally** — which is where directory **search/sort over names** happens (client-side), so the server needs no
-  plaintext name.
+  plaintext name. The real name is **optional**, and is **offered at the tenant join itself** (alongside the
+  required username): when the invitee already holds `K_tenant` at accept — the owner cold-birth, or any accept
+  that seals the grant on-device — the client seals it right there and submits it with the accept; otherwise it is
+  added or edited later in the profile (both entry points seal identically). A grant-less "awaiting access" accept
+  always defers to the profile (Consequences).
 - **Directory visibility.** Every tenant member sees each member's `username` (plaintext) + `firstName`/`lastName`
   (locally decrypted). **Only a tenant `OWNER`** additionally sees `email` (owner correlates a pending member to
   their invite — [ADR 0007](0007-membership-role-grant-relation.md); the field is omitted for ordinary members).
@@ -74,10 +78,12 @@ a tenant.**
   `UNIQUE(tenant_id, username)`) + the sealed name blob (one per person per tenant, independent of how many
   scopes they're in); the member directory (`listScopeMembers`) joins it in and returns username + sealed name to
   every member and `email` only to an owner caller.
-- **The sealed name lags the grant.** A member can seal first/last only once they hold `K_tenant` — which for a
-  grant-less "awaiting access" member arrives later via grant-delivery ([ADR 0021](0021-operator-blind-background-tasks.md)).
-  Until then the directory shows only `@username` + (owner-only) email; the real name appears once they hold the
-  grant and seal their profile.
+- **The sealed name follows the grant.** A member can seal first/last only once they hold `K_tenant`. When that
+  is true **at accept** (the owner cold-birth, or an accept that seals the grant on-device), the name is offered
+  and sealed **at the join** — one step, no separate profile visit. For a grant-less **"awaiting access"** member
+  `K_tenant` arrives later via grant-delivery ([ADR 0021](0021-operator-blind-background-tasks.md)), so their name
+  **necessarily defers**: the directory shows only `@username` + (owner-only) email until their grant lands and
+  they seal it. Either way it stays **editable** in the profile afterward.
 - **Better operator-blindness than today.** Real names move from plaintext to ciphertext; the server's plaintext
   identity surface shrinks to `email` + a per-tenant pseudonymous `username`. No global handle namespace to
   govern; tenants stay isolated (no cross-tenant handle correlation) — good for the hosted SaaS.

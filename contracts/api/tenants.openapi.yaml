@@ -991,7 +991,8 @@ components:
           description: >
             The caller's chosen handle **in the tenant they are joining** — per-tenant, unique within it,
             plaintext (not a login credential; email is, ADR 0023). Trimmed + lowercased server-side; a clash in
-            the target tenant is `409 username_taken`. Real names are sealed separately via the profile op.
+            the target tenant is `409 username_taken`. The optional real name may be sealed here (`sealedName`) at
+            join, or later via the profile op.
           minLength: 2
           maxLength: 32
           example: kevin
@@ -1006,6 +1007,17 @@ components:
           contentEncoding: base64
           maxLength: 8192
           example: AQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedName:
+          type: [string, "null"]
+          description: >
+            OPTIONAL real name (first + last) sealed under `K_tenant` (opaque base64) — the same blob the profile
+            op stores (ADR 0023). Submitted **at the join** when the invitee already holds `K_tenant` at accept
+            (owner cold-birth / grant-sealed accept); omitted ⇒ username-only, the name added/edited later in the
+            profile (a grant-less accept always omits it). Stored verbatim; the server never decrypts it.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     TenantActivated:
@@ -1050,7 +1062,8 @@ components:
           description: >
             The new account's chosen handle **in the tenant it is joining** — per-tenant, unique within it,
             plaintext (not a login credential; email is, ADR 0023). Trimmed + lowercased server-side; a clash in
-            the target tenant is `409 username_taken`. Real names are sealed separately via the profile op.
+            the target tenant is `409 username_taken`. The optional real name may be sealed here (`sealedName`) at
+            join, or later via the profile op.
           minLength: 2
           maxLength: 32
           example: kevin
@@ -1070,14 +1083,25 @@ components:
           maxLength: 8192
           example: AQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedName:
+          type: [string, "null"]
+          description: >
+            OPTIONAL real name (first + last) sealed under `K_tenant` (opaque base64) — the same blob the profile
+            op stores (ADR 0023). Submitted **at the join** when the invitee already holds `K_tenant` at accept
+            (owner cold-birth / grant-sealed accept); omitted ⇒ username-only, the name added/edited later in the
+            profile (a grant-less accept always omits it). Stored verbatim; the server never decrypts it.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     AccountRegistration:
       type: object
       description: >
         Cold-birth material for a new account (operator-blind, same shape as setup's owner registration minus
         the email, which is taken from the invite). All key material is ciphertext or a public key. The account
-        carries **no** display name — identity is the per-tenant `username` (on the request) + the sealed real
-        name set via the profile op (ADR 0023).
+        carries **no** display name — identity is the per-tenant `username` (on the request) + the optional sealed
+        real name (`sealedName`, on the request at join, or later via the profile op — ADR 0023).
       required: [suiteId, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authPublicKey]
       properties:
         suiteId:

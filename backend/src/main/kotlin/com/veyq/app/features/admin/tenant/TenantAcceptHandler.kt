@@ -89,7 +89,7 @@ class TenantAcceptHandler(
      *  (cr-0077): an OWNER accept cold-activates the tenant (grant required); a MEMBER accept joins the ACTIVE
      *  tenant grant-less (no grant), the key delivered later by a key-holder (cr-0076). */
     @Transactional
-    fun accept(userId: String, bootstrapSecret: String, grant: String?, username: String): AcceptOutcome {
+    fun accept(userId: String, bootstrapSecret: String, grant: String?, username: String, sealedName: String?): AcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return AcceptOutcome.NotFound
         if (!isLive(invite)) return AcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return AcceptOutcome.NotFound
@@ -105,7 +105,7 @@ class TenantAcceptHandler(
             } else {
                 if (profiles.usernameTaken(tenant.id, username)) return AcceptOutcome.UsernameTaken
                 store.joinAsMember(tenant.id, userId, invite.id)
-                profiles.create(userId, tenant.id, username)
+                profiles.create(userId, tenant.id, username, sealedName)
             }
             AcceptOutcome.Activated(tenant.id)
         } else {
@@ -113,7 +113,8 @@ class TenantAcceptHandler(
             val g = grant ?: return AcceptOutcome.MissingGrant
             if (profiles.usernameTaken(tenant.id, username)) return AcceptOutcome.UsernameTaken
             store.activate(tenant.id, userId, g, invite.id)
-            profiles.create(userId, tenant.id, username)
+            // Owner cold-birth: the caller holds K_tenant here, so an optional sealed name may ride the accept (cr-0106).
+            profiles.create(userId, tenant.id, username, sealedName)
             AcceptOutcome.Activated(tenant.id)
         }
     }
@@ -121,7 +122,7 @@ class TenantAcceptHandler(
     /** Register-and-accept: the invited email has no account yet — born cold here (email from the invite).
      *  Role-branched like [accept]: OWNER activates (grant required), MEMBER joins grant-less. */
     @Transactional
-    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String?, username: String): RegisterAcceptOutcome {
+    fun registerAndAccept(bootstrapSecret: String, account: NewAccount, grant: String?, username: String, sealedName: String?): RegisterAcceptOutcome {
         val invite = store.findInviteByTokenHash(Tokens.hash(bootstrapSecret)) ?: return RegisterAcceptOutcome.NotFound
         if (!isLive(invite)) return RegisterAcceptOutcome.NoLongerValid
         val tenant = store.findTenant(invite.tenantId) ?: return RegisterAcceptOutcome.NotFound
@@ -143,9 +144,10 @@ class TenantAcceptHandler(
         )
         if (invite.role == TenantInviteEntity.MEMBER) store.joinAsMember(tenant.id, userId, invite.id)
         else store.activate(tenant.id, userId, grant!!, invite.id)
-        // The per-tenant identity: the plaintext handle now; the sealed real name is written later via the
-        // profile op (once the member holds K_tenant — immediately for the owner, post-delivery for a member).
-        profiles.create(userId, tenant.id, username)
+        // The per-tenant identity: the plaintext handle, plus the optional sealed real name when the invitee
+        // already holds K_tenant at accept (owner cold-birth / grant-sealed accept — ADR 0023); a grant-less
+        // member passes null and seals later via the profile op. The server stores the blob verbatim (blind).
+        profiles.create(userId, tenant.id, username, sealedName)
         return RegisterAcceptOutcome.Activated(tenant.id, userId)
     }
 

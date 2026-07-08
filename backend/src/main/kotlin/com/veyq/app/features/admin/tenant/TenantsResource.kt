@@ -160,6 +160,7 @@ class TenantsResource(
             acceptInviteRequest.bootstrapSecret,
             acceptInviteRequest.grant,
             acceptInviteRequest.username,
+            acceptInviteRequest.sealedName,
         )) {
             is AcceptOutcome.Activated ->
                 Response.ok(TenantActivated(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE)).build()
@@ -185,7 +186,7 @@ class TenantsResource(
         )
         return when (val outcome = acceptHandler.registerAndAccept(
             registerAndAcceptRequest.bootstrapSecret, account, registerAndAcceptRequest.grant,
-            registerAndAcceptRequest.username,
+            registerAndAcceptRequest.username, registerAndAcceptRequest.sealedName,
         )) {
             is RegisterAcceptOutcome.Activated -> Response.status(Response.Status.CREATED)
                 .entity(TenantActivatedWithUser(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE, UUID.fromString(outcome.userId)))

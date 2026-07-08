@@ -44,11 +44,14 @@ member's own group rows) and splits it by sensitivity:
 
 ## Main flow — build your tenant identity on join
 
-1. In the tenant-join flow the member picks a **username** (plaintext, on device) → the server checks it is free
-   **in this tenant** (`UNIQUE(tenant_id, username)`); a clash is `409 username_taken`.
-2. Once the member **holds `K_tenant`** (immediately for an owner's cold-birth; after grant-delivery for a
-   grant-less member — [ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md)), the client
-   **seals** `firstName` + `lastName` under `K_tenant` and stores the opaque blob on the membership.
+1. In the tenant-join flow the member picks a **username** (required, plaintext, on device) **and optionally a
+   first/last name** → the server checks the username is free **in this tenant** (`UNIQUE(tenant_id, username)`);
+   a clash is `409 username_taken`.
+2. Once the member **holds `K_tenant`** (immediately for an owner's cold-birth or any accept that seals the grant
+   on-device; after grant-delivery for a grant-less member — [ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md)),
+   the client **seals** `firstName` + `lastName` under `K_tenant` and stores the opaque blob on the profile row —
+   **at the join itself** when the key is already present (submitted with the accept), otherwise later from the
+   profile. Both entry points seal identically; the name stays editable in the profile.
 3. Any tenant member reading the directory gets each member's `username` (plaintext) + the sealed name blob,
    **decrypts the name locally**, and can search/sort. A tenant **OWNER** additionally gets `email`.
 
@@ -57,7 +60,8 @@ member's own group rows) and splits it by sensitivity:
 - **E1 — username taken in the tenant:** `409 username_taken`; the member picks another. Uniqueness is
   per-tenant, so the same handle may be free in a different tenant.
 - **E2 — name before the grant:** a grant-less "awaiting access" member has no `K_tenant` yet, so cannot seal a
-  name — the directory shows only `@username` (+ owner-only email) until their grant lands and they seal.
+  name — the join's optional name field is **skipped** (username only), and the directory shows just `@username`
+  (+ owner-only email) until their grant lands and they seal it from the profile.
 - **E3 — username change:** re-checked for uniqueness in the tenant; re-slugs the member's `~username` path (old
   bookmarks may miss — [ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md)).
 

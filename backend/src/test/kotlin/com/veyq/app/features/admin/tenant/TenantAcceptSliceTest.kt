@@ -2,6 +2,7 @@ package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.features.account.login.SessionService
 import com.veyq.app.shared.crypto.Tokens
+import com.veyq.app.shared.identity.TenantProfileEntity
 import com.veyq.app.shared.identity.VeyqUser
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
@@ -55,6 +56,29 @@ class TenantAcceptSliceTest {
             .then().statusCode(200).body("status", equalTo("ACTIVE"))
         assert(store.findTenant(id)?.status == TenantEntity.ACTIVE)
         assert(ownerMembershipCount(id) == 1L)
+    }
+
+    @Test
+    fun existingOwnerAcceptSealsTheOptionalNameAtJoin() {
+        // cr-0106: the existing-account OWNER accept threads the optional sealedName onto the fresh profile row.
+        val secret = "acc-name-secret"
+        val id = seedPendingTenant("accname.example.com", "owner-name@example.com", secret)
+        val userId = seedUser("owner-name@example.com")
+        given().header("Authorization", "Bearer ${sessions.issue(userId).accessToken}")
+            .contentType(ContentType.JSON)
+            .body("""{"bootstrapSecret":"$secret","username":"named","grant":"AQ==","sealedName":"c2VhbGVkLW5hbWU="}""")
+            .`when`().post("/api/tenants/accept")
+            .then().statusCode(200).body("status", equalTo("ACTIVE"))
+        // The server stored the opaque sealed blob verbatim on the profile row (never a plaintext name).
+        assert(profileSealedName(id, userId) == "c2VhbGVkLW5hbWU=")
+        // And a plain accept (no name) leaves it null — a grant-less join or an owner who skipped the field.
+        val secret2 = "acc-noname-secret"
+        val id2 = seedPendingTenant("accnoname.example.com", "owner-noname@example.com", secret2)
+        val userId2 = seedUser("owner-noname@example.com")
+        given().header("Authorization", "Bearer ${sessions.issue(userId2).accessToken}")
+            .contentType(ContentType.JSON).body("""{"bootstrapSecret":"$secret2","username":"noname","grant":"AQ=="}""")
+            .`when`().post("/api/tenants/accept").then().statusCode(200)
+        assert(profileSealedName(id2, userId2) == null)
     }
 
     @Test
@@ -156,6 +180,11 @@ class TenantAcceptSliceTest {
 
     private fun userRole(email: String): String? =
         QuarkusTransaction.requiringNew().call { VeyqUser.find("email", email).firstResult()?.serverRole }
+
+    private fun profileSealedName(tenantId: String, userId: String): String? =
+        QuarkusTransaction.requiringNew().call {
+            TenantProfileEntity.find("tenantId = ?1 and userId = ?2", tenantId, userId).firstResult()?.sealedName
+        }
 
     private fun registerBody(secret: String) = """
         {"bootstrapSecret":"$secret","username":"newowner",
