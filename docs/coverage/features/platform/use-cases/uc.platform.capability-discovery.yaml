@@ -1,0 +1,31 @@
+useCase: uc.platform.capability-discovery
+feature: platform
+title: A client discovers an instance's version + capabilities, and refuses to break silently
+status: planned
+# Refined (ADR 0032, lean core): the pre-auth GET /api/setup becomes the capability-discovery surface — it adds
+# version { major, build } (major = the only hard gate, bumped only on capability removal) and capabilities [{id}]
+# (the active set, from the append-only catalog contracts/platform/capabilities.json, codegen'd into a backend
+# registry + client constants). Clients hard-gate on a major mismatch (blocking update-app/update-server), soft-gate
+# each optional feature on its capability's presence (graceful hide), and an operator disables a capability
+# instance-wide — omitted from the manifest AND rejected at its endpoint (422 capability_disabled). Capability
+# (instance-wide, pre-auth) is kept distinct from permission (per-scope/role, post-auth). First consumer: the sharing
+# roles (sharing.public-links / sharing.uploader-links). NOT BUILT — cr-0103 is pending (contracts -> backend -> web
+# -> native). Lean-core scope: no deprecation lifecycle / notices / audience filter yet.
+acceptanceCriteria:
+  - id: discover-manifest
+    text: GET /api/setup (pre-auth, no identity) returns version { major, build } and capabilities [{ id }] — the instance's ACTIVE capability set, sourced from the append-only catalog contracts/platform/capabilities.json. The response is identical for every caller (operator-blind-safe, no per-user data).
+  - id: major-hard-gate
+    text: A client whose compiled major differs from server.version.major shows a BLOCKING incompatibility state (direction-specific — update-app when server>client, update-server when server<client) BEFORE login; an equal major proceeds. build is informational and never gates.
+  - id: capability-soft-gate
+    text: A client hides/omits a feature whose capability id is ABSENT from the manifest, and renders normally when present. A missing capability degrades gracefully (feature hidden, never invoked), never throws.
+  - id: operator-disable-enforced
+    text: An operator disables a capability instance-wide (config); the server BOTH drops it from the manifest AND rejects the corresponding endpoint with 422 capability_disabled. The manifest is a UX hint; the server-side enforcement is the authority (a stale/ignoring client still cannot use it).
+  - id: capability-not-permission
+    text: A capability is instance-wide + pre-auth, NOT a per-scope/role permission. A feature is offered only when (capability present) AND (policy permits here) — e.g. sharing.public-links present AND the node is a personal-scope Memory the caller owns. The manifest carries no identity/permission data.
+  - id: sharing-first-consumer
+    text: The Share dialog gates its role options on sharing.public-links / sharing.uploader-links; disabling sharing.uploader-links hides the Uploader option AND makes createShare(role=UPLOADER) return 422 capability_disabled. Proves the full loop (manifest -> client gate -> server enforcement) on a real feature.
+gaps:
+  backend: "Not built — pending cr-0103. Contracts: contracts/platform/capabilities.json (append-only catalog) + version{major,build} and capabilities[{id}] on SetupStatus in contracts/api/setup.openapi.yaml + a 422 capability_disabled error on the sharing create path. Backend: a CapabilityRegistry (reads the catalog + a veyq.capabilities.disabled config) folded into SetupHandler; the sharing create-gate enforcing a disabled capability (422). Slice tests."
+  web: "Not built — pending cr-0103. Needs: a capability store (fetch /api/setup, expose hasCapability(id) + the major gate), a blocking incompatibility screen on a major mismatch, and the ShareDialog gating its role options on the sharing capabilities. Unit tests + a live smoke."
+  apple: "Platform discovery is web-first — native parity is a later CR (the native clients read the same /api/setup manifest + major gate)."
+  android: "Platform discovery is web-first — native parity is a later CR."
