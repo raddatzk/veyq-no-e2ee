@@ -51,7 +51,9 @@ response and a client-side gate that reads them.
 - The instance advertises the **active** capabilities it serves, as stable lowercase-dotted ids
   (`sharing.public-links`, `sharing.uploader-links`, …).
 - **Source of truth** is an **append-only** catalog `contracts/platform/capabilities.json`, codegen'd into a
-  backend registry **and** each client's constants — so ids can never silently diverge across surfaces.
+  backend registry **and** each client's constants — so ids can never silently diverge across surfaces. Each
+  catalog entry also carries a `serves: [uc.…]` back-ref to the use-case(s) it gates (catalog-only, validated —
+  see §6); it is **not** put on the wire.
 - **Lean core = active set only.** The `state` field (`active | deprecated`), `sunsetAt`/`supersededBy`, and the
   deprecation lifecycle are **deferred** — the wire shape is `[{ id }]` now, extensible to `[{ id, state, … }]`
   later without a `major` bump (additive → `build`).
@@ -79,18 +81,62 @@ per-feature flag). A disabled capability is then:
 Both are required: the manifest alone is only UX; the endpoint gate alone gives a broken-looking UI. Together
 they are honest and safe.
 
-### 5. First consumer — the sharing roles
+### 5. Seed catalog & first consumers
 
-The lean core ships with the **sharing** feature as its first gated consumer, two catalog entries:
+The lean core seeds the catalog with the capabilities whose features already exist **and** that an operator has
+a plausible reason to switch off. Two computation sources feed the same active manifest: an operator
+**disabled-list** (policy) and, separately, an infra **preflight** (runtime).
 
-- **`sharing.public-links`** — the public **viewer + contributor** share ([ADR 0029](0029-public-viewer-share.md),
-  [ADR 0030](0030-contributor-public-share.md)). Absent → the Share affordance is hidden entirely.
-- **`sharing.uploader-links`** — the **uploader** drop-box ([ADR 0031](0031-uploader-public-share.md)). Absent →
-  the **Uploader** role option is hidden **and** `createShare(role = UPLOADER)` is rejected `422
-  capability_disabled`.
+| id | `serves` (use-cases) | source | disabled ⇒ |
+|---|---|---|---|
+| `sharing.public-links` | share-public-viewer, share-contributor | operator policy | Share affordance hidden; `createShare(VIEWER/CONTRIBUTOR)` → `422` |
+| `sharing.uploader-links` | share-uploader | operator policy | Uploader option hidden; `createShare(UPLOADER)` → `422` |
+| `spaces.groups` | add-group-member, manage-group-members, rename-group, delete-group, consent-group-add | operator policy | group-space UI hidden; the group-create endpoint → `422` |
+| `account.device-trust` | trust-device, remember-this-device, auto-unlock, set-device-security | operator policy | the "remember this device" toggle hidden; enrolling a device wrap → `422` |
 
-This proves the whole loop end-to-end (manifest → client gate → server enforcement) on a real feature an
-operator has a plausible reason to disable.
+**Sharing is the worked end-to-end proof** (manifest → client soft-gate → server `422`) since it is fully built
+(web). `spaces.groups` and `account.device-trust` are seeded + advertised + client-soft-gated on the **same**
+machinery; their endpoint-`422` enforcement lands at each feature's own create/enable gate (the identical
+one-line pattern), advertised **active** only once that feature is built (§6).
+
+The **infra-detected** category (a capability computed by a preflight, not a policy toggle, with no operator
+off-switch or `422`) was originally illustrated by `directTransport` on `/api/setup`. That flag is now being
+**removed** — a byte-path store became a hard instance requirement ([ADR 0013](0013-blob-storage-presigned-direct-to-store.md)),
+so there is nothing to soft-gate — leaving a future worker-gated `memory.derivatives` as the standing example of
+an infra-detected capability that could fold into the manifest (see Consequences).
+
+### 6. Capability grain — a coarser projection over use-cases, cross-referenced to them
+
+A capability *looks* like a feature/use-case name and almost always **is** one (or a cluster) — but the two are
+different **projections** and must not be collapsed 1:1:
+
+- A **use-case** (`uc.<feature>.<name>`) is the **engineering-truth grain**: a spec + acceptance criteria +
+  coverage, internal, kept forever as a record, **constant** across instances.
+- A **capability** is the **toggle/negotiation grain**: the coarsest thing an operator would sensibly switch off
+  and a client would sensibly gate a whole feature-surface on — a **per-instance, versioned, client-facing** wire
+  token.
+
+The mapping is therefore **many-to-many**, not identity — the seed shows it: `sharing.public-links` bundles the
+viewer + contributor use-cases while `sharing.uploader-links` stands alone (2 capabilities over 3 sharing
+use-cases), and `spaces.groups` / `account.device-trust` each fold **four to five** use-cases into one operator
+switch. Always-on core use-cases (e.g. creating a Memory) get **no** capability; runtime/ops signals (e.g. a
+future `server.auto-updates`) would be capabilities with **no** single use-case.
+
+Two rules follow, so the catalog stays honest instead of being invented in parallel:
+
+- **A capability entry declares the use-case(s) it gates** — a `serves: [uc.…]` back-ref in the catalog
+  `contracts/platform/capabilities.json` (**catalog-only metadata**; the wire manifest stays `[{ id }]` — a
+  client needs the ids, not the use-case links). This is the **same wiring model** `validate_feature_wiring`
+  already enforces between use-cases/enablers and features. A validator (an extension of that one, or a sibling)
+  checks every capability's `serves` resolves to a **real** use-case (the doc exists) — so a catalog entry can't
+  be a typo or drift from the graph. Because the catalog is **append-only**, an id may be *reserved* ahead of its
+  first advertisement; a capability is **advertised active** only once its use-case(s) are actually **built** and
+  the operator hasn't disabled it. (So `spaces.groups` / `account.device-trust` are valid catalog entries now,
+  advertised as their features finish building.)
+- **Pick the grain coarser than a use-case.** One token *per* use-case would bloat the wire contract and the
+  client gating, and most use-cases can't be disabled independently anyway. The **default grain is feature- or
+  feature-cluster-level**; drop to a finer capability only when an operator has a real reason to toggle that slice
+  alone (as `sharing.uploader-links` splits from `sharing.public-links`).
 
 ## Consequences
 
@@ -99,15 +145,19 @@ operator has a plausible reason to disable.
 - **Operators get a real off-switch** for optional features, enforced server-side, hidden client-side — without
   per-feature bespoke plumbing (one registry, one gate).
 - **`/api/setup` grows into the pre-auth manifest** it was already becoming (`suites` + `directTransport` were
-  the precedent). Those two existing signals **stay as-is** for now; folding them into the unified `capabilities`
-  list is an additive follow-up, not part of this lean core.
+  the precedent). `suites` **stays as-is** for now; `directTransport` is being **removed** (S3 is a hard
+  requirement, [ADR 0013](0013-blob-storage-presigned-direct-to-store.md)) rather than folded in.
 - **Deferred (each a later slice, none blocking this):** the **deprecation lifecycle** (`state`, `sunsetAt`,
   `supersededBy`, the ~4-month sunset + non-dismissable warning); **per-user "new feature" notices/acks**;
   **audience filtering** (`ALL_USERS` vs `SERVER_OWNER`); **client device self-capabilities** (NPU/WebCodecs,
-  a separate direction); migrating `suites`/`directTransport` into the unified manifest; **native parity**.
+  a separate direction); migrating `suites` into the unified manifest; **native parity**.
 - **Not a permission system.** This ADR deliberately does not touch per-scope/role authorization — it only adds
   the instance-wide discovery + version layer above it. Conflating the two is the main modeling risk, called out
   in §3.
+- **The catalog is wired to the use-case index, not a parallel list.** Because every capability `serves` real,
+  built use-cases (§6, validated), the catalog can't grow orphan entries or outlive the behavior it gates — the
+  same guarantee `validate_feature_wiring` already gives the feature graph. The second modeling risk (treating
+  capabilities *as* use-cases 1:1) is closed by the coarser-grain rule in §6.
 
 ## Alternatives considered
 

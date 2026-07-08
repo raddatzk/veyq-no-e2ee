@@ -6,6 +6,12 @@ export type SupportedLocale = 'en' | 'de'
 
 const en = {
   common: { email: 'Email', password: 'Password', cancel: 'Cancel', save: 'Save', create: 'Create', done: 'Done', show: 'Show', hide: 'Hide', unreachable: 'This instance can’t be reached right now. Please try again.' },
+  incompatible: {
+    title: 'This app and this server don’t match',
+    updateApp: 'Your app is older than this server. Update the app to a newer version to continue.',
+    updateServer: 'This server is older than your app. The person who runs it needs to update the server before you can continue.',
+    hint: 'Nothing is wrong with your account or data — this is only a version check to avoid errors.',
+  },
   members: {
     pageTitle: 'Space members',
     pageSub: 'Manage who belongs to this shared space.',
@@ -476,6 +482,12 @@ const en = {
 
 const de: typeof en = {
   common: { email: 'E-Mail', password: 'Passwort', cancel: 'Abbrechen', save: 'Speichern', create: 'Erstellen', done: 'Fertig', show: 'Anzeigen', hide: 'Verbergen', unreachable: 'Diese Instanz ist gerade nicht erreichbar. Bitte erneut versuchen.' },
+  incompatible: {
+    title: 'Diese App und dieser Server passen nicht zusammen',
+    updateApp: 'Deine App ist älter als dieser Server. Aktualisiere die App auf eine neuere Version, um fortzufahren.',
+    updateServer: 'Dieser Server ist älter als deine App. Die Person, die ihn betreibt, muss den Server aktualisieren, bevor du fortfahren kannst.',
+    hint: 'Mit deinem Konto oder deinen Daten ist nichts falsch — das ist nur eine Versionsprüfung, um Fehler zu vermeiden.',
+  },
   members: {
     pageTitle: 'Mitglieder',
     pageSub: 'Verwalte, wer zu diesem geteilten Bereich gehört.',

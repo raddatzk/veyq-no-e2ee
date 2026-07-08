@@ -122,8 +122,8 @@ class MediaHandler(
         }
         val storageKey = UUID.randomUUID().toString()
         val uploadId = store.createSession(scopeId, storageKey, d.chunkCount, d.byteSize, d.wrappedBlobKey)
-        // The session is metadata; presigned PUTs require a transport-capable store. With the dev store the
-        // session still opens (puts = null) — the `directTransport` flag tells real clients not to upload.
+        // The session is metadata; presigned PUTs require a transport-capable store. Only the %test in-memory stub
+        // cannot presign (puts = null) — %dev/%prod always have a real store (BlobStoreStartupCheck, ADR 0013).
         val puts = if (blobStore.canPresign) {
             (0 until d.chunkCount).map { i -> PresignedRef(i, blobStore.presignPut(chunkKey(storageKey, i))!!) }
         } else {

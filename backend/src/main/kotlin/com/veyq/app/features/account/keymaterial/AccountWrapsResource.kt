@@ -33,6 +33,8 @@ class AccountWrapsResource(
                 Response.status(Response.Status.CREATED).entity(AddWrapResult(id = outcome.id)).build()
             AddWrapOutcome.LimitReached ->
                 Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "too_many_devices")).build()
+            AddWrapOutcome.CapabilityDisabled ->
+                Response.status(422).entity(ErrorResponse(code = "capability_disabled")).build()
         }
 
     override fun deleteAccountWrap(id: String): Response {

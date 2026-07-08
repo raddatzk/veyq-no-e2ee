@@ -105,6 +105,15 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: too_many_devices }
+        "422":
+          description: >
+            The `account.device-trust` capability is disabled instance-wide (ADR 0032): the operator mandates a
+            full password every time, so device-local convenience wraps (trust-this-device / remember-me) are
+            turned off. Enforced server-side even if a stale client still offers the toggle.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: capability_disabled }
 
   /api/account/profile:
     get:

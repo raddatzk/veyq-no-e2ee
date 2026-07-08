@@ -16,6 +16,8 @@ import { parseHash, resolveSlugPath, hashForNode } from '../features/memory/loca
 import { listMyTenants } from '../features/spaces/scopes'
 import { NodeKind } from '../api/generated/content'
 import { ScopeKind, type MyTenant } from '../api/generated/scopes'
+import { useCapabilities } from '../shared/state/useCapabilities'
+import { SHARING_PUBLIC_LINKS } from '../features/platform/capabilities'
 import type { TreeNode } from '../features/memory/tree'
 import Message from 'primevue/message'
 import MemoryBrowse from '../features/memory/components/MemoryBrowse.vue'
@@ -27,6 +29,7 @@ import ShareDialog from '../features/memory/components/ShareDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
+const { hasCapability } = useCapabilities()
 
 // Pending-deletion (cr-0090): the active GROUP is being deleted — the shell shows a banner and the browse hides
 // its create affordances (writes are server-rejected during the grace window anyway).
@@ -65,8 +68,13 @@ const memoryKey = computed(() =>
 
 // Public-share affordance (cr-0100): v1 offers it only for a **personal-scope MEMORY** the caller owns — a
 // chapter, a folder, or a group/tenant Memory is out of scope (the backend rejects a non-personal node anyway).
+// Also gated on the `sharing.public-links` capability (ADR 0032): an operator can turn public sharing off
+// instance-wide, in which case the affordance is hidden entirely (and the server rejects createShare with 422).
 const shareable = computed(
-  () => activeSpace.kind === ScopeKind.Personal && currentNode.value?.kind === NodeKind.Memory,
+  () =>
+    hasCapability(SHARING_PUBLIC_LINKS) &&
+    activeSpace.kind === ScopeKind.Personal &&
+    currentNode.value?.kind === NodeKind.Memory,
 )
 const shareVisible = ref(false)
 

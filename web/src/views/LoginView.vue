@@ -13,6 +13,8 @@ import { unlockMasterKey, unlockWithDevice } from '../features/account/unlock/un
 import { trustThisDevice, untrustThisDevice, isTrusted } from '../features/account/trustDevice/trustDevice'
 import { enrolDeviceKey, clearDeviceKey, isRememberSupported } from '../features/account/rememberMe/deviceKeyWrap'
 import { cacheSessionVault, clearSessionVault } from '../features/account/rememberMe/sessionVault'
+import { useCapabilities } from '../shared/state/useCapabilities'
+import { ACCOUNT_DEVICE_TRUST } from '../features/platform/capabilities'
 import { LoginVerifyRequestSessionScopeEnum } from '../api/generated/auth'
 import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
@@ -29,6 +31,7 @@ import { takeRoute } from '../app/pendingRoute'
 // DEVICE wrap; remember on → a password-less DEVICE_KEY wrap + the persistent session cookie. One wrap per
 // device (§9): enrolling one drops the other. The Secret Key is typed once per device, then forgotten.
 const { t } = useI18n()
+const { hasCapability } = useCapabilities()
 const router = useRouter()
 const email = ref('')
 const password = ref('')
@@ -46,7 +49,11 @@ const sessionReady = ref(false)
 // The single per-device choice. Drives the login cookie (on → persistent) AND which convenience wrap is
 // auto-enrolled. Only offered where IndexedDB + WebCrypto exist (a wrap can't otherwise be persisted).
 const remember = ref(false)
-const rememberSupported = isRememberSupported()
+// "Remember this device" needs BOTH this browser's device-key support AND the instance's `account.device-trust`
+// capability (ADR 0032): an operator can mandate a full password every time, disabling device-local convenience
+// wraps. When off, the toggle is hidden AND enrolConvenienceWrap enrols no wrap — matching the server, which
+// rejects enrolling one with 422 capability_disabled.
+const rememberSupported = isRememberSupported() && hasCapability(ACCOUNT_DEVICE_TRUST)
 const fileInput = ref<HTMLInputElement | null>(null)
 const showSecret = ref(false)
 const scanOpen = ref(false)

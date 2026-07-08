@@ -14,8 +14,9 @@
 - **Depends on:** [en.memory.media](en.memory.media.md) — a derivative is **just another blob**, sealed by the
   exact same `K_blob`-under-`K_mem` chunked-AEAD transport; through it [en.memory.tree](en.memory.tree.md) +
   `uc.account.unlock` (identity → `K_SC` → `K_mem`).
-- **Preconditions:** an **unlocked** vault; an **open Memory** whose `K_mem` is unwrapped; a reachable object
-  store (`directTransport: ok`, [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)).
+- **Preconditions:** an **unlocked** vault; an **open Memory** whose `K_mem` is unwrapped; a configured object
+  store — a **hard instance requirement** ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md),
+  so a running instance always has one).
 - **Postconditions (success):** for a media item, up to **three role-tagged blobs** (thumbnail, preview,
   original) exist in the store; the server holds only ciphertext chunks + the role tags + the `K_blob` wraps.
   No plaintext pixel, no content key.

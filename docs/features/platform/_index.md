@@ -14,19 +14,21 @@ what this instance can do, what version it speaks, and which optional features t
 
 ## Use-cases
 
-- [uc.platform.capability-discovery](use-cases/uc.platform.capability-discovery.md) — **refined** (cr-0103
-  planned: a client discovers the instance's `version` + active `capabilities` from the pre-auth `/api/setup`,
+- [uc.platform.capability-discovery](use-cases/uc.platform.capability-discovery.md) — **built (web)** (cr-0103:
+  a client discovers the instance's `version` + active `capabilities` from the pre-auth `/api/setup`,
   **hard-gates** on a `major` mismatch (forced "update app / update server"), **soft-gates** each feature on its
   capability's presence (graceful hide, never a crash), and an operator can **turn a capability off instance-wide**
   — omitted from the manifest **and** rejected at its endpoint. First consumer: the **sharing** roles
-  (`sharing.public-links` / `sharing.uploader-links`). [ADR 0032](../../decisions/0032-capability-discovery-version-gating.md))
+  (`sharing.public-links` / `sharing.uploader-links`). apple/android are a later native-parity CR.
+  [ADR 0032](../../decisions/0032-capability-discovery-version-gating.md))
 
 ## Precedent already in the fresh state
 
-The pre-auth `GET /api/setup` already advertises `suites: ["v1"]` (crypto-suite negotiation) and `directTransport`
-(a runtime-detected capability the client degrades on); the background-tasks layer already matches worker
-**capability tags** (`CapabilityTags`, [ADR 0021](../../decisions/0021-operator-blind-background-tasks.md)). This
-feature adds the **generic client-facing** layer (a versioned capability manifest + the hard gate) above those.
+The pre-auth `GET /api/setup` already advertises `suites: ["v1"]` (crypto-suite negotiation); the background-tasks
+layer already matches worker **capability tags** (`CapabilityTags`,
+[ADR 0021](../../decisions/0021-operator-blind-background-tasks.md)). This feature adds the **generic
+client-facing** layer (a versioned capability manifest + the hard gate) above those. (An earlier `directTransport`
+advisory on `/api/setup` was **removed** when a byte-path store became a hard requirement, cr-0105 / ADR 0013.)
 
 ## Deferred (later slices, each its own dependency)
 
@@ -34,7 +36,7 @@ feature adds the **generic client-facing** layer (a versioned capability manifes
   non-dismissable warning, and the *remove-X-add-Y* replacement pattern (immutable ids).
 - **"New feature" notices + per-user acks** — surfacing a freshly-introduced capability, dismissed per user.
 - **Audience filtering** — `ALL_USERS` vs `SERVER_OWNER` capability visibility.
-- **Unify `suites` / `directTransport`** into the single `capabilities` manifest.
+- **Unify `suites`** into the single `capabilities` manifest.
 - **Client device self-capabilities** (NPU / WebCodecs / …) — a separate direction (client → self), not
   server-advertised.
 - **Native parity** — the web vertical lands first, apple/android follow.

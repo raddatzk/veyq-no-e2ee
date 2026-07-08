@@ -13,6 +13,8 @@ import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { listMyTenants, listMyGroups, type GroupSpace } from '../../features/spaces/scopes'
 import { activeSpace } from '../../app/activeSpace'
 import CreateGroupDialog from '../../features/spaces/CreateGroupDialog.vue'
+import { useCapabilities } from '../../shared/state/useCapabilities'
+import { SPACES_GROUPS } from '../../features/platform/capabilities'
 import { favoritesStore } from '../../app/favoritesStore'
 import { useThemeState } from '../../shared/state/useThemeState'
 import { treeStore } from '../../features/memory/treeStore'
@@ -25,6 +27,11 @@ import type { MyTenant } from '../../api/generated/scopes'
 import ProfileMenu from './ProfileMenu.vue'
 
 const { t } = useI18n()
+const { hasCapability } = useCapabilities()
+// Group creation is gated on the `spaces.groups` capability (ADR 0032): a personal-only instance disables it,
+// so the "New group" affordance is hidden (and the group-create endpoint rejects with 422). Existing groups
+// stay listed/manageable — only creation is gated, matching the server.
+const canCreateGroup = computed(() => hasCapability(SPACES_GROUPS))
 const route = useRoute()
 const router = useRouter()
 const { resolvedTheme } = useThemeState()
@@ -216,6 +223,7 @@ function closeMobileMenu() {
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('shell.groups') }}</p>
         <button
+          v-if="canCreateGroup"
           class="sidebar-section-action"
           type="button"
           :title="t('shell.groupCreate')"
@@ -330,7 +338,7 @@ function closeMobileMenu() {
             >
               <span class="sidebar-scope-icon pi pi-users" /><span><strong>{{ group.name }}</strong></span>
             </RouterLink>
-            <button class="mobile-nav-item" type="button" @click="createGroupOpen = true; closeMobileMenu()">
+            <button v-if="canCreateGroup" class="mobile-nav-item" type="button" @click="createGroupOpen = true; closeMobileMenu()">
               <span class="sidebar-scope-icon pi pi-plus" /><span>{{ t('shell.groupCreate') }}</span>
             </button>
           </div>

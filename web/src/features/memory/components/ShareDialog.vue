@@ -10,6 +10,8 @@ import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import { createShare, listSharesFor, revokeShare, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
+import { useCapabilities } from '../../../shared/state/useCapabilities'
+import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
 
 const props = defineProps<{
   nodeId: string
@@ -19,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const { t, locale } = useI18n()
+const { hasCapability } = useCapabilities()
 
 const shares = ref<ManagedShare[]>([])
 const loadError = ref(false)
@@ -34,11 +37,19 @@ const revokingId = ref<string | null>(null)
 // The share role to mint: VIEWER (read-only, cr-0100), CONTRIBUTOR (view + add photos, cr-0101), or
 // UPLOADER (write-only drop-box — add photos but can't see the Memory or others', cr-0102, ADR 0031).
 const role = ref<ShareRole>(ShareRole.Viewer)
-const roleOptions = computed(() => [
-  { label: t('share.roleViewer'), value: ShareRole.Viewer },
-  { label: t('share.roleContributor'), value: ShareRole.Contributor },
-  { label: t('share.roleUploader'), value: ShareRole.Uploader },
-])
+// The Uploader drop-box option is gated on the `sharing.uploader-links` capability (ADR 0032): when the operator
+// has disabled it instance-wide, it is dropped from the choices — and the server rejects it anyway (422). The
+// viewer/contributor options ride `sharing.public-links`, which gates the Share affordance itself upstream.
+const roleOptions = computed(() => {
+  const options: Array<{ label: string; value: ShareRole }> = [
+    { label: t('share.roleViewer'), value: ShareRole.Viewer },
+    { label: t('share.roleContributor'), value: ShareRole.Contributor },
+  ]
+  if (hasCapability(SHARING_UPLOADER_LINKS)) {
+    options.push({ label: t('share.roleUploader'), value: ShareRole.Uploader })
+  }
+  return options
+})
 function roleLabel(r: ShareRole | string): string {
   if (r === ShareRole.Uploader) return t('share.roleUploader')
   if (r === ShareRole.Contributor) return t('share.roleContributor')

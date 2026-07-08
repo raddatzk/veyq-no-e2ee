@@ -16,7 +16,9 @@
   [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) and `uc.account.unlock`
   (identity → scope key → `K_SC` → `K_mem`).
 - **Preconditions:** an **unlocked** vault; an **open Memory** whose `K_mem` is unwrapped (the blob keys wrap
-  under it); a reachable object store (the instance advertises `directTransport: ok`, ADR 0013).
+  under it); a configured object store — a **hard instance requirement** (`%dev`/`%prod` fail loud without one,
+  [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)), so a running instance always has
+  a byte path.
 - **Postconditions (success):** the blob's **ciphertext chunks** live in the object store; the server holds the
   blob's **metadata + chunk manifest + the `K_blob` wrap** and a **media** record linking the blob to a node.
   The server learned **no bytes of plaintext** and holds **no content key**.
@@ -83,8 +85,9 @@ note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno
 
 ## Alternate / exception flows
 
-- **E1 — store unreachable / can't presign** (`directTransport: unavailable`, e.g. the in-memory dev store):
-  there is no transport path; the action is unavailable. Exercised only by opt-in e2e against MinIO
+- **E1 — no object store configured:** a byte path is a **hard requirement**, so this is a **fail-loud startup
+  error** in `%dev`/`%prod` (not a runtime "unavailable" state a client soft-gates on — there is no
+  `directTransport` flag). Only the `%test` slice profile runs the in-memory stub (metadata only, no transport)
   ([ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)).
 - **E2 — declared budget exceeded** (or actual object sizes exceed it at complete): the server rejects and
   **purges** the staged objects (declare-then-verify, ADR 0013 §3).

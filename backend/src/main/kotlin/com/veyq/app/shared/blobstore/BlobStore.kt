@@ -26,8 +26,9 @@ import java.util.Optional
  * sealed client-side. One object key per chunk: `storageKey/<index>`.
  *
  * [canPresign] is the capability switch: an [S3BlobStore] presigns + stats real objects, the
- * [InMemoryBlobStore] cannot presign and has no transport path (dev/test metadata only — the byte transfer
- * is exercised by opt-in e2e against a real S3-compatible store).
+ * [InMemoryBlobStore] cannot presign and has no transport path (`%test`-only metadata stub — a configured store
+ * is a hard requirement of `%dev`/`%prod`, enforced by [BlobStoreStartupCheck]; the byte transfer itself is
+ * exercised by opt-in e2e against a real S3-compatible store).
  */
 interface BlobStore {
     /** True when the store can produce presigned URLs (and therefore carry bytes); false for the dev store. */
@@ -52,9 +53,10 @@ interface BlobStore {
 }
 
 /**
- * Dev/test store: holds no bytes and **cannot presign** (ADR 0013 §1). Endpoints that move bytes therefore
- * have no path here — `start`/`complete`/`list` still exercise the metadata control plane (the blob/media
- * rows, the wrap, the budget *declaration*), and the byte transfer is covered by the opt-in store e2e.
+ * `%test`-only store (cr-0105): holds no bytes and **cannot presign** (ADR 0013 §1). It exists purely so the
+ * hermetic slice suite can drive the metadata control plane (`start`/`complete`/`list` — blob/media rows, the
+ * wrap, the budget *declaration*) without a real store; the byte transfer is covered by the opt-in store e2e.
+ * `%dev`/`%prod` never reach it — [BlobStoreStartupCheck] fails loud there if no store is configured.
  */
 class InMemoryBlobStore : BlobStore {
     override val canPresign = false
@@ -133,6 +135,7 @@ class BlobStoreProducer(
     @ApplicationScoped
     fun blobStore(): BlobStore {
         val endpointUrl = endpoint.orElse("")
+        // A blank endpoint only reaches here in %test — [BlobStoreStartupCheck] already aborted %dev/%prod boot.
         if (endpointUrl.isBlank()) return InMemoryBlobStore()
         val creds = StaticCredentialsProvider.create(
             AwsBasicCredentials.create(accessKey.orElse(""), secretKey.orElse("")),

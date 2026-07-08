@@ -36,10 +36,28 @@ paths:
               examples:
                 fresh:
                   summary: A fresh instance
-                  value: { setupRequired: true, suites: ["v1"], instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI= }
+                  value:
+                    setupRequired: true
+                    suites: ["v1"]
+                    instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI=
+                    version: { major: 1, build: 1 }
+                    capabilities:
+                      - { id: sharing.public-links }
+                      - { id: sharing.uploader-links }
+                      - { id: spaces.groups }
+                      - { id: account.device-trust }
                 done:
                   summary: An instance that is already set up
-                  value: { setupRequired: false, suites: ["v1"], instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI= }
+                  value:
+                    setupRequired: false
+                    suites: ["v1"]
+                    instanceSalt: aW5zdGFuY2Utc2FsdC0xNmI=
+                    version: { major: 1, build: 1 }
+                    capabilities:
+                      - { id: sharing.public-links }
+                      - { id: sharing.uploader-links }
+                      - { id: spaces.groups }
+                      - { id: account.device-trust }
 
   /api/setup/owner:
     post:
@@ -90,20 +108,27 @@ components:
   schemas:
     SetupStatus:
       type: object
-      required: [setupRequired, suites, instanceSalt]
+      required: [setupRequired, suites, instanceSalt, version, capabilities]
       properties:
         setupRequired:
           type: boolean
           description: True while the instance has no owner yet.
           example: true
-        directTransport:
-          type: [boolean, "null"]
+        version:
+          $ref: "#/components/schemas/Version"
+        capabilities:
+          type: array
           description: >
-            Advisory blob-transport capability from the startup preflight (ADR 0013 §4): true when the
-            configured object store can presign and its public route is reachable, false/absent when it cannot
-            (e.g. the in-memory dev store). Clients use it to decide whether direct-to-store media upload is
-            available; never blocks startup.
-          example: true
+            The instance's ACTIVE capability manifest (ADR 0032): the abilities this build supports and the
+            operator has not disabled, sourced from the append-only catalog contracts/platform/capabilities.json
+            minus the veyq.capabilities.disabled config list. Pre-auth, identity-free and identical for every
+            caller (operator-blind-safe) — it advertises only instance-wide abilities, never per-user data. A
+            client soft-gates each optional feature on the presence of its id (absent => hidden). The wire shape
+            is intentionally [{ id }]; the catalog's serves[]/source metadata stays off the wire.
+          items: { $ref: "#/components/schemas/Capability" }
+          example:
+            - { id: sharing.public-links }
+            - { id: sharing.uploader-links }
         suites:
           type: array
           description: Crypto suite ids the server advertises (e.g. "v1").
@@ -119,6 +144,50 @@ components:
           contentEncoding: base64
           maxLength: 256
           example: aW5zdGFuY2Utc2FsdC0xNmI=
+
+    Version:
+      type: object
+      description: >
+        The instance's advertised version (ADR 0032). Two parts with different roles: `major` is the hard
+        compatibility gate, `build` is informational only.
+      required: [major, build]
+      properties:
+        major:
+          type: integer
+          format: int32
+          description: >
+            The ONLY hard-compatibility gate. Incremented exclusively when a capability is REMOVED (a breaking
+            removal an older client might rely on). A client compares this to the `major` it was compiled
+            against: equal => proceed; server > client => a blocking "update your app" state; server < client =>
+            a blocking "update this server" state — any mismatch stops before login, never a silent partial
+            failure. Everything additive (a new capability, field or endpoint) bumps `build`, never `major`.
+          minimum: 0
+          example: 1
+        build:
+          type: integer
+          format: int32
+          description: >
+            Monotonic build counter, informational only (diagnostics, "what's new"). Bumped on every additive
+            change. Never gates.
+          minimum: 0
+          example: 1
+
+    Capability:
+      type: object
+      description: >
+        One entry in the active capability manifest. The wire shape is intentionally `{ id }` only; it is
+        extensible to `{ id, state, ... }` later without a `major` bump (additive => `build`).
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: >
+            Stable lowercase-dotted capability id (e.g. "sharing.public-links"), from the append-only catalog
+            contracts/platform/capabilities.json. A capability is instance-wide + pre-auth ("this server can do
+            X at all") — NOT a per-scope/role permission ("you may do X here"). A feature is offered only when
+            the capability is present AND local policy permits.
+          maxLength: 64
+          example: sharing.public-links
 
     MasterKeyWrap:
       type: object

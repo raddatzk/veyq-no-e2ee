@@ -69,6 +69,8 @@ class ScopesResource(
                     .entity(ScopeCreated(scopeId = UUID.fromString(outcome.scopeId), kind = ScopeKind.GROUP)).build()
             CreateGroupOutcome.NoTenant ->
                 Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
+            CreateGroupOutcome.CapabilityDisabled ->
+                Response.status(422).entity(ErrorResponse(code = "capability_disabled")).build()
         }
 
     override fun listMyScopes(): Response =

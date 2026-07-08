@@ -7,6 +7,8 @@ import com.veyq.app.features.media.DerivativeDeclare
 import com.veyq.app.features.media.MediaHandler
 import com.veyq.app.features.media.UploadDeclare
 import com.veyq.app.features.media.UploadItemResult
+import com.veyq.app.features.platform.capabilities.CapabilityIds
+import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
@@ -26,6 +28,8 @@ data class ShareCompleteItem(
 
 sealed interface CreateShareOutcome {
     data class Created(val shareId: String) : CreateShareOutcome
+    /** The sharing capability this role needs is disabled instance-wide (ADR 0032) — a 422, instance policy. */
+    object CapabilityDisabled : CreateShareOutcome
     /** No such node, or the caller holds no grant for its scope (a 404, no reveal). */
     object NoNode : CreateShareOutcome
     /** The node is not a MEMORY in a **personal** scope (group/tenant sharing deferred, ADR 0029 §6) — a 422. */
@@ -96,11 +100,15 @@ class SharingHandler(
     private val blobStore: BlobStore,
     private val mediaHandler: MediaHandler,
     private val rateLimiter: ShareRateLimiter,
+    private val capabilities: CapabilityRegistry,
 ) {
 
     fun create(
         userId: String, nodeId: String, role: String, wrap: String, sealedName: String, expiresAt: Instant?,
     ): CreateShareOutcome {
+        // Instance policy first (ADR 0032): the capability this role needs must be active, else 422 — checked
+        // before any node/scope lookup so it reads as "the operator turned sharing off", not a scope error.
+        if (!capabilities.isActive(capabilityFor(role))) return CreateShareOutcome.CapabilityDisabled
         val node = store.findNode(nodeId) ?: return CreateShareOutcome.NoNode
         if (!store.isMember(userId, node.scopeId)) return CreateShareOutcome.NoNode // no reveal
         // v1: only a MEMORY in a PERSONAL scope may be public-shared (ADR 0029 §6, ADR 0030).
@@ -194,6 +202,11 @@ class SharingHandler(
         val gets = (0 until blob.chunkCount).map { i -> PresignRef(i, blobStore.presignGet(chunkKey(blob.storageKey, i))!!) }
         return ShareBlobOutcome.Found(gets)
     }
+
+    /** The instance capability a role's public share needs (ADR 0032): UPLOADER → the uploader-links toggle,
+     *  VIEWER/CONTRIBUTOR → the public-links toggle. Kept coarser than the role (2 capabilities, 3 roles). */
+    private fun capabilityFor(role: String): String =
+        if (role == ShareEntity.UPLOADER) CapabilityIds.SHARING_UPLOADER_LINKS else CapabilityIds.SHARING_PUBLIC_LINKS
 
     /** Roles whose guest resolve serves the sealed gallery (VIEWER/CONTRIBUTOR). UPLOADER is write-only → false. */
     private fun canView(role: String) = role == ShareEntity.VIEWER || role == ShareEntity.CONTRIBUTOR

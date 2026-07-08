@@ -1,10 +1,12 @@
 package com.veyq.app.features.admin.setup
 
 import com.veyq.app.generated.api.SetupApi
+import com.veyq.app.generated.model.Capability
 import com.veyq.app.generated.model.CreateServerOwnerRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.SetupResult
 import com.veyq.app.generated.model.SetupStatus
+import com.veyq.app.generated.model.Version
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.util.UUID
@@ -25,7 +27,8 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
                 setupRequired = state.setupRequired,
                 suites = state.suites,
                 instanceSalt = state.instanceSalt,
-                directTransport = state.directTransport,
+                version = Version(major = state.versionMajor, build = state.versionBuild),
+                capabilities = state.capabilities.map { Capability(id = it) },
             ),
         ).build()
     }

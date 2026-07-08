@@ -55,6 +55,7 @@ class SharingResource(
         )) {
             is CreateShareOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareCreated(shareId = o.shareId)).build()
+            CreateShareOutcome.CapabilityDisabled -> error(422, "capability_disabled")
             CreateShareOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
             CreateShareOutcome.IllegalScope -> error(422, "illegal_scope")
         }

@@ -15,7 +15,7 @@ instance-wide** — with the server enforcing it, not just the UI hiding it. No 
 ## Main flow
 
 1. On startup (and before login), the client fetches `GET /api/setup` → `{ setupRequired, suites, instanceSalt,
-   directTransport, version: { major, build }, capabilities: [{ id }] }`.
+   version: { major, build }, capabilities: [{ id }] }`.
 2. The client compares `server.version.major` to the **`major` it was compiled against**:
    - equal → continue;
    - `server > client` → a **blocking** "update your app" screen;
@@ -28,13 +28,20 @@ instance-wide** — with the server enforcing it, not just the UI hiding it. No 
    hides it) **and rejects** the corresponding endpoint (`422 capability_disabled`) — so a stale/ignoring client
    still cannot use it.
 
-## First consumer — the sharing roles
+## Seed consumers
 
-- The Share dialog gates its role options: `sharing.public-links` present → the viewer/contributor share is
-  offered; `sharing.uploader-links` present → the **Uploader** role option is shown.
-- With `sharing.uploader-links` disabled: the Uploader option is **hidden**, and `POST /api/shares` with
-  `role: UPLOADER` is **rejected** `422 capability_disabled`. With `sharing.public-links` disabled: the Share
-  affordance is hidden entirely and any `createShare` is rejected.
+The catalog is seeded with four **operator-policy** capabilities; **sharing is the worked end-to-end proof**,
+the other three ride the same machinery (advertised + `hasCapability` soft-gate + a one-line `422` at their
+create/enable path), advertised active as each feature is built:
+
+- **`sharing.public-links` / `sharing.uploader-links`** — the Share dialog gates its role options; with
+  `sharing.uploader-links` disabled the Uploader option is **hidden** and `POST /api/shares { role: UPLOADER }`
+  is **rejected** `422 capability_disabled`; with `sharing.public-links` disabled the Share affordance is hidden
+  entirely and any `createShare` is rejected.
+- **`spaces.groups`** — group-space creation/UI; disabled → the group affordance is hidden and the group-create
+  endpoint rejects `422`. (An operator who wants a personal-only instance.)
+- **`account.device-trust`** — the "remember this device" / passwordless-unlock levels; disabled → the toggle is
+  hidden and enrolling a device wrap rejects `422`. (An operator who mandates a full password every time.)
 
 ## Acceptance criteria
 
@@ -55,9 +62,16 @@ instance-wide** — with the server enforcing it, not just the UI hiding it. No 
 - **sharing-first-consumer** — the Share dialog gates its role options on `sharing.public-links` /
   `sharing.uploader-links`; disabling `sharing.uploader-links` hides the Uploader option **and** makes
   `createShare(role = UPLOADER)` return `422 capability_disabled`.
+- **catalog-serves-usecases** — a capability is a **coarser projection** over use-cases, not a 1:1 rename of one
+  (ADR 0032 §6): each catalog entry declares a `serves: [uc.…]` back-ref (catalog-only, not on the wire), and a
+  validator enforces that every `serves` resolves to a **real** use-case — so the catalog can't be a typo or drift
+  from the graph. The catalog is **append-only**; an id may be reserved ahead of its first advertisement, and is
+  **advertised active** only once its use-case(s) are built. (Seed: `sharing.public-links` serves viewer +
+  contributor, `sharing.uploader-links` serves uploader, `spaces.groups` serves the five group use-cases,
+  `account.device-trust` serves the four device-unlock use-cases — 4 capabilities over 12 use-cases.)
 
 ## Out of scope (deferred — see the feature index)
 
 The deprecation lifecycle (`state`, `sunsetAt`, `supersededBy`), per-user "new feature" notices/acks, audience
-filtering, folding `suites`/`directTransport` into the unified manifest, client device self-capabilities, and
-native parity.
+filtering, folding `suites` into the unified manifest, client device self-capabilities, and native parity.
+(`directTransport` was **removed** rather than folded in — a byte-path store is now a hard requirement, cr-0105.)

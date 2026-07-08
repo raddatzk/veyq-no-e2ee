@@ -6,6 +6,7 @@
 // the legacy boot arrives with the login CR.
 import { getSetupStatus } from '../features/account/instance/instance'
 import { useServerState } from '../shared/state/useServerState'
+import { setCapabilities, useCapabilities } from '../shared/state/useCapabilities'
 import { refreshSession } from '../features/account/login/login'
 import { restoreVaultFromCache } from '../features/account/unlock/unlock'
 import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
@@ -17,15 +18,22 @@ import { clearSessionVault } from '../features/account/rememberMe/sessionVault'
  */
 export async function boot(): Promise<void> {
   const { serverState, setSetupCompleted, setUnreachable } = useServerState()
+  const { incompatibility } = useCapabilities()
   setUnreachable(false)
   try {
     const status = await getSetupStatus()
+    // Record the instance's version + capability manifest first — the shell reads it to soft-gate optional
+    // features, and to hard-gate on a `major` mismatch (ADR 0032).
+    setCapabilities(status)
     setSetupCompleted(!status.setupRequired)
   } catch {
     // The instance is unreachable — show a clear error state instead of forcing setup or a blank screen.
     setUnreachable(true)
     return
   }
+  // Hard compatibility gate: on a `major` mismatch the shell shows a blocking incompatibility screen before
+  // login — so stop here rather than restoring a session or landing on any content view.
+  if (incompatibility() !== null) return
   if (!serverState.setupCompleted) return
   // Restore a "remember me" session (cr-0054): the httpOnly refresh cookie revives the session, then the
   // device's password-less DEVICE_KEY wrap re-opens the Master Key — so a browser restart lands straight in the

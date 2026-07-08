@@ -20,11 +20,14 @@ import { ScopeKind } from '../api/generated/scopes'
 import { listMyGroups, type GroupSpace } from '../features/spaces/scopes'
 import { listTenants, type TenantSummary } from '../features/admin/createTenant/tenants'
 import { serverRole, probeServerRole } from '../features/admin/serverRole'
+import { useCapabilities } from '../shared/state/useCapabilities'
+import { SPACES_GROUPS } from '../features/platform/capabilities'
 
 type NavItem = { id: string; label: string; icon: string }
 type NavCategory = { key: string; label: string; items: NavItem[]; collapsible: boolean; create?: { label: string; run: () => void } }
 
 const { t } = useI18n()
+const { hasCapability } = useCapabilities()
 const route = useRoute()
 const router = useRouter()
 
@@ -80,7 +83,11 @@ const categories = computed<NavCategory[]>(() => {
       key: 'groups',
       label: t('shell.groups'),
       collapsible: true,
-      create: { label: t('shell.groupCreate'), run: () => { createGroupOpen.value = true } },
+      // Group creation is gated on the `spaces.groups` capability (ADR 0032): a personal-only instance disables
+      // it, so the create affordance is dropped (owned groups stay listed/manageable — only creation is gated).
+      ...(hasCapability(SPACES_GROUPS)
+        ? { create: { label: t('shell.groupCreate'), run: () => { createGroupOpen.value = true } } }
+        : {}),
       // A group in pending-deletion (cr-0090) is badged with a trash icon so the roster shows it's on its way out.
       items: ownedGroups.value.map((g) => ({ id: `group-${g.scopeId}`, label: g.name, icon: g.deletedAt ? 'pi pi-trash' : 'pi pi-users' })),
     })

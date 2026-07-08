@@ -1,6 +1,8 @@
 package com.veyq.app.features.spaces.scope
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.features.platform.capabilities.CapabilityIds
+import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import jakarta.enterprise.context.ApplicationScoped
 
 /** Outcome of birthing a personal scope. */
@@ -14,6 +16,8 @@ sealed interface CreatePersonalOutcome {
 sealed interface CreateGroupOutcome {
     data class Created(val scopeId: String) : CreateGroupOutcome
     object NoTenant : CreateGroupOutcome
+    /** The `spaces.groups` capability is disabled instance-wide (ADR 0032) — a 422, a personal-only instance. */
+    object CapabilityDisabled : CreateGroupOutcome
 }
 
 /** Outcome of listing the caller's scopes. */
@@ -123,7 +127,10 @@ sealed interface ListMembersOutcome {
  * member of). Birth is client-driven and operator-blind — the handler only persists the ciphertext grant.
  */
 @ApplicationScoped
-class ScopesHandler(private val store: ScopesStore) {
+class ScopesHandler(
+    private val store: ScopesStore,
+    private val capabilities: CapabilityRegistry,
+) {
 
     fun createPersonal(userId: String, host: String?, wrappedGrant: String): CreatePersonalOutcome {
         val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return CreatePersonalOutcome.NoTenant
@@ -138,6 +145,9 @@ class ScopesHandler(private val store: ScopesStore) {
      * ciphertext name + the ciphertext self-grant, never the scope key or the plaintext name.
      */
     fun createGroup(userId: String, host: String?, encryptedName: String, wrappedGrant: String): CreateGroupOutcome {
+        // Instance policy first (ADR 0032): a personal-only instance disables group scopes → 422, enforced
+        // server-side even if a stale client still offers the affordance.
+        if (!capabilities.isActive(CapabilityIds.SPACES_GROUPS)) return CreateGroupOutcome.CapabilityDisabled
         val tenantId = host?.let { store.findTenantIdByDomain(it) } ?: return CreateGroupOutcome.NoTenant
         if (!store.isMember(userId, tenantId)) return CreateGroupOutcome.NoTenant
         return CreateGroupOutcome.Created(store.createGroup(userId, tenantId, encryptedName, wrappedGrant))

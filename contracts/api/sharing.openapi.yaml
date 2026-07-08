@@ -77,9 +77,14 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
         "422":
-          description: The node is not in a **personal** scope (group/tenant public-sharing is deferred, ADR 0029 §6).
+          description: >
+            Unprocessable. Two codes: `capability_disabled` — the sharing capability this role needs
+            (`sharing.public-links` for VIEWER/CONTRIBUTOR, `sharing.uploader-links` for UPLOADER) is disabled
+            instance-wide, so the operator has turned public sharing off (ADR 0032; checked first, before any
+            scope check, so it reads as instance policy not a scope error); `illegal_scope` — the node is not in
+            a **personal** scope (group/tenant public-sharing is deferred, ADR 0029 §6).
           content:
-            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_scope } }
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: capability_disabled } }
     get:
       tags: [sharing]
       operationId: listShares

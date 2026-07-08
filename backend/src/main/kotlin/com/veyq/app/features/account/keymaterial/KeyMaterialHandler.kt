@@ -1,5 +1,7 @@
 package com.veyq.app.features.account.keymaterial
 
+import com.veyq.app.features.platform.capabilities.CapabilityIds
+import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
@@ -7,6 +9,8 @@ import jakarta.transaction.Transactional
 sealed interface AddWrapOutcome {
     data class Created(val id: String) : AddWrapOutcome
     object LimitReached : AddWrapOutcome
+    /** The `account.device-trust` capability is disabled instance-wide (ADR 0032) — a 422, full password only. */
+    object CapabilityDisabled : AddWrapOutcome
 }
 
 /**
@@ -16,7 +20,10 @@ sealed interface AddWrapOutcome {
  * resources stay thin HTTP adapters (ADR 0001): Resource → Handler → Store. Each method is @Transactional.
  */
 @ApplicationScoped
-class KeyMaterialHandler(private val store: KeyMaterialStore) {
+class KeyMaterialHandler(
+    private val store: KeyMaterialStore,
+    private val capabilities: CapabilityRegistry,
+) {
 
     /** The caller's key material for the **normal unlock** path, or null only if the account has none — a
      *  server-side inconsistency for an authenticated user (every account is created with its wraps), surfaced
@@ -35,6 +42,9 @@ class KeyMaterialHandler(private val store: KeyMaterialStore) {
      *  client can't flood the row set (re-trust replaces, so normal use never approaches the cap). */
     @Transactional
     fun addWrap(userId: String, method: String, wrappedKey: String, kdfParams: String?): AddWrapOutcome {
+        // Instance policy first (ADR 0032): an instance mandating a full password every time disables the
+        // device-local convenience wraps (DEVICE / DEVICE_KEY) this endpoint serves → 422, server-enforced.
+        if (!capabilities.isActive(CapabilityIds.ACCOUNT_DEVICE_TRUST)) return AddWrapOutcome.CapabilityDisabled
         if (store.countWraps(userId, method) >= MAX_WRAPS_PER_METHOD) return AddWrapOutcome.LimitReached
         return AddWrapOutcome.Created(store.addWrap(userId, method, wrappedKey, kdfParams))
     }

@@ -8,12 +8,18 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useServerState } from '../../shared/state/useServerState'
+import { useCapabilities } from '../../shared/state/useCapabilities'
 import AppSidebar from './AppSidebar.vue'
 import AppTopbar from './AppTopbar.vue'
+import IncompatibleScreen from './IncompatibleScreen.vue'
 
 const route = useRoute()
 const { serverState } = useServerState()
+const { incompatibility } = useCapabilities()
 const { t } = useI18n()
+// A `major` mismatch is a hard stop that supersedes every layout — the client and server are incompatible, so
+// nothing else (not even the anonymous share viewer) may render until one is updated (ADR 0032).
+const incompatible = computed(() => incompatibility() !== null)
 const appLayout = computed(() => route.meta.layout === 'app')
 // The anonymous public share viewer (cr-0100) wants the full viewport width for its gallery, not the narrow
 // centered card the login/setup public shell uses.
@@ -21,7 +27,12 @@ const plainLayout = computed(() => route.meta.layout === 'plain')
 </script>
 
 <template>
-  <div v-if="appLayout" class="app-shell">
+  <main v-if="incompatible" class="public-shell">
+    <div class="veyq-shell-inner">
+      <IncompatibleScreen />
+    </div>
+  </main>
+  <div v-else-if="appLayout" class="app-shell">
     <div class="app-compact-header">
       <AppSidebar />
       <AppTopbar />
