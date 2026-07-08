@@ -40,6 +40,13 @@
   border-top: 1px solid var(--app-line);
 }
 
+/* The top rule is a divider *between* stacked sections; on the leading section it would draw a stray line at
+   the panel's top edge (nothing precedes it). Drop it — and the doubled top padding — for the first section. */
+.settings-panel > .settings-form:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .settings-form-disabled {
   opacity: 0.72;
 }
