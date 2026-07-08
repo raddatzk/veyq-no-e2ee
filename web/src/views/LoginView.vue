@@ -16,7 +16,7 @@ import { cacheSessionVault, clearSessionVault } from '../features/account/rememb
 import { useCapabilities } from '../shared/state/useCapabilities'
 import { ACCOUNT_DEVICE_TRUST } from '../features/platform/capabilities'
 import { LoginVerifyRequestSessionScopeEnum } from '../api/generated/auth'
-import { importKitFromFile } from '../features/account/emergencyKit/emergencyKit'
+import { importKitFromFile, type KitData } from '../features/account/emergencyKit/emergencyKit'
 import KitScanner from '../features/account/emergencyKit/KitScanner.vue'
 import { vaultState, masterKey } from '../app/vault'
 import { takeAuthPrefill } from '../app/authPrefill'
@@ -150,6 +150,14 @@ function triggerUpload() {
   fileInput.value?.click()
 }
 
+/** Fill the form from an imported/scanned Emergency Kit — both its email and Secret Key. Setting the email
+ *  re-resolves the device state via its watcher; a kit is authoritative, so it overwrites any typed-in email. */
+function applyKit(kit: KitData) {
+  email.value = kit.email
+  secretKey.value = kit.secretKey
+  error.value = ''
+}
+
 async function onUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -157,14 +165,13 @@ async function onUpload(event: Event) {
   if (!file) return
   const kit = await importKitFromFile(file)
   // generic failure — never reveal why a kit couldn't be read
-  if (kit) secretKey.value = kit.secretKey
+  if (kit) applyKit(kit)
   else error.value = t('unlock.kitUnreadable')
 }
 
-function onScanned(kit: { secretKey: string }) {
-  secretKey.value = kit.secretKey
+function onScanned(kit: KitData) {
+  applyKit(kit)
   scanOpen.value = false
-  error.value = ''
 }
 
 async function signOut() {
