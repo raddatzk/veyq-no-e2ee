@@ -1,7 +1,7 @@
 # ADR 0029 — Public viewer share: a sealed per-share key + an anonymous access path
 
 - Status: Accepted
-- Date: 2026-07-07
+- Date: 2026-07-08
 
 ## Context
 
@@ -46,19 +46,34 @@ Adopt a **public viewer share** as a standalone, operator-blind resource address
 5. **The whole subtree.** A share covers the Memory **and everything under it** — its chapters and attached media
    (the subtree rooted at `nodeId`), not just the single node.
 
-6. **Scope of shareable content (v1): PERSONAL scope only.** A curator may public-share **their own** Memories.
-   Public-sharing a **group / tenant** Memory is **deferred** for two reasons: (a) it lets one member expose shared
-   content to the world, which needs a who-may-publish governance policy of its own; and (b) it collides with
-   member-removal rotation (see Consequences — *scope rotation does not revoke a share*): a share of a shared-scope
-   Memory keeps a removed member reading via the link, so group/tenant sharing must decide whether a removal also
-   revokes shares / re-seals the Memory. A **personal** scope has **no member removal**, so neither problem arises —
-   the v1 cut sidesteps both deliberately.
+6. **Scope of shareable content: any scope the caller is a member of** (personal, **group**, or **tenant**). A
+   member may public-share **any Memory in a scope they belong to** — not only their own personal Memories. The
+   two shared-scope questions the earlier v1 cut deferred are **decided**, not sidestepped:
+   - **Who may publish — any member.** Content in a shared scope belongs to all members, and any member could
+     already reach an outsider by other means; a public link is a member capability, not an owner-only one. (This
+     is a *capability*, still `AND`-ed with the instance's `sharing.public-links` / `sharing.uploader-links`
+     capability, [ADR 0032](0032-capability-discovery-version-gating.md), and the role-`AND`-scope gate.)
+   - **Member removal — deactivate the removed member's shares.** Removing a member **soft-revokes every share
+     that member created** in that scope (`enabled = false`, §7). The share is **not** deleted: **any remaining
+     member may re-activate it, which transfers its ownership** to the re-activating member — so an active share
+     is always tied to a *current* member's responsibility, never orphaned to a removed one. This deactivation is
+     the **honest-server forward-secrecy layer for a public link**: because `K_mem` is stable and never re-keyed
+     (Consequences — *scope rotation does not revoke a share*), a link **cannot be rotated away**, so the
+     server-side soft-revoke *is* the revocation. It composes with, and is independent of, the scope-key rotation
+     that member-removal also triggers for a **group** ([ADR 0024](0024-scope-key-rotation.md)); the **tenant**,
+     which revokes by ACL rather than rotation ([ADR 0025](0025-forward-secrecy-policy-per-scope.md)), relies on
+     this deactivation as its **only** forward layer for a public link.
+
+   A **personal** scope has no member removal, so only the first slice's crypto/access-path (§1–§5, §7–§8) applies
+   there; the governance above is inert for it.
 
 7. **Revocation is soft (L1).** `enabled = false` / deleting the record → the next guest request `404`s; an
-   `expiresAt` in the past `404`s. There is **no content-key rotation** for a viewer share: already-downloaded
-   ciphertext (and a saved fragment link) cannot be retracted — a **stated limitation**, consistent with
-   [ADR 0012](0012-content-key-hierarchy.md) (already-read content is never retractable). Heavier defense
-   (re-seal under a fresh `K_mem`) stays available but is not part of viewer-share revoke.
+   `expiresAt` in the past `404`s. The same soft-revoke fires **automatically on member removal** for the removed
+   member's shares (§6), and a re-activation flips `enabled` back on (transferring ownership). There is **no
+   content-key rotation** for a viewer share: already-downloaded ciphertext (and a saved fragment link) cannot be
+   retracted — a **stated limitation**, consistent with [ADR 0012](0012-content-key-hierarchy.md) (already-read
+   content is never retractable). Heavier defense (re-seal under a fresh `K_mem`) stays available but is not part
+   of viewer-share revoke.
 
 8. **Client-integrity honesty (the trust tier), surfaced by reference.** The crypto keeps the operator blind — the
    server never sees `K_share`. But a **no-install viewer is served as operator-controlled web code**, so
@@ -83,17 +98,19 @@ Adopt a **public viewer share** as a standalone, operator-blind resource address
   keeps reading until the **share is revoked separately** (soft revoke → the resolve + gated blob GET `404`, after
   which they can only replay already-downloaded ciphertext). *Scope rotation ≠ share revocation* — two distinct
   surfaces. This is consistent (the Memory was **deliberately** made public), but it breaks the naive expectation
-  that "removing a member cuts their access to everything", and is a primary reason group/tenant sharing is
-  deferred (point 6).
+  that "removing a member cuts their access to everything" — which is exactly **why member removal auto-deactivates
+  the removed member's shares** (§6): since `K_mem` cannot be rotated away, that server-side soft-revoke is the
+  only revocation available, and it is the honest-server forward layer that makes group/tenant sharing sound.
 - **T&S "decryptable-on-report" corollary** ([security model](../crosscutting/security-model.md)): an abuse report
   necessarily includes the full share URL — hence the fragment key — so an operator **can** decrypt a **reported
   public** share. Private, unshared content stays unscannable; this is the intended, honest asymmetry.
 - **New contract** `contracts/api/sharing.openapi.yaml` (create/list/revoke for the curator; the unauthenticated
   resolve + gated blob GET for the guest). Blob bytes reuse the ADR 0013 presigned direct-to-store path.
-- **Deferred, each with its own dependency:** contributor/uploader writes (need a blind upload-capability +
-  public-share presign mirror + anonymous share identities); password protection (fold `Argon2id(passphrase)` into
-  the wrap key); public-sharing of shared-scope Memories (governance); persisted shares / person-resolution;
-  notices / tenant terms; and the foreign-operator-proof no-install viewer (trusted-web / SaaS).
+- **Built since:** contributor/uploader writes ([ADR 0030](0030-contributor-public-share.md) /
+  [ADR 0031](0031-uploader-public-share.md)); public-sharing of **group/tenant** Memories (point 6, this revision).
+- **Deferred, each with its own dependency:** password protection (fold `Argon2id(passphrase)` into the wrap key);
+  persisted shares / person-resolution; notices / tenant terms; and the foreign-operator-proof no-install viewer
+  (trusted-web / SaaS).
 
 ## Alternatives considered
 

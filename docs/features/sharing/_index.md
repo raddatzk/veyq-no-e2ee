@@ -32,6 +32,11 @@ least-privilege is crypto-enforced, and the server stays blind.
   previews (never a download), delete-your-own is **token-gated + ownership-checked**, and the ephemerality is
   warned in four places; personal-scope only; [ADR 0031](../../decisions/0031-uploader-public-share.md); native is
   later parity)
+- [uc.sharing.share-shared-scope](use-cases/uc.sharing.share-shared-scope.md) — **refined** (cr-0104 planned: lift
+  the personal-scope-only restriction so **any member** of a **group/tenant** scope may public-share a Memory there,
+  across all three roles; **member removal soft-revokes** the removed member's shares, **re-activation transfers
+  ownership**; `K_mem` is stable across rotation so the share follows new content and the server-side deactivation
+  is the honest-server revocation; [ADR 0029](../../decisions/0029-public-viewer-share.md) §6)
 
 ## Deferred (later slices, each with its own dependency)
 
@@ -41,7 +46,5 @@ least-privilege is crypto-enforced, and the server stays blind.
   **moderation** (review-before-publish) over the direct-append default; and persisting an uploader's id list
   client-side for **post-reload delete** (still no download).
 - **Password-protected shares** — fold `Argon2id(passphrase)` into the wrap key for link-leak defense.
-- **Public-sharing of group / tenant Memories** — a governance policy (who may publish shared content) plus the
-  *scope-rotation ≠ share-revoke* interaction ([ADR 0029](../../decisions/0029-public-viewer-share.md) §6).
 - **Persisted shares / person-resolution**, **share notices / tenant terms** — legal + cross-scope surfaces.
 - **A foreign-operator-proof no-install viewer** — needs the future trusted-web client (SaaS-era).
