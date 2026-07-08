@@ -1,7 +1,7 @@
 ---
 id: cr-0072
 title: Web Memory cover — a deliberately chosen, cropped cover shown everywhere (card · detail · map)
-status: planned
+status: done
 satisfies: [uc.memory.cover]
 adrs: ["0012"]
 invariants: [operator-blind-e2ee]
@@ -82,7 +82,7 @@ ever sees ciphertext. Web-only (native parity is a later CR, ADR 0010).
 | Surface | A chosen, cropped cover in `wrappedMeta` (no blob/endpoint), shown on card · detail · map | Status |
 |---|---|---|
 | backend / contracts | none — the cover rides the opaque node `wrappedMeta` (`updateNode`/`listNodes`) | ✅ n/a (no change) |
-| web | `memoryCover.ts` + `MemoryCoverImage.vue` + `MemoryCoverDialog.vue`; wired into detail · card · map | ◻ planned |
+| web | `memoryCover.ts` + `MemoryCoverImage.vue` + `MemoryCoverDialog.vue`; wired into detail · card · map | ✅ done |
 | apple / android | native cover picker/crop + display is their own later CR (web-first, ADR 0010) | ◻ **separate (native)** |
 
 ## Definition of done
