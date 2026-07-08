@@ -5,9 +5,12 @@
 // First slice: SEQUENTIAL (one file at a time), fraction-based progress (no speed/ETA), one automatic retry on
 // a transient failure, explicit retry on a hard failure. Operator-blind is entirely `addMedia`'s concern.
 import { reactive, computed } from 'vue'
-import { addMedia } from './media'
+import { addMedia, type AddMediaSource, type AddMediaOptions } from './media'
 
 export type UploadStatus = 'queued' | 'uploading' | 'done' | 'failed' | 'cancelled'
+
+/** How one file is sealed + uploaded — the authed `addMedia` (default) or a share-scoped transport (cr-0101). */
+export type UploadFn = (source: AddMediaSource, opts: AddMediaOptions) => Promise<{ blobId: string; mediaId: string }>
 
 export type UploadFile = {
   id: string
@@ -25,8 +28,24 @@ export type UploadFile = {
   mediaId?: string
 }
 
-/** Where a batch's media attach: the active scope, the Memory node, and its in-memory key. */
-export type UploadTarget = { scopeId: string; nodeId: string; memoryKey: Uint8Array }
+/**
+ * Where a batch's media attach + how they upload. The **authed** curator path passes `{ scopeId, nodeId,
+ * memoryKey }` (the default transport is `addMedia`). The **share** contributor path (cr-0101) passes a
+ * `{ key, upload }` — its own grouping key (for the optimistic tiles) + a share-scoped upload fn. `key` defaults
+ * to `nodeId`, so the internal gallery is unchanged.
+ */
+export type UploadTarget = {
+  scopeId?: string
+  nodeId?: string
+  memoryKey?: Uint8Array
+  /** Grouping key for the optimistic tiles (which view an in-flight file belongs to); defaults to `nodeId`. */
+  key?: string
+  /** The transport for this batch; defaults to the authed `addMedia` over `scopeId`/`nodeId`/`memoryKey`. */
+  upload?: UploadFn
+}
+
+/** The grouping key of a batch — its explicit `key`, else its `nodeId` (the authed default). */
+export const batchKey = (t: UploadTarget): string | undefined => t.key ?? t.nodeId
 
 export type UploadBatch = {
   id: string
@@ -115,8 +134,11 @@ async function uploadOne(file: UploadFile): Promise<void> {
   file.attempts += 1
   try {
     const bytes = new Uint8Array(await file.file.arrayBuffer())
-    // pass the file's creation date so addMedia can fall back to it when the source carries no EXIF date (cr-0066)
-    const { mediaId } = await addMedia(batch.target.scopeId, batch.target.nodeId, batch.target.memoryKey, { bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, undefined, {
+    const t = batch.target
+    // the batch's transport: the share-scoped upload fn, or the authed addMedia over scope/node/K_mem (default).
+    // the file's creation date is passed so a source with no EXIF date can fall back to it (cr-0066).
+    const upload: UploadFn = t.upload ?? ((source, opts) => addMedia(t.scopeId!, t.nodeId!, t.memoryKey!, source, undefined, opts))
+    const { mediaId } = await upload({ bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, {
       onProgress: (p) => {
         file.progress = p
       },
@@ -215,6 +237,24 @@ export function retryFile(fileId: string): void {
     file.error = undefined
     batch.finishedAt = null
     scheduleRunner()
+    return
+  }
+}
+
+/**
+ * Remove a settled file from the queue entirely (cr-0102 uploader delete-own) — drops its optimistic tile and
+ * lets the preview lifecycle revoke its object URL. Empties the batch if it was the last file. Only a settled
+ * file should be removed; an in-flight file must be cancelled first.
+ */
+export function removeFile(fileId: string): void {
+  for (const batch of batches) {
+    const idx = batch.files.findIndex((f) => f.id === fileId)
+    if (idx === -1) continue
+    batch.files.splice(idx, 1)
+    if (batch.files.length === 0) {
+      const bi = batches.indexOf(batch)
+      if (bi !== -1) batches.splice(bi, 1)
+    }
     return
   }
 }

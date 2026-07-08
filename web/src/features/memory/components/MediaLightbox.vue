@@ -29,6 +29,14 @@ const props = defineProps<{
   startIndex: number
   memoryName: string
   coverMediaId?: string | null // the photo currently used as the Memory's cover — marks the "Set as cover" button
+  // --- reuse hooks (cr-0100): the SAME lightbox drives the internal Memory (authed, default) AND the anonymous
+  // public-share viewer. When these are omitted it behaves exactly as before (authed media API). When provided,
+  // the byte/metadata access is injected — the share viewer passes its operator-blind, per-item share loaders.
+  readonly?: boolean // hide every write affordance (set-cover, capture-time edit) — the public viewer is view-only
+  previewLoader?: (item: MediaItem) => Promise<Uint8Array> // fetch+decrypt the preview tier (default: authed openLightbox)
+  originalLoader?: (item: MediaItem) => Promise<Uint8Array> // fetch+decrypt the original (default: authed openOriginal)
+  exifLoader?: (item: MediaItem) => Promise<MediaExif | null> // lazy heavy-EXIF (default: authed getMediaExif; skipped when readonly + absent)
+  metaResolver?: (item: MediaItem) => MediaMeta | null // unseal the listed date/GPS tier (default: unsealMeta under memoryKey)
 }>()
 const emit = defineEmits<{
   close: []
@@ -37,6 +45,14 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+
+// Byte/metadata access, resolved once per item: the injected loader when the host provides one (the share
+// viewer), else the built-in authed media-API path (the internal Memory). Keeps behaviour identical by default.
+const previewOf = (it: MediaItem) => (props.previewLoader ?? ((x: MediaItem) => openLightbox(props.scopeId, props.memoryKey, x)))(it)
+const originalOf = (it: MediaItem) => (props.originalLoader ?? ((x: MediaItem) => openOriginal(props.scopeId, props.memoryKey, x)))(it)
+const metaOf = (it: MediaItem) => (props.metaResolver ?? ((x: MediaItem) => unsealMeta(props.memoryKey, x)))(it)
+const exifOf = (it: MediaItem): Promise<MediaExif | null> =>
+  props.exifLoader ? props.exifLoader(it) : props.readonly ? Promise.resolve(null) : loadMediaExif(props.scopeId, it.mediaId, props.memoryKey)
 
 const current = ref(props.startIndex)
 const previewUrl = ref<string | null>(null)
@@ -77,7 +93,7 @@ async function loadPreview() {
   loading.value = true
   const target = item.value
   try {
-    const bytes = await openLightbox(props.scopeId, props.memoryKey, target)
+    const bytes = await previewOf(target)
     if (item.value !== target) return // navigated away while decrypting — drop this result
     previewUrl.value = URL.createObjectURL(new Blob([bytes as BlobPart]))
   } catch {
@@ -97,10 +113,10 @@ async function loadDetails() {
   capturedAtError.value = false
   const target = item.value
   if (!target) return
-  captured.value = unsealMeta(props.memoryKey, target)
+  captured.value = metaOf(target)
   detailsLoading.value = true
   try {
-    const loaded = await loadMediaExif(props.scopeId, target.mediaId, props.memoryKey)
+    const loaded = await exifOf(target)
     if (item.value === target) exif.value = loaded // ignore a result for an item we've navigated away from
   } catch {
     if (item.value === target) exif.value = null
@@ -113,8 +129,9 @@ watch(current, loadDetails, { immediate: true })
 // --- capturedAt (cr-0066): effective time = override ?? derived original, from the listed capture-time tier ---
 const effectiveCaptured = computed(() => effectiveCapturedAt(captured.value))
 const isCapturedAtCorrected = computed(() => captured.value?.capturedAtOverride !== undefined)
-// editable as soon as the item is shown — even with no date, the user can *set* one (a fresh tier)
-const canEditCapturedAt = computed(() => !!item.value)
+// editable as soon as the item is shown — even with no date, the user can *set* one (a fresh tier). Never in
+// the read-only public viewer (cr-0100) — it has no authed write path.
+const canEditCapturedAt = computed(() => !!item.value && !props.readonly)
 
 /** epoch-ms → the `<input type="datetime-local">` value (local wall-clock, minute precision). */
 function msToDatetimeLocal(ms: number | undefined): string {
@@ -215,7 +232,7 @@ async function download() {
   downloading.value = true
   const target = item.value
   try {
-    const bytes = await openOriginal(props.scopeId, props.memoryKey, target)
+    const bytes = await originalOf(target)
     saveBytes(bytes, derivedDownloadName(props.memoryName, current.value, bytes))
   } catch {
     error.value = true
@@ -262,7 +279,7 @@ onBeforeUnmount(() => {
           <span class="pi" :class="downloading ? 'pi-spin pi-spinner' : 'pi-download'" />
         </button>
         <button
-          v-if="previewable"
+          v-if="previewable && !readonly"
           class="veyq-icon-button lightbox-icon-button"
           :class="{ 'lightbox-cover-active': isCover }"
           type="button"

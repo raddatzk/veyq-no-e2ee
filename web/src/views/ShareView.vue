@@ -1,0 +1,590 @@
+<script setup lang="ts">
+// The anonymous public viewer for a shared Memory (uc.sharing.share-public-viewer, cr-0100, ADR 0029). Mounted
+// at the no-session route `/s/:shareId`; the share key `K_share` rides the URL **#fragment** (`#k=<base64url>`)
+// and is read on device — it never reaches the server. We resolve the share (unauthenticated), unwrap `K_mem`
+// with the fragment key, decrypt names/metadata/media **locally**, and render the Memory **read-only** using the
+// SAME components as the internal Memory — the shared [MediaGrid] (justified layout) + [MediaLightbox] (in
+// `readonly` mode, with the operator-blind per-item share byte-loaders injected) — so a share looks exactly like
+// the Memory it mirrors, minus the curator-only affordances. A footer links to veyq's security docs (the
+// client-integrity trust tier, ADR 0026). Operator-blind: media bytes are fetched direct-from-store via gated
+// presigned GETs, so the operator never learns which media a viewer opens.
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import {
+  resolveShare,
+  openShareGrid,
+  openShareLightbox,
+  openShareOriginal,
+  createContributorIdentity,
+  addSharePhoto,
+  deleteSharePhoto,
+  type ShareItem,
+  type ContributorSession,
+} from '../features/memory/share'
+import { unsealMeta, effectiveCapturedAt, hasDerivatives, type MediaItem } from '../features/memory/media'
+import { isSupportedMediaFile, inferMediaType, enqueueUploads, retryFile, removeFile } from '../features/memory/uploadQueue'
+import { useOptimisticTiles, type OptimisticTileVM } from '../features/memory/useOptimisticTiles'
+import { removedThumbIds } from '../features/memory/optimisticUpload'
+import { galleryDisplayAspectRatio } from '../features/memory/mediaGridLayout'
+import { ShareRole } from '../api/generated/sharing'
+import MediaGrid from '../features/memory/components/MediaGrid.vue'
+import OptimisticTile from '../features/memory/components/OptimisticTile.vue'
+import MediaLightbox from '../features/memory/components/MediaLightbox.vue'
+
+const route = useRoute()
+const { t, locale } = useI18n()
+
+const shareId = String(route.params.shareId ?? '')
+// The fragment key rides `#k=<base64url>` (ADR 0015) — read on device, never sent. Router history strips it from
+// route.hash into `#k=...`; parse it here (empty if absent → an inert link, handled as unavailable).
+const fragmentKey = computed(() => {
+  const h = route.hash.startsWith('#') ? route.hash.slice(1) : route.hash
+  const m = /(?:^|&)k=([^&]+)/.exec(h)
+  return m ? m[1] : ''
+})
+
+const status = ref<'loading' | 'ready' | 'unavailable'>('loading')
+const memoryName = ref('')
+const items = ref<ShareItem[]>([])
+const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL
+const donatedThumbs = new Set<string>() // mediaIds whose thumb is currently a donated optimistic-upload preview
+// mediaId → ShareItem, so the injected lightbox loaders resolve each item's own K_mem (chapters differ).
+const shareById = computed(() => new Map(items.value.map((si) => [si.item.mediaId, si])))
+const listedMediaIds = computed(() => new Set(items.value.map((si) => si.item.mediaId)))
+// Optimistic in-grid upload tiles (cr-0074) — the SAME shared composable as the internal gallery, grouped by
+// this shareId: a contributor's picked photos appear instantly with a progress ring, reconciled once listed.
+const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => shareId), listedMediaIds)
+
+// The security-doc footer link (ADR 0026 trust-tier honesty) — the published wiki, locale-aware.
+const securityDocUrl = computed(() =>
+  locale.value === 'de'
+    ? 'https://github.com/raddatzk/veyq/wiki/sind-meine-daten-sicher'
+    : 'https://github.com/raddatzk/veyq/wiki/is-my-data-safe',
+)
+
+// --- justified grid tiles (fed to the shared MediaGrid) ---------------------
+// Newest-first by effective capture time (undated last) — mirrors the curator gallery's default order.
+const sortedItems = computed(() =>
+  items.value
+    .map((si, i) => ({ si, i, t: effectiveCapturedAt(unsealMeta(si.memoryKey, si.item)) }))
+    .sort((a, b) => {
+      if (a.t === undefined && b.t === undefined) return a.i - b.i
+      if (a.t === undefined) return 1
+      if (b.t === undefined) return -1
+      return b.t - a.t
+    })
+    .map((x) => x.si),
+)
+const FALLBACK_ASPECT = galleryDisplayAspectRatio(undefined, undefined)
+type ShareTileItem =
+  | { id: string; aspectRatio: number; kind: 'optimistic'; optimistic: OptimisticTileVM }
+  | { id: string; aspectRatio: number; kind: 'media'; si: ShareItem }
+const layoutItems = computed<ShareTileItem[]>(() => [
+  // optimistic upload tiles pin ahead of the listed media (the freshest action)
+  ...optimisticTiles.value.map((t) => ({ id: t.layoutId, aspectRatio: t.aspectRatio, kind: 'optimistic' as const, optimistic: t })),
+  ...sortedItems.value.map((si) => {
+    const dims = unsealMeta(si.memoryKey, si.item)
+    return { id: si.item.mediaId, aspectRatio: galleryDisplayAspectRatio(dims?.w, dims?.h) || FALLBACK_ASPECT, kind: 'media' as const, si }
+  }),
+])
+// Show the grid when there's anything to render — listed media OR an in-flight optimistic upload.
+const hasContent = computed(() => items.value.length > 0 || optimisticTiles.value.length > 0)
+
+function revokeThumbs() {
+  for (const url of thumbs.value.values()) URL.revokeObjectURL(url) // incl. donated previews (thumbs owns them post-handoff)
+  thumbs.value = new Map()
+  donatedThumbs.clear()
+}
+
+// --- contributor / uploader (CONTRIBUTOR + UPLOADER shares, cr-0101 / cr-0102) ----------------------------
+// The share role + the root Memory's K_mem (for a contributor/uploader to seal their name + uploads under).
+const role = ref<ShareRole>(ShareRole.Viewer)
+const rootMemoryKey = ref<Uint8Array | null>(null)
+const isContributor = computed(() => role.value === ShareRole.Contributor)
+// UPLOADER (cr-0102, ADR 0031): a write-only drop-box — add photos but the resolve serves no media. The own-view
+// is the optimistic tiles themselves (local previews), session-only: on reload the in-memory queue is empty.
+const isUploader = computed(() => role.value === ShareRole.Uploader)
+// Either contributing role names itself once, then may add photos (the backend accepts both on the upload path).
+const canContribute = computed(() => isContributor.value || isUploader.value)
+// The named contributor session, persisted per-share so a reload keeps the name (never leaves the device).
+const sessionKey = `veyq:share-contributor:${shareId}`
+const session = ref<ContributorSession | null>(null)
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(sessionKey)
+    session.value = raw ? (JSON.parse(raw) as ContributorSession) : null
+  } catch {
+    session.value = null
+  }
+}
+// A CONTRIBUTOR or UPLOADER share shows a mandatory name pre-screen until the visitor has named themselves.
+const needsName = computed(() => status.value === 'ready' && canContribute.value && !session.value)
+const displayName = ref('')
+const naming = ref(false)
+const nameError = ref(false)
+async function submitName() {
+  const name = displayName.value.trim()
+  if (!name || naming.value || !rootMemoryKey.value) return
+  naming.value = true
+  nameError.value = false
+  try {
+    const created = await createContributorIdentity(shareId, rootMemoryKey.value, name)
+    localStorage.setItem(sessionKey, JSON.stringify(created))
+    session.value = created
+  } catch {
+    nameError.value = true
+  } finally {
+    naming.value = false
+  }
+}
+
+// Add photos (contributor): enqueue the picked files on the SHARED upload queue with a share-scoped transport —
+// they render as optimistic tiles (progress/retry) immediately and reconcile into the gallery on completion.
+const fileInput = ref<HTMLInputElement | null>(null)
+function triggerAddPhotos() {
+  fileInput.value?.click()
+}
+function onFilesPicked() {
+  const input = fileInput.value
+  const picked = Array.from(input?.files ?? []).filter(isSupportedMediaFile)
+  if (input) input.value = ''
+  const s = session.value
+  const key = rootMemoryKey.value
+  if (!picked.length || !s || !key) return
+  enqueueUploads(
+    { key: shareId, upload: (source, opts) => addSharePhoto({ shareId, memoryKey: key, ...s }, source, undefined, opts) },
+    picked.map((file) => ({ file, mediaType: inferMediaType(file) })),
+    // CONTRIBUTOR: re-resolve so the contributed photo lists. UPLOADER: never re-resolve (the resolve serves the
+    // uploader no media) — the done optimistic tile stays as the session-only own-view from its local preview.
+    { label: memoryName.value, onComplete: isUploader.value ? undefined : () => void load() },
+  )
+}
+
+// Delete-your-own (UPLOADER, cr-0102): the settled tile carries the returned mediaId — call the token-gated
+// delete endpoint, then drop the file from the queue (its optimistic tile + local preview go). Session-only: after
+// a reload the client no longer holds the id, so delete is reachable only this session.
+const deletingIds = ref<Set<string>>(new Set())
+const deleteError = ref(false)
+async function onDeleteUpload(fileId: string) {
+  const tile = optimisticTiles.value.find((t) => t.fileId === fileId)
+  const mediaId = tile?.mediaId
+  const s = session.value
+  deleteError.value = false
+  if (!mediaId || !s) {
+    removeFile(fileId) // never settled to a media id — just drop the local tile
+    return
+  }
+  deletingIds.value = new Set(deletingIds.value).add(fileId)
+  try {
+    await deleteSharePhoto(shareId, s.contributorToken, mediaId)
+    removeFile(fileId)
+  } catch {
+    deleteError.value = true // keep the tile so the visitor can retry the delete this session
+  } finally {
+    const next = new Set(deletingIds.value)
+    next.delete(fileId)
+    deletingIds.value = next
+  }
+}
+
+// --- lightbox (the SHARED MediaLightbox in readonly mode, share loaders injected) ---------------------------
+const lightboxIndex = ref<number | null>(null)
+const lightboxItems = ref<ShareItem[]>([])
+const lightboxMediaItems = computed(() => lightboxItems.value.map((s) => s.item))
+function openLightboxAt(index: number) {
+  lightboxItems.value = sortedItems.value.slice()
+  lightboxIndex.value = index
+}
+// Injected operator-blind loaders — each resolves the media's ShareItem (its own K_mem) then goes through the
+// gated share-scoped presign endpoint (no auth), so the shared lightbox drives the anonymous viewer unchanged.
+// The shared lightbox requires a `memoryKey` prop, but the share viewer overrides every use of it via the
+// injected loaders/metaResolver (each item carries its own K_mem), so a dummy empty key is passed + never used.
+const unusedMemoryKey = new Uint8Array()
+const previewLoader = (item: MediaItem) => openShareLightbox(shareId, shareById.value.get(item.mediaId)!)
+const originalLoader = (item: MediaItem) => openShareOriginal(shareId, shareById.value.get(item.mediaId)!)
+const metaResolver = (item: MediaItem) => unsealMeta(shareById.value.get(item.mediaId)!.memoryKey, item)
+
+// --- resolve (on mount + after a contribution) ------------------------------
+async function load() {
+  try {
+    const resolved = await resolveShare(shareId, fragmentKey.value)
+    memoryName.value = resolved.memoryName
+    role.value = resolved.role
+    rootMemoryKey.value = resolved.rootMemoryKey
+    // incremental merge (no empty-flash): drop thumbs of removed media; donate a just-uploaded photo's optimistic
+    // preview into `thumbs` so its tile hands off with no gray gap (the real thumbnail replaces it once decrypted).
+    for (const id of removedThumbIds(thumbs.value.keys(), resolved.items.map((si) => si.item))) {
+      const url = thumbs.value.get(id)
+      if (url && !donatedThumbs.has(id)) URL.revokeObjectURL(url)
+      thumbs.value.delete(id)
+      donatedThumbs.delete(id)
+    }
+    for (const si of resolved.items) {
+      if (thumbs.value.has(si.item.mediaId) || !hasDerivatives(si.item)) continue
+      const donorUrl = donorPreviewFor(si.item.mediaId)
+      if (!donorUrl) continue
+      thumbs.value.set(si.item.mediaId, donorUrl)
+      donatedThumbs.add(si.item.mediaId)
+    }
+    thumbs.value = new Map(thumbs.value)
+    items.value = resolved.items
+    status.value = 'ready'
+    // fetch each derivable item's real thumbnail that isn't already shown (parallel, operator-blind)
+    await Promise.all(
+      resolved.items.map(async (si) => {
+        if (!hasDerivatives(si.item)) return
+        if (thumbs.value.has(si.item.mediaId) && !donatedThumbs.has(si.item.mediaId)) return // real thumb already in place
+        try {
+          const bytes = await openShareGrid(shareId, si)
+          const prev = thumbs.value.get(si.item.mediaId)
+          if (prev && !donatedThumbs.has(si.item.mediaId)) URL.revokeObjectURL(prev)
+          thumbs.value.set(si.item.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
+          donatedThumbs.delete(si.item.mediaId)
+          thumbs.value = new Map(thumbs.value)
+        } catch {
+          /* a single failed thumbnail stays a placeholder; the rest render */
+        }
+      }),
+    )
+  } catch {
+    // ShareUnavailableError (bad key / 404) or any unexpected error → the same honest "unavailable" state.
+    status.value = 'unavailable'
+  }
+}
+onMounted(() => {
+  loadSession()
+  void load()
+})
+
+onBeforeUnmount(revokeThumbs)
+</script>
+
+<template>
+  <div class="share-view">
+    <div v-if="status === 'loading'" class="share-view-state">
+      <span class="pi pi-spin pi-spinner" />
+      <span>{{ t('share.loading') }}</span>
+    </div>
+
+    <div v-else-if="status === 'unavailable'" class="share-view-state share-view-unavailable">
+      <span class="pi pi-lock" />
+      <h1>{{ t('share.unavailable') }}</h1>
+      <p>{{ t('share.unavailableHint') }}</p>
+    </div>
+
+    <!-- CONTRIBUTOR / UPLOADER share: a mandatory display-name pre-screen before contributing (ADR 0030 / 0031) -->
+    <div v-else-if="needsName" class="share-view-state share-name-gate">
+      <form class="veyq-surface share-name-card" @submit.prevent="submitName">
+        <h1>{{ memoryName }}</h1>
+        <p class="share-name-intro">{{ isUploader ? t('share.uploaderIntro') : t('share.contributeIntro') }}</p>
+        <!-- warning #1 of 4 (ADR 0031 §5): the session-only ephemerality, up front before the first upload -->
+        <p v-if="isUploader" class="share-uploader-warning">
+          <span class="pi pi-info-circle" />
+          <span>{{ t('share.uploaderEphemeralWarning') }}</span>
+        </p>
+        <label for="share-name-input">{{ t('share.yourName') }}</label>
+        <input
+          id="share-name-input"
+          v-model="displayName"
+          type="text"
+          name="display-name"
+          autocomplete="name"
+          :placeholder="t('share.yourNamePlaceholder')"
+          :disabled="naming"
+        />
+        <button class="share-name-submit" type="submit" :disabled="naming || !displayName.trim()">
+          {{ naming ? t('share.joining') : t('share.join') }}
+        </button>
+        <p v-if="nameError" class="share-error">{{ t('share.joinFailed') }}</p>
+      </form>
+    </div>
+
+    <template v-else>
+      <header class="gallery-header share-view-header">
+        <div class="gallery-header-copy">
+          <h1 class="gallery-title">{{ memoryName }}</h1>
+          <span v-if="!isUploader" class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
+          <span
+            class="share-view-badge"
+            :class="{ 'share-view-badge-uploader': isUploader }"
+          >
+            <span :class="isUploader ? 'pi pi-cloud-upload' : 'pi pi-share-alt'" />
+            {{ isUploader ? t('share.uploaderBadge') : isContributor ? t('share.contributorBadge') : t('share.readonly') }}
+          </span>
+        </div>
+        <div v-if="canContribute" class="share-view-actions">
+          <button type="button" class="share-add-button" @click="triggerAddPhotos">
+            <span class="pi pi-plus" />
+            <span>{{ t('share.addPhotos') }}</span>
+          </button>
+          <input
+            ref="fileInput"
+            type="file"
+            multiple
+            accept="image/*,video/*,.heic,.heif,.mov,.m4v,.mkv,.avi,.tif,.tiff"
+            class="visually-hidden"
+            @change="onFilesPicked"
+          />
+        </div>
+      </header>
+
+      <!-- warning #4 of 4 (ADR 0031 §5): a persistent note that the own-view is session-only + delete-in-session -->
+      <p v-if="isUploader && hasContent" class="share-uploader-note">
+        <span class="pi pi-info-circle" />
+        <span>{{ t('share.uploaderSessionNote') }}</span>
+      </p>
+      <p v-if="deleteError" class="share-error">{{ t('share.deleteFailed') }}</p>
+
+      <!-- warning #3 of 4: the reload empty-state — after a reload the session own-view is gone (not a blank grid) -->
+      <p v-if="!hasContent" class="veyq-empty">
+        {{ isUploader ? t('share.uploaderEmpty') : isContributor ? t('share.emptyContribute') : t('share.empty') }}
+      </p>
+      <MediaGrid v-else :items="layoutItems" :aria-label="memoryName">
+        <template #tile="{ tile, item }">
+          <!-- optimistic in-grid upload tile (cr-0074): the SAME shared OptimisticTile as the internal gallery.
+               For an UPLOADER the settled tile persists as the session-only own-view + carries a per-tile delete. -->
+          <OptimisticTile
+            v-if="item.kind === 'optimistic'"
+            :tile="item.optimistic"
+            :deletable="isUploader"
+            :deleting="deletingIds.has(item.optimistic.fileId)"
+            :style="{
+              transform: `translate(${tile.left}px, ${tile.top}px)`,
+              width: `${tile.renderedWidth}px`,
+              height: `${tile.renderedHeight}px`,
+            }"
+            @retry="retryFile"
+            @delete="onDeleteUpload"
+          />
+          <button
+            v-else
+            class="media-grid-tile"
+            type="button"
+            :data-media-id="item.si.item.mediaId"
+            :style="{
+              transform: `translate(${tile.left}px, ${tile.top}px)`,
+              width: `${tile.renderedWidth}px`,
+              height: `${tile.renderedHeight}px`,
+            }"
+            :aria-label="t('media.openItem', { index: sortedItems.indexOf(item.si) + 1 })"
+            @click="openLightboxAt(sortedItems.indexOf(item.si))"
+          >
+            <img
+              v-if="thumbs.get(item.si.item.mediaId)"
+              class="media-grid-tile-media media-grid-tile-media-loaded"
+              :src="thumbs.get(item.si.item.mediaId)"
+              :alt="memoryName"
+            />
+            <span v-else-if="!hasDerivatives(item.si.item)" class="media-grid-icon pi pi-file" />
+            <span v-else class="media-grid-tile-placeholder" />
+          </button>
+        </template>
+      </MediaGrid>
+    </template>
+
+    <footer class="share-view-footer">
+      <a :href="securityDocUrl" target="_blank" rel="noopener noreferrer">{{ t('share.securityFooter') }}</a>
+    </footer>
+
+    <!-- The SAME lightbox component as the internal Memory, driven read-only with the anonymous share loaders. -->
+    <MediaLightbox
+      v-if="lightboxIndex !== null"
+      :scope-id="shareId"
+      :memory-key="unusedMemoryKey"
+      :items="lightboxMediaItems"
+      :start-index="lightboxIndex"
+      :memory-name="memoryName"
+      readonly
+      :preview-loader="previewLoader"
+      :original-loader="originalLoader"
+      :meta-resolver="metaResolver"
+      @close="lightboxIndex = null"
+    />
+  </div>
+</template>
+
+<style scoped>
+/* The share viewer fills the full viewport (rendered outside the app shell, in the 'plain' layout). Only
+   layout-specific rules live here; the gallery grid (.media-grid / .gallery-tile) + the lightbox skin come from
+   the GLOBAL design-source stylesheets (styles/memory.css + media.css) via the shared components, so a share
+   looks exactly like the internal Memory. */
+.share-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2rem;
+  box-sizing: border-box;
+}
+.share-view-state {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  color: var(--app-muted);
+  text-align: center;
+}
+.share-view-unavailable .pi {
+  font-size: 2rem;
+}
+.share-view-unavailable h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.4rem;
+}
+.share-view-unavailable p {
+  margin: 0;
+  max-width: 30rem;
+}
+/* The header reuses the design-source gallery-header look (title + count); contributor shares add an action. */
+.share-view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.15rem;
+  margin-bottom: 1.15rem;
+  border-bottom: 1px solid var(--app-line);
+}
+.share-view-actions {
+  flex: 0 0 auto;
+}
+.share-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--app-accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.share-add-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* The mandatory contributor name pre-screen — a centered card (design-source login-gate feel). */
+.share-name-gate {
+  flex: 1;
+}
+.share-name-card {
+  display: grid;
+  gap: 0.6rem;
+  width: min(28rem, 100%);
+  padding: 1.75rem;
+  text-align: left;
+}
+.share-name-card h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.share-name-intro {
+  margin: 0 0 0.4rem;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+.share-name-card label {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+.share-name-card input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+}
+.share-name-submit {
+  margin-top: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--app-accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.share-name-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.share-error {
+  margin: 0.25rem 0 0;
+  color: var(--app-danger, #e11d48);
+  font-size: 0.85rem;
+}
+.share-view-header .gallery-header-copy {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.share-view-header .gallery-title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.share-view-header .gallery-count {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.share-view-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.share-view-badge .pi {
+  font-size: 0.85rem;
+}
+/* The uploader badge is a persistent warning tone (session-only own-view), not the neutral read-only badge. */
+.share-view-badge-uploader {
+  color: var(--app-warn, #b45309);
+  font-weight: 700;
+}
+/* The uploader's ephemerality warning in the name pre-screen + the persistent session note above the grid. */
+.share-uploader-warning,
+.share-uploader-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--app-warn, #b45309) 45%, var(--app-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--app-warn, #b45309) 10%, transparent);
+  color: var(--app-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.share-uploader-note {
+  margin-bottom: 1rem;
+}
+.share-uploader-warning .pi,
+.share-uploader-note .pi {
+  margin-top: 0.1rem;
+  color: var(--app-warn, #b45309);
+}
+/* The tile (.media-grid-tile) + its inner classes are fully styled by the GLOBAL design-source stylesheet
+   (styles/memory.css) — the same skin the internal gallery uses — so no per-view tile CSS is needed here. */
+.share-view-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--app-line);
+  text-align: center;
+}
+.share-view-footer a {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+</style>

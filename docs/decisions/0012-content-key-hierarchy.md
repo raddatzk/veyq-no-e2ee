@@ -46,8 +46,11 @@ sharing **cryptographically** enforced:
   - **Public link share:** `symWrap(K_share, K_mem)` where `K_share` is a fresh per-share key whose secret
     rides the **URL fragment** (never the server); the shared Memory's name travels in the share record too,
     re-sealed to `K_share`. A guest opens **only** that Memory.
-  - **Member share** (give one person ongoing access to one Memory): `asymWrap(recipientIdentityPub, K_mem)`
-    — a grant at the Memory grain.
+  - **Member share** (a *registered* recipient gets ongoing access to one Memory):
+    `asymWrap(recipientIdentityPub, K_mem)` — the **same identity-targeted grant as a scope grant (ADR 0020),
+    but scoped to a single Memory's `K_mem`** instead of the whole scope's `K_SC`. Opened with the recipient's
+    identity private key — no link, no fragment key (unlike the public link above, which shares one Memory
+    *anonymously*). A capability of the independent-second-wrap model; **not a built feature** (no use-case yet).
 - Because `K_mem` is random, handing a recipient `K_mem` reveals **neither `K_SC`** (so not the rest of the
   scope) **nor any other Memory's `K_mem`** (each is wrapped under `K_SC`). Least-privilege is **crypto-
   enforced**, not server-gated.

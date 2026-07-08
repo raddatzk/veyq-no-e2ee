@@ -10,6 +10,7 @@ import {
   enqueueUploads,
   cancelFile,
   retryFile,
+  removeFile,
   clearUploads,
   useUploadQueue,
   isSupportedMediaFile,
@@ -102,6 +103,21 @@ describe('uploadQueue — runner', () => {
     await vi.waitFor(() => expect(file.status).toBe('done'))
     expect(calls).toBe(2)
     expect(file.attempts).toBe(2)
+  })
+
+  it('removeFile drops a settled file (cr-0102 uploader delete-own) and empties an exhausted batch', async () => {
+    vi.mocked(addMedia).mockResolvedValue({ blobId: 'b', mediaId: 'media-xyz' })
+    const { batches } = useUploadQueue()
+    enqueueUploads(TARGET, [sel(png('a.png')), sel(png('b.png'))], { label: '2' })
+    const [fileA, fileB] = batches.value[0].files
+    await vi.waitFor(() => expect(fileA.status).toBe('done'))
+    await vi.waitFor(() => expect(fileB.status).toBe('done'))
+
+    removeFile(fileA.id) // one gone, the batch (and the other file) remains
+    expect(batches.value[0].files.map((f) => f.name)).toEqual(['b.png'])
+
+    removeFile(fileB.id) // the last file gone → the whole batch is dropped from the queue
+    expect(batches.value).toHaveLength(0)
   })
 
   it('marks a file failed after the retry is exhausted; retryFile re-runs it', async () => {

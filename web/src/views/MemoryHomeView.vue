@@ -22,6 +22,7 @@ import MemoryBrowse from '../features/memory/components/MemoryBrowse.vue'
 import MemoryDetail from '../features/memory/components/MemoryDetail.vue'
 import NodeMutationDialog from '../features/memory/components/NodeMutationDialog.vue'
 import DeleteNodeDialog from '../features/memory/components/DeleteNodeDialog.vue'
+import ShareDialog from '../features/memory/components/ShareDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +62,13 @@ const memoryKey = computed(() =>
     ? nodeContentKey(epochs.value, treeStore.nodes, currentNodeId.value)
     : null,
 )
+
+// Public-share affordance (cr-0100): v1 offers it only for a **personal-scope MEMORY** the caller owns — a
+// chapter, a folder, or a group/tenant Memory is out of scope (the backend rejects a non-personal node anyway).
+const shareable = computed(
+  () => activeSpace.kind === ScopeKind.Personal && currentNode.value?.kind === NodeKind.Memory,
+)
+const shareVisible = ref(false)
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 const mutationVisible = ref(false)
@@ -172,11 +180,13 @@ async function onDeleteDone() {
         :memory-key="memoryKey"
         :favorite="isFavorite(currentNode.id)"
         :chapters="level.chapters"
+        :shareable="shareable"
         @toggle-favorite="currentNode && onToggleFavorite(currentNode)"
         @rename="currentNode && startRename(currentNode)"
         @delete="currentNode && startDelete(currentNode)"
         @create-chapter="startCreate('create-chapter')"
         @open-chapter="openChapter"
+        @share="shareVisible = true"
         @meta-updated="patchNodeMeta($event.nodeId, $event.wrappedMeta)"
       />
       <MemoryBrowse
@@ -213,6 +223,13 @@ async function onDeleteDone() {
       :node="deleteTarget"
       @done="onDeleteDone"
       @close="deleteVisible = false"
+    />
+    <ShareDialog
+      v-if="shareVisible && currentNode && memoryKey"
+      :node-id="currentNode.id"
+      :memory-key="memoryKey"
+      :memory-name="currentNode.name"
+      @close="shareVisible = false"
     />
   </div>
 </template>

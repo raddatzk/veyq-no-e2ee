@@ -9,6 +9,7 @@ import SettingsHubView from './views/SettingsHubView.vue'
 import TenantJoinView from './views/TenantJoinView.vue'
 import MemoryHomeView from './views/MemoryHomeView.vue'
 import GroupInvitationsView from './views/GroupInvitationsView.vue'
+import ShareView from './views/ShareView.vue'
 
 // Setup slice routing: a fresh instance lands on /setup; an already-set-up instance on /login. /server/settings
 // is the Server-Owner instance-administration page (cr-0050; tenant administration lives there, cr-0009) — it
@@ -33,6 +34,10 @@ const router = createRouter({
     // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
     // preview/register are public and the existing-owner path signs in within the view (cr-0010).
     { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },
+    // Public anonymous viewer share (uc.sharing.share-public-viewer, cr-0100). No session gate — an account-less
+    // visitor opens ONE Memory read-only; the share key rides the #fragment (`/s/{shareId}#k=<K_share>`), resolved
+    // + decrypted client-side. `layout: 'plain'` gives the gallery the full viewport (not the narrow public card).
+    { path: '/s/:shareId', name: 'share', component: ShareView, meta: { layout: 'plain' } },
     { path: '/:pathMatch(.*)*', redirect: { name: 'login' } },
   ],
 })

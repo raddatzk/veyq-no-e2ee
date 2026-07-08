@@ -63,4 +63,6 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   (`{ mediaId, crop }` on the same `wrappedMeta`), shown on the browse card, the detail header, and the map pin
 - Memory journal — markdown sealed under `K_mem`
 - Tracks (GPX) — sealed under `K_mem` (the sealed *location* is now [uc.memory.place](use-cases/uc.memory.place.md))
-- Share a Memory — wrap its `K_mem` to a per-share key / recipient identity — least-privilege, ADR 0012
+- Share a Memory — wrap its `K_mem` to a per-share key (least-privilege, ADR 0012) → the
+  [Sharing](../sharing/_index.md) feature ([uc.sharing.share-public-viewer](../sharing/use-cases/uc.sharing.share-public-viewer.md),
+  **refined**, [ADR 0029](../../decisions/0029-public-viewer-share.md))

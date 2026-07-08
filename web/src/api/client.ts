@@ -21,6 +21,7 @@ import { Configuration as ScopesConfiguration, ScopesApi } from './generated/sco
 import { ContentApi, FavoritesApi, Configuration as ContentConfiguration } from './generated/content'
 import { MediaApi, Configuration as MediaConfiguration } from './generated/media'
 import { TasksApi, Configuration as TasksConfiguration } from './generated/tasks'
+import { SharingApi, Configuration as SharingConfiguration } from './generated/sharing'
 import { session } from '../app/session'
 
 export function setupApi(): SetupApi {
@@ -82,4 +83,15 @@ export function mediaApi(): MediaApi {
 
 export function tasksApi(): TasksApi {
   return new TasksApi(new TasksConfiguration(bearerParams()))
+}
+
+// Public viewer shares (cr-0100). The **curator** ops (create/list/revoke) are bearer-authed like the rest.
+// The **guest** ops (resolve + gated blob GET) are unauthenticated — [publicSharesApi] carries NO token (the
+// anonymous /s/ viewer has no session), so no Authorization header is ever sent from the no-account page.
+export function sharesApi(): SharingApi {
+  return new SharingApi(new SharingConfiguration(bearerParams()))
+}
+
+export function publicSharesApi(): SharingApi {
+  return new SharingApi(new SharingConfiguration({ basePath: session.apiBase }))
 }

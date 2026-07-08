@@ -6,7 +6,7 @@
 // Ported presentation from the design source (legacy/frontend-noe2ee); only the data layer is ours. Decrypted
 // thumbnails become object URLs that are **revoked** on reload / unmount (no lingering plaintext blob URLs).
 // Out of scope (own CRs): journal, chapters + chapter-nested media, map/tracks, playlists, buckets, sharing.
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tabs from 'primevue/tabs'
@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, createBrowserDeriver, type MediaItem } from '../media'
+import { listMedia, openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
 import {
   unsealMemoryLocation,
@@ -29,9 +29,12 @@ import {
 import { unsealMemoryCover, setMemoryCover, FULL_FRAME, type MemoryCover, type CoverSaveIntent } from '../memoryCover'
 import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
-import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio, type MediaGridLayoutTile } from '../mediaGridLayout'
-import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile, useUploadQueue, type UploadFile } from '../uploadQueue'
-import { selectOptimisticUploads, removedThumbIds, optimisticTileId } from '../optimisticUpload'
+import { galleryDisplayAspectRatio } from '../mediaGridLayout'
+import MediaGrid from './MediaGrid.vue'
+import OptimisticTile from './OptimisticTile.vue'
+import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile } from '../uploadQueue'
+import { removedThumbIds } from '../optimisticUpload'
+import { useOptimisticTiles, type OptimisticTileVM } from '../useOptimisticTiles'
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryDateEditor from './MemoryDateEditor.vue'
 import MemoryLocationEditor from './MemoryLocationEditor.vue'
@@ -49,6 +52,7 @@ const props = defineProps<{
   memoryKey: Uint8Array | null
   favorite?: boolean
   chapters?: TreeNode[] // child CHAPTER nodes of this Memory/chapter (cr-0060)
+  shareable?: boolean // this is a personal-scope MEMORY → offer the public-share affordance (cr-0100)
 }>()
 const emit = defineEmits<{
   toggleFavorite: []
@@ -56,6 +60,7 @@ const emit = defineEmits<{
   delete: []
   openChapter: [node: TreeNode]
   createChapter: []
+  share: []
   metaUpdated: [{ nodeId: string; wrappedMeta: string }]
 }>()
 
@@ -74,12 +79,8 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 // --- justified grid (uc.memory.gallery, cr-0059). Each tile's aspect ratio comes from the E2EE-sealed
 // dimensions unwrapped under K_mem (operator-blind); items without sealed dimensions fall back to a default
-// aspect. The layout is recomputed whenever the items or the measured container width change.
-const GAP = 8
-const gridEl = ref<HTMLElement | null>(null)
-const containerWidth = ref(0)
-let gridObserver: ResizeObserver | null = null
-let measureFrame: number | null = null
+// aspect. The container measurement + justified layout live in the shared [MediaGrid] (reused by the public
+// share viewer, cr-0100); here we only assemble the tile list + render each tile's content in its slot.
 
 // The effective capture time of an item (from its sealed metadata tier), or undefined when it has none.
 function capturedAtOf(item: MediaItem): number | undefined {
@@ -314,7 +315,6 @@ async function onCoverSave(intent: CoverSaveIntent) {
   }
 }
 
-const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
 const aspectRatios = computed(() => {
   const key = props.memoryKey
   const m = new Map<string, number>()
@@ -324,128 +324,33 @@ const aspectRatios = computed(() => {
   }
   return m
 })
-// --- optimistic in-grid upload tiles (uc.memory.upload, cr-0074). The global upload queue's still-in-flight
-// files for THIS node render immediately as tiles — an instant local preview (a `URL.createObjectURL` of the
-// user's own file, never uploaded in the clear) + a per-tile progress / failed-with-retry state — pinned ahead
-// of the listed media. Each reconciles into the real decrypted thumbnail once its media lists (matched by the
-// `mediaId` the queue records on `done`); the pure selection/merge logic lives in ../optimisticUpload.
-const { batches: uploadBatches } = useUploadQueue()
-const deriver = createBrowserDeriver()
-const RING_CIRCUMFERENCE = 2 * Math.PI * 16 // the progress-ring radius (see the SVG below)
-type Preview = { url: string; aspectRatio: number; donated: boolean }
-// fileId → { local objectURL, client-probed aspect ratio (4:3 until probed), donated (its url handed to `thumbs`
-// on reconcile so the swap has no gray flash — `thumbs` then owns its revoke) }.
-const previews = reactive(new Map<string, Preview>())
-const donatedThumbs = new Set<string>() // mediaIds in `thumbs` currently backed by a donated preview url
-
+// --- optimistic in-grid upload tiles (uc.memory.upload, cr-0074). The shared [useOptimisticTiles] composable
+// renders the global upload queue's still-in-flight files for THIS node (grouping key = the node id) as instant
+// preview tiles + progress/retry, pinned ahead of the listed media, reconciled into the real thumbnail by
+// `mediaId`. Reused by the anonymous contributor viewer (cr-0101).
 const listedMediaIds = computed(() => new Set(items.value.map((it) => it.mediaId)))
-const optimisticFiles = computed(() => selectOptimisticUploads(uploadBatches.value, props.node.id, listedMediaIds.value))
-const optimisticTiles = computed(() =>
-  optimisticFiles.value.map((f) => {
-    const p = previews.get(f.id)
-    return {
-      layoutId: optimisticTileId(f.id),
-      fileId: f.id,
-      name: f.name,
-      url: p?.url ?? null,
-      aspectRatio: p?.aspectRatio ?? galleryDisplayAspectRatio(undefined, undefined),
-      status: f.status,
-      progress: f.progress,
-      isVideo: f.mediaType.startsWith('video/'),
-    }
-  }),
-)
+const donatedThumbs = new Set<string>() // mediaIds in `thumbs` currently backed by a donated preview url
+const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => props.node.id), listedMediaIds)
 
-// Own the preview lifecycle: mint a local objectURL + probe the aspect ratio as each file appears; revoke +
-// prune when it drops (cancelled / reconciled). A donated url is skipped — `thumbs` owns its revoke by then.
-watch(
-  optimisticFiles,
-  (files) => {
-    const present = new Set(files.map((f) => f.id))
-    for (const [fileId, p] of previews) {
-      if (present.has(fileId)) continue
-      if (!p.donated) URL.revokeObjectURL(p.url)
-      previews.delete(fileId)
-    }
-    for (const f of files) {
-      if (previews.has(f.id)) continue
-      previews.set(f.id, { url: URL.createObjectURL(f.file), aspectRatio: galleryDisplayAspectRatio(undefined, undefined), donated: false })
-      void probeAspectRatio(f)
-    }
-  },
-  { immediate: true },
-)
-
-/** Probe a picked file's intrinsic dimensions client-side (best-effort) and settle its tile's aspect ratio. */
-async function probeAspectRatio(f: UploadFile) {
-  try {
-    const dims = await deriver.probeDimensions?.(f.file, f.mediaType)
-    const p = previews.get(f.id)
-    if (p && dims) previews.set(f.id, { ...p, aspectRatio: galleryDisplayAspectRatio(dims.w, dims.h) })
-  } catch {
-    // best-effort: keep the fallback aspect ratio
-  }
-}
-
-/** Retry a failed optimistic tile's upload (re-enqueues it in the shared queue). */
-function onRetryOptimistic(fileId: string) {
-  retryFile(fileId)
-}
-
-const layout = computed(() =>
-  calculateJustifiedMediaLayout({
-    // optimistic tiles pin ahead of the listed media (the freshest action), in enqueue order
-    items: [
-      ...optimisticTiles.value.map((t) => ({ id: t.layoutId, aspectRatio: t.aspectRatio })),
-      ...sortedItems.value.map((it) => ({ id: it.mediaId, aspectRatio: aspectRatios.value.get(it.mediaId) })),
-    ],
-    containerWidth: containerWidth.value,
-    targetHeight: targetTileHeight.value,
-    gap: GAP,
-  }),
-)
-const itemsById = computed(() => new Map(sortedItems.value.map((it, index) => [it.mediaId, { item: it, index }])))
-const optimisticById = computed(() => new Map(optimisticTiles.value.map((t) => [t.layoutId, t])))
-type OptimisticTile = (typeof optimisticTiles.value)[number]
-type GridTile = MediaGridLayoutTile &
-  ({ kind: 'optimistic'; optimistic: OptimisticTile } | { kind: 'media'; media: MediaItem; index: number })
-const tiles = computed<GridTile[]>(() =>
-  layout.value.tiles.flatMap((tile): GridTile[] => {
-    const opt = optimisticById.value.get(tile.id)
-    if (opt) return [{ ...tile, kind: 'optimistic', optimistic: opt }]
-    const entry = itemsById.value.get(tile.id)
-    return entry ? [{ ...tile, kind: 'media', media: entry.item, index: entry.index }] : []
-  }),
-)
-// Whether the gallery has anything to show — real media or in-flight optimistic uploads. Drives the grid/empty
-// gate: it must NOT depend on the measured `layout` (the grid element has to mount first so its width can be
-// measured — gating on measured tiles would deadlock: no width → no tiles → grid never renders → no width).
-const hasContent = computed(() => items.value.length > 0 || optimisticFiles.value.length > 0)
-
-function measureGrid() {
-  const el = gridEl.value
-  if (!el) return
-  const width = el.getBoundingClientRect().width || el.clientWidth || el.parentElement?.clientWidth || 0
-  if (width > 0) containerWidth.value = Math.floor(width)
-}
-
-function attachGridObserver() {
-  const el = gridEl.value
-  gridObserver?.disconnect()
-  gridObserver = null
-  if (!el) return
-  measureGrid()
-  if (typeof ResizeObserver === 'undefined') return
-  // rAF-debounce so a width change doesn't trip the ResizeObserver loop guard
-  gridObserver = new ResizeObserver(() => {
-    if (measureFrame !== null) return
-    measureFrame = requestAnimationFrame(() => {
-      measureFrame = null
-      measureGrid()
-    })
-  })
-  gridObserver.observe(el)
-}
+// The tile list handed to [MediaGrid] — optimistic upload tiles pinned ahead of the listed media (the freshest
+// action, in enqueue order), each carrying its content so the grid slot renders it without a lookup. MediaGrid
+// runs the justified layout + positions each tile; here we just declare id + aspect + content.
+type MemoryTileItem =
+  | { id: string; aspectRatio: number; kind: 'optimistic'; optimistic: OptimisticTileVM }
+  | { id: string; aspectRatio: number; kind: 'media'; media: MediaItem; index: number }
+const FALLBACK_ASPECT = galleryDisplayAspectRatio(undefined, undefined)
+const layoutItems = computed<MemoryTileItem[]>(() => [
+  ...optimisticTiles.value.map((t) => ({ id: t.layoutId, aspectRatio: t.aspectRatio, kind: 'optimistic' as const, optimistic: t })),
+  ...sortedItems.value.map((it, index) => ({
+    id: it.mediaId,
+    aspectRatio: aspectRatios.value.get(it.mediaId) ?? FALLBACK_ASPECT,
+    kind: 'media' as const,
+    media: it,
+    index,
+  })),
+])
+// Whether the gallery has anything to show — real media or in-flight optimistic uploads.
+const hasContent = computed(() => items.value.length > 0 || optimisticTiles.value.length > 0)
 
 // --- upload trigger (uc.memory.upload). The Safari Photos picker populates input.files LATE / across repeated
 // picks with empty MIME types — so we re-read the input over a short window, MERGE (never replace) the picks,
@@ -506,22 +411,6 @@ function setThumb(mediaId: string, url: string) {
   thumbs.value = new Map(thumbs.value) // reassign so the template reacts
 }
 
-/** Find a done upload's still-live preview for a just-listed media, and mark it donated (so its lifecycle passes
- *  to `thumbs`) — the seamless-handoff source. */
-function donorPreviewFor(mediaId: string): Preview | null {
-  for (const b of uploadBatches.value) {
-    for (const f of b.files) {
-      if (f.status !== 'done' || f.mediaId !== mediaId) continue
-      const p = previews.get(f.id)
-      if (p && !p.donated) {
-        previews.set(f.id, { ...p, donated: true })
-        return previews.get(f.id)!
-      }
-    }
-  }
-  return null
-}
-
 /** Merge a fresh media list into `items` WITHOUT an empty-flash: revoke only the thumbnails of dropped media,
  *  keep the rest in place, and donate a done upload's preview into `thumbs` for each newly-listed media so its
  *  optimistic tile hands off with no gray gap (the real thumbnail replaces the donation once it decrypts). */
@@ -535,9 +424,9 @@ function mergeItems(listed: MediaItem[]) {
   const known = listedMediaIds.value
   for (const m of listed) {
     if (known.has(m.mediaId) || thumbs.value.has(m.mediaId) || !hasDerivatives(m)) continue
-    const donor = donorPreviewFor(m.mediaId)
-    if (!donor) continue
-    thumbs.value.set(m.mediaId, donor.url)
+    const donorUrl = donorPreviewFor(m.mediaId) // the composable marks the preview donated + returns its url
+    if (!donorUrl) continue
+    thumbs.value.set(m.mediaId, donorUrl)
     donatedThumbs.add(m.mediaId)
   }
   thumbs.value = new Map(thumbs.value)
@@ -612,17 +501,10 @@ watch(
   { immediate: true },
 )
 
-// The grid element mounts/unmounts with the ready state; (re)attach the size observer when it appears.
-onMounted(attachGridObserver)
-watch(gridEl, attachGridObserver, { flush: 'post' })
-
 onBeforeUnmount(() => {
   revokeThumbs()
   revokeUploadCover()
-  for (const p of previews.values()) if (!p.donated) URL.revokeObjectURL(p.url) // donated urls are owned by `thumbs`
-  previews.clear()
-  gridObserver?.disconnect()
-  if (measureFrame !== null) cancelAnimationFrame(measureFrame)
+  // the optimistic preview urls are owned + revoked by useOptimisticTiles
 })
 </script>
 
@@ -692,6 +574,17 @@ onBeforeUnmount(() => {
           @change="onFilesPicked"
         />
         <Button
+          v-if="shareable"
+          v-tooltip.bottom="t('share.share')"
+          type="button"
+          :aria-label="t('share.share')"
+          icon="pi pi-share-alt"
+          severity="secondary"
+          text
+          :disabled="!memoryKey"
+          @click="$emit('share')"
+        />
+        <Button
           v-tooltip.bottom="favorite ? t('memory.unfavorite') : t('memory.favorite')"
           type="button"
           class="memory-detail-fav"
@@ -753,79 +646,43 @@ onBeforeUnmount(() => {
                 <span>{{ sortDir === 'newest' ? t('media.sortNewest') : t('media.sortOldest') }}</span>
               </button>
             </div>
-            <div
-              ref="gridEl"
-              class="gallery-grid"
-            :style="{ height: `${layout.height}px` }"
-            :aria-label="t('media.gallery')"
-          >
-            <template v-for="tile in tiles" :key="tile.id">
-              <!-- optimistic in-grid upload tile (cr-0074): the picked file's local preview + progress / retry -->
-              <div
-                v-if="tile.kind === 'optimistic'"
-                class="gallery-tile gallery-tile-optimistic"
-                :class="{ 'is-failed': tile.optimistic.status === 'failed' }"
-                :data-upload-id="tile.optimistic.fileId"
-                :style="{
-                  transform: `translate(${tile.left}px, ${tile.top}px)`,
-                  width: `${tile.renderedWidth}px`,
-                  height: `${tile.renderedHeight}px`,
-                }"
-                :aria-label="t('media.uploadTilePreview', { name: tile.optimistic.name })"
-              >
-                <img
-                  v-if="tile.optimistic.url && !tile.optimistic.isVideo"
-                  class="media-grid-tile-media"
-                  :src="tile.optimistic.url"
-                  :alt="tile.optimistic.name"
+            <MediaGrid :items="layoutItems" :aria-label="t('media.gallery')">
+              <template #tile="{ tile, item }">
+                <!-- optimistic in-grid upload tile (cr-0074): the shared OptimisticTile (preview + progress / retry) -->
+                <OptimisticTile
+                  v-if="item.kind === 'optimistic'"
+                  :tile="item.optimistic"
+                  :style="{
+                    transform: `translate(${tile.left}px, ${tile.top}px)`,
+                    width: `${tile.renderedWidth}px`,
+                    height: `${tile.renderedHeight}px`,
+                  }"
+                  @retry="retryFile"
                 />
-                <span v-else class="media-grid-icon pi pi-video" />
-                <div v-if="tile.optimistic.status === 'failed'" class="upload-tile-state upload-tile-failed">
-                  <span class="pi pi-exclamation-triangle" />
-                  <span class="upload-tile-failed-label">{{ t('media.uploadTileFailed') }}</span>
-                  <button type="button" class="upload-tile-retry" @click.stop="onRetryOptimistic(tile.optimistic.fileId)">
-                    <span class="pi pi-refresh" />
-                    <span>{{ t('media.uploadRetry') }}</span>
-                  </button>
-                </div>
-                <div v-else class="upload-tile-state upload-tile-progress" :aria-label="t('media.uploadStatus.uploading')">
-                  <svg class="upload-ring" viewBox="0 0 36 36" role="progressbar">
-                    <circle class="upload-ring-track" cx="18" cy="18" r="16" />
-                    <circle
-                      class="upload-ring-fill"
-                      :class="{ 'is-indeterminate': tile.optimistic.status === 'queued' }"
-                      cx="18"
-                      cy="18"
-                      r="16"
-                      :stroke-dasharray="`${tile.optimistic.progress * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <button
-                v-else
-                class="gallery-tile"
-                type="button"
-                :data-media-id="tile.media.mediaId"
-                :style="{
-                  transform: `translate(${tile.left}px, ${tile.top}px)`,
-                  width: `${tile.renderedWidth}px`,
-                  height: `${tile.renderedHeight}px`,
-                }"
-                :aria-label="t('media.openItem', { index: tile.index + 1 })"
-                @click="openLightboxAt(tile.index)"
-              >
-                <img
-                  v-if="thumbs.get(tile.media.mediaId)"
-                  class="media-grid-tile-media media-grid-tile-media-loaded"
-                  :src="thumbs.get(tile.media.mediaId)"
-                  :alt="node.name"
-                />
-                <span v-else-if="!hasDerivatives(tile.media)" class="media-grid-icon pi pi-file" />
-                <span v-else class="media-grid-tile-placeholder" />
-              </button>
-            </template>
-            </div>
+                <button
+                  v-else
+                  class="gallery-tile"
+                  type="button"
+                  :data-media-id="item.media.mediaId"
+                  :style="{
+                    transform: `translate(${tile.left}px, ${tile.top}px)`,
+                    width: `${tile.renderedWidth}px`,
+                    height: `${tile.renderedHeight}px`,
+                  }"
+                  :aria-label="t('media.openItem', { index: item.index + 1 })"
+                  @click="openLightboxAt(item.index)"
+                >
+                  <img
+                    v-if="thumbs.get(item.media.mediaId)"
+                    class="media-grid-tile-media media-grid-tile-media-loaded"
+                    :src="thumbs.get(item.media.mediaId)"
+                    :alt="node.name"
+                  />
+                  <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
+                  <span v-else class="media-grid-tile-placeholder" />
+                </button>
+              </template>
+            </MediaGrid>
           </template>
         </TabPanel>
 
@@ -1132,89 +989,5 @@ onBeforeUnmount(() => {
   height: 100%;
   font-size: 1.5rem;
 }
-/* Optimistic upload tile (cr-0074): the picked file shown instantly as a dimmed local preview with a progress
-   overlay; a failed upload dims further and surfaces an inline retry. Not clickable (the lightbox opens the
-   real media once it lands) — a plain div, not a button. */
-.gallery-tile-optimistic {
-  cursor: default;
-}
-.gallery-tile-optimistic .media-grid-tile-media {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.55; /* dim the preview so the progress overlay reads clearly */
-}
-.gallery-tile-optimistic.is-failed .media-grid-tile-media {
-  opacity: 0.3;
-}
-.upload-tile-state {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.5rem;
-  text-align: center;
-}
-.upload-ring {
-  width: 42px;
-  height: 42px;
-  transform: rotate(-90deg); /* start the fill at 12 o'clock */
-}
-.upload-ring-track {
-  fill: none;
-  stroke: color-mix(in srgb, #fff 55%, transparent);
-  stroke-width: 3;
-}
-.upload-ring-fill {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 3;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.2s ease;
-}
-/* A queued file has no real progress yet — spin a short arc until its bytes start moving. */
-.upload-ring-fill.is-indeterminate {
-  stroke-dasharray: 25 100;
-  transform-origin: center;
-  animation: upload-ring-spin 0.9s linear infinite;
-}
-@keyframes upload-ring-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.upload-tile-failed {
-  color: #fff;
-  background: color-mix(in srgb, var(--app-backdrop-strong) 55%, transparent);
-}
-.upload-tile-failed .pi-exclamation-triangle {
-  font-size: 1.25rem;
-}
-.upload-tile-failed-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-.upload-tile-retry {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid color-mix(in srgb, #fff 70%, transparent);
-  border-radius: 999px;
-  background: transparent;
-  color: #fff;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-.upload-tile-retry:hover {
-  background: color-mix(in srgb, #fff 18%, transparent);
-}
-.upload-tile-retry:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-}
+/* The optimistic upload tile's own styles now live in the shared OptimisticTile component (cr-0074). */
 </style>

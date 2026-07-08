@@ -92,6 +92,7 @@ class MediaStore {
         derivatives: List<DerivativeAttach>,
         wrappedMeta: String?,
         wrappedExif: String?,
+        shareIdentityId: String? = null, // cr-0101: the contributor identity, when attached via a CONTRIBUTOR share
     ): Pair<String, String> {
         val originalBlobId = persistBlob(original, originalManifest)
         val mediaId = UUID.randomUUID().toString()
@@ -102,6 +103,7 @@ class MediaStore {
             this.blobId = originalBlobId
             this.wrappedMeta = wrappedMeta
             this.wrappedExif = wrappedExif
+            this.shareIdentityId = shareIdentityId
             createdAt = Instant.now()
         }.persist()
         for (d in derivatives) {

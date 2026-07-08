@@ -100,4 +100,6 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
   open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
   on a future per-Memory **participants** tag (sealed `userId`s)
-- Public share of a subtree — planned (per-share key; least-privilege; the sharing feature)
+- Public share of a subtree — **refined** → [Sharing](../sharing/_index.md)
+  ([uc.sharing.share-public-viewer](../sharing/use-cases/uc.sharing.share-public-viewer.md), [ADR 0029](../../decisions/0029-public-viewer-share.md)):
+  a per-share key, anonymous read-only link, least-privilege (only that one Memory's `K_mem`); v1 = personal-scope

@@ -1,0 +1,53 @@
+### Contributor share — anonymous contributor guest surface (uc.sharing.share-contributor, cr-0101)
+# The contributor endpoints are a genuinely UNAUTHENTICATED guest surface (ADR 0030): naming yourself
+# (`identities`) + the share-scoped upload (`blob-uploads` / `media`) are `@PermitAll`, gated only by share
+# state + a contributor token. So (like sharing.http) this asserts REAL guest behavior — a well-formed but
+# unknown share is a non-enumerable 404 (`share_not_found`, NOT a 401), which proves the paths are public and
+# don't enumerate.
+#
+# The full authenticated happy-path — create a CONTRIBUTOR share → name yourself (sealed under K_mem) → the
+# share-scoped upload attaches to the shared root stamped with the identity → it surfaces in the anonymous
+# resolve → a VIEWER share / bad token / revoked share is rejected — is covered hermetically at the integration
+# layer (ShareContributorSliceTest, which seeds a member + personal scope + a Memory in-tx) and end-to-end in the
+# web client's live smoke. Those need the operator-blind grant flow + client-side crypto, not a bare .http.
+#
+# Run: ijhttp --env-file http/sharing/http-client.env.json --env dev http/sharing/contribute.http
+
+### 1. Name yourself on a well-formed but unknown share, NO bearer → 404 share_not_found (public + non-enumerable)
+POST {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/identities
+Content-Type: application/json
+
+{ "sealedDisplayName": "c2VhbGVkLW5hbWU=" }
+
+> {%
+client.test("identity-create on an unknown share is a public, non-enumerable 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "share_not_found", "expected share_not_found");
+});
+%}
+
+### 2. Start a share-scoped upload on an unknown share, NO bearer → 404 (public; the token can't be checked)
+POST {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/blob-uploads
+Content-Type: application/json
+
+{ "contributorToken": "dG9rZW4", "items": [{ "chunkCount": 1, "byteSize": 16, "wrappedBlobKey": "Ymxvyi13cmFw" }] }
+
+> {%
+client.test("share-scoped upload on an unknown share is a public 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "share_not_found", "expected share_not_found");
+});
+%}
+
+### 3. Complete a share-scoped media on an unknown share, NO bearer → 404
+POST {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/media
+Content-Type: application/json
+
+{ "contributorToken": "dG9rZW4", "items": [{ "originalUploadId": "1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c" }] }
+
+> {%
+client.test("share-scoped complete on an unknown share is a public 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "share_not_found", "expected share_not_found");
+});
+%}

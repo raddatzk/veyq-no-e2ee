@@ -5,7 +5,7 @@
 // (a local preview + progress/error state), pinned ahead of the listed media. Each optimistic tile reconciles
 // into the real decrypted thumbnail once the upload round-trip lists its media — matched by the `mediaId` the
 // queue records on `done` — for a clean 1:1 handoff (never a duplicate).
-import type { UploadBatch, UploadFile } from './uploadQueue'
+import { batchKey, type UploadBatch, type UploadFile } from './uploadQueue'
 import type { MediaItem } from './media'
 
 /** The id an optimistic tile carries in the justified-layout input — namespaced so it can't collide with a
@@ -20,12 +20,12 @@ export const optimisticTileId = (fileId: string): string => `upload:${fileId}`
  */
 export function selectOptimisticUploads(
   batches: readonly UploadBatch[],
-  nodeId: string,
+  key: string,
   listedMediaIds: ReadonlySet<string>,
 ): UploadFile[] {
   const out: UploadFile[] = []
   for (const batch of batches.slice().sort((a, b) => a.seq - b.seq)) {
-    if (batch.target.nodeId !== nodeId) continue
+    if (batchKey(batch.target) !== key) continue
     for (const file of batch.files) {
       if (file.status === 'cancelled') continue
       // reconciled: the real media is now listed under the same id → hand off to the real tile

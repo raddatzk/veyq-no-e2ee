@@ -105,8 +105,16 @@ class MediaHandler(
 
     fun start(userId: String, scopeId: String, declares: List<UploadDeclare>): StartOutcome {
         if (!store.isMember(userId, scopeId)) return StartOutcome.NoScope
-        return StartOutcome.Results(declares.map { startOne(scopeId, it) })
+        return StartOutcome.Results(startForScope(scopeId, declares))
     }
+
+    /**
+     * The member-less core of [start]: reserve a session + presign PUTs per declared blob, scoped only by
+     * `scopeId`. The caller does its own authorization — the member gate ([start]) or the share + contributor
+     * token gate (the CONTRIBUTOR share upload path, cr-0101). Bytes never flow through here.
+     */
+    fun startForScope(scopeId: String, declares: List<UploadDeclare>): List<UploadItemResult> =
+        declares.map { startOne(scopeId, it) }
 
     private fun startOne(scopeId: String, d: UploadDeclare): UploadItemResult {
         if (d.chunkCount < 1 || d.chunkCount > maxChunks || d.byteSize < 0 || d.byteSize > maxBytes) {
@@ -126,15 +134,23 @@ class MediaHandler(
 
     fun complete(userId: String, scopeId: String, items: List<CompleteItem>): CompleteOutcome {
         if (!store.isMember(userId, scopeId)) return CompleteOutcome.NoScope
-        return CompleteOutcome.Results(items.map { completeOne(scopeId, it) })
+        return CompleteOutcome.Results(completeForNode(scopeId, items, null))
     }
+
+    /**
+     * The member-less core of [complete]: verify + attach each item, scoped only by `scopeId`, optionally
+     * stamping a **contributor `shareIdentityId`** (the CONTRIBUTOR share upload path, cr-0101). The caller does
+     * its own authorization. Each item's `nodeId` is honoured (the share path sets it to the shared root node).
+     */
+    fun completeForNode(scopeId: String, items: List<CompleteItem>, shareIdentityId: String?): List<CompleteItemResult> =
+        items.map { completeOne(scopeId, it, shareIdentityId) }
 
     /**
      * Complete one logical media (original + derivative uploads). The item is **atomic**: the node + every
      * upload session are resolved first, then **every** blob is declare-then-verified, and only if all pass are
      * the blobs + media + derivative rows attached. On a budget failure the item's staged objects are purged.
      */
-    private fun completeOne(scopeId: String, item: CompleteItem): CompleteItemResult {
+    private fun completeOne(scopeId: String, item: CompleteItem, shareIdentityId: String? = null): CompleteItemResult {
         val node = store.findNode(scopeId, item.nodeId)
             ?: return CompleteItemResult(null, null, "node_not_found")
         if (node.kind == NodeEntity.FOLDER) return CompleteItemResult(null, null, "illegal_target")
@@ -165,6 +181,7 @@ class MediaHandler(
             derivSessions.map { (kind, s) -> DerivativeAttach(kind, s, manifests[s.id]) },
             item.wrappedMeta,
             item.wrappedExif,
+            shareIdentityId,
         )
         return CompleteItemResult(blobId, mediaId, null)
     }

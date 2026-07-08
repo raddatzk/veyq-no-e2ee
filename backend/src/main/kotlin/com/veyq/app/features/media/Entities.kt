@@ -106,6 +106,10 @@ class MediaEntity : PanacheEntityBase {
     @Column(name = "wrapped_exif")
     var wrappedExif: String? = null
 
+    /** The anonymous **contributor identity** that added this media on a CONTRIBUTOR share (cr-0101); null for curator uploads. Opaque link only. */
+    @Column(name = "share_identity_id", length = 36)
+    var shareIdentityId: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

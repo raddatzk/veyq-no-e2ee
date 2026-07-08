@@ -15,6 +15,9 @@ const route = useRoute()
 const { serverState } = useServerState()
 const { t } = useI18n()
 const appLayout = computed(() => route.meta.layout === 'app')
+// The anonymous public share viewer (cr-0100) wants the full viewport width for its gallery, not the narrow
+// centered card the login/setup public shell uses.
+const plainLayout = computed(() => route.meta.layout === 'plain')
 </script>
 
 <template>
@@ -29,6 +32,9 @@ const appLayout = computed(() => route.meta.layout === 'app')
       </main>
     </div>
   </div>
+  <main v-else-if="plainLayout" class="plain-shell">
+    <RouterView />
+  </main>
   <main v-else class="public-shell">
     <div class="veyq-shell-inner">
       <p v-if="serverState.unreachable" class="veyq-banner" role="alert">{{ t('common.unreachable') }}</p>

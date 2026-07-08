@@ -446,18 +446,39 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Upload cancelled', 'AbortError')
 }
 
+/** One blob to reserve: its declared shape + the K_blob wrap (under K_mem). */
+export type BlobDeclare = { chunkCount: number; byteSize: number; wrappedBlobKey: string }
+/** One reserved upload: the session id + the ordered per-chunk PUT URLs. */
+export type ReservedUpload = { uploadId: string; putUrls: string[] }
+/** One logical media to complete: the original session + its role-tagged derivative sessions + the sealed metadata. */
+export type CompleteDecl = {
+  originalUploadId: string
+  derivatives: { kind: MediaDerivativeKind; uploadId: string }[]
+  wrappedMeta: string | null
+  wrappedExif: string | null
+}
 /**
- * Seal the original + its derivatives, each under its **own** `K_blob`, upload all ciphertext chunks
- * direct-to-store in one batch, and attach the result to `nodeId` (a MEMORY/CHAPTER) as one role-tagged media.
- * Returns the new ids (the original's `blobId` + the `mediaId`). `deriver` is injectable for tests; `opts`
- * carries an `onProgress` (0..1, over the ciphertext chunks) + an `AbortSignal` for the upload queue.
+ * The upload control plane behind [uploadMediaVia] — reserve sessions + presign PUTs, then complete + attach.
+ * The **authed** transport ([mediaApiTransport]) drives the internal Memory upload; the **share-scoped**
+ * transport (share.ts) drives the anonymous contributor upload (cr-0101). The sealing + direct-to-store PUTs
+ * are identical either way — only who authorizes the reserve/complete differs.
  */
-export async function addMedia(
-  scopeId: string,
-  nodeId: string,
+export type MediaUploadTransport = {
+  reserve(declares: BlobDeclare[]): Promise<ReservedUpload[]>
+  complete(media: CompleteDecl): Promise<{ blobId: string; mediaId: string }>
+}
+
+/**
+ * Seal the original + its derivatives (each under its own `K_blob`), upload all ciphertext chunks direct-to-store,
+ * and complete + attach — via an injected [MediaUploadTransport]. Shared by the authed [addMedia] and the
+ * anonymous contributor upload. `deriver` is injectable for tests; `opts` carries `onProgress` (0..1) + an
+ * `AbortSignal`.
+ */
+export async function uploadMediaVia(
   memoryKey: Uint8Array,
   source: AddMediaSource,
-  deriver: MediaDeriver = createBrowserDeriver(),
+  deriver: MediaDeriver,
+  transport: MediaUploadTransport,
   opts: AddMediaOptions = {},
 ): Promise<{ blobId: string; mediaId: string }> {
   const { onProgress, signal } = opts
@@ -469,22 +490,13 @@ export async function addMedia(
   const sealedTiers = tiers.map((t) => ({ kind: t.kind, sealed: sealBlob(memoryKey, t.bytes) }))
   const sealedAll = [sealedOriginal, ...sealedTiers.map((t) => t.sealed)]
 
-  // start — reserve one upload session + presign one PUT per chunk, per blob
+  // reserve — one upload session + presign one PUT per chunk, per blob
   throwIfAborted(signal)
-  const started = await withRefresh(() =>
-    mediaApi().startBlobUploads({
-      scopeId,
-      blobUploadsBatchRequest: {
-        items: sealedAll.map((s) => ({ chunkCount: s.chunkCount, byteSize: s.byteSize, wrappedBlobKey: s.wrappedBlobKey })),
-      },
-    }),
+  const reserved = await transport.reserve(
+    sealedAll.map((s) => ({ chunkCount: s.chunkCount, byteSize: s.byteSize, wrappedBlobKey: s.wrappedBlobKey })),
   )
-  if (started.results.length !== sealedAll.length) throw new Error('upload_failed')
-  const uploads = started.results.map((r, i) => {
-    if (!r || r.error) throw new Error(r?.error ?? 'upload_failed')
-    if (!r.uploadId || !r.presignedPuts) throw new Error('store_unavailable')
-    return { uploadId: r.uploadId, putUrls: byIndex(r.presignedPuts), frames: sealedAll[i].frames }
-  })
+  if (reserved.length !== sealedAll.length) throw new Error('upload_failed')
+  const uploads = reserved.map((r, i) => ({ uploadId: r.uploadId, putUrls: r.putUrls, frames: sealedAll[i].frames }))
 
   // PUT every chunk of every blob straight to the store (no base64, no JSON, no credentials), reporting
   // progress as chunks land and passing the abort signal so a cancel stops the in-flight PUTs.
@@ -504,25 +516,58 @@ export async function addMedia(
 
   // complete — one logical media: the original + its role-tagged derivative uploads
   throwIfAborted(signal)
-  const done = await withRefresh(() =>
-    mediaApi().completeMedia({
-      scopeId,
-      mediaBatchRequest: {
-        items: [
-          {
-            nodeId,
-            originalUploadId: uploads[0].uploadId,
-            derivatives: sealedTiers.map((t, i) => ({ kind: t.kind, uploadId: uploads[i + 1].uploadId })),
-            wrappedMeta,
-            wrappedExif,
+  return transport.complete({
+    originalUploadId: uploads[0].uploadId,
+    derivatives: sealedTiers.map((t, i) => ({ kind: t.kind, uploadId: uploads[i + 1].uploadId })),
+    wrappedMeta,
+    wrappedExif,
+  })
+}
+
+/** The authed upload transport — the internal Memory control plane (`startBlobUploads` + `completeMedia`). */
+function mediaApiTransport(scopeId: string, nodeId: string): MediaUploadTransport {
+  return {
+    async reserve(declares) {
+      const started = await withRefresh(() =>
+        mediaApi().startBlobUploads({ scopeId, blobUploadsBatchRequest: { items: declares } }),
+      )
+      if (started.results.length !== declares.length) throw new Error('upload_failed')
+      return started.results.map((r) => {
+        if (!r || r.error) throw new Error(r?.error ?? 'upload_failed')
+        if (!r.uploadId || !r.presignedPuts) throw new Error('store_unavailable')
+        return { uploadId: r.uploadId, putUrls: byIndex(r.presignedPuts) }
+      })
+    },
+    async complete(media) {
+      const done = await withRefresh(() =>
+        mediaApi().completeMedia({
+          scopeId,
+          mediaBatchRequest: {
+            items: [{ nodeId, originalUploadId: media.originalUploadId, derivatives: media.derivatives, wrappedMeta: media.wrappedMeta, wrappedExif: media.wrappedExif }],
           },
-        ],
-      },
-    }),
-  )
-  const m = done.results[0]
-  if (!m || m.error || !m.blobId || !m.mediaId) throw new Error(m?.error ?? 'attach_failed')
-  return { blobId: m.blobId, mediaId: m.mediaId }
+        }),
+      )
+      const m = done.results[0]
+      if (!m || m.error || !m.blobId || !m.mediaId) throw new Error(m?.error ?? 'attach_failed')
+      return { blobId: m.blobId, mediaId: m.mediaId }
+    },
+  }
+}
+
+/**
+ * Seal the original + its derivatives, upload direct-to-store, and attach to `nodeId` (a MEMORY/CHAPTER) as one
+ * role-tagged media. Returns the new ids. `deriver` is injectable for tests; `opts` carries `onProgress` + an
+ * `AbortSignal` for the upload queue.
+ */
+export async function addMedia(
+  scopeId: string,
+  nodeId: string,
+  memoryKey: Uint8Array,
+  source: AddMediaSource,
+  deriver: MediaDeriver = createBrowserDeriver(),
+  opts: AddMediaOptions = {},
+): Promise<{ blobId: string; mediaId: string }> {
+  return uploadMediaVia(memoryKey, source, deriver, mediaApiTransport(scopeId, nodeId), opts)
 }
 
 // --- standalone cover blob (cr-0073) ---------------------------------------
@@ -667,22 +712,29 @@ export function downloadRef(item: MediaItem): BlobRef {
 }
 
 /**
+ * Open a blob from a set of **already-presigned** per-chunk GET URLs: unwrap its `K_blob` under `K_mem`, fetch
+ * the ciphertext frames direct-from-store, and `openFrame` them back to plaintext (the AAD position check still
+ * applies). Shared by the authed [openBlob] (presign via the media endpoint) and the anonymous share viewer
+ * (presign via the gated share endpoint, cr-0100) — the decrypt is identical; only who presigns differs.
+ */
+export async function openBlobFromUrls(memoryKey: Uint8Array, ref: BlobRef, getUrls: string[]): Promise<Uint8Array> {
+  const blobKey = v1.symUnwrap(memoryKey, fromB64std(ref.wrappedBlobKey), KBLOB_CTX)
+  const frames = await Promise.all(getUrls.map((url) => getChunk(url)))
+  const chunks = frames.map((frame, i) => v1.openFrame(blobKey, i, frames.length, frame))
+  return v1.concat(...chunks)
+}
+
+/**
  * Open a blob: unwrap its `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
  * direct-from-store, and `openFrame` them back to plaintext (the AAD position check still applies).
  */
 export async function openBlob(scopeId: string, memoryKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
-  const blobKey = v1.symUnwrap(memoryKey, fromB64std(ref.wrappedBlobKey), KBLOB_CTX)
-
   const presigned = await withRefresh(() =>
     mediaApi().presignBlobDownloads({ scopeId, blobDownloadsBatchRequest: { items: [{ blobId: ref.blobId }] } }),
   )
   const d = presigned.results[0]
   if (!d || d.error || !d.presignedGets) throw new Error(d?.error ?? 'store_unavailable')
-
-  const getUrls = byIndex(d.presignedGets)
-  const frames = await Promise.all(getUrls.map((url) => getChunk(url)))
-  const chunks = frames.map((frame, i) => v1.openFrame(blobKey, i, frames.length, frame))
-  return v1.concat(...chunks)
+  return openBlobFromUrls(memoryKey, ref, byIndex(d.presignedGets))
 }
 
 /** Open the grid tier (thumbnail) of a media. */

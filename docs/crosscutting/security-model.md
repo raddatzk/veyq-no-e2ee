@@ -165,6 +165,15 @@ server-blind tokens make this work without the server ever seeing content:
   preserve evidence and act. The same intake serves takedown requests.
 - **Consequently:** private (unshared) content is **unscannable** by design; public shares are
   decryptable-on-report — notice-and-takedown works exactly where content is distributed.
+- **Revocation is soft, and independent of scope rotation.** Disabling a share / expiry stops *new* access;
+  already-downloaded content is not retractable. A scope key rotation (a member removal) does **not** revoke a
+  share — a shared `K_mem` is wrapped independently of `K_SC` — so shares are revoked **separately** (a removed
+  member with the link keeps reading until then). The no-install web viewer is operator-served, so it is
+  **passive-operator-safe** (the client-integrity tier, [ADR 0026](../decisions/0026-client-trust-tiers.md)), not
+  operator-proof against a *foreign* operator; the viewer surfaces this honestly via a footer link here.
+- **Full mechanism:** the [Sharing](../features/sharing/_index.md) feature
+  ([ADR 0029](../decisions/0029-public-viewer-share.md) — the public viewer share resource + anonymous access path;
+  v1 = personal-scope, VIEWER only).
 
 ## Key-directory trust — TOFU pinning + out-of-band verification ([ADR 0028](../decisions/0028-identity-authenticity-tofu-verification.md))
 
