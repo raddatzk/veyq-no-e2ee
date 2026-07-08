@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -10,7 +10,7 @@ import Password from 'primevue/password'
 import { registerServerOwner } from '../features/admin/setupServer/setupServer'
 import { forgetAllTrust } from '../features/account/trustDevice/trustDevice'
 import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
-import { downloadKitPdf } from '../features/account/emergencyKit/emergencyKit'
+import EmergencyKitSave from '../features/account/emergencyKit/EmergencyKitSave.vue'
 import { usePwnedWarning } from '../features/account/passwordWarning'
 import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
 import { setAuthPrefill } from '../app/authPrefill'
@@ -25,9 +25,7 @@ const { breachCount } = usePwnedWarning(password)
 const busy = ref(false)
 const error = ref('')
 const secretKey = ref<string | null>(null)
-const kitDownloadTriggered = ref(false)
-const kitBackupConfirmed = ref(false)
-const canProceed = computed(() => kitDownloadTriggered.value && kitBackupConfirmed.value)
+const kitReady = ref(false)
 let kitEmail = ''
 
 async function submit() {
@@ -38,8 +36,7 @@ async function submit() {
     const { emergencyKit } = await registerServerOwner(email.value, password.value)
     kitEmail = email.value
     secretKey.value = emergencyKit.secretKey
-    kitDownloadTriggered.value = false
-    kitBackupConfirmed.value = false
+    kitReady.value = false
     setSetupCompleted(true)
   } catch {
     error.value = t('setup.failed')
@@ -49,7 +46,7 @@ async function submit() {
 }
 
 async function proceed() {
-  if (!canProceed.value) return
+  if (!kitReady.value) return
   // Fresh instance after setup: the owner now holds their Emergency Kit (just downloaded + confirmed), so the
   // Secret Key lives there. Drop any device convenience wraps this browser kept from a previous account /
   // instance (local only — the server is fresh) so the owner's first sign-in is pristine: the Secret-Key field
@@ -58,17 +55,6 @@ async function proceed() {
   // Hand the email + Secret Key to the login form so the owner doesn't retype them right after setup.
   setAuthPrefill(kitEmail, secretKey.value!)
   void router.push({ name: 'login' })
-}
-
-async function downloadKit() {
-  if (!secretKey.value) return
-  error.value = ''
-  try {
-    await downloadKitPdf({ email: kitEmail, secretKey: secretKey.value })
-    kitDownloadTriggered.value = true
-  } catch {
-    error.value = t('kit.downloadFailed')
-  }
 }
 </script>
 
@@ -110,27 +96,14 @@ async function downloadKit() {
       </template>
 
       <template v-else>
-        <p class="veyq-form-copy">{{ t('setup.kitSub') }}</p>
-        <Button
-          type="button"
-          :label="t('kit.download')"
-          icon="pi pi-download"
-          severity="secondary"
-          @click="downloadKit"
-        />
-        <p v-if="kitDownloadTriggered" class="kit-status">
-          <span class="pi pi-check" aria-hidden="true" />
-          {{ t('kit.downloaded') }}
-        </p>
-        <label class="checkbox-row kit-confirm">
-          <input v-model="kitBackupConfirmed" type="checkbox" :disabled="!kitDownloadTriggered" />
-          <span>{{ t('kit.backupDownloadConfirm') }}</span>
-        </label>
+        <EmergencyKitSave :email="kitEmail" :secret-key="secretKey!" v-model="kitReady">
+          <p class="veyq-form-copy">{{ t('setup.kitSub') }}</p>
+        </EmergencyKitSave>
         <Button
           type="button"
           :label="t('setup.kitProceed')"
           icon="pi pi-arrow-right"
-          :disabled="!canProceed"
+          :disabled="!kitReady"
           @click="proceed"
         />
       </template>
@@ -139,17 +112,3 @@ async function downloadKit() {
     </template>
   </Card>
 </template>
-
-<style scoped>
-.kit-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0.75rem 0 0;
-  color: var(--app-success, #22c55e);
-}
-
-.kit-confirm {
-  margin: 0.75rem 0;
-}
-</style>

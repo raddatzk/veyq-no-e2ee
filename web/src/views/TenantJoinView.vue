@@ -9,12 +9,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
-import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { previewInvite, acceptInvite, registerAndAccept, bornTenantScope, tenantError } from '../features/admin/createTenant/tenants'
 import { sealName } from '../features/account/profile/profile'
+import EmergencyKitSave from '../features/account/emergencyKit/EmergencyKitSave.vue'
 import { InviteRole } from '../api/generated/tenants'
 import { buildAccount, type BuiltAccount } from '../features/account/register/accountBirth'
 import { login, withRefresh } from '../features/account/login/login'
@@ -56,7 +56,7 @@ const firstName = ref('')
 const lastName = ref('')
 const password = ref('')
 const secretKeyDisplay = ref('')
-const kitSaved = ref(false)
+const kitReady = ref(false)
 // sign-in form
 const secretKey = ref('')
 // Fast path: the session lapsed while the vault stayed unlocked → ask for the password only (re-login), never
@@ -118,7 +118,7 @@ function sealedNameFor(scopeRootKey: Uint8Array): string | undefined {
 
 /** Register step 2: cold-birth the scope grant to the new identity and register-and-accept. */
 async function finishRegistration() {
-  if (!built || !kitSaved.value) return
+  if (!built || !kitReady.value) return
   error.value = ''
   busy.value = true
   try {
@@ -271,13 +271,11 @@ async function mapError(e: unknown): Promise<string> {
 
       <template v-else-if="phase === 'kit'">
         <Message severity="info" :closable="false">{{ t('tenant.join.saveKitTitle') }}</Message>
-        <p class="veyq-form-copy">{{ t('tenant.join.saveKitSub') }}</p>
-        <pre class="secret-key">{{ secretKeyDisplay }}</pre>
-        <label class="kit-confirm">
-          <Checkbox v-model="kitSaved" :binary="true" /><span>{{ t('tenant.join.kitConfirm') }}</span>
-        </label>
+        <EmergencyKitSave :email="ownerEmail" :secret-key="secretKeyDisplay" v-model="kitReady">
+          <p class="veyq-form-copy">{{ t('tenant.join.saveKitSub') }}</p>
+        </EmergencyKitSave>
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-        <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" :disabled="!kitSaved" @click="finishRegistration" />
+        <Button :label="jcopy('join')" icon="pi pi-check" :loading="busy" :disabled="!kitReady" @click="finishRegistration" />
       </template>
 
       <template v-else-if="phase === 'signin'">
@@ -341,13 +339,4 @@ async function mapError(e: unknown): Promise<string> {
 
 <style scoped>
 .muted { opacity: 0.7; }
-.secret-key {
-  font-family: ui-monospace, monospace;
-  background: var(--p-content-border-color, rgba(255, 255, 255, 0.08));
-  padding: 0.6rem 0.8rem;
-  border-radius: 0.5rem;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.kit-confirm { display: flex; align-items: center; gap: 0.5rem; }
 </style>
