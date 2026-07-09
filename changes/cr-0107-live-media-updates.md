@@ -34,6 +34,9 @@ Memory is open. **Web vertical only; native is a later CR.**
   chapters **subtree** rollup is out of scope. **Cover changes are excluded** from the counter (they write no
   `veyq_media` row, never list). No authenticated curator delete endpoint exists — the delete-reconcile covers the
   share delete-own + node-delete that do.
+- **Forward-compat:** `updated_at` + `media_revision` are the general gallery-media-change signal — a later
+  **highlight** toggle (per-media badge) bumps them the same way, so highlights propagate live through this delta
+  for free (a `wrappedMeta` highlight flag already rides the `setMeta` bump; a separate field calls the same bump).
 
 ## Phases (web vertical; native is a later CR)
 
