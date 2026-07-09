@@ -26,8 +26,9 @@ import java.util.UUID
  * **in-memory store** (metadata only — the byte path is direct-from-store, covered by the store e2e). Covers
  * the six acceptance criteria: create → **anonymous** resolve returns the sealed subtree; the shareId alone is
  * inert (the wrap is opaque); the gated blob GET allows an in-subtree blob (store_unavailable proves authz on
- * the dev store) and 404s an out-of-subtree blob; revoke + expiry 404 the guest paths; a non-personal (group)
- * node create is rejected 422; a non-member/unknown node is 404; resolve leaks nothing outside the subtree.
+ * the dev store) and 404s an out-of-subtree blob; revoke + expiry 404 the guest paths; a non-MEMORY (folder)
+ * node create is rejected 422 (group/tenant shared-scope sharing is cr-0104); a non-member/unknown node is 404;
+ * resolve leaks nothing outside the subtree.
  *
  * With the in-memory store a presign answers `503 store_unavailable` when the blob **is** authorized (proving
  * the subtree gate passed) vs `404 share_not_found` when it is not — so the two codes distinguish "authorized
@@ -154,17 +155,6 @@ class ShareSliceTest {
             .then().statusCode(200)
             .body("find { it.shareId == '$shareId' }.nodeId", equalTo(memory))
             .body("find { it.shareId == '$shareId' }.enabled", equalTo(true))
-    }
-
-    @Test
-    fun nonPersonalScopeNodeIsRejected() {
-        val (userId, scopeId) = seedMemberScope(ScopeEntity.GROUP)
-        val memory = seedNode(scopeId, NodeEntity.MEMORY, parent = scopeId)
-
-        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
-            .body("""{"nodeId":"$memory","role":"VIEWER","wrap":"$wrap","sealedName":"$sealedName"}""")
-            .`when`().post("/api/shares")
-            .then().statusCode(422).body("code", equalTo("illegal_scope"))
     }
 
     @Test

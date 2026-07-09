@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.features.sharing.SharingStore
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
@@ -84,6 +85,7 @@ class TenantHandler(
     private val scopes: ScopesStore,
     private val tasks: TasksStore,
     private val mailer: TenantInviteMailer,
+    private val shares: SharingStore,
     @param:ConfigProperty(name = "veyq.tenant.invite.ttl", defaultValue = "P7D") private val inviteTtl: Duration,
     @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
 ) {
@@ -219,6 +221,9 @@ class TenantHandler(
                             ?.let { scopes.setRole(it, m.scopeId, MembershipEntity.OWNER) }
                     }
                     scopes.removeMembership(targetId, m.scopeId)
+                    // cr-0104: soft-revoke the shares this member created in the shared scope they're removed from
+                    // — their public links 404 now (their own personal/solo-group shares stay through the grace).
+                    shares.deactivateSharesByOwnerInScope(targetId, m.scopeId)
                     // Layer-2 forward secrecy for a co-shared GROUP: the removing owner isn't necessarily a
                     // key-holder here, so queue an async rotation for the next online remaining key-holder to
                     // complete on-device (cr-0092, Fork 1b). Idempotent + coalescing. The TENANT scope is NOT

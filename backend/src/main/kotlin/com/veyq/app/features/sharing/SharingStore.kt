@@ -5,7 +5,6 @@ import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.media.MediaDerivativeEntity
 import com.veyq.app.features.media.MediaEntity
-import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
@@ -69,8 +68,6 @@ class SharingStore {
 
     fun findNode(nodeId: String): NodeEntity? = NodeEntity.findById(nodeId)
 
-    fun scopeKind(scopeId: String): String? = ScopeEntity.findById(scopeId)?.kind
-
     @Transactional
     fun create(
         ownerAccount: String, scopeId: String, nodeId: String, role: String,
@@ -97,6 +94,11 @@ class SharingStore {
     fun listByOwner(ownerAccount: String): List<ShareEntity> =
         ShareEntity.find("ownerAccount = ?1", ownerAccount).list()
 
+    /** Every share on a node, any owner — for the shared-scope manage panel (cr-0104). The handler gates it on
+     *  scope membership; the store just reads the node's shares. */
+    fun listByNode(nodeId: String): List<ShareEntity> =
+        ShareEntity.find("nodeId = ?1", nodeId).list()
+
     /** Soft-revoke a share the caller owns (idempotent). Returns false when no such share is owned by the caller. */
     @Transactional
     fun revoke(ownerAccount: String, shareId: String): Boolean {
@@ -104,6 +106,27 @@ class SharingStore {
         share.enabled = false
         return true
     }
+
+    /** Re-activate a soft-revoked share and adopt its ownership (cr-0104): any current **member** of the share's
+     *  scope may flip `enabled` back on and take `ownerAccount`. False when there is no such share, or the caller
+     *  is not a member of its scope. */
+    @Transactional
+    fun reactivate(callerAccount: String, shareId: String): Boolean {
+        val share = ShareEntity.findById(shareId) ?: return false
+        if (!isMember(callerAccount, share.scopeId)) return false
+        share.enabled = true
+        share.ownerAccount = callerAccount
+        return true
+    }
+
+    /** Soft-revoke every enabled share a removed member created in a scope (cr-0104) — their links then 404 on
+     *  the next resolve/blob GET. Idempotent; other members' shares + the record shape are untouched. */
+    @Transactional
+    fun deactivateSharesByOwnerInScope(ownerAccount: String, scopeId: String): Int =
+        ShareEntity.update(
+            "enabled = false where ownerAccount = ?1 and scopeId = ?2 and enabled = true",
+            ownerAccount, scopeId,
+        )
 
     // --- contributor identities (cr-0101) --------------------------------------
 

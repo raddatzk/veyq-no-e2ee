@@ -93,7 +93,8 @@ note right of S : never serves the uploader a gallery (resolve media=[]);\nholds
   `share_identity_id` stamp (for the curator’s view + the delete check) + ciphertext.
 - **Inherited from the contributor share.** Mandatory sealed name → anonymous identity; the share-scoped upload
   path; direct-append (the curator sees the contributions); byte budget + rate limit; the footer-link trust tier;
-  personal-scope-only; scope-rotation ≠ share-revoke.
+  scope-rotation ≠ share-revoke. cr-0102's personal-scope-only restriction is lifted for group/tenant by
+  [uc.sharing.share-shared-scope](uc.sharing.share-shared-scope.md) (cr-0104).
 
 ## What this means for you / Was das für dich bedeutet
 

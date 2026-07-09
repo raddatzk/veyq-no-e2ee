@@ -100,9 +100,10 @@ note right of S : sees shareId, wrap, role, sealedName, nodeId,\nthe sealed cont
 - **Client-integrity trust tier ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** Same as the viewer:
   the no-install page is passive-operator-safe, not operator-proof against an active foreign operator; surfaced by
   the **footer link** to the security docs. For the self-hosted case (operator = curator) the gap is moot.
-- **Scope rotation ≠ share revocation; personal scope only.** Unchanged from
-  [uc.sharing.share-public-viewer](uc.sharing.share-public-viewer.md) — personal scope has no member removal, so
-  the governance + rotation interactions don't arise; group/tenant contributor shares are deferred.
+- **Scope rotation ≠ share revocation.** Unchanged from
+  [uc.sharing.share-public-viewer](uc.sharing.share-public-viewer.md). cr-0101's personal-scope v1 had no member
+  removal; group/tenant contributor shares — where removal soft-revokes the removed member's shares — are now
+  [uc.sharing.share-shared-scope](uc.sharing.share-shared-scope.md) (cr-0104).
 
 ## What this means for you / Was das für dich bedeutet
 

@@ -9,7 +9,6 @@ import com.veyq.app.features.media.UploadDeclare
 import com.veyq.app.features.media.UploadItemResult
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
-import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import jakarta.enterprise.context.ApplicationScoped
@@ -32,7 +31,7 @@ sealed interface CreateShareOutcome {
     object CapabilityDisabled : CreateShareOutcome
     /** No such node, or the caller holds no grant for its scope (a 404, no reveal). */
     object NoNode : CreateShareOutcome
-    /** The node is not a MEMORY in a **personal** scope (group/tenant sharing deferred, ADR 0029 §6) — a 422. */
+    /** The node is not a MEMORY (only a Memory can be public-shared, ADR 0029 §6) — a 422. */
     object IllegalScope : CreateShareOutcome
 }
 
@@ -86,9 +85,16 @@ sealed interface RevokeShareOutcome {
     object NotFound : RevokeShareOutcome
 }
 
+sealed interface ReactivateShareOutcome {
+    object Done : ReactivateShareOutcome
+    /** No such share, or the caller is not a member of its scope — a non-enumerable 404. */
+    object NotFound : ReactivateShareOutcome
+}
+
 /**
  * Use-case logic for public viewer shares (cr-0100, ADR 0029). Two authorization surfaces:
- *  - **Curator** (create/list/revoke): authenticated + gated to a **personal-scope MEMORY the caller owns**.
+ *  - **Curator** (create/list/revoke/reactivate): authenticated + gated to a **MEMORY in a scope the caller is
+ *    a member of** (personal, group, or tenant — cr-0104).
  *  - **Guest** (resolve/blob): unauthenticated, keyed only on share state (`enabled` + `expiresAt`) — a
  *    parallel authz path, never a relaxed scope filter. The blob GET is authorized structurally (the blob is
  *    attached under the shared subtree), and bytes go **direct-from-store** so the operator never learns which
@@ -111,17 +117,31 @@ class SharingHandler(
         if (!capabilities.isActive(capabilityFor(role))) return CreateShareOutcome.CapabilityDisabled
         val node = store.findNode(nodeId) ?: return CreateShareOutcome.NoNode
         if (!store.isMember(userId, node.scopeId)) return CreateShareOutcome.NoNode // no reveal
-        // v1: only a MEMORY in a PERSONAL scope may be public-shared (ADR 0029 §6, ADR 0030).
+        // Any member of the node's scope may share (cr-0104) — personal, group, or tenant; only a MEMORY node can
+        // be public-shared (ADR 0029 §6, ADR 0030).
         if (node.kind != NodeEntity.MEMORY) return CreateShareOutcome.IllegalScope
-        if (store.scopeKind(node.scopeId) != ScopeEntity.PERSONAL) return CreateShareOutcome.IllegalScope
         val shareId = store.create(userId, node.scopeId, nodeId, role, wrap, sealedName, expiresAt)
         return CreateShareOutcome.Created(shareId)
     }
 
     fun list(userId: String): List<ShareEntity> = store.listByOwner(userId)
 
+    /** Every public share on a Memory node, for the shared-scope manage panel (cr-0104): visible to any **member**
+     *  of the node's scope, not only the shares' owners — so a member can see + adopt an orphaned (disabled) share.
+     *  Empty when the node is unknown or the caller is not a member (no reveal). The resource tags each row `mine`. */
+    fun listForNode(userId: String, nodeId: String): List<ShareEntity> {
+        val node = store.findNode(nodeId) ?: return emptyList()
+        if (!store.isMember(userId, node.scopeId)) return emptyList()
+        return store.listByNode(nodeId)
+    }
+
     fun revoke(userId: String, shareId: String): RevokeShareOutcome =
         if (store.revoke(userId, shareId)) RevokeShareOutcome.Done else RevokeShareOutcome.NotFound
+
+    /** Re-activate a soft-revoked share and adopt it (cr-0104): any current member of the share's scope may flip
+     *  it back on, which transfers ownership to them. A non-member / unknown share is a non-enumerable 404. */
+    fun reactivate(userId: String, shareId: String): ReactivateShareOutcome =
+        if (store.reactivate(userId, shareId)) ReactivateShareOutcome.Done else ReactivateShareOutcome.NotFound
 
     /**
      * Resolve a share for a guest. For a **viewable** role (VIEWER/CONTRIBUTOR) the full sealed subtree + the

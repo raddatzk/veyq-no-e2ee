@@ -3,6 +3,7 @@ package com.veyq.app.features.spaces.scope
 import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
+import com.veyq.app.features.sharing.SharingStore
 import jakarta.enterprise.context.ApplicationScoped
 
 /** Outcome of birthing a personal scope. */
@@ -130,6 +131,7 @@ sealed interface ListMembersOutcome {
 class ScopesHandler(
     private val store: ScopesStore,
     private val capabilities: CapabilityRegistry,
+    private val shares: SharingStore,
 ) {
 
     fun createPersonal(userId: String, host: String?, wrappedGrant: String): CreatePersonalOutcome {
@@ -278,6 +280,9 @@ class ScopesHandler(
         val current = store.memberRole(targetId, scopeId) ?: return RemoveMemberOutcome.MemberNotFound
         if (current == MembershipEntity.OWNER && store.ownerCount(scopeId) <= 1) return RemoveMemberOutcome.LastOwner
         store.removeMembership(targetId, scopeId)
+        // cr-0104: soft-revoke the public shares this member created in the group — their links 404 now. (Layer-1;
+        // the caller's follow-up rotation is the layer-2 forward-secrecy for the group's content, ADR 0024.)
+        shares.deactivateSharesByOwnerInScope(targetId, scopeId)
         return RemoveMemberOutcome.Ok
     }
 

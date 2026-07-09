@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, ShareUnavailableError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, ShareUnavailableError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -149,6 +149,34 @@ describe('createContributorIdentity (cr-0101)', () => {
     // and it unwraps back under K_mem (proves the seal is correct + operator-blind)
     const opened = new TextDecoder().decode(v1.symUnwrap(kMem, fromB64std(req.sealedDisplayName), 'share-identity-name'))
     expect(opened).toBe('Oma')
+  })
+})
+
+describe('shared-scope management (cr-0104)', () => {
+  it('listSharesFor scopes by nodeId server-side and threads each row’s `mine` flag', async () => {
+    const list = vi.fn().mockResolvedValue([
+      { shareId: 's1', nodeId: NODE_ID, role: 'VIEWER', sealedName: 'x', enabled: true, mine: true, createdAt: '2026-07-07T12:00:00Z', expiresAt: null },
+      { shareId: 's2', nodeId: NODE_ID, role: 'VIEWER', sealedName: 'x', enabled: false, mine: false, createdAt: '2026-07-06T12:00:00Z', expiresAt: null },
+    ])
+    vi.mocked(sharesApi).mockReturnValue({ listShares: list } as unknown as ReturnType<typeof sharesApi>)
+
+    const rows = await listSharesFor(NODE_ID)
+
+    expect(list).toHaveBeenCalledWith({ nodeId: NODE_ID }) // server-scoped to the Memory, not a client filter
+    // co-members' shares come back too (mine=false), disabled ones included — newest first
+    expect(rows.map((r) => [r.shareId, r.mine, r.enabled])).toEqual([
+      ['s1', true, true],
+      ['s2', false, false],
+    ])
+  })
+
+  it('reactivateShare adopts a disabled share via the member-gated endpoint', async () => {
+    const reactivate = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(sharesApi).mockReturnValue({ reactivateShare } as unknown as ReturnType<typeof sharesApi>)
+
+    await reactivateShare('share-9')
+
+    expect(reactivate).toHaveBeenCalledWith({ shareId: 'share-9' })
   })
 })
 

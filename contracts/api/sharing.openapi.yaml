@@ -36,13 +36,14 @@ paths:
     post:
       tags: [sharing]
       operationId: createShare
-      summary: Create a public viewer share of a personal-scope Memory.
+      summary: Create a public share of a Memory the caller is a member of (any scope).
       description: >
         The client generates a fresh 32-byte `K_share`, computes `wrap = symWrap(K_share, K_mem)`, re-seals the
         Memory name under `K_share`, and POSTs `{ nodeId, role, wrap, sealedName, expiresAt? }` — `role` is
         **VIEWER** (read-only) or **CONTRIBUTOR** (view + append photos, cr-0101). The server verifies the caller
-        owns the node's **personal** scope (a group/tenant node is rejected `422`, ADR 0029 §6), mints a **256-bit
-        unguessable `shareId`**, and stores the record opaquely. The link is `/s/{shareId}#k=base64url(K_share)` —
+        is a **member** of the node's scope — personal, group, or tenant (cr-0104, ADR 0029 §6); a non-MEMORY node
+        is rejected `422`, a non-member is a non-enumerable `404`. It mints a **256-bit unguessable `shareId`** and
+        stores the record opaquely. The link is `/s/{shareId}#k=base64url(K_share)` —
         the fragment (`K_share`) is built client-side and never sent.
       security:
         - bearerAuth: []
@@ -73,7 +74,7 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "404":
-          description: No such node, or the caller holds no grant for its scope.
+          description: No such node, or the caller is not a member of its scope.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
         "422":
@@ -81,20 +82,27 @@ paths:
             Unprocessable. Two codes: `capability_disabled` — the sharing capability this role needs
             (`sharing.public-links` for VIEWER/CONTRIBUTOR, `sharing.uploader-links` for UPLOADER) is disabled
             instance-wide, so the operator has turned public sharing off (ADR 0032; checked first, before any
-            scope check, so it reads as instance policy not a scope error); `illegal_scope` — the node is not in
-            a **personal** scope (group/tenant public-sharing is deferred, ADR 0029 §6).
+            scope check, so it reads as instance policy not a scope error); `illegal_scope` — the node is not a
+            **MEMORY** (only a Memory can be shared; a non-member scope is a non-enumerable `404`, not `422`).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: capability_disabled } }
     get:
       tags: [sharing]
       operationId: listShares
-      summary: List the caller's shares (opaque management rows).
+      summary: List shares — the caller's own, or (with nodeId) every member's on one Memory.
       description: >
-        Returns every share the authenticated caller has created — the `shareId`, the shared `nodeId`, the
-        `role`, the `K_share`-sealed name, `enabled`, `expiresAt`, and `createdAt`. The curator UI filters by
-        `nodeId` to show a Memory's shares. Operator-blind: the row carries no plaintext name or content.
+        Without `nodeId`: every share the authenticated caller created. With `nodeId`: **every** share on that
+        Memory node visible to a **member of its scope** — not only the caller's (cr-0104), so a member can see
+        and adopt an orphaned (disabled) share on a shared Memory. Each row carries `mine` (owned by the caller).
+        Operator-blind: the row carries no plaintext name or content; a non-member / unknown node yields `[]`.
       security:
         - bearerAuth: []
+      parameters:
+        - name: nodeId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Scope the listing to one Memory node — returns all its shares visible to a scope member.
       responses:
         "200":
           description: The caller's shares.
@@ -130,6 +138,32 @@ paths:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "404":
           description: No such share owned by the caller.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
+
+  /api/shares/{shareId}/reactivate:
+    post:
+      tags: [sharing]
+      operationId: reactivateShare
+      summary: Re-activate a soft-revoked share and adopt its ownership.
+      description: >
+        Re-enables a disabled share (`enabled = true`) and transfers `owner_account` to the caller — for a share
+        auto-deactivated when its creator was removed from the scope (cr-0104, ADR 0029 §6). Any **current member**
+        of the share's scope may adopt it; the link resolves again (its `#k=K_share` fragment is unchanged), now
+        owned by the caller. Idempotent for a share the caller may already adopt.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ShareId"
+      responses:
+        "204":
+          description: The share is enabled and now owned by the caller.
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such share, or the caller is not a member of its scope.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
 
@@ -412,7 +446,7 @@ components:
         nodeId:
           type: string
           format: uuid
-          description: The Memory to share — must be a MEMORY the caller owns in a **personal** scope.
+          description: The Memory to share — must be a MEMORY in a scope the caller is a member of (personal, group, or tenant).
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
         role:
           $ref: "#/components/schemas/ShareRole"
@@ -449,7 +483,7 @@ components:
 
     ShareSummary:
       type: object
-      required: [shareId, nodeId, role, sealedName, enabled, createdAt]
+      required: [shareId, nodeId, role, sealedName, enabled, mine, createdAt]
       properties:
         shareId:
           type: string
@@ -472,6 +506,13 @@ components:
         enabled:
           type: boolean
           description: False once revoked — the guest resolve + blob GET then `404`.
+          example: true
+        mine:
+          type: boolean
+          description: >
+            True when the authenticated caller owns this share (so may revoke it). On a shared-scope Memory the
+            list also includes other members' shares (cr-0104); a disabled share by anyone can be re-activated by
+            a member, which transfers ownership.
           example: true
         expiresAt:
           type: [string, "null"]

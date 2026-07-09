@@ -84,8 +84,9 @@ note right of S : sees shareId, wrap, role, sealedName, nodeId —\nnever K_shar
 - **Revocation is soft (L1); already-read is not retractable.** Revoke/expiry stop *new* access (resolve + gated
   blobs `404`), but content a visitor already downloaded cannot be pulled back — a stated limitation.
 - **Scope rotation ≠ share revocation.** A share is independent of `K_SC`, so a scope key rotation does **not**
-  close it. In **v1 this cannot arise** (personal scope has no member removal); it is the crux of the deferred
-  group/tenant sharing slice ([ADR 0029](../../../decisions/0029-public-viewer-share.md) §6).
+  close it. In **cr-0100's v1 this could not arise** (personal scope has no member removal); group/tenant sharing —
+  where a member IS removed — is now [uc.sharing.share-shared-scope](uc.sharing.share-shared-scope.md) (cr-0104),
+  which soft-revokes the removed member's shares as the honest-server revocation ([ADR 0029](../../../decisions/0029-public-viewer-share.md) §6).
 
 ## What this means for you / Was das für dich bedeutet
 

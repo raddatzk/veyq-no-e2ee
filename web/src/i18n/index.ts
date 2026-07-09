@@ -448,6 +448,11 @@ const en = {
     revoking: 'Revoking…',
     revoked: 'Revoked',
     revokeFailed: 'The link could not be revoked.',
+    reactivate: 'Re-activate',
+    reactivating: 'Re-activating…',
+    reactivateFailed: 'The link could not be re-activated.',
+    disabled: 'Switched off',
+    byMember: 'By another member',
     loadFailed: 'Your links could not be loaded.',
     // the anonymous /s/ viewer
     loading: 'Opening this Memory…',
@@ -923,6 +928,11 @@ const de: typeof en = {
     revoking: 'Wird widerrufen …',
     revoked: 'Widerrufen',
     revokeFailed: 'Der Link konnte nicht widerrufen werden.',
+    reactivate: 'Reaktivieren',
+    reactivating: 'Wird reaktiviert …',
+    reactivateFailed: 'Der Link konnte nicht reaktiviert werden.',
+    disabled: 'Abgeschaltet',
+    byMember: 'Von einem anderen Mitglied',
     loadFailed: 'Deine Links konnten nicht geladen werden.',
     // the anonymous /s/ viewer
     loading: 'Erinnerung wird geöffnet …',

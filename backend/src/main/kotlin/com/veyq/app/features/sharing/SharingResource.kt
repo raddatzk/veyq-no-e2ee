@@ -60,23 +60,35 @@ class SharingResource(
             CreateShareOutcome.IllegalScope -> error(422, "illegal_scope")
         }
 
-    override fun listShares(): Response =
-        Response.ok(handler.list(identity.principal.name).map { s ->
+    override fun listShares(nodeId: UUID?): Response {
+        val me = identity.principal.name
+        // Without nodeId: the caller's own shares. With nodeId: every share on that Memory visible to a scope
+        // member (cr-0104) — `mine` tells the UI which the caller may revoke vs merely see / adopt.
+        val shares = if (nodeId != null) handler.listForNode(me, nodeId.toString()) else handler.list(me)
+        return Response.ok(shares.map { s ->
             ShareSummary(
                 shareId = s.id,
                 nodeId = UUID.fromString(s.nodeId),
                 role = ShareRole.decode(s.role),
                 sealedName = s.sealedName,
                 enabled = s.enabled,
+                mine = s.ownerAccount == me,
                 createdAt = s.createdAt.atOffset(ZoneOffset.UTC),
                 expiresAt = s.expiresAt?.atOffset(ZoneOffset.UTC),
             )
         }).build()
+    }
 
     override fun revokeShare(shareId: String): Response =
         when (handler.revoke(identity.principal.name, shareId)) {
             RevokeShareOutcome.Done -> Response.noContent().build()
             RevokeShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+        }
+
+    override fun reactivateShare(shareId: String): Response =
+        when (handler.reactivate(identity.principal.name, shareId)) {
+            ReactivateShareOutcome.Done -> Response.noContent().build()
+            ReactivateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }
 
     @PermitAll

@@ -32,7 +32,7 @@ least-privilege is crypto-enforced, and the server stays blind.
   previews (never a download), delete-your-own is **token-gated + ownership-checked**, and the ephemerality is
   warned in four places; personal-scope only; [ADR 0031](../../decisions/0031-uploader-public-share.md); native is
   later parity)
-- [uc.sharing.share-shared-scope](use-cases/uc.sharing.share-shared-scope.md) — **refined** (cr-0104 planned: lift
+- [uc.sharing.share-shared-scope](use-cases/uc.sharing.share-shared-scope.md) — **built (web)** (cr-0104: lifts
   the personal-scope-only restriction so **any member** of a **group/tenant** scope may public-share a Memory there,
   across all three roles; **member removal soft-revokes** the removed member's shares, **re-activation transfers
   ownership**; `K_mem` is stable across rotation so the share follows new content and the server-side deactivation

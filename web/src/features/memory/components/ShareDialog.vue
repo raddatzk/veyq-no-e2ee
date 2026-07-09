@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
-import { createShare, listSharesFor, revokeShare, type ManagedShare } from '../share'
+import { createShare, listSharesFor, revokeShare, reactivateShare, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
 import { useCapabilities } from '../../../shared/state/useCapabilities'
 import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
@@ -33,6 +33,8 @@ const revokeError = ref(false)
 const freshLink = ref<string | null>(null)
 const copied = ref(false)
 const revokingId = ref<string | null>(null)
+const reactivatingId = ref<string | null>(null)
+const reactivateError = ref(false)
 
 // The share role to mint: VIEWER (read-only, cr-0100), CONTRIBUTOR (view + add photos, cr-0101), or
 // UPLOADER (write-only drop-box — add photos but can't see the Memory or others', cr-0102, ADR 0031).
@@ -112,6 +114,21 @@ async function onRevoke(shareId: string) {
   }
 }
 
+// cr-0104: re-activate an orphaned (disabled) share on a shared Memory — any member may adopt it; ownership
+// transfers to the caller and the guest link resolves again.
+async function onReactivate(shareId: string) {
+  reactivatingId.value = shareId
+  reactivateError.value = false
+  try {
+    await reactivateShare(shareId)
+    await loadShares()
+  } catch {
+    reactivateError.value = true
+  } finally {
+    reactivatingId.value = null
+  }
+}
+
 function fmtDate(d: Date): string {
   return new Intl.DateTimeFormat(locale.value === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' }).format(d)
 }
@@ -166,9 +183,22 @@ function linkFor(share: ManagedShare): string | null {
             <span class="share-list-role">{{ roleLabel(share.role) }}</span>
             <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
             <span v-if="share.expiresAt" class="share-list-expiry">{{ t('share.expires', { date: fmtDate(share.expiresAt) }) }}</span>
+            <span v-if="!share.mine" class="share-list-note">{{ t('share.byMember') }}</span>
+            <span v-if="!share.enabled" class="share-list-note">{{ t('share.disabled') }}</span>
             <code v-if="linkFor(share)" class="share-list-link">{{ linkFor(share) }}</code>
           </div>
           <Button
+            v-if="!share.enabled"
+            type="button"
+            :label="reactivatingId === share.shareId ? t('share.reactivating') : t('share.reactivate')"
+            icon="pi pi-refresh"
+            severity="secondary"
+            text
+            :disabled="reactivatingId === share.shareId"
+            @click="onReactivate(share.shareId)"
+          />
+          <Button
+            v-else-if="share.mine"
             type="button"
             :label="revokingId === share.shareId ? t('share.revoking') : t('share.revoke')"
             icon="pi pi-trash"
@@ -180,6 +210,7 @@ function linkFor(share: ManagedShare): string | null {
         </li>
       </ul>
       <p v-if="revokeError" class="share-error">{{ t('share.revokeFailed') }}</p>
+      <p v-if="reactivateError" class="share-error">{{ t('share.reactivateFailed') }}</p>
     </section>
   </Dialog>
 </template>
@@ -256,6 +287,10 @@ function linkFor(share: ManagedShare): string | null {
   margin: 0;
   color: var(--app-muted);
   font-size: 0.88rem;
+}
+.share-list-note {
+  color: var(--app-muted);
+  font-size: 0.8rem;
 }
 .share-list {
   list-style: none;

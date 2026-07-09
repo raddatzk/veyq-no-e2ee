@@ -66,15 +66,12 @@ const memoryKey = computed(() =>
     : null,
 )
 
-// Public-share affordance (cr-0100): v1 offers it only for a **personal-scope MEMORY** the caller owns — a
-// chapter, a folder, or a group/tenant Memory is out of scope (the backend rejects a non-personal node anyway).
-// Also gated on the `sharing.public-links` capability (ADR 0032): an operator can turn public sharing off
-// instance-wide, in which case the affordance is hidden entirely (and the server rejects createShare with 422).
+// Public-share affordance: offered for any **MEMORY** in a scope the caller is a member of — personal, group, or
+// tenant (cr-0104; a chapter or folder is out of scope, the backend rejects a non-MEMORY node). Also gated on the
+// `sharing.public-links` capability (ADR 0032): an operator can turn public sharing off instance-wide, in which
+// case the affordance is hidden entirely (and the server rejects createShare with 422).
 const shareable = computed(
-  () =>
-    hasCapability(SHARING_PUBLIC_LINKS) &&
-    activeSpace.kind === ScopeKind.Personal &&
-    currentNode.value?.kind === NodeKind.Memory,
+  () => hasCapability(SHARING_PUBLIC_LINKS) && currentNode.value?.kind === NodeKind.Memory,
 )
 const shareVisible = ref(false)
 

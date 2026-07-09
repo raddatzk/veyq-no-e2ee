@@ -75,20 +75,23 @@ export type ManagedShare = {
   nodeId: string
   role: ShareRole
   enabled: boolean
+  /** True when the caller owns this share (so may revoke it). A disabled share by any member is adoptable (cr-0104). */
+  mine: boolean
   createdAt: Date
   expiresAt: Date | null
 }
 
-/** List the caller's shares for one Memory (filtered by `nodeId`) — for the manage-shares panel. */
+/** List every share on one Memory visible to a scope member (cr-0104) — the manage-shares panel. Scoped by
+ *  `nodeId` server-side, so it includes co-members' shares (each tagged `mine`), not only the caller's own. */
 export async function listSharesFor(nodeId: string): Promise<ManagedShare[]> {
-  const rows = await withRefresh(() => sharesApi().listShares())
+  const rows = await withRefresh(() => sharesApi().listShares({ nodeId }))
   return rows
-    .filter((r) => r.nodeId === nodeId)
     .map((r) => ({
       shareId: r.shareId,
       nodeId: r.nodeId,
       role: r.role,
       enabled: r.enabled,
+      mine: r.mine,
       createdAt: new Date(r.createdAt),
       expiresAt: r.expiresAt ? new Date(r.expiresAt) : null,
     }))
@@ -98,6 +101,12 @@ export async function listSharesFor(nodeId: string): Promise<ManagedShare[]> {
 /** Revoke a share (soft — the next guest request 404s). */
 export async function revokeShare(shareId: string): Promise<void> {
   await withRefresh(() => sharesApi().revokeShare({ shareId }))
+}
+
+/** Re-activate a soft-revoked share and adopt its ownership (cr-0104) — any current member may take over an
+ *  orphaned (disabled) share on a shared Memory; the guest link then resolves again, now owned by the caller. */
+export async function reactivateShare(shareId: string): Promise<void> {
+  await withRefresh(() => sharesApi().reactivateShare({ shareId }))
 }
 
 // --- contributor (anonymous, no session; cr-0101) --------------------------

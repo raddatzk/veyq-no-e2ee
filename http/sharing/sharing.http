@@ -68,3 +68,13 @@ client.test("revoke share requires auth", function () {
     client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
 });
 %}
+
+### 6. Re-activate a share without a bearer token → 401 (curator op, cr-0104)
+POST {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/reactivate
+
+> {%
+client.test("reactivate share requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
