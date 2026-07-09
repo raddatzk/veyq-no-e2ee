@@ -27,12 +27,8 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
 
 1. **`node.media_revision` — a per-node counter, the cheap signal.** A monotonic `INT` on `veyq_node`, **bumped
    on every gallery-media mutation**: attach (curator + contributor/uploader upload complete), meta edit
-   (`updateMediaMeta`, cr-0068), and delete (share delete-own, cr-0102). A future **highlight** toggle (marking a
-   media a highlight — its own CR) is the same kind of mutation and bumps the counter + `updated_at` too, so
-   highlights **ride this delta live** (the media re-delivers with its new flag, like a meta edit) — no separate
-   channel; a `wrappedMeta` flag rides the `setMeta` bump, else the highlight CR calls the same `bumpMediaRevision`.
-   **Cover changes are excluded** — `commitCover`/`clearCover` write no `veyq_media` row and never list, so a cover
-   swap must not force a re-list.
+   (`updateMediaMeta`, cr-0068), and delete (share delete-own, cr-0102). **Cover changes are excluded** —
+   `commitCover`/`clearCover` write no `veyq_media` row and never list, so a cover swap must not force a re-list.
    Reading it is **O(1)** — this is what replaces legacy's O(N)-per-tick hash. It is opaque operational metadata
    (a number), so it is **operator-blind**.
 

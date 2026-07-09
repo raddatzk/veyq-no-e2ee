@@ -64,9 +64,6 @@ removed). The counter read is **O(1)** — this is what makes idle polling cheap
 - **Tightens the `auto`-date self-heal.** New media surfacing into an open grid lets the cr-0067 `auto`-date
   reconcile ([uc.memory.date](uc.memory.date.md) E5) see others' additions sooner — the same `media_revision` the
   date use-case foreshadowed as the blind-safe upgrade.
-- **Highlights ride it for free.** The planned per-media **highlight** (a grid badge) is one more gallery-media
-  mutation: toggling it bumps the media's `updated_at` / the node's revision, so the change re-delivers via the
-  delta and the badge appears/updates **live** on others' open grids — like a meta edit, no separate channel.
 - **Reuse the grid — never invent.** Auto-insert reuses the optimistic-tile grid + `mergeItems` reconcile
   (cr-0074); the poll loop mirrors `grantDeliveryPolling` / `scopeRotationPolling` (interval + visibility gate).
 - **Deferred (out of scope):** long-poll / push for sub-second latency (shared later with the live journal, #6);
