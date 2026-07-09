@@ -8,6 +8,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
+import Popover from 'primevue/popover'
+import TenantAvatar from './TenantAvatar.vue'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { listMyTenants, listMyGroups, type GroupSpace } from '../../features/spaces/scopes'
@@ -74,11 +76,15 @@ async function onGroupCreated(scopeId: string) {
 const myUsername = ref('')
 const personalHash = computed(() => `#${personalScope(myUsername.value)}`)
 
-// The shared tenant space is labelled with the tenant's own name (membership metadata — no sealed name to
-// decrypt); falls back to a generic "Shared" until the tenant list resolves.
-const tenantLabel = computed(
-  () => tenants.value.find((tn) => tn.tenantId === activeSpace.tenantId)?.name ?? t('shell.shared'),
+// The active tenant drives the merged switcher row (cr-0108): its avatar + name + domain, and its body enters
+// the shared Tenant home. Falls back to the first known tenant until the active id resolves.
+const activeTenant = computed(
+  () => tenants.value.find((tn) => tn.tenantId === activeSpace.tenantId) ?? tenants.value[0] ?? null,
 )
+
+// The all-tenants overview (cr-0108): a chevron on the active row toggles this popup; it lists every tenant the
+// member belongs to and switches on select. Shown only when there is more than one tenant to switch between.
+const tenantOverview = ref<InstanceType<typeof Popover> | null>(null)
 
 // The pinned Memories, resolved against the local decrypted tree (a favorite whose node is gone just drops).
 const favoriteMemories = computed(() =>
@@ -101,10 +107,6 @@ onMounted(async () => {
   }
   await loadGroups()
 })
-
-function tenantInitial(value: string): string {
-  return value.trim().charAt(0).toUpperCase() || 'V'
-}
 
 function isActive(tenant: MyTenant): boolean {
   return tenant.tenantId === activeSpace.tenantId
@@ -136,57 +138,73 @@ function closeMobileMenu() {
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('shell.spaces') }}</p>
       </div>
-      <div class="sidebar-tenant-switcher">
-        <div v-for="tenant in tenants" :key="tenant.tenantId" class="sidebar-tenant-item">
-          <div
-            v-if="isActive(tenant)"
-            class="sidebar-tenant-link sidebar-tenant-link-active"
-            :title="tenant.name"
-          >
-            <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
-            <span class="sidebar-tenant-text">
-              <strong>{{ tenant.name }}</strong>
-              <!-- Awaiting access: a grant-less member is on this tenant but has no key yet (cr-0077). The
-                   token-less home fell back to Personal (activeSpace.tenantUnavailable); a key-holder delivers
-                   the grant automatically (cr-0076), then this clears on the next entry. -->
-              <small v-if="activeSpace.tenantUnavailable" class="sidebar-tenant-awaiting">
-                {{ t('members.awaitingAccess') }}
-              </small>
-              <small v-else>{{ tenant.domain }}</small>
-            </span>
-          </div>
+      <!-- The tenant switcher and the shared-Tenant-space entry are one row (cr-0108): the body enters the
+           token-less Tenant home; a chevron opens the all-tenants overview. Both are labelled with the active
+           tenant, so a single row replaces the old inline switcher list + the separate Tenant-space nav link. -->
+      <div v-if="activeTenant" class="sidebar-tenant-switcher">
+        <div class="sidebar-tenant-active">
+          <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: '' }" custom>
+            <a
+              :href="href"
+              class="sidebar-tenant-link sidebar-tenant-space-link"
+              :class="{ 'router-link-active': tenantActive }"
+              :title="activeTenant.name"
+              @click="navigate"
+            >
+              <TenantAvatar :name="activeTenant.name" active />
+              <span class="sidebar-tenant-text">
+                <strong>{{ activeTenant.name }}</strong>
+                <!-- Awaiting access: a grant-less member is on this tenant but has no key yet (cr-0077). The
+                     token-less home fell back to Personal (activeSpace.tenantUnavailable); a key-holder delivers
+                     the grant automatically (cr-0076), then this clears on the next entry. -->
+                <small v-if="activeSpace.tenantUnavailable" class="sidebar-tenant-awaiting">
+                  {{ t('members.awaitingAccess') }}
+                </small>
+                <small v-else>{{ activeTenant.domain }}</small>
+              </span>
+            </a>
+          </RouterLink>
+          <!-- Only when there is somewhere to switch to (self-hosted is usually a single tenant). -->
           <button
-            v-else
-            class="sidebar-tenant-link"
-            :title="tenant.name"
+            v-if="tenants.length > 1"
+            class="sidebar-tenant-switch"
             type="button"
-            @click="switchTenant(tenant)"
+            :title="t('shell.tenantSwitch')"
+            :aria-label="t('shell.tenantSwitch')"
+            aria-haspopup="menu"
+            @click="tenantOverview?.toggle($event)"
           >
-            <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
-            <span class="sidebar-tenant-text">
-              <strong>{{ tenant.name }}</strong>
-              <small>{{ tenant.domain }}</small>
-            </span>
+            <span class="pi pi-chevron-down" />
           </button>
         </div>
+        <Popover ref="tenantOverview" class="sidebar-tenant-overview">
+          <p class="sidebar-tenant-overview-label">{{ t('shell.tenantSwitch') }}</p>
+          <div class="sidebar-tenant-overview-list">
+            <button
+              v-for="tenant in tenants"
+              :key="tenant.tenantId"
+              class="sidebar-tenant-link"
+              :class="{ 'sidebar-tenant-link-active': isActive(tenant) }"
+              type="button"
+              :title="tenant.name"
+              @click="switchTenant(tenant); tenantOverview?.hide()"
+            >
+              <TenantAvatar :name="tenant.name" :active="isActive(tenant)" />
+              <span class="sidebar-tenant-text">
+                <strong>{{ tenant.name }}</strong>
+                <small>{{ tenant.domain }}</small>
+              </span>
+              <span v-if="isActive(tenant)" class="pi pi-check sidebar-tenant-current" aria-hidden="true" />
+            </button>
+          </div>
+        </Popover>
       </div>
     </section>
 
     <nav class="sidebar-nav" :aria-label="t('shell.spaces')">
-      <!-- Both entries share the `/` path (only the fragment differs), so we drive the active class from the
-           leading token ourselves rather than RouterLink's path-based `router-link-active`. The shared tenant
-           space is the token-less home; Personal rides `#~me`. -->
-      <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: '' }" custom>
-        <a
-          :href="href"
-          class="sidebar-nav-link sidebar-tenant-space-link"
-          :class="{ 'router-link-active': tenantActive }"
-          @click="navigate"
-        >
-          <span class="pi pi-users" />
-          <span>{{ tenantLabel }}</span>
-        </a>
-      </RouterLink>
+      <!-- The shared Tenant home is the active-tenant row above (cr-0108); Personal rides `#~me`. Both share the
+           `/` path (only the fragment differs), so the active class is driven from the leading token, not
+           RouterLink's path-based `router-link-active`. -->
       <RouterLink v-slot="{ href, navigate }" :to="{ name: 'home', hash: personalHash }" custom>
         <a
           :href="href"
@@ -286,34 +304,37 @@ function closeMobileMenu() {
 
     <Dialog v-model:visible="mobileMenuOpen" modal position="bottom" class="tenant-dialog mobile-nav-dialog" :header="t('shell.menu')">
       <div class="mobile-nav-sheet">
+        <!-- One BEREICHE group (cr-0108): the active tenant row enters the shared Tenant home (the old separate
+             "Gemeinsam" entry, folded in), other tenants switch, and Personal follows — mirroring the desktop
+             merge. No popover here; the full sheet lists the tenants inline. -->
         <section class="mobile-nav-section">
           <h2>{{ t('shell.spaces') }}</h2>
           <div class="mobile-nav-list">
-            <button
-              v-for="tenant in tenants"
-              :key="tenant.tenantId"
-              class="mobile-nav-item"
-              :class="{ 'mobile-nav-item-active': isActive(tenant) }"
-              type="button"
-              @click="switchTenant(tenant); closeMobileMenu()"
-            >
-              <span class="sidebar-tenant-avatar"><span>{{ tenantInitial(tenant.name) }}</span></span>
-              <span><strong>{{ tenant.name }}</strong><small>{{ tenant.domain }}</small></span>
-            </button>
-          </div>
-        </section>
-
-        <section class="mobile-nav-section">
-          <h2>{{ tenantLabel }}</h2>
-          <div class="mobile-nav-list">
-            <RouterLink
-              :to="{ name: 'home', hash: '' }"
-              class="mobile-nav-item"
-              :class="{ 'mobile-nav-item-active': tenantActive }"
-              @click="closeMobileMenu"
-            >
-              <span class="sidebar-scope-icon pi pi-users" /><span>{{ t('shell.shared') }}</span>
-            </RouterLink>
+            <template v-for="tenant in tenants" :key="tenant.tenantId">
+              <RouterLink
+                v-if="isActive(tenant)"
+                :to="{ name: 'home', hash: '' }"
+                class="mobile-nav-item"
+                :class="{ 'mobile-nav-item-active': tenantActive }"
+                @click="closeMobileMenu"
+              >
+                <TenantAvatar :name="tenant.name" active />
+                <span>
+                  <strong>{{ tenant.name }}</strong>
+                  <small v-if="activeSpace.tenantUnavailable" class="sidebar-tenant-awaiting">{{ t('members.awaitingAccess') }}</small>
+                  <small v-else>{{ tenant.domain }}</small>
+                </span>
+              </RouterLink>
+              <button
+                v-else
+                class="mobile-nav-item"
+                type="button"
+                @click="switchTenant(tenant); closeMobileMenu()"
+              >
+                <TenantAvatar :name="tenant.name" />
+                <span><strong>{{ tenant.name }}</strong><small>{{ tenant.domain }}</small></span>
+              </button>
+            </template>
             <RouterLink
               :to="{ name: 'home', hash: personalHash }"
               class="mobile-nav-item"

@@ -4,7 +4,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 
-// The tenant list is a network call (onMounted) — hand it a single seeded tenant.
+// The tenant list is a network call (onMounted) — hand it a single seeded tenant (a test overrides it for the
+// multi-tenant overview).
 vi.mock('../../features/spaces/scopes', () => ({
   listMyTenants: vi.fn().mockResolvedValue([
     { tenantId: 't-1', name: 'Familie Muster', domain: '127.0.0.1', role: 'OWNER' },
@@ -12,6 +13,7 @@ vi.mock('../../features/spaces/scopes', () => ({
 }))
 
 import AppSidebar from './AppSidebar.vue'
+import { listMyTenants } from '../../features/spaces/scopes'
 import { activeSpace, clearActiveSpace } from '../../app/activeSpace'
 
 const i18n = createI18n({
@@ -19,11 +21,19 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
-      shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', favorites: 'Favorites', menu: 'Navigation', menuOpen: 'Open navigation' },
+      shell: { spaces: 'Spaces', personal: 'Personal', shared: 'Shared', tenantSwitch: 'Switch space', favorites: 'Favorites', menu: 'Navigation', menuOpen: 'Open navigation' },
       members: { awaitingAccess: 'Awaiting access' },
     },
   },
 })
+
+// The overview lives in a teleporting PrimeVue Popover — stub it with a pass-through that always renders its
+// slot (so the tenant list is assertable) and exposes the toggle/hide the trigger calls.
+const PopoverStub = { template: '<div class="popover-stub"><slot /></div>', methods: { toggle() {}, hide() {} } }
+
+// The mobile sheet's teleporting PrimeVue Dialog needs the PrimeVue plugin's config to render — stub it with a
+// pass-through that renders its slot only when visible (also lets the mobile-sheet test drive it).
+const DialogStub = { props: ['visible'], template: '<div v-if="visible" class="dialog-stub"><slot /></div>' }
 
 function makeRouter(): Router {
   return createRouter({
@@ -37,7 +47,7 @@ async function mountAt(hash: string) {
   await router.replace({ name: 'home', hash })
   await router.isReady()
   const wrapper = mount(AppSidebar, {
-    global: { plugins: [router, i18n], stubs: { ProfileMenu: true } },
+    global: { plugins: [router, i18n], stubs: { ProfileMenu: true, Popover: PopoverStub, Dialog: DialogStub } },
   })
   await flushPromises()
   return wrapper
@@ -84,16 +94,15 @@ describe('AppSidebar space list', () => {
     expect(wrapper.find('.sidebar-tenant-awaiting').exists()).toBe(false)
   })
 
-  // The mobile bottom-sheet nav (cr-0084): the inline nav is CSS-hidden below the compact threshold, so the
-  // hamburger opens a sheet with the full navigation (tenant switch + Shared + Personal).
-  it('opens a mobile nav sheet with the tenant switch, Shared and Personal', async () => {
-    // Stub the teleporting PrimeVue Dialog with a pass-through that renders its slot when visible.
-    const DialogStub = { props: ['visible'], template: '<div v-if="visible" class="dialog-stub"><slot /></div>' }
+  // The mobile bottom-sheet nav (cr-0084 + cr-0108): the inline nav is CSS-hidden below the compact threshold,
+  // so the hamburger opens a sheet with the full navigation. Post-merge the active-tenant row IS the shared-home
+  // entry (no separate "Shared" item), with Personal below — mirroring the desktop merge.
+  it('opens a mobile nav sheet where the active-tenant row enters the shared home (no separate Shared item)', async () => {
     const router = makeRouter()
     await router.replace({ name: 'home', hash: '' })
     await router.isReady()
     const wrapper = mount(AppSidebar, {
-      global: { plugins: [router, i18n], stubs: { ProfileMenu: true, Dialog: DialogStub } },
+      global: { plugins: [router, i18n], stubs: { ProfileMenu: true, Dialog: DialogStub, Popover: PopoverStub } },
     })
     await flushPromises()
 
@@ -101,9 +110,65 @@ describe('AppSidebar space list', () => {
     await wrapper.get('.mobile-navigation-button').trigger('click')
     await flushPromises()
 
-    const items = wrapper.findAll('.mobile-nav-item').map((i) => i.text())
-    expect(items.some((t) => t.includes('Familie Muster'))).toBe(true) // tenant switch
-    expect(items.some((t) => t.includes('Shared'))).toBe(true)
-    expect(items.some((t) => t.includes('Personal'))).toBe(true)
+    const items = wrapper.findAll('.mobile-nav-item')
+    const texts = items.map((i) => i.text())
+    expect(texts.some((t) => t.includes('Familie Muster'))).toBe(true) // the active tenant row
+    expect(texts.some((t) => t.includes('Personal'))).toBe(true)
+    expect(texts.every((t) => !t.includes('Shared'))).toBe(true) // folded into the tenant row; no standalone entry
+
+    // The active-tenant row navigates into the shared Tenant home.
+    const tenantRow = items.find((i) => i.text().includes('Familie Muster'))!
+    expect(tenantRow.element.tagName).toBe('A')
+    expect(tenantRow.attributes('href')).toBe('/')
+  })
+})
+
+// The merged tenant switcher (cr-0108): one active-tenant row whose body enters the shared Tenant home, plus a
+// chevron that opens an overview of all the member's tenants.
+describe('AppSidebar tenant switcher', () => {
+  it('enters the shared Tenant home from the active-tenant row', async () => {
+    const wrapper = await mountAt('')
+    const row = wrapper.get('.sidebar-tenant-space-link')
+    expect(row.text()).toContain('Familie Muster')
+    expect(row.attributes('href')).toBe('/') // token-less tenant home
+    expect(row.classes()).toContain('router-link-active') // highlighted on the token-less home
+  })
+
+  it('hides the switch chevron when the member belongs to a single tenant', async () => {
+    const wrapper = await mountAt('')
+    expect(wrapper.find('.sidebar-tenant-switch').exists()).toBe(false)
+  })
+
+  it('shows a chevron and an overview of every tenant when there are several', async () => {
+    vi.mocked(listMyTenants).mockResolvedValueOnce([
+      { tenantId: 't-1', name: 'Familie Muster', domain: '127.0.0.1', role: 'OWNER' },
+      { tenantId: 't-2', name: 'Verein Beispiel', domain: 'verein.localhost', role: 'MEMBER' },
+    ])
+    const wrapper = await mountAt('')
+
+    expect(wrapper.find('.sidebar-tenant-switch').exists()).toBe(true)
+    const overview = wrapper.findAll('.sidebar-tenant-overview-list .sidebar-tenant-link')
+    expect(overview.map((b) => b.text())).toEqual([
+      expect.stringContaining('Familie Muster'),
+      expect.stringContaining('Verein Beispiel'),
+    ])
+    // The active tenant is marked (gradient avatar class) — the other is not.
+    expect(overview[0].classes()).toContain('sidebar-tenant-link-active')
+    expect(overview[1].classes()).not.toContain('sidebar-tenant-link-active')
+  })
+
+  it('switches to another tenant from the overview (full navigation to its domain)', async () => {
+    vi.mocked(listMyTenants).mockResolvedValueOnce([
+      { tenantId: 't-1', name: 'Familie Muster', domain: '127.0.0.1', role: 'OWNER' },
+      { tenantId: 't-2', name: 'Verein Beispiel', domain: 'verein.localhost', role: 'MEMBER' },
+    ])
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    const wrapper = await mountAt('')
+
+    const rows = wrapper.findAll('.sidebar-tenant-overview-list .sidebar-tenant-link')
+    await rows[1].trigger('click') // the inactive tenant
+    expect(assign).toHaveBeenCalledWith('https://verein.localhost')
+
+    assign.mockRestore()
   })
 })

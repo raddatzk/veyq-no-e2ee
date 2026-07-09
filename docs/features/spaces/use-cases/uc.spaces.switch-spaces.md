@@ -10,14 +10,19 @@
 
 ## Main flow
 
-1. The sidebar lists the member's **tenants** (the "Bereiche/Spaces" switcher) from `GET /api/scopes/my-tenants`
-   — each its own domain ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)).
-2. The sidebar lists the **spaces** in the active tenant: the shared **Tenant** space
-   ([en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md), labelled with the **tenant's name**), the
-   **Personal** space ([en.spaces.personal-scope](../enablers/en.spaces.personal-scope.md)), and the member's
-   **groups** ([en.spaces.group-scope](../enablers/en.spaces.group-scope.md), as they land).
-3. Selecting a **different tenant** navigates to that tenant's domain (a full navigation — each tenant is its
-   own origin).
+1. Under the sidebar's **"Bereiche/Spaces"** header the **active tenant** is shown as a single row — its avatar
+   (the tenant's initial), name and domain — from `GET /api/scopes/my-tenants`, each tenant reached at its own
+   domain ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)). A **chevron** on that row opens an
+   **overview of all the member's tenants** to switch between them; the chevron appears only when the member
+   belongs to **more than one** tenant.
+2. That **same active-tenant row is the entry into the shared Tenant space**
+   ([en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md), labelled with the **tenant's name**) — its
+   body opens the token-less tenant home, so the tenant *switcher* and the Tenant-*space* entry are **one row**,
+   not two. Below it the sidebar lists the remaining spaces in the active tenant: the **Personal** space
+   ([en.spaces.personal-scope](../enablers/en.spaces.personal-scope.md)) and the member's **groups**
+   ([en.spaces.group-scope](../enablers/en.spaces.group-scope.md), as they land).
+3. Selecting a **different tenant** from the overview navigates to that tenant's domain (a full navigation —
+   each tenant is its own origin).
 4. Selecting a **space** switches the in-shell content position via the URL `#fragment`, resolved entirely
    client-side ([ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md)). The grammar
    ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md)):
@@ -39,8 +44,9 @@
 
 ## Alternate / exception flows
 
-- A1 — **only one tenant / no groups:** the switcher still shows the single tenant + its Tenant space +
-  Personal; the groups section is hidden until a group exists.
+- A1 — **only one tenant / no groups:** the active-tenant row is shown **without the overview chevron** (there
+  is nothing to switch to) and still enters the Tenant space, with Personal below; the groups section is hidden
+  until a group exists.
 - A2 — **no tenant grant → Personal is home.** If the member holds **no `TENANT` grant** (today the common
   case for anyone but the cold-birth owner — tenant member-invite is not built yet), the token-less default is
   **not** openable, so the shell **falls back to Personal** (`~me`) as the effective home and surfaces the
@@ -85,4 +91,5 @@ liegt.
   [ADR 0019](../../../decisions/0019-token-less-tenant-home.md) (tenant is the token-less default home)
 - Work orders: cr-0031 (the switcher + fragment routing), cr-0032 (groups appear in the switcher),
   [cr-0075](../../../../changes/cr-0075-web-enter-tenant-scope.md) (enter the tenant space + Personal ↔ Tenant
-  switching, web)
+  switching, web), [cr-0108](../../../../changes/cr-0108-web-merge-tenant-switcher-root.md) (merge the switcher
+  into the active-tenant row + chevron overview, web)
