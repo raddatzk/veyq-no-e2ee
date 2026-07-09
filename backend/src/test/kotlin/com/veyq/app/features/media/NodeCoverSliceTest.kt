@@ -57,10 +57,14 @@ class NodeCoverSliceTest {
             .body("wrappedBlobKey", equalTo("Y292ZXItd3JhcA==")) // operator-blind: the K_blob wrap round-trips
             .extract().path<String>("blobId")
 
-        // NO media row — a cover blob never appears in the gallery list
+        // NO media row — a cover blob never appears in the gallery list; and cr-0107: a cover change bumps
+        // NEITHER counter (it writes no veyq_media row + never lists), so a cover swap must not force a re-list.
         given().header("Authorization", token(userId))
             .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
-            .then().statusCode(200).body("size()", equalTo(0))
+            .then().statusCode(200)
+            .body("media.size()", equalTo(0))
+            .body("mediaRevision", equalTo(0))
+            .body("deleteRevision", equalTo(0))
 
         // the committed blob is download-authorized (store_unavailable, not upload_not_found → the row + authz exist)
         assertEquals("store_unavailable", downloadError(userId, scopeId, blobId))

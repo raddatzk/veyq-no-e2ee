@@ -15,6 +15,7 @@ import com.veyq.app.generated.model.MediaBatchResponse
 import com.veyq.app.generated.model.MediaDerivativeKind
 import com.veyq.app.generated.model.MediaDerivativeSummary
 import com.veyq.app.generated.model.MediaExifResponse
+import com.veyq.app.generated.model.MediaListPage
 import com.veyq.app.generated.model.MediaMetaResponse
 import com.veyq.app.generated.model.MediaMetaUpdate
 import com.veyq.app.generated.model.MediaResultItem
@@ -23,6 +24,9 @@ import com.veyq.app.generated.model.PresignedUrl
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -84,11 +88,45 @@ class MediaResource(
         }
     }
 
-    override fun listNodeMedia(scopeId: UUID, nodeId: UUID): Response =
-        when (val o = handler.listMedia(identity.principal.name, scopeId.toString(), nodeId.toString())) {
-            is ListMediaOutcome.Rows -> Response.ok(o.rows.map(::toSummary)).build()
+    override fun listNodeMedia(scopeId: UUID, nodeId: UUID, ifNoneMatch: String?, since: String?, sinceDelete: Int?): Response =
+        when (
+            val o = handler.listMedia(
+                identity.principal.name, scopeId.toString(), nodeId.toString(),
+                parseETag(ifNoneMatch), parseCursor(since), sinceDelete ?: 0,
+            )
+        ) {
+            is ListMediaOutcome.Page -> Response.ok(
+                MediaListPage(
+                    media = o.rows.map(::toSummary),
+                    mediaRevision = o.mediaRevision,
+                    deleteRevision = o.deleteRevision,
+                    mediaIds = o.mediaIds?.map(UUID::fromString),
+                ),
+            ).header("ETag", "\"${o.mediaRevision}\"").build() // the ETag doubles as the client's next If-None-Match
+            ListMediaOutcome.NotModified -> Response.notModified().build() // 304 — no body, no media query (idle fast path)
             ListMediaOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
         }
+
+    /** The client's `If-None-Match` echo of `media_revision` — lenient (strips a weak marker + quotes); null when absent/unparseable ⇒ never a 304. */
+    private fun parseETag(raw: String?): Int? =
+        raw?.trim()?.removePrefix("W/")?.trim()?.trim('"')?.toIntOrNull()
+
+    /**
+     * Parse the keyset cursor `"updatedAt,mediaId"`; null (⇒ the full list) when absent or malformed. Robust to
+     * the timestamp's wire form — an offset date-time (`…Z` / `…+00:00`, what `MediaSummary.updatedAt` serializes
+     * as) or a bare instant — so the client can echo back exactly what it received.
+     */
+    private fun parseCursor(raw: String?): MediaCursor? {
+        val s = raw?.trim().orEmpty()
+        val comma = s.indexOf(',')
+        if (comma <= 0 || comma == s.length - 1) return null
+        val ts = s.substring(0, comma).trim()
+        val id = s.substring(comma + 1).trim()
+        val instant = runCatching { OffsetDateTime.parse(ts).toInstant() }
+            .recoverCatching { Instant.parse(ts) }
+            .getOrNull() ?: return null
+        return MediaCursor(instant, id)
+    }
 
     override fun getMediaExif(scopeId: UUID, mediaId: UUID): Response =
         when (val o = handler.mediaExif(identity.principal.name, scopeId.toString(), mediaId.toString())) {
@@ -146,6 +184,7 @@ class MediaResource(
         chunkCount = row.chunkCount,
         byteSize = row.byteSize,
         wrappedBlobKey = row.wrappedBlobKey,
+        updatedAt = row.updatedAt.atOffset(ZoneOffset.UTC), // cr-0107: the keyset cursor's sort key
         manifest = row.manifest,
         derivatives = row.derivatives.map(::toDerivativeSummary),
         wrappedMeta = row.wrappedMeta,

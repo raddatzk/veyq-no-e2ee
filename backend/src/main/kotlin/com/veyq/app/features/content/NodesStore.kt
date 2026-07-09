@@ -140,6 +140,10 @@ class NodesStore(
             BlobEntity.delete("id in ?1", coverBlobIds)
             blobStore.delete(coverBlobs.flatMap { b -> (0 until b.chunkCount).map { chunkKey(b.storageKey, it) } })
         }
+        // cr-0107 (ADR 0033): no media_revision/delete_revision bump here. Delete removes the node rows themselves
+        // (their counters vanish, no open gallery can poll a deleted node), and it leaves each node's own media
+        // rows untouched — so no *surviving* node's gallery set changes. The observable delete-reconcile is the
+        // share delete-own path (cr-0102), which does bump both counters; own-node galleries are the whole scope.
         NodeEntity.delete("id in ?1", doomed)
     }
 }

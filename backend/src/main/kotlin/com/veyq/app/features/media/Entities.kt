@@ -110,6 +110,13 @@ class MediaEntity : PanacheEntityBase {
     @Column(name = "share_identity_id", length = 36)
     var shareIdentityId: String? = null
 
+    /** When this media last changed — set `= createdAt` at attach, bumped to `now` on a meta edit (cr-0068). The
+     *  `(updatedAt, mediaId)` pair is the gallery's keyset cursor for the live-updates delta (cr-0107, ADR 0033):
+     *  a poll pulls only media past its cursor. Nullable in the DB (V33 backfills `= created_at`); always set by
+     *  the write paths, and the read path coalesces `updatedAt ?: createdAt` defensively. */
+    @Column(name = "updated_at")
+    var updatedAt: Instant? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

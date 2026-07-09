@@ -45,7 +45,15 @@ sealed interface CompleteOutcome {
 }
 
 sealed interface ListMediaOutcome {
-    data class Rows(val rows: List<MediaRow>) : ListMediaOutcome
+    /** A conditional-GET page (cr-0107, ADR 0033): the keyset delta + both revisions + the id-set — the latter present **only when a delete advanced `delete_revision`** past the client's `sinceDelete`. */
+    data class Page(
+        val rows: List<MediaRow>,
+        val mediaRevision: Int,
+        val deleteRevision: Int,
+        val mediaIds: List<String>?,
+    ) : ListMediaOutcome
+    /** The client's `If-None-Match` equals the node's `media_revision` — nothing changed (a 304, no media query ran). */
+    object NotModified : ListMediaOutcome
     object NoNode : ListMediaOutcome
 }
 
@@ -206,10 +214,29 @@ class MediaHandler(
         blobStore.delete(sessions.flatMap { s -> (0 until s.chunkCount).map { chunkKey(s.storageKey, it) } })
     }
 
-    fun listMedia(userId: String, scopeId: String, nodeId: String): ListMediaOutcome {
+    /**
+     * One `listNodeMedia` poll (cr-0107, ADR 0033). Reads the node's `media_revision` + `delete_revision` as a
+     * **consistent pair** (one row). When the client's [ifNoneMatch] still equals `media_revision` ⇒ **NotModified**
+     * (a 304 — no media query, the idle fast path). Otherwise a **keyset delta** past the [since] cursor, plus both
+     * revisions and — **only when [sinceDelete] lags `delete_revision`** (a real delete since) — the current
+     * `mediaId` set for delete-reconcile. Non-member / unknown node ⇒ NoNode (a 404, no reveal).
+     */
+    fun listMedia(
+        userId: String,
+        scopeId: String,
+        nodeId: String,
+        ifNoneMatch: Int?,
+        since: MediaCursor?,
+        sinceDelete: Int,
+    ): ListMediaOutcome {
         if (!store.isMember(userId, scopeId)) return ListMediaOutcome.NoNode
-        store.findNode(scopeId, nodeId) ?: return ListMediaOutcome.NoNode
-        return ListMediaOutcome.Rows(store.listNodeMedia(scopeId, nodeId))
+        val node = store.findNode(scopeId, nodeId) ?: return ListMediaOutcome.NoNode
+        val mediaRevision = node.mediaRevision
+        val deleteRevision = node.deleteRevision
+        if (ifNoneMatch != null && ifNoneMatch == mediaRevision) return ListMediaOutcome.NotModified
+        val rows = store.listNodeMediaSince(scopeId, nodeId, since)
+        val mediaIds = if (sinceDelete < deleteRevision) store.listNodeMediaIds(scopeId, nodeId) else null
+        return ListMediaOutcome.Page(rows, mediaRevision, deleteRevision, mediaIds)
     }
 
     /** The media's lazy heavy EXIF tier for the lightbox. Non-member or unknown media → NoMedia (a 404, no reveal). */

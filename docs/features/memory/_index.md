@@ -61,9 +61,10 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   (medoid position + typed/reverse-geocoded name), a tenant-wide map; reverse-only, veyq-blind geocoding (ADR 0016)
 - [uc.memory.cover](use-cases/uc.memory.cover.md) — **planned** (cr-0072): a deliberately chosen, cropped cover
   (`{ mediaId, crop }` on the same `wrappedMeta`), shown on the browse card, the detail header, and the map pin
-- [uc.memory.live-updates](use-cases/uc.memory.live-updates.md) — **refined** (cr-0107 planned, ADR 0033): an open
+- [uc.memory.live-updates](use-cases/uc.memory.live-updates.md) — **built (web)** (cr-0107, ADR 0033): an open
   gallery reflects others' media adds/removes live; a per-node `media_revision` counter → conditional-GET `304` +
-  keyset delta + id-set delete-reconcile, short-polled
+  keyset delta + id-set delete-reconcile (gated by a `delete_revision` counter), short-polled + visibility-gated;
+  apple/android native-deferred
 - Memory journal — markdown sealed under `K_mem`
 - Tracks (GPX) — sealed under `K_mem` (the sealed *location* is now [uc.memory.place](use-cases/uc.memory.place.md))
 - Share a Memory — wrap its `K_mem` to a per-share key (least-privilege, ADR 0012) → the

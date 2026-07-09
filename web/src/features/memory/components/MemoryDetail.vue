@@ -15,7 +15,8 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { listMedia, openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, type MediaItem } from '../media'
+import { openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, type MediaItem } from '../media'
+import { startMediaRevisionPolling, stopMediaRevisionPolling } from '../mediaRevisionPolling'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
 import {
   unsealMemoryLocation,
@@ -70,6 +71,10 @@ const { viewMode } = useViewMode()
 const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
+// live media updates (uc.memory.live-updates, cr-0107): the cached per-node counters — mediaRevision (the ETag
+// echoed as If-None-Match; null until the first load) + deleteRevision (echoed as sinceDelete to gate the id-set).
+const mediaRevision = ref<number | null>(null)
+const deleteRevision = ref(0)
 const lightboxIndex = ref<number | null>(null)
 const lightboxItems = ref<MediaItem[]>([]) // a snapshot of the sorted order at open time (so an in-lightbox date edit can't reorder underfoot)
 // date sort (cr-0066): tiles order by effective capturedAt; newest first by default.
@@ -448,6 +453,25 @@ function onCapturedAtUpdated(payload: { mediaId: string; wrappedMeta: string | n
   items.value = [...items.value] // reassign so sortedItems recomputes and the grid re-sorts
 }
 
+/** Fetch + decrypt the thumbnail tier for each derivable item lacking a real thumbnail (parallel, operator-blind).
+ *  Used by both the full [load] and the live delta [pollMedia] — the poll passes only the delta, so it decrypts
+ *  just the new/changed tiles, never the whole grid. */
+async function fetchThumbs(list: MediaItem[], key: Uint8Array, nodeId: string) {
+  await Promise.all(
+    list.map(async (m) => {
+      if (!hasDerivatives(m)) return // E1: non-image/video → icon tile, no fetch
+      if (thumbs.value.has(m.mediaId) && !donatedThumbs.has(m.mediaId)) return // real thumbnail already in place
+      try {
+        const bytes = await openGrid(props.scopeId, key, m)
+        if (props.node.id !== nodeId) return
+        setThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
+      } catch {
+        // E5: a single failed tile stays a placeholder (or its donated preview); the rest of the grid is unaffected
+      }
+    }),
+  )
+}
+
 // `reset` (a Memory/chapter switch) clears the grid up front; an incremental reload (post-upload batch) merges
 // the fresh list into place so existing tiles don't blink empty — jarring next to the optimistic tiles (cr-0074).
 async function load({ reset = false }: { reset?: boolean } = {}) {
@@ -456,32 +480,26 @@ async function load({ reset = false }: { reset?: boolean } = {}) {
   if (!key) {
     revokeThumbs()
     items.value = []
-    status.value = 'error' // E2: no K_mem (locked / not openable) → gallery unavailable
+    mediaRevision.value = null // E4: no K_mem (locked / not openable) → gallery unavailable, no live poll
+    deleteRevision.value = 0
+    status.value = 'error'
     return
   }
   if (reset) {
     revokeThumbs()
     items.value = []
+    mediaRevision.value = null
+    deleteRevision.value = 0
   }
   status.value = items.value.length ? 'ready' : 'loading'
   try {
-    const listed = await listMedia(props.scopeId, nodeId)
-    if (props.node.id !== nodeId) return // navigated away while listing
-    mergeItems(listed)
+    const page = await listMediaPage(props.scopeId, nodeId) // full list — no ETag/cursor, so never a 304
+    if (props.node.id !== nodeId || page.notModified) return // navigated away while listing / (unreachable) 304
+    mergeItems(page.items)
+    mediaRevision.value = page.mediaRevision // cache the ETag + delete gate for the live poll
+    deleteRevision.value = page.deleteRevision
     status.value = 'ready'
-    await Promise.all(
-      listed.map(async (m) => {
-        if (!hasDerivatives(m)) return // E1: non-image/video → icon tile, no fetch
-        if (thumbs.value.has(m.mediaId) && !donatedThumbs.has(m.mediaId)) return // real thumbnail already in place
-        try {
-          const bytes = await openGrid(props.scopeId, key, m)
-          if (props.node.id !== nodeId) return
-          setThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
-        } catch {
-          // a single failed tile stays a placeholder (or its donated preview); the rest of the grid is unaffected
-        }
-      }),
-    )
+    await fetchThumbs(page.items, key, nodeId)
     if (props.node.id === nodeId) {
       await reconcileAuto() // settle point: open-time self-heal + post-upload-batch (date, then location)
       await reconcileAutoLocation() // reads the date-reconciled wrappedMeta (patched in place) → RMW-safe
@@ -491,17 +509,81 @@ async function load({ reset = false }: { reset?: boolean } = {}) {
   }
 }
 
+/** One live poll (uc.memory.live-updates, cr-0107): a conditional GET keyed on the cached `mediaRevision`. A 304
+ *  is a no-op; a change upserts the keyset delta (new tiles auto-insert), reconciles removals via the id-set, and
+ *  decrypts just the delta's tiles. Errors are swallowed — the last-rendered grid stays and the next poll re-syncs
+ *  in one round-trip (E6). Node-race-guarded so a mid-poll navigation can't write into the wrong gallery. */
+async function pollMedia() {
+  const key = props.memoryKey
+  const nodeId = props.node.id
+  if (!key || mediaRevision.value === null) return // not an open, loaded gallery
+  try {
+    const page = await listMediaPage(props.scopeId, nodeId, {
+      ifNoneMatch: String(mediaRevision.value),
+      since: newestCursor(items.value),
+      sinceDelete: deleteRevision.value,
+    })
+    if (props.node.id !== nodeId || page.notModified) return // navigated away / nothing changed (304)
+    upsertItems(page.items, page.mediaIds)
+    mediaRevision.value = page.mediaRevision
+    deleteRevision.value = page.deleteRevision
+    await fetchThumbs(page.items, key, nodeId) // decrypt only the delta's new/changed tiles
+    if (props.node.id === nodeId) {
+      await reconcileAuto() // others' new media surfacing tightens the cr-0067 auto-date self-heal (ADR 0033)
+      await reconcileAutoLocation()
+    }
+  } catch {
+    // offline/transient: keep the current grid; the revision compare makes the next successful poll a single round-trip
+  }
+}
+
+/** Merge a live delta into `items` (cr-0107): upsert each delta media by `mediaId` — a new media auto-inserts, an
+ *  in-place meta edit patches the existing tile (keeping object identity, so an open lightbox snapshot stays
+ *  consistent) — and, **only when the id-set is present** (a delete advanced `delete_revision`), drop any cached
+ *  media absent from it, revoking its thumbnail. Reassigns `items` so the justified grid re-sorts. */
+function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
+  const byId = new Map(items.value.map((it) => [it.mediaId, it] as const))
+  for (const m of delta) {
+    const existing = byId.get(m.mediaId)
+    if (existing) {
+      existing.wrappedMeta = m.wrappedMeta // a meta edit re-sealed the tier; patch in place (shared with the lightbox snapshot)
+      existing.updatedAt = m.updatedAt
+    } else {
+      byId.set(m.mediaId, m)
+    }
+  }
+  if (mediaIds) {
+    const keep = new Set(mediaIds)
+    for (const id of [...byId.keys()]) {
+      if (keep.has(id)) continue
+      const url = thumbs.value.get(id)
+      if (url) URL.revokeObjectURL(url)
+      thumbs.value.delete(id)
+      donatedThumbs.delete(id)
+      byId.delete(id)
+    }
+    thumbs.value = new Map(thumbs.value) // reassign so the template drops removed tiles
+  }
+  items.value = [...byId.values()]
+}
+
 watch(
   () => [props.node.id, props.memoryKey] as const,
   () => {
     lightboxIndex.value = null
     activeTab.value = 'gallery' // reset to the gallery when a different Memory/chapter opens
-    void load({ reset: true }) // a different Memory/chapter → clear the grid; a post-upload reload merges (below)
+    stopMediaRevisionPolling() // tear down the previous Memory's live poll before switching
+    // a different Memory/chapter → clear the grid; a post-upload reload merges (below). Once the full list has
+    // loaded, start the live poll — but only for an open, unlocked gallery (E4: no K_mem ⇒ no polling).
+    void load({ reset: true }).then(() => {
+      if (props.memoryKey) startMediaRevisionPolling(() => void pollMedia())
+    })
   },
   { immediate: true },
 )
 
 onBeforeUnmount(() => {
+  stopMediaRevisionPolling() // stop the live poll on close/navigate away
   revokeThumbs()
   revokeUploadCover()
   // the optimistic preview urls are owned + revoked by useOptimisticTiles

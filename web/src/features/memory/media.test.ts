@@ -16,6 +16,8 @@ import {
   uploadCoverBlob,
   deleteCoverBlob,
   listMedia,
+  listMediaPage,
+  newestCursor,
   openBlob,
   openOriginal,
   gridRef,
@@ -34,6 +36,7 @@ import {
 } from './media'
 import exifr from 'exifr'
 import { mediaApi } from '../../api/client'
+import { ResponseError } from '../../api/generated/media'
 import * as v1 from '../../shared/crypto/v1'
 import { fromB64std } from '../../shared/base64'
 
@@ -76,15 +79,22 @@ function fakeStore() {
     }),
     listNodeMedia: vi.fn(async () => {
       const item = captured.completeItem
-      return [
-        {
-          mediaId: 'media-1',
-          ...blobOf(item.originalUploadId),
-          derivatives: (item.derivatives ?? []).map((d: any) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
-          wrappedMeta: captured.updatedMeta ?? item.wrappedMeta ?? null, // listed for grid layout + date sorting (cr-0068)
-          // wrappedExif is deliberately NOT echoed by listNodeMedia — it is lazy via getMediaExif (cr-0064)
-        },
-      ]
+      // cr-0107: the response is now the MediaListPage envelope (delta rows + both revisions + optional id-set).
+      return {
+        media: [
+          {
+            mediaId: 'media-1',
+            ...blobOf(item.originalUploadId),
+            derivatives: (item.derivatives ?? []).map((d: any) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
+            wrappedMeta: captured.updatedMeta ?? item.wrappedMeta ?? null, // listed for grid layout + date sorting (cr-0068)
+            updatedAt: new Date('2026-07-09T12:00:00.000Z'), // the keyset cursor's sort key (cr-0107)
+            // wrappedExif is deliberately NOT echoed by listNodeMedia — it is lazy via getMediaExif (cr-0064)
+          },
+        ],
+        mediaRevision: 1,
+        deleteRevision: 0,
+        mediaIds: null,
+      }
     }),
     updateMediaMeta: vi.fn(async ({ mediaMetaUpdate }: any) => {
       captured.updatedMeta = mediaMetaUpdate.wrappedMeta // opaque ciphertext (or null to clear)
@@ -590,5 +600,86 @@ describe('read-back — operator-blind round-trip + tier selection', () => {
     const wrap = store.captured.startItems[0].wrappedBlobKey
     const blobKey = v1.symUnwrap(memoryKey, fromB64std(wrap), 'blob-key')
     expect(blobKey.length).toBe(32)
+  })
+})
+
+describe('live-updates data layer (uc.memory.live-updates, cr-0107)', () => {
+  const item = (id: string, updatedAt: string): MediaItem => ({
+    mediaId: id,
+    original: { blobId: `b-${id}`, chunkCount: 1, byteSize: 0, wrappedBlobKey: 'aw==' },
+    derivatives: [],
+    updatedAt: new Date(updatedAt),
+  })
+
+  describe('newestCursor', () => {
+    it('is undefined for an empty grid', () => {
+      expect(newestCursor([])).toBeUndefined()
+    })
+
+    it('picks the latest updatedAt and formats "updatedAt,mediaId"', () => {
+      const cursor = newestCursor([item('a', '2026-07-09T10:00:00.000Z'), item('b', '2026-07-09T12:00:00.000Z')])
+      expect(cursor).toBe('2026-07-09T12:00:00.000Z,b')
+    })
+
+    it('breaks a same-timestamp tie by the larger mediaId (so all seen rows are ≤ the cursor)', () => {
+      const t = '2026-07-09T12:00:00.000Z'
+      expect(newestCursor([item('a', t), item('c', t), item('b', t)])).toBe(`${t},c`)
+    })
+
+    it('round-trips millisecond precision losslessly (matches the server TIMESTAMP(3))', () => {
+      expect(newestCursor([item('a', '2026-07-09T12:34:56.789Z')])).toBe('2026-07-09T12:34:56.789Z,a')
+    })
+  })
+
+  describe('listMediaPage', () => {
+    it('maps the envelope: delta items + both revisions + the id-set', async () => {
+      vi.mocked(mediaApi).mockReturnValue({
+        listNodeMedia: vi.fn(async () => ({
+          media: [
+            {
+              mediaId: 'm1', blobId: 'b1', chunkCount: 1, byteSize: 0, wrappedBlobKey: 'aw==',
+              derivatives: [], wrappedMeta: null, updatedAt: new Date('2026-07-09T12:00:00.000Z'),
+            },
+          ],
+          mediaRevision: 5,
+          deleteRevision: 2,
+          mediaIds: ['m1', 'm2'],
+        })),
+      } as unknown as ReturnType<typeof mediaApi>)
+
+      const page = await listMediaPage(SCOPE_ID, NODE_ID, { ifNoneMatch: '4', since: '2026-07-09T11:00:00.000Z,m0', sinceDelete: 1 })
+      expect(page.notModified).toBe(false)
+      if (page.notModified) return
+      expect(page.items.map((i) => i.mediaId)).toEqual(['m1'])
+      expect(page.items[0].updatedAt?.toISOString()).toBe('2026-07-09T12:00:00.000Z')
+      expect(page.mediaRevision).toBe(5)
+      expect(page.deleteRevision).toBe(2)
+      expect(page.mediaIds).toEqual(['m1', 'm2'])
+    })
+
+    it('threads the conditional-GET params (If-None-Match, since, sinceDelete) through to the client', async () => {
+      const listNodeMedia = vi.fn(async () => ({ media: [], mediaRevision: 3, deleteRevision: 0, mediaIds: null }))
+      vi.mocked(mediaApi).mockReturnValue({ listNodeMedia } as unknown as ReturnType<typeof mediaApi>)
+      await listMediaPage(SCOPE_ID, NODE_ID, { ifNoneMatch: '3', since: 't,m', sinceDelete: 0 })
+      expect(listNodeMedia).toHaveBeenCalledWith({ scopeId: SCOPE_ID, nodeId: NODE_ID, ifNoneMatch: '3', since: 't,m', sinceDelete: 0 })
+    })
+
+    it('returns { notModified: true } on a 304 (idle fast path), swallowing the ResponseError', async () => {
+      vi.mocked(mediaApi).mockReturnValue({
+        listNodeMedia: vi.fn(async () => {
+          throw new ResponseError({ status: 304 } as Response, 'Not Modified')
+        }),
+      } as unknown as ReturnType<typeof mediaApi>)
+      expect(await listMediaPage(SCOPE_ID, NODE_ID, { ifNoneMatch: '5' })).toEqual({ notModified: true })
+    })
+
+    it('rethrows a non-304 error', async () => {
+      vi.mocked(mediaApi).mockReturnValue({
+        listNodeMedia: vi.fn(async () => {
+          throw new ResponseError({ status: 500 } as Response, 'Server Error')
+        }),
+      } as unknown as ReturnType<typeof mediaApi>)
+      await expect(listMediaPage(SCOPE_ID, NODE_ID)).rejects.toBeInstanceOf(ResponseError)
+    })
   })
 })

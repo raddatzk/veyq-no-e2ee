@@ -99,8 +99,8 @@ class BlobBatchE2ETest {
         given().header("Authorization", token(userId))
             .`when`().get("/api/scopes/$scopeId/nodes/$memory/media")
             .then().statusCode(200)
-            .body("[0].blobId", equalTo(blobId))
-            .body("[0].manifest.size()", equalTo(chunks.size))
+            .body("media[0].blobId", equalTo(blobId))
+            .body("media[0].manifest.size()", equalTo(chunks.size))
 
         // presign GET → fetch each chunk back → byte-identical
         val dl = given().header("Authorization", token(userId)).contentType(ContentType.JSON)

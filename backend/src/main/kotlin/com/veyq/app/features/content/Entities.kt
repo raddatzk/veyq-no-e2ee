@@ -59,6 +59,19 @@ class NodeEntity : PanacheEntityBase {
     @Column(name = "cover_byte_size")
     var coverByteSize: Long? = null
 
+    /** Live-updates change signal (cr-0107, ADR 0033): a monotonic per-node counter bumped by **every**
+     *  gallery-media mutation — attach, meta-edit, delete — but **not** a cover change. Doubles as the
+     *  `listNodeMedia` ETag; an unchanged poll is an O(1) compare → a 304 (no media query). */
+    @Column(name = "media_revision", nullable = false)
+    var mediaRevision: Int = 0
+
+    /** Live-updates delete gate (cr-0107, ADR 0033): bumped **only** by a delete — so a delete moves **both**
+     *  counters, an add/edit only [mediaRevision]. Gates the O(N) id-set delete-reconcile: the server returns
+     *  the current mediaId set only when a client's echoed value lags this. On the same row as [mediaRevision],
+     *  so one read is a consistent pair. */
+    @Column(name = "delete_revision", nullable = false)
+    var deleteRevision: Int = 0
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

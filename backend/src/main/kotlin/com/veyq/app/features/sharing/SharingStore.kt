@@ -5,6 +5,7 @@ import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.media.MediaDerivativeEntity
 import com.veyq.app.features.media.MediaEntity
+import com.veyq.app.features.media.MediaStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
@@ -61,7 +62,10 @@ data class ShareBlobRef(val storageKey: String, val chunkCount: Int)
  * the blob is attached under that subtree (a structural id check, never a name or content).
  */
 @ApplicationScoped
-class SharingStore {
+class SharingStore(
+    /** cr-0107: the delete-own path bumps the node's live-updates counters via the media store's single bump helper. */
+    private val mediaStore: MediaStore,
+) {
 
     fun isMember(userId: String, scopeId: String): Boolean =
         MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
@@ -166,6 +170,7 @@ class SharingStore {
     fun deleteContributedMedia(scopeId: String, mediaId: String, identityId: String): List<String>? {
         val media = MediaEntity.findById(mediaId)
             ?.takeIf { it.scopeId == scopeId && it.shareIdentityId == identityId } ?: return null
+        val nodeId = media.nodeId // captured before the row is deleted — the node whose gallery must reconcile
         val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
         val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
         // The referencing rows must go first (FK: `veyq_media.blob_id`, `veyq_media_derivative.blob_id`).
@@ -173,6 +178,10 @@ class SharingStore {
         MediaEntity.deleteById(media.id)
         val reclaimKeys = ArrayList<String>()
         blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
+        // cr-0107 (ADR 0033): a media-row removal moves BOTH counters — media_revision (the change signal) and
+        // delete_revision (which gates the id-set), so an open gallery's next poll gets the current mediaId set
+        // and drops the removed tile. Same transaction ⇒ atomic with the delete.
+        mediaStore.bumpMediaRevision(nodeId, deleted = true)
         return reclaimKeys
     }
 

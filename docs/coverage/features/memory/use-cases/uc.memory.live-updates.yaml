@@ -1,27 +1,66 @@
 useCase: uc.memory.live-updates
 feature: memory
 title: Live media updates — others' adds/removes surface into the open gallery
-status: planned
-# Refined (ADR 0033): an open Memory gallery reflects other members'/contributors' media adds + removes live, and
-# re-opens are cheap. Mechanism: a per-node media_revision counter (bumped on attach/meta-edit/delete, NOT cover)
-# → an ETag conditional GET on listNodeMedia (304 when unchanged); on change a keyset delta (media newer than the
-# client's (updatedAt,id) cursor, so an active upload streams new items, never a full re-list) + the current
-# mediaId set for delete-reconcile. Short-poll, tab-visibility-gated, only while a Memory is open. Operator-blind
-# (opaque counter + opaque ids). NOT BUILT — pending cr-0107.
+# Built (web) — cr-0107, ADR 0033. A per-node media_revision counter (bumped on attach/meta-edit/delete, NOT a
+# cover change) → an ETag conditional GET on listNodeMedia (304 when unchanged); on a change a keyset delta (media
+# past the client's (updatedAt,id) cursor, so an active upload streams new items, never a full re-list) + the
+# current mediaId set for delete-reconcile, gated by a second delete_revision counter (present only when a delete
+# advanced it). Short-poll, tab-visibility-gated, only while a Memory is open. Operator-blind (opaque counters +
+# opaque ids + coarse timestamps). Backend + web verticals built + tested; apple/android are native-deferred (the
+# gallery UI itself is a later native CR); the two-member browser auto-insert/drop is the manual live smoke.
 acceptanceCriteria:
   - id: cheap-unchanged-check
     text: listNodeMedia is a conditional GET keyed on the node's media_revision (an opaque counter, bumped on every gallery-media mutation but NOT on a cover change); a poll/re-open whose revision matches gets a 304 with no body and no media query server-side — so an unchanged gallery costs an O(1) counter compare, not a full list.
+    coverage:
+      backend:
+        integration:
+          - MediaSliceTest.unchangedPollIsNotModified
+          - NodeCoverSliceTest.commitAttachesCoverBlobWithNoMediaRow
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/mediaRevisionPolling.test.ts
+      http: { e2e: [http/media/live-updates.http] }
   - id: keyset-delta-on-change
     text: On a revision change the server returns only media with updated_at past the client's (updatedAt, mediaId) cursor — a keyset delta, not the whole list — so an active upload by another member streams the few new items each poll. The client upserts by mediaId and advances the cursor. Requires a new veyq_media.updated_at (= created_at at attach, bumped on meta edit).
+    coverage:
+      backend:
+        integration:
+          - MediaSliceTest.attachDeltaCarriesOnlyNewMediaAndNoIdSet
+          - MediaSliceTest.metaEditSurfacesViaCursorAndNoIdSet
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: delete-reconcile
     text: A change response also carries the node's current mediaId set; the client drops any cached id no longer present. Because it is the set (not a count), a removal AND a net-zero delete+add are both caught. The id-set is returned only on a revision change, never scanned per idle poll.
+    coverage:
+      backend:
+        integration:
+          - MediaSliceTest.deleteBumpsBothCountersAndIdSetOmitsRemoved
+          - MediaSliceTest.netZeroDeleteAddStillCarriesIdSet
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: live-auto-insert
     text: While a Memory is open, the client short-polls (visibility-gated — pauses when the tab is hidden, ticks once immediately on return, stops on close); new media auto-inserts as tiles into the open grid and removed media drops out, with no manual reload, reusing the optimistic-tile grid + mergeItems reconcile.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/mediaRevisionPolling.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
   - id: operator-blind-live
     text: The server sees only an opaque revision counter, opaque mediaIds, coarse timestamps, and the poll access-pattern it already sees on reads — never content, never a key. No new operator-visible signal; K_mem/K_share never touch the server.
+    coverage:
+      backend:
+        integration:
+          - MediaSliceTest.attachDeltaCarriesOnlyNewMediaAndNoIdSet
+          - MediaSliceTest.deleteBumpsBothCountersAndIdSetOmitsRemoved
+      web:
+        unit:
+          - src/features/memory/media.test.ts
 gaps:
-  backend: "Not built — pending cr-0107. New node.media_revision column + media.updated_at; bump on attach/meta-edit/delete (exclude cover); listNodeMedia gains If-None-Match/304, a since-cursor keyset delta, and the current-id-set on 200; slice tests."
-  web: "Not built — pending cr-0107. A mediaRevisionPolling loop (mirroring grantDeliveryPolling: interval + visibility gate) wired into MemoryDetail; cache the revision + cursor; on 304 skip, on delta upsert + drop reconciled removals; unit tests + a live smoke."
-  http: "Not built — pending cr-0107. ijhttp coverage for the conditional GET (304 vs 200 + delta)."
-  apple: "Live updates are web-first — native parity is a deferred catch-up (platform-parity)."
-  android: "Live updates are web-first — native parity is a deferred catch-up (platform-parity)."
+  web: "Built (cr-0107): a mediaRevisionPolling loop (interval + visibility gate, mirroring grantDeliveryPolling) wired into MemoryDetail — the initial full load caches both revisions + the (updatedAt,mediaId) cursor; each poll sends If-None-Match (media_revision) + since (cursor) + sinceDelete (delete_revision), skips on 304, upserts the keyset delta via listMediaPage, and drops cached ids absent from the id-set when a delete advanced delete_revision. Unit-tested: the conditional-GET data layer + newestCursor + the 304 fast path (media.test.ts), the visibility-gated poll loop start/stop (mediaRevisionPolling.test.ts), and the gallery wiring (MemoryDetail.test.ts). A full two-member live smoke against the real V33 backend confirmed the wire end-to-end: a curator held the gallery open in the browser while a second actor drove the public-share CONTRIBUTOR path over the API (share.ts resolve→identity→addSharePhoto/deleteSharePhoto). Observed on the curator's Network + the DB: idle polls short-circuit to 304 (and the poll pauses while the tab is hidden, resuming on visibilitychange); the contributor's API upload surfaces cross-member (2 Objekte); its API delete (deleteContributedMedia) bumps both counters (DB media_revision 2→3, delete_revision 0→1) and the curator's poll returns {media:[], mediaRevision:3, deleteRevision:1, mediaIds:[kept]} → the tile drops (2→1); a second upload returns {media:[new], mediaRevision:4, deleteRevision:1, mediaIds:null} (delta-only, no id-set on a pure add) → the tile auto-inserts (1→2). All matched the design."
+  apple: "Live updates are web-first — native parity is a deferred catch-up (platform-parity). The native gallery UI itself is not built yet (its own later CR), so there is nothing to keep live."
+  android: "Live updates are web-first — native parity is a deferred catch-up (platform-parity). The native gallery UI itself is not built yet (its own later CR), so there is nothing to keep live."

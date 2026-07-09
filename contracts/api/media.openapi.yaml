@@ -128,28 +128,66 @@ paths:
     get:
       tags: [media]
       operationId: listNodeMedia
-      summary: List a node's media (opaque metadata for read-back).
+      summary: List a node's media — a conditional-GET keyset delta for the live gallery (cr-0107, ADR 0033).
       description: >
-        Returns each media attached to the node with its `mediaId`, the **original** blob ref (`blobId`,
-        `chunkCount`, total `byteSize`, the per-chunk size `manifest`, `wrappedBlobKey`), **plus** its
-        role-tagged `derivatives` (THUMBNAIL, PREVIEW — each its own blob ref with its own wrap). A gallery
-        fetches the thumbnail tier for the grid, the preview for the lightbox, and the original only on
-        download — never pulling the full original to render a grid. The client unwraps each `K_blob` under
-        `K_mem`, presigns the downloads (`blob-downloads-batch`), and opens the chunks with `openFrame`. The
-        operator sees only ciphertext sizes.
+        Returns the node's media for the open gallery. **Live-updates (cr-0107, ADR 0033):** the response is a
+        conditional-GET **keyset delta**, not an unconditional full list. The client caches the node's
+        `mediaRevision` (an opaque per-node mutation counter) and echoes it as **`If-None-Match`**; when it still
+        equals the node's counter ⇒ **`304`** (no body, no media query — the idle fast path). On a change ⇒ `200`
+        with only the media whose `updatedAt` is **past the client's `since` cursor** (`updatedAt,mediaId`) — so an
+        active upload streams the few new items, never re-listing the whole gallery. Each row carries its
+        `mediaId`, the **original** blob ref (`blobId`, `chunkCount`, total `byteSize`, per-chunk `manifest`,
+        `wrappedBlobKey`), its role-tagged `derivatives` (THUMBNAIL, PREVIEW), the sealed `wrappedMeta`, and its
+        `updatedAt` (the cursor's sort key). The `200` also carries **both revisions** and — **only when a delete
+        advanced `deleteRevision`** past the client's echoed `sinceDelete` — the node's current **`mediaIds`** set,
+        so the client drops any id it no longer sees (catching a delete and a net-zero delete+add); pure adds/edits
+        stay delta-only. First load: omit `If-None-Match`/`since` for the full list. The client unwraps each
+        `K_blob` under `K_mem`, presigns the downloads (`blob-downloads-batch`), and opens the chunks with
+        `openFrame`. **Operator-blind** — opaque counters, opaque ids, coarse timestamps; never content, never a key.
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ScopeId"
         - $ref: "#/components/parameters/NodeId"
+        - name: If-None-Match
+          in: header
+          required: false
+          description: >
+            The client's cached `mediaRevision` (opaque ETag). When it equals the node's current
+            `media_revision` the server answers `304`. Omitted on first load.
+          schema: { type: string, maxLength: 64, example: "7" }
+        - name: since
+          in: query
+          required: false
+          description: >
+            The client's keyset cursor `updatedAt,mediaId` (an RFC3339 timestamp, a `,`, then the media uuid). On a
+            `200` the server returns only media strictly past it (`updated_at > ts`, id as the tie-break). Omitted
+            on first load ⇒ the full list.
+          schema: { type: string, maxLength: 80, example: "2026-07-09T12:34:56.789Z,2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e" }
+        - name: sinceDelete
+          in: query
+          required: false
+          description: >
+            The client's last-seen `deleteRevision`. The server includes the current `mediaIds` set (for
+            delete-reconcile) **only when it lags** the node's `delete_revision` — i.e. a delete happened since.
+            Defaults to 0.
+          schema: { type: integer, format: int32, minimum: 0, default: 0, example: 0 }
       responses:
         "200":
-          description: The node's media.
+          description: >
+            A keyset delta (the media past the `since` cursor) plus both revisions; `mediaIds` is present only when
+            `deleteRevision` advanced past the client's `sinceDelete`.
+          headers:
+            ETag:
+              description: The node's current `mediaRevision` — echo it as `If-None-Match` on the next poll.
+              schema: { type: string, example: "7" }
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/MediaSummary" }
+              schema: { $ref: "#/components/schemas/MediaListPage" }
+        "304":
+          description: >
+            Not Modified — the client's `If-None-Match` equals the node's `media_revision`; nothing changed. No
+            body, and no media query ran server-side (the idle fast path).
         "401":
           description: Generic authentication failure.
           content:
@@ -560,7 +598,7 @@ components:
         A media's read-back view: the **original** blob ref plus its role-tagged `derivatives`. A gallery
         fetches `derivatives[THUMBNAIL]` for the grid, `derivatives[PREVIEW]` for the lightbox, and the
         original blob only on download.
-      required: [mediaId, blobId, chunkCount, byteSize, wrappedBlobKey]
+      required: [mediaId, blobId, chunkCount, byteSize, wrappedBlobKey, updatedAt]
       properties:
         mediaId: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
         blobId: { type: string, format: uuid, example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a }
@@ -597,6 +635,49 @@ components:
           contentEncoding: base64
           maxLength: 512
           example: bWV0YS1jaXBoZXJ0ZXh0
+        updatedAt:
+          type: string
+          format: date-time
+          description: >
+            When this media last changed — set `= createdAt` at attach, bumped on a meta edit (cr-0068). The
+            `(updatedAt, mediaId)` pair is the gallery's keyset cursor for the live-updates delta (cr-0107,
+            ADR 0033); the client advances its `since` cursor to the newest row it has seen.
+          example: 2026-07-09T12:34:56.789Z
+
+    MediaListPage:
+      type: object
+      description: >
+        The conditional-GET response for the live gallery (cr-0107, ADR 0033). `media` carries only the rows past
+        the client's `since` cursor — a **keyset delta** (the full list on first load, when `since` is omitted).
+        `mediaRevision`/`deleteRevision` are the node's opaque per-node counters (`mediaRevision` doubles as the
+        ETag). `mediaIds` — the node's **current** id set for delete-reconcile — is present **only when a delete
+        advanced `deleteRevision`** past the client's `sinceDelete`, and is null on pure adds/edits.
+      required: [media, mediaRevision, deleteRevision]
+      properties:
+        media:
+          type: array
+          description: The delta rows — media whose `updatedAt` is past the `since` cursor, each a full read-back view.
+          items: { $ref: "#/components/schemas/MediaSummary" }
+        mediaRevision:
+          type: integer
+          format: int32
+          description: >
+            The node's current media-revision — a monotonic per-node counter bumped by every gallery-media
+            mutation (attach / meta-edit / delete; **not** a cover change). Doubles as the ETag; echo it as
+            `If-None-Match`.
+          example: 7
+        deleteRevision:
+          type: integer
+          format: int32
+          description: The node's current delete-revision — bumped **only** by a delete. Echo it as `sinceDelete` to gate the id-set.
+          example: 0
+        mediaIds:
+          type: [array, "null"]
+          description: >
+            The node's **current** `mediaId` set (ids only), present **only when `sinceDelete < deleteRevision`**
+            (a delete happened since the client last synced). The client drops any cached id absent from it,
+            catching a delete and a net-zero delete+add. Null on pure adds/edits.
+          items: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
 
     MediaDerivativeSummary:
       type: object

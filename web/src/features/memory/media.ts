@@ -15,7 +15,7 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { mediaApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import type { MediaSummary, PresignedUrl, MediaDerivativeKind } from '../../api/generated/media'
+import { ResponseError, type MediaSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
 /**
@@ -107,6 +107,10 @@ export type MediaItem = {
   derivatives: MediaDerivative[]
   /** The original's listed-metadata tier sealed under `K_mem` (opaque base64); unwrap with [unsealMeta]. Absent when none. */
   wrappedMeta?: string
+  /** When this media last changed (cr-0107) — the `(updatedAt, mediaId)` pair is the live-updates keyset cursor.
+   *  Present for the authenticated gallery (`listMedia`/`listMediaPage`); absent for the public-share snapshot
+   *  viewer, which doesn't poll (the sharing resolve carries no per-media timestamp). */
+  updatedAt?: Date
 }
 
 function summaryToItem(s: MediaSummary): MediaItem {
@@ -118,6 +122,7 @@ function summaryToItem(s: MediaSummary): MediaItem {
       ref: { blobId: d.blobId, chunkCount: d.chunkCount, byteSize: d.byteSize, wrappedBlobKey: d.wrappedBlobKey },
     })),
     wrappedMeta: s.wrappedMeta ?? undefined,
+    updatedAt: s.updatedAt,
   }
 }
 
@@ -635,10 +640,67 @@ export async function deleteCoverBlob(scopeId: string, nodeId: string): Promise<
 
 // --- read-back -------------------------------------------------------------
 
-/** List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier). */
+/**
+ * One conditional-GET page of a node's media (uc.memory.live-updates, cr-0107, ADR 0033). A poll echoes the
+ * cached `mediaRevision` as `ifNoneMatch`; unchanged ⇒ `{ notModified: true }` (the server ran no media query).
+ * On a change ⇒ a **keyset delta** — only the media past the `since` cursor (`"updatedAt,mediaId"`) — plus both
+ * revisions and, **only when a delete advanced `deleteRevision`** past the echoed `sinceDelete`, the node's
+ * current `mediaIds` set for delete-reconcile (else null). First load: omit `ifNoneMatch`/`since` for the full
+ * list. Operator-blind: opaque counters + ids + wraps only.
+ */
+export type MediaPage =
+  | { notModified: true }
+  | { notModified: false; items: MediaItem[]; mediaRevision: number; deleteRevision: number; mediaIds: string[] | null }
+
+export async function listMediaPage(
+  scopeId: string,
+  nodeId: string,
+  opts: { ifNoneMatch?: string; since?: string; sinceDelete?: number } = {},
+): Promise<MediaPage> {
+  try {
+    const page = await withRefresh(() =>
+      mediaApi().listNodeMedia({ scopeId, nodeId, ifNoneMatch: opts.ifNoneMatch, since: opts.since, sinceDelete: opts.sinceDelete }),
+    )
+    return {
+      notModified: false,
+      items: page.media.map(summaryToItem),
+      mediaRevision: page.mediaRevision,
+      deleteRevision: page.deleteRevision,
+      mediaIds: page.mediaIds ?? null,
+    }
+  } catch (e) {
+    if (e instanceof ResponseError && e.response.status === 304) return { notModified: true } // idle fast path — nothing changed
+    throw e
+  }
+}
+
+/**
+ * List a node's media in full (opaque metadata + the K_blob wraps for the original + every derivative tier). A
+ * thin wrapper over [listMediaPage] with no cursor/ETag, so the server always returns the whole list — used
+ * where a snapshot suffices (cover picker, tests); the live gallery uses [listMediaPage] directly to poll deltas.
+ */
 export async function listMedia(scopeId: string, nodeId: string): Promise<MediaItem[]> {
-  const rows = await withRefresh(() => mediaApi().listNodeMedia({ scopeId, nodeId }))
-  return rows.map(summaryToItem)
+  const page = await listMediaPage(scopeId, nodeId)
+  return page.notModified ? [] : page.items // no ifNoneMatch was sent, so a 304 is impossible — the guard is just exhaustiveness
+}
+
+/** The newest `(updatedAt, mediaId)` keyset cursor across [items] — what a live poll echoes as `since`; undefined
+ *  when none carry an `updatedAt` (e.g. an empty grid). Millisecond-precision by construction (a JS `Date`), which
+ *  round-trips losslessly against the server's `TIMESTAMP(3)` so the same rows are never re-fetched. */
+export function newestCursor(items: readonly MediaItem[]): string | undefined {
+  let bestT = -Infinity
+  let bestId = ''
+  let found = false
+  for (const it of items) {
+    if (!it.updatedAt) continue
+    const t = it.updatedAt.getTime()
+    if (t > bestT || (t === bestT && it.mediaId > bestId)) {
+      bestT = t
+      bestId = it.mediaId
+      found = true
+    }
+  }
+  return found ? `${new Date(bestT).toISOString()},${bestId}` : undefined
 }
 
 /**

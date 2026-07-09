@@ -18,7 +18,12 @@ data class MediaRow(
     val manifest: List<Long>?,
     val derivatives: List<DerivativeRow>,
     val wrappedMeta: String?,
+    /** When this media last changed (cr-0107): `= createdAt` at attach, `now` on a meta edit — the keyset cursor sort key. */
+    val updatedAt: Instant,
 )
+
+/** The gallery's keyset cursor (cr-0107, ADR 0033): the newest `(updatedAt, mediaId)` the client has already seen. */
+data class MediaCursor(val updatedAt: Instant, val mediaId: String)
 
 /** One role-tagged derivative tier of a media (its own blob metadata + wrap). */
 data class DerivativeRow(
@@ -96,6 +101,7 @@ class MediaStore {
     ): Pair<String, String> {
         val originalBlobId = persistBlob(original, originalManifest)
         val mediaId = UUID.randomUUID().toString()
+        val now = Instant.now()
         MediaEntity().apply {
             id = mediaId
             scopeId = original.scopeId
@@ -104,7 +110,8 @@ class MediaStore {
             this.wrappedMeta = wrappedMeta
             this.wrappedExif = wrappedExif
             this.shareIdentityId = shareIdentityId
-            createdAt = Instant.now()
+            createdAt = now
+            updatedAt = now // cr-0107: the keyset cursor starts at creation time
         }.persist()
         for (d in derivatives) {
             val derivBlobId = persistBlob(d.session, d.manifest)
@@ -118,7 +125,25 @@ class MediaStore {
         }
         UploadSessionEntity.deleteById(original.id)
         derivatives.forEach { UploadSessionEntity.deleteById(it.session.id) }
+        bumpMediaRevision(nodeId) // cr-0107: an add moves media_revision (the live-updates change signal), not delete_revision
         return originalBlobId to mediaId
+    }
+
+    /**
+     * Bump the node's live-updates counters (cr-0107, ADR 0033) in **one atomic UPDATE** on the `veyq_node` row,
+     * so `media_revision` + `delete_revision` always read as a **consistent pair**. Every gallery-media mutation
+     * moves `media_revision` (the conditional-GET change signal); a real delete additionally moves
+     * `delete_revision` ([deleted] = true), which gates the O(N) id-set delete-reconcile. A cover change calls
+     * neither. Joins the caller's transaction (attach/setMeta self-invoke within their `@Transactional`; the
+     * share delete-own path calls it within its own). Opaque operational metadata — operator-blind.
+     */
+    @Transactional
+    fun bumpMediaRevision(nodeId: String, deleted: Boolean = false) {
+        if (deleted) {
+            NodeEntity.update("mediaRevision = mediaRevision + 1, deleteRevision = deleteRevision + 1 where id = ?1", nodeId)
+        } else {
+            NodeEntity.update("mediaRevision = mediaRevision + 1 where id = ?1", nodeId)
+        }
     }
 
     /** Persist a blob row from a verified session; returns the new blob id. */
@@ -137,16 +162,42 @@ class MediaStore {
         return blobId
     }
 
-    fun listNodeMedia(scopeId: String, nodeId: String): List<MediaRow> {
-        val media = MediaEntity.find("scopeId = ?1 and nodeId = ?2", scopeId, nodeId).list()
-        return media.mapNotNull { m ->
-            val blob = BlobEntity.findById(m.blobId) ?: return@mapNotNull null
-            val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
-                val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
-                DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
-            }
-            MediaRow(m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest), derivatives, m.wrappedMeta)
+    /**
+     * The node's media as a **keyset delta** past [since] (cr-0107, ADR 0033): rows whose `updated_at` is strictly
+     * greater than the cursor (id as the tie-break), oldest-first so the client advances its cursor to the last
+     * row. [since] = null ⇒ the full list (first load). Ordered by `(updated_at, id)`, the cursor's sort key.
+     */
+    fun listNodeMediaSince(scopeId: String, nodeId: String, since: MediaCursor?): List<MediaRow> {
+        val media = if (since == null) {
+            MediaEntity.find("scopeId = ?1 and nodeId = ?2 order by updatedAt, id", scopeId, nodeId).list()
+        } else {
+            MediaEntity.find(
+                "scopeId = ?1 and nodeId = ?2 and (updatedAt > ?3 or (updatedAt = ?3 and id > ?4)) order by updatedAt, id",
+                scopeId, nodeId, since.updatedAt, since.mediaId,
+            ).list()
         }
+        return media.mapNotNull(::toRow)
+    }
+
+    /**
+     * Every current `mediaId` of the node (ids only) — the delete-reconcile set (cr-0107). O(N), so the handler
+     * asks for it **only when `delete_revision` advanced** (a real removal); the client drops any cached id it no
+     * longer sees, catching a delete and a net-zero delete+add.
+     */
+    fun listNodeMediaIds(scopeId: String, nodeId: String): List<String> =
+        MediaEntity.find("scopeId = ?1 and nodeId = ?2", scopeId, nodeId).list().map { it.id }
+
+    /** Map a media entity to its read-back row, resolving the original + derivative blobs; null when the original blob is missing. */
+    private fun toRow(m: MediaEntity): MediaRow? {
+        val blob = BlobEntity.findById(m.blobId) ?: return null
+        val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
+            val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
+            DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
+        }
+        return MediaRow(
+            m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest),
+            derivatives, m.wrappedMeta, m.updatedAt ?: m.createdAt, // cr-0107: coalesce for pre-backfill safety
+        )
     }
 
     /** The media, if it exists in this scope — carries the lazy `wrappedExif` for the lightbox exif endpoint. */
@@ -158,7 +209,9 @@ class MediaStore {
     fun setMeta(scopeId: String, mediaId: String, wrappedMeta: String?): MediaEntity? {
         val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId } ?: return null
         media.wrappedMeta = wrappedMeta
+        media.updatedAt = Instant.now() // cr-0107: the edit advances the keyset cursor, so the live poll re-fetches it
         media.persist()
+        bumpMediaRevision(media.nodeId) // a meta edit moves media_revision, not delete_revision
         return media
     }
 

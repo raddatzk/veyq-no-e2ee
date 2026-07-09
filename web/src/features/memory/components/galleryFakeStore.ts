@@ -53,15 +53,22 @@ export function galleryFakeStore() {
         return { blobId: `blob-${item.originalUploadId}`, mediaId, error: null }
       }),
     })),
-    listNodeMedia: vi.fn(async () =>
-      media.map((m) => ({
+    // cr-0107: the MediaListPage envelope (delta rows + both revisions + optional id-set). This fake always
+    // returns the full list with a revision = the media count (so a poll after an add sees a higher revision);
+    // it doesn't emulate the 304 / since-cursor filtering — the component tests exercise the initial render.
+    listNodeMedia: vi.fn(async () => ({
+      media: media.map((m, i) => ({
         mediaId: m.mediaId,
         ...blobOf(m.originalUploadId),
         derivatives: m.derivatives.map((d) => ({ kind: d.kind, ...blobOf(d.uploadId) })),
         wrappedMeta: m.wrappedMeta, // the listed-metadata tier is listed, for grid layout + date sorting (cr-0068)
+        updatedAt: new Date(1_700_000_000_000 + i * 1000), // distinct per media → a valid keyset cursor (cr-0107)
         // wrappedExif is deliberately NOT listed — it is lazy via getMediaExif (cr-0064)
       })),
-    ),
+      mediaRevision: media.length,
+      deleteRevision: 0,
+      mediaIds: null,
+    })),
     // The heavy EXIF, echoed only through the exif endpoint (kept out of the list) — operator-blind ciphertext.
     getMediaExif: vi.fn(async ({ mediaId }: any) => ({
       wrappedExif: media.find((m) => m.mediaId === mediaId)?.wrappedExif ?? null,
