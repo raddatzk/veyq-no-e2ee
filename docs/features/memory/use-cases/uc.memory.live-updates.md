@@ -50,8 +50,10 @@
 - **Cheap idle, cheap active.** Idle re-opens/polls are an **O(1)** counter compare → `304`; an active upload is a
   **keyset delta**, not a full re-list. Neither re-serializes the whole gallery — the failure mode a naïve
   poll-then-full-list would hit.
-- **Delete-robust by an id-set, not a count.** Returning the current `mediaId` set on change (only on change)
-  catches removals and net-zero delete+add, keeping the legacy insight without its per-tick O(N) hash cost.
+- **Delete-robust by an id-set, not a count.** When a delete happens the server returns the current `mediaId` set;
+  the client diffs it to drop removals and catch net-zero delete+add — the legacy set-not-count insight, without
+  its per-tick O(N) hash and without riding pure adds/edits (a second `delete_revision` counter gates it —
+  [ADR 0033](../../../decisions/0033-live-media-updates-revision-polling.md)).
 - **Tightens the `auto`-date self-heal.** New media surfacing into an open grid lets the cr-0067 `auto`-date
   reconcile ([uc.memory.date](uc.memory.date.md) E5) see others' additions sooner — the same `media_revision` the
   date use-case foreshadowed as the blind-safe upgrade.

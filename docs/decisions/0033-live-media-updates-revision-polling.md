@@ -43,11 +43,17 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
    handful of new items each poll**, not the whole gallery every interval — the failure mode a full-re-list-on-
    change would have. The client upserts the delta by `mediaId` and advances the cursor.
 
-4. **Delete-reconcile via the current id-set.** A keyset delta is add/edit-only — it cannot express a removal. So
-   a `200` also carries the node's **current `mediaId` set** (ids only, lightweight); the client **drops any id
-   it no longer sees**. This catches deletes and, because it is the *set* (not a count), a **net-zero delete+add**
-   too — legacy's insight, kept, but the id-set is returned **only on a revision change**, never scanned per idle
-   tick.
+4. **Delete-reconcile via the current id-set, gated by a second counter.** A keyset delta is add/edit-only — it
+   cannot express a removal. So a `200` **may** also carry the node's **current `mediaId` set** (ids only); the
+   client **drops any id it no longer sees** — this catches deletes and, because it is the *set* (not a count), a
+   **net-zero delete+add** too (legacy's insight, kept). But the id-set is **O(N)**, so it must not ride *every*
+   change — an active upload would re-send the growing full set each poll. A **second per-node counter,
+   `delete_revision`, bumped *only* on a delete** (never on attach/meta-edit — so a delete bumps *both* counters,
+   an add/edit only `media_revision`) gates it: the client echoes its last-seen `delete_revision`, and the server
+   includes the id-set **only when `client.delete_revision < node.delete_revision`** — i.e. only when a delete
+   actually happened since the client last synced. Pure adds/edits stay **delta-only**; the O(N) id-set scan is
+   paid solely on real deletes (rare, and self-limiting — one reconcile re-syncs the client). Both counters live on
+   the same `veyq_node` row, so a single read returns a **consistent pair** — no torn read can strand a delete.
 
 5. **Short-poll transport for v1.** A client with a Memory open polls on an interval, **gated on tab visibility**
    (mirrors `grantDeliveryPolling` / `scopeRotationPolling`: a `visibilitychange` listener ticks immediately on
@@ -63,46 +69,56 @@ case** (no media query at all), and only a genuine change runs the two queries (
 title Server: computing one listNodeMedia poll response
 skinparam shadowing false
 start
-:read node.media_revision   (O(1) counter);
+:read node.media_revision + delete_revision   (O(1), one row);
 note right
-  media_revision is bumped +1 by every gallery-media
-  mutation of this node — attach, setMeta, delete.
-  A cover change does NOT bump it.
+  media_revision : bumped by every gallery-media mutation
+     — attach, setMeta, delete (a cover change bumps neither).
+  delete_revision : bumped ONLY by a delete.
 end note
 :etag := tag(media_revision);
 if (client's If-None-Match == etag?) then (equal — nothing changed)
   :respond 304 Not Modified;
   note right: no body, no media rows read — the idle fast path
   stop
-else (differs — a mutation bumped it)
+else (differs — a mutation bumped media_revision)
   :delta := media rows WHERE updated_at > client cursor\n(keyset scan, id as tie-break);
-  :idSet := every mediaId of this node   (ids only, no rows);
-  :respond 200  ->  delta + idSet + new etag;
-  note right
-    delta → client upserts adds + in-place edits
-    idSet → client drops any id it no longer sees (deletes)
-  end note
+  if (client delete_revision < node delete_revision?) then (a delete happened)
+    :idSet := every mediaId of this node   (ids only);
+    :respond 200  ->  delta + idSet + both revisions;
+    note right
+      delta → client upserts adds + in-place edits
+      idSet → client drops any id it no longer sees (deletes)
+    end note
+  else (adds / edits only)
+    :respond 200  ->  delta + both revisions   (no id-set);
+    note right
+      pure adds/edits — the O(N) id-set is skipped
+    end note
+  endif
   stop
 endif
 @enduml
 ```
 
-The revision is a monotonic count of *mutations* (not of media), so any change moves it — that is what turns the
-idle case into an `O(1)` `304`. On a change, adds + in-place meta edits ride the **keyset delta** (keyed by
-`mediaId`), while **deletes — and a net-zero delete+add — are caught by the returned `mediaId` set** (a *set*,
-diffed on the client), never by a count. The id-set is computed **only on a change**, never per idle tick.
+`media_revision` is a monotonic count of *mutations* (not of media), so any change moves it — that is what turns
+the idle case into an `O(1)` `304`. On a change, adds + in-place meta edits ride the **keyset delta** (keyed by
+`mediaId`). The full `mediaId` **set** rides along **only when `delete_revision` advanced** — a real delete — and
+the client diffs it to drop removals, catching a **net-zero delete+add** too (a *set*, not a count). A pure
+add/edit never carries the O(N) id-set, and nothing does per idle tick.
 
 ## Consequences
 
-- **Idle is cheap (O(1) 304), an active upload is cheap (delta only), deletes are robust (id-set), and it stays
-  operator-blind** — a counter + opaque ids + coarse timestamps, no content, no new operator-visible signal
-  beyond the poll access-pattern the operator already sees on reads.
+- **Idle is cheap (O(1) 304), an active upload is cheap (delta only — no id-set until a delete), deletes are robust
+  (the id-set, gated by `delete_revision`), and it stays operator-blind** — two counters + opaque ids + coarse
+  timestamps, no content, no new operator-visible signal beyond the poll access-pattern the operator already sees
+  on reads.
 - **`media_revision` is exactly the blind-safe `media_rev` CAS that [uc.memory.date](../features/memory/use-cases/uc.memory.date.md)
   foreshadowed** — a live poll surfacing others' new media into an open grid also **tightens the cr-0067 `auto`-date
   self-heal window** (the reconcile sees new media sooner). One counter, two payoffs.
-- **New server state:** a `media_revision INT` column on `veyq_node`, an `updated_at TIMESTAMP` on `veyq_media`
-  (backfilled `= created_at`); `listNodeMedia` gains a conditional GET (`If-None-Match` → `304`), a `since` cursor
-  (keyset delta), and the current-id-set on a `200`. All opaque/operational — no key, no plaintext.
+- **New server state:** a `media_revision INT` + a `delete_revision INT` column on `veyq_node`, an `updated_at
+  TIMESTAMP` on `veyq_media` (backfilled `= created_at`); `listNodeMedia` gains a conditional GET (`If-None-Match`
+  → `304`), a `since` cursor (keyset delta), and the current-id-set on a `200` **only when the client's
+  `delete_revision` lags** (a delete occurred). All opaque/operational — no key, no plaintext.
 - **Scope: own-node gallery only.** The gallery lists the open node's own media (chapters open to their own
   galleries), so a **per-node** revision suffices. A Memory+chapters **subtree** aggregation (inbox #16) would
   need a subtree-max revision — **out of scope**, a later slice.
