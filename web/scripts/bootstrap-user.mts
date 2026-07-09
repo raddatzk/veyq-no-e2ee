@@ -5,9 +5,10 @@
 // The human fills the inputs in .run/.env (copy from .run/.env.example):
 //   VEYQ_USERNAME, VEYQ_PASSWORD, VEYQ_EMAIL, VEYQ_TENANT, VEYQ_TENANT_DOMAIN, and the optional
 //   VEYQ_FIRST_NAME / VEYQ_LAST_NAME (the real name, sealed under K_tenant at accept — operator-blind).
-// This script creates ONE veyq_user that is both Server Owner AND the tenant owner (via the existing-user
-// accept path — no second account) with a personal scope, then writes back:
-//   VEYQ_SECRET_KEY, VEYQ_WRAPPED_MASTERKEY
+// This script creates the Server-Owner / tenant-owner veyq_user (with a personal scope), and — when the optional
+// VEYQ_USER2_* inputs are set — a SECOND user onboarded as a tenant MEMBER with its tenant grant delivered (a
+// ready 2-member tenant for multi-member dev). It writes the derived key material back:
+//   VEYQ_SECRET_KEY, VEYQ_WRAPPED_MASTERKEY (+ VEYQ_USER2_SECRET_KEY / VEYQ_USER2_WRAPPED_MASTERKEY)
 // Run it against a FRESH backend (Bootstrap DB + Garage → Run Backend first). Re-run needs a `down -v` wipe:
 // the Secret Key is random per birth, so a second run can't reproduce an existing account.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -18,6 +19,7 @@ import * as v1 from '../src/shared/crypto/v1'
 import { fromB64std, b64std } from '../src/shared/base64'
 import { buildAccount } from '../src/features/account/register/accountBirth'
 import { sealName } from '../src/features/account/profile/memberName'
+import { wrapScopeKeyToMember } from '../src/features/spaces/grant'
 import { awaitInvite } from './devSeed.mts'
 
 const ENV_FILE = fileURLToPath(new URL('../../.run/.env', import.meta.url))
@@ -38,7 +40,7 @@ function readEnv(): Record<string, string> {
   return out
 }
 function writeEnv(fields: Record<string, string>): void {
-  const order = ['VEYQ_USERNAME', 'VEYQ_EMAIL', 'VEYQ_PASSWORD', 'VEYQ_FIRST_NAME', 'VEYQ_LAST_NAME', 'VEYQ_SECRET_KEY', 'VEYQ_WRAPPED_MASTERKEY', 'VEYQ_TENANT', 'VEYQ_TENANT_DOMAIN']
+  const order = ['VEYQ_USERNAME', 'VEYQ_EMAIL', 'VEYQ_PASSWORD', 'VEYQ_FIRST_NAME', 'VEYQ_LAST_NAME', 'VEYQ_SECRET_KEY', 'VEYQ_WRAPPED_MASTERKEY', 'VEYQ_TENANT', 'VEYQ_TENANT_DOMAIN', 'VEYQ_USER2_USERNAME', 'VEYQ_USER2_EMAIL', 'VEYQ_USER2_PASSWORD', 'VEYQ_USER2_SECRET_KEY', 'VEYQ_USER2_WRAPPED_MASTERKEY']
   const body = order.map((k) => `${k}=${fields[k] ?? ''}`).join('\n')
   writeFileSync(ENV_FILE, `# Local dev principal (gitignored). Inputs filled by you; SECRET_KEY + WRAPPED_MASTERKEY\n# filled by \`npm run bootstrap:user\`. Throwaway dev creds for a local instance — never committed.\n${body}\n`)
 }
@@ -89,6 +91,10 @@ const tenantName = env.VEYQ_TENANT || fail('VEYQ_TENANT missing in .run/.env')
 const domain = (env.VEYQ_TENANT_DOMAIN || fail('VEYQ_TENANT_DOMAIN missing in .run/.env')).toLowerCase()
 const firstName = (env.VEYQ_FIRST_NAME ?? '').trim()
 const lastName = (env.VEYQ_LAST_NAME ?? '').trim()
+// Optional second user (a tenant MEMBER) — onboarded only when all three are set.
+const u2Username = (env.VEYQ_USER2_USERNAME ?? '').trim().toLowerCase()
+const u2Email = (env.VEYQ_USER2_EMAIL ?? '').trim()
+const u2Password = env.VEYQ_USER2_PASSWORD ?? ''
 
 const numeric = /^[0-9.]+$/.test(domain)
 const createDomain = numeric ? (process.env.VEYQ_CREATE_DOMAIN ?? 'local.veyq.test') : domain
@@ -138,6 +144,47 @@ const scopeRes = await tenant('POST', '/api/scopes', token, domain, { wrappedGra
 if (scopeRes.status >= 300) fail(`createPersonalScope failed: ${scopeRes.status} ${JSON.stringify(scopeRes.body)}`)
 console.log(`scope: personal scope ${scopeRes.body?.scopeId ?? ''} created`)
 
+// 4b — optional SECOND user: a tenant MEMBER, fully granted so it is usable immediately (no "log the owner in
+// first" step). The owner mints a MEMBER invite; user2 cold-births + register-and-accepts grant-less; then — as
+// the online key-holder — we drain the grant-delivery job the backend originated (claim → wrap K_tenant to
+// user2's identity → complete), exactly what a key-holder's device does in the web client (cr-0076).
+let u2SecretKey = ''
+let u2WrappedKey = ''
+if (u2Username && u2Email && u2Password) {
+  const inv = await tenant('POST', `/api/tenants/${tenantId}/member-invites`, token, domain, { email: u2Email })
+  if (inv.status >= 300) fail(`inviteTenantMember failed: ${inv.status} ${JSON.stringify(inv.body)}`)
+  const u2Secret = await awaitInvite(INVITE_FILE, u2Email)
+  const u2 = buildAccount(u2Email, u2Password, fromB64std(setup.instanceSalt))
+  const u2Accept = await post('/api/tenants/accept/register', {
+    bootstrapSecret: u2Secret,
+    username: u2Username,
+    account: {
+      suiteId: u2.material.suiteId,
+      identityPublicKey: u2.material.identityPublicKey,
+      wrappedIdentityPrivateKey: u2.material.wrappedIdentityPrivateKey,
+      authPublicKey: u2.material.authPublicKey,
+      masterKeyWraps: u2.material.masterKeyWraps,
+      recoveryMasterKeyTag: u2.material.recoveryMasterKeyTag,
+    },
+  })
+  if (!u2Accept.ok) fail(`user2 accept/register failed: ${u2Accept.status} ${await u2Accept.text()}`)
+  // Deliver the tenant grant: claim the grant-delivery job the backend originated for the new grant-less
+  // membership (retry briefly in case origination lags), wrap K_tenant to user2's identity, complete.
+  let job: any = null
+  for (let i = 0; i < 5 && !job; i++) {
+    const claim = await tenant('POST', '/api/tasks/claim', token, domain, { capabilityTags: ['02f271ff'], scopeId: tenantId })
+    if (claim.status === 200 && claim.body?.grantDelivery) job = claim.body
+    else await sleep(400)
+  }
+  if (!job) fail('grant-delivery job for user2 was not claimable')
+  const wrap = wrapScopeKeyToMember(tenantScopeKey, job.grantDelivery.identityPublicKey)
+  const done = await tenant('POST', `/api/tasks/${job.jobId}/complete`, token, domain, { sealedResult: wrap })
+  if (done.status >= 300) fail(`grant-delivery complete failed: ${done.status} ${JSON.stringify(done.body)}`)
+  u2SecretKey = u2.emergencyKit.secretKey
+  u2WrappedKey = u2.material.masterKeyWraps.find((w) => w.method === 'PASSWORD')!.wrappedKey
+  console.log(`user2: ${u2Email} joined ${domain} as MEMBER (@${u2Username}) + tenant grant delivered`)
+}
+
 // 5 — record the derived material back into .run/.env
 const passwordWrap = m.masterKeyWraps.find((w) => w.method === 'PASSWORD')!
 writeEnv({
@@ -145,6 +192,9 @@ writeEnv({
   VEYQ_FIRST_NAME: firstName, VEYQ_LAST_NAME: lastName,
   VEYQ_SECRET_KEY: built.emergencyKit.secretKey, VEYQ_WRAPPED_MASTERKEY: passwordWrap.wrappedKey,
   VEYQ_TENANT: tenantName, VEYQ_TENANT_DOMAIN: domain,
+  VEYQ_USER2_USERNAME: u2Username, VEYQ_USER2_EMAIL: u2Email, VEYQ_USER2_PASSWORD: u2Password,
+  VEYQ_USER2_SECRET_KEY: u2SecretKey, VEYQ_USER2_WRAPPED_MASTERKEY: u2WrappedKey,
 })
 console.log(`\nbootstrap-user complete → ${ENV_FILE}`)
-console.log(`  ${email} @ ${domain} — log in with VEYQ_EMAIL / VEYQ_PASSWORD / VEYQ_SECRET_KEY`)
+console.log(`  ${email} @ ${domain} (owner) — log in with VEYQ_EMAIL / VEYQ_PASSWORD / VEYQ_SECRET_KEY`)
+if (u2SecretKey) console.log(`  ${u2Email} @ ${domain} (member) — log in with VEYQ_USER2_EMAIL / VEYQ_USER2_PASSWORD / VEYQ_USER2_SECRET_KEY`)
