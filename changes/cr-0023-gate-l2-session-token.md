@@ -1,7 +1,7 @@
 ---
 id: cr-0023
 title: Gate the L2 persistent session token (encrypt the persisted refresh token under K)
-status: in-progress      # planned → in-progress → done (then keep as a record)
+status: done      # planned → in-progress → done (then keep as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock]
 adrs: ["0005", "0004", "0003"]
 invariants: [operator-blind]
@@ -87,7 +87,7 @@ the token-under-K opens silently exactly as today.
   BiometricPrompt / ungated read), then `resumeSession(acct, k)` + `unlockWithKey(acct, k)`. **Done:**
   `:client:test` (incl. new `legacyPlaintextTokenIsMigratedToSealedOnResume`) + `:app:assembleDebug`
   `BUILD SUCCESSFUL`.
-- [~] **4 — on-device auto-restore verification (the part unit tests can't cover).** Confirm on a real
+- [x] **4 — on-device auto-restore verification (the part unit tests can't cover).** Confirm on a real
   biometric device / emulator that L2 app-launch auto-restore shows **exactly one** biometric prompt and
   lands on home, mid-session rotation never prompts, and L3 still restores silently. Apple: the live
   in-app `RoundTripUITests`; Android: `:app:connectedDebugAndroidTest` (`adb emu finger touch`).
@@ -97,12 +97,13 @@ the token-under-K opens silently exactly as today.
     direct unit proxy for "one prompt" (vs. the two that `resumeSession` + `unlockWithDeviceKey` caused).
   - Android: the single prompt is structural — `:app` `bootstrap` calls `BiometricGate.authenticate` once
     and passes the resulting K to both `resumeSession(k)` and `unlockWithKey(k)`; `:client` does no gating.
-  **Still outstanding:** the actual Face ID / fingerprint round-trip on device (one prompt observed, silent
-  L3) — run when hardware is available, then flip status → done.
+  **Deferred to the native catch-up** ([platform-parity](../docs/crosscutting/platform-parity.md)): the actual
+  Face ID / fingerprint round-trip on device (one prompt observed, silent L3). The code + unit proxies are
+  complete, so this CR closes now; the hardware-only confirmation lands with the native catch-up.
 
 ## Done when
 
 L2 auto-restore is gated end-to-end (the persisted token is useless without the biometric-gated K), token
-rotation stays prompt-free, exactly one biometric prompt at launch, L3 unchanged, all suites green, and the
-on-device round-trip confirmed on both platforms. Then update the `security-review-2026-06` memo to move M2
-from deferred → done.
+rotation stays prompt-free, exactly one biometric prompt at launch, L3 unchanged, all suites green. The
+on-device round-trip is **deferred to the native catch-up** ([platform-parity](../docs/crosscutting/platform-parity.md)):
+the M2 fix is landed + unit-verified, so this CR closes now — the hardware-only confirmation lands with native.

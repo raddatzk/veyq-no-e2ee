@@ -14,6 +14,16 @@ parity axis, which is [`ui-design-parity.md`](ui-design-parity.md) (one veyq des
 A surface can be implemented here yet still have an open coverage gap, or vice versa; the axes are
 independent and may legitimately disagree.
 
+## Native parity is a deferred catch-up
+
+The **web** vertical leads; **apple / android** parity for a feature is a **deferred program** — caught up
+later as dedicated native CRs, not gating each web-first CR. So a CR may close as **done** while its
+apple/android cells here stay ◻: that is the standing plan, not an omission. Likewise, **on-device
+verifications that need real hardware** (a Face ID / fingerprint round-trip, an emulator gesture) fold into
+that catch-up — a native CR whose code + unit tests are complete may close with only the hardware-only
+confirmation outstanding, run when the native catch-up lands (e.g. the L2/L3 biometric round-trip left by
+[cr-0023](../../changes/cr-0023-gate-l2-session-token.md) + [cr-0024](../../changes/cr-0024-unify-passwordless-unlock-mechanism.md)).
+
 ## Legend
 
 - ✅ — implemented

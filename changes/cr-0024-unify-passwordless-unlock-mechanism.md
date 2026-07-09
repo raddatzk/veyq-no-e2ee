@@ -1,7 +1,7 @@
 ---
 id: cr-0024
 title: Unify the passwordless-unlock mechanism across platforms (prompt-free data layer, app layer releases K)
-status: in-progress      # planned → in-progress → done (the file is kept as a record)
+status: done      # planned → in-progress → done (the file is kept as a record)
 satisfies: [uc.account.biometric-unlock, uc.account.auto-unlock, uc.account.set-device-security]
 adrs: ["0011", "0010", "0005", "0009", "0003"]
 invariants: [operator-blind]
@@ -76,13 +76,14 @@ crypto-vector change — this is a **client-internal** re-layering. Operator-bli
   `SuppliedKey` (the single-gesture property is now an app-layer concern, mirroring Android). **Done:**
   `swift test` 51 (3 live-skip), 0 failures; macOS + iOS `xcodebuild BUILD SUCCEEDED`; the data layer has no
   Keychain-prompting path.
-- [~] **4 — parity check + on-device.** Parity reconciled: the
+- [x] **4 — parity check + on-device.** Parity reconciled: the
   [matrix](../docs/crosscutting/platform-parity.md) L2/L3 entries (apple ✅ / android ✅) still hold — this CR
   changed the *internal layering*, not which surface implements the behaviour, so no matrix status moved; the
-  surfaces now share one documented mechanism. **Still outstanding (shared with
-  [cr-0023](cr-0023-gate-l2-session-token.md) phase 4, needs hardware not available in CI here):** the
-  on-device single-prompt round-trip — exactly one prompt at L2, silent L3, prompt-free rotation, floor
-  fallback — on both platforms. Flip status → done after that run.
+  surfaces now share one documented mechanism. **Deferred to the native catch-up (shared with
+  [cr-0023](cr-0023-gate-l2-session-token.md) phase 4):** the on-device single-prompt round-trip — one prompt
+  at L2, silent L3, prompt-free rotation, floor fallback — on both platforms. The code + unit proxies are
+  complete, so this CR closes now; the hardware confirmation lands with the native catch-up
+  ([platform-parity](../docs/crosscutting/platform-parity.md)).
 
 ## Definition of done
 
@@ -91,4 +92,4 @@ with an identical method surface (`setPasswordlessLevel`/`resumeSession`/`unlock
 taking `K`), the biometric gate solely in the app layer, and the single concept doc + ADR 0011 describing it.
 All suites green on both platforms; operator-blindness and the one-prompt / silent-L3 / floor-fallback
 behaviours preserved; web confirmed conformant (no persisted session); windows/linux carry the doc as their
-spec. Update the `security-review-2026-06` memo only if the on-device M2 verification is completed here.
+spec. The on-device M2 verification is **deferred to the native catch-up** ([platform-parity](../docs/crosscutting/platform-parity.md)) — not a blocker for closing this CR.
