@@ -172,7 +172,9 @@ describe('shared-scope management (cr-0104)', () => {
 
   it('reactivateShare adopts a disabled share via the member-gated endpoint', async () => {
     const reactivate = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(sharesApi).mockReturnValue({ reactivateShare } as unknown as ReturnType<typeof sharesApi>)
+    // NB: wire the mock to the local `reactivate` fn — a bare `{ reactivateShare }` shorthand would resolve to the
+    // imported module function under test, so `sharesApi().reactivateShare` would recurse into it (stack overflow).
+    vi.mocked(sharesApi).mockReturnValue({ reactivateShare: reactivate } as unknown as ReturnType<typeof sharesApi>)
 
     await reactivateShare('share-9')
 
