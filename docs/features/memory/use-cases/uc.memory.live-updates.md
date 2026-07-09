@@ -23,6 +23,32 @@ sends its cached revision (`If-None-Match`); unchanged ⇒ **`304`** (no media q
 new items, never the whole list) **plus the node's current `mediaId` set** (so the client drops what was
 removed). The counter read is **O(1)** — this is what makes idle polling cheap and re-opens instant.
 
+```plantuml
+@startuml
+title Memory live media updates — poll + conditional GET
+skinparam shadowing false
+participant "Gallery\n(client)" as G
+participant "Server\n(blind)" as S
+
+note over G : caches items, revision (the ETag), cursor (updatedAt, id)
+loop while the Memory is open + the tab is foregrounded
+  G -> S : GET listNodeMedia\nIf-None-Match: revision, since: cursor
+  alt revision unchanged
+    S --> G : 304 Not Modified — no body, no media query (O(1))
+  else revision changed (any add / edit / delete bumped it)
+    S --> G : 200 — delta (media newer than cursor)\n+ current mediaId set + new revision
+    G -> G : upsert delta by mediaId (adds + meta-edits appear)
+    G -> G : drop cached ids missing from the set (deletes disappear)
+    G -> G : advance cursor + revision
+  end
+end
+@enduml
+```
+
+Adds + in-place meta edits ride the **delta** (keyed by `mediaId`); **deletes — and a net-zero delete+add — are
+caught by diffing the returned `mediaId` set**, never by a count. The revision is a monotonic count of *mutations*
+(not of media), so any change moves it — that is what turns the idle case into an `O(1)` `304`.
+
 ## Main flow
 
 1. **Open a Memory.** The gallery lists its media once (full list) and caches the media **plus** the node's
