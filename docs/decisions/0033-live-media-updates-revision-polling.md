@@ -55,6 +55,43 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
    closes. With the delta, even an active upload is cheap per poll. A few seconds of latency is fine for a photo
    grid; **long-poll / a push channel** (sub-second, shared later with #6 live journal) is a deferred upgrade.
 
+How the server computes one `listNodeMedia` poll response — the **O(1) revision compare short-circuits the idle
+case** (no media query at all), and only a genuine change runs the two queries (keyset delta + current id-set):
+
+```plantuml
+@startuml
+title Server: computing one listNodeMedia poll response
+skinparam shadowing false
+start
+:read node.media_revision   (O(1) counter);
+note right
+  media_revision is bumped +1 by every gallery-media
+  mutation of this node — attach, setMeta, delete.
+  A cover change does NOT bump it.
+end note
+:etag := tag(media_revision);
+if (client's If-None-Match == etag?) then (equal — nothing changed)
+  :respond 304 Not Modified;
+  note right: no body, no media rows read — the idle fast path
+  stop
+else (differs — a mutation bumped it)
+  :delta := media rows WHERE updated_at > client cursor\n(keyset scan, id as tie-break);
+  :idSet := every mediaId of this node   (ids only, no rows);
+  :respond 200  ->  delta + idSet + new etag;
+  note right
+    delta → client upserts adds + in-place edits
+    idSet → client drops any id it no longer sees (deletes)
+  end note
+  stop
+endif
+@enduml
+```
+
+The revision is a monotonic count of *mutations* (not of media), so any change moves it — that is what turns the
+idle case into an `O(1)` `304`. On a change, adds + in-place meta edits ride the **keyset delta** (keyed by
+`mediaId`), while **deletes — and a net-zero delete+add — are caught by the returned `mediaId` set** (a *set*,
+diffed on the client), never by a count. The id-set is computed **only on a change**, never per idle tick.
+
 ## Consequences
 
 - **Idle is cheap (O(1) 304), an active upload is cheap (delta only), deletes are robust (id-set), and it stays
