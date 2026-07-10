@@ -5,6 +5,7 @@
 // (operator-blind: `K_SC` is derived on-device) and resets the per-scope tree + favorites.
 import { reactive } from 'vue'
 import { ensurePersonalScope, openScope, openScopeById, type OpenedScope } from '../features/spaces/scopes'
+import { getTenantTerms } from '../features/admin/createTenant/tenants'
 import { zeroEpochKeys, type EpochKeys } from '../features/spaces/epochs'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
@@ -34,7 +35,26 @@ export const activeSpace = reactive({
   purgeAfter: null as Date | null,
   // The token-less tenant home resolved to Personal because the caller holds no TENANT grant (ADR 0019, E1).
   tenantUnavailable: false,
+  // The active tenant's terms of service (cr-0114, ADR 0035): the operator's current `termsVersion` and the
+  // caller's `acceptedVersion` — both 0 when no terms are set / none accepted. When accepted < version the
+  // member accept-gate fires (`termsStale()`, enforced by the router). Refreshed on every scope entry.
+  termsVersion: 0,
+  acceptedVersion: 0,
 })
+
+/** Whether the active tenant has terms the caller hasn't accepted yet — the member accept-gate condition
+ *  (uc.account.accept-terms). False when no tenant is active or no terms are set (version 0). Fail-open: a
+ *  transient terms-fetch error leaves the versions at 0, so a member is never locked out by an API hiccup. */
+export function termsStale(): boolean {
+  return activeSpace.tenantId !== null && activeSpace.termsVersion > 0 &&
+    activeSpace.acceptedVersion < activeSpace.termsVersion
+}
+
+/** Record locally that the caller accepted [version] (called by the /terms view after a successful accept), so
+ *  `termsStale()` clears and the guard lets them back into the shell without a re-fetch. */
+export function markTermsAccepted(version: number): void {
+  if (version > activeSpace.acceptedVersion) activeSpace.acceptedVersion = version
+}
 
 // The scope's epoch keys are held outside the reactive proxy on purpose — key material must not flow through Vue
 // reactivity. `scopeKey` is the **write key** (E_current); `epochKeys` carries the full peeled chain for reads.
@@ -99,6 +119,9 @@ export async function enterScope(token: string): Promise<void> {
     resetTree() // no stale tree/favorites bleed across scopes — the view reloads for the new scope
     clearFavorites()
     activeSpace.status = 'ready'
+    // cr-0114: refresh the tenant's terms status so the router accept-gate knows if a (re-)accept is due. The
+    // tenant is the same regardless of which scope (tenant/personal/group) is open, and terms are member-readable.
+    await refreshTenantTerms(opened.tenantId)
     // As a key-holder, keep delivering the scope key to any pending member (cr-0076/cr-0077, first-online-wins):
     // deliver on entry and then poll in the background so "awaiting access" closes without a re-entry (cr-0079).
     // A shared TENANT/GROUP scope may have grant-less members; Personal never does, so it just stops any poll.
@@ -150,6 +173,8 @@ export function clearActiveSpace(): void {
   activeSpace.deletedAt = null
   activeSpace.purgeAfter = null
   activeSpace.tenantUnavailable = false
+  activeSpace.termsVersion = 0
+  activeSpace.acceptedVersion = 0
   if (epochKeys) zeroEpochKeys(epochKeys)
   epochKeys = null
   scopeKey = null
@@ -159,4 +184,23 @@ export function clearActiveSpace(): void {
 /** A 404 from the scope endpoints means no tenant claims this Host (`tenant_not_found`). */
 function isNoTenant(err: unknown): boolean {
   return Boolean(err) && typeof err === 'object' && (err as { response?: { status?: number } }).response?.status === 404
+}
+
+/** Fetch the active tenant's terms status into `activeSpace` (cr-0114). Fail-open: on any error the versions
+ *  stay/reset to 0 so `termsStale()` is false — a transient terms hiccup must never lock a member out of the
+ *  shell (terms acceptance is an operational gate, not a confidentiality control). */
+async function refreshTenantTerms(tenantId: string | null): Promise<void> {
+  if (!tenantId) {
+    activeSpace.termsVersion = 0
+    activeSpace.acceptedVersion = 0
+    return
+  }
+  try {
+    const t = await getTenantTerms(tenantId)
+    activeSpace.termsVersion = t.termsVersion
+    activeSpace.acceptedVersion = t.acceptedVersion
+  } catch {
+    activeSpace.termsVersion = 0
+    activeSpace.acceptedVersion = 0
+  }
 }

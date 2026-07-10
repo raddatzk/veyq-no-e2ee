@@ -72,7 +72,9 @@ request the **user** turned on, straight to the chosen provider.
   **uploader attribution + bucket structure** (an opaque `owner_key` per medium — `user:{id}` / `share:{id}` —
   plus its `bucket_id` and the bucket rows' shape: node, parentage, `is_primary`, per-bucket counts; the
   bucket/uploader **names stay sealed** under `K_mem`, [ADR 0034](../decisions/0034-media-uploader-buckets.md));
-  per-parent blinded tokens.
+  per-parent blinded tokens; the tenant's **terms text + `terms_version`** (the operator's *public* policy,
+  served to everyone incl. pre-auth) and a member's **`accepted_terms_version`** (coarse acceptance metadata, like
+  membership — never content, [ADR 0035](../decisions/0035-server-terms-of-service.md)).
 
 These operational fields are exactly what lets the server **sort, paginate, route, authorize and
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"

@@ -519,6 +519,164 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: tenant_not_pending }
 
+  /api/tenants/{tenantId}/terms:
+    get:
+      tags: [tenants]
+      operationId: getTenantTerms
+      summary: Read a tenant's current terms + the caller's accepted version.
+      description: >
+        Returns the tenant's per-locale terms markdown, the current `termsVersion`, and the **caller's**
+        `acceptedVersion` (0 = not yet accepted). Serves the owner editor (loads the current text), the member
+        accept-gate (compare `acceptedVersion` to `termsVersion`), and the `/terms` accept view. The terms are
+        the operator's **public** policy (operational content, not E2EE); for now this is gated to **members**
+        of the tenant (a non-member is `404`, indistinguishable) — a pre-auth public-serving path is a later
+        slice. `@Authenticated`, enforced by code (ADR 0008, ADR 0035).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: The tenant's current terms + the caller's accepted version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantTerms" }
+              example:
+                termsVersion: 3
+                acceptedVersion: 2
+                terms:
+                  de: "## Nutzungsbedingungen\n…"
+                  en: "## Terms of use\n…"
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant with that id, or the caller is not a member (indistinguishable).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+    put:
+      tags: [tenants]
+      operationId: updateTenantTerms
+      summary: Set/replace a tenant's terms (owner-gated; bumps the version on a real change).
+      description: >
+        The tenant **owner** replaces the per-locale terms markdown. The server **normalizes** the markdown
+        and, **only if it changed**, stores it and **bumps `terms_version`** (an idempotent re-save returns the
+        same version — the pre-E2EE logic). The higher version re-gates every member (uc.account.accept-terms).
+        Gated on the caller holding the tenant **OWNER** membership (a code check, `403 not_tenant_owner`).
+        Operator-blind: terms are public operational content, never a key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TenantTermsUpdate" }
+            example:
+              terms:
+                de: "## Nutzungsbedingungen\n…"
+                en: "## Terms of use\n…"
+      responses:
+        "200":
+          description: The terms were stored; the (possibly bumped) current state is returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantTerms" }
+              example:
+                termsVersion: 3
+                acceptedVersion: 3
+                terms:
+                  de: "## Nutzungsbedingungen\n…"
+                  en: "## Terms of use\n…"
+        "400":
+          description: The request was malformed (terms too long).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller does not own this tenant (only the tenant owner may edit terms).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: No tenant with that id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
+  /api/tenants/{tenantId}/terms/accept:
+    post:
+      tags: [tenants]
+      operationId: acceptTenantTerms
+      summary: Accept the tenant's current terms (member gate; re-accept on a bump).
+      description: >
+        The signed-in **member** accepts the tenant's terms at the version they were shown. The server records
+        `accepted_terms_version = version` for `(caller, tenant)` — **only if** `version` equals the current
+        `terms_version`, else `409 terms_version_changed` (the operator bumped them meanwhile → the client
+        re-reads and re-presents). Acceptance is **coarse operational metadata** (like membership), never
+        content. `@Authenticated`; a non-member is `404` (uc.account.accept-terms, ADR 0035).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptTermsRequest" }
+            example: { version: 3 }
+      responses:
+        "200":
+          description: Accepted; the current terms state (with the updated acceptedVersion) is returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantTerms" }
+              example:
+                termsVersion: 3
+                acceptedVersion: 3
+                terms:
+                  de: "## Nutzungsbedingungen\n…"
+                  en: "## Terms of use\n…"
+        "400":
+          description: The request was malformed (missing/invalid version).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_request }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "404":
+          description: No tenant with that id, or the caller is not a member (indistinguishable).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+        "409":
+          description: The terms version changed since it was shown — re-read and re-present before accepting.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: terms_version_changed }
+
   /api/tenants/accept/preview:
     post:
       tags: [tenants]
@@ -919,6 +1077,71 @@ components:
         plaintext, never echoed in the tenant list — only here at mint time, over TLS to the owner-gated caller).
       maxLength: 128
       example: 87olM0gSJLPgnKSjdNkC4pPQyuvMVguyb5kHoJyU9Cc
+
+    # --- cr-0114 (ADR 0035): tenant terms of service ---
+
+    LocalizedMarkdown:
+      type: object
+      description: >
+        Per-locale terms markdown (the operator's public policy). Each locale is optional; an absent/blank
+        locale falls back to the other at display time (no empty terms shown). Trimmed + newline-normalized
+        server-side before comparison.
+      properties:
+        de:
+          type: [string, "null"]
+          description: German terms markdown (neutral-first inclusive language, cc.inclusive-language).
+          maxLength: 20000
+          example: "## Nutzungsbedingungen\n…"
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(max = 20000)'
+        en:
+          type: [string, "null"]
+          description: English terms markdown.
+          maxLength: 20000
+          example: "## Terms of use\n…"
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(max = 20000)'
+
+    TenantTerms:
+      type: object
+      required: [termsVersion, acceptedVersion]
+      properties:
+        termsVersion:
+          type: integer
+          format: int32
+          description: The tenant's current terms version. 0 = no terms set (nothing to accept, the gate never fires).
+          example: 3
+        acceptedVersion:
+          type: integer
+          format: int32
+          description: >
+            The **caller's** accepted version. 0 = not yet accepted; anything below `termsVersion` = the accept
+            gate fires (uc.account.accept-terms).
+          example: 2
+        terms:
+          description: The current per-locale terms (absent/empty until the owner publishes).
+          oneOf:
+            - $ref: "#/components/schemas/LocalizedMarkdown"
+            - type: "null"
+
+    TenantTermsUpdate:
+      type: object
+      required: [terms]
+      properties:
+        terms:
+          $ref: "#/components/schemas/LocalizedMarkdown"
+          # @Valid cascades the per-locale size validation into the map.
+          x-field-extra-annotation: '@field:jakarta.validation.Valid'
+
+    AcceptTermsRequest:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: The terms version the member is accepting — must equal the current termsVersion, else 409.
+          minimum: 1
+          example: 3
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Min(1)'
 
     ErrorResponse:
       type: object

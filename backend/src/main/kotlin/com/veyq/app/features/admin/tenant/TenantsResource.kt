@@ -3,10 +3,12 @@ package com.veyq.app.features.admin.tenant
 import com.veyq.app.generated.api.TenantsApi
 import com.veyq.app.generated.model.AcceptInviteRequest
 import com.veyq.app.generated.model.AcceptPreviewRequest
+import com.veyq.app.generated.model.AcceptTermsRequest
 import com.veyq.app.generated.model.CreateTenantRequest
 import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.InviteRole
 import com.veyq.app.generated.model.InviteStatus
+import com.veyq.app.generated.model.LocalizedMarkdown
 import com.veyq.app.generated.model.MemberInviteRequest
 import com.veyq.app.generated.model.MemberInviteState
 import com.veyq.app.generated.model.PendingMemberInvite
@@ -19,6 +21,8 @@ import com.veyq.app.generated.model.TenantCreated
 import com.veyq.app.generated.model.TenantInviteState
 import com.veyq.app.generated.model.TenantStatus
 import com.veyq.app.generated.model.TenantSummary
+import com.veyq.app.generated.model.TenantTerms
+import com.veyq.app.generated.model.TenantTermsUpdate
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
 import com.veyq.app.shared.identity.WrapData
 import io.quarkus.security.Authenticated
@@ -42,6 +46,7 @@ import java.util.UUID
 class TenantsResource(
     private val handler: TenantHandler,
     private val acceptHandler: TenantAcceptHandler,
+    private val termsHandler: TenantTermsHandler,
     private val identity: SecurityIdentity,
 ) : TenantsApi {
 
@@ -198,6 +203,36 @@ class TenantsResource(
             RegisterAcceptOutcome.MissingGrant -> badRequest()
         }
     }
+
+    // --- Terms of service (cr-0114, ADR 0035). All @Authenticated (not Server-Owner): read/accept are
+    // member-facing, update is tenant-owner-gated in the handler (403 not_tenant_owner). A non-member read/accept
+    // is 404 (indistinguishable). ---
+    @Authenticated
+    override fun getTenantTerms(tenantId: UUID): Response =
+        when (val o = termsHandler.read(identity.principal.name, tenantId.toString())) {
+            is TermsReadOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
+            TermsReadOutcome.NotFound -> notFound()
+        }
+
+    @Authenticated
+    override fun updateTenantTerms(tenantId: UUID, tenantTermsUpdate: TenantTermsUpdate): Response =
+        when (val o = termsHandler.update(
+            identity.principal.name, tenantId.toString(), tenantTermsUpdate.terms.de, tenantTermsUpdate.terms.en,
+        )) {
+            is TermsUpdateOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
+            TermsUpdateOutcome.NotFound -> notFound()
+            TermsUpdateOutcome.NotOwner -> notTenantOwner()
+        }
+
+    @Authenticated
+    override fun acceptTenantTerms(tenantId: UUID, acceptTermsRequest: AcceptTermsRequest): Response =
+        when (val o = termsHandler.accept(identity.principal.name, tenantId.toString(), acceptTermsRequest.version)) {
+            is TermsAcceptOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
+            TermsAcceptOutcome.NotFound -> notFound()
+            TermsAcceptOutcome.VersionChanged -> conflict("terms_version_changed")
+        }
+
+    private fun TermsContent.toDto() = LocalizedMarkdown(de, en)
 
     private fun inviteNotFound() = Response.status(Response.Status.NOT_FOUND)
         .entity(ErrorResponse(code = "invite_not_found")).build()

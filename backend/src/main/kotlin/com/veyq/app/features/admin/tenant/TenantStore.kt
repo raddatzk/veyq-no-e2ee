@@ -25,6 +25,10 @@ data class InviteView(val ownerEmail: String, val status: String, val expiresAt:
 /** A pending member invite in the owner-facing list (cr-0082) — metadata only, never the secret. */
 data class PendingInviteRow(val inviteId: String, val email: String, val status: String, val expiresAt: Instant)
 
+/** A tenant's current terms + a specific caller's accepted version (cr-0114). `markdownByLocale` is the raw
+ *  serialized locale→markdown map (null = none set); the handler decodes it into the per-locale DTO. */
+data class TenantTermsRow(val version: Int, val acceptedVersion: Int, val markdownByLocale: String?)
+
 /**
  * Persistence for tenant creation + invite lifecycle (cr-0009). The invite is its own row history; only the
  * SHA-256 token hash is stored (never the token), and transitions are soft (ACTIVE → SUPERSEDED/CONSUMED/
@@ -212,6 +216,48 @@ class TenantStore {
 
     private fun currentInvite(tenantId: String): TenantInviteEntity? =
         TenantInviteEntity.find("tenantId = ?1 order by createdAt desc", tenantId).firstResult()
+
+    // --- terms of service (cr-0114, ADR 0035) ---
+
+    /** The tenant's current terms + [userId]'s accepted version (0 if never accepted). Null if no such tenant. */
+    fun termsFor(tenantId: String, userId: String): TenantTermsRow? {
+        val tenant = TenantEntity.findById(tenantId) ?: return null
+        val accepted = TenantTermsAcceptanceEntity
+            .find("userId = ?1 and tenantId = ?2", userId, tenantId).firstResult()?.acceptedVersion ?: 0
+        return TenantTermsRow(tenant.termsVersion, accepted, tenant.termsMarkdownByLocale)
+    }
+
+    /** Store the (already normalized) serialized terms and bump the version **only if the markdown changed** — an
+     *  idempotent re-save returns the same version (the pre-E2EE logic). Returns the resulting current version. */
+    @Transactional
+    fun updateTerms(tenantId: String, normalizedMarkdown: String): Int {
+        val tenant = TenantEntity.findById(tenantId) ?: return 0
+        if (tenant.termsMarkdownByLocale == normalizedMarkdown) return tenant.termsVersion
+        tenant.termsMarkdownByLocale = normalizedMarkdown
+        tenant.termsVersion += 1
+        tenant.persist()
+        return tenant.termsVersion
+    }
+
+    /** Upsert [userId]'s acceptance of [version] for [tenantId] (keyed by the (user, tenant) UNIQUE). */
+    @Transactional
+    fun recordAcceptance(userId: String, tenantId: String, version: Int) {
+        val existing = TenantTermsAcceptanceEntity
+            .find("userId = ?1 and tenantId = ?2", userId, tenantId).firstResult()
+        if (existing != null) {
+            existing.acceptedVersion = version
+            existing.acceptedAt = Instant.now()
+            existing.persist()
+        } else {
+            TenantTermsAcceptanceEntity().apply {
+                id = UUID.randomUUID().toString()
+                this.userId = userId
+                this.tenantId = tenantId
+                acceptedVersion = version
+                acceptedAt = Instant.now()
+            }.persist()
+        }
+    }
 
     // --- scheduled cleanup (see TenantInvitePurge) ---
 

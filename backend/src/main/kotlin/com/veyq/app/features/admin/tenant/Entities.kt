@@ -35,10 +35,48 @@ class TenantEntity : PanacheEntityBase {
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
+    /** cr-0114 (ADR 0035): the operator's per-locale terms markdown, serialized as a locale→markdown JSON map
+     *  (opaque TEXT). Null until the owner first publishes. Public operational content, never a key. */
+    @Column(name = "terms_markdown_by_locale")
+    var termsMarkdownByLocale: String? = null
+
+    /** cr-0114: the terms version, bumped only on a **normalized** change (idempotent re-saves don't). 0 = no
+     *  terms set (the member accept-gate never fires); a member whose accepted version is below this re-accepts. */
+    @Column(name = "terms_version", nullable = false)
+    var termsVersion: Int = 0
+
     companion object : PanacheCompanionBase<TenantEntity, String> {
         const val PENDING = "PENDING"
         const val ACTIVE = "ACTIVE"
     }
+}
+
+/**
+ * A member's acceptance of a tenant's terms (cr-0114, ADR 0035). Keyed logically by (user_id, tenant_id) — a
+ * surrogate id + a UNIQUE — it records the highest terms version the member accepted. **Coarse operational
+ * metadata** (like membership), never content. When `acceptedVersion < tenant.termsVersion` the member accept
+ * gate re-fires (uc.account.accept-terms); accepting upserts this row to the current version.
+ */
+@Entity
+@Table(name = "veyq_tenant_terms_acceptance")
+class TenantTermsAcceptanceEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "id", length = 36)
+    lateinit var id: String
+
+    @Column(name = "user_id", nullable = false, length = 36)
+    lateinit var userId: String
+
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    lateinit var tenantId: String
+
+    @Column(name = "accepted_version", nullable = false)
+    var acceptedVersion: Int = 0
+
+    @Column(name = "accepted_at", nullable = false)
+    lateinit var acceptedAt: Instant
+
+    companion object : PanacheCompanionBase<TenantTermsAcceptanceEntity, String>
 }
 
 /**

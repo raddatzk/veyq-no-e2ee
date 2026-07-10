@@ -44,12 +44,17 @@ least-privilege is crypto-enforced, and the server stays blind.
   [uc.memory.buckets](../memory/use-cases/uc.memory.buckets.md) +
   [en.memory.buckets](../memory/enablers/en.memory.buckets.md)
   ([ADR 0034](../../decisions/0034-media-uploader-buckets.md)) — the contributor identity becomes the
-  `share:{shareIdentityId}` **`owner_key`**, read with no migration. **cr-0113** (planned) ships the full bucket
-  data layer + backend + the primary-grouping tab; the **sub-bucket management UI**, a **camera filter**, and
-  **batch** stay later slices.
+  `share:{shareIdentityId}` **`owner_key`**, read with no migration. **cr-0113 (done)** shipped the full bucket
+  data layer + backend + the **web** organizer (the always-visible Beiträge tab, sub-bucket create/rename/delete,
+  move + batch, virtual-primary); a **camera filter** and the **native** surfaces stay later slices.
 - **MANAGER role + moderation + persistent uploader deletes** — a manager role with view-all + edit/delete;
   **moderation** (review-before-publish) over the direct-append default; and persisting an uploader's id list
   client-side for **post-reload delete** (still no download).
 - **Password-protected shares** — fold `Argon2id(passphrase)` into the wrap key for link-leak defense.
-- **Persisted shares / person-resolution**, **share notices / tenant terms** — legal + cross-scope surfaces.
+- **Persisted shares / person-resolution** — cross-scope surfaces. **Tenant terms** are now refined
+  ([ADR 0035](../../decisions/0035-server-terms-of-service.md); the operator sets versioned per-locale terms in
+  [uc.admin.tenant-terms](../admin/use-cases/uc.admin.tenant-terms.md), members accept server-side in
+  [uc.account.accept-terms](../account/use-cases/uc.account.accept-terms.md)); what stays deferred **here** is the
+  **anonymous share-page notice** — an accountless visitor's *client-side* (localStorage) acceptance on the public
+  share page, a slice on top of those terms.
 - **A foreign-operator-proof no-install viewer** — needs the future trusted-web client (SaaS-era).

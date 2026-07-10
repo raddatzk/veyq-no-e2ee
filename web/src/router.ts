@@ -1,12 +1,15 @@
+import { watch } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useServerState } from './shared/state/useServerState'
 import { session } from './app/session'
 import { vaultState } from './app/vault'
 import { rememberRoute } from './app/pendingRoute'
+import { termsStale } from './app/activeSpace'
 import SetupView from './views/SetupView.vue'
 import LoginView from './views/LoginView.vue'
 import SettingsHubView from './views/SettingsHubView.vue'
 import TenantJoinView from './views/TenantJoinView.vue'
+import TermsAcceptView from './views/TermsAcceptView.vue'
 import MemoryHomeView from './views/MemoryHomeView.vue'
 import GroupInvitationsView from './views/GroupInvitationsView.vue'
 import ShareView from './views/ShareView.vue'
@@ -34,6 +37,11 @@ const router = createRouter({
     // Public invitee-acceptance deep link (the bootstrap secret rides in the #fragment). No session gate —
     // preview/register are public and the existing-owner path signs in within the view (cr-0010).
     { path: '/tenant/accept', name: 'tenant-accept', component: TenantJoinView },
+    // The member terms accept-gate (uc.account.accept-terms, cr-0114). A standalone full-screen card (no shell)
+    // so a member who hasn't accepted the tenant's current terms can ONLY accept or sign out — every attempt to
+    // reach a `requiresUnlock` shell route bounces here (below). Not itself unlock-gated: it reads the active
+    // tenant from `activeSpace` (set by the shell) and bounces to `/` if none is resolved yet.
+    { path: '/terms', name: 'terms', component: TermsAcceptView },
     // Public anonymous viewer share (uc.sharing.share-public-viewer, cr-0100). No session gate — an account-less
     // visitor opens ONE Memory read-only; the share key rides the #fragment (`/s/{shareId}#k=<K_share>`), resolved
     // + decrypted client-side. `layout: 'plain'` gives the gallery the full viewport (not the narrow public card).
@@ -56,11 +64,33 @@ router.beforeEach((to) => {
       return { name: 'login' }
     }
   }
+  // Terms accept-gate (cr-0114, ADR 0035): a member who hasn't accepted the active tenant's current terms is
+  // bounced to /terms before any shell route. Sits ABOVE unlock (a session gate) — but the shell routes are all
+  // `requiresUnlock`, and `termsStale()` reads the active tenant the shell resolved, so gating on `requiresUnlock`
+  // is exact. The remembered deep link is restored after acceptance (the terms view consumes pendingRoute). On a
+  // cold boot the tenant isn't entered yet, so `termsStale()` is false here; the watcher below re-fires the gate
+  // once `enterScope` resolves stale terms.
+  if (to.meta.requiresUnlock && to.name !== 'terms' && termsStale()) {
+    rememberRoute(to.fullPath)
+    return { name: 'terms' }
+  }
   // An already-unlocked session on the login card jumps into the shell. The remembered deep link (if any) is
   // restored by the login view after unlock — it is the single consumer of pendingRoute, so we don't take it
   // here (that would race the view to the one-shot value and drop it).
   if (to.name === 'login' && session.accessToken !== null && vaultState.unlocked) return { name: 'home' }
   return true
+})
+
+// Cold-boot / late-resolution trigger for the terms gate (cr-0114): the tenant is entered AFTER `beforeEach`
+// already allowed `/` through (from `MemoryHomeView`'s mount), so `enterScope` flips `termsStale()` to true only
+// afterward. This watcher catches that transition and bounces the (already-mounted) shell to /terms, remembering
+// the current route so acceptance returns the member where they were.
+watch(termsStale, (stale) => {
+  const current = router.currentRoute.value
+  if (stale && current.name !== 'terms' && current.meta.requiresUnlock) {
+    rememberRoute(current.fullPath)
+    void router.push({ name: 'terms' })
+  }
 })
 
 export default router

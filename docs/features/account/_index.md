@@ -40,3 +40,7 @@ holds only **public** keys and ciphertext, never the password and never a conten
 - Change password / Secret Key — planned (re-register auth key, re-wrap Master Key)
 - Recover access with a recovery code — planned (RECOVERY wrap, reissue code)
 - Manage active sessions — planned (list session families by their **E2EE** client-built name, revoke individually; unlock-gated; [ADR 0004](../../decisions/0004-session-tokens.md))
+
+**Terms gate** — an *operational* gate that sits on a **session**, above unlock ([ADR 0035](../../decisions/0035-server-terms-of-service.md)):
+
+- ★ [Accept the tenant's terms](use-cases/uc.account.accept-terms.md) — **built (web, cr-0114)** (a hard member gate on a stale `accepted_terms_version`; server-side, re-accept on a bump; the operator sets the version in [uc.admin.tenant-terms](../admin/use-cases/uc.admin.tenant-terms.md))

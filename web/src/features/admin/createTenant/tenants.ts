@@ -6,11 +6,13 @@ import { tenantsApi } from '../../../api/client'
 import { ResponseError } from '../../../api/generated/tenants'
 import type {
   InvitePreview,
+  LocalizedMarkdown,
   TenantActivated,
   TenantActivatedWithUser,
   TenantCreated,
   TenantInviteState,
   TenantSummary,
+  TenantTerms,
 } from '../../../api/generated/tenants'
 import * as v1 from '../../../shared/crypto/v1'
 import type { HybridPublic } from '../../../shared/crypto/v1'
@@ -18,6 +20,7 @@ import { b64std } from '../../../shared/base64'
 import type { AccountMaterial } from '../../account/register/accountBirth'
 
 export type { TenantSummary, TenantInviteState, TenantCreated, InvitePreview } from '../../../api/generated/tenants'
+export type { TenantTerms, LocalizedMarkdown } from '../../../api/generated/tenants'
 
 /** Create a PENDING tenant and mint an owner invite. */
 export function createTenant(tenantName: string, domain: string, ownerEmail: string): Promise<TenantCreated> {
@@ -42,6 +45,23 @@ export function reassignInvite(tenantId: string, ownerEmail: string): Promise<Te
 /** Revoke a pending tenant. */
 export function revokeTenant(tenantId: string): Promise<void> {
   return tenantsApi().revokeTenant({ tenantId })
+}
+
+// --- Terms of service (cr-0114, ADR 0035) ---
+
+/** The tenant's current terms + the caller's accepted version (member-readable; a non-member is 404). */
+export function getTenantTerms(tenantId: string): Promise<TenantTerms> {
+  return tenantsApi().getTenantTerms({ tenantId })
+}
+
+/** Owner-only: set/replace the tenant's per-locale terms — a normalized change bumps the version (else 403). */
+export function updateTenantTerms(tenantId: string, terms: LocalizedMarkdown): Promise<TenantTerms> {
+  return tenantsApi().updateTenantTerms({ tenantId, tenantTermsUpdate: { terms } })
+}
+
+/** Member: accept the tenant's current terms at [version] — must equal the current version, else 409. */
+export function acceptTenantTerms(tenantId: string, version: number): Promise<TenantTerms> {
+  return tenantsApi().acceptTenantTerms({ tenantId, acceptTermsRequest: { version } })
 }
 
 // --- Slice B (cr-0010): invite acceptance / activation ---

@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppearancePanel from '../features/settings/AppearancePanel.vue'
 import ProfilePanel from '../features/account/profile/ProfilePanel.vue'
 import TenantMembersPanel from '../features/spaces/TenantMembersPanel.vue'
+import TenantTermsPanel from '../features/admin/createTenant/TenantTermsPanel.vue'
 import GroupMembersPanel from '../features/spaces/GroupMembersPanel.vue'
 import TenantDetailPanel from '../features/admin/createTenant/TenantDetailPanel.vue'
 import CreateGroupDialog from '../features/spaces/CreateGroupDialog.vue'
@@ -73,9 +74,13 @@ const categories = computed<NavCategory[]>(() => {
       ],
     },
   ]
-  // Tenant members — scope-in-path: managed while the shared Tenant scope is active (needs K_tenant open).
+  // Tenant members + terms — scope-in-path: managed while the shared Tenant scope is active (needs K_tenant open).
+  // Terms are member-readable (the editor is owner-only, cr-0114); the item is shown to every member.
   if (activeSpace.kind === ScopeKind.Tenant) {
-    cats.push({ key: 'tenant', label: t('settings.tenant'), collapsible: false, items: [{ id: 'tenant-members', label: t('members.title'), icon: 'pi pi-users' }] })
+    cats.push({ key: 'tenant', label: t('settings.tenant'), collapsible: false, items: [
+      { id: 'tenant-members', label: t('members.title'), icon: 'pi pi-users' },
+      { id: 'terms', label: t('terms.navTitle'), icon: 'pi pi-file-edit' },
+    ] })
   }
   // Gruppen collection — every group I own + a create affordance (management hub, decoupled from active scope).
   if (activeSpace.tenantId) {
@@ -123,6 +128,7 @@ const hasSection = computed(() => Boolean(route.params.section))
 const activeView = computed<{ component: Component; props: Record<string, unknown> }>(() => {
   const id = activeId.value
   if (id === 'tenant-members') return { component: TenantMembersPanel, props: {} }
+  if (id === 'terms') return { component: TenantTermsPanel, props: {} }
   if (id.startsWith('group-')) {
     const scopeId = id.slice('group-'.length)
     return { component: GroupMembersPanel, props: { scopeId, name: ownedGroups.value.find((g) => g.scopeId === scopeId)?.name ?? '' } }
