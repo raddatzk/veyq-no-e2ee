@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// The uploader (drop-box) share dialog (cr-0116) — a SEPARATE memory action from the normal share dialog, matching
-// the legacy shape. An UPLOADER link lets anyone add photos but not see the Memory or others' contributions
-// (ADR 0031). Reduced create form (just an optional name, hardcoded role UPLOADER — no role switch, no note) + a
-// list of this Memory's uploader links with copy (copy-only) / revoke. Operator-blind: the name is sealed under
-// K_share; the link is reconstructed via the K_mem-recoverable K_share (cr-0115).
+// The uploader (drop-box) share dialog (cr-0116) — a SEPARATE memory action from the normal share dialog. An
+// UPLOADER link lets anyone add photos but not see the Memory or others' contributions (ADR 0031). Like the normal
+// shares, it is **list-only + a "New" button** that opens the SAME create dialog (ShareCreateDialog) with the role
+// fixed to UPLOADER — so an uploader link is created with a name + a per-locale note just like the others
+// (cr-0116 follow-up). Rows show copy (copy-only, the link reconstructed via the K_mem-recoverable K_share) +
+// revoke. Operator-blind: name/note sealed under K_share.
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+import ShareCreateDialog from './ShareCreateDialog.vue'
 import {
-  createShare,
   listSharesFor,
   revokeShare,
   recoverShareLink,
@@ -25,13 +25,10 @@ const { t, locale } = useI18n()
 
 const shares = ref<ManagedShare[]>([])
 const loadError = ref(false)
-const name = ref('')
-const creating = ref(false)
-const createError = ref(false)
-const freshLink = ref('')
 const copiedId = ref<string | null>(null)
 const revokingId = ref<string | null>(null)
 const actionError = ref(false)
+const createOpen = ref(false)
 
 const uploaderShares = computed(() => shares.value.filter((s) => s.role === ShareRole.Uploader))
 const decodedNames = computed(() => {
@@ -60,22 +57,6 @@ async function loadShares() {
   }
 }
 onMounted(loadShares)
-
-async function onCreate() {
-  creating.value = true
-  createError.value = false
-  freshLink.value = ''
-  try {
-    const minted = await createShare(props.nodeId, props.memoryKey, props.memoryName, ShareRole.Uploader, null, {}, name.value)
-    freshLink.value = minted.link
-    name.value = ''
-    await loadShares()
-  } catch {
-    createError.value = true
-  } finally {
-    creating.value = false
-  }
-}
 
 async function copyLink(id: string, link: string) {
   try {
@@ -106,117 +87,76 @@ function fmtDate(d: Date): string {
 
 <template>
   <Dialog :visible="true" :header="t('share.uploaderTitle')" modal class="share-dialog" @update:visible="emit('close')">
-    <p class="share-intro">{{ t('share.uploaderDialogCopy') }}</p>
-
-    <div class="share-field">
-      <label for="uploader-name">{{ t('share.name') }}</label>
-      <InputText id="uploader-name" v-model="name" :placeholder="t('share.nameOptional')" />
-    </div>
-    <div class="share-create-row">
-      <Button
-        :label="creating ? t('share.creating') : t('share.uploaderCreate')"
-        icon="pi pi-user-plus"
-        :disabled="creating"
-        @click="onCreate"
-      />
-    </div>
-    <p v-if="createError" class="share-error">{{ t('share.createFailed') }}</p>
-
-    <div v-if="freshLink" class="share-link-row">
-      <input class="share-link-input" type="text" :value="freshLink" readonly @focus="($event.target as HTMLInputElement).select()" />
-      <Button
-        :label="copiedId === 'fresh' ? t('share.copied') : t('share.copy')"
-        :icon="copiedId === 'fresh' ? 'pi pi-check' : 'pi pi-copy'"
-        severity="secondary"
-        @click="copyLink('fresh', freshLink)"
-      />
+    <div class="share-manage-head">
+      <p class="share-intro">{{ t('share.uploaderDialogCopy') }}</p>
+      <Button :label="t('share.uploaderCreate')" icon="pi pi-user-plus" size="small" @click="createOpen = true" />
     </div>
 
-    <section class="share-manage">
-      <h3>{{ t('share.uploaderExisting') }}</h3>
-      <p v-if="loadError" class="share-error">{{ t('share.loadFailed') }}</p>
-      <p v-else-if="!uploaderShares.length" class="share-empty">{{ t('share.uploaderNone') }}</p>
-      <ul v-else class="share-list">
-        <li v-for="share in uploaderShares" :key="share.shareId" class="share-list-item">
-          <div class="share-list-meta">
-            <strong class="share-list-title">{{ titleFor(share) }}</strong>
-            <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
-            <span v-if="!share.enabled" class="share-badge muted">{{ t('share.disabled') }}</span>
-          </div>
-          <div class="share-list-actions">
-            <Button
-              v-if="share.enabled && shareLinks.get(share.shareId)"
-              type="button"
-              :icon="copiedId === share.shareId ? 'pi pi-check' : 'pi pi-copy'"
-              :aria-label="t('share.copy')"
-              :title="copiedId === share.shareId ? t('share.copied') : t('share.copy')"
-              severity="secondary"
-              text
-              @click="copyLink(share.shareId, shareLinks.get(share.shareId)!)"
-            />
-            <Button
-              v-if="share.mine && share.enabled"
-              type="button"
-              icon="pi pi-trash"
-              :aria-label="t('share.revoke')"
-              :title="t('share.revoke')"
-              severity="danger"
-              text
-              :disabled="revokingId === share.shareId"
-              @click="onRevoke(share.shareId)"
-            />
-          </div>
-        </li>
-      </ul>
-      <p v-if="actionError" class="share-error">{{ t('share.actionFailed') }}</p>
-    </section>
+    <p v-if="loadError" class="share-error">{{ t('share.loadFailed') }}</p>
+    <p v-else-if="!uploaderShares.length" class="share-empty">{{ t('share.uploaderNone') }}</p>
+    <ul v-else class="share-list">
+      <li v-for="share in uploaderShares" :key="share.shareId" class="share-list-item">
+        <div class="share-list-meta">
+          <strong class="share-list-title">{{ titleFor(share) }}</strong>
+          <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
+          <span v-if="!share.enabled" class="share-badge muted">{{ t('share.disabled') }}</span>
+        </div>
+        <div class="share-list-actions">
+          <Button
+            v-if="share.enabled && shareLinks.get(share.shareId)"
+            type="button"
+            :icon="copiedId === share.shareId ? 'pi pi-check' : 'pi pi-copy'"
+            :aria-label="t('share.copy')"
+            :title="copiedId === share.shareId ? t('share.copied') : t('share.copy')"
+            severity="secondary"
+            text
+            @click="copyLink(share.shareId, shareLinks.get(share.shareId)!)"
+          />
+          <Button
+            v-if="share.mine && share.enabled"
+            type="button"
+            icon="pi pi-trash"
+            :aria-label="t('share.revoke')"
+            :title="t('share.revoke')"
+            severity="danger"
+            text
+            :disabled="revokingId === share.shareId"
+            @click="onRevoke(share.shareId)"
+          />
+        </div>
+      </li>
+    </ul>
+    <p v-if="actionError" class="share-error">{{ t('share.actionFailed') }}</p>
+
+    <ShareCreateDialog
+      v-if="createOpen"
+      :node-id="nodeId"
+      :memory-key="memoryKey"
+      :memory-name="memoryName"
+      :fixed-role="ShareRole.Uploader"
+      @saved="loadShares"
+      @close="createOpen = false"
+    />
   </Dialog>
 </template>
 
 <style scoped>
+.share-manage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
 .share-intro {
-  margin: 0 0 1rem;
+  margin: 0;
   color: var(--app-muted);
   font-size: 0.9rem;
-}
-.share-field {
-  display: grid;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
-}
-.share-field > label {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.share-create-row {
-  display: flex;
 }
 .share-error {
   margin: 0.5rem 0 0;
   color: var(--app-danger, #e11d48);
   font-size: 0.85rem;
-}
-.share-link-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-.share-link-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--app-line);
-  border-radius: 8px;
-  background: var(--app-surface);
-  color: var(--app-text);
-  font: inherit;
-}
-.share-manage {
-  margin-top: 1.5rem;
-}
-.share-manage h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
 }
 .share-empty {
   margin: 0;

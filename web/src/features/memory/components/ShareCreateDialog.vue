@@ -20,13 +20,24 @@ const props = defineProps<{
   memoryName: string
   /** When set, the dialog edits this share's name + note in place instead of creating a new one. */
   editShare?: ManagedShare | null
+  /** When set (e.g. UPLOADER), the role is fixed and the switcher is hidden — used by the uploader dialog so it
+   *  shares the same create form (name + note) as the normal shares (cr-0116 follow-up). */
+  fixedRole?: ShareRole | null
 }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 const { t } = useI18n()
 
 const isEdit = computed(() => !!props.editShare)
+const showRoleSwitcher = computed(() => !isEdit.value && !props.fixedRole)
+const headerLabel = computed(() =>
+  isEdit.value
+    ? t('share.editTitle')
+    : props.fixedRole === ShareRole.Uploader
+      ? t('share.uploaderCreate')
+      : t('share.createNew'),
+)
 const name = ref('')
-const role = ref<ShareRole>(ShareRole.Viewer)
+const role = ref<ShareRole>(props.fixedRole ?? ShareRole.Viewer)
 const note = ref<LocaleMap>({})
 const busy = ref(false)
 const error = ref(false)
@@ -85,7 +96,7 @@ async function onCopy() {
 <template>
   <Dialog
     :visible="true"
-    :header="isEdit ? t('share.editTitle') : t('share.createNew')"
+    :header="headerLabel"
     modal
     class="share-dialog"
     @update:visible="emit('close')"
@@ -120,8 +131,8 @@ async function onCopy() {
         <InputText id="share-create-name" v-model="name" :placeholder="t('share.nameOptional')" />
       </div>
 
-      <!-- Role is chosen only when creating (it defines the grant); an edit keeps it. -->
-      <div v-if="!isEdit" class="share-field">
+      <!-- Role is chosen only when creating a normal share (it defines the grant); an edit or a fixed-role (uploader) create keeps it. -->
+      <div v-if="showRoleSwitcher" class="share-field">
         <label>{{ t('share.roleLabel') }}</label>
         <SelectButton v-model="role" :options="roleOptions" option-label="label" option-value="value" :allow-empty="false" />
         <p class="share-hint">{{ roleHint }}</p>

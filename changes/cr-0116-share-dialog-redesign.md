@@ -78,6 +78,13 @@ uploader, a **per-locale** note editor "+ Deutsch/Englisch hinzufügen"). Create
 German note → the list row shows **"Für Oma"** as its title + a **"Hinweis"** badge (older shares fall back to the
 role). "Upload anfragen" → a **separate** dialog with **reduced fields** (name only) + "Upload-Link erstellen".
 
+**Follow-up (uploader consistency).** Per user feedback, the uploader dialog now matches the others exactly: it is
+**list-only + a "New" button** that opens the **same `ShareCreateDialog`** with the role fixed to UPLOADER (a new
+`fixedRole` prop hides the switcher), so an uploader link is created with a **name + a per-locale note** just like a
+normal share (the note renders as the uploader's upload instruction on the drop-box pre-screen). A **password field**
+will be added to `ShareCreateDialog` in cr-0118 and thereby apply to **both** create flows. `npm run check` green;
+live-verified (the uploader "New" button opens the shared create dialog with name + note, no role switcher).
+
 **Deferred (later CRs, chosen with the user):**
 - **cr-0117 — anonymous acceptance gate** (the "gate wie Legacy"): the share page shows the SHARE note + the TENANT
   terms as an **accept-before-view** gate (client-side/localStorage), reviving the cr-0114 anonymous notice — needs
