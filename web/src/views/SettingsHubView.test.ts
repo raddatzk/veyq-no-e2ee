@@ -2,7 +2,7 @@
 // The settings hub (cr-0078, ADR 0022): the section nav is filtered by scope + role, deep links open a section,
 // and the split view tracks index vs. detail. The three section panels are stubbed — this tests the shell, not
 // the panels (they have their own tests).
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -61,13 +61,24 @@ async function mountHub(path = '/settings') {
 
 const navText = (w: Awaited<ReturnType<typeof mountHub>>) => w.get('.settings-nav').text()
 
+/** Stub the viewport so the wide-only /settings→section redirect is deterministic (happy-dom's default is wide). */
+function stubMatchMedia(matches: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches, media: query, onchange: null,
+    addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {},
+    dispatchEvent: () => false,
+  }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   clearActiveSpace()
   serverRole.canManage = false
   vi.mocked(listMyGroups).mockResolvedValue([]) // clearAllMocks keeps impls; reset the defaults per test
   vi.mocked(listTenants).mockResolvedValue([])
+  stubMatchMedia(false) // narrow by default → /settings stays the list; the wide-redirect case opts in
 })
+afterEach(() => vi.unstubAllGlobals())
 
 describe('SettingsHubView — section filtering by scope × role', () => {
   it('a Server Owner in the Tenant scope sees Personal + Shared space + Server', async () => {
@@ -132,11 +143,22 @@ describe('SettingsHubView — section filtering by scope × role', () => {
 })
 
 describe('SettingsHubView — split view index vs detail', () => {
-  it('wide/no param defaults to the current scope section (tenant members) in the detail', async () => {
+  it('wide/no param redirects to the current scope section (tenant members) as an explicit detail URL', async () => {
     activeSpace.tenantId = 't-1'
     activeSpace.kind = ScopeKind.Tenant
+    stubMatchMedia(true) // wide → the gear's default section becomes the explicit /settings/<section> URL
     const w = await mountHub('/settings')
+    await flushPromises()
     expect(w.find('.stub-members').exists()).toBe(true)
+    expect(w.get('.settings-hub').classes()).toContain('is-detail') // redirected to /settings/tenant-members
+  })
+
+  it('narrow/no param stays the drill-down list (no redirect)', async () => {
+    activeSpace.tenantId = 't-1'
+    activeSpace.kind = ScopeKind.Tenant
+    stubMatchMedia(false) // narrow → /settings is the list, not auto-navigated into a section
+    const w = await mountHub('/settings')
+    await flushPromises()
     expect(w.get('.settings-hub').classes()).toContain('is-index')
   })
 

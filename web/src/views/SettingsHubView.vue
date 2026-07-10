@@ -124,6 +124,17 @@ const defaultId = computed(() =>
 const activeId = computed(() => (route.params.section as string | undefined) || defaultId.value)
 const hasSection = computed(() => Boolean(route.params.section))
 
+// On a WIDE viewport the gear (no section) already auto-shows a default section's detail — make the URL explicit by
+// replacing /settings → /settings/<defaultId> (contextual: the Tenant scope → members, a group → its page). On
+// NARROW (≤720px) /settings is the drill-down list, so it stays put (redirecting there would break the back path).
+function reflectDefaultSection() {
+  if (!hasSection.value && defaultId.value && window.matchMedia('(min-width: 721px)').matches) {
+    void router.replace(`/settings/${defaultId.value}`)
+  }
+}
+onMounted(reflectDefaultSection)
+watch([hasSection, defaultId], reflectDefaultSection)
+
 // Resolve the active id → the detail component + its props (a group id encodes its scope, ADR 0022 §2).
 const activeView = computed<{ component: Component; props: Record<string, unknown> }>(() => {
   const id = activeId.value
