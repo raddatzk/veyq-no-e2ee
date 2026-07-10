@@ -25,7 +25,6 @@ import MemoryDetail from '../features/memory/components/MemoryDetail.vue'
 import NodeMutationDialog from '../features/memory/components/NodeMutationDialog.vue'
 import DeleteNodeDialog from '../features/memory/components/DeleteNodeDialog.vue'
 import ShareDialog from '../features/memory/components/ShareDialog.vue'
-import UploaderShareDialog from '../features/memory/components/UploaderShareDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,7 +74,7 @@ const shareable = computed(
   () => hasCapability(SHARING_PUBLIC_LINKS) && currentNode.value?.kind === NodeKind.Memory,
 )
 const shareVisible = ref(false)
-const uploaderVisible = ref(false) // cr-0116: the uploader (drop-box) dialog — a separate memory action
+const uploaderVisible = ref(false) // the uploader (drop-box) share dialog — a separate memory action
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 const mutationVisible = ref(false)
@@ -239,8 +238,10 @@ async function onDeleteDone() {
       :memory-name="currentNode.name"
       @close="shareVisible = false"
     />
-    <UploaderShareDialog
+    <!-- The SAME dialog component, uploader variant (no role switcher, uploader shares only) — a separate action. -->
+    <ShareDialog
       v-if="uploaderVisible && currentNode && memoryKey"
+      uploader
       :node-id="currentNode.id"
       :memory-key="memoryKey"
       :memory-name="currentNode.name"

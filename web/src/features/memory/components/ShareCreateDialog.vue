@@ -1,9 +1,11 @@
 <script setup lang="ts">
-// The share create/edit dialog (cr-0116), opened from the list-only ShareDialog. CREATE: collects an optional
-// name, the role (VIEWER/CONTRIBUTOR — uploader is a separate action), and an optional per-locale note, mints the
-// share and shows the copyable link. EDIT (editShare set): pre-fills name + note (decrypted via the recoverable
-// K_share) and saves them in place with `updateShare` — the link stays valid. Operator-blind: name + note sealed
-// under K_share; the fresh K_share rides only the returned link.
+// The share create/edit dialog (cr-0116), opened from the list-only ShareDialog. Shared by BOTH share flows via the
+// `uploader` flag so they stay identical by construction: the normal flow shows a VIEWER/CONTRIBUTOR role switcher;
+// the uploader (drop-box) flow fixes the role to UPLOADER and hides the switcher — that is the ONLY difference.
+// CREATE collects an optional name + per-locale note, mints the share and shows the copyable link. EDIT (editShare
+// set): pre-fills name + note (decrypted via the recoverable K_share) and saves them in place with `updateShare` —
+// the link stays valid. Operator-blind: name + note sealed under K_share; the fresh K_share rides only the returned
+// link. (The uploader-links capability is gated on the memory ACTION that opens the uploader dialog, not here.)
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
@@ -20,24 +22,21 @@ const props = defineProps<{
   memoryName: string
   /** When set, the dialog edits this share's name + note in place instead of creating a new one. */
   editShare?: ManagedShare | null
-  /** When set (e.g. UPLOADER), the role is fixed and the switcher is hidden — used by the uploader dialog so it
-   *  shares the same create form (name + note) as the normal shares (cr-0116 follow-up). */
-  fixedRole?: ShareRole | null
+  /** The uploader (drop-box) variant: role fixed to UPLOADER, no switcher. Identical otherwise. */
+  uploader?: boolean
 }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 const { t } = useI18n()
 
 const isEdit = computed(() => !!props.editShare)
-const showRoleSwitcher = computed(() => !isEdit.value && !props.fixedRole)
+// The role is chosen only when creating a normal share; an edit keeps the minted role, and the uploader variant is
+// fixed to UPLOADER (no switcher).
+const showRoleSwitcher = computed(() => !isEdit.value && !props.uploader)
 const headerLabel = computed(() =>
-  isEdit.value
-    ? t('share.editTitle')
-    : props.fixedRole === ShareRole.Uploader
-      ? t('share.uploaderCreate')
-      : t('share.createNew'),
+  isEdit.value ? t('share.editTitle') : props.uploader ? t('share.uploaderCreate') : t('share.createNew'),
 )
 const name = ref('')
-const role = ref<ShareRole>(props.fixedRole ?? ShareRole.Viewer)
+const role = ref<ShareRole>(props.uploader ? ShareRole.Uploader : ShareRole.Viewer)
 const note = ref<LocaleMap>({})
 const busy = ref(false)
 const error = ref(false)
@@ -53,7 +52,7 @@ onMounted(() => {
   }
 })
 
-// Uploader is a separate action — the create switcher only offers view-only vs view + add.
+// The normal flow's switcher offers VIEWER + CONTRIBUTOR only — the uploader is its own action/dialog (no switcher).
 const roleOptions = computed(() => [
   { label: t('share.roleViewer'), value: ShareRole.Viewer },
   { label: t('share.roleContributor'), value: ShareRole.Contributor },
@@ -131,12 +130,14 @@ async function onCopy() {
         <InputText id="share-create-name" v-model="name" :placeholder="t('share.nameOptional')" />
       </div>
 
-      <!-- Role is chosen only when creating a normal share (it defines the grant); an edit or a fixed-role (uploader) create keeps it. -->
+      <!-- Normal flow: pick VIEWER/CONTRIBUTOR on create (an edit keeps the role). Uploader flow: no switcher —
+           just a short description of what a drop-box link does. -->
       <div v-if="showRoleSwitcher" class="share-field">
         <label>{{ t('share.roleLabel') }}</label>
         <SelectButton v-model="role" :options="roleOptions" option-label="label" option-value="value" :allow-empty="false" />
         <p class="share-hint">{{ roleHint }}</p>
       </div>
+      <p v-else-if="uploader && !isEdit" class="share-hint share-uploader-desc">{{ t('share.roleUploaderHint') }}</p>
 
       <div class="share-field">
         <label>{{ t('share.noteLabel') }}</label>
@@ -171,6 +172,10 @@ async function onCopy() {
   margin: 0;
   color: var(--app-muted);
   font-size: 0.82rem;
+}
+/* The uploader-flow description stands in for the (absent) role switcher, so it carries the field's spacing. */
+.share-uploader-desc {
+  margin-bottom: 1.1rem;
 }
 .share-error {
   margin: 0 0 0.5rem;

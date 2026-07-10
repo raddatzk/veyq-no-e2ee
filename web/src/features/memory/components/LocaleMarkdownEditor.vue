@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// A compact per-locale markdown editor (cr-0116) — `v-model` a `{ locale: markdown }` map. Ported (simplified)
-// from the legacy `LocaleMarkdownEditor`: add a language, edit each locale in a textarea, remove a locale. veyq
-// ships de/en, so the addable set is just those not yet present.
-import { computed } from 'vue'
+// A per-locale markdown note editor (cr-0116), `v-model` a `{ locale: markdown }` map. Legacy UX: pick a language
+// from a dropdown + "Add language", each added language is a row with Edit + delete, and Edit opens a modal with a
+// large markdown textarea (commit on Save, discard on Cancel). veyq ships de/en, so the addable set is those not yet
+// present. Operator-blind: this only edits the plaintext map — the sealing happens in `share.ts` under K_share.
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
+import Dialog from 'primevue/dialog'
 import type { LocaleMap } from '../share'
 
 const props = defineProps<{ modelValue: LocaleMap }>()
@@ -13,59 +16,113 @@ const { t } = useI18n()
 
 const ALL_LOCALES = ['de', 'en'] as const
 const present = computed(() => Object.keys(props.modelValue))
-const addable = computed(() => ALL_LOCALES.filter((l) => !present.value.includes(l)))
 const localeLabel = (l: string) => (l === 'de' ? t('terms.localeDe') : t('terms.localeEn'))
+const addable = computed(() =>
+  ALL_LOCALES.filter((l) => !present.value.includes(l)).map((l) => ({ value: l as string, label: localeLabel(l) })),
+)
 
-function setText(locale: string, text: string) {
-  emit('update:modelValue', { ...props.modelValue, [locale]: text })
-}
-function addLocale(locale: string) {
-  if (props.modelValue[locale] !== undefined) return
-  emit('update:modelValue', { ...props.modelValue, [locale]: '' })
+// The language chosen in the dropdown but not yet added.
+const pending = ref<string | null>(null)
+
+function addPending() {
+  const loc = pending.value
+  if (!loc || props.modelValue[loc] !== undefined) return
+  emit('update:modelValue', { ...props.modelValue, [loc]: '' })
+  pending.value = null
 }
 function removeLocale(locale: string) {
   const next = { ...props.modelValue }
   delete next[locale]
   emit('update:modelValue', next)
 }
+
+// --- the per-locale edit modal (large markdown textarea, commit on Save) ---
+const editing = ref<string | null>(null)
+const draft = ref('')
+function openEdit(locale: string) {
+  editing.value = locale
+  draft.value = props.modelValue[locale] ?? ''
+}
+function saveEdit() {
+  const loc = editing.value
+  if (loc) emit('update:modelValue', { ...props.modelValue, [loc]: draft.value })
+  editing.value = null
+}
+function cancelEdit() {
+  editing.value = null
+}
 </script>
 
 <template>
   <div class="locale-md-editor">
+    <!-- Add a language: pick from the dropdown, then "Add language". Hidden once both locales are present. -->
+    <div v-if="addable.length" class="locale-md-add">
+      <Select
+        v-model="pending"
+        :options="addable"
+        option-label="label"
+        option-value="value"
+        :placeholder="t('share.noteSelectLang')"
+        class="locale-md-select"
+      />
+      <Button
+        type="button"
+        :label="t('share.noteAddLanguage')"
+        icon="pi pi-plus"
+        :disabled="!pending"
+        @click="addPending"
+      />
+    </div>
+
+    <p v-if="!present.length" class="locale-md-empty">{{ t('share.noteEmpty') }}</p>
+
+    <!-- One row per added language: name + Edit (opens the modal) + delete. -->
     <div v-for="loc in present" :key="loc" class="locale-md-row">
-      <div class="locale-md-row-head">
-        <span class="locale-md-lang">{{ localeLabel(loc) }}</span>
+      <span class="locale-md-lang">{{ localeLabel(loc) }}</span>
+      <div class="locale-md-row-actions">
         <Button
           type="button"
-          icon="pi pi-times"
+          :label="t('share.edit')"
+          icon="pi pi-pencil"
           text
           severity="secondary"
           size="small"
-          :aria-label="t('common.cancel')"
+          @click="openEdit(loc)"
+        />
+        <Button
+          type="button"
+          icon="pi pi-trash"
+          text
+          severity="danger"
+          size="small"
+          :aria-label="t('share.noteRemoveLang', { lang: localeLabel(loc) })"
           @click="removeLocale(loc)"
         />
       </div>
+    </div>
+
+    <!-- The per-locale edit modal: a large markdown textarea, committed on Save. -->
+    <Dialog
+      v-if="editing"
+      :visible="true"
+      :header="t('share.noteEditTitle', { lang: localeLabel(editing) })"
+      modal
+      class="locale-md-dialog"
+      @update:visible="cancelEdit"
+    >
+      <label class="locale-md-dialog-label" for="locale-md-textarea">{{ t('share.noteMarkdownLabel') }}</label>
       <textarea
-        :value="modelValue[loc]"
+        id="locale-md-textarea"
+        v-model="draft"
         class="locale-md-input"
-        rows="3"
+        rows="16"
         :placeholder="t('share.notePlaceholder')"
-        @input="setText(loc, ($event.target as HTMLTextAreaElement).value)"
       ></textarea>
-    </div>
-    <p v-if="!present.length" class="locale-md-empty">{{ t('share.noteEmpty') }}</p>
-    <div v-if="addable.length" class="locale-md-add">
-      <Button
-        v-for="loc in addable"
-        :key="loc"
-        type="button"
-        :label="t('share.noteAddLang', { lang: localeLabel(loc) })"
-        icon="pi pi-plus"
-        text
-        size="small"
-        @click="addLocale(loc)"
-      />
-    </div>
+      <div class="locale-md-dialog-actions">
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" text severity="secondary" @click="cancelEdit" />
+        <Button type="button" :label="t('common.save')" icon="pi pi-save" @click="saveEdit" />
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -74,40 +131,63 @@ function removeLocale(locale: string) {
   display: grid;
   gap: 0.6rem;
 }
-.locale-md-row {
-  display: grid;
-  gap: 0.3rem;
-}
-.locale-md-row-head {
+.locale-md-add {
   display: flex;
+  gap: 0.5rem;
   align-items: center;
-  justify-content: space-between;
 }
-.locale-md-lang {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--app-muted);
-}
-.locale-md-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--app-line);
-  border-radius: 8px;
-  background: var(--app-surface);
-  color: var(--app-text);
-  font: inherit;
-  font-size: 0.88rem;
-  resize: vertical;
+.locale-md-select {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .locale-md-empty {
   margin: 0;
   color: var(--app-muted);
   font-size: 0.85rem;
 }
-.locale-md-add {
+.locale-md-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+.locale-md-lang {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.locale-md-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+.locale-md-dialog-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.locale-md-input {
+  width: min(72vw, 620px);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+.locale-md-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 </style>

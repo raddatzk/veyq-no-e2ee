@@ -43,8 +43,10 @@ least-privilege is crypto-enforced, and the server stays blind.
   in place** via a `K_mem`-recoverable share key `sealed_share_key = symWrap(K_mem, K_share)` + an owner-gated
   `updateShare` — the link stays valid. **cr-0116** made the note **per-locale** (`{de,en}`, viewer picks locale),
   added an optional **private share name** (`sealed_share_name`, management-only), and **redesigned the dialogs**
-  toward the legacy shape — list-only manage + separate create, the **uploader as its own action**, copy-only
-  links. Deferred: the **anonymous acceptance gate** (cr-0117) + **password protection** (cr-0118) + native;
+  toward the legacy shape — list-only manage + separate create, copy-only links, with the **uploader as its own
+  capability-gated memory action + dialog** (the same `ShareDialog`/`ShareCreateDialog` reused via an `uploader`
+  flag — identical by construction, its only difference the absent role switcher). Deferred: the **anonymous
+  acceptance gate** (cr-0117) + **password protection** (cr-0118) + native;
   [ADR 0036](../../decisions/0036-editable-share-note-recoverable-share-key.md))
 
 ## Deferred (later slices, each with its own dependency)

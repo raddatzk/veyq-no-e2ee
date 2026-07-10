@@ -30,8 +30,9 @@ accept-before-view) are deliberately **later CRs**.
   **full replace** of the two editable fields (`sealedNote` + `sealedShareName`).
 - **Uploader is its own action.** A separate `pi-user-plus` button in the memory action bar (gated on the
   `sharing.uploader-links` capability, [ADR 0032](../docs/decisions/0032-capability-discovery-version-gating.md))
-  opens `UploaderShareDialog` (list + inline create, **reduced fields**: name only, role fixed UPLOADER). The
-  create switcher therefore only offers VIEWER/CONTRIBUTOR — uploader was removed from it.
+  opens the **uploader variant** of the share dialogs (list of uploader shares + create with **no role switcher**,
+  role fixed UPLOADER). The normal create switcher therefore only offers VIEWER/CONTRIBUTOR — uploader is never a
+  switcher option. (Mechanism: see Follow-up 2 — one shared `ShareDialog`/`ShareCreateDialog` + an `uploader` flag.)
 - **Copy-only links.** The manage list shows a per-row **copy** button (the link reconstructed via the
   `K_mem`-recoverable `K_share`, cr-0115) and no raw URL — a deliberate simplification from legacy (which showed
   both).
@@ -84,6 +85,26 @@ role). "Upload anfragen" → a **separate** dialog with **reduced fields** (name
 normal share (the note renders as the uploader's upload instruction on the drop-box pre-screen). A **password field**
 will be added to `ShareCreateDialog` in cr-0118 and thereby apply to **both** create flows. `npm run check` green;
 live-verified (the uploader "New" button opens the shared create dialog with name + note, no role switcher).
+
+**Follow-up 2 (shared-component uploader variant, 2026-07-10).** Refines Follow-up 1's mechanism. A brief detour
+folded the uploader back into the normal create switcher as a third option, but that was reconsidered and dropped —
+you can't cleanly change an uploader link's role after the fact (it's write-only), so it belongs in its **own flow**,
+which is exactly why the legacy UI separated it. So the uploader stays **its own memory action + dialog**, now built
+cleanly: instead of a bespoke `UploaderShareDialog` + a `fixedRole` prop, **both** the manage dialog (`ShareDialog`)
+and the create dialog (`ShareCreateDialog`) take a single **`uploader` flag** and are mounted twice (normal +
+uploader). The two flows are therefore **identical by construction** — the only difference is the uploader variant
+lists uploader shares + drops the role switcher (showing a short drop-box description instead). The normal create
+switcher offers **only Viewer/Contributor**; the uploader capability soft-gate sits on the `pi-user-plus` memory
+action (`canUploadShare = shareable && hasCapability(sharing.uploader-links)`), and the server still 422-rejects
+`createShare(UPLOADER)` when off. `UploaderShareDialog.vue` is **removed** (its role is now the `uploader`-flagged
+`ShareDialog`). Name/note/copy-only/recoverable-key mechanics unchanged. The `ShareCreateDialog` test now asserts the
+switcher offers Viewer/Contributor (never uploader) in the normal flow and is **absent** in the uploader flow. The per-locale
+note editor (`LocaleMarkdownEditor`) was also reshaped to the legacy pattern — a language **dropdown** +
+"Sprache hinzufügen", one **row per added language** (Bearbeiten + delete), and Bearbeiten opens a **modal** with a
+large markdown textarea (commit on Save, discard on Cancel) — replacing the inline per-locale textareas. Two small
+**polish** fixes rode along: the "New link" button is full-width below the intro (was clipping), and the note hint
+copy was reworded (dropped the terse "Markdown funktioniert"). Docs realigned: `uc.platform.capability-discovery`
+(sharing-first-consumer), the sharing `_index`, inbox #19. `npm run check` green (web 551); live-verified.
 
 **Deferred (later CRs, chosen with the user):**
 - **cr-0117 — anonymous acceptance gate** (the "gate wie Legacy"): the share page shows the SHARE note + the TENANT

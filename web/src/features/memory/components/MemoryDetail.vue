@@ -44,13 +44,13 @@ import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
-import { useCapabilities } from '../../../shared/state/useCapabilities'
-import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
 import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { useViewMode } from '../../../shared/state/useViewMode'
 import { useMapConfig, setMapsConsent } from '../../../shared/state/useMapConfig'
+import { useCapabilities } from '../../../shared/state/useCapabilities'
+import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
 
 const props = defineProps<{
   node: TreeNode
@@ -74,8 +74,8 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 const { viewMode } = useViewMode()
 const { hasCapability } = useCapabilities()
-// cr-0116: the uploader (drop-box) action is offered only when the instance keeps the uploader-links capability
-// (ADR 0032) — mirrors the old switcher gate, now on the separate action. The server also rejects it (422).
+// The uploader (drop-box) link is its OWN memory action (a separate dialog), offered only when the instance keeps
+// the uploader-links capability (ADR 0032) — the server also 422-rejects createShare(UPLOADER) when it is off.
 const canUploadShare = computed(() => !!props.shareable && hasCapability(SHARING_UPLOADER_LINKS))
 
 const items = ref<MediaItem[]>([])
@@ -932,7 +932,7 @@ onBeforeUnmount(() => {
           :disabled="!memoryKey"
           @click="$emit('share')"
         />
-        <!-- cr-0116: the uploader (drop-box) link is its OWN action, not a share-type in the switcher. -->
+        <!-- The uploader (drop-box) link is its own action + own dialog (no role switcher) — capability-gated. -->
         <Button
           v-if="canUploadShare"
           v-tooltip.bottom="t('share.uploadRequest')"

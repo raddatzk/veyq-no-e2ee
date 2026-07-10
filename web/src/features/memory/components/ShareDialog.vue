@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // The curator's share MANAGEMENT dialog (cr-0116, redesigned toward the legacy shape): a **list-only** view of a
-// Memory's VIEWER/CONTRIBUTOR share links + a "New" button that opens the separate create dialog. Uploader (drop-
-// box) links are a **separate action** (UploaderShareDialog) and are filtered out here. Each row shows the share's
-// private name (or the role), badges (note present / disabled / by another member), and per-row actions: **copy
-// link** (copy-only — the URL is reconstructed via the K_mem-recoverable K_share, cr-0115), edit name+note, and
-// revoke / re-activate. Operator-blind throughout: names/notes are sealed under K_share and decrypted on device.
+// Memory's share links + a "New" button that opens the separate create dialog. Shared by BOTH share flows via the
+// `uploader` flag so they stay identical by construction: the NORMAL variant lists VIEWER/CONTRIBUTOR shares and
+// creates them with a role switcher; the UPLOADER (drop-box) variant lists uploader shares and creates them with no
+// switcher (a separate memory action, capability-gated at that action). Each row shows the share's private name (or
+// the role), badges (note present / disabled / by another member), and per-row actions: **copy link** (copy-only —
+// reconstructed via the K_mem-recoverable K_share, cr-0115), edit name+note, and revoke / re-activate.
+// Operator-blind throughout: names/notes are sealed under K_share and decrypted on device.
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
@@ -22,7 +24,13 @@ import {
 } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
 
-const props = defineProps<{ nodeId: string; memoryKey: Uint8Array; memoryName: string }>()
+const props = defineProps<{
+  nodeId: string
+  memoryKey: Uint8Array
+  memoryName: string
+  /** The uploader (drop-box) variant: list only uploader shares, create with no role switcher. Identical otherwise. */
+  uploader?: boolean
+}>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t, locale } = useI18n()
@@ -38,10 +46,18 @@ const copiedLinkId = ref<string | null>(null)
 const createOpen = ref(false)
 const editShare = ref<ManagedShare | null>(null)
 
-// VIEWER/CONTRIBUTOR only — uploader drop-boxes are managed in their own dialog (a separate memory action).
-const visibleShares = computed(() => shares.value.filter((s) => s.role !== ShareRole.Uploader))
+// The two flows differ only in which shares they list + their labels — the uploader variant filters to UPLOADER, the
+// normal variant to everything else. Guaranteed identical look because it is the SAME component.
+const visibleShares = computed(() =>
+  shares.value.filter((s) => (props.uploader ? s.role === ShareRole.Uploader : s.role !== ShareRole.Uploader)),
+)
+const headerTitle = computed(() => (props.uploader ? t('share.uploaderTitle') : t('share.title')))
+const introText = computed(() => (props.uploader ? t('share.uploaderDialogCopy') : t('share.intro')))
+const createLabel = computed(() => (props.uploader ? t('share.uploaderCreate') : t('share.createNew')))
+const emptyLabel = computed(() => (props.uploader ? t('share.uploaderNone') : t('share.none')))
 
 function roleLabel(r: ShareRole | string): string {
+  if (r === ShareRole.Uploader) return t('share.roleUploader')
   if (r === ShareRole.Contributor) return t('share.roleContributor')
   return t('share.roleViewer')
 }
@@ -138,14 +154,14 @@ function fmtDate(d: Date): string {
 </script>
 
 <template>
-  <Dialog :visible="true" :header="t('share.title')" modal class="share-dialog" @update:visible="emit('close')">
+  <Dialog :visible="true" :header="headerTitle" modal class="share-dialog" @update:visible="emit('close')">
     <div class="share-manage-head">
-      <p class="share-intro">{{ t('share.intro') }}</p>
-      <Button :label="t('share.createNew')" icon="pi pi-plus" size="small" @click="openCreate" />
+      <p class="share-intro">{{ introText }}</p>
+      <Button class="share-new-button" :label="createLabel" icon="pi pi-plus" @click="openCreate" />
     </div>
 
     <p v-if="loadError" class="share-error">{{ t('share.loadFailed') }}</p>
-    <p v-else-if="!visibleShares.length" class="share-empty">{{ t('share.none') }}</p>
+    <p v-else-if="!visibleShares.length" class="share-empty">{{ emptyLabel }}</p>
 
     <ul v-else class="share-list">
       <li v-for="share in visibleShares" :key="share.shareId" class="share-list-item">
@@ -213,6 +229,7 @@ function fmtDate(d: Date): string {
       :memory-key="memoryKey"
       :memory-name="memoryName"
       :edit-share="editShare"
+      :uploader="uploader"
       @saved="onSaved"
       @close="onDialogClose"
     />
@@ -222,15 +239,20 @@ function fmtDate(d: Date): string {
 <style scoped>
 .share-manage-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 .share-intro {
   margin: 0;
   color: var(--app-muted);
   font-size: 0.9rem;
+}
+/* A prominent, full-width "New link" button below the intro (the legacy shape), so a long intro can never
+   squeeze/clip its label. */
+.share-new-button {
+  width: 100%;
+  justify-content: center;
 }
 .share-error {
   margin: 0.5rem 0 0;
