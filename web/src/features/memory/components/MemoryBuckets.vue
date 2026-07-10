@@ -148,8 +148,17 @@ const bucketRows = computed<BucketRow[]>(() => {
 const activeBucket = computed<BucketRow | null>(
   () => bucketRows.value.find((b) => b.id === activeBucketId.value) ?? bucketRows.value[0] ?? null,
 )
+// Which bucket the picker opens on: the last one chosen for this node (remembered), else YOUR OWN bucket (not the
+// alphabetically-first, which may be a contributor's), else the first row (cr-0122 f/u).
+const BUCKET_MEMO_KEY = 'veyq.beitraege.bucket'
+function preferredBucketId(rows: BucketRow[]): string {
+  const remembered = localStorage.getItem(`${BUCKET_MEMO_KEY}.${props.nodeId}`)
+  if (remembered && rows.some((r) => r.id === remembered)) return remembered
+  const own = rows.find((r) => r.isPrimary && r.ownerKey.startsWith('user:'))
+  return own?.id ?? rows[0]?.id ?? ''
+}
 watch(bucketRows, (rows) => {
-  if (!rows.some((r) => r.id === activeBucketId.value)) activeBucketId.value = rows[0]?.id ?? ''
+  if (!rows.some((r) => r.id === activeBucketId.value)) activeBucketId.value = preferredBucketId(rows)
 }, { immediate: true })
 
 const selectOptions = computed(() =>
@@ -169,8 +178,6 @@ const aspectFor = (m: MediaItem) => {
   return galleryDisplayAspectRatio(dims?.w, dims?.h)
 }
 const layoutItems = computed(() => filteredMedia.value.map((m, index) => ({ id: m.mediaId, aspectRatio: aspectFor(m), media: m, index })))
-// Smaller than the gallery's 200px target so the thumbnail renders crisply rather than upscaled+soft at a big tile (cr-0122).
-const bucketTargetHeight = (width: number) => (width <= 720 ? 120 : 150)
 
 // where you may move the selection: any bucket sharing the active bucket's owner-root, excluding the active one.
 // A member may re-bucket within one root (own or a contributor's) but never across owners (cr-0123 authz), so the
@@ -183,7 +190,11 @@ const moveTargets = computed<BucketRow[]>(() => {
 
 // --- bucket actions ---------------------------------------------------------
 
-function chooseBucket(id: string) { activeBucketId.value = id; selected.value = new Set() }
+function chooseBucket(id: string) {
+  activeBucketId.value = id
+  try { localStorage.setItem(`${BUCKET_MEMO_KEY}.${props.nodeId}`, id) } catch { /* private mode / quota — memory is best-effort */ }
+  selected.value = new Set()
+}
 
 // Bucket actions render as buttons only where they apply. A member may create a sub under any primary root + rename
 // or delete any sub (own or a contributor's — cr-0123); a primary itself stays read-only.
@@ -421,7 +432,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 
       <!-- the grid -->
       <p v-if="!filteredMedia.length" class="veyq-empty">{{ t('memory.buckets.emptyBucket') }}</p>
-      <MediaGrid v-else :items="layoutItems" :target-height="bucketTargetHeight" :aria-label="activeBucket?.displayName ?? t('memory.buckets.title')">
+      <MediaGrid v-else :items="layoutItems" :aria-label="activeBucket?.displayName ?? t('memory.buckets.title')">
         <template #tile="{ tile, item }">
           <div
             class="gallery-tile bucket-tile"
@@ -557,6 +568,9 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-tile { position: absolute; top: 0; left: 0; overflow: hidden; border-radius: var(--app-radius-sm, 8px); }
 .bucket-tile.is-selected { outline: 2px solid var(--app-accent); outline-offset: -2px; }
 .bucket-tile-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: var(--app-control-bg); cursor: pointer; }
+/* The image fit lives on the gallery's SCOPED `.gallery-tile img` (MemoryDetail-only), so replicate it here — else
+   the bucket thumbnail renders at natural size (oversized + distorted), not filling the tile like the gallery. */
+.bucket-tile-open img { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* checkbox top-left, the per-tile 3-dot top-right (cr-0122). */
 .bucket-tile-check {
   position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; display: grid; place-items: center;

@@ -75,3 +75,24 @@ Concretely, on the Beiträge tab:
   `MediaHandler`/`MediaStore` owner-key gates → "same `owner_key` for source+target, caller is a member"; pure
   authz logic, no schema.)
 - Optional: load the **preview** derivative for tiles (higher-res) if the smaller-tile fix isn't enough.
+
+## Follow-up — default to your own bucket + remember the last (2026-07-10)
+
+The picker defaulted to the **alphabetically-first** bucket, which is often a **contributor's** (e.g. "Aaa …") —
+so opening Beiträge dropped you into someone else's contributions. Now `MemoryBuckets.vue` opens on the bucket the
+user last chose **for that node** (persisted in `localStorage` under `veyq.beitraege.bucket.<nodeId>`), else **your
+own** bucket (the member primary — `isPrimary && owner_key = user:…`, incl. the virtual self-primary), else the
+first row (`preferredBucketId`). `chooseBucket` writes the memory (best-effort — a private-mode/quota throw is
+swallowed). Web-only, no contract/backend/crypto change. `npm run check` green (`MemoryBuckets.test.ts` gained a
+default-to-own case + a remembers-last-per-node case; the contributor cases now select the bucket explicitly since
+it is no longer the default), 5 guards green.
+
+## Follow-up — tile image fit: same grid as the gallery (2026-07-10)
+
+The bucket tiles rendered oversized + cropped/distorted (**not** the same grid as the Galerie). Root cause: the
+image-fit CSS — `width/height: 100%; object-fit: cover` — lives on the gallery's **scoped** `.gallery-tile img`
+rule (MemoryDetail.vue only); the global `.media-grid-tile-media` carries **only** the opacity fade. So the bucket
+`<img>` got no sizing and rendered at natural resolution. (This — not tile size — was also the real cause of the
+earlier "zu groß" report; the phase-1 `targetHeight` shrink treated the wrong cause.) Fix: replicate the fit rule in
+MemoryBuckets' scoped CSS (`.bucket-tile-open img`) **and revert the `targetHeight` override** so the bucket grid is
+now byte-for-byte the gallery's justified grid (default height, `object-fit: cover`). Web-only; `npm run check` green.

@@ -46,7 +46,12 @@ const i18n = createI18n({
 
 // Stub the PrimeVue Select + Menu (not under test) and MediaGrid (renders the tile slot per item so the tile chrome
 // — checkbox + 3-dot — is exercised).
-const SelectStub = { props: ['modelValue', 'options'], template: '<div class="select-stub"><slot name="value" /></div>' }
+const SelectStub = {
+  props: ['modelValue', 'options'],
+  emits: ['update:modelValue'],
+  template:
+    '<div class="select-stub"><slot name="value" /><button v-for="o in options" :key="o.value" class="bucket-opt" :data-val="o.value" type="button" @click="$emit(\'update:modelValue\', o.value)" /></div>',
+}
 const MenuStub = { template: '<div class="menu-stub" />' }
 const MediaGridStub = {
   props: ['items'],
@@ -66,7 +71,13 @@ function mountBuckets(mediaItems: MediaItem[]) {
   })
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorage.clear() // the picker remembers the last bucket per node — reset between tests
+})
+
+const selectBucket = (w: Awaited<ReturnType<typeof mountBuckets>>, id: string) =>
+  w.find(`.bucket-opt[data-val="${id}"]`).trigger('click')
 
 describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () => {
   it('own bucket: select-all selects every tile, then delete soft-deletes each and offers undo → restore', async () => {
@@ -94,10 +105,10 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
   })
 
   it('contributor bucket: selection shown; Move disabled with no same-owner sibling, Delete still works', async () => {
-    // Own primary ('Member') + a contributor primary ('Aaa Contributor', sorts first ⇒ default-active).
     vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 0), bucket('b-share', 'share:x', 1, 'ct')])
     const wrapper = mountBuckets([media('m3', 'share:x', 'b-share')])
     await flushPromises()
+    await selectBucket(wrapper, 'b-share') // the picker defaults to your own bucket — switch into the contributor's
 
     expect(wrapper.find('.select-stub').text()).toContain('Aaa Contributor') // the contributor bucket is active
     expect(wrapper.findAll('.bucket-tile-check').length).toBe(1) // selection ungated for a contributor bucket
@@ -118,9 +129,30 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     ])
     const wrapper = mountBuckets([media('m3', 'share:x', 'b-share')])
     await flushPromises()
+    await selectBucket(wrapper, 'b-share') // switch into the contributor root (own is the default)
 
     await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // select all → 1 selected
     const move = wrapper.find('.bucket-selection-bar .bucket-action-button:not(.bucket-action-danger)')
     expect(move.attributes('disabled')).toBeUndefined() // a same-owner sibling exists → Move is available
+  })
+
+  it('opens with YOUR OWN bucket preselected — not the alphabetically-first contributor (cr-0122 f/u)', async () => {
+    vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 2), bucket('b-share', 'share:x', 1, 'ct')])
+    const wrapper = mountBuckets([media('m1', 'user:me', 'b-own'), media('m2', 'user:me', 'b-own'), media('m3', 'share:x', 'b-share')])
+    await flushPromises()
+    // 'Aaa Contributor' sorts first, but the picker defaults to your own bucket → its 2 media, not the contributor's 1.
+    expect(wrapper.findAll('.bucket-tile-check').length).toBe(2)
+  })
+
+  it('remembers the last chosen bucket per node (cr-0122 f/u)', async () => {
+    vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 0), bucket('b-share', 'share:x', 1, 'ct')])
+    const w1 = mountBuckets([media('m3', 'share:x', 'b-share')])
+    await flushPromises()
+    await selectBucket(w1, 'b-share') // choose the contributor bucket
+    w1.unmount()
+
+    const w2 = mountBuckets([media('m3', 'share:x', 'b-share')]) // re-enter the same node → restores the last pick
+    await flushPromises()
+    expect(w2.find('.select-stub').text()).toContain('Aaa Contributor')
   })
 })
