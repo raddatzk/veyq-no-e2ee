@@ -151,7 +151,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     expect(wrapper.find('.gallery-title').text()).toBe('Rom 2026')
     expect(wrapper.find('.gallery-count').text()).toBe('2 items')
     // two derivable items → two <img> thumbnail tiles, each backed by a decrypted object URL
-    const imgs = wrapper.findAll('.gallery-tile img')
+    const imgs = wrapper.findAll('.media-tile img')
     expect(imgs).toHaveLength(2)
     expect(imgs[0].attributes('src')).toBeTruthy()
     // operator-blind: each thumbnail came back through a presigned GET + on-device decrypt
@@ -177,7 +177,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await flushPromises()
     await flushPromises()
 
-    const order = () => wrapper.findAll('.gallery-tile').map((t) => t.attributes('data-media-id'))
+    const order = () => wrapper.findAll('.media-tile').map((t) => t.attributes('data-media-id'))
     // newest first (default): 2022 (media-1), 2021 (media-2), 2020 (media-0)
     expect(order()).toEqual(['media-1', 'media-2', 'media-0'])
 
@@ -200,7 +200,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await flushPromises()
 
     // open the lightbox, correct the capture time
-    await wrapper.find('.gallery-tile').trigger('click')
+    await wrapper.find('.media-tile-open').trigger('click')
     await flushPromises()
     expect(wrapper.text()).not.toContain('Corrected')
     await wrapper.find('[aria-label="Edit capture time"]').trigger('click')
@@ -216,7 +216,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
 
     // reopen the SAME tile → the correction persisted (the grid item was patched, not just a transient sort key).
     // The regression: an in-lightbox edit updated only the sort order, so reopening unsealed the stale tier.
-    await wrapper.find('.gallery-tile').trigger('click')
+    await wrapper.find('.media-tile-open').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Corrected')
   })
@@ -230,7 +230,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await flushPromises()
 
     expect(wrapper.find('.veyq-empty').text()).toBe('No photos in this Memory yet.')
-    expect(wrapper.findAll('.gallery-tile')).toHaveLength(0)
+    expect(wrapper.findAll('.media-tile')).toHaveLength(0)
   })
 
   it('renders a non-image/video item (E1) as an icon tile, fetching no thumbnail for it', async () => {
@@ -244,9 +244,9 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(wrapper.findAll('.gallery-tile')).toHaveLength(1)
-    expect(wrapper.find('.gallery-tile img').exists()).toBe(false)
-    expect(wrapper.find('.gallery-tile .media-grid-icon').exists()).toBe(true)
+    expect(wrapper.findAll('.media-tile')).toHaveLength(1)
+    expect(wrapper.find('.media-tile img').exists()).toBe(false)
+    expect(wrapper.find('.media-tile .media-grid-icon').exists()).toBe(true)
     // a non-derivable item is never fetched (no preview/thumbnail tier exists)
     expect(store.api.presignBlobDownloads).not.toHaveBeenCalled()
   })
@@ -300,7 +300,7 @@ describe('MemoryDetail (gallery grid + header)', () => {
     await flushPromises()
 
     expect(wrapper.find('.media-lightbox').exists()).toBe(false)
-    await wrapper.find('.gallery-tile').trigger('click')
+    await wrapper.find('.media-tile-open').trigger('click')
     await flushPromises()
     expect(wrapper.find('.media-lightbox').exists()).toBe(true)
   })

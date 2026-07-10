@@ -121,7 +121,7 @@ describe('MemoryDetail — optimistic in-grid upload tiles (cr-0074)', () => {
     await flushPromises()
     // one real tile so far
     expect(wrapper.findAll('.gallery-tile-optimistic')).toHaveLength(0)
-    expect(wrapper.findAll('.gallery-tile:not(.gallery-tile-optimistic)')).toHaveLength(1)
+    expect(wrapper.findAll('.media-tile')).toHaveLength(1)
 
     // an upload starts → an optimistic tile appears immediately, pinned first, with a local preview + a ring
     pushBatch([uploadFile('u1', 'uploading', { progress: 0.4 })])
@@ -166,8 +166,8 @@ describe('MemoryDetail — optimistic in-grid upload tiles (cr-0074)', () => {
     await flushPromises()
 
     expect(wrapper.findAll('.gallery-tile-optimistic')).toHaveLength(0) // reconciled away
-    expect(wrapper.findAll('.gallery-tile')).toHaveLength(1) // exactly one tile — the real media, no duplicate
-    expect(wrapper.find('.gallery-tile').attributes('data-media-id')).toBe('media-0')
+    expect(wrapper.findAll('.media-tile')).toHaveLength(1) // exactly one tile — the real media, no duplicate
+    expect(wrapper.find('.media-tile').attributes('data-media-id')).toBe('media-0')
   })
 
   it('keeps the optimistic tile while a done upload’s media is not yet listed (no gap before reconcile)', async () => {

@@ -14,6 +14,7 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import Dialog from 'primevue/dialog'
 import MediaGrid from './MediaGrid.vue'
+import MediaTile from './MediaTile.vue'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import {
   listBuckets, createBucket, renameBucket, deleteBucket, moveBucketMedia, openBucketName, deleteMedia, restoreMedia,
@@ -434,34 +435,24 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
       <p v-if="!filteredMedia.length" class="veyq-empty">{{ t('memory.buckets.emptyBucket') }}</p>
       <MediaGrid v-else :items="layoutItems" :aria-label="activeBucket?.displayName ?? t('memory.buckets.title')">
         <template #tile="{ tile, item }">
-          <div
-            class="gallery-tile bucket-tile"
-            :class="{ 'is-selected': selected.has(item.media.mediaId) }"
+          <MediaTile
             :style="{ transform: `translate(${tile.left}px, ${tile.top}px)`, width: `${tile.renderedWidth}px`, height: `${tile.renderedHeight}px` }"
+            :src="thumbs.get(item.media.mediaId)"
+            :has-derivatives="hasDerivatives(item.media)"
+            :open-label="t('media.openItem', { index: item.index + 1 })"
+            :selected="selected.has(item.media.mediaId)"
+            @open="openTile(item.index)"
           >
-            <button
-              class="bucket-tile-open"
-              type="button"
-              :aria-label="t('media.openItem', { index: item.index + 1 })"
-              @click="openTile(item.index)"
-            >
-              <img
-                v-if="thumbs.get(item.media.mediaId)"
-                class="media-grid-tile-media media-grid-tile-media-loaded"
-                :src="thumbs.get(item.media.mediaId)"
-                alt=""
-              />
-              <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
-              <span v-else class="media-grid-tile-placeholder" />
-            </button>
-            <label class="bucket-tile-check" :class="{ 'is-on': selected.has(item.media.mediaId) }">
-              <input type="checkbox" :checked="selected.has(item.media.mediaId)" :aria-label="t('media.openItem', { index: item.index + 1 })" @click.stop @change="toggleSelect(item.media.mediaId)" />
-              <span class="pi pi-check" aria-hidden="true" />
-            </label>
-            <button type="button" class="bucket-tile-menu" :aria-label="t('memory.buckets.options')" @click.stop="openMediaMenu($event, item.media.mediaId)">
-              <span class="pi pi-ellipsis-v" />
-            </button>
-          </div>
+            <template #overlay>
+              <label class="media-tile-check" :class="{ 'is-on': selected.has(item.media.mediaId) }">
+                <input type="checkbox" :checked="selected.has(item.media.mediaId)" :aria-label="t('media.openItem', { index: item.index + 1 })" @click.stop @change="toggleSelect(item.media.mediaId)" />
+                <span class="pi pi-check" aria-hidden="true" />
+              </label>
+              <button type="button" class="media-tile-menu" :aria-label="t('memory.buckets.options')" @click.stop="openMediaMenu($event, item.media.mediaId)">
+                <span class="pi pi-ellipsis-v" />
+              </button>
+            </template>
+          </MediaTile>
         </template>
       </MediaGrid>
       <Menu ref="mediaMenu" :model="mediaMenuItems" popup />
@@ -565,25 +556,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 }
 .bucket-dropzone strong { display: block; }
 .bucket-dropzone small { color: var(--app-muted); }
-.bucket-tile { position: absolute; top: 0; left: 0; overflow: hidden; border-radius: var(--app-radius-sm, 8px); }
-.bucket-tile.is-selected { outline: 2px solid var(--app-accent); outline-offset: -2px; }
-.bucket-tile-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: var(--app-control-bg); cursor: pointer; }
-/* The image fit lives on the gallery's SCOPED `.gallery-tile img` (MemoryDetail-only), so replicate it here — else
-   the bucket thumbnail renders at natural size (oversized + distorted), not filling the tile like the gallery. */
-.bucket-tile-open img { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* checkbox top-left, the per-tile 3-dot top-right (cr-0122). */
-.bucket-tile-check {
-  position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; display: grid; place-items: center;
-  border-radius: 999px; background: color-mix(in srgb, #000 45%, transparent); color: #fff; cursor: pointer;
-}
-.bucket-tile-check.is-on { background: var(--app-accent); }
-.bucket-tile-check input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.bucket-tile-check .pi { font-size: 0.7rem; opacity: 0; }
-.bucket-tile-check.is-on .pi { opacity: 1; }
-.bucket-tile-menu {
-  position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; display: grid; place-items: center;
-  border: 0; border-radius: 999px; background: color-mix(in srgb, #000 45%, transparent); color: #fff; cursor: pointer;
-}
+/* Tiles are the shared MediaTile (cr-0125); its check/menu overlays use the global `.media-tile-*` classes. */
 .bucket-dialog-form { display: grid; gap: 0.7rem; }
 .bucket-dialog-copy { color: var(--app-muted); margin: 0; }
 .bucket-dialog-form input[type='text'], .bucket-dialog-form select {

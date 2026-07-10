@@ -32,6 +32,7 @@ import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import MediaGrid from './MediaGrid.vue'
+import MediaTile from './MediaTile.vue'
 import MemoryBuckets from './MemoryBuckets.vue'
 import OptimisticTile from './OptimisticTile.vue'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile } from '../uploadQueue'
@@ -502,9 +503,9 @@ function revokeTrashThumbs() {
 
 /** The trashed media as MediaGrid tiles — the same justified layout as the gallery (aspect from the sealed dims). */
 const trashLayoutItems = computed(() =>
-  trashedItems.value.map((m) => {
+  trashedItems.value.map((m, index) => {
     const dims = props.memoryKey ? unsealMeta(props.memoryKey, m) : null
-    return { id: m.mediaId, aspectRatio: galleryDisplayAspectRatio(dims?.w, dims?.h), media: m }
+    return { id: m.mediaId, aspectRatio: galleryDisplayAspectRatio(dims?.w, dims?.h), media: m, index }
   }),
 )
 
@@ -1032,28 +1033,19 @@ onBeforeUnmount(() => {
                   }"
                   @retry="retryFile"
                 />
-                <button
+                <MediaTile
                   v-else
-                  class="gallery-tile"
-                  type="button"
                   :data-media-id="item.media.mediaId"
                   :style="{
                     transform: `translate(${tile.left}px, ${tile.top}px)`,
                     width: `${tile.renderedWidth}px`,
                     height: `${tile.renderedHeight}px`,
                   }"
-                  :aria-label="t('media.openItem', { index: item.index + 1 })"
-                  @click="openLightboxAt(item.index)"
-                >
-                  <img
-                    v-if="thumbs.get(item.media.mediaId)"
-                    class="media-grid-tile-media media-grid-tile-media-loaded"
-                    :src="thumbs.get(item.media.mediaId)"
-                    :alt="node.name"
-                  />
-                  <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
-                  <span v-else class="media-grid-tile-placeholder" />
-                </button>
+                  :src="thumbs.get(item.media.mediaId)"
+                  :has-derivatives="hasDerivatives(item.media)"
+                  :open-label="t('media.openItem', { index: item.index + 1 })"
+                  @open="openLightboxAt(item.index)"
+                />
               </template>
             </MediaGrid>
           </template>
@@ -1133,38 +1125,33 @@ onBeforeUnmount(() => {
             </div>
             <MediaGrid :items="trashLayoutItems" :aria-label="t('memory.trash.title')">
               <template #tile="{ tile, item }">
-                <div
-                  class="gallery-tile memory-trash-tile"
-                  :class="{ 'is-selected': selectedTrash.has(item.media.mediaId) }"
+                <MediaTile
+                  class="memory-trash-tile"
                   :style="{
                     transform: `translate(${tile.left}px, ${tile.top}px)`,
                     width: `${tile.renderedWidth}px`,
                     height: `${tile.renderedHeight}px`,
                   }"
-                  role="button"
-                  :aria-pressed="selectedTrash.has(item.media.mediaId)"
-                  @click="toggleTrashSelect(item.media.mediaId)"
+                  :src="trashThumbs.get(item.media.mediaId)"
+                  :has-derivatives="hasDerivatives(item.media)"
+                  :open-label="t('media.openItem', { index: item.index + 1 })"
+                  :selected="selectedTrash.has(item.media.mediaId)"
+                  @open="toggleTrashSelect(item.media.mediaId)"
                 >
-                  <img
-                    v-if="trashThumbs.get(item.media.mediaId)"
-                    class="media-grid-tile-media media-grid-tile-media-loaded"
-                    :src="trashThumbs.get(item.media.mediaId)"
-                    :alt="node.name"
-                  />
-                  <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
-                  <span v-else class="media-grid-tile-placeholder" />
-                  <span class="memory-trash-check" :class="{ 'is-on': selectedTrash.has(item.media.mediaId) }" aria-hidden="true">
-                    <span class="pi pi-check" />
-                  </span>
-                  <button
-                    type="button"
-                    class="memory-trash-menu-btn"
-                    :aria-label="t('common.more')"
-                    @click.stop="openTrashMenu($event, item.media.mediaId)"
-                  >
-                    <span class="pi pi-ellipsis-v" />
-                  </button>
-                </div>
+                  <template #overlay>
+                    <span class="media-tile-check" :class="{ 'is-on': selectedTrash.has(item.media.mediaId) }" aria-hidden="true">
+                      <span class="pi pi-check" />
+                    </span>
+                    <button
+                      type="button"
+                      class="media-tile-menu"
+                      :aria-label="t('common.more')"
+                      @click.stop="openTrashMenu($event, item.media.mediaId)"
+                    >
+                      <span class="pi pi-ellipsis-v" />
+                    </button>
+                  </template>
+                </MediaTile>
               </template>
             </MediaGrid>
             <Menu ref="trashMenu" :model="trashMenuModel" popup />
@@ -1491,33 +1478,8 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
 }
-.gallery-tile {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: block;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: var(--app-radius-sm);
-  background: var(--app-control-bg);
-  color: var(--app-muted);
-  cursor: pointer;
-}
-.gallery-tile img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.gallery-tile .media-grid-icon {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  font-size: 1.5rem;
-}
-/* The optimistic upload tile's own styles now live in the shared OptimisticTile component (cr-0074). */
+/* Gallery tiles are the shared MediaTile (cr-0125) — its wrapper/fit/icon styles live in the component + global
+   memory.css. The optimistic upload tile's own styles live in the shared OptimisticTile component (cr-0074). */
 
 /* --- Trash tab (cr-0110/0111): the same gallery grid, dimmed tiles + select-check + 3-dot menu --- */
 .memory-trash-toolbar {
@@ -1554,58 +1516,14 @@ onBeforeUnmount(() => {
   color: var(--app-danger);
   border-color: color-mix(in srgb, var(--app-danger) 40%, var(--app-line));
 }
-/* A trashed tile IS the shared .gallery-tile (absolute-positioned), just dimmed + selectable, with overlays. */
-.memory-trash-tile {
-  cursor: pointer;
-}
-.memory-trash-tile img {
+/* A trashed tile IS the shared MediaTile (cr-0125), just with the trashed media dimmed (the check/menu/outline are
+   the standard `.media-tile*`). `:deep` reaches the image inside the child component. */
+.memory-trash-tile :deep(.media-tile-img) {
   opacity: 0.72; /* trashed media reads as dimmed */
   transition: opacity 0.15s ease;
 }
-.memory-trash-tile.is-selected {
-  outline: 3px solid var(--app-accent);
-  outline-offset: -3px;
-}
-.memory-trash-tile.is-selected img {
+.memory-trash-tile.is-selected :deep(.media-tile-img) {
   opacity: 0.92;
-}
-.memory-trash-check {
-  position: absolute;
-  top: 0.4rem;
-  left: 0.4rem;
-  display: grid;
-  place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border: 2px solid rgb(255 255 255 / 85%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--app-backdrop-strong) 45%, transparent);
-  color: transparent;
-}
-.memory-trash-check .pi {
-  font-size: 0.75rem;
-}
-.memory-trash-check.is-on {
-  border-color: var(--app-accent);
-  background: var(--app-accent);
-  color: #fff;
-}
-.memory-trash-menu-btn {
-  position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
-  display: grid;
-  place-items: center;
-  width: 1.9rem;
-  height: 1.9rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--app-backdrop-strong) 45%, transparent);
-  color: #fff;
-  cursor: pointer;
-}
-.memory-trash-menu-btn:hover {
-  background: color-mix(in srgb, var(--app-backdrop-strong) 70%, transparent);
 }
 /* The undo snackbar sits above the lightbox (z-index 1000) so it's visible mid-culling. */
 .memory-undo-snackbar {

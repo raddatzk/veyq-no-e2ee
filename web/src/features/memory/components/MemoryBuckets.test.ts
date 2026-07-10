@@ -85,9 +85,9 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     const wrapper = mountBuckets([media('m1', 'user:me', 'b-own'), media('m2', 'user:me', 'b-own')])
     await flushPromises()
 
-    expect(wrapper.findAll('.bucket-tile-check').length).toBe(2) // selection UI present
+    expect(wrapper.findAll('.media-tile-check').length).toBe(2) // selection UI present
     await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // "Select all"
-    expect(wrapper.findAll('.bucket-tile.is-selected').length).toBe(2)
+    expect(wrapper.findAll('.media-tile.is-selected').length).toBe(2)
 
     const del = wrapper.find('.bucket-selection-bar .bucket-action-danger')
     expect(del.attributes('disabled')).toBeUndefined() // enabled with a selection
@@ -111,7 +111,7 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     await selectBucket(wrapper, 'b-share') // the picker defaults to your own bucket — switch into the contributor's
 
     expect(wrapper.find('.select-stub').text()).toContain('Aaa Contributor') // the contributor bucket is active
-    expect(wrapper.findAll('.bucket-tile-check').length).toBe(1) // selection ungated for a contributor bucket
+    expect(wrapper.findAll('.media-tile-check').length).toBe(1) // selection ungated for a contributor bucket
 
     await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // select all → 1 selected
     const move = wrapper.find('.bucket-selection-bar .bucket-action-button:not(.bucket-action-danger)')
@@ -141,7 +141,7 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     const wrapper = mountBuckets([media('m1', 'user:me', 'b-own'), media('m2', 'user:me', 'b-own'), media('m3', 'share:x', 'b-share')])
     await flushPromises()
     // 'Aaa Contributor' sorts first, but the picker defaults to your own bucket → its 2 media, not the contributor's 1.
-    expect(wrapper.findAll('.bucket-tile-check').length).toBe(2)
+    expect(wrapper.findAll('.media-tile-check').length).toBe(2)
   })
 
   it('remembers the last chosen bucket per node (cr-0122 f/u)', async () => {

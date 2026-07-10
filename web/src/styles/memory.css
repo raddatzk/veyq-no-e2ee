@@ -125,6 +125,55 @@
   font-size: 1.5rem;
 }
 
+/* Overlay controls on a MediaTile (cr-0125): the selection check (top-left) + the 3-dot menu (top-right), shared by
+   the Papierkorb + Beiträge grids. The slot content lives in the parent, so these classes are global (not scoped). */
+.media-tile-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 45%, transparent);
+  color: #fff;
+  cursor: pointer;
+}
+.media-tile-check.is-on {
+  background: var(--app-accent);
+}
+.media-tile-check input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.media-tile-check .pi {
+  font-size: 0.7rem;
+  opacity: 0;
+}
+.media-tile-check.is-on .pi {
+  opacity: 1;
+}
+.media-tile-menu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 45%, transparent);
+  color: #fff;
+  cursor: pointer;
+}
+.media-tile-menu:hover {
+  background: color-mix(in srgb, #000 60%, transparent);
+}
+
 .media-grid-highlight-badge {
   position: absolute;
   z-index: 2;
