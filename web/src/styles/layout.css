@@ -1034,6 +1034,19 @@
     background: color-mix(in srgb, var(--app-surface) 68%, transparent);
   }
 
+  /* cr-0108 follow-up: the "create group" + stays reachable in the compact top bar (it was hidden with the other
+     section actions, leaving no way to make a group at this width). */
+  .sidebar-groups-section .sidebar-section-action {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 1px solid transparent;
+    border-radius: var(--app-radius-sm);
+    background: color-mix(in srgb, var(--app-surface) 68%, transparent);
+  }
+
   .sidebar-section,
   .sidebar-tenant-switcher,
   .sidebar-nav {
@@ -1102,8 +1115,30 @@
     font-size: 0.72rem;
   }
 
-  .sidebar-tenant-switcher {
-    display: none;
+  /* cr-0108 follow-up: keep the tenant switcher in the compact top bar (it was hidden, leaving no Tenant-home
+     entry or tenant switch at this width) — laid out horizontally: the tenant link + a switch chevron. */
+  .sidebar-tenant-active {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .sidebar-tenant-switch {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 1px solid transparent;
+    border-radius: var(--app-radius-sm);
+    background: color-mix(in srgb, var(--app-surface) 68%, transparent);
+    color: var(--app-muted);
+    cursor: pointer;
+  }
+
+  .sidebar-tenant-switch:hover {
+    background: var(--app-hover);
   }
 
   .sidebar-favorites-section {
@@ -1150,14 +1185,6 @@
     flex: 1 1 auto;
     min-width: 3.6rem;
     overflow: hidden;
-  }
-
-  .compact-group-divider {
-    flex: 0 0 auto;
-    width: 1px;
-    height: 2rem;
-    margin: 0 0.15rem 0 0.25rem;
-    background: var(--app-line);
   }
 
   .compact-group-links {

@@ -61,7 +61,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="root" class="uploads-tray">
+    <!-- The tray button appears only when there is something to show — no uploads, no button (not an empty popover). -->
     <button
+      v-if="hasUploads || activeFileCount"
       type="button"
       class="uploads-trigger"
       :aria-label="t('media.uploads')"
@@ -76,7 +78,8 @@ onBeforeUnmount(() => {
       <header class="uploads-header">
         <div>
           <h3>{{ t('media.uploads') }}</h3>
-          <p>{{ activeFileCount ? t('media.uploadActive', { count: activeFileCount }) : t('media.uploadNone') }}</p>
+          <!-- Only the active summary here; the "no uploads" line lives in the empty row below (no double). -->
+          <p v-if="activeFileCount">{{ t('media.uploadActive', { count: activeFileCount }) }}</p>
         </div>
         <button v-if="activeFileCount" type="button" class="uploads-cancel-all" @click="cancelAll">
           {{ t('media.uploadCancelAll') }}

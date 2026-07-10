@@ -269,7 +269,6 @@ function closeMobileMenu() {
         </a>
       </RouterLink>
       <div class="compact-group-nav">
-        <span class="compact-group-divider" aria-hidden="true" />
         <div class="compact-group-links">
           <RouterLink
             v-for="group in groups"
