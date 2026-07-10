@@ -337,6 +337,12 @@
   font-size: 0.92rem;
 }
 
+/* The active-tenant name reads as a label, not a heading — regular weight, so it sits level with the Personal nav
+   link beside it (the avatar already carries the visual anchor). Groups/favorites keep their bold. cr-0120 f/u. */
+.sidebar-tenant-text strong {
+  font-weight: 400;
+}
+
 .sidebar-tenant-text small,
 .sidebar-memory-link small,
 .sidebar-scope-link small {

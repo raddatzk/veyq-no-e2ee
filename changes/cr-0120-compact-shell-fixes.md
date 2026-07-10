@@ -65,3 +65,38 @@ cr-0108, just never wired): a hidden off-screen clone measures each group's rend
 into a PrimeVue `Menu` popup behind a chevron button (with a trailing **"Neue Gruppe"** action). Live-verified with 5
 groups at **820px**: one group ("Familie Süd") fits inline + a "＋N" chevron whose menu lists the other four + "Neue
 Gruppe". `npm run check` green (556 tests). i18n `shell.groupsMenuOpen` added.
+
+## Follow-up 2 — overflow-clipping fix + readable group slug (2026-07-10)
+
+Two issues the user hit after the overflow port, both in `AppSidebar.vue` (+ a small routing touch):
+
+1. **Compact strip clipped the chevron at a narrow width.** The greedy packer had a `slice(0, 1)` fallback that
+   **forced one group inline even when it didn't fit** — at a squeezed strip (measured **~109px** at 760px viewport)
+   that one link (~140px) *and* the "＋N" chevron both overflowed the `overflow: hidden` strip, so the group was cut
+   off **and** the chevron (the only way to reach the other groups) was clipped away entirely. Fixed by dropping the
+   forced fallback: when not even the first link fits, **none** render inline and the chevron alone (48px, always
+   fits) holds every group. Also removed the now-redundant trailing **"Neue Gruppe"** from the chevron menu — group
+   creation already has the always-present "＋" in the section heading (restored in phase 1), so the menu is now
+   purely the overflow groups and the chevron shows **only when something actually overflowed**.
+2. **Group URL now carries a readable slug** — `#@familie-sued` instead of `#@<scopeId-UUID>`. `groupHash` emits
+   `slugify(name)` when that slug is **unique among the caller's groups**, else the opaque scopeId. Groups (unlike
+   content nodes, which the server keeps collision-free via a blinded `slugToken` + `UNIQUE(parentId)`) have **no
+   server-enforced slug uniqueness**, so a same-name collision falls back to the unambiguous id rather than guessing.
+   Resolution is a new **`openGroupByToken(token)`** in `scopes.ts`: one scope-list fetch, an exact-id fast path (no
+   name decryption — keeps legacy/collision `#@<id>` links + `refreshActiveScope` working), otherwise the group whose
+   decrypted name slugifies to the token, but only when **exactly one** does (an ambiguous slug resolves to nothing →
+   Personal fallback). `enterScope`'s group branch calls it; `groupActive` now highlights by the **resolved**
+   `activeSpace.scopeId` (format-independent — slug, id, or an old link all match the same open scope). Operator-blind
+   is untouched: slugs are derived from **client-decrypted** names; the server still sees only ciphertext + the opaque
+   scopeId.
+
+3. **Tenant name no longer bold.** The active-tenant label (`.sidebar-tenant-text strong`) rendered at the
+   `<strong>` UA weight (~700), sitting heavier than the regular-weight "Persönlich" nav link beside it. Set to
+   `font-weight: 400` so it reads as a label level with its neighbour (the avatar carries the visual anchor);
+   groups/favorites — which share the `<strong>` name-styling hook — keep their bold via the un-narrowed base rule.
+
+**Verify:** `cd web && npm run check` (adds `openGroupByToken` unit tests — slug resolve, id-token resolve, ambiguous
+→ null — and updates the `activeSpace` group-enter tests to the new resolver); a live smoke at a **narrow compact
+width** with several groups (the chevron stays visible + reaches every group, nothing clipped), that entering a
+group shows **`#@<slug>`** in the URL, and that the tenant name renders regular-weight. No contract/backend/crypto
+change; no doc-graph change (still `uc.spaces.switch-spaces`).

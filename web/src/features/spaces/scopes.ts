@@ -6,7 +6,7 @@ import { b64std, fromB64std } from '../../shared/base64'
 import { scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { identityPrivate } from '../../app/vault'
-import { sealName, openName } from '../memory/tree'
+import { sealName, openName, slugify } from '../memory/tree'
 import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type EpochKeys } from './epochs'
 import { SCOPE_GRANT, wrapScopeKeyToMember } from './grant'
 import { checkAndPin, IdentityChangedError } from '../account/identityPins'
@@ -203,6 +203,50 @@ export async function openScopeById(scopeId: string): Promise<OpenedScope | null
   if (!priv) return null
   try {
     const scope = (await listMyScopes()).find((s) => s.id === scopeId)
+    return scope ? await toOpenedScope(scope, priv) : null
+  } finally {
+    zero(priv)
+  }
+}
+
+/** A group's readable URL slug — `slugify` of its decrypted name (cr-0120), or null when it has no openable name.
+ *  Decrypts under the peeled name-epoch chain and zeroes those keys per call (the name stays operator-blind). */
+async function groupSlug(
+  g: ScopeSummary,
+  priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array },
+): Promise<string | null> {
+  if (!g.encryptedName) return null
+  let epochs: EpochKeys | null = null
+  try {
+    epochs = await epochKeysFor(g, unwrapGrant(g, priv))
+    return slugify(openGroupName(epochs, g.nameEpoch, g.encryptedName))
+  } catch {
+    return null
+  } finally {
+    if (epochs) zeroEpochKeys(epochs)
+  }
+}
+
+/**
+ * Open a group from its URL fragment token (en.spaces.group-scope, cr-0120). The token is either the group's
+ * readable **slug** (`slugify(name)` — the canonical form for a uniquely-named group) or its opaque **scopeId**
+ * (a legacy `#@<id>` link, or the fallback form a name-collision emits). Resolved against the caller's own scope
+ * list in one fetch: an exact id match wins with no name decryption; otherwise the group whose decrypted name
+ * slugifies to the token — but only when **exactly one** does (groups carry no server-enforced slug uniqueness,
+ * unlike content nodes, so an ambiguous slug resolves to nothing → the caller falls back to Personal). Null when
+ * the vault is locked or nothing matches.
+ */
+export async function openGroupByToken(token: string): Promise<OpenedScope | null> {
+  const priv = identityPrivate()
+  if (!priv) return null
+  try {
+    const groups = (await listMyScopes()).filter((s) => s.kind === ScopeKind.Group)
+    let scope = groups.find((s) => s.id === token)
+    if (!scope) {
+      const slugs = await Promise.all(groups.map((g) => groupSlug(g, priv)))
+      const matches = groups.filter((_, i) => slugs[i] === token)
+      if (matches.length === 1) scope = matches[0]
+    }
     return scope ? await toOpenedScope(scope, priv) : null
   } finally {
     zero(priv)

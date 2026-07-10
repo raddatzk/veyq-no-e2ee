@@ -4,6 +4,7 @@ vi.mock('../features/spaces/scopes', () => ({
   ensurePersonalScope: vi.fn(),
   openScope: vi.fn(),
   openScopeById: vi.fn(),
+  openGroupByToken: vi.fn(),
 }))
 // Stub only the async loaders refreshActiveScope drives (they hit the content/favorites APIs) — keep the rest of
 // the stores real so the other tests still assert on treeStore/favoritesStore.
@@ -11,7 +12,7 @@ vi.mock('../features/memory/treeStore', async (orig) => ({ ...(await orig<object
 vi.mock('./favoritesStore', async (orig) => ({ ...(await orig<object>()), loadFavoritesFor: vi.fn() }))
 
 import { activeSpace, activeScopeKey, activeEpochKeys, enterScope, refreshActiveScope, clearActiveSpace } from './activeSpace'
-import { ensurePersonalScope, openScope, openScopeById } from '../features/spaces/scopes'
+import { ensurePersonalScope, openScope, openScopeById, openGroupByToken } from '../features/spaces/scopes'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
 
@@ -100,13 +101,13 @@ describe('enterScope — personal', () => {
 })
 
 describe('enterScope — group', () => {
-  it('opens a group by id (@<id>) → ready, holding its decrypted name on activeSpace', async () => {
+  it('opens a group by fragment token (@<slug|id>) → ready, holding its decrypted name on activeSpace', async () => {
     const key = new Uint8Array(32).fill(3)
-    vi.mocked(openScopeById).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key, epochs: epochsOf(key), nameEpoch: 0, name: 'Familie Raddatz', deletedAt: null, purgeAfter: null })
+    vi.mocked(openGroupByToken).mockResolvedValue({ scopeId: 'g-1', tenantId: TENANT_ID, kind: ScopeKind.Group, key, epochs: epochsOf(key), nameEpoch: 0, name: 'Familie Raddatz', deletedAt: null, purgeAfter: null })
 
-    await enterScope('@g-1')
+    await enterScope('@familie-raddatz')
 
-    expect(openScopeById).toHaveBeenCalledWith('g-1')
+    expect(openGroupByToken).toHaveBeenCalledWith('familie-raddatz')
     expect(ensurePersonalScope).not.toHaveBeenCalled() // a resolvable group never falls back to Personal
     expect(activeSpace.status).toBe('ready')
     expect(activeSpace.kind).toBe(ScopeKind.Group)
@@ -115,8 +116,8 @@ describe('enterScope — group', () => {
     expect(activeScopeKey()).toBe(key)
   })
 
-  it('falls back to Personal when the @<id> group cannot be opened', async () => {
-    vi.mocked(openScopeById).mockResolvedValue(null)
+  it('falls back to Personal when the @<slug|id> group cannot be resolved', async () => {
+    vi.mocked(openGroupByToken).mockResolvedValue(null)
     vi.mocked(ensurePersonalScope).mockResolvedValue(false)
     vi.mocked(openScope).mockResolvedValue(opened(PERSONAL_SCOPE_ID, ScopeKind.Personal, new Uint8Array(32).fill(2)))
 
@@ -150,9 +151,9 @@ describe('enterScope — re-entry resets per-scope state', () => {
 
 describe('refreshActiveScope — reactive epoch swap after a rotation (cr-0089)', () => {
   it('re-opens the scope, swaps in the new epoch keys, and bumps the reactive epoch so key-reading views re-run', async () => {
-    // Enter a group at epoch 0.
+    // Enter a group at epoch 0 (via its fragment token → openGroupByToken).
     const e0 = new Uint8Array(32).fill(4)
-    vi.mocked(openScopeById).mockResolvedValue(opened('g-1', ScopeKind.Group, e0))
+    vi.mocked(openGroupByToken).mockResolvedValue(opened('g-1', ScopeKind.Group, e0))
     await enterScope('@g-1')
     expect(activeSpace.epoch).toBe(0)
 

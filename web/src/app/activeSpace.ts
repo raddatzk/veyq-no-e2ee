@@ -4,7 +4,7 @@
 // token-less → the shared **tenant** scope, `~me` → **personal**. Entering a scope opens its grant client-side
 // (operator-blind: `K_SC` is derived on-device) and resets the per-scope tree + favorites.
 import { reactive } from 'vue'
-import { ensurePersonalScope, openScope, openScopeById, type OpenedScope } from '../features/spaces/scopes'
+import { ensurePersonalScope, openScope, openScopeById, openGroupByToken, type OpenedScope } from '../features/spaces/scopes'
 import { getTenantTerms } from '../features/admin/createTenant/tenants'
 import { zeroEpochKeys, type EpochKeys } from '../features/spaces/epochs'
 import { ScopeKind } from '../api/generated/scopes'
@@ -81,9 +81,9 @@ export function activeEpochKeys(): EpochKeys | null {
  *
  * **No client birth of the tenant scope** (ADR 0006): the token-less home is *open-only*. When the caller holds
  * no `TENANT` grant (tenant member-invite is unbuilt), it **falls back to Personal** and flags the tenant
- * unavailable (ADR 0019, en.spaces.tenant-scope E1) — never a `POST`. A `@<id>` group is opened by id against the
- * caller's own scope list (en.spaces.group-scope, cr-0032); an unopenable one falls back to Personal too. Only
- * Personal auto-births.
+ * unavailable (ADR 0019, en.spaces.tenant-scope E1) — never a `POST`. A `@<slug|id>` group is resolved against the
+ * caller's own scope list (readable slug, or opaque id for a legacy/collision link — en.spaces.group-scope,
+ * cr-0032/0120); an unresolvable one falls back to Personal too. Only Personal auto-births.
  */
 export async function enterScope(token: string): Promise<void> {
   activeSpace.status = 'loading'
@@ -94,7 +94,7 @@ export async function enterScope(token: string): Promise<void> {
       activeSpace.tenantUnavailable = opened === null
     } else {
       activeSpace.tenantUnavailable = false
-      if (token.startsWith('@')) opened = await openScopeById(token.slice(1)) // `@<id>` → open that group
+      if (token.startsWith('@')) opened = await openGroupByToken(token.slice(1)) // `@<slug|id>` → open that group
     }
     if (!opened) {
       // Personal — the explicit `~me`, an unresolved/unopenable `@group`, or the no-grant tenant fallback.

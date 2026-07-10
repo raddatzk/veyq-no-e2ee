@@ -26,7 +26,7 @@ import { nodeById } from '../../features/memory/browse'
 import { hashForNode, parseHash, TENANT_SCOPE, isPersonalScope, personalScope } from '../../features/memory/location'
 import { getMyProfile } from '../../features/account/profile/profile'
 import { NodeKind } from '../../api/generated/content'
-import type { TreeNode } from '../../features/memory/tree'
+import { slugify, type TreeNode } from '../../features/memory/tree'
 import type { MyTenant } from '../../api/generated/scopes'
 import ProfileMenu from './ProfileMenu.vue'
 
@@ -52,11 +52,30 @@ const personalActive = computed(() => isPersonalScope(activeScope.value))
 // The member's groups (en.spaces.group-scope, cr-0032): names decrypted on-device (the server only ever stored
 // ciphertext). A group is entered via the `#@<id>` fragment; the active one is highlighted from the leading token.
 const groups = ref<GroupSpace[]>([])
-function groupHash(scopeId: string): string {
-  return `#@${scopeId}`
+// A group's fragment token is its readable slug (`slugify(name)`, e.g. `#@familie-sued`) when that slug is unique
+// among the caller's groups, else its opaque scopeId — groups have no server-enforced slug uniqueness (unlike
+// content nodes), so a name collision falls back to the unambiguous id (cr-0120). Old `#@<id>` links keep working:
+// openGroupByToken resolves both forms.
+const groupTokens = computed<Record<string, string>>(() => {
+  const counts = new Map<string, number>()
+  for (const g of groups.value) {
+    const slug = slugify(g.name)
+    if (slug) counts.set(slug, (counts.get(slug) ?? 0) + 1)
+  }
+  const tokens: Record<string, string> = {}
+  for (const g of groups.value) {
+    const slug = slugify(g.name)
+    tokens[g.scopeId] = slug && counts.get(slug) === 1 ? slug : g.scopeId
+  }
+  return tokens
+})
+function groupHash(group: GroupSpace): string {
+  return `#@${groupTokens.value[group.scopeId] ?? group.scopeId}`
 }
+// Highlight by the *resolved* scope, not the URL token: a group reached via slug, id, or an old link all open the
+// same scope, so the active row stays correct regardless of which fragment form addressed it.
 function groupActive(scopeId: string): boolean {
-  return activeScope.value === `@${scopeId}`
+  return activeSpace.scopeId === scopeId
 }
 async function loadGroups() {
   try {
@@ -70,7 +89,8 @@ async function loadGroups() {
 const createGroupOpen = ref(false)
 async function onGroupCreated(scopeId: string) {
   await loadGroups()
-  void router.push({ name: 'home', hash: groupHash(scopeId) })
+  const created = groups.value.find((g) => g.scopeId === scopeId)
+  void router.push({ name: 'home', hash: created ? groupHash(created) : `#@${scopeId}` })
 }
 
 // --- compact top bar: measured group overflow (cr-0120 follow-up, ported from the design source's TenantSidebar).
@@ -85,8 +105,10 @@ const compactGroupOverflowWidth = ref(48)
 const compactGroupItemWidths = ref<Record<string, number>>({})
 
 const visibleCompactGroups = computed<GroupSpace[]>(() => {
+  // Reserve the chevron's width so it never has to share the strip with a link it can't fit beside. When not
+  // even the first link fits (a very narrow strip), show none inline — the chevron alone holds every group.
+  // (Forcing a first link here is what clipped both the link and the chevron off the `overflow:hidden` strip.)
   const available = compactGroupLinksWidth.value - compactGroupOverflowWidth.value - 8
-  if (available <= 0) return groups.value.slice(0, 1)
   const visible: GroupSpace[] = []
   let used = 0
   for (const g of groups.value) {
@@ -96,25 +118,21 @@ const visibleCompactGroups = computed<GroupSpace[]>(() => {
     visible.push(g)
     used = next
   }
-  return visible.length > 0 ? visible : groups.value.slice(0, 1)
+  return visible
 })
 const overflowCompactGroups = computed<GroupSpace[]>(() => {
   const seen = new Set(visibleCompactGroups.value.map((g) => g.scopeId))
   return groups.value.filter((g) => !seen.has(g.scopeId))
 })
-// The "＋N" menu: the groups that didn't fit + (when creation is allowed) a trailing "create group" action.
-const groupMenuItems = computed<MenuItem[]>(() => {
-  const items: MenuItem[] = overflowCompactGroups.value.map((g) => ({
+// The "＋N" menu lists only the groups that didn't fit; creation stays on the always-present "＋" in the heading
+// (so it isn't duplicated here). The chevron shows only when something actually overflowed.
+const groupMenuItems = computed<MenuItem[]>(() =>
+  overflowCompactGroups.value.map((g) => ({
     label: g.name,
     icon: 'pi pi-users',
-    command: () => void router.push({ name: 'home', hash: groupHash(g.scopeId) }),
-  }))
-  if (canCreateGroup.value) {
-    if (items.length) items.push({ separator: true })
-    items.push({ label: t('shell.groupCreate'), icon: 'pi pi-plus', command: () => { createGroupOpen.value = true } })
-  }
-  return items
-})
+    command: () => void router.push({ name: 'home', hash: groupHash(g) }),
+  })),
+)
 function toggleGroupMenu(event: Event) {
   groupMenu.value?.toggle(event)
 }
@@ -337,7 +355,7 @@ function closeMobileMenu() {
         v-for="group in groups"
         :key="group.scopeId"
         v-slot="{ href, navigate }"
-        :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+        :to="{ name: 'home', hash: groupHash(group) }"
         custom
       >
         <a
@@ -357,7 +375,7 @@ function closeMobileMenu() {
             v-for="group in visibleCompactGroups"
             :key="group.scopeId"
             v-slot="{ href, navigate }"
-            :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+            :to="{ name: 'home', hash: groupHash(group) }"
             custom
           >
             <a
@@ -460,7 +478,7 @@ function closeMobileMenu() {
             <RouterLink
               v-for="group in groups"
               :key="group.scopeId"
-              :to="{ name: 'home', hash: groupHash(group.scopeId) }"
+              :to="{ name: 'home', hash: groupHash(group) }"
               class="mobile-nav-item"
               :class="{ 'mobile-nav-item-active': groupActive(group.scopeId) }"
               @click="closeMobileMenu"

@@ -19,7 +19,7 @@ vi.mock('../account/identityPins', () => ({
   },
 }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup } from './scopes'
 import { ScopeKind } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { checkAndPin } from '../account/identityPins'
@@ -177,6 +177,33 @@ describe('openScopeById', () => {
   it('returns null when the caller holds no scope with that id', async () => {
     mockScopes(vi.fn().mockResolvedValue([{ id: 't', kind: 'TENANT', tenantId: 't', wrappedGrant: 'AQ==' }]), vi.fn())
     expect(await openScopeById('missing')).toBeNull()
+  })
+})
+
+describe('openGroupByToken (cr-0120 — resolve a group from its `#@<slug|id>` fragment)', () => {
+  const groupRow = (id: string, name: string) => {
+    const key = v1.randomBytes(32)
+    const grant = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), key, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    return { id, kind: 'GROUP', tenantId: 't', wrappedGrant: grant, encryptedName: sealName(deriveGroupNameKey(key), name), nameEpoch: 0, grantedEpoch: 0 }
+  }
+
+  it('resolves a readable slug to its group by decrypting + slugifying each name on-device', async () => {
+    mockScopes(vi.fn().mockResolvedValue([groupRow('g1', 'Familie Süd'), groupRow('g2', 'Reise 2026')]), vi.fn())
+
+    const opened = await openGroupByToken('familie-sued') // ü → ue
+    expect(opened?.scopeId).toBe('g1')
+    expect(opened?.name).toBe('Familie Süd')
+  })
+
+  it('resolves an opaque scopeId token directly (a legacy or collision-fallback link)', async () => {
+    const id = '0264addd-1787-40bc-bccf-811d37bf6989'
+    mockScopes(vi.fn().mockResolvedValue([groupRow(id, 'Familie Süd')]), vi.fn())
+    expect((await openGroupByToken(id))?.scopeId).toBe(id)
+  })
+
+  it('resolves nothing for an ambiguous slug (two groups share it — groups have no server-side slug uniqueness)', async () => {
+    mockScopes(vi.fn().mockResolvedValue([groupRow('g1', 'Familie Süd'), groupRow('g2', 'Familie Sued')]), vi.fn())
+    expect(await openGroupByToken('familie-sued')).toBeNull()
   })
 })
 
