@@ -1,12 +1,13 @@
 <script setup lang="ts">
-// The "Beiträge" organizer (uc.memory.buckets, en.memory.buckets, cr-0113) — ported from the pre-E2EE
-// MemoryAssetBuckets UX, rewired to the operator-blind data layer. A single-column view: a hierarchy Select
-// (primary bucket per uploader → its sub-buckets), a 3-dot bucket menu (upload / create sub-bucket / rename /
-// delete, gated to your OWN buckets), the reused MediaGrid filtered to the active bucket with a per-tile
-// checkbox + menu, a batch toolbar, and a move dialog. The primary bucket is VIRTUAL until the first sub-bucket
-// or upload materializes it (the server's lazy ensurePrimaryBucket). Names are sealed under K_mem — the client
-// unseals; the server never sees a bucket name.
-import { ref, computed, watch } from 'vue'
+// The "Beiträge" organizer (uc.memory.buckets, en.memory.buckets, cr-0113 · action-bar redesign cr-0122) — ported
+// from the pre-E2EE MemoryAssetBuckets UX, rewired to the operator-blind data layer. A single-column view: a
+// content-width hierarchy Select (primary bucket per uploader → its sub-buckets), the bucket actions as explicit
+// buttons beside it (upload / create sub-bucket / rename / delete — shown only where they apply), the reused
+// MediaGrid filtered to the active bucket with a per-tile checkbox (top-left) + 3-dot (top-right), and a selection
+// bar with a select-all toggle + visible Move/Delete. Delete is a straight soft-delete to trash with a local undo
+// bar (no confirm modal). The primary bucket is VIRTUAL until the first sub-bucket or upload materializes it (the
+// server's lazy ensurePrimaryBucket). Names are sealed under K_mem — the client unseals; the server never sees one.
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from 'primevue/select'
 import Menu from 'primevue/menu'
@@ -15,7 +16,7 @@ import Dialog from 'primevue/dialog'
 import MediaGrid from './MediaGrid.vue'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import {
-  listBuckets, createBucket, renameBucket, deleteBucket, moveBucketMedia, openBucketName, deleteMedia,
+  listBuckets, createBucket, renameBucket, deleteBucket, moveBucketMedia, openBucketName, deleteMedia, restoreMedia,
   unsealMeta, hasDerivatives, type MediaItem, type BucketItem,
 } from '../media'
 import { listScopeMembers } from '../../spaces/members'
@@ -53,9 +54,8 @@ const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
 const activeBucketId = ref('')
 const selected = ref<Set<string>>(new Set())
 
-const bucketMenu = ref<InstanceType<typeof Menu> | null>(null)
+// The per-tile 3-dot is the only ellipsis menu left — the bucket + selection menus are now explicit buttons (cr-0122).
 const mediaMenu = ref<InstanceType<typeof Menu> | null>(null)
-const selectionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const menuMediaId = ref<string | null>(null)
 
 const bucketDialog = ref<{ open: boolean; mode: 'create' | 'rename'; name: string; saving: boolean; error: string }>(
@@ -67,9 +67,9 @@ const deleteBucketDialog = ref<{ open: boolean; typed: string; saving: boolean; 
 const moveDialog = ref<{ open: boolean; target: string; saving: boolean; error: string }>(
   { open: false, target: '', saving: false, error: '' },
 )
-const deleteMediaDialog = ref<{ open: boolean; typed: string; count: number; saving: boolean }>(
-  { open: false, typed: '', count: 0, saving: false },
-)
+// A soft-delete just landed — a local undo bar (no toast infra) offers to restore it until it auto-dismisses.
+const undo = ref<{ ids: string[]; count: number } | null>(null)
+let undoTimer: ReturnType<typeof setTimeout> | null = null
 const dropActive = ref(false)
 
 // --- load + label resolution ------------------------------------------------
@@ -100,7 +100,7 @@ async function loadBuckets() {
       isPrimary: b.isPrimary,
       displayName: labelFor(b, key, names),
       mediaCount: b.mediaCount,
-      canManage: b.ownerKey.startsWith('user:'), // personal scope: the member bucket is yours (server enforces regardless)
+      canManage: b.ownerKey.startsWith('user:'), // your own bucket; a contributor (share:) is not yours to manage/move (yet — cr-0123)
       virtual: false,
     }))
     status.value = 'ready'
@@ -169,23 +169,28 @@ const aspectFor = (m: MediaItem) => {
   return galleryDisplayAspectRatio(dims?.w, dims?.h)
 }
 const layoutItems = computed(() => filteredMedia.value.map((m, index) => ({ id: m.mediaId, aspectRatio: aspectFor(m), media: m, index })))
+// Smaller than the gallery's 200px target so the thumbnail renders crisply rather than upscaled+soft at a big tile (cr-0122).
+const bucketTargetHeight = (width: number) => (width <= 720 ? 120 : 150)
 
-// where you may move the selection: your own buckets other than the active one.
-const moveTargets = computed<BucketRow[]>(() => bucketRows.value.filter((b) => b.canManage && !b.virtual && b.id !== activeBucket.value?.id))
+// where you may move the selection: only FROM one of your own buckets, INTO another own bucket. A contributor
+// (share:) bucket yields no target — its cross-owner move needs the cr-0123 authz relaxation — so Move stays
+// disabled there rather than firing a server 403.
+const moveTargets = computed<BucketRow[]>(() => {
+  const active = activeBucket.value
+  if (!active?.canManage) return []
+  return bucketRows.value.filter((b) => b.canManage && !b.virtual && b.id !== active.id)
+})
 
 // --- bucket actions ---------------------------------------------------------
 
 function chooseBucket(id: string) { activeBucketId.value = id; selected.value = new Set() }
 
-const bucketMenuItems = computed<MenuItem[]>(() => {
-  const b = activeBucket.value
-  return [
-    { label: t('memory.buckets.upload'), icon: 'pi pi-upload', disabled: !b, command: () => emit('uploadBucket', b && !b.virtual ? b.id : null) },
-    { label: t('memory.buckets.createBucket'), icon: 'pi pi-folder-plus', disabled: !b || !b.isPrimary || !b.canManage, command: openCreate },
-    { label: t('memory.buckets.rename'), icon: 'pi pi-pencil', disabled: !b || b.isPrimary || !b.canManage, command: openRename },
-    { label: t('memory.buckets.delete'), icon: 'pi pi-trash', disabled: !b || b.isPrimary || b.virtual || !b.canManage, command: openDeleteBucket },
-  ]
-})
+// Bucket actions render as buttons only where they apply (the old 3-dot's per-item disabled logic → show/hide).
+const canCreateSub = computed(() => !!activeBucket.value?.isPrimary && !!activeBucket.value?.canManage)
+const canRenameBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary && activeBucket.value.canManage)
+const canDeleteBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary && !activeBucket.value.virtual && activeBucket.value.canManage)
+
+function uploadToActive() { const b = activeBucket.value; if (b) emit('uploadBucket', b.virtual ? null : b.id) }
 
 function openCreate() {
   if (!activeBucket.value?.isPrimary || !activeBucket.value.canManage) return
@@ -247,19 +252,16 @@ function toggleSelect(id: string) {
   next.has(id) ? next.delete(id) : next.add(id)
   selected.value = next
 }
-function selectAllVisible() { selected.value = new Set(filteredMedia.value.map((m) => m.mediaId)) }
-function clearSelection() { selected.value = new Set() }
+const allSelected = computed(() => filteredMedia.value.length > 0 && filteredMedia.value.every((m) => selected.value.has(m.mediaId)))
+function toggleSelectAll() {
+  selected.value = allSelected.value ? new Set() : new Set(filteredMedia.value.map((m) => m.mediaId))
+}
 const selectedLabel = computed(() => t('memory.buckets.selected', { selected: selected.value.size, visible: filteredMedia.value.length }))
 
 function openMediaMenu(event: Event, id: string) { menuMediaId.value = id; mediaMenu.value?.toggle(event) }
 const mediaMenuItems = computed<MenuItem[]>(() => [
   { label: t('memory.buckets.moveMedia'), icon: 'pi pi-arrow-right-arrow-left', disabled: !moveTargets.value.length, command: () => { if (menuMediaId.value) { selected.value = new Set([menuMediaId.value]); openMove() } } },
-  { label: t('memory.buckets.deleteMediaAction'), icon: 'pi pi-trash', command: () => { if (menuMediaId.value) { selected.value = new Set([menuMediaId.value]); openDeleteMedia() } } },
-])
-function toggleSelectionMenu(event: Event) { selectionMenu.value?.toggle(event) }
-const selectionMenuItems = computed<MenuItem[]>(() => [
-  { label: t('memory.buckets.moveTitle'), icon: 'pi pi-arrow-right-arrow-left', disabled: !moveTargets.value.length || !selected.value.size, command: openMove },
-  { label: t('memory.buckets.deleteMediaAction'), icon: 'pi pi-trash', disabled: !selected.value.size, command: openDeleteMedia },
+  { label: t('memory.buckets.deleteMediaAction'), icon: 'pi pi-trash', command: () => { if (menuMediaId.value) { selected.value = new Set([menuMediaId.value]); void deleteSelected() } } },
 ])
 
 function openMove() {
@@ -283,24 +285,31 @@ async function submitMove() {
   }
 }
 
-function openDeleteMedia() {
-  if (!selected.value.size) return
-  deleteMediaDialog.value = { open: true, typed: '', count: selected.value.size, saving: false }
+// Delete = a recoverable soft-delete straight to the Papierkorb — no confirm modal, just an undo bar (cr-0122).
+function dismissUndo() {
+  if (undoTimer) { clearTimeout(undoTimer); undoTimer = null }
+  undo.value = null
 }
-const canConfirmDeleteMedia = computed(() => deleteMediaDialog.value.typed === String(deleteMediaDialog.value.count))
-async function confirmDeleteMedia() {
-  if (!canConfirmDeleteMedia.value) return
-  deleteMediaDialog.value.saving = true
-  try {
-    await Promise.allSettled([...selected.value].map((id) => deleteMedia(props.scopeId, id))) // soft-delete → trash
-    deleteMediaDialog.value.open = false
-    selected.value = new Set()
-    await loadBuckets()
-    emit('changed')
-  } finally {
-    deleteMediaDialog.value.saving = false
-  }
+async function deleteSelected() {
+  const ids = [...selected.value]
+  if (!ids.length) return
+  selected.value = new Set()
+  await Promise.allSettled(ids.map((id) => deleteMedia(props.scopeId, id))) // soft-delete → trash
+  await loadBuckets()
+  emit('changed')
+  undo.value = { ids, count: ids.length }
+  if (undoTimer) clearTimeout(undoTimer)
+  undoTimer = setTimeout(() => { undo.value = null; undoTimer = null }, 8000)
 }
+async function undoDelete() {
+  const u = undo.value
+  dismissUndo()
+  if (!u) return
+  await Promise.allSettled(u.ids.map((id) => restoreMedia(props.scopeId, id)))
+  await loadBuckets()
+  emit('changed')
+}
+onBeforeUnmount(() => { if (undoTimer) clearTimeout(undoTimer) })
 
 // --- upload / drag-drop into the active bucket ------------------------------
 
@@ -331,37 +340,70 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
       @dragleave.prevent="dropActive = false"
       @drop.prevent="onDrop"
     >
-      <!-- picker + 3-dot bucket menu -->
+      <!-- One row: the bucket picker + its action buttons on the left, the media selection bar on the right (cr-0122). -->
       <div class="bucket-action-row">
-        <Select
-          class="bucket-select"
-          :model-value="activeBucket?.id ?? ''"
-          :options="selectOptions"
-          option-label="displayName"
-          option-value="value"
-          :aria-label="t('memory.buckets.title')"
-          @update:model-value="chooseBucket"
-        >
-          <template #value>
-            <span v-if="activeBucket" class="bucket-select-value">
-              <span class="pi" :class="activeBucket.isPrimary ? 'pi-user' : 'pi-folder'" />
-              <span>{{ activeBucket.displayName }}</span>
-              <small>{{ activeBucket.mediaCount }}</small>
-            </span>
-          </template>
-          <template #option="{ option }">
-            <span class="bucket-select-option" :style="{ paddingLeft: `${option.depth * 1.1}rem` }">
-              <span v-if="option.depth > 0" class="bucket-select-branch" aria-hidden="true">↳</span>
-              <span class="pi" :class="option.isPrimary ? 'pi-user' : 'pi-folder'" />
-              <span class="bucket-select-name">{{ option.displayName }}</span>
-              <small>{{ option.mediaCount }}</small>
-            </span>
-          </template>
-        </Select>
-        <button class="bucket-options-button" type="button" :aria-label="t('memory.buckets.options')" aria-haspopup="menu" @click="bucketMenu?.toggle($event)">
-          <span class="pi pi-ellipsis-v" />
-        </button>
-        <Menu ref="bucketMenu" :model="bucketMenuItems" popup />
+        <div class="bucket-picker">
+          <Select
+            class="bucket-select"
+            :model-value="activeBucket?.id ?? ''"
+            :options="selectOptions"
+            option-label="displayName"
+            option-value="value"
+            :aria-label="t('memory.buckets.title')"
+            @update:model-value="chooseBucket"
+          >
+            <template #value>
+              <span v-if="activeBucket" class="bucket-select-value">
+                <span class="pi" :class="activeBucket.isPrimary ? 'pi-user' : 'pi-folder'" />
+                <span>{{ activeBucket.displayName }}</span>
+                <small>{{ activeBucket.mediaCount }}</small>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <span class="bucket-select-option" :style="{ paddingLeft: `${option.depth * 1.1}rem` }">
+                <span v-if="option.depth > 0" class="bucket-select-branch" aria-hidden="true">↳</span>
+                <span class="pi" :class="option.isPrimary ? 'pi-user' : 'pi-folder'" />
+                <span class="bucket-select-name">{{ option.displayName }}</span>
+                <small>{{ option.mediaCount }}</small>
+              </span>
+            </template>
+          </Select>
+          <!-- Bucket actions — shown only where they apply (was the 3-dot menu). -->
+          <button v-if="activeBucket" type="button" class="bucket-action-button" :title="t('memory.buckets.upload')" :aria-label="t('memory.buckets.upload')" @click="uploadToActive">
+            <span class="pi pi-upload" />
+          </button>
+          <button v-if="canCreateSub" type="button" class="bucket-action-button" :title="t('memory.buckets.createBucket')" :aria-label="t('memory.buckets.createBucket')" @click="openCreate">
+            <span class="pi pi-folder-plus" />
+          </button>
+          <button v-if="canRenameBucket" type="button" class="bucket-action-button" :title="t('memory.buckets.rename')" :aria-label="t('memory.buckets.rename')" @click="openRename">
+            <span class="pi pi-pencil" />
+          </button>
+          <button v-if="canDeleteBucket" type="button" class="bucket-action-button bucket-action-danger" :title="t('memory.buckets.delete')" :aria-label="t('memory.buckets.delete')" @click="openDeleteBucket">
+            <span class="pi pi-trash" />
+          </button>
+        </div>
+
+        <!-- Media selection bar — visible actions, active only with a selection. Shown for every bucket (cr-0122). -->
+        <div v-if="filteredMedia.length" class="bucket-selection-bar">
+          <span class="bucket-selection-count">{{ selectedLabel }}</span>
+          <button type="button" class="veyq-text-button" @click="toggleSelectAll">
+            {{ allSelected ? t('memory.buckets.deselectAll') : t('memory.buckets.selectAllVisible') }}
+          </button>
+          <button type="button" class="bucket-action-button" :disabled="!selected.size || !moveTargets.length" :title="t('memory.buckets.moveTitle')" @click="openMove">
+            <span class="pi pi-arrow-right-arrow-left" /><span class="bucket-action-label">{{ t('memory.buckets.move') }}</span>
+          </button>
+          <button type="button" class="bucket-action-button bucket-action-danger" :disabled="!selected.size" :title="t('memory.buckets.deleteMediaAction')" @click="deleteSelected">
+            <span class="pi pi-trash" /><span class="bucket-action-label">{{ t('memory.buckets.delete') }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- undo bar (a local, auto-dismissing affordance after a soft-delete) -->
+      <div v-if="undo" class="bucket-undo-bar" role="status">
+        <span class="pi pi-trash" aria-hidden="true" />
+        <span>{{ t('memory.buckets.deletedToTrash', { count: undo.count }, undo.count) }}</span>
+        <button type="button" class="veyq-text-button bucket-undo-action" @click="undoDelete">{{ t('memory.buckets.undo') }}</button>
+        <button type="button" class="bucket-undo-close" :aria-label="t('common.cancel')" @click="dismissUndo"><span class="pi pi-times" /></button>
       </div>
 
       <!-- dropzone banner -->
@@ -373,20 +415,9 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
         </div>
       </div>
 
-      <!-- batch toolbar (own buckets only) -->
-      <div v-if="activeBucket?.canManage && filteredMedia.length" class="bucket-selection-toolbar">
-        <span class="bucket-selection-count">{{ selectedLabel }}</span>
-        <button type="button" class="veyq-text-button" @click="selectAllVisible">{{ t('memory.buckets.selectAllVisible') }}</button>
-        <button type="button" class="veyq-text-button" :disabled="!selected.size" @click="clearSelection">{{ t('memory.buckets.clearSelection') }}</button>
-        <button class="bucket-options-button" type="button" :aria-label="t('memory.buckets.options')" :disabled="!selected.size" aria-haspopup="menu" @click="toggleSelectionMenu($event)">
-          <span class="pi pi-ellipsis-v" />
-        </button>
-        <Menu ref="selectionMenu" :model="selectionMenuItems" popup />
-      </div>
-
       <!-- the grid -->
       <p v-if="!filteredMedia.length" class="veyq-empty">{{ t('memory.buckets.emptyBucket') }}</p>
-      <MediaGrid v-else :items="layoutItems" :aria-label="activeBucket?.displayName ?? t('memory.buckets.title')">
+      <MediaGrid v-else :items="layoutItems" :target-height="bucketTargetHeight" :aria-label="activeBucket?.displayName ?? t('memory.buckets.title')">
         <template #tile="{ tile, item }">
           <div
             class="gallery-tile bucket-tile"
@@ -408,15 +439,13 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
               <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
               <span v-else class="media-grid-tile-placeholder" />
             </button>
-            <template v-if="activeBucket?.canManage">
-              <label class="bucket-tile-check" :class="{ 'is-on': selected.has(item.media.mediaId) }">
-                <input type="checkbox" :checked="selected.has(item.media.mediaId)" :aria-label="t('media.openItem', { index: item.index + 1 })" @click.stop @change="toggleSelect(item.media.mediaId)" />
-                <span class="pi pi-check" aria-hidden="true" />
-              </label>
-              <button type="button" class="bucket-tile-menu" :aria-label="t('memory.buckets.options')" @click.stop="openMediaMenu($event, item.media.mediaId)">
-                <span class="pi pi-ellipsis-v" />
-              </button>
-            </template>
+            <label class="bucket-tile-check" :class="{ 'is-on': selected.has(item.media.mediaId) }">
+              <input type="checkbox" :checked="selected.has(item.media.mediaId)" :aria-label="t('media.openItem', { index: item.index + 1 })" @click.stop @change="toggleSelect(item.media.mediaId)" />
+              <span class="pi pi-check" aria-hidden="true" />
+            </label>
+            <button type="button" class="bucket-tile-menu" :aria-label="t('memory.buckets.options')" @click.stop="openMediaMenu($event, item.media.mediaId)">
+              <span class="pi pi-ellipsis-v" />
+            </button>
           </div>
         </template>
       </MediaGrid>
@@ -440,7 +469,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
       </form>
     </Dialog>
 
-    <!-- delete-bucket dialog (type-the-name) -->
+    <!-- delete-bucket dialog (type-the-name) — a whole bucket is the destructive one, so it keeps its confirm -->
     <Dialog v-model:visible="deleteBucketDialog.open" :header="t('memory.buckets.deleteBucketTitle')" modal class="veyq-dialog-panel">
       <form class="veyq-form bucket-dialog-form" @submit.prevent="confirmDeleteBucket">
         <p class="bucket-dialog-copy">{{ t('memory.buckets.deleteBucketCopy', { bucket: activeBucket?.displayName }) }}</p>
@@ -475,22 +504,6 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
         </div>
       </form>
     </Dialog>
-
-    <!-- delete-media (trash) dialog -->
-    <Dialog v-model:visible="deleteMediaDialog.open" :header="t('memory.buckets.deleteMediaTitle')" modal class="veyq-dialog-panel">
-      <form class="veyq-form bucket-dialog-form" @submit.prevent="confirmDeleteMedia">
-        <p class="bucket-dialog-copy">{{ t('memory.buckets.deleteMediaCopy', { count: deleteMediaDialog.count }) }}</p>
-        <input v-model="deleteMediaDialog.typed" type="text" autocomplete="off" :placeholder="String(deleteMediaDialog.count)" :aria-label="t('memory.buckets.deleteMediaConfirm')" />
-        <div class="veyq-dialog-action-row">
-          <button class="veyq-dialog-button veyq-dialog-button-secondary" type="button" :disabled="deleteMediaDialog.saving" @click="deleteMediaDialog.open = false">
-            <span class="pi pi-times" /><span>{{ t('common.cancel') }}</span>
-          </button>
-          <button class="veyq-dialog-button veyq-dialog-button-danger" type="submit" :disabled="!canConfirmDeleteMedia || deleteMediaDialog.saving">
-            <span class="pi pi-trash" /><span>{{ t('memory.buckets.deleteMediaConfirm') }}</span>
-          </button>
-        </div>
-      </form>
-    </Dialog>
   </div>
 </template>
 
@@ -501,8 +514,10 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
   content: ''; position: absolute; inset: -0.5rem; border: 2px dashed color-mix(in srgb, var(--app-accent) 60%, transparent);
   border-radius: 12px; pointer-events: none;
 }
-.bucket-action-row { display: grid; grid-template-columns: minmax(220px, 440px) 40px; gap: 0.5rem; align-items: center; }
-.bucket-select { width: 100%; }
+/* One row: picker + bucket actions on the left, the selection bar on the right; wraps on narrow. */
+.bucket-action-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.bucket-picker { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.bucket-select { width: auto; min-width: 200px; max-width: 300px; }
 .bucket-select-value, .bucket-select-option { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .bucket-select-value small, .bucket-select-option small {
   margin-left: auto; padding: 0 0.4rem; border-radius: 999px; background: var(--app-control-bg); color: var(--app-muted);
@@ -511,12 +526,23 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-select-option { width: 100%; }
 .bucket-select-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bucket-select-branch { color: var(--app-muted); }
-.bucket-options-button {
-  width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--app-line);
-  border-radius: 8px; background: transparent; color: inherit; cursor: pointer;
+.bucket-action-button {
+  height: 40px; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 0.7rem; border: 1px solid var(--app-line);
+  border-radius: 8px; background: transparent; color: inherit; cursor: pointer; white-space: nowrap;
 }
-.bucket-options-button:hover:not(:disabled) { background: var(--app-control-bg); }
-.bucket-options-button:disabled { opacity: 0.5; cursor: default; }
+.bucket-action-button:hover:not(:disabled) { background: var(--app-control-bg); }
+.bucket-action-button:disabled { opacity: 0.45; cursor: default; }
+.bucket-action-button .bucket-action-label { font-size: 0.85rem; }
+.bucket-action-danger:hover:not(:disabled) { color: var(--app-danger, #e11d48); }
+.bucket-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.bucket-selection-count { color: var(--app-muted); font-size: 0.85rem; }
+.bucket-undo-bar {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.85rem; border: 1px solid var(--app-line);
+  border-radius: 10px; background: var(--app-control-bg); font-size: 0.9rem;
+}
+.bucket-undo-bar > .pi-trash { color: var(--app-muted); }
+.bucket-undo-action { margin-left: auto; font-weight: 700; }
+.bucket-undo-close { border: 0; background: transparent; color: var(--app-muted); cursor: pointer; padding: 0.15rem; }
 .bucket-dropzone {
   display: grid; grid-template-columns: 40px 1fr; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;
   border: 1px dashed color-mix(in srgb, var(--app-accent) 55%, var(--app-line)); border-radius: 10px;
@@ -524,13 +550,12 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 }
 .bucket-dropzone strong { display: block; }
 .bucket-dropzone small { color: var(--app-muted); }
-.bucket-selection-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.bucket-selection-count { margin-right: auto; color: var(--app-muted); font-size: 0.85rem; }
 .bucket-tile { position: absolute; top: 0; left: 0; overflow: hidden; border-radius: var(--app-radius-sm, 8px); }
 .bucket-tile.is-selected { outline: 2px solid var(--app-accent); outline-offset: -2px; }
 .bucket-tile-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: var(--app-control-bg); cursor: pointer; }
+/* checkbox top-left, the per-tile 3-dot top-right (cr-0122). */
 .bucket-tile-check {
-  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; display: grid; place-items: center;
+  position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; display: grid; place-items: center;
   border-radius: 999px; background: color-mix(in srgb, #000 45%, transparent); color: #fff; cursor: pointer;
 }
 .bucket-tile-check.is-on { background: var(--app-accent); }
@@ -538,7 +563,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-tile-check .pi { font-size: 0.7rem; opacity: 0; }
 .bucket-tile-check.is-on .pi { opacity: 1; }
 .bucket-tile-menu {
-  position: absolute; bottom: 6px; right: 6px; width: 26px; height: 26px; display: grid; place-items: center;
+  position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; display: grid; place-items: center;
   border: 0; border-radius: 999px; background: color-mix(in srgb, #000 45%, transparent); color: #fff; cursor: pointer;
 }
 .bucket-dialog-form { display: grid; gap: 0.7rem; }
@@ -548,5 +573,9 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
   background: var(--app-surface, transparent); color: inherit; font: inherit;
 }
 .veyq-dialog-button-danger { background: var(--app-danger, #e11d48); color: #fff; }
-@media (max-width: 760px) { .bucket-action-row { grid-template-columns: minmax(0, 1fr) 40px; } }
+@media (max-width: 760px) {
+  .bucket-action-row { justify-content: flex-start; }
+  .bucket-picker { width: 100%; }
+  .bucket-select { flex: 1 1 auto; max-width: none; }
+}
 </style>

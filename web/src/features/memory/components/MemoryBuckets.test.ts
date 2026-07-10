@@ -1,0 +1,111 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createI18n } from 'vue-i18n'
+
+// The buckets data layer is mocked — this test drives the component's selection / delete-to-trash+undo / move-gating
+// UX (cr-0122), not the crypto/network layer. Names come back via a stubbed openBucketName.
+vi.mock('../media', () => ({
+  listBuckets: vi.fn(),
+  createBucket: vi.fn(),
+  renameBucket: vi.fn(),
+  deleteBucket: vi.fn(),
+  moveBucketMedia: vi.fn(async () => {}),
+  deleteMedia: vi.fn(async () => {}),
+  restoreMedia: vi.fn(async () => {}),
+  openBucketName: vi.fn(() => 'Aaa Contributor'),
+  unsealMeta: vi.fn(() => ({ w: 100, h: 100 })),
+  hasDerivatives: vi.fn(() => true),
+}))
+vi.mock('../../spaces/members', () => ({ listScopeMembers: vi.fn(async () => []) }))
+
+import MemoryBuckets from './MemoryBuckets.vue'
+import { listBuckets, deleteMedia, restoreMedia, type MediaItem, type BucketItem } from '../media'
+
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  messages: {
+    en: {
+      common: { save: 'Save', cancel: 'Cancel' },
+      media: { loading: 'Loading…', unavailable: 'Unavailable', openItem: 'Open item {index}' },
+      memory: {
+        buckets: {
+          title: 'Contributions', contributor: 'Contribution', member: 'Member', you: 'You',
+          emptyBucket: 'Nothing here.', options: 'Options', upload: 'Upload', createBucket: 'New sub-bucket',
+          rename: 'Rename', delete: 'Delete', move: 'Move', moveMedia: 'Move item', moveTitle: 'Move selection',
+          deleteMediaAction: 'Move item to trash', selectAllVisible: 'Select all', deselectAll: 'Deselect all',
+          selected: '{selected} of {visible} selected', undo: 'Undo',
+          deletedToTrash: '{count} item moved to trash | {count} items moved to trash',
+          dropTitle: 'Upload into “{bucket}”', dropCopy: 'Drop here',
+        },
+      },
+    },
+  },
+})
+
+// Stub the PrimeVue Select + Menu (not under test) and MediaGrid (renders the tile slot per item so the tile chrome
+// — checkbox + 3-dot — is exercised).
+const SelectStub = { props: ['modelValue', 'options'], template: '<div class="select-stub"><slot name="value" /></div>' }
+const MenuStub = { template: '<div class="menu-stub" />' }
+const MediaGridStub = {
+  props: ['items'],
+  template:
+    '<div class="grid-stub"><template v-for="it in items" :key="it.id"><slot name="tile" :tile="{ left: 0, top: 0, renderedWidth: 100, renderedHeight: 100 }" :item="it" /></template></div>',
+}
+
+const media = (id: string, ownerKey: string, bucketId: string): MediaItem =>
+  ({ mediaId: id, ownerKey, bucketId, original: {}, derivatives: [] }) as unknown as MediaItem
+const bucket = (bucketId: string, ownerKey: string, mediaCount: number, sealedName?: string): BucketItem =>
+  ({ bucketId, ownerKey, isPrimary: true, mediaCount, sealedName }) as BucketItem
+
+function mountBuckets(mediaItems: MediaItem[]) {
+  return mount(MemoryBuckets, {
+    props: { scopeId: 's-1', nodeId: 'n-1', memoryKey: new Uint8Array(32), media: mediaItems, thumbs: new Map() },
+    global: { plugins: [i18n], stubs: { Select: SelectStub, Menu: MenuStub, MediaGrid: MediaGridStub } },
+  })
+}
+
+beforeEach(() => vi.clearAllMocks())
+
+describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () => {
+  it('own bucket: select-all selects every tile, then delete soft-deletes each and offers undo → restore', async () => {
+    vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 2)])
+    const wrapper = mountBuckets([media('m1', 'user:me', 'b-own'), media('m2', 'user:me', 'b-own')])
+    await flushPromises()
+
+    expect(wrapper.findAll('.bucket-tile-check').length).toBe(2) // selection UI present
+    await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // "Select all"
+    expect(wrapper.findAll('.bucket-tile.is-selected').length).toBe(2)
+
+    const del = wrapper.find('.bucket-selection-bar .bucket-action-danger')
+    expect(del.attributes('disabled')).toBeUndefined() // enabled with a selection
+    await del.trigger('click')
+    await flushPromises()
+
+    expect(deleteMedia).toHaveBeenCalledTimes(2) // straight to trash, no confirm dialog
+    const undoBar = wrapper.find('.bucket-undo-bar')
+    expect(undoBar.exists()).toBe(true)
+    expect(undoBar.text()).toContain('2 items moved to trash')
+
+    await wrapper.find('.bucket-undo-bar .bucket-undo-action').trigger('click')
+    await flushPromises()
+    expect(restoreMedia).toHaveBeenCalledTimes(2) // undo restores each id
+  })
+
+  it('contributor bucket: selection is shown but Move is disabled (no same-owner target until cr-0123)', async () => {
+    // Own primary ('Member') + a contributor primary ('Aaa Contributor', sorts first ⇒ default-active).
+    vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 0), bucket('b-share', 'share:x', 1, 'ct')])
+    const wrapper = mountBuckets([media('m3', 'share:x', 'b-share')])
+    await flushPromises()
+
+    expect(wrapper.find('.select-stub').text()).toContain('Aaa Contributor') // the contributor bucket is active
+    expect(wrapper.findAll('.bucket-tile-check').length).toBe(1) // selection ungated for a contributor bucket
+
+    await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // select all → 1 selected
+    const move = wrapper.find('.bucket-selection-bar .bucket-action-button:not(.bucket-action-danger)')
+    expect(move.attributes('disabled')).toBeDefined() // no same-owner move target here
+    const del = wrapper.find('.bucket-selection-bar .bucket-action-danger')
+    expect(del.attributes('disabled')).toBeUndefined() // delete still works (any member soft-deletes)
+  })
+})
