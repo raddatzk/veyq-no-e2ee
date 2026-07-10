@@ -53,6 +53,18 @@ function openNote(kShare: Uint8Array, sealed: string): string {
 export function recoverShareKey(memoryKey: Uint8Array, sealedShareKey: string): Uint8Array {
   return v1.symUnwrap(memoryKey, fromB64std(sealedShareKey), SHARE_KEY_RECOVERY_CTX)
 }
+
+/** Reconstruct a managed share's full copyable link `/s/{shareId}#k=<K_share>` by recovering `K_share` via `K_mem`
+ *  (cr-0115, ADR 0036) — so the curator can re-copy **any** existing link, not just the freshly-minted one. Null
+ *  when the share carries no recoverable key (minted before cr-0115) or the recovery fails. */
+export function recoverShareLink(shareId: string, memoryKey: Uint8Array, sealedShareKey: string | null): string | null {
+  if (!sealedShareKey) return null
+  try {
+    return buildShareLink(shareId, recoverShareKey(memoryKey, sealedShareKey))
+  } catch {
+    return null
+  }
+}
 /** A managed share's current note, decrypted (recover `K_share` via `K_mem`, then open the note). '' when there is
  *  none or the ciphertext can't be opened (a share minted before cr-0115 carries no recoverable key). */
 export function readShareNote(memoryKey: Uint8Array, sealedShareKey: string | null, sealedNote: string | null): string {

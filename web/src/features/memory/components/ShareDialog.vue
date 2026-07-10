@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
-import { createShare, listSharesFor, revokeShare, reactivateShare, updateShareNote, readShareNote, type ManagedShare } from '../share'
+import { createShare, listSharesFor, revokeShare, reactivateShare, updateShareNote, readShareNote, recoverShareLink, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
 import { useCapabilities } from '../../../shared/state/useCapabilities'
 import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
@@ -167,9 +167,29 @@ async function onReactivate(shareId: string) {
 function fmtDate(d: Date): string {
   return new Intl.DateTimeFormat(locale.value === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium' }).format(d)
 }
-// A share whose link the curator can still see this session (only the freshly-minted one carries its fragment key).
-function linkFor(share: ManagedShare): string | null {
-  return freshLink.value && freshLink.value.includes(`/s/${share.shareId}#`) ? freshLink.value : null
+// cr-0115: reconstruct EVERY managed share's full link (with its `#k=` fragment) by recovering `K_share` via
+// `K_mem` — so the curator can re-copy any existing link, not only the just-minted one (ADR 0036). Computed once
+// per list load (a symUnwrap per share, not per render); falls back to the fresh link for a pre-cr-0115 share.
+const shareLinks = computed(() => {
+  const m = new Map<string, string>()
+  for (const s of shares.value) {
+    const recovered = recoverShareLink(s.shareId, props.memoryKey, s.sealedShareKey)
+    const link = recovered ?? (freshLink.value && freshLink.value.includes(`/s/${s.shareId}#`) ? freshLink.value : null)
+    if (link) m.set(s.shareId, link)
+  }
+  return m
+})
+const copiedLinkId = ref<string | null>(null)
+async function copyShareLink(share: ManagedShare) {
+  const link = shareLinks.value.get(share.shareId)
+  if (!link) return
+  try {
+    await navigator.clipboard.writeText(link)
+    copiedLinkId.value = share.shareId
+    setTimeout(() => { if (copiedLinkId.value === share.shareId) copiedLinkId.value = null }, 2000)
+  } catch {
+    /* clipboard denied — the link stays visible in the row to select manually */
+  }
 }
 </script>
 
@@ -233,9 +253,18 @@ function linkFor(share: ManagedShare): string | null {
               <span v-if="share.expiresAt" class="share-list-expiry">{{ t('share.expires', { date: fmtDate(share.expiresAt) }) }}</span>
               <span v-if="!share.mine" class="share-list-note">{{ t('share.byMember') }}</span>
               <span v-if="!share.enabled" class="share-list-note">{{ t('share.disabled') }}</span>
-              <code v-if="linkFor(share)" class="share-list-link">{{ linkFor(share) }}</code>
+              <code v-if="shareLinks.get(share.shareId)" class="share-list-link">{{ shareLinks.get(share.shareId) }}</code>
             </div>
             <div class="share-list-actions">
+              <Button
+                v-if="share.enabled && shareLinks.get(share.shareId)"
+                type="button"
+                :label="copiedLinkId === share.shareId ? t('share.copied') : t('share.copy')"
+                :icon="copiedLinkId === share.shareId ? 'pi pi-check' : 'pi pi-copy'"
+                severity="secondary"
+                text
+                @click="copyShareLink(share)"
+              />
               <Button
                 v-if="share.mine && share.sealedShareKey && editingId !== share.shareId"
                 type="button"

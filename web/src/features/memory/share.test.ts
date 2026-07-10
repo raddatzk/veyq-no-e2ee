@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShareNote, readShareNote, ShareUnavailableError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShareNote, readShareNote, recoverShareLink, ShareUnavailableError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -247,5 +247,18 @@ describe('share note (cr-0115)', () => {
     const kMem = v1.randomBytes(32)
     expect(readShareNote(kMem, null, 'x')).toBe('')
     expect(readShareNote(kMem, 'x', null)).toBe('')
+  })
+
+  it('recoverShareLink rebuilds the full link (with the #k= fragment) for any existing share', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-n4' })
+    mockCurator(create)
+    const kMem = v1.randomBytes(32)
+    const minted = await createShare(NODE_ID, kMem, 'Rom', undefined, null, '')
+    const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
+
+    // recovering K_share via K_mem reconstructs exactly the minted link — so any old link is re-copyable
+    expect(recoverShareLink('share-n4', kMem, sealedShareKey)).toBe(minted.link)
+    // a pre-cr-0115 share carries no recoverable key → null (falls back to the fresh link in the UI)
+    expect(recoverShareLink('share-n4', kMem, null)).toBeNull()
   })
 })

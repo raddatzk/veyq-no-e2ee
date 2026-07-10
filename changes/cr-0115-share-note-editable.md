@@ -86,7 +86,9 @@ Shipped **contracts → backend → http → web**, all green:
 - **Recoverable share key (the enabler).** Every share stores `sealed_share_key = symWrap(K_mem, K_share)`, so the
   curator recovers `K_share` via `K_mem` anytime to edit the `K_share`-sealed note in place — per-share binding **and**
   durable editability, operator-blind (`K_share` never in the clear). It also fixes the prior limitation: the manage
-  list can now show/edit **every** minted share's note, not just the fresh link.
+  list can now show/edit **every** minted share's note **and re-copy its full link** (`recoverShareLink` rebuilds
+  `/s/{id}#k=<K_share>` from the recovered key) — not just the just-minted one. A pre-cr-0115 share (no recoverable
+  key) degrades gracefully (no link/edit, only revoke).
 - **Owner-gated, non-destructive `updateShare`.** Swaps one ciphertext for another; never touches
   `K_share`/`K_mem`/`role`/`wrap` — the capability's identity + grant stay immutable, the link stays valid.
 
