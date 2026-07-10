@@ -54,3 +54,14 @@ switcher ("Familie Raddatz"), the Personal link, and the group-create "＋" (whi
 vertical divider**; at **1400px** the desktop sidebar is unchanged. The uploads tray button is hidden when the queue
 is empty (so the doubled "Keine Uploads" is unreachable). No trust-chain doc-graph change (a bug-fix against the
 existing `uc.spaces.switch-spaces`); the three guards that touch docs stay green.
+
+## Follow-up — measured group overflow (2026-07-10)
+
+The compact groups strip previously **clipped** overflowing groups (`overflow: hidden`, no scroll). Ported the
+design source's (`legacy/frontend-noe2ee/TenantSidebar.vue`) **measured "＋N" overflow** into `AppSidebar.vue` (the
+CSS scaffolding — `.compact-group-overflow-button` + `.compact-group-measure` — was already in `layout.css` from
+cr-0108, just never wired): a hidden off-screen clone measures each group's rendered width, a `ResizeObserver`
+(RAF-debounced) re-runs on reflow, `visibleCompactGroups` greedily packs as many links as fit, and the rest collapse
+into a PrimeVue `Menu` popup behind a chevron button (with a trailing **"Neue Gruppe"** action). Live-verified with 5
+groups at **820px**: one group ("Familie Süd") fits inline + a "＋N" chevron whose menu lists the other four + "Neue
+Gruppe". `npm run check` green (556 tests). i18n `shell.groupsMenuOpen` added.

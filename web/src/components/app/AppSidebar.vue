@@ -4,11 +4,13 @@
 // data is ours — the tenants come from listMyTenants() (E2EE: the server only knows membership), switching is a
 // full navigation to that tenant's domain, and the bottom is the ProfileMenu (theme + language + sign-out).
 // Favorites + groups are later slices.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import Popover from 'primevue/popover'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import TenantAvatar from './TenantAvatar.vue'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
@@ -71,6 +73,75 @@ async function onGroupCreated(scopeId: string) {
   void router.push({ name: 'home', hash: groupHash(scopeId) })
 }
 
+// --- compact top bar: measured group overflow (cr-0120 follow-up, ported from the design source's TenantSidebar).
+// At the compact width the groups become a horizontal strip; only as many links as physically fit are shown, and
+// the rest collapse into a "＋N" chevron menu (with a trailing "create group"). Widths are measured off-screen via
+// a hidden clone (`.compact-group-measure`), re-measured on resize + when the group list changes.
+const groupMenu = ref<InstanceType<typeof Menu> | null>(null)
+const compactGroupLinks = ref<HTMLElement | null>(null)
+const compactGroupMeasure = ref<HTMLElement | null>(null)
+const compactGroupLinksWidth = ref(0)
+const compactGroupOverflowWidth = ref(48)
+const compactGroupItemWidths = ref<Record<string, number>>({})
+
+const visibleCompactGroups = computed<GroupSpace[]>(() => {
+  const available = compactGroupLinksWidth.value - compactGroupOverflowWidth.value - 8
+  if (available <= 0) return groups.value.slice(0, 1)
+  const visible: GroupSpace[] = []
+  let used = 0
+  for (const g of groups.value) {
+    const width = compactGroupItemWidths.value[g.scopeId] ?? 126
+    const next = used + width + (visible.length > 0 ? 8 : 0)
+    if (next > available) break
+    visible.push(g)
+    used = next
+  }
+  return visible.length > 0 ? visible : groups.value.slice(0, 1)
+})
+const overflowCompactGroups = computed<GroupSpace[]>(() => {
+  const seen = new Set(visibleCompactGroups.value.map((g) => g.scopeId))
+  return groups.value.filter((g) => !seen.has(g.scopeId))
+})
+// The "＋N" menu: the groups that didn't fit + (when creation is allowed) a trailing "create group" action.
+const groupMenuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = overflowCompactGroups.value.map((g) => ({
+    label: g.name,
+    icon: 'pi pi-users',
+    command: () => void router.push({ name: 'home', hash: groupHash(g.scopeId) }),
+  }))
+  if (canCreateGroup.value) {
+    if (items.length) items.push({ separator: true })
+    items.push({ label: t('shell.groupCreate'), icon: 'pi pi-plus', command: () => { createGroupOpen.value = true } })
+  }
+  return items
+})
+function toggleGroupMenu(event: Event) {
+  groupMenu.value?.toggle(event)
+}
+
+/** Measure the visible strip + each group's rendered width (from the off-screen clone) so the greedy packer knows
+ *  how many fit. Runs after the DOM settles (nextTick), on group changes, and on resize. */
+async function measureCompactGroupNav() {
+  await nextTick()
+  if (compactGroupLinks.value) compactGroupLinksWidth.value = compactGroupLinks.value.getBoundingClientRect().width
+  const root = compactGroupMeasure.value
+  if (!root) return
+  const widths: Record<string, number> = {}
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>('[data-compact-group-id]'))) {
+    const id = el.dataset.compactGroupId
+    if (id) widths[id] = Math.ceil(el.getBoundingClientRect().width)
+  }
+  compactGroupItemWidths.value = widths
+  const overflowBtn = root.querySelector<HTMLElement>('[data-compact-group-overflow]')
+  if (overflowBtn) compactGroupOverflowWidth.value = Math.ceil(overflowBtn.getBoundingClientRect().width)
+}
+
+watch(groups, () => void measureCompactGroupNav())
+
+// A RAF-debounced ResizeObserver (veyq has no shared helper) re-packs the strip as the top bar width changes.
+let groupResizeObserver: ResizeObserver | null = null
+onBeforeUnmount(() => groupResizeObserver?.disconnect())
+
 // The caller's own per-tenant username builds the Personal link `#~<username>` (ADR 0023); until it resolves (or
 // if there's no profile in this tenant), the `~me` fallback still routes to the personal scope.
 const myUsername = ref('')
@@ -106,6 +177,17 @@ onMounted(async () => {
     /* no profile in this tenant yet → the ~me fallback still routes to the personal scope */
   }
   await loadGroups()
+  // measure once + observe the strip and the hidden clone so the pack re-runs as the compact bar reflows.
+  void measureCompactGroupNav()
+  if (typeof ResizeObserver !== 'undefined') {
+    let raf = 0
+    groupResizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => void measureCompactGroupNav())
+    })
+    if (compactGroupLinks.value) groupResizeObserver.observe(compactGroupLinks.value)
+    if (compactGroupMeasure.value) groupResizeObserver.observe(compactGroupMeasure.value)
+  }
 })
 
 function isActive(tenant: MyTenant): boolean {
@@ -268,10 +350,11 @@ function closeMobileMenu() {
           <span><strong>{{ group.name }}</strong></span>
         </a>
       </RouterLink>
+      <!-- Compact strip (measured overflow): only the groups that fit, then a "＋N" chevron menu for the rest. -->
       <div class="compact-group-nav">
-        <div class="compact-group-links">
+        <div ref="compactGroupLinks" class="compact-group-links">
           <RouterLink
-            v-for="group in groups"
+            v-for="group in visibleCompactGroups"
             :key="group.scopeId"
             v-slot="{ href, navigate }"
             :to="{ name: 'home', hash: groupHash(group.scopeId) }"
@@ -287,8 +370,34 @@ function closeMobileMenu() {
               <span><strong>{{ group.name }}</strong></span>
             </a>
           </RouterLink>
+          <button
+            v-if="groupMenuItems.length"
+            class="compact-group-overflow-button"
+            type="button"
+            :aria-label="t('shell.groupsMenuOpen')"
+            aria-haspopup="menu"
+            @click="toggleGroupMenu"
+          >
+            <span class="pi pi-chevron-down" />
+          </button>
         </div>
       </div>
+      <!-- Off-screen clone: every group + the overflow button, so their rendered widths can be measured. -->
+      <div ref="compactGroupMeasure" class="compact-group-measure" aria-hidden="true">
+        <span
+          v-for="group in groups"
+          :key="group.scopeId"
+          class="sidebar-scope-link compact-group-link"
+          :data-compact-group-id="group.scopeId"
+        >
+          <span class="sidebar-scope-icon pi pi-users" />
+          <span><strong>{{ group.name }}</strong></span>
+        </span>
+        <button class="compact-group-overflow-button" type="button" data-compact-group-overflow>
+          <span class="pi pi-chevron-down" />
+        </button>
+      </div>
+      <Menu ref="groupMenu" :model="groupMenuItems" popup />
     </section>
 
     <section class="sidebar-section sidebar-profile">
