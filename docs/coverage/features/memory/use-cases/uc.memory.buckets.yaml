@@ -4,10 +4,11 @@ title: Buckets — group a Memory's media by who contributed it
 # Built by cr-0113 (contracts → backend → http → web), oriented on legacy ADR 0023. A bucket = a per-uploader
 # container within one Memory, the attribution axis orthogonal to Chapters: a real veyq_bucket table keyed by an
 # opaque owner_key ("user:{id}" | "share:{shareIdentityId}"), a lazy virtual primary + one-level sub-buckets,
-# K_mem-sealed names, media linked via a nullable bucket_id + a denormalized created_by; reparent-on-delete +
-# own-bucket authz (the deliberate reversals of the pre-E2EE code). The web ships the read-only "Beiträge" primary-
-# grouping tab; the sub-bucket MANAGEMENT UI, a camera filter, and batch selection are later slices. Native is
-# web-first (ADR 0010). A full live "Beiträge"-tab click-through is pending a session with the dev backend up.
+# K_mem-sealed names, media linked via a nullable bucket_id + a denormalized created_by; reparent-on-delete. The
+# curation authz was relaxed in cr-0123 (a member curates any owner-root's sub-buckets + moves media within one
+# root — never a primary, never across owners). The web ships the "Beiträge" tab with per-tile selection + an
+# explicit action bar (cr-0122). A camera filter is a later slice. Native is web-first (ADR 0010). A full live
+# "Beiträge"-tab click-through is pending a session with the dev backend up.
 acceptanceCriteria:
   - id: uploader-stamp-on-media
     text: Every uploaded medium carries an operator-visible uploader stamp — a member's created_by = owner_key "user:{id}" XOR a contributor's "share:{shareIdentityId}" — set at attach and returned by the per-node media list (ownerKey/bucketId), so a client can group. A medium with no member stamp (a pre-cr0113 owner upload) is lazily backfilled to the owner's primary at list time.
@@ -24,17 +25,17 @@ acceptanceCriteria:
       backend:
         integration: [MediaBucketsSliceTest.uploadStampsOwnerKeyAndMaterializesPrimary, MediaBucketsSliceTest.createSubBucketMoveThenDeleteReparents]
   - id: sub-bucket-endpoints
-    text: Sub-buckets sit one level under a primary (parent must be primary), owner inherited, K_mem-sealed name; the backend exposes create/rename/delete/move endpoints; delete reparents the sub-bucket's media to the owner's primary and never deletes media, primaries are not deletable; all of create/rename/delete/move are server-gated to owner_key == caller.
+    text: Sub-buckets sit one level under a primary (parent must be primary), owner inherited, K_mem-sealed name; the backend exposes create/rename/delete/move endpoints; delete reparents the sub-bucket's media to the owner's primary and never deletes media, primaries are neither renameable nor deletable. Curation authz (cr-0123) — a scope member may create a sub under any primary root, rename/delete any sub (own or a contributor's), and move media WITHIN one owner-root, but never a primary and never across owners (a single distinct source owner_key is required, else 403).
     coverage:
       backend:
-        integration: [MediaBucketsSliceTest.createSubBucketMoveThenDeleteReparents, MediaBucketsSliceTest.renameSubBucketUpdatesSealedName, MediaBucketsSliceTest.ownBucketAuthzRejectsForeignRenameAndDelete, MediaBucketsSliceTest.primaryBucketNotRenameableNorDeletable]
+        integration: [MediaBucketsSliceTest.createSubBucketMoveThenDeleteReparents, MediaBucketsSliceTest.renameSubBucketUpdatesSealedName, MediaBucketsSliceTest.memberMayManageAnotherRootsSubBucket, MediaBucketsSliceTest.memberCreatesSubUnderAnotherRootInheritingItsOwner, MediaBucketsSliceTest.createSubRejectsNonPrimaryParent, MediaBucketsSliceTest.crossOwnerMoveIsRejected, MediaBucketsSliceTest.primaryBucketNotRenameableNorDeletable]
       web:
-        unit: [src/features/memory/media.buckets.test.ts]
+        unit: [src/features/memory/media.buckets.test.ts, src/features/memory/components/MemoryBuckets.test.ts]
   - id: contributions-tab-primary-grouping
-    text: A "Beiträge" tab lists the Memory's uploaders by their primary bucket (with per-bucket counts); selecting one filters the existing MediaGrid + lightbox to that uploader. Bucket names are unsealed under K_mem client-side (a contributor's sealed name; a member's the per-tenant username), an unsealable name falling back to a neutral placeholder. Read-only grouping; the sub-bucket management UI is deferred.
+    text: A "Beiträge" tab lists the Memory's uploaders by their primary bucket (with per-bucket counts); selecting one filters the existing MediaGrid + lightbox to that uploader. Bucket names are unsealed under K_mem client-side (a contributor's sealed name; a member's the per-tenant username), an unsealable name falling back to a neutral placeholder. An explicit action bar (cr-0122) adds per-tile selection (checkbox top-left, 3-dot top-right), a select-all/deselect toggle, and visible Move / Delete (delete = a straight soft-delete to trash with a local undo bar); the bucket actions (upload / new sub / rename / delete) are buttons beside the picker, enabled per the cr-0123 curation authz.
     coverage:
       web:
-        unit: [src/features/memory/media.buckets.test.ts]
+        unit: [src/features/memory/media.buckets.test.ts, src/features/memory/components/MemoryBuckets.test.ts]
   - id: operator-blind-buckets
     text: Grouping and ownership run over the opaque owner_key + the bucket structure (node, parentage, is_primary, counts) the operator already relays; names are unsealed client-side and a wrong AAD context can never open one. The operator never learns a cleartext bucket/uploader name nor any content, and a personal Memory with no share exposes only the account owner's owner_key.
     coverage:
@@ -43,8 +44,8 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/media.buckets.test.ts]
 gaps:
-  backend: "Built (cr-0113). V35 veyq_bucket + veyq_media.bucket_id/created_by; BucketEntity; store ensurePrimaryBucket/listBuckets/createSubBucket/renameBucket/deleteBucketReparent/moveMedia; attach stamps created_by/bucket_id; BucketsResource with own-bucket authz + reparent-on-delete; MediaBucketsSliceTest (6). media.share_identity_id left untouched (redundant with created_by for contributors)."
+  backend: "Built (cr-0113); curation authz relaxed (cr-0123). V35 veyq_bucket + veyq_media.bucket_id/created_by; BucketEntity; store ensurePrimaryBucket/listBuckets/createSubBucket/renameBucket/deleteBucketReparent/moveMedia (move now derives the shared source owner + requires the target to match — no cross-owner); BucketsResource; createBucket takes parentBucketId (nest under any primary root); rename/delete gate on is_primary only (any member, sub only). MediaBucketsSliceTest (9). No schema change (pure authz). media.share_identity_id left untouched."
   http: "Built (cr-0113). buckets.http asserts the 401 auth boundary of the five endpoints; the authenticated happy-path + own-bucket authz are at MediaBucketsSliceTest (the scope-grant flow isn't reproducible from a bare .http, per trash.http)."
-  web: "Built (cr-0113). media.ts bucket wrappers (listBuckets/createBucket/renameBucket/deleteBucket/moveBucketMedia) + openBucketName unseal; the MediaItem gained ownerKey/bucketId; the read-only Beiträge tab in MemoryDetail.vue (uploader picker → client-side grouping/unseal → the filtered MediaGrid/lightbox). media.buckets.test.ts unit-tests the unseal + wrappers; a full live Beiträge-tab click-through is pending the dev backend. The sub-bucket management UI is the next slice."
+  web: "Built (cr-0113); action-bar redesign (cr-0122) + curation wiring (cr-0123). media.ts bucket wrappers (createBucket now takes parentBucketId) + openBucketName unseal; MediaItem carries ownerKey/bucketId; the Beiträge tab (MemoryBuckets.vue) is a full organizer — bucket picker + bucket-action buttons, per-tile selection, a select-all toggle, visible Move (same-owner targets) / Delete (soft-delete to trash + local undo). media.buckets.test.ts unit-tests the unseal + wrappers; MemoryBuckets.test.ts covers selection/delete-undo + the contributor move-gating. A full live Beiträge-tab click-through is pending the dev backend."
   apple: "Not built. Native buckets are Apple's own later CR (web-first, ADR 0010); the data layer carries ownerKey/bucketId + the bucket endpoints after regen."
   android: "Not built. Native buckets are Android's own later CR (web-first, ADR 0010); the data layer carries ownerKey/bucketId + the bucket endpoints after regen."

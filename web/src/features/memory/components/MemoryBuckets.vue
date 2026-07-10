@@ -172,33 +172,34 @@ const layoutItems = computed(() => filteredMedia.value.map((m, index) => ({ id: 
 // Smaller than the gallery's 200px target so the thumbnail renders crisply rather than upscaled+soft at a big tile (cr-0122).
 const bucketTargetHeight = (width: number) => (width <= 720 ? 120 : 150)
 
-// where you may move the selection: only FROM one of your own buckets, INTO another own bucket. A contributor
-// (share:) bucket yields no target — its cross-owner move needs the cr-0123 authz relaxation — so Move stays
-// disabled there rather than firing a server 403.
+// where you may move the selection: any bucket sharing the active bucket's owner-root, excluding the active one.
+// A member may re-bucket within one root (own or a contributor's) but never across owners (cr-0123 authz), so the
+// picker only offers same-owner targets — enforcing "no cross-user move" in the UI too.
 const moveTargets = computed<BucketRow[]>(() => {
   const active = activeBucket.value
-  if (!active?.canManage) return []
-  return bucketRows.value.filter((b) => b.canManage && !b.virtual && b.id !== active.id)
+  if (!active) return []
+  return bucketRows.value.filter((b) => b.ownerKey === active.ownerKey && !b.virtual && b.id !== active.id)
 })
 
 // --- bucket actions ---------------------------------------------------------
 
 function chooseBucket(id: string) { activeBucketId.value = id; selected.value = new Set() }
 
-// Bucket actions render as buttons only where they apply (the old 3-dot's per-item disabled logic → show/hide).
-const canCreateSub = computed(() => !!activeBucket.value?.isPrimary && !!activeBucket.value?.canManage)
-const canRenameBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary && activeBucket.value.canManage)
-const canDeleteBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary && !activeBucket.value.virtual && activeBucket.value.canManage)
+// Bucket actions render as buttons only where they apply. A member may create a sub under any primary root + rename
+// or delete any sub (own or a contributor's — cr-0123); a primary itself stays read-only.
+const canCreateSub = computed(() => !!activeBucket.value?.isPrimary)
+const canRenameBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary)
+const canDeleteBucket = computed(() => !!activeBucket.value && !activeBucket.value.isPrimary && !activeBucket.value.virtual)
 
 function uploadToActive() { const b = activeBucket.value; if (b) emit('uploadBucket', b.virtual ? null : b.id) }
 
 function openCreate() {
-  if (!activeBucket.value?.isPrimary || !activeBucket.value.canManage) return
+  if (!activeBucket.value?.isPrimary) return
   bucketDialog.value = { open: true, mode: 'create', name: '', saving: false, error: '' }
 }
 function openRename() {
   const b = activeBucket.value
-  if (!b || b.isPrimary || !b.canManage) return
+  if (!b || b.isPrimary) return
   bucketDialog.value = { open: true, mode: 'rename', name: b.displayName, saving: false, error: '' }
 }
 async function submitBucketDialog() {
@@ -209,7 +210,10 @@ async function submitBucketDialog() {
   bucketDialog.value.error = ''
   try {
     if (bucketDialog.value.mode === 'create') {
-      await createBucket(props.scopeId, props.nodeId, key, name) // under your primary (server-side), materializing it
+      // Nest under the active primary root — a real id targets that owner (incl. a contributor's); the virtual
+      // own-primary passes none, so the server nests under (and materializes) your own primary.
+      const parent = activeBucket.value
+      await createBucket(props.scopeId, props.nodeId, key, name, parent && !parent.virtual ? parent.id : undefined)
     } else if (activeBucket.value) {
       await renameBucket(props.scopeId, props.nodeId, key, activeBucket.value.id, name)
     }
@@ -225,7 +229,7 @@ async function submitBucketDialog() {
 
 function openDeleteBucket() {
   const b = activeBucket.value
-  if (!b || b.isPrimary || b.virtual || !b.canManage) return
+  if (!b || b.isPrimary || b.virtual) return
   deleteBucketDialog.value = { open: true, typed: '', saving: false, error: '' }
 }
 const canConfirmDeleteBucket = computed(() => !!activeBucket.value && deleteBucketDialog.value.typed === activeBucket.value.displayName)

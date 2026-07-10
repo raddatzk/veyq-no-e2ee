@@ -56,8 +56,8 @@ const MediaGridStub = {
 
 const media = (id: string, ownerKey: string, bucketId: string): MediaItem =>
   ({ mediaId: id, ownerKey, bucketId, original: {}, derivatives: [] }) as unknown as MediaItem
-const bucket = (bucketId: string, ownerKey: string, mediaCount: number, sealedName?: string): BucketItem =>
-  ({ bucketId, ownerKey, isPrimary: true, mediaCount, sealedName }) as BucketItem
+const bucket = (bucketId: string, ownerKey: string, mediaCount: number, sealedName?: string, isPrimary = true, parentBucketId?: string): BucketItem =>
+  ({ bucketId, ownerKey, isPrimary, mediaCount, sealedName, parentBucketId }) as BucketItem
 
 function mountBuckets(mediaItems: MediaItem[]) {
   return mount(MemoryBuckets, {
@@ -93,7 +93,7 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     expect(restoreMedia).toHaveBeenCalledTimes(2) // undo restores each id
   })
 
-  it('contributor bucket: selection is shown but Move is disabled (no same-owner target until cr-0123)', async () => {
+  it('contributor bucket: selection shown; Move disabled with no same-owner sibling, Delete still works', async () => {
     // Own primary ('Member') + a contributor primary ('Aaa Contributor', sorts first ⇒ default-active).
     vi.mocked(listBuckets).mockResolvedValue([bucket('b-own', 'user:me', 0), bucket('b-share', 'share:x', 1, 'ct')])
     const wrapper = mountBuckets([media('m3', 'share:x', 'b-share')])
@@ -104,8 +104,23 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
 
     await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // select all → 1 selected
     const move = wrapper.find('.bucket-selection-bar .bucket-action-button:not(.bucket-action-danger)')
-    expect(move.attributes('disabled')).toBeDefined() // no same-owner move target here
+    expect(move.attributes('disabled')).toBeDefined() // no same-owner sibling to move into
     const del = wrapper.find('.bucket-selection-bar .bucket-action-danger')
     expect(del.attributes('disabled')).toBeUndefined() // delete still works (any member soft-deletes)
+  })
+
+  it('contributor root: Move enables to a same-owner sibling sub-bucket (cr-0123)', async () => {
+    // A contributor primary + a sub under it (same owner) → the sub is a valid same-owner move target.
+    vi.mocked(listBuckets).mockResolvedValue([
+      bucket('b-own', 'user:me', 0),
+      bucket('b-share', 'share:x', 1, 'ct'),
+      bucket('s-share', 'share:x', 0, 'sub', false, 'b-share'),
+    ])
+    const wrapper = mountBuckets([media('m3', 'share:x', 'b-share')])
+    await flushPromises()
+
+    await wrapper.find('.bucket-selection-bar .veyq-text-button').trigger('click') // select all → 1 selected
+    const move = wrapper.find('.bucket-selection-bar .bucket-action-button:not(.bucket-action-danger)')
+    expect(move.attributes('disabled')).toBeUndefined() // a same-owner sibling exists → Move is available
   })
 })

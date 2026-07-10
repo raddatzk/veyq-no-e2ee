@@ -455,7 +455,8 @@ class MediaStore {
         }
     }
 
-    /** Create a sub-bucket one level under the caller's primary (materialized if needed). */
+    /** Create a sub-bucket one level under `ownerKey`'s primary (materialized if needed) — the caller's own or,
+     *  post-cr0123, a contributor root a member curates. */
     @Transactional
     fun createSubBucket(scopeId: String, nodeId: String, ownerKey: String, sealedName: String): BucketRow {
         val primary = ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey))
@@ -500,22 +501,25 @@ class MediaStore {
     }
 
     /**
-     * Move the caller's own media into a target bucket (null = the caller's primary). Every medium and the target
-     * must be the caller's own (`owner_key == ownerKey`), in this node, live. Returns false (⇒ 403) on any mismatch.
+     * Move media into a target bucket WITHIN one owner-root (null = that owner's primary). The owner is **derived
+     * from the source media** — they must all share one `owner_key` (else a cross-owner move ⇒ false/403) — and the
+     * target bucket must have that same owner. Every medium is in this node + live. Returns false (⇒ 403) on any
+     * mismatch. The caller-is-member gate lives in the handler (cr-0123).
      */
     @Transactional
-    fun moveMedia(scopeId: String, nodeId: String, mediaIds: List<String>, targetBucketId: String?, ownerKey: String): Boolean {
+    fun moveMedia(scopeId: String, nodeId: String, mediaIds: List<String>, targetBucketId: String?): Boolean {
+        val scopeOwner = scopeOwnerUserId(scopeId)
+        val media = mediaIds.map { id ->
+            MediaEntity.findById(id)?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.deletedAt == null } ?: return false
+        }
+        // One shared root only — a single distinct source owner_key; more than one would be a cross-owner move.
+        val ownerKey = media.map { ownerKeyOf(it, scopeOwner) }.distinct().singleOrNull() ?: return false
         val target = if (targetBucketId == null) {
             ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey))
         } else {
             BucketEntity.findById(targetBucketId)
                 ?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.ownerKey == ownerKey } ?: return false
         }
-        val scopeOwner = scopeOwnerUserId(scopeId)
-        val media = mediaIds.map { id ->
-            MediaEntity.findById(id)?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.deletedAt == null } ?: return false
-        }
-        if (media.any { ownerKeyOf(it, scopeOwner) != ownerKey }) return false
         media.forEach { it.bucketId = target.id; it.persist() }
         bumpMediaRevision(nodeId) // cr-0113: a re-bucket changes the listing's bucketId → advance the ETag so clients re-list
         return true

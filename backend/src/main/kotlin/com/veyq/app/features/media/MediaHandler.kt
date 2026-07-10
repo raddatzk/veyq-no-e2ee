@@ -122,6 +122,8 @@ sealed interface ListBucketsOutcome {
 
 sealed interface CreateBucketOutcome {
     data class Ok(val bucket: BucketRow) : CreateBucketOutcome
+    /** A given parentBucketId is missing or not a primary (sub-buckets nest one level) — a 403. */
+    object Forbidden : CreateBucketOutcome
     /** No such scope/node, or the caller holds no grant (a 404). */
     object NoNode : CreateBucketOutcome
 }
@@ -130,7 +132,7 @@ sealed interface RenameBucketOutcome {
     data class Ok(val bucket: BucketRow) : RenameBucketOutcome
     /** No such scope/node/bucket, or the caller holds no grant (a 404). */
     object NoBucket : RenameBucketOutcome
-    /** The bucket is not the caller's own, or it is a primary (not renameable) — a 403. */
+    /** The bucket is a primary (not renameable) — a 403. */
     object Forbidden : RenameBucketOutcome
 }
 
@@ -139,7 +141,7 @@ sealed interface DeleteBucketOutcome {
     object Done : DeleteBucketOutcome
     /** No such scope/node, or the caller holds no grant (a 404). */
     object NoNode : DeleteBucketOutcome
-    /** The bucket is not the caller's own, or it is a primary (not deletable) — a 403. */
+    /** The bucket is a primary (not deletable) — a 403. */
     object Forbidden : DeleteBucketOutcome
 }
 
@@ -393,7 +395,9 @@ class MediaHandler(
         return DownloadItemResult(presignedGets = gets, error = null)
     }
 
-    // --- buckets (uc.memory.buckets, ADR 0034, cr-0113) — member-only; caller's owner_key = "user:{userId}" ---
+    // --- buckets (uc.memory.buckets, ADR 0034, cr-0113 · curation relaxed cr-0123) — member-gated: a member may
+    // curate any owner-root's SUB-buckets (create/rename/delete) + move media WITHIN one root, but never a primary
+    // and never across owners (attribution — the owner_key — is preserved on every path) ---
 
     /** List the node's uploader buckets for the "Beiträge" tab. Non-member / unknown node → NoNode (404, no reveal). */
     fun listBuckets(userId: String, scopeId: String, nodeId: String): ListBucketsOutcome {
@@ -402,39 +406,55 @@ class MediaHandler(
         return ListBucketsOutcome.Ok(store.listBuckets(scopeId, nodeId))
     }
 
-    /** Create a sub-bucket under the caller's own primary. Non-member / unknown node → NoNode (404). */
-    fun createBucket(userId: String, scopeId: String, nodeId: String, sealedName: String): CreateBucketOutcome {
+    /**
+     * Create a sub-bucket under a primary root. `parentBucketId == null` ⇒ the caller's own primary; else it must
+     * be a **primary** (any owner's — so a member can add sub-buckets under a contributor's root), and the new sub
+     * inherits that root's owner_key. A missing/non-primary parent → Forbidden (403). Non-member / unknown node → NoNode (404).
+     */
+    fun createBucket(userId: String, scopeId: String, nodeId: String, sealedName: String, parentBucketId: String?): CreateBucketOutcome {
         if (!store.isMember(userId, scopeId)) return CreateBucketOutcome.NoNode
         if (store.findNode(scopeId, nodeId) == null) return CreateBucketOutcome.NoNode
-        return CreateBucketOutcome.Ok(store.createSubBucket(scopeId, nodeId, "${BucketEntity.OWNER_USER_PREFIX}$userId", sealedName))
+        val ownerKey = if (parentBucketId != null) {
+            val parent = store.findBucket(scopeId, nodeId, parentBucketId) ?: return CreateBucketOutcome.Forbidden
+            if (!parent.isPrimary) return CreateBucketOutcome.Forbidden // nest one level, under a primary only
+            parent.ownerKey
+        } else {
+            "${BucketEntity.OWNER_USER_PREFIX}$userId"
+        }
+        return CreateBucketOutcome.Ok(store.createSubBucket(scopeId, nodeId, ownerKey, sealedName))
     }
 
-    /** Rename one of the caller's own sub-buckets. Own-bucket authz; a primary is not renameable (Forbidden → 403). */
+    /** Rename a sub-bucket (any member may — incl. a contributor's, cr-0123). A primary is not renameable (Forbidden → 403). */
     fun renameBucket(userId: String, scopeId: String, nodeId: String, bucketId: String, sealedName: String): RenameBucketOutcome {
         if (!store.isMember(userId, scopeId)) return RenameBucketOutcome.NoBucket
         val b = store.findBucket(scopeId, nodeId, bucketId) ?: return RenameBucketOutcome.NoBucket
-        if (b.isPrimary || b.ownerKey != "${BucketEntity.OWNER_USER_PREFIX}$userId") return RenameBucketOutcome.Forbidden
+        if (b.isPrimary) return RenameBucketOutcome.Forbidden
         val row = store.renameBucket(bucketId, sealedName) ?: return RenameBucketOutcome.NoBucket
         return RenameBucketOutcome.Ok(row)
     }
 
     /**
-     * Delete one of the caller's own sub-buckets — its media reparent to the primary (never deleted). Own-bucket
-     * authz; a primary is not deletable (Forbidden → 403). An unknown bucket is idempotent (Done → 204).
+     * Delete a sub-bucket — its media reparent to that root's owner primary (never deleted). Any member may
+     * (incl. a contributor's sub, cr-0123); a primary is not deletable (Forbidden → 403). Unknown bucket is
+     * idempotent (Done → 204).
      */
     fun deleteBucket(userId: String, scopeId: String, nodeId: String, bucketId: String): DeleteBucketOutcome {
         if (!store.isMember(userId, scopeId)) return DeleteBucketOutcome.NoNode
         val b = store.findBucket(scopeId, nodeId, bucketId) ?: return DeleteBucketOutcome.Done // idempotent
-        if (b.isPrimary || b.ownerKey != "${BucketEntity.OWNER_USER_PREFIX}$userId") return DeleteBucketOutcome.Forbidden
+        if (b.isPrimary) return DeleteBucketOutcome.Forbidden
         store.deleteBucketReparent(bucketId)
         return DeleteBucketOutcome.Done
     }
 
-    /** Move the caller's own media into a target bucket (null = the caller's primary). Own-bucket authz → Forbidden (403). */
+    /**
+     * Move media into a target bucket WITHIN one owner-root (null = that owner's primary). The store derives the
+     * shared owner from the source media and requires the target to match — so a member may re-bucket a
+     * contributor's media, but a cross-owner move (or a target of a different owner) → Forbidden (403).
+     */
     fun moveMedia(userId: String, scopeId: String, nodeId: String, mediaIds: List<String>, targetBucketId: String?): MoveMediaOutcome {
         if (!store.isMember(userId, scopeId)) return MoveMediaOutcome.NoNode
         if (store.findNode(scopeId, nodeId) == null) return MoveMediaOutcome.NoNode
-        val ok = store.moveMedia(scopeId, nodeId, mediaIds, targetBucketId, "${BucketEntity.OWNER_USER_PREFIX}$userId")
+        val ok = store.moveMedia(scopeId, nodeId, mediaIds, targetBucketId)
         return if (ok) MoveMediaOutcome.Done else MoveMediaOutcome.Forbidden
     }
 }

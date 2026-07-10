@@ -22,8 +22,9 @@ import java.util.UUID
  * Slice tests for media uploader buckets (uc.memory.buckets, en.memory.buckets, ADR 0034, cr-0113). Covers: an
  * upload stamps the member's owner_key ("user:{id}") + materializes a lazy primary; the "Beiträge" list groups by
  * uploader with counts; a sub-bucket is created one level under the primary; a move re-links media; a sub-bucket
- * delete REPARENTS its media to the primary (media survive, never deleted); own-bucket authz rejects a foreign
- * owner_key; a primary is neither renameable nor deletable. In-memory store (metadata only).
+ * delete REPARENTS its media to the primary (media survive, never deleted); a member may curate another root's
+ * SUB-buckets (rename/delete/create-under) + move WITHIN one root, but never a primary and never across owners
+ * (cr-0123). In-memory store (metadata only).
  */
 @QuarkusTest
 class MediaBucketsSliceTest {
@@ -119,21 +120,21 @@ class MediaBucketsSliceTest {
     }
 
     @Test
-    fun ownBucketAuthzRejectsForeignRenameAndDelete() {
+    fun memberMayManageAnotherRootsSubBucket() {
         val (alice, scopeId, tenantId) = seedMemberScopeWithTenant()
         val bob = addMemberToScope(scopeId, tenantId)
         val memory = seedNode(scopeId, NodeEntity.MEMORY)
         completeOne(alice, scopeId, memory, wrap = "YQ==") // alice's primary
         val aliceSub = createSub(alice, scopeId, memory, "YWxpY2U=")
 
-        // bob (a fellow member, different owner_key) may NOT rename or delete alice's sub-bucket → 403
+        // cr-0123: a fellow member may rename + delete another root's SUB-bucket (curating contributions) → 200 / 204
         given().header("Authorization", token(bob)).contentType(ContentType.JSON)
             .body("""{"sealedName":"Ym9i"}""")
             .`when`().patch("/api/scopes/$scopeId/nodes/$memory/buckets/$aliceSub")
-            .then().statusCode(403).body("code", equalTo("illegal_target"))
+            .then().statusCode(200).body("sealedName", equalTo("Ym9i"))
         given().header("Authorization", token(bob))
             .`when`().delete("/api/scopes/$scopeId/nodes/$memory/buckets/$aliceSub")
-            .then().statusCode(403).body("code", equalTo("illegal_target"))
+            .then().statusCode(204)
     }
 
     @Test
@@ -149,6 +150,53 @@ class MediaBucketsSliceTest {
             .then().statusCode(403).body("code", equalTo("illegal_target"))
         given().header("Authorization", token(userId))
             .`when`().delete("/api/scopes/$scopeId/nodes/$memory/buckets/$primary")
+            .then().statusCode(403).body("code", equalTo("illegal_target"))
+    }
+
+    @Test
+    fun memberCreatesSubUnderAnotherRootInheritingItsOwner() {
+        val (alice, scopeId, tenantId) = seedMemberScopeWithTenant()
+        val bob = addMemberToScope(scopeId, tenantId)
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        completeOne(alice, scopeId, memory, wrap = "YQ==")
+        val alicePrimary = firstPrimaryId(alice, scopeId, memory)
+
+        // cr-0123: bob nests a sub under alice's primary root (via parentBucketId) → it inherits alice's owner_key
+        given().header("Authorization", token(bob)).contentType(ContentType.JSON)
+            .body("""{"sealedName":"c3Vi","parentBucketId":"$alicePrimary"}""")
+            .`when`().post("/api/scopes/$scopeId/nodes/$memory/buckets")
+            .then().statusCode(200)
+            .body("ownerKey", equalTo("user:$alice"))
+            .body("parentBucketId", equalTo(alicePrimary))
+            .body("isPrimary", equalTo(false))
+    }
+
+    @Test
+    fun createSubRejectsNonPrimaryParent() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        completeOne(userId, scopeId, memory, wrap = "YQ==")
+        val sub = createSub(userId, scopeId, memory, "c3Vi")
+
+        // a sub-bucket can't be a parent — sub-buckets nest one level under a primary → 403
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"sealedName":"eA==","parentBucketId":"$sub"}""")
+            .`when`().post("/api/scopes/$scopeId/nodes/$memory/buckets")
+            .then().statusCode(403).body("code", equalTo("illegal_target"))
+    }
+
+    @Test
+    fun crossOwnerMoveIsRejected() {
+        val (alice, scopeId, tenantId) = seedMemberScopeWithTenant()
+        val bob = addMemberToScope(scopeId, tenantId)
+        val memory = seedNode(scopeId, NodeEntity.MEMORY)
+        val aliceMedia = completeOne(alice, scopeId, memory, wrap = "YQ==")
+        val bobMedia = completeOne(bob, scopeId, memory, wrap = "Yg==")
+
+        // one move may not span two owners (alice + bob) — a cross-owner move → 403 illegal_target
+        given().header("Authorization", token(alice)).contentType(ContentType.JSON)
+            .body("""{"mediaIds":["$aliceMedia","$bobMedia"],"targetBucketId":null}""")
+            .`when`().post("/api/scopes/$scopeId/nodes/$memory/media-moves")
             .then().statusCode(403).body("code", equalTo("illegal_target"))
     }
 

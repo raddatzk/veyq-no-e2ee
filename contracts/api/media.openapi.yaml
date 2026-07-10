@@ -248,12 +248,14 @@ paths:
     post:
       tags: [buckets]
       operationId: createBucket
-      summary: Create a sub-bucket under the caller's primary (uc.memory.buckets).
+      summary: Create a sub-bucket under a primary root (uc.memory.buckets).
       description: >
-        Create a **sub-bucket** one level under the **caller's own primary** in this node (the primary is lazily
-        materialized if needed). The client supplies the `sealedName` (the folder name sealed under `K_mem`); the
-        server never sees it in clear. The new bucket's `ownerKey` is the caller's. Sub-buckets do not nest
-        further. Operator-blind — the name is stored as ciphertext.
+        Create a **sub-bucket** one level under a **primary** in this node. Without `parentBucketId` it nests under
+        the **caller's own primary** (lazily materialized); with `parentBucketId` (a primary's id) it nests under
+        **that** root — so a member can add sub-buckets under a **contributor's** root to organize contributions —
+        and the new bucket inherits **that root's** `ownerKey`. The parent must be a primary (`403` otherwise). The
+        client supplies the `sealedName` (sealed under `K_mem`); the server never sees it in clear. Sub-buckets do
+        not nest further. Operator-blind — the name is stored as ciphertext.
       security:
         - bearerAuth: []
       parameters:
@@ -280,6 +282,10 @@ paths:
           description: Generic authentication failure.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "403":
+          description: The given parentBucketId is not a primary bucket (sub-buckets nest one level only).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
         "404":
           description: No such scope/node, or the caller holds no grant for the scope.
           content:
@@ -289,11 +295,11 @@ paths:
     patch:
       tags: [buckets]
       operationId: renameBucket
-      summary: Rename one of the caller's own sub-buckets (uc.memory.buckets).
+      summary: Rename a sub-bucket (uc.memory.buckets).
       description: >
-        Re-store a **sub-bucket's** `K_mem`-sealed name. Gated to the caller's **own** buckets
-        (`owner_key == caller`); a **primary** is not renameable (`illegal_target`). Operator-blind — the new name
-        is ciphertext.
+        Re-store a **sub-bucket's** `K_mem`-sealed name. Any scope **member** may rename a sub-bucket (incl. a
+        contributor's, to organize contributions); a **primary** is not renameable (`illegal_target`). Operator-blind
+        — the new name is ciphertext.
       security:
         - bearerAuth: []
       parameters:
@@ -322,7 +328,7 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "403":
-          description: The bucket is not the caller's own (own-bucket authz), or it is a primary (not renameable).
+          description: The bucket is a primary (not renameable).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
         "404":
@@ -332,12 +338,12 @@ paths:
     delete:
       tags: [buckets]
       operationId: deleteBucket
-      summary: Delete one of the caller's own sub-buckets — its media fall back to the primary (uc.memory.buckets).
+      summary: Delete a sub-bucket — its media fall back to its owner's primary (uc.memory.buckets).
       description: >
-        Delete a **sub-bucket**; its media are **reparented to the owner's primary** (`bucket_id = null`) — media
-        are **never** deleted here (destructive delete is the media trash path, uc.memory.delete-media). Gated to
-        the caller's **own** buckets (`owner_key == caller`); a **primary** is not deletable (`illegal_target`).
-        Idempotent — an unknown bucket answers `204`. Operator-blind — a re-link, no content touched.
+        Delete a **sub-bucket**; its media are **reparented to that root's owner primary** — media are **never**
+        deleted here (destructive delete is the media trash path, uc.memory.delete-media). Any scope **member** may
+        delete a sub-bucket (incl. a contributor's); a **primary** is not deletable (`illegal_target`). Idempotent —
+        an unknown bucket answers `204`. Operator-blind — a re-link, no content touched.
       security:
         - bearerAuth: []
       parameters:
@@ -352,7 +358,7 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "403":
-          description: The bucket is not the caller's own (own-bucket authz), or it is a primary (not deletable).
+          description: The bucket is a primary (not deletable).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
         "404":
@@ -364,11 +370,13 @@ paths:
     post:
       tags: [buckets]
       operationId: moveBucketMedia
-      summary: Move the caller's own media between the caller's own buckets (uc.memory.buckets).
+      summary: Move media between buckets of one owner-root (uc.memory.buckets).
       description: >
-        Bulk-move media into `targetBucketId` (null ⇒ the caller's **primary**). Every listed medium **and** the
-        target must be the caller's **own** (`owner_key == caller`) and in this node; otherwise `403`
-        (`illegal_target`). A read-side re-link — no blobs move, no content touched. Operator-blind.
+        Bulk-move media into `targetBucketId` (null ⇒ the shared owner's **primary**). Every listed medium **and**
+        the target bucket must share **one** `owner_key` (the same root), and the caller must be a scope member;
+        otherwise `403` (`illegal_target`). A member may curate a contributor's contributions this way, but **never
+        across owners** (a single distinct source `owner_key` is required) — attribution is preserved. A read-side
+        re-link — no blobs move, no content touched. Operator-blind.
       security:
         - bearerAuth: []
       parameters:
@@ -394,7 +402,7 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "403":
-          description: A medium or the target bucket is not the caller's own (own-bucket authz).
+          description: The source media span more than one owner, or the target bucket's owner differs (cross-owner move).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
         "404":
@@ -1132,7 +1140,9 @@ components:
 
     CreateBucketRequest:
       type: object
-      description: Create a sub-bucket under the caller's primary. The name is sealed client-side under `K_mem`.
+      description: >
+        Create a sub-bucket. Without `parentBucketId` it nests under the caller's own primary; with it, under that
+        primary root (e.g. a contributor's). The name is sealed client-side under `K_mem`.
       required: [sealedName]
       properties:
         sealedName:
@@ -1142,6 +1152,11 @@ components:
           maxLength: 512
           example: YnVja2V0LW5hbWUtY2lwaGVy
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        parentBucketId:
+          type: [string, "null"]
+          format: uuid
+          description: The primary bucket to nest under — null ⇒ the caller's own primary. Must be a primary.
+          example: null
 
     RenameBucketRequest:
       type: object
@@ -1158,19 +1173,19 @@ components:
 
     MoveMediaRequest:
       type: object
-      description: Bulk-move the caller's own media into a target bucket (null = the caller's primary).
+      description: Bulk-move media into a target bucket within one owner-root (null = that owner's primary).
       required: [mediaIds]
       properties:
         mediaIds:
           type: array
-          description: The media to move — all must be the caller's own, in this node.
+          description: The media to move — all must share one owner_key (the same root), in this node.
           minItems: 1
           maxItems: 256
           items: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
         targetBucketId:
           type: [string, "null"]
           format: uuid
-          description: The destination bucket (the caller's own), or null ⇒ the caller's primary.
+          description: The destination bucket (same owner as the source), or null ⇒ that owner's primary.
           example: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
 
     # --- cover blob (standalone, no media row) -------------------------------

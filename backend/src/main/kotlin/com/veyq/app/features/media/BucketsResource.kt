@@ -15,9 +15,9 @@ import java.util.UUID
 /**
  * HTTP adapter for uploader buckets (en.memory.buckets, ADR 0034, cr-0113). Implements the generated [BucketsApi];
  * thin (ADR 0001) — delegates to [MediaHandler]. `@Authenticated`; the caller (the `SecurityIdentity` principal)
- * must hold a grant for the scope (a non-member gets a 404). Member-only: the caller's owner_key is
- * `user:{userId}`, so create/rename/delete/move are gated to their OWN buckets (`owner_key == caller`).
- * Operator-blind — opaque owner_key + bucket structure + sealed names cross, never a cleartext name or content.
+ * must hold a grant for the scope (a non-member gets a 404). Member-gated: a member may curate any owner-root's
+ * SUB-buckets (create/rename/delete) + move media within one root, but never a primary and never across owners
+ * (cr-0123). Operator-blind — opaque owner_key + bucket structure + sealed names cross, never a cleartext name.
  */
 @Authenticated
 class BucketsResource(
@@ -32,8 +32,14 @@ class BucketsResource(
         }
 
     override fun createBucket(scopeId: UUID, nodeId: UUID, createBucketRequest: CreateBucketRequest): Response =
-        when (val o = handler.createBucket(identity.principal.name, scopeId.toString(), nodeId.toString(), createBucketRequest.sealedName)) {
+        when (
+            val o = handler.createBucket(
+                identity.principal.name, scopeId.toString(), nodeId.toString(),
+                createBucketRequest.sealedName, createBucketRequest.parentBucketId?.toString(),
+            )
+        ) {
             is CreateBucketOutcome.Ok -> Response.ok(toSummary(o.bucket)).build()
+            CreateBucketOutcome.Forbidden -> error(Response.Status.FORBIDDEN, "illegal_target")
             CreateBucketOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
         }
 

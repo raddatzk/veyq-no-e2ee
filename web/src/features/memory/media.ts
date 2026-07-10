@@ -735,10 +735,11 @@ export async function listBuckets(scopeId: string, nodeId: string): Promise<Buck
   return res.buckets.map(toBucket)
 }
 
-/** Create a sub-bucket under the caller's primary — the client seals the folder name under K_mem (the sub-bucket UI is a later slice). */
-export async function createBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, name: string): Promise<BucketItem> {
+/** Create a sub-bucket under a primary root — the client seals the folder name under K_mem. `parentBucketId` nests
+ *  it under that root (a contributor's, to curate contributions — cr-0123); omitted ⇒ the caller's own primary. */
+export async function createBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, name: string, parentBucketId?: string): Promise<BucketItem> {
   const sealedName = b64std(v1.symWrap(memoryKey, v1.utf8(name), BUCKET_NAME_CTX, v1.randomBytes(12)))
-  return toBucket(await withRefresh(() => bucketsApi().createBucket({ scopeId, nodeId, createBucketRequest: { sealedName } })))
+  return toBucket(await withRefresh(() => bucketsApi().createBucket({ scopeId, nodeId, createBucketRequest: { sealedName, parentBucketId } })))
 }
 
 /** Rename one of the caller's own sub-buckets — re-seal the name under K_mem (a later slice's UI). */
