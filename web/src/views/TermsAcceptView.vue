@@ -19,6 +19,7 @@ import { activeSpace, markTermsAccepted, clearActiveSpace } from '../app/activeS
 import { takeRoute } from '../app/pendingRoute'
 import { logout } from '../features/account/login/login'
 import { resetServerRole } from '../features/admin/serverRole'
+import { renderMarkdown } from '../shared/markdown'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -37,6 +38,9 @@ const body = computed(() => {
   const preferred = locale.value === 'de' ? tm.de : tm.en
   return preferred || tm.en || tm.de || ''
 })
+
+// Rendered to a safe HTML subset (escape-first — no raw HTML/script survives), so `v-html` is safe here.
+const renderedBody = computed(() => renderMarkdown(body.value))
 
 onMounted(async () => {
   // Reached directly (a reload on /terms) before the shell resolved a tenant → bounce to home; the shell enters
@@ -109,7 +113,8 @@ async function signOut() {
 
       <template v-else-if="phase === 'ready'">
         <p class="veyq-form-copy">{{ t('terms.gateIntro') }}</p>
-        <div class="terms-body">{{ body }}</div>
+        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown escapes first (safe subset, no raw HTML). -->
+        <div class="terms-body markdown-body" v-html="renderedBody"></div>
         <Message v-if="error" severity="warn" :closable="false">{{ error }}</Message>
         <div class="terms-actions">
           <Button :label="t('terms.accept')" icon="pi pi-check" :loading="busy" @click="accept" />
@@ -136,13 +141,43 @@ async function signOut() {
 .terms-body {
   max-height: 50vh;
   overflow-y: auto;
-  white-space: pre-wrap;
   padding: 0.85rem 1rem;
   margin: 0.75rem 0;
   border: 1px solid var(--app-border, var(--p-content-border-color, rgba(127, 127, 127, 0.25)));
   border-radius: 0.6rem;
   font-size: 0.92rem;
   line-height: 1.5;
+}
+/* Rendered markdown subset (headings 1-3, paragraphs, lists, inline). */
+.markdown-body :deep(h1) {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+.markdown-body :deep(h2) {
+  font-size: 1rem;
+  margin: 1rem 0 0.35rem;
+}
+.markdown-body :deep(h3) {
+  font-size: 0.92rem;
+  margin: 0.85rem 0 0.3rem;
+}
+.markdown-body :deep(p) {
+  margin: 0 0 0.6rem;
+}
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0 0 0.6rem;
+  padding-left: 1.3rem;
+}
+.markdown-body :deep(li) {
+  margin: 0.15rem 0;
+}
+.markdown-body :deep(code) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+}
+.markdown-body :deep(a) {
+  color: var(--p-primary-color, inherit);
 }
 .terms-actions {
   display: flex;

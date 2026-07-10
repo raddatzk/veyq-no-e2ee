@@ -104,6 +104,15 @@ Shipped **contracts → backend → http → web**, all green:
 - **Acceptance grain.** A dedicated `veyq_tenant_terms_acceptance` (surrogate id + `UNIQUE(user_id, tenant_id)`),
   independent of the multi-row `veyq_membership` — `veyq_user` is the wrong grain (acceptance is per-tenant).
 
+**Follow-up (markdown rendering).** The terms are authored + stored as markdown, so they must render as markdown
+(not raw `#`/`##`). Ported the legacy **escape-first safe-subset renderer** (`legacy/.../journal/markdown.ts`) to
+`web/src/shared/markdown.ts` — headings 1-3, bold/italic/inline-code, http(s) links, bullet/ordered lists,
+paragraphs; everything HTML-escaped **before** rendering (no raw HTML/script survives), so it is safe for `v-html`
+with **no new dependency** (chose this over adding markdown-it + a sanitizer). Wired into `TermsAcceptView` (the
+member gate renders the terms), `TenantTermsPanel` (a live **preview** for the owner; the read-only view for a
+non-owner renders instead of raw textareas), + `markdown.test.ts` (6 cases incl. XSS-escape + `javascript:`-link
+rejection). `npm run check` green (typecheck + 545 tests + build); the rendered gate + preview verified live.
+
 **Still open (later slices):** the **anonymous public-share client-side notice** (localStorage on the share page)
 and the **native** editor + gate (apple/android) — both intentionally out of this CR.
 
