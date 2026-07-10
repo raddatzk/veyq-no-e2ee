@@ -70,6 +70,7 @@ class MediaResource(
                 derivatives = item.derivatives.orEmpty().map { DerivativeDeclare(it.kind.value, it.uploadId.toString()) },
                 wrappedMeta = item.wrappedMeta,
                 wrappedExif = item.wrappedExif,
+                bucketId = item.bucketId?.toString(), // cr-0113: an explicit target bucket, else the caller's primary
             )
         }
         return when (val o = handler.complete(identity.principal.name, scopeId.toString(), items)) {
@@ -88,11 +89,11 @@ class MediaResource(
         }
     }
 
-    override fun listNodeMedia(scopeId: UUID, nodeId: UUID, ifNoneMatch: String?, since: String?, sinceDelete: Int?): Response =
+    override fun listNodeMedia(scopeId: UUID, nodeId: UUID, ifNoneMatch: String?, since: String?, sinceDelete: Int?, state: String?): Response =
         when (
             val o = handler.listMedia(
                 identity.principal.name, scopeId.toString(), nodeId.toString(),
-                parseETag(ifNoneMatch), parseCursor(since), sinceDelete ?: 0,
+                parseETag(ifNoneMatch), parseCursor(since), sinceDelete ?: 0, trashed = state == "trashed",
             )
         ) {
             is ListMediaOutcome.Page -> Response.ok(
@@ -138,6 +139,24 @@ class MediaResource(
         when (val o = handler.updateMeta(identity.principal.name, scopeId.toString(), mediaId.toString(), mediaMetaUpdate.wrappedMeta)) {
             is MetaOutcome.Found -> Response.ok(MediaMetaResponse(wrappedMeta = o.wrappedMeta)).build()
             MetaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+        }
+
+    override fun deleteMedia(scopeId: UUID, mediaId: UUID): Response =
+        when (handler.deleteMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+            DeleteMediaOutcome.Done -> Response.noContent().build()
+            DeleteMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+        }
+
+    override fun restoreMedia(scopeId: UUID, mediaId: UUID): Response =
+        when (handler.restoreMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+            RestoreMediaOutcome.Done -> Response.noContent().build()
+            RestoreMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+        }
+
+    override fun purgeMedia(scopeId: UUID, mediaId: UUID): Response =
+        when (handler.purgeMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+            PurgeMediaOutcome.Done -> Response.noContent().build()
+            PurgeMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
         }
 
     override fun commitCoverBlob(scopeId: UUID, nodeId: UUID, coverBlobCommitRequest: CoverBlobCommitRequest): Response =
@@ -188,6 +207,10 @@ class MediaResource(
         manifest = row.manifest,
         derivatives = row.derivatives.map(::toDerivativeSummary),
         wrappedMeta = row.wrappedMeta,
+        deletedAt = row.deletedAt?.atOffset(ZoneOffset.UTC), // cr-0110: non-null only in the trashed listing
+        deletedBy = row.deletedBy,
+        ownerKey = row.ownerKey, // cr-0113: the uploader's opaque owner_key (the buckets attribution)
+        bucketId = row.bucketId?.let(UUID::fromString), // cr-0113: the media's bucket (null = the uploader's primary)
     )
 
     private fun toDerivativeSummary(d: DerivativeRow) = MediaDerivativeSummary(

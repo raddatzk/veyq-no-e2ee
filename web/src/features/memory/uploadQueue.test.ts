@@ -58,6 +58,26 @@ describe('uploadQueue — runner', () => {
     expect(file.mediaId).toBe('media-xyz')
   })
 
+  it('fires onFileDone per file as it settles, before the batch onComplete (cr-0111 per-file reconcile)', async () => {
+    vi.mocked(addMedia).mockImplementation(async (_s, _n, _k, source) => ({ blobId: 'b', mediaId: `m-${source.mediaType}` }))
+    const done: string[] = []
+    let completeSawCount = -1
+    enqueueUploads(
+      TARGET,
+      [sel(png('a.png')), sel(new File([new Uint8Array([9])], 'b.gif', { type: 'image/gif' }))],
+      {
+        label: '2',
+        onFileDone: (f) => { done.push(f.mediaId!) },
+        onComplete: () => { completeSawCount = done.length },
+      },
+    )
+    // each file fires its OWN completion hook (a per-file reconcile trigger)…
+    await vi.waitFor(() => expect(done.length).toBe(2))
+    expect(new Set(done)).toEqual(new Set(['m-image/png', 'm-image/gif']))
+    // …and the batch onComplete fires only after both per-file hooks (so per-file reconcile precedes batch settle)
+    expect(completeSawCount).toBe(2)
+  })
+
   it('uploads multiple files sequentially (FIFO)', async () => {
     const order: string[] = []
     vi.mocked(addMedia).mockImplementation(async (_s, _n, _k, source) => {

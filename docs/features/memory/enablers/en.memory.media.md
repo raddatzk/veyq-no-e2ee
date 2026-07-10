@@ -38,7 +38,12 @@
 - **media** — the link record attaching a blob to a **node** (a Memory or a Chapter), carrying any per-use
   metadata (e.g. an encrypted original filename / capture time under `K_mem`, later slices). One blob can be
   attached by more than one media record (e.g. cover + in-body) **within the owner circle** — that is a
-  metadata reference the members already see, not content dedup.
+  metadata reference the members already see, not content dedup. Each media record also carries its **bucket
+  linkage** — a **`bucket_id`** (nullable; `null` = the uploader's primary) and a denormalized **`created_by`** =
+  the uploader's opaque **`owner_key`** (`user:{id}` / `share:{id}`), the operator-visible attribution the
+  [buckets](../use-cases/uc.memory.buckets.md) grouping reads. The bucket data model + the `K_mem`-sealed names
+  live in [en.memory.buckets](en.memory.buckets.md)
+  ([ADR 0034](../../../decisions/0034-media-uploader-buckets.md)).
 
 ## Main flow — add a media blob to a Memory (operator-blind)
 

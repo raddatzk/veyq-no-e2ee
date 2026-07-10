@@ -67,8 +67,12 @@ request the **user** turned on, straight to the chosen provider.
   shares; scope and membership (who belongs to which tenant/group); a member's **per-tenant username,
   identity public key, and group-add-consent flag** — visible to, and effectively **enumerable by**, any
   fellow tenant member (anyone can create a group to run the member-resolve, [ADR 0014](../decisions/0014-group-scopes-and-governance.md) §5);
-  coarse timestamps for ordering; sizes; MIME type; job-queue and op-log offsets; presence facts; per-parent
-  blinded tokens.
+  coarse timestamps for ordering; sizes; MIME type; job-queue and op-log offsets; presence facts; a media
+  item's **trash state** (a trashed flag + who trashed it + when, until the scheduled purge); a media item's
+  **uploader attribution + bucket structure** (an opaque `owner_key` per medium — `user:{id}` / `share:{id}` —
+  plus its `bucket_id` and the bucket rows' shape: node, parentage, `is_primary`, per-bucket counts; the
+  bucket/uploader **names stay sealed** under `K_mem`, [ADR 0034](../decisions/0034-media-uploader-buckets.md));
+  per-parent blinded tokens.
 
 These operational fields are exactly what lets the server **sort, paginate, route, authorize and
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"
@@ -272,6 +276,13 @@ re-key — the same posture 1Password takes for shared vaults.
 ## Deletion & erasure
 
 One mechanism serves both data-loss protection and erasure: **soft-delete → trash → retention window →
-scheduled hard-purge**, propagated to backups within a documented rotation window. Deletion is a
-**privilege** (not "anyone with access can delete"); blob-level purge handles erasure of an item across
-all references; a deletion audit records accountability without retaining the erased data.
+scheduled hard-purge**, propagated to backups within a documented rotation window. The two steps carry
+different authority. **Trashing is reversible** — an item moves to a per-scope trash and is restorable for the
+retention window — so it may be done by **any member of the scope** (recovery, not destruction), and it is
+**audited**: the trashed record carries **who** trashed it and **when**, so the action is accountable rather than
+anonymous. **Purging is irreversible** — the blob-level hard-purge that erases an item across all references. It
+happens two ways: the **scheduled retention job** (or an explicit erasure request), and — for an item **already in
+the trash** — a member may **expedite** its purge by hand (the item was already reversibly removed, so this only
+brings the inevitable purge forward, bypassing the retention window). A member cannot purge a **live** item
+directly: destruction always goes **trash → purge**, never a one-step "delete forever" of another member's live
+content. A deletion audit records accountability without retaining the erased data.

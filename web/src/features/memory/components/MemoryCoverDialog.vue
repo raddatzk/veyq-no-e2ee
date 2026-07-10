@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // The Memory cover editor (cr-0072 §1–2 + cr-0073). Crops **one** source and emits a [CoverSaveIntent]
-// (`upload` | `keep` | `remove`) — the parent seals it. Sources: a **brand-new uploaded image** (an
-// `<input type=file accept=image/*>`), or the **current cover re-cropped** (`existingSrc`). Using an existing
-// Memory photo as the cover is a one-click action in the gallery lightbox ("Set as cover"), not a step in here —
-// so this dialog has no media picker and scales regardless of photo count. Presentation only: no crypto, no
-// network. The crop math (base-scale fill, clamp-so-no-empty-corners, normalize to `0..1`) is the legacy math.
+// (`upload` | `media` | `keep` | `remove`) — the parent seals it. Sources: a **brand-new uploaded image** (an
+// `<input type=file accept=image/*>`), an **existing Memory photo** chosen in the gallery lightbox ("Set as
+// cover" → `mediaSource`, so its 16:9 crop is framed right here instead of defaulted to the full frame), or the
+// **current cover re-cropped** (`existingSrc`). Presentation only: no crypto, no network. The crop math
+// (base-scale fill, clamp-so-no-empty-corners, normalize to `0..1`) is the legacy math.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -15,6 +15,7 @@ const props = defineProps<{
   cover: MemoryCover | null // the current stored cover (restore its crop + enable Remove), or null
   existingSrc: string | null // the current cover's decrypted image URL — the crop source when re-cropping it
   hasMedia: boolean // whether the Memory has photos — drives the copy's "…or open a photo in the gallery" hint
+  mediaSource?: { mediaId: string; src: string } | null // a Memory photo picked in the lightbox to crop as the cover (its decrypted thumbnail = the crop source)
 }>()
 const emit = defineEmits<{ save: [CoverSaveIntent]; close: [] }>()
 const { t } = useI18n()
@@ -35,8 +36,9 @@ function measureCropper() {
   }
 }
 
-// The active crop source: a freshly uploaded file, or the current cover kept (only the crop moves).
-type Pick = { kind: 'upload'; file: File } | { kind: 'keep' }
+// The active crop source: a freshly uploaded file, an existing Memory photo (lightbox pick), or the current cover
+// kept (only the crop moves).
+type Pick = { kind: 'upload'; file: File } | { kind: 'keep' } | { kind: 'media'; mediaId: string }
 const pick = ref<Pick | null>(null)
 const sourceUrl = ref('')
 const uploadObjectUrl = ref<string | null>(null) // an owned object URL for a freshly picked file (revoke on replace/close)
@@ -68,9 +70,18 @@ const displayedImageStyle = computed(() => ({
 const dragging = ref(false)
 const dragStart = ref({ pointerId: 0, x: 0, y: 0, offsetX: 0, offsetY: 0 })
 
-// Open re-cropping the current cover (its decrypted image), else empty (upload only). The stored crop is applied
-// once the image's natural size is known (loadImage); `initialCrop` defaults to `props.cover?.crop`.
-if (props.cover && props.existingSrc) {
+// Seed the crop source. A Memory photo picked in the lightbox (`mediaSource`) takes precedence — crop THAT photo,
+// restoring its stored crop only when it is already the cover, else a fresh centre crop. Otherwise re-crop the
+// current cover (the header "edit cover" flow), or open empty (upload only). The crop is applied once the image's
+// natural size is known (loadImage).
+if (props.mediaSource) {
+  pick.value = { kind: 'media', mediaId: props.mediaSource.mediaId }
+  sourceUrl.value = props.mediaSource.src
+  initialCrop.value =
+    props.cover?.source.kind === 'media' && props.cover.source.mediaId === props.mediaSource.mediaId
+      ? props.cover.crop
+      : null
+} else if (props.cover && props.existingSrc) {
   pick.value = { kind: 'keep' }
   sourceUrl.value = props.existingSrc
 }
@@ -193,6 +204,7 @@ function save() {
   if (!p || !imageLoaded.value) return
   const crop = currentCoverCrop()
   if (p.kind === 'upload') emit('save', { kind: 'upload', file: p.file, crop })
+  else if (p.kind === 'media') emit('save', { kind: 'media', mediaId: p.mediaId, crop })
   else emit('save', { kind: 'keep', crop })
   emit('close')
 }

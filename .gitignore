@@ -272,3 +272,4 @@ gradle-app.setting
 *.hprof
 
 # End of https://www.toptal.com/developers/gitignore/api/git,intellij+all,vue,vuejs,gradle,kotlin,macos,windows,linux
+.venv/

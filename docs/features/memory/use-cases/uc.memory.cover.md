@@ -31,15 +31,16 @@ and offsets it.
 
 1. The cover image comes from one of two entry points — **there is no modal media picker** (browsing existing
    photos stays in the gallery, which scales to any count):
-   - **A Memory photo — one click, no interruption:** open a photo in the **gallery lightbox** and choose
-     **"Set as cover"**. It becomes the cover **immediately** with a default centre-crop (full-frame → shown
-     `object-fit: cover`, never distorted), and the **lightbox stays open** so the user keeps browsing; the
-     button marks that photo as the current cover. Fine-tuning the crop is a deliberate later step (below).
+   - **A Memory photo — framed in the cropper:** open a photo in the **gallery lightbox** and choose
+     **"Set as cover"**. This opens the **crop editor seeded on that photo** (its already-decrypted thumbnail is
+     the crop source — the exact tier the cover renders from), with the **lightbox staying open underneath** (its
+     keyboard suspended) so the user keeps browsing after saving. The user frames the 16:9 crop and saves; if the
+     photo is **already the cover**, its stored crop is pre-loaded to fine-tune. The button marks the current cover.
    - **A brand-new image, or re-cropping the current cover:** the header's **"set cover"** opens the editor —
      **"Upload a photo"** (an `<input type=file accept=image/*>`), or the current cover pre-loaded to re-frame.
-2. In the editor a **16:9 crop viewport** (filling the dialog width) shows the source; the user **drag-pans** and
-   **zooms** (1–3×) to frame it. Save normalizes the pan/zoom back to the `0..1` crop rectangle. (A one-click
-   gallery cover skips this and takes the default centre-crop.)
+2. In the editor a **16:9 crop viewport** (filling the dialog width) shows the source — a **Memory photo picked in
+   the lightbox**, an **uploaded image**, or the **current cover re-framed**; the user **drag-pans** and **zooms**
+   (1–3×) to frame it. Save normalizes the pan/zoom back to the `0..1` crop rectangle.
 3. On save, the client seals `cover { source, crop }` — `source` = the media `mediaId` or the uploaded blob ref —
    into the node's `wrappedMeta` under `K_mem` (read-modify-write — the sibling date/location are preserved) and
    PATCHes it via `updateNode`. Switching away from an uploaded cover reclaims its standalone blob. The detail
@@ -99,6 +100,9 @@ Gerät verschlüsselt; der Server speichert nur verschlüsselte Daten.
   contract + backend + web, cr-0073). cr-0073 generalized the cr-0072 **`mediaId`-only** `cover` shape into a
   discriminated **`source` (media | upload blob ref)** — with a backward-compatible `normalizeMemoryCover` so
   existing `{ mediaId, crop }` seals still open — and branched `loadNodeCover` onto a blob-fetch path; the display
-  (`MemoryCoverImage` + `coverImageStyle`) and the crop editor are reused unchanged.
+  (`MemoryCoverImage` + `coverImageStyle`) and the crop editor are reused unchanged. cr-0109 changed the lightbox
+  **"Set as cover"** from a one-click full-frame set into **opening the crop editor seeded on that photo** (the
+  lightbox stays open beneath the modal, its keyboard suspended) so the 16:9 crop is framed at pick time — the
+  editor gained a third `media` crop source alongside `upload`/`keep`.
 - Future: native cover parity (Apple + Android own later CRs, ADR 0010) — the upload source (contract + endpoints)
   is carried to the native data layer after regen.

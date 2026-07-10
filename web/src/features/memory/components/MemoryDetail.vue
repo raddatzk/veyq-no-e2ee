@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, type MediaItem } from '../media'
+import { openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, deleteMedia, restoreMedia, listTrash, purgeMedia, type MediaItem } from '../media'
 import { startMediaRevisionPolling, stopMediaRevisionPolling } from '../mediaRevisionPolling'
 import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
 import {
@@ -32,6 +32,7 @@ import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
 import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import MediaGrid from './MediaGrid.vue'
+import MemoryBuckets from './MemoryBuckets.vue'
 import OptimisticTile from './OptimisticTile.vue'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile } from '../uploadQueue'
 import { removedThumbIds } from '../optimisticUpload'
@@ -44,6 +45,8 @@ import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import Dialog from 'primevue/dialog'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import { useViewMode } from '../../../shared/state/useViewMode'
 import { useMapConfig, setMapsConsent } from '../../../shared/state/useMapConfig'
 
@@ -77,9 +80,26 @@ const mediaRevision = ref<number | null>(null)
 const deleteRevision = ref(0)
 const lightboxIndex = ref<number | null>(null)
 const lightboxItems = ref<MediaItem[]>([]) // a snapshot of the sorted order at open time (so an in-lightbox date edit can't reorder underfoot)
+// --- trash (uc.memory.delete-media, cr-0110). A lightbox-only delete soft-deletes a photo into a per-Memory
+// trash; the "Trash" tab lists the trashed media (restorable until the retention purge), loaded lazily on open.
+// The undo snackbar offers an immediate restore right after a lightbox delete.
+const trashedItems = ref<MediaItem[]>([])
+const trashThumbs = ref<Map<string, string>>(new Map())
+const trashStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+const undo = ref<{ mediaId: string } | null>(null)
+let undoTimer: ReturnType<typeof setTimeout> | null = null
+// Tombstone of mediaIds optimistically removed by a trash but not yet confirmed gone by the server (cr-0111):
+// filtered out of the merge/poll paths so a stale live read (a poll firing before the delete commits) can't
+// re-add them — the "two-quick-trashes reappear" race.
+const pendingDelete = new Set<string>()
+// Trash tab (cr-0111): batch selection + the per-tile overflow menu + the irreversible-purge confirm.
+const selectedTrash = ref<Set<string>>(new Set())
+const trashMenu = ref<InstanceType<typeof Menu> | null>(null)
+const menuTargetId = ref<string | null>(null)
+const purgeConfirm = ref<{ ids: string[] } | null>(null)
 // date sort (cr-0066): tiles order by effective capturedAt; newest first by default.
 const sortDir = ref<'newest' | 'oldest'>('newest')
-const activeTab = ref<'gallery' | 'chapters'>('gallery') // local (the #fragment carries the tree path, cr-0031)
+const activeTab = ref<'gallery' | 'chapters' | 'beitraege' | 'trash'>('gallery') // local (the #fragment carries the tree path, cr-0031)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 // --- justified grid (uc.memory.gallery, cr-0059). Each tile's aspect ratio comes from the E2EE-sealed
@@ -238,6 +258,9 @@ async function reconcileAutoLocation() {
 // Memory's own media OR a brand-new uploaded image (a standalone cover blob, cr-0073); the header shows it via the
 // shared crop formula. No auto-cover — unset ⇒ the placeholder tile.
 const coverEditorOpen = ref(false)
+// When the cover editor is opened from the lightbox "Set as cover", it is seeded to crop THAT photo (its already-
+// decrypted thumbnail is the crop source); null = the header "edit current cover" flow. Cleared on close.
+const coverEditorMedia = ref<{ mediaId: string; src: string } | null>(null)
 const storedCover = computed(() => (props.memoryKey ? unsealMemoryCover(props.memoryKey, props.node) : null))
 // An **upload**-source cover isn't in `thumbs` (no media row), so its standalone blob is decrypted on demand into
 // this object URL (revoked on change/unmount). A **media**-source cover reuses the already-decrypted thumbnail.
@@ -273,12 +296,32 @@ const coverExistingSrc = computed(() => coverSrc.value)
 const coverMediaId = computed(() => (storedCover.value?.source.kind === 'media' ? storedCover.value.source.mediaId : null))
 
 /**
- * "Set as cover" from the lightbox (cr-0073 §gallery): set that photo as the cover **in one click**, with a
- * default centre-crop (full frame → `object-fit: cover`), and **keep the lightbox open** so the user can keep
- * browsing. Fine-tuning the crop is a deliberate step later, via the header cover button.
+ * "Set as cover" from the lightbox: open the cover **cropper** seeded on that photo so the user frames the 16:9
+ * crop right away (the earlier cr-0073 behaviour set a one-click full-frame cover, skipping framing). The crop
+ * source is the photo's already-decrypted thumbnail — the exact tier the cover renders from — so no extra
+ * decrypt. The lightbox stays open under the modal (its keyboard is suspended via `:suspend-keys`). Fallback:
+ * a photo with no thumbnail yet (non-derivable / still loading) reverts to the one-click full-frame set.
  */
 function onSetCoverFromPhoto(payload: { mediaId: string }) {
-  void onCoverSave({ kind: 'media', mediaId: payload.mediaId, crop: { ...FULL_FRAME } })
+  const src = thumbs.value.get(payload.mediaId)
+  if (!src) {
+    void onCoverSave({ kind: 'media', mediaId: payload.mediaId, crop: { ...FULL_FRAME } })
+    return
+  }
+  coverEditorMedia.value = { mediaId: payload.mediaId, src }
+  coverEditorOpen.value = true
+}
+
+/** Open the header "edit current cover" flow — not seeded to a specific photo (upload / re-crop the current cover). */
+function openCoverEditor() {
+  coverEditorMedia.value = null
+  coverEditorOpen.value = true
+}
+
+/** Close the cover editor and drop any lightbox seeding (so the next header open is the plain edit flow). */
+function closeCoverEditor() {
+  coverEditorOpen.value = false
+  coverEditorMedia.value = null
 }
 
 /**
@@ -320,6 +363,185 @@ async function onCoverSave(intent: CoverSaveIntent) {
   }
 }
 
+// --- delete / trash (uc.memory.delete-media, cr-0110) ---
+
+/**
+ * Trash the current lightbox photo: optimistic removal from the grid + lightbox snapshot, the server soft-delete,
+ * and a transient undo snackbar (restore). The live poll would also drop it; the optimistic removal is instant.
+ */
+async function onDeleteFromLightbox(payload: { mediaId: string }) {
+  if (!props.memoryKey) return
+  removeFromGrid(payload.mediaId)
+  showUndo(payload.mediaId)
+  try {
+    await deleteMedia(props.scopeId, payload.mediaId)
+  } catch {
+    clearUndo() // the trash failed → re-list to restore the true state
+    void load()
+  }
+}
+
+/** Drop a media from the open grid + lightbox snapshot (optimistic), revoking its thumbnail object URL. */
+function removeFromGrid(mediaId: string) {
+  pendingDelete.add(mediaId) // cr-0111: tombstone so a racing live read can't re-add it before the delete commits
+  const url = thumbs.value.get(mediaId)
+  if (url) URL.revokeObjectURL(url)
+  thumbs.value.delete(mediaId)
+  donatedThumbs.delete(mediaId)
+  thumbs.value = new Map(thumbs.value)
+  items.value = items.value.filter((it) => it.mediaId !== mediaId)
+  lightboxItems.value = lightboxItems.value.filter((it) => it.mediaId !== mediaId)
+}
+
+function showUndo(mediaId: string) {
+  if (undoTimer) clearTimeout(undoTimer)
+  undo.value = { mediaId }
+  undoTimer = setTimeout(() => { undo.value = null; undoTimer = null }, 6000)
+}
+function clearUndo() {
+  if (undoTimer) clearTimeout(undoTimer)
+  undoTimer = null
+  undo.value = null
+}
+
+/** Undo the just-trashed media: restore it server-side, then re-list so it re-appears in the grid. */
+async function onUndoDelete() {
+  const u = undo.value
+  clearUndo()
+  if (!u) return
+  pendingDelete.delete(u.mediaId) // cr-0111: a genuine restore lifts the tombstone so the media can re-list
+  try {
+    await restoreMedia(props.scopeId, u.mediaId)
+  } finally {
+    void load()
+  }
+}
+
+/** Restore a media from the Trash tab: drop it from the tab (optimistic), restore server-side, re-list the gallery. */
+async function onRestoreFromTrash(mediaId: string) {
+  dropFromTrash(mediaId)
+  pendingDelete.delete(mediaId) // cr-0111: a genuine restore lifts the gallery tombstone
+  try {
+    await restoreMedia(props.scopeId, mediaId)
+  } finally {
+    void load()
+  }
+}
+
+/** Drop a media from the Trash tab locally (revoke its thumb + deselect) — the optimistic half of restore/purge. */
+function dropFromTrash(mediaId: string) {
+  const url = trashThumbs.value.get(mediaId)
+  if (url) URL.revokeObjectURL(url)
+  trashThumbs.value.delete(mediaId)
+  trashThumbs.value = new Map(trashThumbs.value)
+  trashedItems.value = trashedItems.value.filter((it) => it.mediaId !== mediaId)
+  if (selectedTrash.value.has(mediaId)) {
+    const n = new Set(selectedTrash.value)
+    n.delete(mediaId)
+    selectedTrash.value = n
+  }
+}
+
+/** Load the Memory's trashed media for the Trash tab (lazy, on open) — decrypt each thumbnail like the gallery. */
+async function loadTrash() {
+  const key = props.memoryKey
+  if (!key) return
+  const nodeId = props.node.id
+  trashStatus.value = 'loading'
+  revokeTrashThumbs()
+  try {
+    const list = await listTrash(props.scopeId, nodeId)
+    if (props.node.id !== nodeId) return
+    trashedItems.value = list
+    trashStatus.value = 'ready'
+    await Promise.all(
+      list.map(async (m) => {
+        if (!hasDerivatives(m)) return
+        try {
+          const bytes = await openGrid(props.scopeId, key, m)
+          if (props.node.id === nodeId) setTrashThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
+        } catch {
+          // a failed tile stays a placeholder
+        }
+      }),
+    )
+  } catch {
+    if (props.node.id === nodeId) trashStatus.value = 'error'
+  }
+}
+
+function setTrashThumb(mediaId: string, url: string) {
+  const prev = trashThumbs.value.get(mediaId)
+  if (prev) URL.revokeObjectURL(prev)
+  trashThumbs.value.set(mediaId, url)
+  trashThumbs.value = new Map(trashThumbs.value)
+}
+function revokeTrashThumbs() {
+  for (const url of trashThumbs.value.values()) URL.revokeObjectURL(url)
+  trashThumbs.value = new Map()
+}
+
+// --- Trash tab redesign (cr-0111): the SAME MediaGrid, a per-tile checkbox (batch select) + a 3-dot menu
+// (restore / purge), and a confirm for the irreversible hard-delete. ---
+
+/** The trashed media as MediaGrid tiles — the same justified layout as the gallery (aspect from the sealed dims). */
+const trashLayoutItems = computed(() =>
+  trashedItems.value.map((m) => {
+    const dims = props.memoryKey ? unsealMeta(props.memoryKey, m) : null
+    return { id: m.mediaId, aspectRatio: galleryDisplayAspectRatio(dims?.w, dims?.h), media: m }
+  }),
+)
+
+function toggleTrashSelect(mediaId: string) {
+  const next = new Set(selectedTrash.value)
+  if (next.has(mediaId)) next.delete(mediaId)
+  else next.add(mediaId)
+  selectedTrash.value = next
+}
+function clearTrashSelection() {
+  selectedTrash.value = new Set()
+}
+
+/** Open the per-tile overflow menu (restore / purge) anchored at the click, targeting [mediaId]. */
+function openTrashMenu(event: Event, mediaId: string) {
+  menuTargetId.value = mediaId
+  trashMenu.value?.toggle(event)
+}
+const trashMenuModel = computed<MenuItem[]>(() => {
+  const id = menuTargetId.value
+  return [
+    { label: t('memory.trash.restore'), icon: 'pi pi-replay', command: () => { if (id) void onRestoreFromTrash(id) } },
+    { label: t('memory.trash.purge'), icon: 'pi pi-trash', command: () => { if (id) requestPurge([id]) } },
+  ]
+})
+
+/** Ask to confirm the irreversible purge of [ids] (a single item from the menu, or the batch selection). */
+function requestPurge(ids: string[]) {
+  if (ids.length) purgeConfirm.value = { ids: [...ids] }
+}
+
+/** Batch restore the current selection: optimistic drop, restore each server-side, one re-list of the gallery. */
+async function restoreSelected() {
+  const ids = [...selectedTrash.value]
+  if (!ids.length) return
+  ids.forEach((id) => { dropFromTrash(id); pendingDelete.delete(id) })
+  await Promise.allSettled(ids.map((id) => restoreMedia(props.scopeId, id)))
+  void load()
+}
+function purgeSelected() {
+  requestPurge([...selectedTrash.value])
+}
+
+/** Permanently delete the confirmed ids now (cr-0111): optimistic drop from the tab, then the hard-delete purge. */
+async function confirmPurge() {
+  const ids = purgeConfirm.value?.ids ?? []
+  purgeConfirm.value = null
+  if (!ids.length) return
+  ids.forEach(dropFromTrash)
+  const results = await Promise.allSettled(ids.map((id) => purgeMedia(props.scopeId, id)))
+  if (results.some((r) => r.status === 'rejected')) void loadTrash() // resync the tab on any failure
+}
+
 const aspectRatios = computed(() => {
   const key = props.memoryKey
   const m = new Map<string, number>()
@@ -356,6 +578,22 @@ const layoutItems = computed<MemoryTileItem[]>(() => [
 ])
 // Whether the gallery has anything to show — real media or in-flight optimistic uploads.
 const hasContent = computed(() => items.value.length > 0 || optimisticTiles.value.length > 0)
+
+// The Beiträge tab (the media organizer, MemoryBuckets.vue) is ALWAYS available — it's where you create sub-buckets
+// and file your own uploads (cr-0113). Its own state/loading live in that component; here we only host it + wire the
+// lightbox/upload/reload it emits.
+const showBeitraege = computed(() => true)
+
+/** Open the lightbox on a bucket-scoped list the organizer hands up (so prev/next stays within the picked bucket). */
+function openBucketLightbox(payload: { items: MediaItem[]; index: number }) {
+  lightboxItems.value = payload.items.slice()
+  lightboxIndex.value = payload.index
+}
+/** The organizer changed buckets/media (create/rename/delete/move) — re-list so each item's ownerKey/bucketId refresh. */
+function onBucketChanged() { void load() }
+/** Upload from the organizer — reuses the Memory upload; the caller's primary materializes on complete (moving into a
+ *  specific sub-bucket after upload is a follow-up; for now uploads land in the primary, then move them in). */
+function onBucketUpload() { triggerUpload() }
 
 // --- upload trigger (uc.memory.upload). The Safari Photos picker populates input.files LATE / across repeated
 // picks with empty MIME types — so we re-read the input over a short window, MERGE (never replace) the picks,
@@ -397,7 +635,13 @@ function flushSelection() {
   enqueueUploads(
     { scopeId: props.scopeId, nodeId: targetNodeId, memoryKey: key },
     picked.map((file) => ({ file, mediaType: inferMediaType(file) })),
-    { label: props.node.name, onComplete: () => { if (props.node.id === targetNodeId) void load() } },
+    {
+      label: props.node.name,
+      // cr-0111: reconcile each file's optimistic tile the moment IT finishes — a targeted live poll lists just
+      // the newly-attached media so its tile flips to the real thumbnail without waiting for the whole batch.
+      onFileDone: () => { if (props.node.id === targetNodeId) void pollMedia() },
+      onComplete: () => { if (props.node.id === targetNodeId) void load() }, // final settle (date/location self-heal)
+    },
   )
 }
 
@@ -420,14 +664,16 @@ function setThumb(mediaId: string, url: string) {
  *  keep the rest in place, and donate a done upload's preview into `thumbs` for each newly-listed media so its
  *  optimistic tile hands off with no gray gap (the real thumbnail replaces the donation once it decrypts). */
 function mergeItems(listed: MediaItem[]) {
-  for (const id of removedThumbIds(thumbs.value.keys(), listed)) {
+  for (const id of [...pendingDelete]) if (!listed.some((m) => m.mediaId === id)) pendingDelete.delete(id) // cr-0111: confirmed gone
+  const visible = listed.filter((m) => !pendingDelete.has(m.mediaId)) // cr-0111: keep optimistically-trashed media out until the delete commits
+  for (const id of removedThumbIds(thumbs.value.keys(), visible)) {
     const url = thumbs.value.get(id)
     if (url) URL.revokeObjectURL(url)
     thumbs.value.delete(id)
     donatedThumbs.delete(id)
   }
   const known = listedMediaIds.value
-  for (const m of listed) {
+  for (const m of visible) {
     if (known.has(m.mediaId) || thumbs.value.has(m.mediaId) || !hasDerivatives(m)) continue
     const donorUrl = donorPreviewFor(m.mediaId) // the composable marks the preview donated + returns its url
     if (!donorUrl) continue
@@ -435,7 +681,7 @@ function mergeItems(listed: MediaItem[]) {
     donatedThumbs.add(m.mediaId)
   }
   thumbs.value = new Map(thumbs.value)
-  items.value = listed
+  items.value = visible
 }
 
 /** List the Memory's media and fetch each derivable item's thumbnail tier (parallel, operator-blind). */
@@ -544,6 +790,7 @@ async function pollMedia() {
 function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
   const byId = new Map(items.value.map((it) => [it.mediaId, it] as const))
   for (const m of delta) {
+    if (pendingDelete.has(m.mediaId)) continue // cr-0111: don't re-add an optimistically-trashed media (a stale pre-commit read)
     const existing = byId.get(m.mediaId)
     if (existing) {
       existing.wrappedMeta = m.wrappedMeta // a meta edit re-sealed the tier; patch in place (shared with the lightbox snapshot)
@@ -554,6 +801,7 @@ function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
   }
   if (mediaIds) {
     const keep = new Set(mediaIds)
+    for (const id of [...pendingDelete]) if (!keep.has(id)) pendingDelete.delete(id) // cr-0111: server confirmed it's gone → lift the tombstone
     for (const id of [...byId.keys()]) {
       if (keep.has(id)) continue
       const url = thumbs.value.get(id)
@@ -567,11 +815,20 @@ function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
   items.value = [...byId.values()]
 }
 
+// The Trash tab loads lazily on open — no extra list on every Memory open.
+watch(activeTab, (tab) => { if (tab === 'trash') void loadTrash() })
+
 watch(
   () => [props.node.id, props.memoryKey] as const,
   () => {
     lightboxIndex.value = null
     activeTab.value = 'gallery' // reset to the gallery when a different Memory/chapter opens
+    revokeTrashThumbs() // cr-0110: drop the previous Memory's trash state
+    trashedItems.value = []
+    trashStatus.value = 'idle'
+    selectedTrash.value = new Set() // cr-0111: clear the trash batch selection + tombstones on switch
+    pendingDelete.clear()
+    clearUndo()
     stopMediaRevisionPolling() // tear down the previous Memory's live poll before switching
     // a different Memory/chapter → clear the grid; a post-upload reload merges (below). Once the full list has
     // loaded, start the live poll — but only for an open, unlocked gallery (E4: no K_mem ⇒ no polling).
@@ -586,6 +843,8 @@ onBeforeUnmount(() => {
   stopMediaRevisionPolling() // stop the live poll on close/navigate away
   revokeThumbs()
   revokeUploadCover()
+  revokeTrashThumbs() // cr-0110
+  clearUndo()
   // the optimistic preview urls are owned + revoked by useOptimisticTiles
 })
 </script>
@@ -601,7 +860,7 @@ onBeforeUnmount(() => {
           :disabled="!memoryKey"
           :aria-label="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
           :title="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
-          @click="coverEditorOpen = true"
+          @click="openCoverEditor"
         >
           <MemoryCoverImage :src="coverSrc" :crop="storedCover?.crop ?? null" :alt="node.name" />
           <span class="memory-cover-preview-hint">
@@ -706,6 +965,8 @@ onBeforeUnmount(() => {
         <Tab value="chapters">
           {{ t('memory.chapters') }}<span v-if="chapters && chapters.length" class="tab-count">{{ chapters.length }}</span>
         </Tab>
+        <Tab v-if="showBeitraege" value="beitraege">{{ t('memory.buckets.title') }}</Tab>
+        <Tab value="trash">{{ t('memory.trash.title') }}</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
@@ -798,6 +1059,87 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </TabPanel>
+
+        <!-- Beiträge tab (uc.memory.buckets, cr-0113): the media ORGANIZER — a hierarchy picker (your primary +
+             sub-buckets), create/rename/delete sub-buckets, move media in, upload into a bucket. Ported from the
+             legacy MemoryAssetBuckets UX. Always present; the primary is virtual until a sub-bucket/upload materializes it. -->
+        <TabPanel v-if="showBeitraege" value="beitraege">
+          <MemoryBuckets
+            :scope-id="scopeId"
+            :node-id="node.id"
+            :memory-key="memoryKey"
+            :media="items"
+            :thumbs="thumbs"
+            @open-lightbox="openBucketLightbox"
+            @changed="onBucketChanged"
+            @upload-bucket="onBucketUpload"
+          />
+        </TabPanel>
+
+        <!-- Trash tab (uc.memory.delete-media, cr-0110/0111): the Memory's soft-deleted media in the SAME justified
+             MediaGrid, with a per-tile checkbox (batch select) + a 3-dot menu (restore / purge). Lazy on open. -->
+        <TabPanel value="trash">
+          <div v-if="trashStatus === 'loading'" class="media-grid-placeholder">
+            <span class="pi pi-spin pi-spinner" />
+            <span>{{ t('media.loading') }}</span>
+          </div>
+          <p v-else-if="trashStatus === 'error'" class="veyq-empty">{{ t('media.unavailable') }}</p>
+          <p v-else-if="trashedItems.length === 0" class="veyq-empty">{{ t('memory.trash.empty') }}</p>
+          <template v-else>
+            <div class="memory-trash-toolbar">
+              <span class="memory-trash-hint">{{ t('memory.trash.hint') }}</span>
+              <div v-if="selectedTrash.size" class="memory-trash-batch">
+                <span class="memory-trash-batch-count">{{ t('memory.trash.selected', { count: selectedTrash.size }) }}</span>
+                <button type="button" class="veyq-text-button" @click="restoreSelected">
+                  <span class="pi pi-replay" /><span>{{ t('memory.trash.restore') }}</span>
+                </button>
+                <button type="button" class="veyq-text-button memory-trash-purge-action" @click="purgeSelected">
+                  <span class="pi pi-trash" /><span>{{ t('memory.trash.purge') }}</span>
+                </button>
+                <button type="button" class="veyq-text-button" @click="clearTrashSelection">
+                  <span class="pi pi-times" /><span>{{ t('common.cancel') }}</span>
+                </button>
+              </div>
+            </div>
+            <MediaGrid :items="trashLayoutItems" :aria-label="t('memory.trash.title')">
+              <template #tile="{ tile, item }">
+                <div
+                  class="gallery-tile memory-trash-tile"
+                  :class="{ 'is-selected': selectedTrash.has(item.media.mediaId) }"
+                  :style="{
+                    transform: `translate(${tile.left}px, ${tile.top}px)`,
+                    width: `${tile.renderedWidth}px`,
+                    height: `${tile.renderedHeight}px`,
+                  }"
+                  role="button"
+                  :aria-pressed="selectedTrash.has(item.media.mediaId)"
+                  @click="toggleTrashSelect(item.media.mediaId)"
+                >
+                  <img
+                    v-if="trashThumbs.get(item.media.mediaId)"
+                    class="media-grid-tile-media media-grid-tile-media-loaded"
+                    :src="trashThumbs.get(item.media.mediaId)"
+                    :alt="node.name"
+                  />
+                  <span v-else-if="!hasDerivatives(item.media)" class="media-grid-icon pi pi-file" />
+                  <span v-else class="media-grid-tile-placeholder" />
+                  <span class="memory-trash-check" :class="{ 'is-on': selectedTrash.has(item.media.mediaId) }" aria-hidden="true">
+                    <span class="pi pi-check" />
+                  </span>
+                  <button
+                    type="button"
+                    class="memory-trash-menu-btn"
+                    :aria-label="t('common.more')"
+                    @click.stop="openTrashMenu($event, item.media.mediaId)"
+                  >
+                    <span class="pi pi-ellipsis-v" />
+                  </button>
+                </div>
+              </template>
+            </MediaGrid>
+            <Menu ref="trashMenu" :model="trashMenuModel" popup />
+          </template>
+        </TabPanel>
       </TabPanels>
     </Tabs>
 
@@ -809,9 +1151,11 @@ onBeforeUnmount(() => {
       :start-index="lightboxIndex"
       :memory-name="node.name"
       :cover-media-id="coverMediaId"
+      :suspend-keys="coverEditorOpen"
       @close="lightboxIndex = null"
       @updated="onCapturedAtUpdated"
       @set-cover="onSetCoverFromPhoto"
+      @delete="onDeleteFromLightbox"
     />
 
     <MemoryDateEditor
@@ -835,9 +1179,10 @@ onBeforeUnmount(() => {
       v-if="coverEditorOpen && memoryKey"
       :cover="storedCover"
       :existing-src="coverExistingSrc"
+      :media-source="coverEditorMedia"
       :has-media="items.length > 0"
       @save="onCoverSave"
-      @close="coverEditorOpen = false"
+      @close="closeCoverEditor"
     />
 
     <Dialog
@@ -853,6 +1198,27 @@ onBeforeUnmount(() => {
         <Button type="button" :label="t('memory.place.consentEnable')" icon="pi pi-map" @click="enableMaps" />
       </div>
     </Dialog>
+
+    <!-- Confirm the irreversible purge (cr-0111): permanently deletes the trashed media NOW (bypasses the 30-day retention). -->
+    <Dialog
+      :visible="purgeConfirm !== null"
+      :header="t('memory.trash.purgeConfirmTitle')"
+      modal
+      class="memory-trash-purge-dialog"
+      @update:visible="purgeConfirm = null"
+    >
+      <p>{{ t('memory.trash.purgeConfirmBody', { count: purgeConfirm?.ids.length ?? 0 }, purgeConfirm?.ids.length ?? 0) }}</p>
+      <div class="veyq-dialog-action-row">
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="purgeConfirm = null" />
+        <Button type="button" :label="t('memory.trash.purge')" icon="pi pi-trash" severity="danger" @click="confirmPurge" />
+      </div>
+    </Dialog>
+
+    <!-- Undo snackbar after a lightbox delete (cr-0110): a transient restore, above the lightbox so it's visible mid-culling. -->
+    <div v-if="undo" class="memory-undo-snackbar" role="status">
+      <span>{{ t('memory.trash.movedToTrash') }}</span>
+      <button type="button" class="veyq-text-button memory-undo-action" @click="onUndoDelete">{{ t('common.undo') }}</button>
+    </div>
   </div>
 </template>
 
@@ -1036,6 +1402,40 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
   font-weight: 700;
 }
+/* Beiträge tab (cr-0113): the uploader picker — a row of chips (label + count), the active one accented. */
+.beitraege-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.beitraege-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.beitraege-chip:hover {
+  background: var(--app-control-bg);
+}
+.beitraege-chip.is-active {
+  border-color: color-mix(in srgb, var(--app-accent) 55%, var(--app-line));
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+.beitraege-chip-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--app-control-bg);
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 /* The justified-rows gallery (cr-0059): aspect-preserving tiles laid out by calculateJustifiedMediaLayout into
    rows that fill the container width (the per-tile aspect ratio comes from the E2EE-sealed dimensions). The
    container is position:relative with an explicit height; each tile is absolutely positioned via a transform +
@@ -1072,4 +1472,122 @@ onBeforeUnmount(() => {
   font-size: 1.5rem;
 }
 /* The optimistic upload tile's own styles now live in the shared OptimisticTile component (cr-0074). */
+
+/* --- Trash tab (cr-0110/0111): the same gallery grid, dimmed tiles + select-check + 3-dot menu --- */
+.memory-trash-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.memory-trash-hint {
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+.memory-trash-batch {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.memory-trash-batch-count {
+  margin-right: 0.2rem;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.memory-trash-batch .veyq-text-button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+.memory-trash-purge-action {
+  color: var(--app-danger);
+  border-color: color-mix(in srgb, var(--app-danger) 40%, var(--app-line));
+}
+/* A trashed tile IS the shared .gallery-tile (absolute-positioned), just dimmed + selectable, with overlays. */
+.memory-trash-tile {
+  cursor: pointer;
+}
+.memory-trash-tile img {
+  opacity: 0.72; /* trashed media reads as dimmed */
+  transition: opacity 0.15s ease;
+}
+.memory-trash-tile.is-selected {
+  outline: 3px solid var(--app-accent);
+  outline-offset: -3px;
+}
+.memory-trash-tile.is-selected img {
+  opacity: 0.92;
+}
+.memory-trash-check {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid rgb(255 255 255 / 85%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 45%, transparent);
+  color: transparent;
+}
+.memory-trash-check .pi {
+  font-size: 0.75rem;
+}
+.memory-trash-check.is-on {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+  color: #fff;
+}
+.memory-trash-menu-btn {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 45%, transparent);
+  color: #fff;
+  cursor: pointer;
+}
+.memory-trash-menu-btn:hover {
+  background: color-mix(in srgb, var(--app-backdrop-strong) 70%, transparent);
+}
+/* The undo snackbar sits above the lightbox (z-index 1000) so it's visible mid-culling. */
+.memory-undo-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.6rem 0.6rem 1.1rem;
+  border-radius: 999px;
+  background: var(--app-backdrop-strong);
+  color: #fff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
+  z-index: 1200;
+}
+/* The undo button on the DARK snackbar: transparent (not the light .veyq-text-button surface) + white text. */
+.memory-undo-action {
+  min-height: auto;
+  padding: 0.2rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.memory-undo-action:hover:not(:disabled) {
+  background: rgb(255 255 255 / 14%);
+}
 </style>

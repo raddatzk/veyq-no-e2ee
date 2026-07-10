@@ -23,6 +23,7 @@ data class CompleteItem(
     val derivatives: List<DerivativeDeclare>,
     val wrappedMeta: String?,
     val wrappedExif: String?,
+    val bucketId: String? = null, // cr-0113: an explicit target bucket; null = the uploader's primary
 )
 
 /** Per-item result of `start`: success carries the session + presigned PUTs (null when the store can't presign). */
@@ -92,6 +93,65 @@ sealed interface CoverDeleteOutcome {
     object NoTarget : CoverDeleteOutcome
 }
 
+sealed interface DeleteMediaOutcome {
+    /** The media is trashed (or was already trashed — idempotent). */
+    object Done : DeleteMediaOutcome
+    /** No such scope/media, or the caller holds no grant (a 404, no reveal). */
+    object NoMedia : DeleteMediaOutcome
+}
+
+sealed interface RestoreMediaOutcome {
+    /** The media is restored (or was already live — idempotent). */
+    object Done : RestoreMediaOutcome
+    /** No such scope/media (e.g. already purged), or the caller holds no grant (a 404). */
+    object NoMedia : RestoreMediaOutcome
+}
+
+sealed interface PurgeMediaOutcome {
+    /** The trashed media was permanently deleted. */
+    object Done : PurgeMediaOutcome
+    /** No such trashed media (unknown / already purged / still live), or no grant (a 404). */
+    object NoMedia : PurgeMediaOutcome
+}
+
+sealed interface ListBucketsOutcome {
+    data class Ok(val buckets: List<BucketRow>) : ListBucketsOutcome
+    /** No such scope/node, or the caller holds no grant (a 404, no reveal). */
+    object NoNode : ListBucketsOutcome
+}
+
+sealed interface CreateBucketOutcome {
+    data class Ok(val bucket: BucketRow) : CreateBucketOutcome
+    /** No such scope/node, or the caller holds no grant (a 404). */
+    object NoNode : CreateBucketOutcome
+}
+
+sealed interface RenameBucketOutcome {
+    data class Ok(val bucket: BucketRow) : RenameBucketOutcome
+    /** No such scope/node/bucket, or the caller holds no grant (a 404). */
+    object NoBucket : RenameBucketOutcome
+    /** The bucket is not the caller's own, or it is a primary (not renameable) — a 403. */
+    object Forbidden : RenameBucketOutcome
+}
+
+sealed interface DeleteBucketOutcome {
+    /** The sub-bucket was deleted + its media reparented (or it did not exist — idempotent). */
+    object Done : DeleteBucketOutcome
+    /** No such scope/node, or the caller holds no grant (a 404). */
+    object NoNode : DeleteBucketOutcome
+    /** The bucket is not the caller's own, or it is a primary (not deletable) — a 403. */
+    object Forbidden : DeleteBucketOutcome
+}
+
+sealed interface MoveMediaOutcome {
+    /** The media were moved. */
+    object Done : MoveMediaOutcome
+    /** No such scope/node, or the caller holds no grant (a 404). */
+    object NoNode : MoveMediaOutcome
+    /** A medium or the target bucket is not the caller's own — a 403. */
+    object Forbidden : MoveMediaOutcome
+}
+
 /**
  * Use-case logic for media blobs (en.memory.media, cr-0028). Operator-blind, batch-shaped, per-item results.
  * Scope access = the caller holds a membership (a non-member sees a top-level 404, not a reveal). Direct-to-
@@ -142,7 +202,7 @@ class MediaHandler(
 
     fun complete(userId: String, scopeId: String, items: List<CompleteItem>): CompleteOutcome {
         if (!store.isMember(userId, scopeId)) return CompleteOutcome.NoScope
-        return CompleteOutcome.Results(completeForNode(scopeId, items, null))
+        return CompleteOutcome.Results(completeForNode(scopeId, items, null, userId)) // cr-0113: member uploader → owner_key
     }
 
     /**
@@ -150,15 +210,15 @@ class MediaHandler(
      * stamping a **contributor `shareIdentityId`** (the CONTRIBUTOR share upload path, cr-0101). The caller does
      * its own authorization. Each item's `nodeId` is honoured (the share path sets it to the shared root node).
      */
-    fun completeForNode(scopeId: String, items: List<CompleteItem>, shareIdentityId: String?): List<CompleteItemResult> =
-        items.map { completeOne(scopeId, it, shareIdentityId) }
+    fun completeForNode(scopeId: String, items: List<CompleteItem>, shareIdentityId: String?, uploaderUserId: String? = null): List<CompleteItemResult> =
+        items.map { completeOne(scopeId, it, shareIdentityId, uploaderUserId) }
 
     /**
      * Complete one logical media (original + derivative uploads). The item is **atomic**: the node + every
      * upload session are resolved first, then **every** blob is declare-then-verified, and only if all pass are
      * the blobs + media + derivative rows attached. On a budget failure the item's staged objects are purged.
      */
-    private fun completeOne(scopeId: String, item: CompleteItem, shareIdentityId: String? = null): CompleteItemResult {
+    private fun completeOne(scopeId: String, item: CompleteItem, shareIdentityId: String? = null, uploaderUserId: String? = null): CompleteItemResult {
         val node = store.findNode(scopeId, item.nodeId)
             ?: return CompleteItemResult(null, null, "node_not_found")
         if (node.kind == NodeEntity.FOLDER) return CompleteItemResult(null, null, "illegal_target")
@@ -190,6 +250,8 @@ class MediaHandler(
             item.wrappedMeta,
             item.wrappedExif,
             shareIdentityId,
+            uploaderUserId, // cr-0113: the member uploader → owner_key "user:{id}" (null on the contributor path)
+            item.bucketId,  // cr-0113: an explicit target bucket, else the uploader's primary
         )
         return CompleteItemResult(blobId, mediaId, null)
     }
@@ -228,9 +290,13 @@ class MediaHandler(
         ifNoneMatch: Int?,
         since: MediaCursor?,
         sinceDelete: Int,
+        trashed: Boolean,
     ): ListMediaOutcome {
         if (!store.isMember(userId, scopeId)) return ListMediaOutcome.NoNode
         val node = store.findNode(scopeId, nodeId) ?: return ListMediaOutcome.NoNode
+        // The Trash tab (cr-0110): a plain full list of the node's trashed media (carrying deletedAt/deletedBy), no
+        // conditional-GET/delta — the trash isn't live-polled, so the ETag/since/id-set machinery doesn't apply.
+        if (trashed) return ListMediaOutcome.Page(store.listNodeTrashed(scopeId, nodeId), node.mediaRevision, node.deleteRevision, null)
         val mediaRevision = node.mediaRevision
         val deleteRevision = node.deleteRevision
         if (ifNoneMatch != null && ifNoneMatch == mediaRevision) return ListMediaOutcome.NotModified
@@ -251,6 +317,34 @@ class MediaHandler(
         if (!store.isMember(userId, scopeId)) return MetaOutcome.NoMedia
         val media = store.setMeta(scopeId, mediaId, wrappedMeta) ?: return MetaOutcome.NoMedia
         return MetaOutcome.Found(media.wrappedMeta)
+    }
+
+    /**
+     * Trash a media (uc.memory.delete-media, cr-0110): **any member** of the scope may soft-delete it into the
+     * per-Memory trash (reversible; the irreversible purge is MediaTrashPurge's). Non-member or unknown media →
+     * NoMedia (a 404, no reveal). Idempotent.
+     */
+    fun deleteMedia(userId: String, scopeId: String, mediaId: String): DeleteMediaOutcome {
+        if (!store.isMember(userId, scopeId)) return DeleteMediaOutcome.NoMedia
+        return if (store.trashMedia(scopeId, mediaId, userId) != null) DeleteMediaOutcome.Done else DeleteMediaOutcome.NoMedia
+    }
+
+    /** Restore a trashed media (cr-0110): any member may bring it back before the purge. 404 on unknown/purged. */
+    fun restoreMedia(userId: String, scopeId: String, mediaId: String): RestoreMediaOutcome {
+        if (!store.isMember(userId, scopeId)) return RestoreMediaOutcome.NoMedia
+        return if (store.restoreMedia(scopeId, mediaId) != null) RestoreMediaOutcome.Done else RestoreMediaOutcome.NoMedia
+    }
+
+    /**
+     * Permanently delete a trashed media NOW (uc.memory.delete-media, cr-0111): any member may expedite the purge
+     * of an already-trashed item (the security-model reversible/irreversible split). Non-member, unknown, or a
+     * still-LIVE media → NoMedia (a 404). The blob-object purge is best-effort.
+     */
+    fun purgeMedia(userId: String, scopeId: String, mediaId: String): PurgeMediaOutcome {
+        if (!store.isMember(userId, scopeId)) return PurgeMediaOutcome.NoMedia
+        val reclaimKeys = store.purgeMedia(scopeId, mediaId) ?: return PurgeMediaOutcome.NoMedia
+        blobStore.delete(reclaimKeys) // best-effort store purge
+        return PurgeMediaOutcome.Done
     }
 
     /**
@@ -297,5 +391,50 @@ class MediaHandler(
         if (!blobStore.canPresign) return DownloadItemResult(presignedGets = null, error = "store_unavailable")
         val gets = (0 until blob.chunkCount).map { i -> PresignedRef(i, blobStore.presignGet(chunkKey(blob.storageKey, i))!!) }
         return DownloadItemResult(presignedGets = gets, error = null)
+    }
+
+    // --- buckets (uc.memory.buckets, ADR 0034, cr-0113) — member-only; caller's owner_key = "user:{userId}" ---
+
+    /** List the node's uploader buckets for the "Beiträge" tab. Non-member / unknown node → NoNode (404, no reveal). */
+    fun listBuckets(userId: String, scopeId: String, nodeId: String): ListBucketsOutcome {
+        if (!store.isMember(userId, scopeId)) return ListBucketsOutcome.NoNode
+        if (store.findNode(scopeId, nodeId) == null) return ListBucketsOutcome.NoNode
+        return ListBucketsOutcome.Ok(store.listBuckets(scopeId, nodeId))
+    }
+
+    /** Create a sub-bucket under the caller's own primary. Non-member / unknown node → NoNode (404). */
+    fun createBucket(userId: String, scopeId: String, nodeId: String, sealedName: String): CreateBucketOutcome {
+        if (!store.isMember(userId, scopeId)) return CreateBucketOutcome.NoNode
+        if (store.findNode(scopeId, nodeId) == null) return CreateBucketOutcome.NoNode
+        return CreateBucketOutcome.Ok(store.createSubBucket(scopeId, nodeId, "${BucketEntity.OWNER_USER_PREFIX}$userId", sealedName))
+    }
+
+    /** Rename one of the caller's own sub-buckets. Own-bucket authz; a primary is not renameable (Forbidden → 403). */
+    fun renameBucket(userId: String, scopeId: String, nodeId: String, bucketId: String, sealedName: String): RenameBucketOutcome {
+        if (!store.isMember(userId, scopeId)) return RenameBucketOutcome.NoBucket
+        val b = store.findBucket(scopeId, nodeId, bucketId) ?: return RenameBucketOutcome.NoBucket
+        if (b.isPrimary || b.ownerKey != "${BucketEntity.OWNER_USER_PREFIX}$userId") return RenameBucketOutcome.Forbidden
+        val row = store.renameBucket(bucketId, sealedName) ?: return RenameBucketOutcome.NoBucket
+        return RenameBucketOutcome.Ok(row)
+    }
+
+    /**
+     * Delete one of the caller's own sub-buckets — its media reparent to the primary (never deleted). Own-bucket
+     * authz; a primary is not deletable (Forbidden → 403). An unknown bucket is idempotent (Done → 204).
+     */
+    fun deleteBucket(userId: String, scopeId: String, nodeId: String, bucketId: String): DeleteBucketOutcome {
+        if (!store.isMember(userId, scopeId)) return DeleteBucketOutcome.NoNode
+        val b = store.findBucket(scopeId, nodeId, bucketId) ?: return DeleteBucketOutcome.Done // idempotent
+        if (b.isPrimary || b.ownerKey != "${BucketEntity.OWNER_USER_PREFIX}$userId") return DeleteBucketOutcome.Forbidden
+        store.deleteBucketReparent(bucketId)
+        return DeleteBucketOutcome.Done
+    }
+
+    /** Move the caller's own media into a target bucket (null = the caller's primary). Own-bucket authz → Forbidden (403). */
+    fun moveMedia(userId: String, scopeId: String, nodeId: String, mediaIds: List<String>, targetBucketId: String?): MoveMediaOutcome {
+        if (!store.isMember(userId, scopeId)) return MoveMediaOutcome.NoNode
+        if (store.findNode(scopeId, nodeId) == null) return MoveMediaOutcome.NoNode
+        val ok = store.moveMedia(scopeId, nodeId, mediaIds, targetBucketId, "${BucketEntity.OWNER_USER_PREFIX}$userId")
+        return if (ok) MoveMediaOutcome.Done else MoveMediaOutcome.Forbidden
     }
 }

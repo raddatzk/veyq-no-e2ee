@@ -23,6 +23,14 @@ tags:
       Encrypted media blobs under a scope: start uploads (presign PUT) → complete + attach to a node → list a
       node's media → presign GET for download. One tag = one resource interface owning the media subtree under
       `/api/scopes/{scopeId}` (distinct from the `content` nodes resource).
+  - name: buckets
+    description: >
+      Per-uploader **buckets** within a Memory node — the attribution axis
+      ([en.memory.buckets](../../docs/features/memory/enablers/en.memory.buckets.md), ADR 0034). A lazy virtual
+      **primary** bucket per uploader (keyed by an opaque `owner_key`) plus optional **one-level sub-buckets** with
+      `K_mem`-sealed names; media link via `bucketId` + a denormalized `createdBy`. Operator-blind — opaque
+      `owner_key` + structure, sealed names, **own-bucket authz** (`owner_key == caller`). A distinct resource
+      interface from `media`, sharing the node subtree.
 
 paths:
   /api/scopes/{scopeId}/blob-uploads-batch:
@@ -172,6 +180,15 @@ paths:
             delete-reconcile) **only when it lags** the node's `delete_revision` — i.e. a delete happened since.
             Defaults to 0.
           schema: { type: integer, format: int32, minimum: 0, default: 0, example: 0 }
+        - name: state
+          in: query
+          required: false
+          description: >
+            Which media to list: **`active`** (default) — the live gallery, the conditional-GET delta above; or
+            **`trashed`** — the node's soft-deleted media for the Trash tab (uc.memory.delete-media), a plain full
+            list (`If-None-Match`/`since`/`sinceDelete` do not apply, `mediaIds` is null), each row carrying
+            `deletedAt` + `deletedBy`. Trashed media never appear in the `active` listing.
+          schema: { type: string, default: active, maxLength: 8, example: active }
       responses:
         "200":
           description: >
@@ -194,6 +211,194 @@ paths:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
         "404":
           description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+
+  /api/scopes/{scopeId}/nodes/{nodeId}/buckets:
+    get:
+      tags: [buckets]
+      operationId: listNodeBuckets
+      summary: List a node's uploader buckets — the "Beiträge" grouping (uc.memory.buckets).
+      description: >
+        Returns the node's materialized buckets for the Beiträge tab: one lazy **primary** per uploader (keyed by
+        `owner_key`) plus any **sub-buckets**, each with its opaque `ownerKey`, `parentBucketId` (null = primary),
+        `isPrimary`, the `K_mem`-sealed `sealedName` (null for a member's primary — the client shows the operator-
+        visible username; present for a contributor primary + every sub-bucket), and a per-bucket `mediaCount`. The
+        client groups by uploader, unseals names client-side, and filters the gallery grid. Operator-blind — opaque
+        `owner_key` + structure only, never a cleartext name, never content.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      responses:
+        "200":
+          description: The node's buckets (primaries + sub-buckets) with per-bucket counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BucketListResponse" }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+    post:
+      tags: [buckets]
+      operationId: createBucket
+      summary: Create a sub-bucket under the caller's primary (uc.memory.buckets).
+      description: >
+        Create a **sub-bucket** one level under the **caller's own primary** in this node (the primary is lazily
+        materialized if needed). The client supplies the `sealedName` (the folder name sealed under `K_mem`); the
+        server never sees it in clear. The new bucket's `ownerKey` is the caller's. Sub-buckets do not nest
+        further. Operator-blind — the name is stored as ciphertext.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBucketRequest" }
+            example:
+              sealedName: YnVja2V0LW5hbWUtY2lwaGVy
+      responses:
+        "200":
+          description: The created sub-bucket.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BucketSummary" }
+        "400":
+          description: Malformed request (missing/invalid sealed name).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+
+  /api/scopes/{scopeId}/nodes/{nodeId}/buckets/{bucketId}:
+    patch:
+      tags: [buckets]
+      operationId: renameBucket
+      summary: Rename one of the caller's own sub-buckets (uc.memory.buckets).
+      description: >
+        Re-store a **sub-bucket's** `K_mem`-sealed name. Gated to the caller's **own** buckets
+        (`owner_key == caller`); a **primary** is not renameable (`illegal_target`). Operator-blind — the new name
+        is ciphertext.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+        - $ref: "#/components/parameters/BucketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RenameBucketRequest" }
+            example:
+              sealedName: cmVuYW1lZC1jaXBoZXI=
+      responses:
+        "200":
+          description: The renamed bucket.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BucketSummary" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "403":
+          description: The bucket is not the caller's own (own-bucket authz), or it is a primary (not renameable).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
+        "404":
+          description: No such scope/node/bucket, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: bucket_not_found } }
+    delete:
+      tags: [buckets]
+      operationId: deleteBucket
+      summary: Delete one of the caller's own sub-buckets — its media fall back to the primary (uc.memory.buckets).
+      description: >
+        Delete a **sub-bucket**; its media are **reparented to the owner's primary** (`bucket_id = null`) — media
+        are **never** deleted here (destructive delete is the media trash path, uc.memory.delete-media). Gated to
+        the caller's **own** buckets (`owner_key == caller`); a **primary** is not deletable (`illegal_target`).
+        Idempotent — an unknown bucket answers `204`. Operator-blind — a re-link, no content touched.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+        - $ref: "#/components/parameters/BucketId"
+      responses:
+        "204":
+          description: The sub-bucket was deleted and its media reparented to the primary (or it did not exist).
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "403":
+          description: The bucket is not the caller's own (own-bucket authz), or it is a primary (not deletable).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
+        "404":
+          description: No such scope/node, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
+
+  /api/scopes/{scopeId}/nodes/{nodeId}/media-moves:
+    post:
+      tags: [buckets]
+      operationId: moveBucketMedia
+      summary: Move the caller's own media between the caller's own buckets (uc.memory.buckets).
+      description: >
+        Bulk-move media into `targetBucketId` (null ⇒ the caller's **primary**). Every listed medium **and** the
+        target must be the caller's **own** (`owner_key == caller`) and in this node; otherwise `403`
+        (`illegal_target`). A read-side re-link — no blobs move, no content touched. Operator-blind.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveMediaRequest" }
+            example:
+              mediaIds: [2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e]
+              targetBucketId: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
+      responses:
+        "204":
+          description: The media were moved to the target bucket.
+        "400":
+          description: Malformed request.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "403":
+          description: A medium or the target bucket is not the caller's own (own-bucket authz).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: illegal_target } }
+        "404":
+          description: No such scope/node/media/bucket, or the caller holds no grant for the scope.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: node_not_found } }
 
@@ -349,6 +554,91 @@ paths:
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
 
+  /api/scopes/{scopeId}/media/{mediaId}:
+    delete:
+      tags: [media]
+      operationId: deleteMedia
+      summary: Trash a media — soft-delete into the Memory's recoverable trash (uc.memory.delete-media).
+      description: >
+        **Soft-delete** the media: set its `deleted_at`/`deleted_by` (the deletion audit) and bump the node's
+        `delete_revision` so every open gallery drops the tile on its next poll (cr-0107, ADR 0033). The row + its
+        blobs **survive** in the Memory's trash until the scheduled retention purge — `restoreMedia` brings it
+        back. **Any member** of the scope may trash (reversible, recovery-not-destruction — the irreversible purge
+        is the system job). Idempotent: an already-trashed media answers `204`. Operator-blind — a flag flip, no
+        content, no key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "204":
+          description: The media is trashed (or was already trashed).
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/media, or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+
+  /api/scopes/{scopeId}/media/{mediaId}/restore:
+    post:
+      tags: [media]
+      operationId: restoreMedia
+      summary: Restore a trashed media back into the gallery (uc.memory.delete-media).
+      description: >
+        Clear the media's `deleted_at`/`deleted_by` and bump the node's `media_revision` (advancing the media's
+        `updatedAt`) so the tile returns to every open gallery in its date position — a pure flag flip, its blobs
+        were never removed. **Any member** of the scope may restore. Idempotent on a live media (`204`). A media
+        already **purged** by the retention job is gone (`404`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "204":
+          description: The media is restored (or was already live).
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such scope/media (e.g. already purged), or the caller holds no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+
+  /api/scopes/{scopeId}/media/{mediaId}/purge:
+    post:
+      tags: [media]
+      operationId: purgeMedia
+      summary: Permanently delete a trashed media now — expedite the retention purge (uc.memory.delete-media).
+      description: >
+        **Hard-delete** a media that is currently **in the trash**: remove its derivative + media + blob rows and
+        the store objects (the same reclaim the scheduled `MediaTrashPurge` runs, expedited by a member). This is
+        **irreversible**. **Any member** may purge an already-trashed item — the security model's reversible/
+        irreversible split lets a member expedite the purge of an item that was already reversibly removed. Only a
+        **trashed** media can be purged: a live (untrashed) or unknown media answers `404` (a live media is deleted
+        only via trash → purge). Operator-blind — opaque blob objects removed, never content.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ScopeId"
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "204":
+          description: The trashed media was permanently deleted (rows + blob objects reclaimed).
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such trashed media (unknown, already purged, or still live), or no grant for the scope.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: media_not_found } }
+
   /api/scopes/{scopeId}/blob-downloads-batch:
     post:
       tags: [media]
@@ -419,6 +709,12 @@ components:
       required: true
       description: Opaque id of the media whose sealed metadata is requested.
       schema: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
+    BucketId:
+      name: bucketId
+      in: path
+      required: true
+      description: Opaque id of a bucket (a primary or a sub-bucket) within the node.
+      schema: { type: string, format: uuid, example: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a }
 
   schemas:
     # --- start uploads -------------------------------------------------------
@@ -512,6 +808,14 @@ components:
           format: uuid
           description: The MEMORY/CHAPTER node to attach the media to.
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
+        bucketId:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            Optional target bucket to attach into — must be one of the **caller's own** buckets in this node.
+            Omitted/null ⇒ the caller's **primary** bucket (lazily created on first upload). ADR 0034 /
+            [en.memory.buckets](../../docs/features/memory/enablers/en.memory.buckets.md).
+          example: null
         derivatives:
           type: [array, "null"]
           description: >
@@ -643,6 +947,38 @@ components:
             `(updatedAt, mediaId)` pair is the gallery's keyset cursor for the live-updates delta (cr-0107,
             ADR 0033); the client advances its `since` cursor to the newest row it has seen.
           example: 2026-07-09T12:34:56.789Z
+        deletedAt:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            When this media was trashed (soft-deleted), or null for a live media. Non-null **only** in the
+            `state=trashed` listing (uc.memory.delete-media); the Trash tab shows it and offers Restore until the
+            retention purge.
+          example: null
+        deletedBy:
+          type: [string, "null"]
+          description: >
+            Who trashed this media — the member's opaque user id (the deletion audit), or null for a live media.
+            The client compares it to the signed-in user to show "trashed by you" vs. another member.
+          maxLength: 64
+          example: null
+        ownerKey:
+          type: [string, "null"]
+          description: >
+            The uploader's opaque **`owner_key`** — `user:{userId}` (a member) or `share:{shareIdentityId}` (a
+            public contributor) — the attribution the buckets grouping reads
+            ([en.memory.buckets](../../docs/features/memory/enablers/en.memory.buckets.md), ADR 0034).
+            Operator-visible coarse metadata; never a cleartext name. Null only for a pre-buckets row not yet
+            attributed.
+          maxLength: 64
+          example: "user:2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e"
+        bucketId:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            The bucket this media lives in, or **null = the uploader's primary** (resolved lazily). Set when the
+            media was attached into an explicit sub-bucket or moved.
+          example: null
 
     MediaListPage:
       type: object
@@ -744,6 +1080,98 @@ components:
           contentEncoding: base64
           maxLength: 512
           example: bWV0YS1jaXBoZXJ0ZXh0
+
+    # --- buckets (uploader containers, ADR 0034 / en.memory.buckets) ---------
+    BucketListResponse:
+      type: object
+      required: [buckets]
+      properties:
+        buckets:
+          type: array
+          description: The node's materialized buckets — primaries (one per uploader) + any sub-buckets.
+          items: { $ref: "#/components/schemas/BucketSummary" }
+
+    BucketSummary:
+      type: object
+      description: >
+        One uploader bucket in a node. `ownerKey` is the opaque uploader key (`user:{id}` / `share:{id}`);
+        `parentBucketId` is null for a **primary**. `sealedName` is the `K_mem`-sealed name — null for a member's
+        primary (the client shows the operator-visible username), present for a contributor primary + every
+        sub-bucket. `mediaCount` is the live (non-trashed) media in this bucket.
+      required: [bucketId, ownerKey, isPrimary, mediaCount]
+      properties:
+        bucketId: { type: string, format: uuid, example: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a }
+        ownerKey:
+          type: string
+          description: The uploader's opaque owner_key — `user:{userId}` or `share:{shareIdentityId}`.
+          maxLength: 64
+          example: "user:2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e"
+        parentBucketId:
+          type: [string, "null"]
+          format: uuid
+          description: The parent primary's id for a sub-bucket, or null when this is the primary.
+          example: null
+        isPrimary:
+          type: boolean
+          description: True for the uploader's lazy primary bucket; false for a sub-bucket.
+          example: true
+        sealedName:
+          type: [string, "null"]
+          description: >
+            The bucket name sealed under `K_mem` (opaque base64) — null for a member's primary (the client shows
+            the operator-visible username), present for a contributor primary + every sub-bucket.
+          contentEncoding: base64
+          maxLength: 512
+          example: null
+        mediaCount:
+          type: integer
+          format: int32
+          description: Live (non-trashed) media currently in this bucket.
+          minimum: 0
+          example: 12
+
+    CreateBucketRequest:
+      type: object
+      description: Create a sub-bucket under the caller's primary. The name is sealed client-side under `K_mem`.
+      required: [sealedName]
+      properties:
+        sealedName:
+          type: string
+          description: The sub-bucket's name sealed under `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 512
+          example: YnVja2V0LW5hbWUtY2lwaGVy
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    RenameBucketRequest:
+      type: object
+      description: Re-store a sub-bucket's `K_mem`-sealed name.
+      required: [sealedName]
+      properties:
+        sealedName:
+          type: string
+          description: The new name sealed under `K_mem` (opaque base64).
+          contentEncoding: base64
+          maxLength: 512
+          example: cmVuYW1lZC1jaXBoZXI=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    MoveMediaRequest:
+      type: object
+      description: Bulk-move the caller's own media into a target bucket (null = the caller's primary).
+      required: [mediaIds]
+      properties:
+        mediaIds:
+          type: array
+          description: The media to move — all must be the caller's own, in this node.
+          minItems: 1
+          maxItems: 256
+          items: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
+        targetBucketId:
+          type: [string, "null"]
+          format: uuid
+          description: The destination bucket (the caller's own), or null ⇒ the caller's primary.
+          example: 5b6c7c3f-0e2a-9b1d-4a6e-8b2c1f2d3e4a
 
     # --- cover blob (standalone, no media row) -------------------------------
     CoverBlobCommitRequest:

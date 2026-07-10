@@ -19,7 +19,7 @@ import {
 import { Configuration as TenantsConfiguration, TenantsApi } from './generated/tenants'
 import { Configuration as ScopesConfiguration, ScopesApi } from './generated/scopes'
 import { ContentApi, FavoritesApi, Configuration as ContentConfiguration } from './generated/content'
-import { MediaApi, Configuration as MediaConfiguration } from './generated/media'
+import { MediaApi, BucketsApi, Configuration as MediaConfiguration } from './generated/media'
 import { TasksApi, Configuration as TasksConfiguration } from './generated/tasks'
 import { SharingApi, Configuration as SharingConfiguration } from './generated/sharing'
 import { session } from '../app/session'
@@ -79,6 +79,11 @@ export function favoritesApi(): FavoritesApi {
 
 export function mediaApi(): MediaApi {
   return new MediaApi(new MediaConfiguration(bearerParams()))
+}
+
+// Uploader buckets (cr-0113) — the `buckets` tag on the media spec → its own BucketsApi, same media config/auth.
+export function bucketsApi(): BucketsApi {
+  return new BucketsApi(new MediaConfiguration(bearerParams()))
 }
 
 export function tasksApi(): TasksApi {

@@ -13,9 +13,9 @@
 import exifr from 'exifr'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
-import { mediaApi } from '../../api/client'
+import { mediaApi, bucketsApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import { ResponseError, type MediaSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
+import { ResponseError, type MediaSummary, type BucketSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
 /**
@@ -26,6 +26,10 @@ const KBLOB_CTX = 'blob-key'
 const MEDIA_META_CTX = 'media-meta'
 /** AAD context binding the sealed heavy EXIF tier to its purpose (cr-0064) — distinct from the listed tier's. */
 const MEDIA_EXIF_CTX = 'media-exif'
+// AAD contexts for bucket names sealed under K_mem (cr-0113): a contributor primary's name is the identity's
+// sealed display name (cr-0101, copied server-side onto the bucket); a user-created sub-bucket seals with its own.
+const SHARE_IDENTITY_NAME_CTX = 'share-identity-name'
+const BUCKET_NAME_CTX = 'bucket-name'
 
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
@@ -111,6 +115,15 @@ export type MediaItem = {
    *  Present for the authenticated gallery (`listMedia`/`listMediaPage`); absent for the public-share snapshot
    *  viewer, which doesn't poll (the sharing resolve carries no per-media timestamp). */
   updatedAt?: Date
+  /** When this media was trashed + who trashed it (cr-0110, the deletion audit) — present only in the Trash tab
+   *  listing ([listTrash]); undefined for a live media. */
+  deletedAt?: Date
+  deletedBy?: string
+  /** cr-0113: the uploader's opaque owner_key (`user:{id}` | `share:{id}`) — the buckets attribution the Beiträge
+   *  tab groups by; undefined for a pre-buckets member row or the public-share viewer (no attribution). */
+  ownerKey?: string
+  /** cr-0113: the bucket this media lives in, or undefined = the uploader's primary. */
+  bucketId?: string
 }
 
 function summaryToItem(s: MediaSummary): MediaItem {
@@ -123,6 +136,10 @@ function summaryToItem(s: MediaSummary): MediaItem {
     })),
     wrappedMeta: s.wrappedMeta ?? undefined,
     updatedAt: s.updatedAt,
+    deletedAt: s.deletedAt ?? undefined,
+    deletedBy: s.deletedBy ?? undefined,
+    ownerKey: s.ownerKey ?? undefined,
+    bucketId: s.bucketId ?? undefined,
   }
 }
 
@@ -636,6 +653,108 @@ export async function uploadCoverBlob(
  */
 export async function deleteCoverBlob(scopeId: string, nodeId: string): Promise<void> {
   await withRefresh(() => mediaApi().deleteCoverBlob({ scopeId, nodeId }))
+}
+
+// --- delete / restore / trash (uc.memory.delete-media, cr-0110) -------------
+
+/**
+ * Trash a media — soft-delete it into the Memory's recoverable per-Memory trash. Any scope member may do it; the
+ * server flips `deleted_at`/`deleted_by` (the audit) and bumps `delete_revision` so every open gallery drops the
+ * tile on its next poll (cr-0107). The row + its blobs survive until the retention purge, so [restoreMedia] brings
+ * it back. Operator-blind — a flag flip, no content, no key.
+ */
+export async function deleteMedia(scopeId: string, mediaId: string): Promise<void> {
+  await withRefresh(() => mediaApi().deleteMedia({ scopeId, mediaId }))
+}
+
+/** Restore a trashed media back into the gallery (cr-0110) — clears the trash flags; the tile re-surfaces via the live poll. */
+export async function restoreMedia(scopeId: string, mediaId: string): Promise<void> {
+  await withRefresh(() => mediaApi().restoreMedia({ scopeId, mediaId }))
+}
+
+/**
+ * List a node's TRASHED media for the Trash tab (cr-0110): the soft-deleted items with their deletion audit
+ * (`deletedAt`/`deletedBy`), newest-trashed first — a plain full list (not the live conditional-GET). Each item
+ * still carries its original + derivative tiers, so the tab renders thumbnails the same way the gallery does.
+ */
+export async function listTrash(scopeId: string, nodeId: string): Promise<MediaItem[]> {
+  const page = await withRefresh(() => mediaApi().listNodeMedia({ scopeId, nodeId, state: 'trashed' }))
+  return page.media.map(summaryToItem)
+}
+
+/**
+ * Permanently delete a **trashed** media now (cr-0111) — the member-expedited purge (hard-delete + blob reclaim).
+ * **Irreversible.** Only a media already in the trash can be purged (a live one is a 404). Operator-blind.
+ */
+export async function purgeMedia(scopeId: string, mediaId: string): Promise<void> {
+  await withRefresh(() => mediaApi().purgeMedia({ scopeId, mediaId }))
+}
+
+// --- buckets (en.memory.buckets, ADR 0034, cr-0113) — the per-uploader "Beiträge" grouping -------------------
+
+/** One uploader bucket in a node: the opaque owner_key + structure + the (sealed) name + a live media count. */
+export type BucketItem = {
+  bucketId: string
+  ownerKey: string
+  parentBucketId?: string
+  isPrimary: boolean
+  /** The K_mem-sealed name (opaque base64): a contributor primary + every sub-bucket carry one; a member's primary
+   *  is undefined (the client shows the operator-visible username). Unwrap with [openBucketName]. */
+  sealedName?: string
+  mediaCount: number
+}
+
+/**
+ * Unwrap a bucket name under K_mem — best-effort (null when absent/unopenable, so the picker falls back to a
+ * neutral label). A **contributor** primary's name is the identity's sealed display name (cr-0101, copied
+ * server-side); a **sub-bucket** seals with its own tag (cr-0113). Operator-blind — the server relays ciphertext.
+ */
+export function openBucketName(memoryKey: Uint8Array, sealedName: string, kind: 'contributor' | 'sub'): string | null {
+  const ctx = kind === 'contributor' ? SHARE_IDENTITY_NAME_CTX : BUCKET_NAME_CTX
+  try {
+    return new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealedName), ctx))
+  } catch {
+    return null // not openable → the picker uses a neutral fallback label
+  }
+}
+
+function toBucket(b: BucketSummary): BucketItem {
+  return {
+    bucketId: b.bucketId,
+    ownerKey: b.ownerKey,
+    parentBucketId: b.parentBucketId ?? undefined,
+    isPrimary: b.isPrimary,
+    sealedName: b.sealedName ?? undefined,
+    mediaCount: b.mediaCount,
+  }
+}
+
+/** List a node's uploader buckets for the "Beiträge" tab (primaries + sub-buckets) with per-bucket counts. */
+export async function listBuckets(scopeId: string, nodeId: string): Promise<BucketItem[]> {
+  const res = await withRefresh(() => bucketsApi().listNodeBuckets({ scopeId, nodeId }))
+  return res.buckets.map(toBucket)
+}
+
+/** Create a sub-bucket under the caller's primary — the client seals the folder name under K_mem (the sub-bucket UI is a later slice). */
+export async function createBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, name: string): Promise<BucketItem> {
+  const sealedName = b64std(v1.symWrap(memoryKey, v1.utf8(name), BUCKET_NAME_CTX, v1.randomBytes(12)))
+  return toBucket(await withRefresh(() => bucketsApi().createBucket({ scopeId, nodeId, createBucketRequest: { sealedName } })))
+}
+
+/** Rename one of the caller's own sub-buckets — re-seal the name under K_mem (a later slice's UI). */
+export async function renameBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, bucketId: string, name: string): Promise<BucketItem> {
+  const sealedName = b64std(v1.symWrap(memoryKey, v1.utf8(name), BUCKET_NAME_CTX, v1.randomBytes(12)))
+  return toBucket(await withRefresh(() => bucketsApi().renameBucket({ scopeId, nodeId, bucketId, renameBucketRequest: { sealedName } })))
+}
+
+/** Delete one of the caller's own sub-buckets — its media reparent to the primary (a later slice's UI). */
+export async function deleteBucket(scopeId: string, nodeId: string, bucketId: string): Promise<void> {
+  await withRefresh(() => bucketsApi().deleteBucket({ scopeId, nodeId, bucketId }))
+}
+
+/** Move the caller's own media into a target bucket (null = the caller's primary) — a later slice's UI. */
+export async function moveBucketMedia(scopeId: string, nodeId: string, mediaIds: string[], targetBucketId: string | null): Promise<void> {
+  await withRefresh(() => bucketsApi().moveBucketMedia({ scopeId, nodeId, moveMediaRequest: { mediaIds, targetBucketId } }))
 }
 
 // --- read-back -------------------------------------------------------------

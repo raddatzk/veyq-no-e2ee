@@ -40,8 +40,13 @@ least-privilege is crypto-enforced, and the server stays blind.
 
 ## Deferred (later slices, each with its own dependency)
 
-- **Buckets** — group each contributor's uploads under their (sealed) name (the contributor share stores the
-  `share_identity` link as the forward-compat hook; this is the grouping/display UI on top).
+- **Buckets** — the per-uploader grouping (each contributor's uploads under their sealed name) is now refined as
+  [uc.memory.buckets](../memory/use-cases/uc.memory.buckets.md) +
+  [en.memory.buckets](../memory/enablers/en.memory.buckets.md)
+  ([ADR 0034](../../decisions/0034-media-uploader-buckets.md)) — the contributor identity becomes the
+  `share:{shareIdentityId}` **`owner_key`**, read with no migration. **cr-0113** (planned) ships the full bucket
+  data layer + backend + the primary-grouping tab; the **sub-bucket management UI**, a **camera filter**, and
+  **batch** stay later slices.
 - **MANAGER role + moderation + persistent uploader deletes** — a manager role with view-all + edit/delete;
   **moderation** (review-before-publish) over the direct-append default; and persisting an uploader's id list
   client-side for **post-reload delete** (still no download).

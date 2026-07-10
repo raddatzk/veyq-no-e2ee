@@ -1,0 +1,60 @@
+useCase: uc.memory.delete-media
+feature: memory
+title: Delete media — remove a photo into a recoverable per-Memory trash
+# Built by cr-0110 (contracts → backend → web). Soft-delete → per-Memory trash → 30-day retention (operator-
+# configurable) → scheduled hard-purge. Any scope member may TRASH and RESTORE (reversible, recovery-not-
+# destruction), audited by deleted_by/deleted_at; the irreversible purge is the scheduled system job, never a
+# member hand-action — per the security-model `Deletion & erasure` posture. Reuses the cr-0107 delete_revision
+# reconcile (no new propagation) and the cr-0102 blob-reclaim path (the purge). Native (apple/android) is deferred
+# per ADR 0010 (web-first) — the data layer carries the delete/restore endpoints after regen.
+acceptanceCriteria:
+  - id: trash-soft-delete-any-member
+    text: Any member of the scope may trash a media item — the server marks it trashed (deleted_at + deleted_by), it leaves listNodeMedia and the delete-reconcile id-set, and bumps the node's delete_revision so every open gallery drops the tile on its next poll (uc.memory.live-updates). Operator-blind — a flag flip, no content, no key. A non-member gets a non-enumerable 404; unauthenticated is 401.
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.trashHidesFromListBumpsBothCountersAndDropsFromIdSet, MediaTrashSliceTest.deleteByNonMemberIs404, MediaTrashSliceTest.unauthenticatedDeleteIs401]
+      http:
+        e2e: [http/media/trash.http]
+      web:
+        unit: [src/features/memory/components/MediaLightbox.test.ts]
+  - id: restore-from-trash
+    text: Any member may restore a trashed media before it is purged — clearing deleted_at, bumping the revision — and the tile returns to the gallery in its date position (its blobs were never removed, only the flag flipped). Restoring an already-purged media is a 404.
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.restoreBringsItBackIntoTheGallery, MediaTrashSliceTest.restoreUnknownMediaIs404]
+  - id: per-memory-trash-tab
+    text: The Memory detail carries a "Trash" tab (beside Gallery/Chapters) that lazily lists the node's trashed media (state=trashed) in the SAME justified MediaGrid as the gallery (dimmed tiles), with a per-tile checkbox (batch-select) + a 3-dot menu (Restore / Delete forever) + a batch toolbar, plus an empty state; the trashed listing is excluded from the active gallery. (The deletion audit's actor id rides the data; surfacing the actor's display name is a later nicety, needing a username resolve.)
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.trashedListingCarriesTheAuditAndExcludesFromActive]
+  - id: member-expedited-purge
+    text: A member may permanently delete an ALREADY-TRASHED media now (the expedited purge, cr-0111) — hard-deleting its derivative + media + blob rows + store objects, bypassing the retention window; a live (untrashed) or unknown media is a 404 (destruction always goes trash → purge, never a one-step delete-forever of a live item). The Trash tab's 3-dot menu + batch toolbar drive it behind a confirm on the irreversible action. Matches the sharpened security-model `Deletion & erasure` (purge = the scheduled job OR a member expediting an already-trashed item).
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.purgeTrashedMediaHardDeletesNow, MediaTrashSliceTest.purgingALiveMediaIs404, MediaTrashSliceTest.purgeByNonMemberIs404]
+  - id: lightbox-delete-and-hotkey
+    text: Delete is a lightbox-only affordance — a trash button in the lightbox top bar and a Delete/Backspace hotkey — with no confirmation dialog (recoverable); it emits a delete for the current photo (the parent trashes it, advances, and shows an undo toast). The hotkey + button respect the lightbox's suspend-keys (no delete while the cover modal is open, cr-0109) and are hidden in the read-only public-share viewer.
+    coverage:
+      web:
+        unit: [src/features/memory/components/MediaLightbox.test.ts]
+  - id: scheduled-hard-purge
+    text: A scheduled job hard-deletes each media trashed longer than the retention window (default 30 days, operator-configurable) — its derivative + media + blob rows in FK order and the store objects reclaimed, reusing the cr-0102 blob-reclaim path. The purge is irreversible and is not a member action.
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.purgeHardDeletesTrashedPastRetention]
+  - id: reversible-audit-vs-irreversible
+    text: The reversible trash step is any-member and audited (deleted_by/deleted_at, surfaced in the trashed listing); the irreversible purge is the scheduled system job — no member can delete-forever another member's content by hand. Trashing is idempotent. Matches the security-model `Deletion & erasure` reversible/irreversible split; the trash state (flag + actor + timestamp) is the disclosed server-visible operational metadata.
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.trashedListingCarriesTheAuditAndExcludesFromActive, MediaTrashSliceTest.deleteIsIdempotent]
+  - id: self-heal-cover-and-auto
+    text: A trashed media that was the cover falls back to the placeholder (the existing dangling-cover E2 path, no cover rewrite required); auto date + auto place re-materialize from the shrunken media list (the trashed media is excluded from listNodeMedia), never touching a manual/fixed value — no delete-specific reconcile code.
+    coverage:
+      backend:
+        integration: [MediaTrashSliceTest.trashHidesFromListBumpsBothCountersAndDropsFromIdSet]
+      web:
+        unit: [src/features/memory/memoryCover.test.ts]
+gaps:
+  web: "Built (cr-0110). media.ts deleteMedia/restoreMedia/listTrash wrappers; MediaLightbox trash button + Delete/Backspace hotkey (respecting suspendKeys, hidden when readonly) + the delete emit — unit-tested (MediaLightbox.test.ts). The MemoryDetail glue — optimistic grid+lightbox removal, the undo snackbar, the lazy Trash tab + Restore — is verified by the cr-0110 live smoke on veyq.localhost (trash from the lightbox drops the tile + advances + undo restores; the Trash tab lists the trashed photo + restores it; operator-blind at the DB: only deleted_at/deleted_by, ciphertext intact until purge). Surfacing the trasher's display name (self vs. other) is deferred — deleted_by is carried in the data, but a friendly name needs a username resolve. cr-0111 added the member-expedited purge (media.ts purgeMedia; backend MediaTrashSliceTest.purge*) and redesigned the Trash tab onto the shared MediaGrid (per-tile checkbox batch-select + a 3-dot Restore/Delete-forever menu + a batch toolbar + a purge confirm dialog) — the redesign UI is cr-0111-live-smoke-verified on veyq.localhost. cr-0111 also fixed the upload per-file reconcile (uploadQueue onFileDone → a targeted poll; unit-tested in uploadQueue.test.ts) and the trashed-still-in-grid race (a client-side pendingDelete tombstone in MemoryDetail filtered in upsertItems/mergeItems; smoke-verified)."
+  apple: "Not built. Native gallery/delete/trash is Apple's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."
+  android: "Not built. Native gallery/delete/trash is Android's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."

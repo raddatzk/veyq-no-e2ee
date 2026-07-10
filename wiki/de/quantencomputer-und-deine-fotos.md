@@ -8,8 +8,8 @@ Quantencomputern standhält** — und die Schlösser können mit der Zeit noch b
 
 Eines Tages könnten leistungsfähige **Quantencomputer** Teile der Verschlüsselung knacken, die heute im
 ganzen Internet verwendet wird. Es gibt eine hinterhältige Variante dieser Bedrohung — **„harvest now,
-decrypt later"** (heute abgreifen, später entschlüsseln): Ein geduldiger Angreifer kopiert sich *heute*
-deine **verschlüsselten** Fotos, legt sie weg und hofft, sie in etwa fünfzehn Jahren zu knacken. Das
+decrypt later"** (heute abgreifen, später entschlüsseln): Geduldige Angreifende kopieren sich *heute*
+deine **verschlüsselten** Fotos, legen sie weg und hoffen, sie in etwa fünfzehn Jahren zu knacken. Das
 Problem: ein privates Foto von heute ist auch in fünfzehn Jahren **immer noch privat** — der Wert läuft
 nicht ab.
 

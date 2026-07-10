@@ -37,11 +37,13 @@ const props = defineProps<{
   originalLoader?: (item: MediaItem) => Promise<Uint8Array> // fetch+decrypt the original (default: authed openOriginal)
   exifLoader?: (item: MediaItem) => Promise<MediaExif | null> // lazy heavy-EXIF (default: authed getMediaExif; skipped when readonly + absent)
   metaResolver?: (item: MediaItem) => MediaMeta | null // unseal the listed date/GPS tier (default: unsealMeta under memoryKey)
+  suspendKeys?: boolean // pause the global Escape/arrow handler while a modal (the cover cropper) is open over the lightbox
 }>()
 const emit = defineEmits<{
   close: []
   updated: [{ mediaId: string; wrappedMeta: string | null }]
   setCover: [{ mediaId: string }] // "use this photo as the Memory's cover" (cr-0073 §gallery-source)
+  delete: [{ mediaId: string }] // trash this photo (cr-0110); the parent soft-deletes + shows an undo toast
 }>()
 
 const { t, locale } = useI18n()
@@ -103,7 +105,9 @@ async function loadPreview() {
   }
 }
 
-watch(current, loadPreview, { immediate: true })
+// Reload when the SHOWN item changes — by identity, not just the index: after a delete (cr-0110) the parent
+// removes the item and the array shifts, so the same index now holds a different item (its mediaId changes).
+watch(() => item.value?.mediaId, loadPreview, { immediate: true })
 
 // When the item changes: unseal the listed metadata tier (date + GPS) **instantly** from the listed item (no
 // fetch), then lazily fetch + unseal the heavy EXIF tier (camera/lens) via the exif endpoint (never listed).
@@ -124,7 +128,7 @@ async function loadDetails() {
     if (item.value === target) detailsLoading.value = false
   }
 }
-watch(current, loadDetails, { immediate: true })
+watch(() => item.value?.mediaId, loadDetails, { immediate: true })
 
 // --- capturedAt (cr-0066): effective time = override ?? derived original, from the listed capture-time tier ---
 const effectiveCaptured = computed(() => effectiveCapturedAt(captured.value))
@@ -227,6 +231,17 @@ function next() {
   if (canNext.value) current.value += 1
 }
 
+// After a delete (cr-0110) the parent removes the item from `items`, shrinking the array: the item that shifted
+// into this slot shows (a natural advance), clamp to the last when the deleted one WAS last, and close when the
+// grid empties — so the lightbox stays consistent with the optimistic removal.
+watch(
+  () => props.items.length,
+  (len) => {
+    if (len === 0) emit('close')
+    else if (current.value >= len) current.value = len - 1
+  },
+)
+
 async function download() {
   if (!item.value || downloading.value) return
   downloading.value = true
@@ -241,10 +256,17 @@ async function download() {
   }
 }
 
+function emitDelete() {
+  if (props.readonly || !item.value) return
+  emit('delete', { mediaId: item.value.mediaId }) // the parent trashes it + shows an undo toast (cr-0110)
+}
+
 function onKeydown(event: KeyboardEvent) {
+  if (props.suspendKeys) return // a modal (cover cropper) is open over the lightbox — let it own the keyboard
   if (event.key === 'Escape') emit('close')
   else if (event.key === 'ArrowLeft') prev()
   else if (event.key === 'ArrowRight') next()
+  else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); emitDelete() } // cr-0110 culling hotkey
 }
 window.addEventListener('keydown', onKeydown)
 
@@ -289,6 +311,16 @@ onBeforeUnmount(() => {
           @click="!isCover && item && emit('setCover', { mediaId: item.mediaId })"
         >
           <span class="pi" :class="isCover ? 'pi-check' : 'pi-image'" />
+        </button>
+        <button
+          v-if="!readonly"
+          class="veyq-icon-button lightbox-icon-button lightbox-delete-button"
+          type="button"
+          :aria-label="t('media.delete')"
+          :title="t('media.delete')"
+          @click="emitDelete"
+        >
+          <span class="pi pi-trash" />
         </button>
         <button
           class="veyq-icon-button lightbox-icon-button"
@@ -420,6 +452,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* The lightbox trash affordance (cr-0110): a subtle danger tint on hover, set apart from the neutral actions. */
+.lightbox-delete-button:hover {
+  color: var(--app-danger);
+}
 /* The "Set as cover" button, when THIS photo is the current cover: an accent-filled state ("it's the cover"). */
 .lightbox-cover-active {
   color: #fff;

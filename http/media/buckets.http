@@ -1,0 +1,69 @@
+### Media uploader buckets — authz boundary (uc.memory.buckets, en.memory.buckets, cr-0113)
+# The unauthenticated boundary of the bucket endpoints (a `buckets` tag → its own BucketsApi), runnable against
+# ANY instance — no account/scope/membership needed. Like trash.http, the AUTHENTICATED happy-path is not
+# reproducible from a bare .http: listing/creating/moving needs the operator-blind scope-grant flow (a member of
+# the scope) + seeded media, and the own-bucket authz (owner_key == caller) needs two members. Those — the lazy
+# primary + grouping, create-sub → move → delete-reparents, foreign-owner 403, primary-not-renameable/deletable,
+# and the member upload stamping user:{id} — are covered at the integration layer (MediaBucketsSliceTest) and in
+# the web client's live smoke.
+#
+# Run: ijhttp --env-file http/media/http-client.env.json --env dev http/media/buckets.http
+
+### 1. List a node's buckets without a bearer token → generic 401 (auth before validation)
+GET {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/buckets
+
+> {%
+client.test("list buckets requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 2. Create a sub-bucket without a bearer token → 401
+POST {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/buckets
+Content-Type: application/json
+
+{ "sealedName": "YnVja2V0" }
+
+> {%
+client.test("create bucket requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 3. Rename a bucket without a bearer token → 401
+PATCH {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/buckets/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+{ "sealedName": "cmVuYW1lZA==" }
+
+> {%
+client.test("rename bucket requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 4. Delete a bucket without a bearer token → 401
+DELETE {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/buckets/00000000-0000-0000-0000-000000000000
+
+> {%
+client.test("delete bucket requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 5. Move media between buckets without a bearer token → 401
+POST {{host}}/api/scopes/00000000-0000-0000-0000-000000000000/nodes/00000000-0000-0000-0000-000000000000/media-moves
+Content-Type: application/json
+
+{ "mediaIds": ["00000000-0000-0000-0000-000000000000"], "targetBucketId": null }
+
+> {%
+client.test("move media requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}

@@ -56,6 +56,9 @@ export type UploadBatch = {
   finishedAt: number | null
   acknowledged: boolean
   onComplete?: (batch: UploadBatch) => void
+  /** Per-file settle hook (cr-0111): fired the moment ONE file finishes `done`, so the gallery reconciles that
+   *  file's optimistic tile immediately instead of waiting for the whole batch's `onComplete`. */
+  onFileDone?: (file: UploadFile) => void
 }
 
 const MAX_ATTEMPTS = 2 // one automatic retry on a transient failure
@@ -147,6 +150,7 @@ async function uploadOne(file: UploadFile): Promise<void> {
     file.mediaId = mediaId // the gallery reconciles its optimistic tile against the listed media by this id (cr-0074)
     file.status = 'done'
     file.progress = 1
+    batch.onFileDone?.(file) // cr-0111: reconcile THIS file's tile now, not only at the batch's onComplete
   } catch (e) {
     if (file.controller.signal.aborted || (e as { name?: string })?.name === 'AbortError') {
       file.status = 'cancelled'
@@ -178,7 +182,7 @@ function scheduleRunner(): void {
 export function enqueueUploads(
   target: UploadTarget,
   selections: { file: File; mediaType: string }[],
-  opts: { label: string; onComplete?: (batch: UploadBatch) => void } = { label: '' },
+  opts: { label: string; onComplete?: (batch: UploadBatch) => void; onFileDone?: (file: UploadFile) => void } = { label: '' },
 ): string | null {
   if (selections.length === 0) return null
   const files: UploadFile[] = selections.map((s) => ({
@@ -201,6 +205,7 @@ export function enqueueUploads(
     finishedAt: null,
     acknowledged: false,
     onComplete: opts.onComplete,
+    onFileDone: opts.onFileDone,
   }
   batches.push(batch)
   scheduleRunner()

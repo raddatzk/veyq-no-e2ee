@@ -35,10 +35,10 @@ const stubs = {
   },
 }
 
-type Props = { cover?: MemoryCover | null; existingSrc?: string | null; hasMedia?: boolean }
+type Props = { cover?: MemoryCover | null; existingSrc?: string | null; hasMedia?: boolean; mediaSource?: { mediaId: string; src: string } | null }
 function mountDialog(p: Props = {}) {
   return mount(MemoryCoverDialog, {
-    props: { cover: p.cover ?? null, existingSrc: p.existingSrc ?? null, hasMedia: p.hasMedia ?? false },
+    props: { cover: p.cover ?? null, existingSrc: p.existingSrc ?? null, hasMedia: p.hasMedia ?? false, mediaSource: p.mediaSource ?? null },
     global: { plugins: [i18n], stubs },
   })
 }
@@ -103,6 +103,40 @@ describe('MemoryCoverDialog', () => {
     const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
     expect(intent.kind).toBe('keep')
     if (intent.kind !== 'keep') throw new Error('expected keep')
+    expect(near(intent.crop.x, crop.x)).toBe(true)
+    expect(near(intent.crop.width, crop.width)).toBe(true)
+  })
+
+  it('seeded with a Memory photo (lightbox “Set as cover”) crops that photo and emits a media intent', async () => {
+    // the lightbox hands in the picked photo's decrypted thumbnail — the cropper is up immediately, no upload step
+    const w = mountDialog({ mediaSource: { mediaId: 'm7', src: 'blob:photo-thumb' }, hasMedia: true })
+    expect(w.find('.memory-cover-cropper').exists()).toBe(true)
+    expect(w.find('.memory-cover-cropper img').attributes('src')).toBe('blob:photo-thumb')
+    await loadCropper(w, 3200, 1800) // a 16:9 source → default centre crop == the full frame
+
+    await btn(w, 'Save cover').trigger('click')
+    const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
+    expect(intent.kind).toBe('media')
+    if (intent.kind !== 'media') throw new Error('expected media')
+    expect(intent.mediaId).toBe('m7')
+    expect(near(intent.crop.width, 1)).toBe(true)
+    expect(near(intent.crop.height, 1)).toBe(true)
+  })
+
+  it('seeded with the photo that is already the cover restores its stored crop (media intent)', async () => {
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 }
+    const w = mountDialog({
+      cover: { source: { kind: 'media', mediaId: 'm7' }, crop },
+      mediaSource: { mediaId: 'm7', src: 'blob:photo-thumb' },
+      hasMedia: true,
+    })
+    await loadCropper(w, 3200, 1800)
+
+    await btn(w, 'Save cover').trigger('click')
+    const intent = w.emitted('save')?.[0]?.[0] as CoverSaveIntent
+    expect(intent.kind).toBe('media')
+    if (intent.kind !== 'media') throw new Error('expected media')
+    expect(intent.mediaId).toBe('m7')
     expect(near(intent.crop.x, crop.x)).toBe(true)
     expect(near(intent.crop.width, crop.width)).toBe(true)
   })

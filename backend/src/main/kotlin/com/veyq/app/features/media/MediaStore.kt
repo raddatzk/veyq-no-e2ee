@@ -2,6 +2,7 @@ package com.veyq.app.features.media
 
 import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.content.NodeEntity
+import com.veyq.app.features.sharing.ShareIdentityEntity
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -20,6 +21,14 @@ data class MediaRow(
     val wrappedMeta: String?,
     /** When this media last changed (cr-0107): `= createdAt` at attach, `now` on a meta edit — the keyset cursor sort key. */
     val updatedAt: Instant,
+    /** When this media was trashed (cr-0110), or null for a live media; populated only in the trashed listing. */
+    val deletedAt: Instant? = null,
+    /** Who trashed this media (cr-0110, the audit), or null for a live media; populated only in the trashed listing. */
+    val deletedBy: String? = null,
+    /** cr-0113: the uploader's opaque owner_key ("user:{id}"|"share:{id}"), or null for a pre-buckets member row. */
+    val ownerKey: String? = null,
+    /** cr-0113: the bucket this media lives in, or null = the uploader's primary. */
+    val bucketId: String? = null,
 )
 
 /** The gallery's keyset cursor (cr-0107, ADR 0033): the newest `(updatedAt, mediaId)` the client has already seen. */
@@ -49,6 +58,16 @@ data class BlobRefData(
 
 /** The outcome of committing a cover blob: the new ref + the superseded prior blob's chunk keys to purge from the store. */
 data class CoverCommitRows(val ref: BlobRefData, val reclaimKeys: List<String>)
+
+/** A node's uploader bucket for the "Beiträge" tab (en.memory.buckets, cr-0113): opaque owner_key + structure + count. */
+data class BucketRow(
+    val bucketId: String,
+    val ownerKey: String,
+    val parentBucketId: String?,
+    val isPrimary: Boolean,
+    val sealedName: String?,
+    val mediaCount: Int,
+)
 
 /**
  * Persistence for media blobs (cr-0028). Operator-blind: stores ciphertext wraps + opaque metadata only.
@@ -98,18 +117,25 @@ class MediaStore {
         wrappedMeta: String?,
         wrappedExif: String?,
         shareIdentityId: String? = null, // cr-0101: the contributor identity, when attached via a CONTRIBUTOR share
+        uploaderUserId: String? = null,  // cr-0113: the member uploader (member path); null on the contributor path
+        targetBucketId: String? = null,  // cr-0113: an explicit target bucket; null = the uploader's primary
     ): Pair<String, String> {
+        val scopeId = original.scopeId
+        val ownerKey = ownerKeyFor(uploaderUserId, shareIdentityId)
+        val bucket = resolveAttachBucket(scopeId, nodeId, ownerKey, targetBucketId)
         val originalBlobId = persistBlob(original, originalManifest)
         val mediaId = UUID.randomUUID().toString()
         val now = Instant.now()
         MediaEntity().apply {
             id = mediaId
-            scopeId = original.scopeId
+            this.scopeId = scopeId
             this.nodeId = nodeId
             this.blobId = originalBlobId
             this.wrappedMeta = wrappedMeta
             this.wrappedExif = wrappedExif
             this.shareIdentityId = shareIdentityId
+            this.createdBy = ownerKey // cr-0113: the buckets attribution (denormalized owner_key)
+            this.bucketId = bucket.id // cr-0113: the resolved primary (or explicit) bucket
             createdAt = now
             updatedAt = now // cr-0107: the keyset cursor starts at creation time
         }.persist()
@@ -169,10 +195,10 @@ class MediaStore {
      */
     fun listNodeMediaSince(scopeId: String, nodeId: String, since: MediaCursor?): List<MediaRow> {
         val media = if (since == null) {
-            MediaEntity.find("scopeId = ?1 and nodeId = ?2 order by updatedAt, id", scopeId, nodeId).list()
+            MediaEntity.find("scopeId = ?1 and nodeId = ?2 and deletedAt is null order by updatedAt, id", scopeId, nodeId).list()
         } else {
             MediaEntity.find(
-                "scopeId = ?1 and nodeId = ?2 and (updatedAt > ?3 or (updatedAt = ?3 and id > ?4)) order by updatedAt, id",
+                "scopeId = ?1 and nodeId = ?2 and deletedAt is null and (updatedAt > ?3 or (updatedAt = ?3 and id > ?4)) order by updatedAt, id",
                 scopeId, nodeId, since.updatedAt, since.mediaId,
             ).list()
         }
@@ -185,7 +211,84 @@ class MediaStore {
      * longer sees, catching a delete and a net-zero delete+add.
      */
     fun listNodeMediaIds(scopeId: String, nodeId: String): List<String> =
-        MediaEntity.find("scopeId = ?1 and nodeId = ?2", scopeId, nodeId).list().map { it.id }
+        MediaEntity.find("scopeId = ?1 and nodeId = ?2 and deletedAt is null", scopeId, nodeId).list().map { it.id }
+
+    /**
+     * Soft-delete (trash) a media in this scope (uc.memory.delete-media, cr-0110): set `deleted_at`/`deleted_by`
+     * (the audit) and bump BOTH counters (`bumpMediaRevision(deleted = true)`) so an open gallery drops the tile
+     * via the id-set reconcile (cr-0107). Idempotent — an already-trashed media is a no-op (no re-bump). Returns
+     * the media's nodeId, or null when no such media exists in the scope (⇒ a non-enumerable 404).
+     */
+    @Transactional
+    fun trashMedia(scopeId: String, mediaId: String, userId: String): String? {
+        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId } ?: return null
+        if (media.deletedAt != null) return media.nodeId // already trashed — idempotent
+        media.deletedAt = Instant.now()
+        media.deletedBy = userId
+        media.persist()
+        bumpMediaRevision(media.nodeId, deleted = true)
+        return media.nodeId
+    }
+
+    /**
+     * Restore a trashed media (cr-0110): clear `deleted_at`/`deleted_by`, advance `updated_at` so it re-surfaces
+     * in the live keyset delta, and bump `media_revision` (an add-back, not a delete). Idempotent on a live media.
+     * Returns the nodeId, or null when no such media in the scope (e.g. already purged) ⇒ a 404.
+     */
+    @Transactional
+    fun restoreMedia(scopeId: String, mediaId: String): String? {
+        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId } ?: return null
+        if (media.deletedAt == null) return media.nodeId // already live — idempotent
+        media.deletedAt = null
+        media.deletedBy = null
+        media.updatedAt = Instant.now() // re-surface via the keyset delta (cr-0107)
+        media.persist()
+        bumpMediaRevision(media.nodeId)
+        return media.nodeId
+    }
+
+    /** The node's TRASHED media, newest-trashed first (cr-0110) — the Trash tab list (rows carry deletedAt/deletedBy). */
+    fun listNodeTrashed(scopeId: String, nodeId: String): List<MediaRow> =
+        MediaEntity.find("scopeId = ?1 and nodeId = ?2 and deletedAt is not null order by deletedAt desc, id", scopeId, nodeId)
+            .list().mapNotNull(::toRow)
+
+    /**
+     * Hard-delete a single **trashed** media now (cr-0111, the member-expedited purge). Drops derivative → media →
+     * blob rows in FK order (reusing [deleteBlobRow]) and returns the store chunk keys to purge. Only a trashed
+     * media (`deletedAt != null`) is purgeable — a live or unknown media returns null (⇒ a 404). No revision bump:
+     * a trashed row is already excluded from every list. The blob-object purge is the caller's (best-effort).
+     */
+    @Transactional
+    fun purgeMedia(scopeId: String, mediaId: String): List<String>? {
+        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId && it.deletedAt != null } ?: return null
+        val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
+        val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
+        derivatives.forEach { MediaDerivativeEntity.deleteById(it.id) } // FK: the referencing rows go first
+        MediaEntity.deleteById(media.id)
+        val reclaimKeys = ArrayList<String>()
+        blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
+        return reclaimKeys
+    }
+
+    /**
+     * Hard-delete every media trashed before [cutoff] — the retention purge (cr-0110, MediaTrashPurge). Drops
+     * derivative → media → blob rows in FK order (parallels the cr-0102 delete-own reclaim) across all scopes,
+     * returning the store chunk keys to purge. NO revision bump: trashed rows are already excluded from every
+     * list, so no client ever saw them. The blob-object purge is the caller's (best-effort, after this tx).
+     */
+    @Transactional
+    fun purgeTrashedBefore(cutoff: Instant): List<String> {
+        val expired = MediaEntity.find("deletedAt is not null and deletedAt < ?1", cutoff).list()
+        val reclaimKeys = ArrayList<String>()
+        for (media in expired) {
+            val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
+            val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
+            derivatives.forEach { MediaDerivativeEntity.deleteById(it.id) } // FK: the referencing rows go first
+            MediaEntity.deleteById(media.id)
+            blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
+        }
+        return reclaimKeys
+    }
 
     /** Map a media entity to its read-back row, resolving the original + derivative blobs; null when the original blob is missing. */
     private fun toRow(m: MediaEntity): MediaRow? {
@@ -197,6 +300,8 @@ class MediaStore {
         return MediaRow(
             m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest),
             derivatives, m.wrappedMeta, m.updatedAt ?: m.createdAt, // cr-0107: coalesce for pre-backfill safety
+            m.deletedAt, m.deletedBy, // cr-0110: null for live media, populated in the trashed listing
+            m.createdBy ?: m.shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }, m.bucketId, // cr-0113
         )
     }
 
@@ -227,7 +332,7 @@ class MediaStore {
     @Transactional
     fun commitCover(nodeId: String, session: UploadSessionEntity, manifest: List<Long>?): CoverCommitRows {
         val node = NodeEntity.findById(nodeId)!! // resolved by the handler before verify; reloaded in-tx
-        val reclaimKeys = deleteCoverBlobRow(node.coverBlobId)
+        val reclaimKeys = deleteBlobRow(node.coverBlobId)
         val blobId = persistBlob(session, manifest)
         node.coverBlobId = blobId
         node.coverByteSize = session.byteSize
@@ -247,15 +352,15 @@ class MediaStore {
     @Transactional
     fun clearCover(scopeId: String, nodeId: String): List<String> {
         val node = NodeEntity.findById(nodeId)?.takeIf { it.scopeId == scopeId } ?: return emptyList()
-        val reclaimKeys = deleteCoverBlobRow(node.coverBlobId)
+        val reclaimKeys = deleteBlobRow(node.coverBlobId)
         node.coverBlobId = null
         node.coverByteSize = null
         node.persist()
         return reclaimKeys
     }
 
-    /** Delete a cover blob row by id (if present) and return its chunk keys for a best-effort store purge. */
-    private fun deleteCoverBlobRow(blobId: String?): List<String> {
+    /** Delete a blob row by id (if present) and return its chunk keys for a best-effort store purge (cover + trash purge). */
+    private fun deleteBlobRow(blobId: String?): List<String> {
         val blob = blobId?.let { BlobEntity.findById(it) } ?: return emptyList()
         val keys = (0 until blob.chunkCount).map { chunkKey(blob.storageKey, it) }
         BlobEntity.deleteById(blob.id)
@@ -267,4 +372,152 @@ class MediaStore {
 
     private fun decodeManifest(s: String?): List<Long>? =
         s?.trim()?.removeSurrounding("[", "]")?.takeIf { it.isNotBlank() }?.split(",")?.map { it.trim().toLong() }
+
+    // --- buckets (en.memory.buckets, ADR 0034, cr-0113) ----------------------
+
+    /** The scope's owner userId (its sole/oldest membership) — the fallback attribution for pre-cr0113 member media. */
+    fun scopeOwnerUserId(scopeId: String): String? =
+        MembershipEntity.find("scopeId = ?1", scopeId).firstResult()?.userId
+
+    /** A media's owner_key: the denormalized `created_by`, else the contributor `share:{id}`, else the scope owner. */
+    private fun ownerKeyOf(m: MediaEntity, scopeOwnerUserId: String?): String =
+        m.createdBy
+            ?: m.shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }
+            ?: "${BucketEntity.OWNER_USER_PREFIX}${scopeOwnerUserId ?: "unknown"}"
+
+    /** The owner_key for a NEW upload: a contributor `share:{id}`, else a member `user:{id}`. */
+    private fun ownerKeyFor(uploaderUserId: String?, shareIdentityId: String?): String =
+        shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }
+            ?: uploaderUserId?.let { "${BucketEntity.OWNER_USER_PREFIX}$it" }
+            ?: "${BucketEntity.OWNER_USER_PREFIX}unknown"
+
+    /** A primary's sealed name: for a contributor (`share:{id}`) copy the identity's sealed name; else null (member → username). */
+    private fun primarySealedNameFor(ownerKey: String): String? =
+        if (ownerKey.startsWith(BucketEntity.OWNER_SHARE_PREFIX))
+            ShareIdentityEntity.findById(ownerKey.removePrefix(BucketEntity.OWNER_SHARE_PREFIX))?.sealedDisplayName
+        else null
+
+    /**
+     * Find-or-create the uploader's PRIMARY bucket in a node (lazy, virtual-until-first-use). Primary uniqueness
+     * `(node, owner_key)` is enforced HERE under the caller's transaction (no DB partial index in the H2 ∩ MariaDB
+     * subset). Refreshes a still-missing sealed name (a contributor primary materialized before its identity name).
+     */
+    private fun ensurePrimaryBucket(scopeId: String, nodeId: String, ownerKey: String, sealedName: String?): BucketEntity {
+        val existing = BucketEntity.find("nodeId = ?1 and ownerKey = ?2 and isPrimary = true", nodeId, ownerKey).firstResult()
+        if (existing != null) {
+            if (existing.sealedName == null && sealedName != null) { existing.sealedName = sealedName; existing.persist() }
+            return existing
+        }
+        return BucketEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.scopeId = scopeId
+            this.nodeId = nodeId
+            this.ownerKey = ownerKey
+            parentBucketId = null
+            this.sealedName = sealedName
+            isPrimary = true
+            createdAt = Instant.now()
+        }.also { it.persist() }
+    }
+
+    /** Resolve the bucket a new media attaches to: an explicit caller-owned bucket in this node, else the uploader's primary. */
+    private fun resolveAttachBucket(scopeId: String, nodeId: String, ownerKey: String, targetBucketId: String?): BucketEntity {
+        if (targetBucketId != null) {
+            BucketEntity.findById(targetBucketId)
+                ?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.ownerKey == ownerKey }
+                ?.let { return it }
+        }
+        return ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey))
+    }
+
+    /**
+     * The node's buckets for the "Beiträge" tab (uc.memory.buckets). Materializes a primary per distinct uploader
+     * among the live media and lazily backfills pre-cr0113 rows (sets their `created_by` + `bucket_id`), so every
+     * live medium groups under a concrete bucket; returns each bucket (primaries first) with its live media count.
+     */
+    @Transactional
+    fun listBuckets(scopeId: String, nodeId: String): List<BucketRow> {
+        val scopeOwner = scopeOwnerUserId(scopeId)
+        val liveMedia = MediaEntity.find("scopeId = ?1 and nodeId = ?2 and deletedAt is null", scopeId, nodeId).list()
+        for (m in liveMedia) {
+            val ownerKey = ownerKeyOf(m, scopeOwner)
+            var dirty = false
+            if (m.createdBy == null) { m.createdBy = ownerKey; dirty = true }
+            if (m.bucketId == null) {
+                m.bucketId = ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey)).id
+                dirty = true
+            }
+            if (dirty) m.persist()
+        }
+        return BucketEntity.find("nodeId = ?1 order by isPrimary desc, createdAt", nodeId).list().map { b ->
+            val count = MediaEntity.count("nodeId = ?1 and bucketId = ?2 and deletedAt is null", nodeId, b.id).toInt()
+            BucketRow(b.id, b.ownerKey, b.parentBucketId, b.isPrimary, b.sealedName, count)
+        }
+    }
+
+    /** Create a sub-bucket one level under the caller's primary (materialized if needed). */
+    @Transactional
+    fun createSubBucket(scopeId: String, nodeId: String, ownerKey: String, sealedName: String): BucketRow {
+        val primary = ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey))
+        val sub = BucketEntity().apply {
+            id = UUID.randomUUID().toString()
+            this.scopeId = scopeId
+            this.nodeId = nodeId
+            this.ownerKey = ownerKey
+            parentBucketId = primary.id
+            this.sealedName = sealedName
+            isPrimary = false
+            createdAt = Instant.now()
+        }.also { it.persist() }
+        return BucketRow(sub.id, sub.ownerKey, sub.parentBucketId, false, sub.sealedName, 0)
+    }
+
+    /** A bucket in this scope+node (for the handler's own-bucket authz + primary check), or null. */
+    fun findBucket(scopeId: String, nodeId: String, bucketId: String): BucketEntity? =
+        BucketEntity.findById(bucketId)?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId }
+
+    /** Re-store a sub-bucket's sealed name (the handler validated own + non-primary). Returns the updated row. */
+    @Transactional
+    fun renameBucket(bucketId: String, sealedName: String): BucketRow? {
+        val b = BucketEntity.findById(bucketId) ?: return null
+        b.sealedName = sealedName
+        b.persist()
+        val count = MediaEntity.count("nodeId = ?1 and bucketId = ?2 and deletedAt is null", b.nodeId, b.id).toInt()
+        return BucketRow(b.id, b.ownerKey, b.parentBucketId, b.isPrimary, b.sealedName, count)
+    }
+
+    /**
+     * Delete a sub-bucket (the handler validated own + non-primary): reparent its media to the owner's primary,
+     * then drop the row. **Media are never deleted** (destructive delete is the media trash path, cr-0110).
+     */
+    @Transactional
+    fun deleteBucketReparent(bucketId: String) {
+        val sub = BucketEntity.findById(bucketId) ?: return
+        val primary = ensurePrimaryBucket(sub.scopeId, sub.nodeId, sub.ownerKey, primarySealedNameFor(sub.ownerKey))
+        MediaEntity.update("bucketId = ?1 where bucketId = ?2", primary.id, bucketId)
+        bumpMediaRevision(sub.nodeId) // cr-0113: reparent changed the media's bucketId → advance the ETag
+        BucketEntity.deleteById(bucketId)
+    }
+
+    /**
+     * Move the caller's own media into a target bucket (null = the caller's primary). Every medium and the target
+     * must be the caller's own (`owner_key == ownerKey`), in this node, live. Returns false (⇒ 403) on any mismatch.
+     */
+    @Transactional
+    fun moveMedia(scopeId: String, nodeId: String, mediaIds: List<String>, targetBucketId: String?, ownerKey: String): Boolean {
+        val target = if (targetBucketId == null) {
+            ensurePrimaryBucket(scopeId, nodeId, ownerKey, primarySealedNameFor(ownerKey))
+        } else {
+            BucketEntity.findById(targetBucketId)
+                ?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.ownerKey == ownerKey } ?: return false
+        }
+        val scopeOwner = scopeOwnerUserId(scopeId)
+        val media = mediaIds.map { id ->
+            MediaEntity.findById(id)?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId && it.deletedAt == null } ?: return false
+        }
+        if (media.any { ownerKeyOf(it, scopeOwner) != ownerKey }) return false
+        media.forEach { it.bucketId = target.id; it.persist() }
+        bumpMediaRevision(nodeId) // cr-0113: a re-bucket changes the listing's bucketId → advance the ETag so clients re-list
+        return true
+    }
 }

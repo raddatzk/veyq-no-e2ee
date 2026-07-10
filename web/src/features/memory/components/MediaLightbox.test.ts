@@ -34,6 +34,7 @@ const i18n = createI18n({
         itemPosition: '{index} of {count}',
         download: 'Download original',
         close: 'Close',
+        delete: 'Move to trash',
         previous: 'Previous',
         next: 'Next',
         loading: 'Loading…',
@@ -218,6 +219,44 @@ describe('MediaLightbox (preview, prev/next, download)', () => {
     expect(presigned).toEqual(['up-0'])
     // the original decrypts to the stub's 8 bytes filled with 1 → not a known signature → .bin
     expect(anchors.at(-1)!.getAttribute('download')).toBe('Rom 2026 1.bin')
+  })
+})
+
+describe('MediaLightbox — delete (cr-0110)', () => {
+  it('the trash button emits delete for the current item', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedTwo(memoryKey)
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+
+    const del = wrapper.findAll('.media-lightbox-actions button').find((b) => b.attributes('aria-label') === 'Move to trash')
+    expect(del).toBeTruthy()
+    await del!.trigger('click')
+    expect(wrapper.emitted('delete')?.[0]?.[0]).toEqual({ mediaId: items[0].mediaId })
+  })
+
+  it('the Delete key emits delete for the current item (the culling hotkey)', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedTwo(memoryKey)
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }))
+    expect(wrapper.emitted('delete')?.[0]?.[0]).toEqual({ mediaId: items[0].mediaId })
+  })
+
+  it('a readonly viewer (public share) has no trash button and ignores the Delete key', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedTwo(memoryKey)
+    const wrapper = mount(MediaLightbox, {
+      props: { scopeId: SCOPE_ID, memoryKey, items, startIndex: 0, memoryName: 'Rom 2026', coverMediaId: null, readonly: true },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll('.media-lightbox-actions button').some((b) => b.attributes('aria-label') === 'Move to trash')).toBe(false)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }))
+    expect(wrapper.emitted('delete')).toBeFalsy()
   })
 })
 

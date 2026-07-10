@@ -59,7 +59,8 @@ a real contract-level verification surface, not docs that rot. CR phases follow 
   right (e.g. the media derivatives before the gallery). Correctness + clean structure first; speed-to-demo
   is not a goal.
 - **Language.** Converse with the user in the language they use; **document and implement in English**
-  (docs, code, identifiers, commits). The published `wiki/` is the intentional bilingual EN+DE exception.
+  (docs, code, identifiers, commits). The published `wiki/` is the intentional bilingual EN+DE exception. German
+  user-facing text follows [neutral-first inclusive language](../crosscutting/cc.inclusive-language.md).
 - **Diagrams as inline PlantUML.** Where a diagram genuinely clarifies, embed it as a ` ```plantuml `
   fenced block directly in the markdown (IntelliJ renders it in the preview). Diagrams-as-code only —
   no binary image files. Skip diagrams that are mere decoration.

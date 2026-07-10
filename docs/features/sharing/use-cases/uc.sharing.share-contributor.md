@@ -88,8 +88,11 @@ note right of S : sees shareId, wrap, role, sealedName, nodeId,\nthe sealed cont
   It never sees `K_share`, `K_mem`, the Memory name, the contributor's name, the photo bytes, or *who* the person
   is — only that an opaque identity contributed opaque ciphertext.
 - **Mandatory name = the buckets hook.** The contributor names themselves once; the sealed name → the anonymous
-  identity → (a later slice) a per-contributor **bucket** that groups their uploads under that name. v1 stores the
-  link + shows contributed media inline; the grouping UI is deferred but needs no migration
+  identity → its `share:{shareIdentityId}` **`owner_key`** → a per-contributor **bucket** grouping their uploads
+  under that name — now [uc.memory.buckets](../../memory/use-cases/uc.memory.buckets.md) +
+  [en.memory.buckets](../../memory/enablers/en.memory.buckets.md)
+  ([ADR 0034](../../../decisions/0034-media-uploader-buckets.md)). This share stores the identity + shows
+  contributed media inline; the buckets grouping reads that hook with **no migration** on the contributor half
   ([ADR 0030](../../../decisions/0030-contributor-public-share.md)).
 - **Direct-append; moderation is later.** A contributed photo is live immediately — good for a shared album, but
   spam is visible until the curator deletes it or revokes the link. Review-before-publish is a deferred slice.

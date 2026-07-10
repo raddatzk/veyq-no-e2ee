@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
       :title="t('media.uploads')"
       @click="toggle"
     >
-      <span class="pi" :class="activeFileCount > 0 ? 'pi-spin pi-spinner' : 'pi-cloud-upload'" />
+      <span class="pi" :class="activeFileCount > 0 ? 'pi-spin pi-spinner' : 'pi-list'" />
       <span v-if="activeFileCount" class="uploads-badge">{{ activeFileCount }}</span>
     </button>
 
@@ -132,20 +132,22 @@ onBeforeUnmount(() => {
 .uploads-tray {
   position: relative;
 }
+/* Match the sibling topbar icon buttons (theme, settings): transparent + borderless, hover tint only — not the
+   boxed border+surface look it carried before (cr-0058). Same 2.25rem (36px) square + radius as .topbar-icon-button. */
 .uploads-trigger {
   position: relative;
   display: grid;
   place-items: center;
   width: 2.25rem;
   height: 2.25rem;
-  border: 1px solid var(--app-border, #d4d4d8);
+  border: none;
   border-radius: 0.5rem;
-  background: var(--app-surface, #fff);
-  color: var(--app-text, #18181b);
+  background: transparent;
+  color: inherit;
   cursor: pointer;
 }
 .uploads-trigger:hover {
-  background: var(--app-surface-hover, #f4f4f5);
+  background: var(--p-content-hover-background, rgba(127, 127, 127, 0.08));
 }
 .uploads-badge {
   position: absolute;

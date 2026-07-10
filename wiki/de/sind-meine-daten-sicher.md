@@ -2,7 +2,7 @@
 
 **In einem Satz:** veyq ist **Ende-zu-Ende-verschlüsselt** — deine Fotos, Videos, Tagebuchtexte und
 die sensiblen Details drumherum werden auf deinem eigenen Gerät verschlüsselt, *bevor* sie den Server
-überhaupt erreichen, und **niemand, der veyq betreibt, besitzt einen Schlüssel, um sie zu öffnen.** Wir
+überhaupt erreichen, und **keine Person, die veyq betreibt, besitzt einen Schlüssel, um sie zu öffnen.** Wir
 betreiben das Gebäude; den einzigen Schlüssel hast du.
 
 ## Stell dir ein Schließfach vor
@@ -15,8 +15,8 @@ nur die ehrliche Erklärung, wo genau diese Grenze verläuft.
 
 ## Was wir wirklich nicht sehen können
 
-All das ist mit **deinen** Schlüsseln gesperrt und für uns — und für jeden, der unsere Datenbank
-stiehlt — nur unverständlicher Datenmüll:
+All das ist mit **deinen** Schlüsseln gesperrt und für uns — und für alle, die unsere Datenbank
+stehlen — nur unverständlicher Datenmüll:
 
 - deine **Fotos und Videos** (und die kleineren Vorschaubilder),
 - deine **Tagebuchtexte**,
@@ -47,7 +47,7 @@ ausdrückliche Handlung:
 
 - Teilst du mit einer **Gruppe oder Person**, kann sie diesen Inhalt lesen. Du hast ihn **ihr**
   gegeben — nicht uns; wir können ihn weiterhin nicht lesen.
-- Einen **öffentlichen Link** kann **jeder öffnen, der den Link hat**. Der Schlüssel, der ihn
+- Einen **öffentlichen Link** kann **jede Person öffnen, die den Link hat**. Der Schlüssel, der ihn
   entsperrt, steckt **im Link selbst** und erreicht unseren Server nie — eine öffentliche Freigabe ist
   also „lesbar für Link-Inhaber, weiterhin nicht für uns".
 
@@ -77,11 +77,11 @@ Mehr: [Was passiert mit meinen Fotos, wenn die Quantencomputer kommen?](quantenc
 
 ## Ist es wirklich *ihr* Schlüssel — und eine ehrliche Lücke
 
-Wenn du mit einem Freund teilst, braucht deine App seinen Schlüssel, den sie von unserem Server holt.
-Ein unehrlicher Betreiber könnte deiner App theoretisch den *falschen* Schlüssel unterschieben. Um das
-zu erkennen, hat jede Person einen **Fingerabdruck** (eine kurze „Sicherheitsnummer"). Du und dein
-Freund könnt sie **über einen zweiten Kanal** vergleichen — vorlesen oder einen QR-Code scannen — und
-stimmt sie überein, ist der Schlüssel wirklich seiner.
+Wenn du mit einer anderen Person teilst, braucht deine App ihren Schlüssel, den sie von unserem Server holt.
+Wer den Server unehrlich betreibt, könnte deiner App theoretisch den *falschen* Schlüssel unterschieben. Um das
+zu erkennen, hat jede Person einen **Fingerabdruck** (eine kurze „Sicherheitsnummer"). Du und die
+andere Person könnt sie **über einen zweiten Kanal** vergleichen — vorlesen oder einen QR-Code scannen — und
+stimmt sie überein, gehört der Schlüssel wirklich dieser Person.
 
 **Der ehrliche Teil:** diese Prüfung ist **manuell** — sie schützt dich nur, wenn du tatsächlich
 vergleichst. veyq merkt sich den Schlüssel eines Kontakts **noch nicht** automatisch und warnt dich
@@ -98,5 +98,5 @@ nicht — und das sagen wir lieber, als es vorzutäuschen.
   Es gibt **keine Hintertür und keine Schlüsselhinterlegung**: Dasselbe, was *uns* am Lesen deiner
   Daten hindert, hindert uns auch daran, sie zu retten. Das sagen wir von vornherein.
 
-> **Hinweis fürs Self-Hosting:** Betreibst *du* deinen eigenen veyq-Server, bist *du* der Betreiber —
-> dann stellt sich die Frage „kann man dem Betreiber vertrauen" für deine eigene Instanz gar nicht.
+> **Hinweis fürs Self-Hosting:** Betreibst *du* deinen eigenen veyq-Server, liegt der Betrieb bei *dir* —
+> dann stellt sich die Frage, ob man der betreibenden Person vertrauen kann, für deine eigene Instanz gar nicht.
