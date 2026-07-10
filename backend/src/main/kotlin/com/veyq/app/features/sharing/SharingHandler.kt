@@ -12,7 +12,9 @@ import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import jakarta.enterprise.context.ApplicationScoped
+import java.security.MessageDigest
 import java.time.Instant
+import java.util.Base64
 
 /** A presigned GET for one chunk (index in chunk order). */
 data class PresignRef(val index: Int, val url: String)
@@ -39,6 +41,10 @@ sealed interface ResolveShareOutcome {
     data class Found(val share: ShareEntity, val subtree: SubtreeData, val identities: List<ShareIdentityEntity>) : ResolveShareOutcome
     /** Unknown, disabled, or expired — a non-enumerable 404 (identical in every case). */
     object NotFound : ResolveShareOutcome
+    /** Password-protected + no token given (cr-0118) — a LOCKED shell (only `passwordRequired` + `pwSalt`). */
+    data class Locked(val share: ShareEntity) : ResolveShareOutcome
+    /** Password-protected + a wrong token (cr-0118) — a 403. */
+    object PasswordIncorrect : ResolveShareOutcome
 }
 
 sealed interface CreateIdentityOutcome {
@@ -74,8 +80,11 @@ sealed interface ShareCompleteOutcome {
 
 sealed interface ShareBlobOutcome {
     data class Found(val gets: List<PresignRef>) : ShareBlobOutcome
-    /** Unknown/disabled/expired share, or the blob is not under the shared subtree — a 404. */
+    /** Unknown/disabled/expired share, the blob is not under the shared subtree, or a required password token is
+     *  absent — a non-enumerable 404. */
     object NotFound : ShareBlobOutcome
+    /** Password-protected + a wrong token (cr-0118) — a 403. */
+    object PasswordIncorrect : ShareBlobOutcome
     /** The store cannot presign (the in-memory dev store) — a 503. */
     object StoreUnavailable : ShareBlobOutcome
 }
@@ -120,6 +129,7 @@ class SharingHandler(
     fun create(
         userId: String, nodeId: String, role: String, wrap: String, sealedName: String, expiresAt: Instant?,
         sealedNote: String?, sealedShareKey: String?, sealedShareName: String?,
+        passwordRequired: Boolean, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
     ): CreateShareOutcome {
         // Instance policy first (ADR 0032): the capability this role needs must be active, else 422 — checked
         // before any node/scope lookup so it reads as "the operator turned sharing off", not a scope error.
@@ -129,7 +139,10 @@ class SharingHandler(
         // Any member of the node's scope may share (cr-0104) — personal, group, or tenant; only a MEMORY node can
         // be public-shared (ADR 0029 §6, ADR 0030).
         if (node.kind != NodeEntity.MEMORY) return CreateShareOutcome.IllegalScope
-        val shareId = store.create(userId, node.scopeId, nodeId, role, wrap, sealedName, expiresAt, sealedNote, sealedShareKey, sealedShareName)
+        val shareId = store.create(
+            userId, node.scopeId, nodeId, role, wrap, sealedName, expiresAt, sealedNote, sealedShareKey, sealedShareName,
+            passwordRequired, pwSalt, pwVerifier, sealedPassword,
+        )
         return CreateShareOutcome.Created(shareId)
     }
 
@@ -152,8 +165,11 @@ class SharingHandler(
      *  a non-null `role` changes the grant in place (VIEWER ↔ CONTRIBUTOR only — UPLOADER, either as the target or
      *  as the share's current role, is `InvalidRole` → 422). Role change is a plaintext authz change: no re-crypto,
      *  the wrap/`K_share`/link are untouched. */
-    fun updateShare(userId: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?): UpdateShareOutcome =
-        when (store.updateShare(userId, shareId, sealedNote, sealedShareName, role)) {
+    fun updateShare(
+        userId: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?,
+        passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
+    ): UpdateShareOutcome =
+        when (store.updateShare(userId, shareId, sealedNote, sealedShareName, role, passwordRequired, pwSalt, pwVerifier, sealedPassword)) {
             SharingStore.UpdateResult.DONE -> UpdateShareOutcome.Done
             SharingStore.UpdateResult.NOT_FOUND -> UpdateShareOutcome.NotFound
             SharingStore.UpdateResult.INVALID_ROLE -> UpdateShareOutcome.InvalidRole
@@ -170,8 +186,13 @@ class SharingHandler(
      * `media: []` + the **root node only** and **no identities** — the uploader is structurally handed nothing to
      * see (no gallery, no other guests). The `canView` gate is the server-side enforcement of "cannot see others".
      */
-    fun resolve(shareId: String): ResolveShareOutcome {
+    fun resolve(shareId: String, pwToken: String?): ResolveShareOutcome {
         val share = activeShare(shareId) ?: return ResolveShareOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0118: nothing is served without a valid password token
+            PwCheck.MISSING -> return ResolveShareOutcome.Locked(share)
+            PwCheck.WRONG -> return ResolveShareOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         if (canView(share.role)) {
             return ResolveShareOutcome.Found(share, store.subtree(share.scopeId, share.nodeId), store.listIdentities(shareId))
         }
@@ -233,8 +254,13 @@ class SharingHandler(
         return ShareDeleteOutcome.Done
     }
 
-    fun resolveBlob(shareId: String, blobId: String): ShareBlobOutcome {
+    fun resolveBlob(shareId: String, blobId: String, pwToken: String?): ShareBlobOutcome {
         val share = activeShare(shareId) ?: return ShareBlobOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0118: no bytes without the password (missing → 404, wrong → 403)
+            PwCheck.MISSING -> return ShareBlobOutcome.NotFound
+            PwCheck.WRONG -> return ShareBlobOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         // A write-only role has NO download capability (ADR 0031) — an UPLOADER share serves no blob, even for an
         // in-subtree id. This makes "cannot see" a real server gate, not just id-secrecy (the resolve returns none).
         if (!canView(share.role)) return ShareBlobOutcome.NotFound
@@ -254,6 +280,26 @@ class SharingHandler(
 
     /** Roles that accept anonymous contributions (identity + upload + delete-own): CONTRIBUTOR/UPLOADER. */
     private fun canUpload(role: String) = role == ShareEntity.CONTRIBUTOR || role == ShareEntity.UPLOADER
+
+    private enum class PwCheck { OK, MISSING, WRONG }
+
+    /** cr-0118 (ADR 0037): the access-control password gate. A non-password share is always OK; a password share
+     *  needs the guest's `pwToken` (base64) to `SHA-256`-hash to the stored `pw_verifier` (constant-time compare).
+     *  No token → MISSING (locked); a mismatch or a malformed token → WRONG. The server runs **no** Argon2id (the
+     *  KDF is client-side) and never sees the raw password. */
+    private fun passwordCheck(share: ShareEntity, pwToken: String?): PwCheck {
+        if (!share.passwordRequired) return PwCheck.OK
+        if (pwToken.isNullOrBlank()) return PwCheck.MISSING
+        val verifier = share.pwVerifier ?: return PwCheck.MISSING
+        return try {
+            val digest = Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(pwToken)),
+            )
+            if (MessageDigest.isEqual(digest.toByteArray(), verifier.toByteArray())) PwCheck.OK else PwCheck.WRONG
+        } catch (e: IllegalArgumentException) {
+            PwCheck.WRONG // malformed base64 token
+        }
+    }
 
     /** A share that exists, is enabled, and has not expired — else null (the single non-enumerable 404 gate). */
     private fun activeShare(shareId: String): ShareEntity? {

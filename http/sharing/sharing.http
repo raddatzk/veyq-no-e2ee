@@ -93,3 +93,17 @@ client.test("update share note requires auth", function () {
     client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
 });
 %}
+
+### 8. Resolve an unknown share WITH an X-Share-Password header → still 404 (cr-0118: the password gate is after
+### the existence check, so the header is not an enumeration oracle — a bad id reveals nothing, password or not).
+### The authed password happy-path (locked resolve → wrong then right token → content) is slice-proven
+### (SharePasswordSliceTest) — it needs a real member-scope share the boundary file can't create.
+GET {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+X-Share-Password: cHctdG9rZW4=
+
+> {%
+client.test("a password header on an unknown share still 404s (non-enumerable)", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "share_not_found", "expected share_not_found");
+});
+%}

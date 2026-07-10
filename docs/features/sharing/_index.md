@@ -46,8 +46,17 @@ least-privilege is crypto-enforced, and the server stays blind.
   toward the legacy shape — list-only manage + separate create, copy-only links, with the **uploader as its own
   capability-gated memory action + dialog** (the same `ShareDialog`/`ShareCreateDialog` reused via an `uploader`
   flag — identical by construction, its only difference the absent role switcher). Deferred: the **anonymous
-  acceptance gate** (cr-0117) + **password protection** (cr-0118) + native;
+  acceptance gate** (cr-0117) + native;
   [ADR 0036](../../decisions/0036-editable-share-note-recoverable-share-key.md))
+
+- [uc.sharing.share-password](use-cases/uc.sharing.share-password.md) — **built (web, cr-0118)** (an optional
+  **password** on a share so a leaked link alone isn't enough — an **operator-blind access-control gate** (not a
+  crypto gate): the content stays E2EE under the unchanged `K_share` fragment, and the password gates **what the
+  server serves**, reusing the [contributor-token](use-cases/uc.sharing.share-contributor.md) shape. The client
+  sends `Argon2id(pw)` (never the raw password); the server stores a verifier + salt + a `K_share`-sealed copy the
+  curator can **reveal**; a locked resolve serves only the password challenge. **Set / change / remove in place**,
+  same link; all roles. Honest limit: defends a leaked link against an **honest** operator, not a malicious one —
+  stated plainly; [ADR 0037](../../decisions/0037-password-protected-shares.md))
 
 ## Deferred (later slices, each with its own dependency)
 

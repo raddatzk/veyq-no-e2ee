@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShare, readShareNoteMap, readShareName, pickLocaleText, recoverShareLink, ShareUnavailableError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShare, readShareNoteMap, readShareName, pickLocaleText, recoverShareLink, derivePasswordToken, readSharePassword, ShareUnavailableError, SharePasswordRequiredError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -277,5 +277,49 @@ describe('share note + name (cr-0115 / cr-0116)', () => {
     expect(recoverShareLink('share-n4', kMem, sealedShareKey)).toBe(minted.link)
     // a pre-cr-0115 share carries no recoverable key → null (falls back to the fresh link in the UI)
     expect(recoverShareLink('share-n4', kMem, null)).toBeNull()
+  })
+})
+
+describe('password protection (cr-0118)', () => {
+  it('createShare with a password sends the gate fields; the verifier = SHA-256(Argon2id(pw, salt))', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-p1' })
+    mockCurator(create)
+    await createShare(NODE_ID, v1.randomBytes(32), 'Rom', undefined, null, {}, '', 'hunter2')
+    const req = create.mock.calls[0][0].createShareRequest
+    expect(req.passwordRequired).toBe(true)
+    expect(req.pwSalt).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
+    // the stored verifier must equal SHA-256(Argon2id(pw, salt)) so the server accepts the right password's token
+    expect(req.pwVerifier).toBe(b64std(v1.sha256Digest(v1.sharesPwToken('hunter2', fromB64std(req.pwSalt)))))
+    // the raw password never travels in the clear
+    expect(JSON.stringify(req)).not.toContain('hunter2')
+  })
+
+  it('derivePasswordToken is deterministic for the same password + salt', () => {
+    const salt = b64std(v1.randomBytes(16))
+    expect(derivePasswordToken('pw', salt)).toBe(derivePasswordToken('pw', salt))
+  })
+
+  it('readSharePassword reveals the plaintext via the K_mem-recovered K_share', () => {
+    const kMem = v1.randomBytes(32)
+    const kShare = v1.randomBytes(32)
+    const sealedShareKey = b64std(v1.symWrap(kMem, kShare, 'share-key-recovery', v1.randomBytes(12)))
+    const sealedPassword = b64std(v1.symWrap(kShare, v1.utf8('s3cret'), 'share-password', v1.randomBytes(12)))
+    expect(readSharePassword(kMem, sealedShareKey, sealedPassword)).toBe('s3cret')
+    expect(readSharePassword(kMem, null, sealedPassword)).toBe('') // no recoverable key → ''
+  })
+
+  it('resolveShare throws SharePasswordRequiredError on a locked shell, then unlocks with the token', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-p2' })
+    mockCurator(create)
+    const minted = await createShare(NODE_ID, v1.randomBytes(32), 'Rom', undefined, null, {}, '', 'hunter2')
+    const { wrap, sealedName } = create.mock.calls[0][0].createShareRequest
+    const resolveMock = vi.fn()
+      .mockResolvedValueOnce({ passwordRequired: true, pwSalt: 'c2FsdA==', role: 'VIEWER', nodes: [], media: [] })
+      .mockResolvedValueOnce({ passwordRequired: true, pwSalt: 'c2FsdA==', role: 'VIEWER', wrap, sealedName, nodes: [{ id: NODE_ID, parentId: null, kind: 'MEMORY' }], media: [] })
+    vi.mocked(publicSharesApi).mockReturnValue({ resolveShare: resolveMock } as unknown as ReturnType<typeof publicSharesApi>)
+    const fragment = keyFromLink(minted.link)
+    await expect(resolveShare('share-p2', fragment)).rejects.toBeInstanceOf(SharePasswordRequiredError)
+    const resolved = await resolveShare('share-p2', fragment, 'token')
+    expect(resolved.memoryName).toBe('Rom')
   })
 })

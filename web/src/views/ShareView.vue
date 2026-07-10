@@ -20,6 +20,9 @@ import {
   addSharePhoto,
   deleteSharePhoto,
   pickLocaleText,
+  derivePasswordToken,
+  SharePasswordRequiredError,
+  SharePasswordIncorrectError,
   type ShareItem,
   type ContributorSession,
 } from '../features/memory/share'
@@ -46,7 +49,14 @@ const fragmentKey = computed(() => {
   return m ? m[1] : ''
 })
 
-const status = ref<'loading' | 'ready' | 'unavailable'>('loading')
+const status = ref<'loading' | 'ready' | 'unavailable' | 'locked'>('loading')
+// cr-0118: a password-protected share resolves to a LOCKED shell — the viewer enters the password, we derive the
+// Argon2id token client-side, and re-resolve with it. The token is then held + presented on every gated blob GET.
+const pwSalt = ref('')
+const pwInput = ref('')
+const pwToken = ref<string | undefined>(undefined)
+const pwError = ref(false) // last attempt was the wrong password
+const pwBusy = ref(false) // deriving Argon2id + re-resolving
 const memoryName = ref('')
 // cr-0115: the optional curator note (a message the sharer attached), decrypted client-side + rendered as markdown
 // (the safe escape-first subset — no raw HTML/script survives, so v-html is safe).
@@ -207,14 +217,14 @@ function openLightboxAt(index: number) {
 // The shared lightbox requires a `memoryKey` prop, but the share viewer overrides every use of it via the
 // injected loaders/metaResolver (each item carries its own K_mem), so a dummy empty key is passed + never used.
 const unusedMemoryKey = new Uint8Array()
-const previewLoader = (item: MediaItem) => openShareLightbox(shareId, shareById.value.get(item.mediaId)!)
-const originalLoader = (item: MediaItem) => openShareOriginal(shareId, shareById.value.get(item.mediaId)!)
+const previewLoader = (item: MediaItem) => openShareLightbox(shareId, shareById.value.get(item.mediaId)!, pwToken.value)
+const originalLoader = (item: MediaItem) => openShareOriginal(shareId, shareById.value.get(item.mediaId)!, pwToken.value)
 const metaResolver = (item: MediaItem) => unsealMeta(shareById.value.get(item.mediaId)!.memoryKey, item)
 
 // --- resolve (on mount + after a contribution) ------------------------------
 async function load() {
   try {
-    const resolved = await resolveShare(shareId, fragmentKey.value)
+    const resolved = await resolveShare(shareId, fragmentKey.value, pwToken.value)
     memoryName.value = resolved.memoryName
     // cr-0116: the curator note is a per-locale map — pick the viewer's locale (exact → base → en → first).
     note.value = pickLocaleText(resolved.noteByLocale, locale.value)
@@ -244,7 +254,7 @@ async function load() {
         if (!hasDerivatives(si.item)) return
         if (thumbs.value.has(si.item.mediaId) && !donatedThumbs.has(si.item.mediaId)) return // real thumb already in place
         try {
-          const bytes = await openShareGrid(shareId, si)
+          const bytes = await openShareGrid(shareId, si, pwToken.value)
           const prev = thumbs.value.get(si.item.mediaId)
           if (prev && !donatedThumbs.has(si.item.mediaId)) URL.revokeObjectURL(prev)
           thumbs.value.set(si.item.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
@@ -255,9 +265,33 @@ async function load() {
         }
       }),
     )
-  } catch {
-    // ShareUnavailableError (bad key / 404) or any unexpected error → the same honest "unavailable" state.
-    status.value = 'unavailable'
+  } catch (e) {
+    // cr-0118: a password-protected share → prompt (or re-prompt on a wrong password); otherwise the honest
+    // "unavailable" state (bad key / 404 / unexpected).
+    if (e instanceof SharePasswordRequiredError) {
+      pwSalt.value = e.pwSalt
+      status.value = 'locked'
+    } else if (e instanceof SharePasswordIncorrectError) {
+      pwError.value = true
+      status.value = 'locked'
+    } else {
+      status.value = 'unavailable'
+    }
+  }
+}
+
+/** The viewer submitted the password: derive the Argon2id token client-side, then re-resolve with it. */
+async function submitPassword() {
+  if (!pwInput.value || pwBusy.value) return
+  pwBusy.value = true
+  pwError.value = false
+  await new Promise((r) => setTimeout(r, 10)) // let the busy state paint before the (blocking) Argon2id
+  try {
+    pwToken.value = derivePasswordToken(pwInput.value, pwSalt.value)
+    status.value = 'loading'
+    await load()
+  } finally {
+    pwBusy.value = false
   }
 }
 onMounted(() => {
@@ -279,6 +313,30 @@ onBeforeUnmount(revokeThumbs)
       <span class="pi pi-lock" />
       <h1>{{ t('share.unavailable') }}</h1>
       <p>{{ t('share.unavailableHint') }}</p>
+    </div>
+
+    <!-- cr-0118: a password-protected share resolves to a LOCKED shell (nothing else crossed the wire) — prompt for
+         the password, derive the Argon2id token on device, and re-resolve with it. -->
+    <div v-else-if="status === 'locked'" class="share-view-state share-name-gate">
+      <form class="veyq-surface share-name-card" @submit.prevent="submitPassword">
+        <span class="pi pi-lock share-password-icon" />
+        <h1>{{ t('share.passwordTitle') }}</h1>
+        <p class="share-name-intro">{{ t('share.passwordIntro') }}</p>
+        <label for="share-password-input">{{ t('share.passwordLabel') }}</label>
+        <input
+          id="share-password-input"
+          v-model="pwInput"
+          type="password"
+          name="share-password"
+          autocomplete="current-password"
+          :placeholder="t('share.passwordPlaceholder')"
+          :disabled="pwBusy"
+        />
+        <button class="share-name-submit" type="submit" :disabled="pwBusy || !pwInput">
+          {{ pwBusy ? t('share.passwordChecking') : t('share.passwordUnlock') }}
+        </button>
+        <p v-if="pwError" class="share-error">{{ t('share.passwordWrong') }}</p>
+      </form>
     </div>
 
     <!-- CONTRIBUTOR / UPLOADER share: a mandatory display-name pre-screen before contributing (ADR 0030 / 0031) -->

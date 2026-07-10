@@ -188,6 +188,17 @@ server-blind tokens make this work without the server ever seeing content:
   operator's reach. The conscious consequence: a `K_mem`-holder (a scope member) can now **derive** `K_share` for
   that Memory's shares — harmless (they already read the content, and revoke stays owner-gated), recorded in
   [ADR 0036](../decisions/0036-editable-share-note-recoverable-share-key.md).
+- **An optional share password** is an **operator-blind access-control gate**, *not* a cryptographic one
+  ([ADR 0037](../decisions/0037-password-protected-shares.md)): the content stays E2EE under the unchanged
+  `K_share` fragment, and the password gates **what the server serves** (a locked resolve returns only the
+  challenge; no `wrap`/name/note/media without a valid token) — the same shape as the `contributorToken`. The
+  server holds only `password_required` (coarse metadata) + `pw_salt` + `pw_verifier` (= `SHA-256` of the
+  client-side `Argon2id(pw)` token) + `sealed_password` (one more opaque `K_share`-sealed ciphertext, a
+  curator-only reveal copy) — never the raw password. **Honest limit:** it defends a **leaked link against an
+  honest operator** (the realistic self-hosted / trusted case), not a malicious one who could bypass the check and
+  serve ciphertext to a colluder holding the fragment — the same posture as the passive-operator-safe web viewer
+  ([ADR 0026](../decisions/0026-client-trust-tiers.md)). A crypto-gate (fold `Argon2id` into the key) is a
+  documented future upgrade.
 
 ## Key-directory trust — TOFU pinning + out-of-band verification ([ADR 0028](../decisions/0028-identity-authenticity-tofu-verification.md))
 

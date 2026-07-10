@@ -70,6 +70,25 @@ class ShareEntity : PanacheEntityBase {
     @Column(name = "sealed_share_key")
     var sealedShareKey: String? = null
 
+    /** cr-0118 (ADR 0037): true when the share is password-protected — the guest resolve + blob GET then require a
+     *  valid `X-Share-Password` token. An access-control gate, not a crypto one (content stays E2EE via `K_share`). */
+    @Column(name = "password_required", nullable = false)
+    var passwordRequired: Boolean = false
+
+    /** cr-0118: the salt for the client's `pwToken = Argon2id(password, pw_salt)` (opaque base64), or null. */
+    @Column(name = "pw_salt")
+    var pwSalt: String? = null
+
+    /** cr-0118: `SHA-256(pwToken)` (opaque base64) — the server-checked verifier, or null. The server never sees the
+     *  raw password (the client sends `Argon2id(pw)`); a DB leak still costs an Argon2id-per-guess to use. */
+    @Column(name = "pw_verifier")
+    var pwVerifier: String? = null
+
+    /** cr-0118: the plaintext password sealed under `K_share` (AAD `share-password`, opaque base64), or null — a
+     *  management-only reveal copy the curator opens with a recovered `K_share`; never served to a viewer. */
+    @Column(name = "sealed_password")
+    var sealedPassword: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

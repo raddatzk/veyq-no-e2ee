@@ -154,6 +154,11 @@ export function dedupToken(contentKey: Uint8Array, content: Uint8Array): Uint8Ar
 
 export const sha256Digest = (content: Uint8Array): Uint8Array => sha256(content)
 
+/** cr-0118 (ADR 0037): a share-password token = Argon2id(password, salt). The client presents it (base64) as the
+ *  guest bearer credential; its `sha256Digest` is the server-checked verifier. Reuses the pinned Argon2id params. */
+export const sharesPwToken = (password: string, salt: Uint8Array, params: ArgonParams = ARGON): Uint8Array =>
+  argon2id(utf8(password), salt, { ...params, dkLen: 32 })
+
 /**
  * Recovery commitment (AD: password reset). A domain-separated hash of the master key, stored server-side
  * when the RECOVERY wrap is written. Password reset must reproduce it — which needs the master key, i.e. the

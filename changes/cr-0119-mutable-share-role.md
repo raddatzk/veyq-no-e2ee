@@ -76,9 +76,9 @@ edited in place: [ADR 0036](../docs/decisions/0036-editable-share-note-recoverab
 grant-affecting `updateShare` field), [uc.sharing.share-contributor](../docs/features/sharing/use-cases/uc.sharing.share-contributor.md)
 (alternate flow A3 + the coverage criterion).
 
-**Live browser smoke — pending a backend restart.** The end-to-end smoke (edit a VIEWER share → switch to
-CONTRIBUTOR → save → the same link accepts a contribution) needs the running backend on the new contract. A
-**contract change can't be carried by the quarkusDev hot-reload** — the dev agent recompiles the Kotlin but does
-**not** re-run `openApiGenerateSpecs`, so it choked on `Unresolved reference 'role'` and 500'd. A clean IntelliJ
-backend restart re-runs the codegen and clears it; the behaviour is otherwise fully slice-proven. Committed on the
-strength of the hermetic verification (the user chose to commit now).
+**Live browser smoke — PASSED (2026-07-10, after the backend restart).** Editing a share now shows the
+VIEWER/CONTRIBUTOR switcher; switching a VIEWER share ("Passwort-Test") to CONTRIBUTOR → save → the manage list
+reflects the new grant **in place** (same link, no new mint), and an unrelated field (its password) was **kept**
+(the tri-state "untouched" path). The switcher was live-verified full-width. (The interim "pending a backend
+restart" state was due to the dev agent not re-running `openApiGenerateSpecs` on a contract change — a clean restart
+cleared it, as expected.)

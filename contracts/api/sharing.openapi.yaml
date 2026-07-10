@@ -179,14 +179,22 @@ paths:
         key, derives each descendant's `K_mem` from `wrappedContentKey`, and decrypts names / metadata / blob
         keys **locally**. A disabled, expired, or unknown share is a non-enumerable `404` (same shape in every
         case). Without the fragment key the response is inert — the wrap cannot be opened.
+        **Password-protected shares (cr-0118, ADR 0037):** with **no** `X-Share-Password` the response is
+        **locked** — only `passwordRequired` + `pwSalt` (no `wrap`/`sealedName`/subtree); the client prompts,
+        derives the token, and re-resolves with the header. A **wrong** token → `403 share_password_incorrect`.
       parameters:
         - $ref: "#/components/parameters/ShareId"
+        - $ref: "#/components/parameters/SharePassword"
       responses:
         "200":
-          description: The share record + its sealed Memory subtree (opaque; still under `K_mem`).
+          description: The share record + its sealed Memory subtree (opaque; still under `K_mem`) — or a locked shell when a password is required and none/valid-token was given.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PublicShare" }
+        "403":
+          description: The share is password-protected and the presented `X-Share-Password` token is wrong (cr-0118).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_password_incorrect } }
         "404":
           description: No such share, or it is disabled/expired (non-enumerable — identical in every case).
           content:
@@ -248,17 +256,24 @@ paths:
         viewer fetches the ciphertext **directly from the object store** and opens it with `openFrame`, so the
         operator never learns which media a viewer opens. A disabled/expired share, an unknown blob, or a blob
         outside the shared subtree is a non-enumerable `404`. The in-memory dev store cannot presign (`503`).
+        For a **password-protected** share the valid `X-Share-Password` token is required too (cr-0118, ADR 0037) —
+        a missing token is `404` (non-enumerable, like an out-of-subtree blob), a wrong token is `403`.
       parameters:
         - $ref: "#/components/parameters/ShareId"
         - $ref: "#/components/parameters/BlobId"
+        - $ref: "#/components/parameters/SharePassword"
       responses:
         "200":
           description: One presigned GET URL per chunk, in chunk order.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ShareBlobDownload" }
+        "403":
+          description: The share is password-protected and the presented `X-Share-Password` token is wrong (cr-0118).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_password_incorrect } }
         "404":
-          description: No such share (disabled/expired/unknown), or the blob is not under the shared subtree.
+          description: No such share (disabled/expired/unknown), the blob is not under the shared subtree, or a required password token is absent.
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
         "503":
@@ -465,6 +480,15 @@ components:
       required: true
       description: Opaque id of a media the caller contributed (deletable only if its `share_identity_id` matches the token's identity).
       schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c }
+    SharePassword:
+      name: X-Share-Password
+      in: header
+      required: false
+      description: >
+        The password token `base64(Argon2id(password, pwSalt))` for a password-protected share (cr-0118, ADR 0037).
+        Omit for a share with no password; a locked resolve then returns only `passwordRequired` + `pwSalt` so the
+        client can prompt and retry with this header.
+      schema: { type: string, maxLength: 64, pattern: "^[A-Za-z0-9+/]*={0,2}$" }
 
   schemas:
     ShareRole:
@@ -543,16 +567,49 @@ components:
           maxLength: 256
           example: cmVjb3ZlcmFibGUtc2hhcmUta2V5LXVuZGVyLWttZW0=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        passwordRequired:
+          type: boolean
+          default: false
+          description: OPTIONAL — protect the share with a password (cr-0118, ADR 0037). When true, `pwSalt` + `pwVerifier` (+ optionally `sealedPassword`) must accompany it.
+          example: false
+        pwSalt:
+          type: [string, "null"]
+          description: The random salt for `pwToken = Argon2id(password, pwSalt)` (opaque base64). Present iff `passwordRequired` (cr-0118).
+          contentEncoding: base64
+          maxLength: 64
+          example: cHctc2FsdC0xNmI=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 64) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        pwVerifier:
+          type: [string, "null"]
+          description: >
+            `SHA-256(pwToken)` where `pwToken = Argon2id(password, pwSalt)` (opaque base64) — the server checks a
+            presented token against this; it never sees the raw password (cr-0118, ADR 0037).
+          contentEncoding: base64
+          maxLength: 64
+          example: cHctdmVyaWZpZXItc2hhMjU2
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 64) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedPassword:
+          type: [string, "null"]
+          description: >
+            OPTIONAL — the plaintext password sealed under `K_share` (AAD `share-password`, opaque base64) so the
+            curator can **reveal** it later; **management-only**, never served to a viewer (cr-0118, ADR 0037).
+          contentEncoding: base64
+          maxLength: 512
+          example: c2VhbGVkLXBhc3N3b3Jk
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     UpdateShareRequest:
       type: object
       description: >
-        Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036). `sealedNote` + `sealedShareName` are a **full
-        replace** of the two `K_share`-sealed fields (each is the new value, `null`/blank clears it) — the curator
-        holds both current values (decrypted in the manage list) and sends them together. `role` is an **optional
-        grant change** (cr-0119): when present it changes the share's role **in place** (a plaintext authz change,
-        no re-crypto — the link/wrap stay valid), restricted to **VIEWER ↔ CONTRIBUTOR** (setting `UPLOADER`, or
-        editing an UPLOADER share's role, is `422 invalid_role_change`); when omitted the grant is unchanged.
+        Edit a share in place (cr-0115/cr-0116/cr-0119/cr-0118, ADR 0036/0037). `sealedNote` + `sealedShareName`
+        are a **full replace** of the two `K_share`-sealed fields (each is the new value, `null`/blank clears it) —
+        the curator holds both current values (decrypted in the manage list) and sends them together. `role` is an
+        **optional grant change** (cr-0119): when present it changes the share's role **in place** (a plaintext
+        authz change, no re-crypto — the link/wrap stay valid), restricted to **VIEWER ↔ CONTRIBUTOR** (setting
+        `UPLOADER`, or editing an UPLOADER share's role, is `422 invalid_role_change`); when omitted the grant is
+        unchanged. `passwordRequired` is an **optional tri-state** (cr-0118): `true` sets/changes the password (send
+        `pwSalt` + `pwVerifier` + `sealedPassword` with it), `false` removes it (the pw fields are cleared),
+        **omitted** leaves the password untouched — all in place, the link/`K_share` untouched.
       properties:
         sealedNote:
           type: [string, "null"]
@@ -570,6 +627,31 @@ components:
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         role:
           $ref: "#/components/schemas/ShareRole"
+        passwordRequired:
+          type: [boolean, "null"]
+          description: Tri-state (cr-0118, ADR 0037) — true sets/changes the password (with pwSalt/pwVerifier/sealedPassword), false removes it, null/omitted leaves it untouched.
+          example: null
+        pwSalt:
+          type: [string, "null"]
+          description: The new salt for `Argon2id(password, pwSalt)` (opaque base64) — sent with `passwordRequired` = true.
+          contentEncoding: base64
+          maxLength: 64
+          example: cHctc2FsdC0xNmI=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 64) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        pwVerifier:
+          type: [string, "null"]
+          description: The new `SHA-256(Argon2id(password, pwSalt))` (opaque base64) — sent with `passwordRequired` = true.
+          contentEncoding: base64
+          maxLength: 64
+          example: cHctdmVyaWZpZXItc2hhMjU2
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 64) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedPassword:
+          type: [string, "null"]
+          description: The new plaintext password sealed under `K_share` (AAD `share-password`, opaque base64) — the reveal copy, management-only.
+          contentEncoding: base64
+          maxLength: 512
+          example: c2VhbGVkLXBhc3N3b3Jk
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     ShareCreated:
       type: object
@@ -624,6 +706,19 @@ components:
           contentEncoding: base64
           maxLength: 256
           example: null
+        passwordRequired:
+          type: boolean
+          default: false
+          description: True when the share is password-protected (cr-0118) — the manage UI shows a lock badge.
+          example: false
+        sealedPassword:
+          type: [string, "null"]
+          description: >
+            The plaintext password sealed under `K_share` (opaque base64), or null — management-only; the manage UI
+            recovers `K_share` (via `sealedShareKey`) to **reveal** it. Never served to a viewer (cr-0118, ADR 0037).
+          contentEncoding: base64
+          maxLength: 512
+          example: null
         enabled:
           type: boolean
           description: False once revoked — the guest resolve + blob GET then `404`.
@@ -647,19 +742,35 @@ components:
 
     PublicShare:
       type: object
-      required: [role, wrap, sealedName, nodes, media]
+      required: [role, passwordRequired, nodes, media]
+      description: >
+        A resolved share. When `passwordRequired` is true and the guest presented **no** (or a wrong) password
+        token, the response is **locked**: only `role` + `passwordRequired` + `pwSalt` are set and `wrap` /
+        `sealedName` / `sealedNote` / `nodes` / `media` / `identities` are omitted/empty — the client prompts for
+        the password and re-resolves with the token (cr-0118, ADR 0037).
       properties:
         role:
           $ref: "#/components/schemas/ShareRole"
+        passwordRequired:
+          type: boolean
+          default: false
+          description: True when this share needs a password token; a locked response carries only this + `pwSalt` (cr-0118).
+          example: false
+        pwSalt:
+          type: [string, "null"]
+          description: The salt for `Argon2id(password, pwSalt)` (opaque base64) — present when `passwordRequired`, so the client can derive the token (cr-0118).
+          contentEncoding: base64
+          maxLength: 64
+          example: null
         wrap:
-          type: string
-          description: The wrap `symWrap(K_share, K_mem)` (opaque base64) — the viewer unwraps `K_mem` with the fragment key.
+          type: [string, "null"]
+          description: The wrap `symWrap(K_share, K_mem)` (opaque base64) — the viewer unwraps `K_mem` with the fragment key. Null in a locked (password-gated) response.
           contentEncoding: base64
           maxLength: 256
           example: d3JhcHBlZC1rLW1lbS11bmRlci1rLXNoYXJl
         sealedName:
-          type: string
-          description: The Memory name re-sealed under `K_share` (opaque base64).
+          type: [string, "null"]
+          description: The Memory name re-sealed under `K_share` (opaque base64). Null in a locked response.
           contentEncoding: base64
           maxLength: 4096
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==

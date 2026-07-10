@@ -13,6 +13,8 @@ vi.mock('../share', () => ({
   updateShare: vi.fn(),
   readShareName: vi.fn(() => ''),
   readShareNoteMap: vi.fn(() => ({})),
+  readSharePassword: vi.fn(() => ''),
+  hasLocaleText: vi.fn(() => false),
 }))
 
 import ShareCreateDialog from './ShareCreateDialog.vue'
@@ -44,6 +46,7 @@ const stubs = {
   },
   Button: { props: ['label'], template: '<button>{{ label }}</button>' },
   InputText: true,
+  ToggleSwitch: true,
   LocaleMarkdownEditor: true,
 }
 
@@ -72,6 +75,7 @@ describe('ShareCreateDialog (cr-0116)', () => {
     const editShare = {
       shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
       createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
+      passwordRequired: false, sealedPassword: null,
     }
     const w = mountDialog({ editShare })
     expect(w.find('.select-button').exists()).toBe(true)

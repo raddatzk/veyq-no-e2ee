@@ -56,6 +56,10 @@ class SharingResource(
             sealedNote = createShareRequest.sealedNote, // cr-0115: optional curator note under K_share
             sealedShareKey = createShareRequest.sealedShareKey, // cr-0115: recoverable K_share for a later edit
             sealedShareName = createShareRequest.sealedShareName, // cr-0116: optional private label under K_share
+            passwordRequired = createShareRequest.passwordRequired ?: false, // cr-0118: optional access-control gate
+            pwSalt = createShareRequest.pwSalt,
+            pwVerifier = createShareRequest.pwVerifier,
+            sealedPassword = createShareRequest.sealedPassword, // cr-0118: management-only reveal copy
         )) {
             is CreateShareOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareCreated(shareId = o.shareId)).build()
@@ -82,6 +86,8 @@ class SharingResource(
                 sealedNote = s.sealedNote, // cr-0115: the manage UI shows + edits it
                 sealedShareName = s.sealedShareName, // cr-0116: the manage list's row title (falls back to the role)
                 sealedShareKey = s.sealedShareKey, // cr-0115: lets the manage UI recover K_share to edit note + name
+                passwordRequired = s.passwordRequired, // cr-0118: a lock badge in the manage list
+                sealedPassword = s.sealedPassword, // cr-0118: the reveal copy (management-only; never a viewer)
             )
         }).build()
     }
@@ -105,6 +111,7 @@ class SharingResource(
         when (handler.updateShare(
             identity.principal.name, shareId,
             updateShareRequest.sealedNote, updateShareRequest.sealedShareName, updateShareRequest.role?.value,
+            updateShareRequest.passwordRequired, updateShareRequest.pwSalt, updateShareRequest.pwVerifier, updateShareRequest.sealedPassword,
         )) {
             UpdateShareOutcome.Done -> Response.noContent().build()
             UpdateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
@@ -112,11 +119,13 @@ class SharingResource(
         }
 
     @PermitAll
-    override fun resolveShare(shareId: String): Response =
-        when (val o = handler.resolve(shareId)) {
+    override fun resolveShare(shareId: String, xSharePassword: String?): Response =
+        when (val o = handler.resolve(shareId, xSharePassword)) {
             is ResolveShareOutcome.Found -> Response.ok(
                 PublicShare(
                     role = ShareRole.decode(o.share.role),
+                    passwordRequired = o.share.passwordRequired, // cr-0118: false, or true once unlocked with a valid token
+                    pwSalt = if (o.share.passwordRequired) o.share.pwSalt else null,
                     wrap = o.share.wrap,
                     sealedName = o.share.sealedName,
                     sealedNote = o.share.sealedNote, // cr-0115: the share page renders it (null when none)
@@ -125,15 +134,27 @@ class SharingResource(
                     identities = o.identities.map { ShareIdentity(identityId = UUID.fromString(it.id), sealedDisplayName = it.sealedDisplayName) },
                 ),
             ).build()
+            // cr-0118: password required + no token → a LOCKED shell (only the challenge; no wrap/name/note/subtree).
+            is ResolveShareOutcome.Locked -> Response.ok(
+                PublicShare(
+                    role = ShareRole.decode(o.share.role),
+                    passwordRequired = true,
+                    pwSalt = o.share.pwSalt,
+                    wrap = null, sealedName = null, sealedNote = null,
+                    nodes = emptyList(), media = emptyList(), identities = null,
+                ),
+            ).build()
+            ResolveShareOutcome.PasswordIncorrect -> error(403, "share_password_incorrect")
             ResolveShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }
 
     @PermitAll
-    override fun resolveShareBlob(shareId: String, blobId: UUID): Response =
-        when (val o = handler.resolveBlob(shareId, blobId.toString())) {
+    override fun resolveShareBlob(shareId: String, blobId: UUID, xSharePassword: String?): Response =
+        when (val o = handler.resolveBlob(shareId, blobId.toString(), xSharePassword)) {
             is ShareBlobOutcome.Found -> Response.ok(
                 ShareBlobDownload(presignedGets = o.gets.map { PresignedUrl(index = it.index, url = it.url) }),
             ).build()
+            ShareBlobOutcome.PasswordIncorrect -> error(403, "share_password_incorrect")
             ShareBlobOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
             ShareBlobOutcome.StoreUnavailable -> error(503, "store_unavailable")
         }

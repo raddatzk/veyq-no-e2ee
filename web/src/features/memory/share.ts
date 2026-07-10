@@ -41,6 +41,7 @@ const SHARE_NOTE_CTX = 'share-note'
 const SHARE_KEY_RECOVERY_CTX = 'share-key-recovery'
 // cr-0116: the AAD context for a share's optional private name sealed under `K_share`.
 const SHARE_NAME_CTX = 'share-name'
+const SHARE_PASSWORD_CTX = 'share-password' // cr-0118: the reveal copy of the plaintext password, under K_share
 const noteDecoder = new TextDecoder()
 
 /** A per-locale text map, e.g. `{ de: '…', en: '…' }` (cr-0116). Empty when there is no text. */
@@ -75,6 +76,43 @@ function openShareName(kShare: Uint8Array, sealed: string): string {
 /** Recover `K_share` from its `K_mem`-sealed copy `symWrap(K_mem, K_share)` — the curator always holds `K_mem`. */
 export function recoverShareKey(memoryKey: Uint8Array, sealedShareKey: string): Uint8Array {
   return v1.symUnwrap(memoryKey, fromB64std(sealedShareKey), SHARE_KEY_RECOVERY_CTX)
+}
+
+// --- password protection (cr-0118, ADR 0037): an operator-blind ACCESS-CONTROL gate ------------------------
+//
+// The password gates what the SERVER serves; the content stays E2EE under K_share. The client derives a token
+// `pwToken = Argon2id(password, pwSalt)` (the guest bearer credential) and stores only its `SHA-256` verifier +
+// salt + a K_share-sealed reveal copy — never the raw password.
+
+/** The password fields for a create/change: a fresh salt, the SHA-256 verifier, and the reveal copy under K_share. */
+function buildPasswordFields(kShare: Uint8Array, password: string): {
+  passwordRequired: true; pwSalt: string; pwVerifier: string; sealedPassword: string
+} {
+  const salt = v1.randomBytes(16)
+  const pwToken = v1.sharesPwToken(password, salt)
+  return {
+    passwordRequired: true,
+    pwSalt: b64std(salt),
+    pwVerifier: b64std(v1.sha256Digest(pwToken)),
+    sealedPassword: b64std(v1.symWrap(kShare, v1.utf8(password), SHARE_PASSWORD_CTX, v1.randomBytes(12))),
+  }
+}
+
+/** The base64 guest token `Argon2id(password, pwSalt)` a viewer presents in `X-Share-Password` (the salt comes from
+ *  the locked resolve). Heavy (Argon2id) but a one-off per unlock. */
+export function derivePasswordToken(password: string, pwSalt: string): string {
+  return b64std(v1.sharesPwToken(password, fromB64std(pwSalt)))
+}
+
+/** Reveal a managed share's password (curator only): recover `K_share` via `K_mem`, open the sealed copy. '' when
+ *  none / unreadable (or a share minted before cr-0118). */
+export function readSharePassword(memoryKey: Uint8Array, sealedShareKey: string | null, sealedPassword: string | null): string {
+  if (!sealedShareKey || !sealedPassword) return ''
+  try {
+    return noteDecoder.decode(v1.symUnwrap(recoverShareKey(memoryKey, sealedShareKey), fromB64std(sealedPassword), SHARE_PASSWORD_CTX))
+  } catch {
+    return ''
+  }
 }
 
 /** Reconstruct a managed share's full copyable link `/s/{shareId}#k=<K_share>` by recovering `K_share` via `K_mem`
@@ -145,6 +183,7 @@ export async function createShare(
   expiresAt: Date | null = null,
   note: LocaleMap = {},
   name = '',
+  password = '',
 ): Promise<MintedShare> {
   const kShare = v1.randomBytes(32)
   const wrap = b64std(v1.symWrap(kShare, memoryKey, SHARE_CTX, v1.randomBytes(12)))
@@ -155,27 +194,43 @@ export async function createShare(
   const sealedShareKey = b64std(v1.symWrap(memoryKey, kShare, SHARE_KEY_RECOVERY_CTX, v1.randomBytes(12)))
   const sealedNote = hasLocaleText(note) ? sealNoteMap(kShare, note) : undefined
   const sealedShareName = name.trim() ? sealShareName(kShare, name) : undefined
+  // cr-0118 (ADR 0037): an optional operator-blind password gate (fields derived client-side; the raw password never leaves).
+  const pw = password.trim() ? buildPasswordFields(kShare, password) : undefined
   const { shareId } = await withRefresh(() =>
     sharesApi().createShare({
-      createShareRequest: { nodeId, role, wrap, sealedName, expiresAt: expiresAt ?? undefined, sealedNote, sealedShareKey, sealedShareName },
+      createShareRequest: {
+        nodeId, role, wrap, sealedName, expiresAt: expiresAt ?? undefined, sealedNote, sealedShareKey, sealedShareName,
+        passwordRequired: pw?.passwordRequired, pwSalt: pw?.pwSalt, pwVerifier: pw?.pwVerifier, sealedPassword: pw?.sealedPassword,
+      },
     }),
   )
   return { shareId, link: buildShareLink(shareId, kShare) }
 }
 
 /**
- * Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036): recover `K_share` from its `K_mem`-sealed copy,
- * re-seal note + name (or clear a blank one) and PATCH the full pair — the same link keeps working. An optional
- * `role` changes the grant in place (VIEWER ↔ CONTRIBUTOR; the server 422s UPLOADER); omitted when unchanged / for
- * the uploader variant. Owner-gated server-side. A role change is a plaintext authz change — no re-crypto.
+ * Edit a share in place (cr-0115/cr-0116/cr-0119/cr-0118, ADR 0036/0037): recover `K_share` from its `K_mem`-sealed
+ * copy, re-seal note + name (or clear a blank one) and PATCH the full pair — the same link keeps working. An
+ * optional `role` changes the grant in place (VIEWER ↔ CONTRIBUTOR; the server 422s UPLOADER). `passwordChange` is
+ * the tri-state gate: `{ set }` sets/changes it, `{ remove: true }` removes it, `undefined` leaves it untouched.
+ * Owner-gated server-side; the link/`K_share` are untouched throughout.
  */
 export async function updateShare(
   shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string, role?: ShareRole,
+  passwordChange?: { set: string } | { remove: true },
 ): Promise<void> {
   const kShare = recoverShareKey(memoryKey, sealedShareKey)
   const sealedNote = hasLocaleText(note) ? sealNoteMap(kShare, note) : null
   const sealedShareName = name.trim() ? sealShareName(kShare, name) : null
-  await withRefresh(() => sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName, role } }))
+  // cr-0118: the password tri-state. A `remove` sends only `passwordRequired: false` — the server clears the fields.
+  const passwordPatch =
+    passwordChange && 'set' in passwordChange
+      ? buildPasswordFields(kShare, passwordChange.set)
+      : passwordChange && 'remove' in passwordChange
+        ? { passwordRequired: false }
+        : {}
+  await withRefresh(() =>
+    sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName, role, ...passwordPatch } }),
+  )
 }
 
 /** A curator's management row for one of their shares (opaque; the sealed name isn't shown — the Memory is known). */
@@ -194,6 +249,10 @@ export type ManagedShare = {
   sealedNote: string | null
   sealedShareName: string | null
   sealedShareKey: string | null
+  /** cr-0118: whether the share is password-protected (a lock badge) + the `K_share`-sealed reveal copy of the
+   *  plaintext password (management-only), read via `readSharePassword`. */
+  passwordRequired: boolean
+  sealedPassword: string | null
 }
 
 /** List every share on one Memory visible to a scope member (cr-0104) — the manage-shares panel. Scoped by
@@ -212,6 +271,8 @@ export async function listSharesFor(nodeId: string): Promise<ManagedShare[]> {
       sealedNote: r.sealedNote ?? null,
       sealedShareName: r.sealedShareName ?? null,
       sealedShareKey: r.sealedShareKey ?? null,
+      passwordRequired: r.passwordRequired ?? false,
+      sealedPassword: r.sealedPassword ?? null,
     }))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
@@ -322,6 +383,18 @@ export type ResolvedShare = { memoryName: string; noteByLocale: LocaleMap; role:
 /** The fragment key is missing/malformed, or the share is unknown/revoked/expired (a non-enumerable 404). */
 export class ShareUnavailableError extends Error {}
 
+/** cr-0118: the share is password-protected and no (valid) token was given — the caller prompts with `pwSalt`. */
+export class SharePasswordRequiredError extends Error {
+  constructor(public pwSalt: string) {
+    super('password_required')
+  }
+}
+/** cr-0118: the presented password token was wrong (403) — the caller re-prompts. */
+export class SharePasswordIncorrectError extends Error {}
+
+const isStatus = (e: unknown, status: number): boolean =>
+  Boolean(e) && typeof e === 'object' && (e as { response?: { status?: number } }).response?.status === status
+
 function shareMediaToItem(m: ShareMedia): MediaItem {
   return {
     mediaId: m.mediaId,
@@ -374,7 +447,7 @@ function deriveSubtreeKeys(nodes: ShareNode[], rootKmem: Uint8Array): Map<string
  * a flat, read-only list of media (each tagged with the exact `K_mem` its blobs open under). Throws
  * [ShareUnavailableError] on a missing/bad fragment key or a 404 (unknown/revoked/expired — indistinguishable).
  */
-export async function resolveShare(shareId: string, fragmentKey: string): Promise<ResolvedShare> {
+export async function resolveShare(shareId: string, fragmentKey: string, pwToken?: string): Promise<ResolvedShare> {
   let kShare: Uint8Array
   try {
     kShare = fromB64url(fragmentKey)
@@ -385,16 +458,19 @@ export async function resolveShare(shareId: string, fragmentKey: string): Promis
 
   let share: PublicShare
   try {
-    share = await publicSharesApi().resolveShare({ shareId })
-  } catch {
+    share = await publicSharesApi().resolveShare({ shareId, xSharePassword: pwToken }) // cr-0118: the guest token gates it
+  } catch (e) {
+    if (isStatus(e, 403)) throw new SharePasswordIncorrectError() // wrong password
     throw new ShareUnavailableError('not_found') // 404 (revoked/expired/unknown) or a network error
   }
+  // cr-0118: a locked share (password required, no/valid-less token) serves only the challenge — prompt the viewer.
+  if (share.passwordRequired && !share.wrap) throw new SharePasswordRequiredError(share.pwSalt ?? '')
 
   let rootKmem: Uint8Array
   let memoryName: string
   try {
-    rootKmem = v1.symUnwrap(kShare, fromB64std(share.wrap), SHARE_CTX)
-    memoryName = openName(kShare, share.sealedName)
+    rootKmem = v1.symUnwrap(kShare, fromB64std(share.wrap!), SHARE_CTX)
+    memoryName = openName(kShare, share.sealedName!)
   } catch {
     throw new ShareUnavailableError('bad_fragment_key') // the id was valid but the fragment key doesn't match
   }
@@ -412,16 +488,17 @@ export async function resolveShare(shareId: string, fragmentKey: string): Promis
   return { memoryName, noteByLocale, role: share.role, rootMemoryKey: rootKmem, items }
 }
 
-/** Open a shared blob via the gated, share-scoped presign endpoint (no auth), then decrypt it under its `K_mem`. */
-async function openShareBlob(shareId: string, memoryKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
-  const dl = await publicSharesApi().resolveShareBlob({ shareId, blobId: ref.blobId })
+/** Open a shared blob via the gated, share-scoped presign endpoint (no auth), then decrypt it under its `K_mem`.
+ *  A password-protected share needs the same guest token (cr-0118) as the resolve. */
+async function openShareBlob(shareId: string, memoryKey: Uint8Array, ref: BlobRef, pwToken?: string): Promise<Uint8Array> {
+  const dl = await publicSharesApi().resolveShareBlob({ shareId, blobId: ref.blobId, xSharePassword: pwToken })
   const getUrls = [...dl.presignedGets].sort((a, b) => a.index - b.index).map((u) => u.url)
   return openBlobFromUrls(memoryKey, ref, getUrls)
 }
 
 /** Open a shared media's grid (thumbnail) tier. */
-export const openShareGrid = (shareId: string, si: ShareItem) => openShareBlob(shareId, si.memoryKey, gridRef(si.item))
+export const openShareGrid = (shareId: string, si: ShareItem, pwToken?: string) => openShareBlob(shareId, si.memoryKey, gridRef(si.item), pwToken)
 /** Open a shared media's lightbox (preview) tier. */
-export const openShareLightbox = (shareId: string, si: ShareItem) => openShareBlob(shareId, si.memoryKey, lightboxRef(si.item))
+export const openShareLightbox = (shareId: string, si: ShareItem, pwToken?: string) => openShareBlob(shareId, si.memoryKey, lightboxRef(si.item), pwToken)
 /** Open a shared media's pristine original (download). */
-export const openShareOriginal = (shareId: string, si: ShareItem) => openShareBlob(shareId, si.memoryKey, downloadRef(si.item))
+export const openShareOriginal = (shareId: string, si: ShareItem, pwToken?: string) => openShareBlob(shareId, si.memoryKey, downloadRef(si.item), pwToken)

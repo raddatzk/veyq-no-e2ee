@@ -77,6 +77,7 @@ class SharingStore(
         ownerAccount: String, scopeId: String, nodeId: String, role: String,
         wrap: String, sealedName: String, expiresAt: Instant?, sealedNote: String?, sealedShareKey: String?,
         sealedShareName: String?,
+        passwordRequired: Boolean, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
     ): String {
         val id = Tokens.random() // 256-bit random, base64url — the unguessable share id (half the capability)
         ShareEntity().apply {
@@ -92,6 +93,10 @@ class SharingStore(
             this.sealedNote = sealedNote
             this.sealedShareKey = sealedShareKey
             this.sealedShareName = sealedShareName
+            this.passwordRequired = passwordRequired // cr-0118 (ADR 0037): the access-control gate + reveal copy
+            this.pwSalt = pwSalt
+            this.pwVerifier = pwVerifier
+            this.sealedPassword = sealedPassword
             createdAt = Instant.now()
         }.persist()
         return id
@@ -100,17 +105,27 @@ class SharingStore(
     /** The 3-way result of an in-place share edit (cr-0119): applied, no such owned share, or an illegal role change. */
     enum class UpdateResult { DONE, NOT_FOUND, INVALID_ROLE }
 
-    /** Edit a share the caller owns in place (cr-0115/cr-0116/cr-0119; idempotent). Full-replaces the two editable,
-     *  `K_share`-sealed fields (note + name — a null value clears that field); a non-null `role` changes the grant
-     *  **in place** (VIEWER ↔ CONTRIBUTOR only — a role of, or a share currently in, UPLOADER is `INVALID_ROLE`, the
-     *  write-only drop-box's promise is not flippable on distributed links). Ownership is checked first, so a share
-     *  not owned by the caller is `NOT_FOUND` regardless of the role (non-enumerable, mirroring `revoke`). */
+    /** Edit a share the caller owns in place (cr-0115/cr-0116/cr-0119/cr-0118; idempotent). Full-replaces the two
+     *  editable, `K_share`-sealed fields (note + name — a null value clears that field); a non-null `role` changes
+     *  the grant **in place** (VIEWER ↔ CONTRIBUTOR only — a role of, or a share currently in, UPLOADER is
+     *  `INVALID_ROLE`); a non-null `passwordRequired` is the tri-state password patch (true sets/changes it with the
+     *  fields, false removes + clears them; null leaves it untouched). Ownership is checked first, so a share not
+     *  owned by the caller is `NOT_FOUND` regardless of the role (non-enumerable, mirroring `revoke`). */
     @Transactional
-    fun updateShare(ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?): UpdateResult {
+    fun updateShare(
+        ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?,
+        passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
+    ): UpdateResult {
         val share = ShareEntity.findById(shareId)?.takeIf { it.ownerAccount == ownerAccount } ?: return UpdateResult.NOT_FOUND
         if (role != null) {
             if (role == ShareEntity.UPLOADER || share.role == ShareEntity.UPLOADER) return UpdateResult.INVALID_ROLE
             share.role = role
+        }
+        if (passwordRequired != null) { // cr-0118: tri-state — set/change (true) or remove (false); absent = untouched
+            share.passwordRequired = passwordRequired
+            share.pwSalt = if (passwordRequired) pwSalt else null
+            share.pwVerifier = if (passwordRequired) pwVerifier else null
+            share.sealedPassword = if (passwordRequired) sealedPassword else null
         }
         share.sealedNote = sealedNote
         share.sealedShareName = sealedShareName
