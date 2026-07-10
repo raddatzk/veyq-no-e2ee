@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShareNote, readShareNote, recoverShareLink, ShareUnavailableError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShare, readShareNoteMap, readShareName, pickLocaleText, recoverShareLink, ShareUnavailableError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -193,67 +193,84 @@ describe('deleteSharePhoto (cr-0102 uploader delete-own)', () => {
   })
 })
 
-describe('share note (cr-0115)', () => {
-  it('seals an optional note under K_share + a recoverable K_share under K_mem; the viewer reads the note', async () => {
+describe('share note + name (cr-0115 / cr-0116)', () => {
+  it('seals an optional per-locale note + a recoverable K_share; the viewer reads the right locale', async () => {
     const create = vi.fn().mockResolvedValue({ shareId: 'share-n1' })
     mockCurator(create)
     const kMem = v1.randomBytes(32)
 
-    const minted = await createShare(NODE_ID, kMem, 'Rom 2026', undefined, null, 'Enjoy our trip!')
+    const minted = await createShare(NODE_ID, kMem, 'Rom 2026', undefined, null, { de: 'Viel Spaß!', en: 'Enjoy our trip!' })
     const req = create.mock.calls[0][0].createShareRequest
-    // both ciphertexts are opaque base64; the plaintext note never appears in the request
+    // all ciphertexts are opaque base64; neither locale's plaintext appears in the request
     expect(req.sealedNote).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
     expect(req.sealedShareKey).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
     expect(JSON.stringify(req)).not.toContain('Enjoy our trip')
+    expect(JSON.stringify(req)).not.toContain('Viel Spa')
 
-    // the anonymous viewer opens the note with the fragment key
+    // the anonymous viewer opens the note map with the fragment key, then picks its locale
     mockGuest({
       role: 'VIEWER', wrap: req.wrap, sealedName: req.sealedName, sealedNote: req.sealedNote,
       nodes: [{ id: NODE_ID, parentId: null, kind: 'MEMORY' }], media: [],
     })
     const resolved = await resolveShare('share-n1', keyFromLink(minted.link))
-    expect(resolved.note).toBe('Enjoy our trip!')
+    expect(pickLocaleText(resolved.noteByLocale, 'de')).toBe('Viel Spaß!')
+    expect(pickLocaleText(resolved.noteByLocale, 'en')).toBe('Enjoy our trip!')
+    expect(pickLocaleText(resolved.noteByLocale, 'fr')).toBe('Enjoy our trip!') // no fr → falls back to en
   })
 
-  it('edits the note in place: recovers K_share via K_mem, re-seals, PATCHes (shareId unchanged)', async () => {
+  it('edits the note + name in place: recovers K_share via K_mem, re-seals both, PATCHes (shareId unchanged)', async () => {
     const create = vi.fn().mockResolvedValue({ shareId: 'share-n2' })
     const update = vi.fn().mockResolvedValue(undefined)
     vi.mocked(sharesApi).mockReturnValue({ createShare: create, updateShare: update } as unknown as ReturnType<typeof sharesApi>)
     const kMem = v1.randomBytes(32)
-    await createShare(NODE_ID, kMem, 'Rom', undefined, null, 'v1 note')
+    await createShare(NODE_ID, kMem, 'Rom', undefined, null, { en: 'v1 note' }, 'For friends')
     const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
 
-    await updateShareNote('share-n2', kMem, sealedShareKey, 'v2 note')
+    await updateShare('share-n2', kMem, sealedShareKey, { en: 'v2 note' }, 'For Grandma')
     const patch = update.mock.calls[0][0]
     expect(patch.shareId).toBe('share-n2')
-    // the new note is opaque ciphertext that round-trips to the new text via the recovered K_share
-    expect(patch.updateShareRequest.sealedNote).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
-    expect(readShareNote(kMem, sealedShareKey, patch.updateShareRequest.sealedNote)).toBe('v2 note')
+    // both ciphertexts round-trip to the new values via the recovered K_share
+    expect(readShareNoteMap(kMem, sealedShareKey, patch.updateShareRequest.sealedNote)).toEqual({ en: 'v2 note' })
+    expect(readShareName(kMem, sealedShareKey, patch.updateShareRequest.sealedShareName)).toBe('For Grandma')
   })
 
-  it('clears the note with a blank edit (PATCH sealedNote null)', async () => {
+  it('clears note + name with blank edits (PATCH nulls)', async () => {
     const create = vi.fn().mockResolvedValue({ shareId: 'share-n3' })
     const update = vi.fn().mockResolvedValue(undefined)
     vi.mocked(sharesApi).mockReturnValue({ createShare: create, updateShare: update } as unknown as ReturnType<typeof sharesApi>)
     const kMem = v1.randomBytes(32)
-    await createShare(NODE_ID, kMem, 'Rom', undefined, null, 'note')
+    await createShare(NODE_ID, kMem, 'Rom', undefined, null, { en: 'note' }, 'name')
     const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
 
-    await updateShareNote('share-n3', kMem, sealedShareKey, '   ')
+    await updateShare('share-n3', kMem, sealedShareKey, { en: '  ' }, '   ')
     expect(update.mock.calls[0][0].updateShareRequest.sealedNote).toBeNull()
+    expect(update.mock.calls[0][0].updateShareRequest.sealedShareName).toBeNull()
   })
 
-  it('readShareNote returns "" when a share has no note or no recoverable key', () => {
+  it('seals + reads the private share name (management-only, never on the viewer resolve)', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-n5' })
+    mockCurator(create)
     const kMem = v1.randomBytes(32)
-    expect(readShareNote(kMem, null, 'x')).toBe('')
-    expect(readShareNote(kMem, 'x', null)).toBe('')
+    await createShare(NODE_ID, kMem, 'Rom', undefined, null, {}, 'For Grandma')
+    const req = create.mock.calls[0][0].createShareRequest
+    expect(req.sealedShareName).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
+    expect(JSON.stringify(req)).not.toContain('For Grandma')
+    expect(readShareName(kMem, req.sealedShareKey, req.sealedShareName)).toBe('For Grandma')
+  })
+
+  it('readShareNoteMap / readShareName return empty when there is no ciphertext or recoverable key', () => {
+    const kMem = v1.randomBytes(32)
+    expect(readShareNoteMap(kMem, null, 'x')).toEqual({})
+    expect(readShareNoteMap(kMem, 'x', null)).toEqual({})
+    expect(readShareName(kMem, null, 'x')).toBe('')
+    expect(readShareName(kMem, 'x', null)).toBe('')
   })
 
   it('recoverShareLink rebuilds the full link (with the #k= fragment) for any existing share', async () => {
     const create = vi.fn().mockResolvedValue({ shareId: 'share-n4' })
     mockCurator(create)
     const kMem = v1.randomBytes(32)
-    const minted = await createShare(NODE_ID, kMem, 'Rom', undefined, null, '')
+    const minted = await createShare(NODE_ID, kMem, 'Rom', undefined, null, {})
     const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
 
     // recovering K_share via K_mem reconstructs exactly the minted link — so any old link is re-copyable

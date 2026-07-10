@@ -76,6 +76,7 @@ class SharingStore(
     fun create(
         ownerAccount: String, scopeId: String, nodeId: String, role: String,
         wrap: String, sealedName: String, expiresAt: Instant?, sealedNote: String?, sealedShareKey: String?,
+        sealedShareName: String?,
     ): String {
         val id = Tokens.random() // 256-bit random, base64url — the unguessable share id (half the capability)
         ShareEntity().apply {
@@ -90,17 +91,20 @@ class SharingStore(
             this.expiresAt = expiresAt
             this.sealedNote = sealedNote
             this.sealedShareKey = sealedShareKey
+            this.sealedShareName = sealedShareName
             createdAt = Instant.now()
         }.persist()
         return id
     }
 
-    /** Set the curator note on a share the caller owns (cr-0115; idempotent). A null note clears it. Returns false
-     *  when no such share is owned by the caller — a non-enumerable 404, mirroring `revoke`. */
+    /** Full-replace the two editable, `K_share`-sealed fields (note + name) on a share the caller owns (cr-0115/
+     *  cr-0116; idempotent). A null value clears that field. Returns false when no such share is owned by the caller
+     *  — a non-enumerable 404, mirroring `revoke`. */
     @Transactional
-    fun updateNote(ownerAccount: String, shareId: String, sealedNote: String?): Boolean {
+    fun updateShare(ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?): Boolean {
         val share = ShareEntity.findById(shareId)?.takeIf { it.ownerAccount == ownerAccount } ?: return false
         share.sealedNote = sealedNote
+        share.sealedShareName = sealedShareName
         return true
     }
 

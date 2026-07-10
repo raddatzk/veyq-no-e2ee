@@ -55,6 +55,7 @@ class SharingResource(
             expiresAt = createShareRequest.expiresAt?.toInstant(),
             sealedNote = createShareRequest.sealedNote, // cr-0115: optional curator note under K_share
             sealedShareKey = createShareRequest.sealedShareKey, // cr-0115: recoverable K_share for a later edit
+            sealedShareName = createShareRequest.sealedShareName, // cr-0116: optional private label under K_share
         )) {
             is CreateShareOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareCreated(shareId = o.shareId)).build()
@@ -79,7 +80,8 @@ class SharingResource(
                 createdAt = s.createdAt.atOffset(ZoneOffset.UTC),
                 expiresAt = s.expiresAt?.atOffset(ZoneOffset.UTC),
                 sealedNote = s.sealedNote, // cr-0115: the manage UI shows + edits it
-                sealedShareKey = s.sealedShareKey, // cr-0115: lets the manage UI recover K_share to edit the note
+                sealedShareName = s.sealedShareName, // cr-0116: the manage list's row title (falls back to the role)
+                sealedShareKey = s.sealedShareKey, // cr-0115: lets the manage UI recover K_share to edit note + name
             )
         }).build()
     }
@@ -96,10 +98,10 @@ class SharingResource(
             ReactivateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }
 
-    // Edit a share's curator note in place (cr-0115, ADR 0036) — owner-gated in the handler (404 if not the
-    // caller's), so the link/K_share/role/wrap are untouched; only the note ciphertext changes.
+    // Edit a share's curator note + name in place (cr-0115/cr-0116, ADR 0036) — owner-gated in the handler (404 if
+    // not the caller's), so the link/K_share/role/wrap are untouched; only the two K_share-sealed ciphertexts change.
     override fun updateShare(shareId: String, updateShareRequest: UpdateShareRequest): Response =
-        when (handler.updateNote(identity.principal.name, shareId, updateShareRequest.sealedNote)) {
+        when (handler.updateShare(identity.principal.name, shareId, updateShareRequest.sealedNote, updateShareRequest.sealedShareName)) {
             UpdateShareOutcome.Done -> Response.noContent().build()
             UpdateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }

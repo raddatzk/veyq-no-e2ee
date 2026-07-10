@@ -180,12 +180,13 @@ server-blind tokens make this work without the server ever seeing content:
 - **Full mechanism:** the [Sharing](../features/sharing/_index.md) feature
   ([ADR 0029](../decisions/0029-public-viewer-share.md) — the public viewer share resource + anonymous access path;
   v1 = personal-scope, VIEWER only).
-- **An editable curator note** rides the same blind path: an optional message the sharer attaches, sealed under
-  `K_share` (the server sees only ciphertext), rendered on the share page. To make it editable **in place**, the
-  share also stores `sealed_share_key = symWrap(K_mem, K_share)` — a recoverable copy of the per-share key,
-  openable **only with `K_mem`** (which the operator lacks), so `K_share` never enters the operator's reach. The
-  conscious consequence: a `K_mem`-holder (a scope member) can now **derive** `K_share` for that Memory's shares —
-  harmless (they already read the content, and revoke stays owner-gated), recorded in
+- **An editable curator note (+ private name)** rides the same blind path: an optional **per-locale** message the
+  sharer attaches (sealed under `K_share`, rendered on the share page in the viewer's locale) and an optional
+  **private name** (sealed under `K_share`, a **management-only** label the viewer never receives). To make them
+  editable **in place**, the share also stores `sealed_share_key = symWrap(K_mem, K_share)` — a recoverable copy of
+  the per-share key, openable **only with `K_mem`** (which the operator lacks), so `K_share` never enters the
+  operator's reach. The conscious consequence: a `K_mem`-holder (a scope member) can now **derive** `K_share` for
+  that Memory's shares — harmless (they already read the content, and revoke stays owner-gated), recorded in
   [ADR 0036](../decisions/0036-editable-share-note-recoverable-share-key.md).
 
 ## Key-directory trust — TOFU pinning + out-of-band verification ([ADR 0028](../decisions/0028-identity-authenticity-tofu-verification.md))

@@ -39,15 +39,38 @@ const SHARE_IDENTITY_NAME_CTX = 'share-identity-name'
 // `K_share`; `share-key-recovery` binds the recoverable copy of `K_share` under `K_mem`. Distinct tags, never reused.
 const SHARE_NOTE_CTX = 'share-note'
 const SHARE_KEY_RECOVERY_CTX = 'share-key-recovery'
+// cr-0116: the AAD context for a share's optional private name sealed under `K_share`.
+const SHARE_NAME_CTX = 'share-name'
 const noteDecoder = new TextDecoder()
 
-/** Seal a curator note under `K_share` (opaque base64) — the share page opens it with the fragment key. */
-function sealNote(kShare: Uint8Array, note: string): string {
-  return b64std(v1.symWrap(kShare, v1.utf8(note), SHARE_NOTE_CTX, v1.randomBytes(12)))
+/** A per-locale text map, e.g. `{ de: '…', en: '…' }` (cr-0116). Empty when there is no text. */
+export type LocaleMap = Record<string, string>
+
+/** Whether a per-locale map has any non-blank text. */
+export function hasLocaleText(map: LocaleMap): boolean {
+  return Object.values(map).some((t) => t.trim().length > 0)
 }
-/** Open a note sealed under `K_share` (the counterpart to {@link sealNote}). */
-function openNote(kShare: Uint8Array, sealed: string): string {
-  return noteDecoder.decode(v1.symUnwrap(kShare, fromB64std(sealed), SHARE_NOTE_CTX))
+
+/** Seal a per-locale curator-note map under `K_share` — the plaintext is a JSON `{locale: markdown}` map (cr-0116). */
+function sealNoteMap(kShare: Uint8Array, note: LocaleMap): string {
+  return b64std(v1.symWrap(kShare, v1.utf8(JSON.stringify(note)), SHARE_NOTE_CTX, v1.randomBytes(12)))
+}
+/** Open a per-locale note map sealed under `K_share`; `{}` when it can't be opened or isn't a JSON object. */
+function openNoteMap(kShare: Uint8Array, sealed: string): LocaleMap {
+  try {
+    const parsed = JSON.parse(noteDecoder.decode(v1.symUnwrap(kShare, fromB64std(sealed), SHARE_NOTE_CTX)))
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as LocaleMap) : {}
+  } catch {
+    return {}
+  }
+}
+/** Seal a share's optional private name under `K_share` (opaque base64). */
+function sealShareName(kShare: Uint8Array, name: string): string {
+  return b64std(v1.symWrap(kShare, v1.utf8(name), SHARE_NAME_CTX, v1.randomBytes(12)))
+}
+/** Open a share name sealed under `K_share`. */
+function openShareName(kShare: Uint8Array, sealed: string): string {
+  return noteDecoder.decode(v1.symUnwrap(kShare, fromB64std(sealed), SHARE_NAME_CTX))
 }
 /** Recover `K_share` from its `K_mem`-sealed copy `symWrap(K_mem, K_share)` — the curator always holds `K_mem`. */
 export function recoverShareKey(memoryKey: Uint8Array, sealedShareKey: string): Uint8Array {
@@ -65,15 +88,38 @@ export function recoverShareLink(shareId: string, memoryKey: Uint8Array, sealedS
     return null
   }
 }
-/** A managed share's current note, decrypted (recover `K_share` via `K_mem`, then open the note). '' when there is
- *  none or the ciphertext can't be opened (a share minted before cr-0115 carries no recoverable key). */
-export function readShareNote(memoryKey: Uint8Array, sealedShareKey: string | null, sealedNote: string | null): string {
-  if (!sealedShareKey || !sealedNote) return ''
+/** A managed share's per-locale note, decrypted (recover `K_share` via `K_mem`, then open the map). `{}` when there
+ *  is none or the ciphertext can't be opened (a share minted before cr-0115 carries no recoverable key). */
+export function readShareNoteMap(memoryKey: Uint8Array, sealedShareKey: string | null, sealedNote: string | null): LocaleMap {
+  if (!sealedShareKey || !sealedNote) return {}
   try {
-    return openNote(recoverShareKey(memoryKey, sealedShareKey), sealedNote)
+    return openNoteMap(recoverShareKey(memoryKey, sealedShareKey), sealedNote)
+  } catch {
+    return {}
+  }
+}
+/** A managed share's private name, decrypted. '' when none / unreadable. */
+export function readShareName(memoryKey: Uint8Array, sealedShareKey: string | null, sealedShareName: string | null): string {
+  if (!sealedShareKey || !sealedShareName) return ''
+  try {
+    return openShareName(recoverShareKey(memoryKey, sealedShareKey), sealedShareName)
   } catch {
     return ''
   }
+}
+
+/** Pick the best per-locale text for a viewer's locale (exact → base language → en → first present). '' if empty. */
+export function pickLocaleText(map: LocaleMap, locale: string): string {
+  const entries = Object.entries(map).filter(([, t]) => t && t.trim())
+  if (!entries.length) return ''
+  const req = locale.toLowerCase()
+  const base = req.split('-')[0]
+  const hit =
+    entries.find(([l]) => l.toLowerCase() === req) ??
+    entries.find(([l]) => l.toLowerCase() === base) ??
+    entries.find(([l]) => l.toLowerCase() === 'en') ??
+    entries[0]
+  return hit[1]
 }
 
 // --- curator (authenticated) -----------------------------------------------
@@ -97,32 +143,38 @@ export async function createShare(
   memoryName: string,
   role: ShareRole = ShareRole.Viewer,
   expiresAt: Date | null = null,
-  note = '',
+  note: LocaleMap = {},
+  name = '',
 ): Promise<MintedShare> {
   const kShare = v1.randomBytes(32)
   const wrap = b64std(v1.symWrap(kShare, memoryKey, SHARE_CTX, v1.randomBytes(12)))
   const sealedName = sealName(kShare, memoryName) // the Memory name re-sealed under K_share (same node-name construction)
-  // cr-0115 (ADR 0036): store a recoverable copy of K_share under K_mem (so the curator can edit the note later)
-  // and seal the optional note under K_share for the share page. sealedShareKey is stored on EVERY share, so a
-  // note can be added later even to one minted without one.
+  // cr-0115/cr-0116 (ADR 0036): store a recoverable copy of K_share under K_mem (so the curator can edit note + name
+  // later) and seal the optional per-locale note + private name under K_share. sealedShareKey is on EVERY share, so
+  // a note/name can be added later even to one minted without them.
   const sealedShareKey = b64std(v1.symWrap(memoryKey, kShare, SHARE_KEY_RECOVERY_CTX, v1.randomBytes(12)))
-  const sealedNote = note.trim() ? sealNote(kShare, note) : undefined
+  const sealedNote = hasLocaleText(note) ? sealNoteMap(kShare, note) : undefined
+  const sealedShareName = name.trim() ? sealShareName(kShare, name) : undefined
   const { shareId } = await withRefresh(() =>
     sharesApi().createShare({
-      createShareRequest: { nodeId, role, wrap, sealedName, expiresAt: expiresAt ?? undefined, sealedNote, sealedShareKey },
+      createShareRequest: { nodeId, role, wrap, sealedName, expiresAt: expiresAt ?? undefined, sealedNote, sealedShareKey, sealedShareName },
     }),
   )
   return { shareId, link: buildShareLink(shareId, kShare) }
 }
 
 /**
- * Edit a share's curator note in place (cr-0115, ADR 0036): recover `K_share` from its `K_mem`-sealed copy, re-seal
- * the new note (or clear it when blank), and PATCH — the same link keeps working. Owner-gated server-side.
+ * Edit a share's curator **note + name** in place (cr-0115/cr-0116, ADR 0036): recover `K_share` from its
+ * `K_mem`-sealed copy, re-seal both (or clear a blank one), and PATCH the full pair — the same link keeps working.
+ * Owner-gated server-side.
  */
-export async function updateShareNote(shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: string): Promise<void> {
+export async function updateShare(
+  shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string,
+): Promise<void> {
   const kShare = recoverShareKey(memoryKey, sealedShareKey)
-  const sealedNote = note.trim() ? sealNote(kShare, note) : null
-  await withRefresh(() => sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote } }))
+  const sealedNote = hasLocaleText(note) ? sealNoteMap(kShare, note) : null
+  const sealedShareName = name.trim() ? sealShareName(kShare, name) : null
+  await withRefresh(() => sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName } }))
 }
 
 /** A curator's management row for one of their shares (opaque; the sealed name isn't shown — the Memory is known). */
@@ -135,9 +187,11 @@ export type ManagedShare = {
   mine: boolean
   createdAt: Date
   expiresAt: Date | null
-  /** cr-0115: the note ciphertext (under `K_share`) + the recoverable `K_share` (under `K_mem`). The dialog reads
-   *  the current note via `readShareNote` and edits it via `updateShareNote`. Null on a pre-cr-0115 share. */
+  /** cr-0115/cr-0116: the note (per-locale) + name ciphertext (under `K_share`) + the recoverable `K_share` (under
+   *  `K_mem`). The dialog reads them via `readShareNoteMap`/`readShareName` and edits them via `updateShare`. Null
+   *  on a pre-cr-0115 share. */
   sealedNote: string | null
+  sealedShareName: string | null
   sealedShareKey: string | null
 }
 
@@ -155,6 +209,7 @@ export async function listSharesFor(nodeId: string): Promise<ManagedShare[]> {
       createdAt: new Date(r.createdAt),
       expiresAt: r.expiresAt ? new Date(r.expiresAt) : null,
       sealedNote: r.sealedNote ?? null,
+      sealedShareName: r.sealedShareName ?? null,
       sealedShareKey: r.sealedShareKey ?? null,
     }))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -261,7 +316,7 @@ export type ShareItem = { item: MediaItem; memoryKey: Uint8Array }
  * The decrypted shared Memory, ready to render: its name, the grant `role` (VIEWER / CONTRIBUTOR), the **root**
  * `K_mem` (for a contributor to seal their name + uploads under), and every media (each with its own `K_mem`).
  */
-export type ResolvedShare = { memoryName: string; note: string; role: ShareRole; rootMemoryKey: Uint8Array; items: ShareItem[] }
+export type ResolvedShare = { memoryName: string; noteByLocale: LocaleMap; role: ShareRole; rootMemoryKey: Uint8Array; items: ShareItem[] }
 
 /** The fragment key is missing/malformed, or the share is unknown/revoked/expired (a non-enumerable 404). */
 export class ShareUnavailableError extends Error {}
@@ -342,15 +397,9 @@ export async function resolveShare(shareId: string, fragmentKey: string): Promis
   } catch {
     throw new ShareUnavailableError('bad_fragment_key') // the id was valid but the fragment key doesn't match
   }
-  // cr-0115: the optional curator note, opened with the same fragment key (a bad/absent one just leaves it empty).
-  let note = ''
-  if (share.sealedNote) {
-    try {
-      note = openNote(kShare, share.sealedNote)
-    } catch {
-      /* an unreadable note is non-fatal — the share still renders without it */
-    }
-  }
+  // cr-0116: the optional per-locale curator note, opened with the same fragment key (a bad/absent one leaves `{}`).
+  // The share page picks the viewer's locale via `pickLocaleText`.
+  const noteByLocale = share.sealedNote ? openNoteMap(kShare, share.sealedNote) : {}
 
   const keys = deriveSubtreeKeys(share.nodes, rootKmem)
   const items: ShareItem[] = []
@@ -359,7 +408,7 @@ export async function resolveShare(shareId: string, fragmentKey: string): Promis
     if (!memoryKey) continue // a media under a chapter whose K_mem didn't open — skip
     items.push({ item: shareMediaToItem(m), memoryKey })
   }
-  return { memoryName, note, role: share.role, rootMemoryKey: rootKmem, items }
+  return { memoryName, noteByLocale, role: share.role, rootMemoryKey: rootKmem, items }
 }
 
 /** Open a shared blob via the gated, share-scoped presign endpoint (no auth), then decrypt it under its `K_mem`. */

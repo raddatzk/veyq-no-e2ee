@@ -19,6 +19,7 @@ import {
   createContributorIdentity,
   addSharePhoto,
   deleteSharePhoto,
+  pickLocaleText,
   type ShareItem,
   type ContributorSession,
 } from '../features/memory/share'
@@ -215,7 +216,8 @@ async function load() {
   try {
     const resolved = await resolveShare(shareId, fragmentKey.value)
     memoryName.value = resolved.memoryName
-    note.value = resolved.note // cr-0115: the curator note (opened with the fragment key), '' when none
+    // cr-0116: the curator note is a per-locale map — pick the viewer's locale (exact → base → en → first).
+    note.value = pickLocaleText(resolved.noteByLocale, locale.value)
     role.value = resolved.role
     rootMemoryKey.value = resolved.rootMemoryKey
     // incremental merge (no empty-flash): drop thumbs of removed media; donate a just-uploaded photo's optimistic

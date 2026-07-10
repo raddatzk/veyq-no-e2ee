@@ -36,6 +36,8 @@ class ShareNoteSliceTest {
     private val note1 = "bm90ZS1vbmU=" // "note-one"
     private val note2 = "bm90ZS10d28=" // "note-two"
     private val shareKey = "cmVjb3ZlcmFibGUta2V5" // symWrap(K_mem, K_share), opaque here
+    private val name1 = "Rm9yIEdyYW5kbWE=" // "For Grandma" sealed (opaque here)
+    private val name2 = "cmVuYW1lZA==" // "renamed"
 
     @Test
     fun createWithNoteThenAnonymousResolveReturnsIt() {
@@ -112,6 +114,40 @@ class ShareNoteSliceTest {
             .`when`().get("/api/shares")
             .then().statusCode(200)
             .body("find { it.shareId == '$shareId' }.sealedShareKey", equalTo(shareKey))
+    }
+
+    @Test
+    fun createWithANameShowsItInTheManageListButNeverToTheViewer() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"nodeId":"$memory","role":"VIEWER","wrap":"$wrap","sealedName":"$sealedName","sealedShareName":"$name1","sealedShareKey":"$shareKey"}""")
+            .`when`().post("/api/shares")
+            .then().statusCode(201).extract().path<String>("shareId")
+
+        // the owner's manage list carries the private name
+        given().header("Authorization", token(userId)).`when`().get("/api/shares")
+            .then().statusCode(200).body("find { it.shareId == '$shareId' }.sealedShareName", equalTo(name1))
+
+        // the anonymous resolve carries no name field at all (management-only) — it just resolves
+        given().`when`().get("/api/shares/$shareId").then().statusCode(200)
+    }
+
+    @Test
+    fun renameViaUpdateShareChangesTheNameKeepsTheNoteAndTheLink() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = createWithNote(userId, memory, note1)
+
+        // full-replace the editable fields: set a name, keep the note (same shareId)
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"sealedNote":"$note1","sealedShareName":"$name2"}""")
+            .`when`().patch("/api/shares/$shareId").then().statusCode(204)
+
+        given().header("Authorization", token(userId)).`when`().get("/api/shares")
+            .then().statusCode(200)
+            .body("find { it.shareId == '$shareId' }.sealedShareName", equalTo(name2))
+            .body("find { it.shareId == '$shareId' }.sealedNote", equalTo(note1))
     }
 
     // --- helpers ---

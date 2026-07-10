@@ -508,18 +508,29 @@ components:
         sealedNote:
           type: [string, "null"]
           description: >
-            OPTIONAL curator note sealed under `K_share` (AAD `share-note`, opaque base64) — a short message shown
-            on the share page. Absent/blank = no note (cr-0115, ADR 0036).
+            OPTIONAL curator note sealed under `K_share` (AAD `share-note`, opaque base64) — the plaintext is a
+            **per-locale JSON map** `{ "de": "…", "en": "…" }` (cr-0116); the share page renders the viewer's
+            locale (exact → base → en → first). Absent/blank = no note (cr-0115/cr-0116, ADR 0036).
           contentEncoding: base64
-          maxLength: 8192
-          example: c2VhbGVkLW5vdGUtdW5kZXItay1zaGFyZQ==
-          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+          maxLength: 16384
+          example: c2VhbGVkLW5vdGUtbG9jYWxlLW1hcA==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 16384) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedShareName:
+          type: [string, "null"]
+          description: >
+            OPTIONAL private label for this share, sealed under `K_share` (AAD `share-name`, opaque base64) — a
+            **management-only** name (e.g. "For Grandma") shown in the curator's share list, distinct from the
+            Memory name; **never served to the viewer** (cr-0116).
+          contentEncoding: base64
+          maxLength: 512
+          example: c2VhbGVkLXNoYXJlLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         sealedShareKey:
           type: [string, "null"]
           description: >
             OPTIONAL recoverable copy of the per-share key — `symWrap(K_mem, K_share)` (AAD `share-key-recovery`,
-            opaque base64). Lets the curator (who holds `K_mem`) recover `K_share` later to edit the note in place.
-            Openable only with `K_mem`; the operator never sees `K_share` (cr-0115, ADR 0036).
+            opaque base64). Lets the curator (who holds `K_mem`) recover `K_share` later to edit the note/name in
+            place. Openable only with `K_mem`; the operator never sees `K_share` (cr-0115, ADR 0036).
           contentEncoding: base64
           maxLength: 256
           example: cmVjb3ZlcmFibGUtc2hhcmUta2V5LXVuZGVyLWttZW0=
@@ -528,16 +539,24 @@ components:
     UpdateShareRequest:
       type: object
       description: >
-        Edit a share's curator note in place (cr-0115, ADR 0036) — `sealedNote` is the new note under `K_share`;
-        null or blank clears it.
+        Edit a share's curator **note** and **name** in place (cr-0115/cr-0116, ADR 0036). A **full replace** of the
+        two editable, `K_share`-sealed fields: each is the new value, `null`/blank clears it. The curator holds both
+        current values (decrypted in the manage list) and sends them together.
       properties:
         sealedNote:
           type: [string, "null"]
-          description: The new curator note sealed under `K_share` (AAD `share-note`, opaque base64). Null/empty clears it.
+          description: The new curator note (per-locale JSON map) sealed under `K_share` (AAD `share-note`). Null/empty clears it.
           contentEncoding: base64
-          maxLength: 8192
+          maxLength: 16384
           example: c2VhbGVkLW5vdGUtdjI=
-          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 16384) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedShareName:
+          type: [string, "null"]
+          description: The new private share name sealed under `K_share` (AAD `share-name`). Null/blank clears it (cr-0116).
+          contentEncoding: base64
+          maxLength: 512
+          example: c2VhbGVkLXNoYXJlLW5hbWU=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     ShareCreated:
       type: object
@@ -574,15 +593,21 @@ components:
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==
         sealedNote:
           type: [string, "null"]
-          description: The curator note under `K_share` (opaque base64), or null — the manage UI shows + edits it (cr-0115).
+          description: The curator note (per-locale JSON map) under `K_share` (opaque base64), or null — the manage UI shows + edits it.
           contentEncoding: base64
-          maxLength: 8192
+          maxLength: 16384
+          example: null
+        sealedShareName:
+          type: [string, "null"]
+          description: The share's private label under `K_share` (opaque base64), or null — the manage UI shows it as the row title, falling back to the role (cr-0116).
+          contentEncoding: base64
+          maxLength: 512
           example: null
         sealedShareKey:
           type: [string, "null"]
           description: >
             The recoverable per-share key `symWrap(K_mem, K_share)` (opaque base64), or null — lets the manage UI
-            recover `K_share` to edit the note (cr-0115, ADR 0036).
+            recover `K_share` to decrypt/edit the note + name (cr-0115/cr-0116, ADR 0036).
           contentEncoding: base64
           maxLength: 256
           example: null
@@ -627,9 +652,9 @@ components:
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==
         sealedNote:
           type: [string, "null"]
-          description: The curator note sealed under `K_share` (opaque base64), or null when the share has none (cr-0115).
+          description: The curator note (per-locale JSON map) sealed under `K_share` (opaque base64), or null when the share has none. The page renders the viewer's locale (cr-0115/cr-0116).
           contentEncoding: base64
-          maxLength: 8192
+          maxLength: 16384
           example: null
         nodes:
           type: array

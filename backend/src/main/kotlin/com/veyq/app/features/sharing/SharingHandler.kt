@@ -117,7 +117,7 @@ class SharingHandler(
 
     fun create(
         userId: String, nodeId: String, role: String, wrap: String, sealedName: String, expiresAt: Instant?,
-        sealedNote: String?, sealedShareKey: String?,
+        sealedNote: String?, sealedShareKey: String?, sealedShareName: String?,
     ): CreateShareOutcome {
         // Instance policy first (ADR 0032): the capability this role needs must be active, else 422 — checked
         // before any node/scope lookup so it reads as "the operator turned sharing off", not a scope error.
@@ -127,7 +127,7 @@ class SharingHandler(
         // Any member of the node's scope may share (cr-0104) — personal, group, or tenant; only a MEMORY node can
         // be public-shared (ADR 0029 §6, ADR 0030).
         if (node.kind != NodeEntity.MEMORY) return CreateShareOutcome.IllegalScope
-        val shareId = store.create(userId, node.scopeId, nodeId, role, wrap, sealedName, expiresAt, sealedNote, sealedShareKey)
+        val shareId = store.create(userId, node.scopeId, nodeId, role, wrap, sealedName, expiresAt, sealedNote, sealedShareKey, sealedShareName)
         return CreateShareOutcome.Created(shareId)
     }
 
@@ -145,10 +145,11 @@ class SharingHandler(
     fun revoke(userId: String, shareId: String): RevokeShareOutcome =
         if (store.revoke(userId, shareId)) RevokeShareOutcome.Done else RevokeShareOutcome.NotFound
 
-    /** Edit a share's curator note in place (cr-0115, ADR 0036) — owner-gated. A share not owned by the caller is a
-     *  non-enumerable 404. The note ciphertext (re-sealed client-side under `K_share`) replaces the old one. */
-    fun updateNote(userId: String, shareId: String, sealedNote: String?): UpdateShareOutcome =
-        if (store.updateNote(userId, shareId, sealedNote)) UpdateShareOutcome.Done else UpdateShareOutcome.NotFound
+    /** Edit a share's curator note + name in place (cr-0115/cr-0116, ADR 0036) — owner-gated. A share not owned by
+     *  the caller is a non-enumerable 404. The `K_share`-sealed ciphertexts (re-sealed client-side) replace the old
+     *  ones — a full replace of the two editable fields. */
+    fun updateShare(userId: String, shareId: String, sealedNote: String?, sealedShareName: String?): UpdateShareOutcome =
+        if (store.updateShare(userId, shareId, sealedNote, sealedShareName)) UpdateShareOutcome.Done else UpdateShareOutcome.NotFound
 
     /** Re-activate a soft-revoked share and adopt it (cr-0104): any current member of the share's scope may flip
      *  it back on, which transfers ownership to them. A non-member / unknown share is a non-enumerable 404. */

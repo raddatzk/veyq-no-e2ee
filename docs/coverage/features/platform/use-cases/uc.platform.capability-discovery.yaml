@@ -27,7 +27,7 @@ acceptanceCriteria:
     text: A client hides/omits a feature whose capability id is ABSENT from the manifest, and renders normally when present. A missing capability degrades gracefully (feature hidden, never invoked), never throws.
     coverage:
       web:
-        unit: [src/shared/state/useCapabilities.test.ts, src/features/memory/components/ShareDialog.test.ts]
+        unit: [src/shared/state/useCapabilities.test.ts, src/features/memory/components/ShareCreateDialog.test.ts]
   - id: operator-disable-enforced
     text: An operator disables a capability instance-wide (config); the server BOTH drops it from the manifest AND rejects the corresponding endpoint with 422 capability_disabled. The manifest is a UX hint; the server-side enforcement is the authority (a stale/ignoring client still cannot use it).
     coverage:
@@ -40,12 +40,12 @@ acceptanceCriteria:
       backend:
         integration: [CapabilityManifestSliceTest.manifestCarriesNoIdentityAndIsIdenticalForEveryCaller, CapabilityDisabledSliceTest.createUploaderShareIsRejectedWhileViewerPassesTheGate]
   - id: sharing-first-consumer
-    text: The Share dialog gates its role options on sharing.public-links / sharing.uploader-links; disabling sharing.uploader-links hides the Uploader option AND makes createShare(role=UPLOADER) return 422 capability_disabled. Proves the full loop (manifest -> client gate -> server enforcement) on a real feature.
+    text: Sharing gates on sharing.public-links / sharing.uploader-links. Since cr-0116 the share create dialog offers only VIEWER/CONTRIBUTOR (the uploader is a SEPARATE memory action, gated on sharing.uploader-links in MemoryDetail); disabling sharing.uploader-links hides the uploader action AND makes createShare(role=UPLOADER) return 422 capability_disabled. Proves the full loop (manifest -> client gate -> server enforcement) on a real feature.
     coverage:
       backend:
         integration: [CapabilityDisabledSliceTest.createUploaderShareIsRejectedWhileViewerPassesTheGate]
       web:
-        unit: [src/features/memory/components/ShareDialog.test.ts]
+        unit: [src/features/memory/components/ShareCreateDialog.test.ts]
   - id: catalog-serves-usecases
     text: A capability is a coarser projection over use-cases, not a 1:1 rename (ADR 0032 §6). Each catalog entry in contracts/platform/capabilities.json declares a serves [uc.…] back-ref (catalog-only, NOT on the wire), and a validator enforces every serves resolves to a real use-case — so the catalog can't be a typo or drift from the graph. The catalog is append-only; an id may be reserved ahead of first advertisement and is advertised active only once its use-cases are built. Seed - 4 capabilities over 12 use-cases (sharing.public-links=viewer+contributor, sharing.uploader-links=uploader, spaces.groups=the 5 group use-cases, account.device-trust=the 4 device-unlock use-cases).
     coverage:

@@ -44,6 +44,8 @@ import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
+import { useCapabilities } from '../../../shared/state/useCapabilities'
+import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
 import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
@@ -65,11 +67,16 @@ const emit = defineEmits<{
   openChapter: [node: TreeNode]
   createChapter: []
   share: []
+  shareUpload: []
   metaUpdated: [{ nodeId: string; wrappedMeta: string }]
 }>()
 
 const { t, locale } = useI18n()
 const { viewMode } = useViewMode()
+const { hasCapability } = useCapabilities()
+// cr-0116: the uploader (drop-box) action is offered only when the instance keeps the uploader-links capability
+// (ADR 0032) — mirrors the old switcher gate, now on the separate action. The server also rejects it (422).
+const canUploadShare = computed(() => !!props.shareable && hasCapability(SHARING_UPLOADER_LINKS))
 
 const items = ref<MediaItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
@@ -924,6 +931,18 @@ onBeforeUnmount(() => {
           text
           :disabled="!memoryKey"
           @click="$emit('share')"
+        />
+        <!-- cr-0116: the uploader (drop-box) link is its OWN action, not a share-type in the switcher. -->
+        <Button
+          v-if="canUploadShare"
+          v-tooltip.bottom="t('share.uploadRequest')"
+          type="button"
+          :aria-label="t('share.uploadRequest')"
+          icon="pi pi-user-plus"
+          severity="secondary"
+          text
+          :disabled="!memoryKey"
+          @click="$emit('shareUpload')"
         />
         <Button
           v-tooltip.bottom="favorite ? t('memory.unfavorite') : t('memory.favorite')"
