@@ -197,11 +197,20 @@ const consentDialogOpen = ref(false)
 const storedLocation = computed(() => (props.memoryKey ? unsealMemoryLocation(props.memoryKey, props.node) : null))
 const gpsPoints = computed(() => (props.memoryKey ? mediaGpsPoints(items.value, props.memoryKey) : []))
 const medoid = computed(() => computeMedoid(gpsPoints.value))
-// A pending auto place (armed, name deferred) shows a "…being determined" label until the first media names it.
+// A pending auto place (armed, name deferred) is only genuinely "being determined" when there's a geotagged
+// medium to derive a position from; with no GPS media there is nothing to detect, so say "no location detected"
+// rather than imply an in-progress lookup that will never resolve.
 const locationLabel = computed(() => {
   const loc = storedLocation.value
   if (!loc) return ''
-  return isLocationPending(loc) ? t('memory.place.pending') : loc.name
+  if (!isLocationPending(loc)) return loc.name
+  return gpsPoints.value.length ? t('memory.place.pending') : t('memory.place.none')
+})
+// A location the header can show as a real, set place (a materialized name) — vs. the "set / pending / none"
+// placeholder states, which render in the muted `is-empty` style.
+const locationResolved = computed(() => {
+  const loc = storedLocation.value
+  return Boolean(loc && !isLocationPending(loc))
 })
 
 /** Open the location editor — but first gate on the personal maps opt-in (no consent ⇒ ask, no external calls). */
@@ -878,30 +887,32 @@ onBeforeUnmount(() => {
       <div class="gallery-header-copy">
         <h1 class="gallery-title">{{ node.name }}</h1>
         <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
-        <button
-          type="button"
-          class="memory-date-chip"
-          :class="{ 'is-empty': !dateLabel }"
-          :disabled="!memoryKey"
-          :aria-label="t('memory.date.edit')"
-          :title="t('memory.date.edit')"
-          @click="dateEditorOpen = true"
-        >
-          <span class="pi pi-calendar" />
-          <span>{{ dateLabel || t('memory.date.noDate') }}</span>
-        </button>
-        <button
-          type="button"
-          class="memory-date-chip memory-location-chip"
-          :class="{ 'is-empty': !locationLabel }"
-          :disabled="!memoryKey"
-          :aria-label="locationLabel ? t('memory.place.edit') : t('memory.place.set')"
-          :title="locationLabel ? t('memory.place.edit') : t('memory.place.set')"
-          @click="openLocationEditor"
-        >
-          <span class="pi pi-map-marker" />
-          <span>{{ locationLabel || t('memory.place.set') }}</span>
-        </button>
+        <div class="memory-meta-row">
+          <button
+            type="button"
+            class="memory-date-chip"
+            :class="{ 'is-empty': !dateLabel }"
+            :disabled="!memoryKey"
+            :aria-label="t('memory.date.edit')"
+            :title="t('memory.date.edit')"
+            @click="dateEditorOpen = true"
+          >
+            <span class="pi pi-calendar" />
+            <span>{{ dateLabel || t('memory.date.noDate') }}</span>
+          </button>
+          <button
+            type="button"
+            class="memory-date-chip memory-location-chip"
+            :class="{ 'is-empty': !locationResolved }"
+            :disabled="!memoryKey"
+            :aria-label="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
+            :title="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
+            @click="openLocationEditor"
+          >
+            <span class="pi pi-map-marker" />
+            <span>{{ locationLabel || t('memory.place.set') }}</span>
+          </button>
+        </div>
       </div>
       </div>
       <div class="gallery-header-actions">
@@ -1354,21 +1365,32 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
   font-weight: 700;
 }
-/* The sealed Memory date, shown under the title as a clickable chip that opens the date editor (cr-0067). */
+/* Date + location under the title, side by side (cr-0067/0069). A light metadata row rather than bordered pills:
+   each is a borderless button (accent icon + label) that opens its editor, with a subtle hover so it still reads
+   as clickable. The "set / pending / no-location" placeholder states render muted via `.is-empty`. */
+.memory-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.4rem;
+  margin-top: 0.4rem;
+}
 .memory-date-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  width: auto;
-  justify-self: start;
-  margin-top: 0.15rem;
-  padding: 0.28rem 0.6rem;
-  border: 1px solid var(--app-line);
-  border-radius: 999px;
-  background: var(--app-surface);
+  padding: 0.25rem 0.45rem;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
   color: var(--app-text);
-  font-size: 0.86rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.memory-date-chip:hover:not(:disabled) {
+  background: var(--app-hover);
 }
 .memory-date-chip:disabled {
   opacity: 0.6;
@@ -1376,9 +1398,14 @@ onBeforeUnmount(() => {
 }
 .memory-date-chip.is-empty {
   color: var(--app-muted);
+  font-weight: 500;
 }
 .memory-date-chip .pi {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  color: var(--app-accent);
+}
+.memory-date-chip.is-empty .pi {
+  color: var(--app-muted);
 }
 .gallery-header-actions {
   display: flex;

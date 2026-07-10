@@ -51,7 +51,7 @@ const i18n = createI18n({
         },
         place: {
           title: 'Location', edit: 'Edit location', set: 'Set location', noPlace: 'No location yet', name: 'Name',
-          pending: 'Location pending…', remove: 'Remove location', consentTitle: 'Enable maps?', consentBody: 'Third-party tiles + geocoder.', consentEnable: 'Enable maps',
+          pending: 'Location pending…', none: 'No location detected', remove: 'Remove location', consentTitle: 'Enable maps?', consentBody: 'Third-party tiles + geocoder.', consentEnable: 'Enable maps',
         },
       },
       media: {
@@ -499,11 +499,27 @@ describe('MemoryDetail (Memory location — header chip + read-modify-write, cr-
     })
   })
 
-  it('shows a “pending” placeholder in the chip for an armed-but-unnamed auto location', async () => {
+  it('shows “no location detected” for an armed auto location when there is NO geotagged media (nothing to resolve)', async () => {
     emptyStore()
     const memoryKey = v1.randomBytes(32)
     const pending = sealNodeMeta(memoryKey, { v: 1, location: { nameSource: 'geocoded', derivedMode: 'auto' } })
     const wrapper = mountWithLocationStub(memoryKey, pending)
+    await flushPromises()
+    // No GPS media ⇒ the armed auto place can never resolve, so the chip says so rather than imply an in-progress lookup.
+    expect(wrapper.find('.memory-location-chip').text()).toContain('No location detected')
+  })
+
+  it('shows the “pending” placeholder for an armed auto location while a geotagged medium exists but no name yet', async () => {
+    setMapsConsent(false) // a position to resolve exists, but geocoding is not consented ⇒ the name stays deferred
+    const memoryKey = v1.randomBytes(32)
+    const pending = sealNodeMeta(memoryKey, { v: 1, location: { nameSource: 'geocoded', derivedMode: 'auto' } })
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    vi.mocked(exifr.parse).mockResolvedValue({ latitude: 48.85, longitude: 2.35 } as never)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/jpeg' }, stubDeriver())
+    const wrapper = mountWithLocationStub(memoryKey, pending)
+    await flushPromises()
     await flushPromises()
     expect(wrapper.find('.memory-location-chip').text()).toContain('Location pending')
   })
