@@ -97,15 +97,24 @@ class SharingStore(
         return id
     }
 
-    /** Full-replace the two editable, `K_share`-sealed fields (note + name) on a share the caller owns (cr-0115/
-     *  cr-0116; idempotent). A null value clears that field. Returns false when no such share is owned by the caller
-     *  — a non-enumerable 404, mirroring `revoke`. */
+    /** The 3-way result of an in-place share edit (cr-0119): applied, no such owned share, or an illegal role change. */
+    enum class UpdateResult { DONE, NOT_FOUND, INVALID_ROLE }
+
+    /** Edit a share the caller owns in place (cr-0115/cr-0116/cr-0119; idempotent). Full-replaces the two editable,
+     *  `K_share`-sealed fields (note + name — a null value clears that field); a non-null `role` changes the grant
+     *  **in place** (VIEWER ↔ CONTRIBUTOR only — a role of, or a share currently in, UPLOADER is `INVALID_ROLE`, the
+     *  write-only drop-box's promise is not flippable on distributed links). Ownership is checked first, so a share
+     *  not owned by the caller is `NOT_FOUND` regardless of the role (non-enumerable, mirroring `revoke`). */
     @Transactional
-    fun updateShare(ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?): Boolean {
-        val share = ShareEntity.findById(shareId)?.takeIf { it.ownerAccount == ownerAccount } ?: return false
+    fun updateShare(ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?): UpdateResult {
+        val share = ShareEntity.findById(shareId)?.takeIf { it.ownerAccount == ownerAccount } ?: return UpdateResult.NOT_FOUND
+        if (role != null) {
+            if (role == ShareEntity.UPLOADER || share.role == ShareEntity.UPLOADER) return UpdateResult.INVALID_ROLE
+            share.role = role
+        }
         share.sealedNote = sealedNote
         share.sealedShareName = sealedShareName
-        return true
+        return UpdateResult.DONE
     }
 
     fun find(shareId: String): ShareEntity? = ShareEntity.findById(shareId)

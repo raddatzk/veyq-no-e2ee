@@ -98,12 +98,17 @@ class SharingResource(
             ReactivateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }
 
-    // Edit a share's curator note + name in place (cr-0115/cr-0116, ADR 0036) — owner-gated in the handler (404 if
-    // not the caller's), so the link/K_share/role/wrap are untouched; only the two K_share-sealed ciphertexts change.
+    // Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036) — owner-gated in the handler (404 if not the
+    // caller's). The K_share-sealed ciphertexts (note + name) are re-sealed client-side; an optional `role` changes
+    // the grant in place (VIEWER ↔ CONTRIBUTOR — UPLOADER is 422). The link/K_share/wrap are untouched either way.
     override fun updateShare(shareId: String, updateShareRequest: UpdateShareRequest): Response =
-        when (handler.updateShare(identity.principal.name, shareId, updateShareRequest.sealedNote, updateShareRequest.sealedShareName)) {
+        when (handler.updateShare(
+            identity.principal.name, shareId,
+            updateShareRequest.sealedNote, updateShareRequest.sealedShareName, updateShareRequest.role?.value,
+        )) {
             UpdateShareOutcome.Done -> Response.noContent().build()
             UpdateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            UpdateShareOutcome.InvalidRole -> error(422, "invalid_role_change")
         }
 
     @PermitAll

@@ -75,6 +75,13 @@ note right of S : sees shareId, wrap, role, sealedName, nodeId,\nthe sealed cont
   experience is the separate VIEWER share.)
 - **A2 — revoked / expired:** `enabled = false` or a passed `expiresAt` → the resolve **and** the upload
   endpoints `404`/`403`; in-flight and already-uploaded photos remain (no retraction — see Quality notes).
+- **A3 — change the grant in place (cr-0119):** the curator edits an existing **VIEWER** share and switches it to
+  **CONTRIBUTOR** (or back) from the share-management dialog — the **same link keeps working**, no new `K_share`,
+  no re-wrap. `role` is plaintext authorization the server enforces per request, so the new grant bites on the next
+  resolve/upload (a promote enables contributions at once; a demote 403s new uploads at once, already-contributed
+  photos stay). Restricted to **VIEWER ↔ CONTRIBUTOR** — an **UPLOADER** drop-box is its own separate action and its
+  write-only promise is never flipped in place (a `422 invalid_role_change` rejects setting UPLOADER or editing an
+  UPLOADER share's role). Owner-gated via `updateShare` ([ADR 0036](../../../decisions/0036-editable-share-note-recoverable-share-key.md)).
 - **E1 — blank name:** the pre-screen blocks submission until a non-blank name is entered (mandatory).
 - **E2 — over budget / rate-limited:** an oversized upload fails the per-blob byte budget; too many uploads in a
   window are rate-limited (per-share, best-effort) — defense against an abusive link holder.

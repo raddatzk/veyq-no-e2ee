@@ -89,6 +89,8 @@ sealed interface UpdateShareOutcome {
     object Done : UpdateShareOutcome
     /** No such share owned by the caller — a non-enumerable 404 (owner-gated, like revoke). */
     object NotFound : UpdateShareOutcome
+    /** An illegal role change (cr-0119) — `role = UPLOADER`, or a change on an UPLOADER share → 422. */
+    object InvalidRole : UpdateShareOutcome
 }
 
 sealed interface ReactivateShareOutcome {
@@ -145,11 +147,17 @@ class SharingHandler(
     fun revoke(userId: String, shareId: String): RevokeShareOutcome =
         if (store.revoke(userId, shareId)) RevokeShareOutcome.Done else RevokeShareOutcome.NotFound
 
-    /** Edit a share's curator note + name in place (cr-0115/cr-0116, ADR 0036) — owner-gated. A share not owned by
-     *  the caller is a non-enumerable 404. The `K_share`-sealed ciphertexts (re-sealed client-side) replace the old
-     *  ones — a full replace of the two editable fields. */
-    fun updateShare(userId: String, shareId: String, sealedNote: String?, sealedShareName: String?): UpdateShareOutcome =
-        if (store.updateShare(userId, shareId, sealedNote, sealedShareName)) UpdateShareOutcome.Done else UpdateShareOutcome.NotFound
+    /** Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036) — owner-gated. A share not owned by the caller is a
+     *  non-enumerable 404. The `K_share`-sealed ciphertexts (re-sealed client-side) full-replace the note + name;
+     *  a non-null `role` changes the grant in place (VIEWER ↔ CONTRIBUTOR only — UPLOADER, either as the target or
+     *  as the share's current role, is `InvalidRole` → 422). Role change is a plaintext authz change: no re-crypto,
+     *  the wrap/`K_share`/link are untouched. */
+    fun updateShare(userId: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?): UpdateShareOutcome =
+        when (store.updateShare(userId, shareId, sealedNote, sealedShareName, role)) {
+            SharingStore.UpdateResult.DONE -> UpdateShareOutcome.Done
+            SharingStore.UpdateResult.NOT_FOUND -> UpdateShareOutcome.NotFound
+            SharingStore.UpdateResult.INVALID_ROLE -> UpdateShareOutcome.InvalidRole
+        }
 
     /** Re-activate a soft-revoked share and adopt it (cr-0104): any current member of the share's scope may flip
      *  it back on, which transfers ownership to them. A non-member / unknown share is a non-enumerable 404. */

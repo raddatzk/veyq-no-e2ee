@@ -29,9 +29,9 @@ const emit = defineEmits<{ close: []; saved: [] }>()
 const { t } = useI18n()
 
 const isEdit = computed(() => !!props.editShare)
-// The role is chosen only when creating a normal share; an edit keeps the minted role, and the uploader variant is
-// fixed to UPLOADER (no switcher).
-const showRoleSwitcher = computed(() => !isEdit.value && !props.uploader)
+// The role switcher shows in the normal flow on BOTH create and edit (cr-0119: an existing VIEWER/CONTRIBUTOR share
+// can be re-graded in place); the uploader variant never shows it (its role is fixed, its promise not flippable).
+const showRoleSwitcher = computed(() => !props.uploader)
 const headerLabel = computed(() =>
   isEdit.value ? t('share.editTitle') : props.uploader ? t('share.uploaderCreate') : t('share.createNew'),
 )
@@ -66,7 +66,11 @@ async function onSubmit() {
   error.value = false
   try {
     if (isEdit.value && props.editShare?.sealedShareKey) {
-      await updateShare(props.editShare.shareId, props.memoryKey, props.editShare.sealedShareKey, note.value, name.value)
+      // cr-0119: a normal-flow edit may re-grade the role (VIEWER ↔ CONTRIBUTOR); the uploader variant never sends one.
+      await updateShare(
+        props.editShare.shareId, props.memoryKey, props.editShare.sealedShareKey,
+        note.value, name.value, props.uploader ? undefined : role.value,
+      )
       emit('saved')
       emit('close')
     } else {
@@ -130,8 +134,8 @@ async function onCopy() {
         <InputText id="share-create-name" v-model="name" :placeholder="t('share.nameOptional')" />
       </div>
 
-      <!-- Normal flow: pick VIEWER/CONTRIBUTOR on create (an edit keeps the role). Uploader flow: no switcher —
-           just a short description of what a drop-box link does. -->
+      <!-- Normal flow: pick VIEWER/CONTRIBUTOR on create AND edit (cr-0119, re-grade in place). Uploader flow: no
+           switcher — just a short description of what a drop-box link does. -->
       <div v-if="showRoleSwitcher" class="share-field">
         <label>{{ t('share.roleLabel') }}</label>
         <SelectButton v-model="role" :options="roleOptions" option-label="label" option-value="value" :allow-empty="false" />

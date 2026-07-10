@@ -52,6 +52,13 @@ acceptanceCriteria:
         integration: [ShareContributorSliceTest.viewerShareRejectsContribution, ShareContributorSliceTest.revokeStopsContribution]
       http:
         e2e: [http/sharing/contribute.http]
+  - id: role-mutable-in-place
+    text: A curator changes an existing share's role in place (VIEWER <-> CONTRIBUTOR) via PATCH updateShare { role } (cr-0119, ADR 0036) — the same link / wrap / K_share are untouched (role is server-enforced plaintext authz, no re-crypto), so the new grant bites on the next guest request (a promote enables contribution at once; a demote 403s new uploads, already-contributed photos stay). Restricted to VIEWER <-> CONTRIBUTOR - setting role=UPLOADER, or changing an UPLOADER share's role, is 422 invalid_role_change (the write-only drop-box is its own separate action, its promise not flippable on distributed links). Owner-gated (a non-owner is 404, like the note edit); role is optional on the PATCH (omitted for a plain note/name edit). Web - the normal edit dialog shows the VIEWER/CONTRIBUTOR switcher (never the uploader variant).
+    coverage:
+      backend:
+        integration: [ShareNoteSliceTest.promoteViewerToContributorInPlaceKeepsTheLinkAndEnablesContribution, ShareNoteSliceTest.roleChangeToUploaderIs422, ShareNoteSliceTest.changingAnUploaderShareRoleIs422]
+      web:
+        unit: [src/features/memory/components/ShareCreateDialog.test.ts]
 gaps:
   apple: "Sharing is web-first — a later native CR, like the rest of the feature epics. (A native curator can create a contributor share; the anonymous contributor is inherently the no-install web page.)"
   android: "Sharing is web-first — a later native CR, like the rest of the feature epics."

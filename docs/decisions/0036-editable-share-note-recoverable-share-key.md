@@ -49,8 +49,12 @@ parts.
    `owner_account`-checked) that accepts a new **`sealedNote`**. The curator, editing from the Memory's share
    dialog (which holds `K_mem`), lists their shares (the list now also returns `sealed_note` + `sealed_share_key`),
    recovers `K_share`, re-seals the new note, and PATCHes it — **the link stays valid**. The op is deliberately
-   extensible (expiry, and re-sealing `sealedName` after a rename, are natural later fields) but v1 edits only the
-   note.
+   extensible: cr-0116 added the private **`sealedShareName`** (both sealed fields are a full replace), and
+   **cr-0119** added an optional **`role`** — the first *grant-affecting* field, a **pure server-side authorization
+   change** (no re-crypto: the three roles share one `symWrap(K_share, K_mem)`, so the wrap/`K_share`/link are
+   untouched). The role change is restricted to **VIEWER ↔ CONTRIBUTOR** (a `422 invalid_role_change` rejects
+   setting `role = UPLOADER` or changing an UPLOADER share's role — a write-only drop-box's "cannot see" promise
+   can't be honestly flipped on already-distributed links). `role` is omitted for a plain note/name edit.
 
 **Roles + scope.** All three roles (VIEWER / CONTRIBUTOR / UPLOADER) carry a note. **v1 = personal-scope shares**
 (the current share cut); the note rides [cr-0104](../../changes/cr-0104-shared-scope-public-shares.md)'s

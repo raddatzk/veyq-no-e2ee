@@ -38,6 +38,7 @@ class ShareNoteSliceTest {
     private val shareKey = "cmVjb3ZlcmFibGUta2V5" // symWrap(K_mem, K_share), opaque here
     private val name1 = "Rm9yIEdyYW5kbWE=" // "For Grandma" sealed (opaque here)
     private val name2 = "cmVuYW1lZA==" // "renamed"
+    private val sealedDisplayName = "c2VhbGVkLWNvbnRyaWJ1dG9yLW5hbWU=" // a contributor's K_mem-sealed name (opaque here)
 
     @Test
     fun createWithNoteThenAnonymousResolveReturnsIt() {
@@ -150,7 +151,68 @@ class ShareNoteSliceTest {
             .body("find { it.shareId == '$shareId' }.sealedNote", equalTo(note1))
     }
 
+    // --- role change in place (uc.sharing.share-contributor role-mutable-in-place, cr-0119, ADR 0036) ---
+
+    @Test
+    fun promoteViewerToContributorInPlaceKeepsTheLinkAndEnablesContribution() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = createWithRole(userId, memory, "VIEWER")
+
+        // a VIEWER share rejects the anonymous contribute (name) step
+        given().contentType(ContentType.JSON).body("""{"sealedDisplayName":"$sealedDisplayName"}""")
+            .`when`().post("/api/shares/$shareId/identities")
+            .then().statusCode(403).body("code", equalTo("share_not_contributable"))
+
+        // promote the grant in place — same shareId, no re-wrap
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"role":"CONTRIBUTOR"}""")
+            .`when`().patch("/api/shares/$shareId").then().statusCode(204)
+
+        // the link is unchanged (same wrap), the grant flipped, and the contribution now works
+        given().`when`().get("/api/shares/$shareId")
+            .then().statusCode(200).body("role", equalTo("CONTRIBUTOR")).body("wrap", equalTo(wrap))
+        given().contentType(ContentType.JSON).body("""{"sealedDisplayName":"$sealedDisplayName"}""")
+            .`when`().post("/api/shares/$shareId/identities").then().statusCode(201)
+    }
+
+    @Test
+    fun roleChangeToUploaderIs422() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = createWithRole(userId, memory, "VIEWER")
+
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"role":"UPLOADER"}""")
+            .`when`().patch("/api/shares/$shareId")
+            .then().statusCode(422).body("code", equalTo("invalid_role_change"))
+
+        // the grant is unchanged — you can't turn a viewer link into a write-only drop-box in place
+        given().`when`().get("/api/shares/$shareId").then().statusCode(200).body("role", equalTo("VIEWER"))
+    }
+
+    @Test
+    fun changingAnUploaderShareRoleIs422() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = createWithRole(userId, memory, "UPLOADER")
+
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"role":"CONTRIBUTOR"}""")
+            .`when`().patch("/api/shares/$shareId")
+            .then().statusCode(422).body("code", equalTo("invalid_role_change"))
+
+        // still a write-only drop-box — its promise isn't flippable on distributed links
+        given().`when`().get("/api/shares/$shareId").then().statusCode(200).body("role", equalTo("UPLOADER"))
+    }
+
     // --- helpers ---
+
+    private fun createWithRole(userId: String, nodeId: String, role: String): String =
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"nodeId":"$nodeId","role":"$role","wrap":"$wrap","sealedName":"$sealedName","sealedShareKey":"$shareKey"}""")
+            .`when`().post("/api/shares")
+            .then().statusCode(201).extract().path("shareId")
 
     private fun createWithNote(userId: String, nodeId: String, note: String): String =
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)

@@ -194,14 +194,16 @@ paths:
     patch:
       tags: [sharing]
       operationId: updateShare
-      summary: Edit a share's curator note in place (owner-gated).
+      summary: Edit a share in place — note / name / role (owner-gated).
       description: >
-        Sets the share's **curator note** (`sealedNote`, sealed under `K_share`) — a curator edits the message on
-        an existing share **without minting a new link** (cr-0115, ADR 0036). The caller recovers `K_share` from
-        the share's `sealedShareKey` (`symWrap(K_mem, K_share)`, which they hold `K_mem` for), re-seals the note,
-        and PATCHes it. Owner-gated: only the share's `owner_account` may edit — a share not owned by the caller is
-        a non-enumerable `404` (like revoke). A null/blank `sealedNote` clears the note. Operator-blind: one opaque
-        ciphertext replaces another; no key crosses the boundary.
+        Edits an existing share **without minting a new link** (cr-0115/cr-0116/cr-0119, ADR 0036). Sets the
+        `K_share`-sealed **note** (`sealedNote`) + **private name** (`sealedShareName`) — the caller recovers
+        `K_share` from the share's `sealedShareKey` (`symWrap(K_mem, K_share)`, which they hold `K_mem` for),
+        re-seals them, and PATCHes them (null/blank clears a field). Optionally changes the **`role`** in place
+        (cr-0119) — a plaintext authorization change, no re-crypto, **VIEWER ↔ CONTRIBUTOR** only (UPLOADER →
+        `422`). Owner-gated: only the share's `owner_account` may edit — a share not owned by the caller is a
+        non-enumerable `404` (like revoke). Operator-blind: opaque ciphertext in, opaque ciphertext out; no key
+        crosses the boundary.
       security:
         - bearerAuth: []
       parameters:
@@ -214,7 +216,7 @@ paths:
             example: { sealedNote: c2VhbGVkLW5vdGUtdjI= }
       responses:
         "204":
-          description: The share's note was updated.
+          description: The share was updated (note / name / role).
         "400":
           description: Malformed request (invalid note encoding).
           content:
@@ -227,6 +229,12 @@ paths:
           description: No such share owned by the caller (non-enumerable).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
+        "422":
+          description: >
+            An illegal role change (cr-0119) — `role = UPLOADER`, or a role change on a share whose current role is
+            UPLOADER. The write-only drop-box is a separate action and its role is not editable in place.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_role_change } }
 
   /api/shares/{shareId}/blobs/{blobId}:
     get:
@@ -539,9 +547,12 @@ components:
     UpdateShareRequest:
       type: object
       description: >
-        Edit a share's curator **note** and **name** in place (cr-0115/cr-0116, ADR 0036). A **full replace** of the
-        two editable, `K_share`-sealed fields: each is the new value, `null`/blank clears it. The curator holds both
-        current values (decrypted in the manage list) and sends them together.
+        Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036). `sealedNote` + `sealedShareName` are a **full
+        replace** of the two `K_share`-sealed fields (each is the new value, `null`/blank clears it) — the curator
+        holds both current values (decrypted in the manage list) and sends them together. `role` is an **optional
+        grant change** (cr-0119): when present it changes the share's role **in place** (a plaintext authz change,
+        no re-crypto — the link/wrap stay valid), restricted to **VIEWER ↔ CONTRIBUTOR** (setting `UPLOADER`, or
+        editing an UPLOADER share's role, is `422 invalid_role_change`); when omitted the grant is unchanged.
       properties:
         sealedNote:
           type: [string, "null"]
@@ -557,6 +568,8 @@ components:
           maxLength: 512
           example: c2VhbGVkLXNoYXJlLW5hbWU=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        role:
+          $ref: "#/components/schemas/ShareRole"
 
     ShareCreated:
       type: object

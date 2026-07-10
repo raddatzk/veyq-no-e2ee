@@ -164,17 +164,18 @@ export async function createShare(
 }
 
 /**
- * Edit a share's curator **note + name** in place (cr-0115/cr-0116, ADR 0036): recover `K_share` from its
- * `K_mem`-sealed copy, re-seal both (or clear a blank one), and PATCH the full pair — the same link keeps working.
- * Owner-gated server-side.
+ * Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036): recover `K_share` from its `K_mem`-sealed copy,
+ * re-seal note + name (or clear a blank one) and PATCH the full pair — the same link keeps working. An optional
+ * `role` changes the grant in place (VIEWER ↔ CONTRIBUTOR; the server 422s UPLOADER); omitted when unchanged / for
+ * the uploader variant. Owner-gated server-side. A role change is a plaintext authz change — no re-crypto.
  */
 export async function updateShare(
-  shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string,
+  shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string, role?: ShareRole,
 ): Promise<void> {
   const kShare = recoverShareKey(memoryKey, sealedShareKey)
   const sealedNote = hasLocaleText(note) ? sealNoteMap(kShare, note) : null
   const sealedShareName = name.trim() ? sealShareName(kShare, name) : null
-  await withRefresh(() => sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName } }))
+  await withRefresh(() => sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName, role } }))
 }
 
 /** A curator's management row for one of their shares (opaque; the sealed name isn't shown — the Memory is known). */

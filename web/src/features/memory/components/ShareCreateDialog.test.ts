@@ -16,6 +16,7 @@ vi.mock('../share', () => ({
 }))
 
 import ShareCreateDialog from './ShareCreateDialog.vue'
+import { ShareRole } from '../../../api/generated/sharing'
 
 const i18n = createI18n({
   legacy: false,
@@ -65,5 +66,16 @@ describe('ShareCreateDialog (cr-0116)', () => {
   it('uploader flow: no role switcher at all (role fixed to UPLOADER)', () => {
     const w = mountDialog({ uploader: true })
     expect(w.find('.select-button').exists()).toBe(false)
+  })
+
+  it('edit flow (normal): shows the switcher so the role can be re-graded in place (cr-0119)', () => {
+    const editShare = {
+      shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
+      createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
+    }
+    const w = mountDialog({ editShare })
+    expect(w.find('.select-button').exists()).toBe(true)
+    expect(w.text()).toContain('View only')
+    expect(w.text()).toContain('View + add photos')
   })
 })
