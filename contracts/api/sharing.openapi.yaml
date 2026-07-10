@@ -191,6 +191,42 @@ paths:
           description: No such share, or it is disabled/expired (non-enumerable — identical in every case).
           content:
             application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
+    patch:
+      tags: [sharing]
+      operationId: updateShare
+      summary: Edit a share's curator note in place (owner-gated).
+      description: >
+        Sets the share's **curator note** (`sealedNote`, sealed under `K_share`) — a curator edits the message on
+        an existing share **without minting a new link** (cr-0115, ADR 0036). The caller recovers `K_share` from
+        the share's `sealedShareKey` (`symWrap(K_mem, K_share)`, which they hold `K_mem` for), re-seals the note,
+        and PATCHes it. Owner-gated: only the share's `owner_account` may edit — a share not owned by the caller is
+        a non-enumerable `404` (like revoke). A null/blank `sealedNote` clears the note. Operator-blind: one opaque
+        ciphertext replaces another; no key crosses the boundary.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ShareId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateShareRequest" }
+            example: { sealedNote: c2VhbGVkLW5vdGUtdjI= }
+      responses:
+        "204":
+          description: The share's note was updated.
+        "400":
+          description: Malformed request (invalid note encoding).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } }
+        "404":
+          description: No such share owned by the caller (non-enumerable).
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: share_not_found } }
 
   /api/shares/{shareId}/blobs/{blobId}:
     get:
@@ -469,6 +505,39 @@ components:
           format: date-time
           description: Optional expiry; a share past this instant resolves `404` (same shape as an unknown id). Null = no expiry.
           example: null
+        sealedNote:
+          type: [string, "null"]
+          description: >
+            OPTIONAL curator note sealed under `K_share` (AAD `share-note`, opaque base64) — a short message shown
+            on the share page. Absent/blank = no note (cr-0115, ADR 0036).
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5vdGUtdW5kZXItay1zaGFyZQ==
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        sealedShareKey:
+          type: [string, "null"]
+          description: >
+            OPTIONAL recoverable copy of the per-share key — `symWrap(K_mem, K_share)` (AAD `share-key-recovery`,
+            opaque base64). Lets the curator (who holds `K_mem`) recover `K_share` later to edit the note in place.
+            Openable only with `K_mem`; the operator never sees `K_share` (cr-0115, ADR 0036).
+          contentEncoding: base64
+          maxLength: 256
+          example: cmVjb3ZlcmFibGUtc2hhcmUta2V5LXVuZGVyLWttZW0=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+
+    UpdateShareRequest:
+      type: object
+      description: >
+        Edit a share's curator note in place (cr-0115, ADR 0036) — `sealedNote` is the new note under `K_share`;
+        null or blank clears it.
+      properties:
+        sealedNote:
+          type: [string, "null"]
+          description: The new curator note sealed under `K_share` (AAD `share-note`, opaque base64). Null/empty clears it.
+          contentEncoding: base64
+          maxLength: 8192
+          example: c2VhbGVkLW5vdGUtdjI=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
 
     ShareCreated:
       type: object
@@ -503,6 +572,20 @@ components:
           contentEncoding: base64
           maxLength: 4096
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==
+        sealedNote:
+          type: [string, "null"]
+          description: The curator note under `K_share` (opaque base64), or null — the manage UI shows + edits it (cr-0115).
+          contentEncoding: base64
+          maxLength: 8192
+          example: null
+        sealedShareKey:
+          type: [string, "null"]
+          description: >
+            The recoverable per-share key `symWrap(K_mem, K_share)` (opaque base64), or null — lets the manage UI
+            recover `K_share` to edit the note (cr-0115, ADR 0036).
+          contentEncoding: base64
+          maxLength: 256
+          example: null
         enabled:
           type: boolean
           description: False once revoked — the guest resolve + blob GET then `404`.
@@ -542,6 +625,12 @@ components:
           contentEncoding: base64
           maxLength: 4096
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==
+        sealedNote:
+          type: [string, "null"]
+          description: The curator note sealed under `K_share` (opaque base64), or null when the share has none (cr-0115).
+          contentEncoding: base64
+          maxLength: 8192
+          example: null
         nodes:
           type: array
           description: The subtree rooted at the shared Memory — the root plus its chapters, for the `K_mem` chain.

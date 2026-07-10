@@ -55,6 +55,15 @@ class ShareEntity : PanacheEntityBase {
     @Column(name = "expires_at")
     var expiresAt: Instant? = null
 
+    /** cr-0115 (ADR 0036): the curator note sealed under `K_share` (opaque base64), or null. Shown on the share page. */
+    @Column(name = "sealed_note")
+    var sealedNote: String? = null
+
+    /** cr-0115 (ADR 0036): the recoverable per-share key `symWrap(K_mem, K_share)` (opaque base64), or null. Lets the
+     *  curator recover `K_share` (they hold `K_mem`) to edit the note in place — openable **only** with `K_mem`. */
+    @Column(name = "sealed_share_key")
+    var sealedShareKey: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

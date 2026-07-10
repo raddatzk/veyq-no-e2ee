@@ -27,6 +27,7 @@ import { isSupportedMediaFile, inferMediaType, enqueueUploads, retryFile, remove
 import { useOptimisticTiles, type OptimisticTileVM } from '../features/memory/useOptimisticTiles'
 import { removedThumbIds } from '../features/memory/optimisticUpload'
 import { galleryDisplayAspectRatio } from '../features/memory/mediaGridLayout'
+import { renderMarkdown } from '../shared/markdown'
 import { ShareRole } from '../api/generated/sharing'
 import MediaGrid from '../features/memory/components/MediaGrid.vue'
 import OptimisticTile from '../features/memory/components/OptimisticTile.vue'
@@ -46,6 +47,10 @@ const fragmentKey = computed(() => {
 
 const status = ref<'loading' | 'ready' | 'unavailable'>('loading')
 const memoryName = ref('')
+// cr-0115: the optional curator note (a message the sharer attached), decrypted client-side + rendered as markdown
+// (the safe escape-first subset — no raw HTML/script survives, so v-html is safe).
+const note = ref('')
+const renderedNote = computed(() => (note.value ? renderMarkdown(note.value) : ''))
 const items = ref<ShareItem[]>([])
 const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL
 const donatedThumbs = new Set<string>() // mediaIds whose thumb is currently a donated optimistic-upload preview
@@ -210,6 +215,7 @@ async function load() {
   try {
     const resolved = await resolveShare(shareId, fragmentKey.value)
     memoryName.value = resolved.memoryName
+    note.value = resolved.note // cr-0115: the curator note (opened with the fragment key), '' when none
     role.value = resolved.role
     rootMemoryKey.value = resolved.rootMemoryKey
     // incremental merge (no empty-flash): drop thumbs of removed media; donate a just-uploaded photo's optimistic
@@ -278,6 +284,10 @@ onBeforeUnmount(revokeThumbs)
       <form class="veyq-surface share-name-card" @submit.prevent="submitName">
         <h1>{{ memoryName }}</h1>
         <p class="share-name-intro">{{ isUploader ? t('share.uploaderIntro') : t('share.contributeIntro') }}</p>
+        <!-- cr-0115: the curator's note = the drop-box instruction ("please upload here"). renderMarkdown escapes
+             first (safe subset), so v-html is safe. -->
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-if="renderedNote" class="share-note markdown-body" v-html="renderedNote"></div>
         <!-- warning #1 of 4 (ADR 0031 §5): the session-only ephemerality, up front before the first upload -->
         <p v-if="isUploader" class="share-uploader-warning">
           <span class="pi pi-info-circle" />
@@ -328,6 +338,11 @@ onBeforeUnmount(revokeThumbs)
           />
         </div>
       </header>
+
+      <!-- cr-0115: the curator's note, a banner under the header for a VIEWER/CONTRIBUTOR share. Safe markdown
+           (escape-first), so v-html is safe. -->
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <div v-if="renderedNote" class="share-note markdown-body" v-html="renderedNote"></div>
 
       <!-- warning #4 of 4 (ADR 0031 §5): a persistent note that the own-view is session-only + delete-in-session -->
       <p v-if="isUploader && hasContent" class="share-uploader-note">
@@ -574,6 +589,47 @@ onBeforeUnmount(revokeThumbs)
 .share-uploader-note .pi {
   margin-top: 0.1rem;
   color: var(--app-warn, #b45309);
+}
+/* cr-0115: the curator note — a card banner (in the header flow) / instruction (in the name pre-screen). The
+   inner elements come from the safe markdown renderer via v-html, so they need :deep. */
+.share-note {
+  margin: 0 0 1.15rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: var(--app-surface-muted, rgba(127, 127, 127, 0.06));
+  color: var(--app-text);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.share-name-card .share-note {
+  margin: 0.1rem 0 0.3rem;
+}
+.share-note :deep(h1) {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+.share-note :deep(h2) {
+  font-size: 1rem;
+  margin: 0.9rem 0 0.35rem;
+}
+.share-note :deep(h3) {
+  font-size: 0.92rem;
+  margin: 0.8rem 0 0.3rem;
+}
+.share-note :deep(p) {
+  margin: 0 0 0.55rem;
+}
+.share-note :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.share-note :deep(ul),
+.share-note :deep(ol) {
+  margin: 0 0 0.55rem;
+  padding-left: 1.3rem;
+}
+.share-note :deep(a) {
+  color: var(--app-accent);
 }
 /* The tile (.media-grid-tile) + its inner classes are fully styled by the GLOBAL design-source stylesheet
    (styles/memory.css) — the same skin the internal gallery uses — so no per-view tile CSS is needed here. */

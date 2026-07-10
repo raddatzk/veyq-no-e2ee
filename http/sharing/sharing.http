@@ -10,7 +10,9 @@
 # expiry 404 → leaks-nothing-outside-the-subtree — is covered hermetically at the integration layer
 # (ShareSliceTest, which seeds a member + personal scope + a Memory subtree in-tx) and end-to-end in the web
 # client's live smoke (a real /s/ link opened with no session). Those need the operator-blind grant flow +
-# client-side crypto, not reproducible from a bare .http.
+# client-side crypto, not reproducible from a bare .http. The **editable curator note** lifecycle (create with a
+# note → resolve returns it → owner PATCH edits it in place at the same shareId → a non-owner PATCH is 404 →
+# null clears it, cr-0115) is likewise covered hermetically by ShareNoteSliceTest; here we assert its auth wall.
 #
 # Run: ijhttp --env-file http/sharing/http-client.env.json --env dev http/sharing/sharing.http
 
@@ -74,6 +76,19 @@ POST {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/reactivate
 
 > {%
 client.test("reactivate share requires auth", function () {
+    client.assert(response.status === 401, "expected 401, got " + response.status);
+    client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
+});
+%}
+
+### 7. Edit a share's note without a bearer token → 401 (curator op, cr-0115; auth before validation)
+PATCH {{host}}/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Content-Type: application/json
+
+{ "sealedNote": "bm90ZS12Mg==" }
+
+> {%
+client.test("update share note requires auth", function () {
     client.assert(response.status === 401, "expected 401, got " + response.status);
     client.assert(response.body.code === "authentication_failed", "expected authentication_failed");
 });

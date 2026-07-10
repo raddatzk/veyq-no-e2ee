@@ -23,6 +23,7 @@ import com.veyq.app.generated.model.ShareMediaResultItem
 import com.veyq.app.generated.model.ShareNode
 import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.ShareSummary
+import com.veyq.app.generated.model.UpdateShareRequest
 import com.veyq.app.generated.model.NodeKind
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
@@ -52,6 +53,8 @@ class SharingResource(
             wrap = createShareRequest.wrap,
             sealedName = createShareRequest.sealedName,
             expiresAt = createShareRequest.expiresAt?.toInstant(),
+            sealedNote = createShareRequest.sealedNote, // cr-0115: optional curator note under K_share
+            sealedShareKey = createShareRequest.sealedShareKey, // cr-0115: recoverable K_share for a later edit
         )) {
             is CreateShareOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareCreated(shareId = o.shareId)).build()
@@ -75,6 +78,8 @@ class SharingResource(
                 mine = s.ownerAccount == me,
                 createdAt = s.createdAt.atOffset(ZoneOffset.UTC),
                 expiresAt = s.expiresAt?.atOffset(ZoneOffset.UTC),
+                sealedNote = s.sealedNote, // cr-0115: the manage UI shows + edits it
+                sealedShareKey = s.sealedShareKey, // cr-0115: lets the manage UI recover K_share to edit the note
             )
         }).build()
     }
@@ -91,6 +96,14 @@ class SharingResource(
             ReactivateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
         }
 
+    // Edit a share's curator note in place (cr-0115, ADR 0036) — owner-gated in the handler (404 if not the
+    // caller's), so the link/K_share/role/wrap are untouched; only the note ciphertext changes.
+    override fun updateShare(shareId: String, updateShareRequest: UpdateShareRequest): Response =
+        when (handler.updateNote(identity.principal.name, shareId, updateShareRequest.sealedNote)) {
+            UpdateShareOutcome.Done -> Response.noContent().build()
+            UpdateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+        }
+
     @PermitAll
     override fun resolveShare(shareId: String): Response =
         when (val o = handler.resolve(shareId)) {
@@ -99,6 +112,7 @@ class SharingResource(
                     role = ShareRole.decode(o.share.role),
                     wrap = o.share.wrap,
                     sealedName = o.share.sealedName,
+                    sealedNote = o.share.sealedNote, // cr-0115: the share page renders it (null when none)
                     nodes = o.subtree.nodes.map(::toShareNode),
                     media = o.subtree.media.map(::toShareMedia),
                     identities = o.identities.map { ShareIdentity(identityId = UUID.fromString(it.id), sealedDisplayName = it.sealedDisplayName) },

@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
-import { createShare, listSharesFor, revokeShare, reactivateShare, type ManagedShare } from '../share'
+import { createShare, listSharesFor, revokeShare, reactivateShare, updateShareNote, readShareNote, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
 import { useCapabilities } from '../../../shared/state/useCapabilities'
 import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
@@ -35,6 +35,40 @@ const copied = ref(false)
 const revokingId = ref<string | null>(null)
 const reactivatingId = ref<string | null>(null)
 const reactivateError = ref(false)
+
+// cr-0115: the optional curator note to attach to the NEW share, + the in-place note editor for an existing one.
+const note = ref('')
+const editingId = ref<string | null>(null)
+const editNote = ref('')
+const savingNote = ref(false)
+const noteError = ref(false)
+
+/** The current (decrypted) note on a managed share — '' when none / not readable (a pre-cr-0115 share). */
+function noteFor(share: ManagedShare): string {
+  return readShareNote(props.memoryKey, share.sealedShareKey, share.sealedNote)
+}
+function startEditNote(share: ManagedShare) {
+  editingId.value = share.shareId
+  editNote.value = noteFor(share)
+  noteError.value = false
+}
+function cancelEditNote() {
+  editingId.value = null
+}
+async function saveNote(share: ManagedShare) {
+  if (!share.sealedShareKey) return
+  savingNote.value = true
+  noteError.value = false
+  try {
+    await updateShareNote(share.shareId, props.memoryKey, share.sealedShareKey, editNote.value)
+    editingId.value = null
+    await loadShares()
+  } catch {
+    noteError.value = true
+  } finally {
+    savingNote.value = false
+  }
+}
 
 // The share role to mint: VIEWER (read-only, cr-0100), CONTRIBUTOR (view + add photos, cr-0101), or
 // UPLOADER (write-only drop-box — add photos but can't see the Memory or others', cr-0102, ADR 0031).
@@ -79,8 +113,9 @@ async function onCreate() {
   createError.value = false
   copied.value = false
   try {
-    const minted = await createShare(props.nodeId, props.memoryKey, props.memoryName, role.value)
+    const minted = await createShare(props.nodeId, props.memoryKey, props.memoryName, role.value, null, note.value)
     freshLink.value = minted.link
+    note.value = '' // consumed into the new share; the manage list now edits it
     await loadShares()
   } catch {
     createError.value = true
@@ -154,6 +189,18 @@ function linkFor(share: ManagedShare): string | null {
       <p class="share-role-hint">{{ roleHint }}</p>
     </div>
 
+    <div class="share-note-block">
+      <label class="share-role-label" for="share-note-input">{{ t('share.noteLabel') }}</label>
+      <textarea
+        id="share-note-input"
+        v-model="note"
+        class="share-note-input"
+        rows="2"
+        :placeholder="t('share.notePlaceholder')"
+      ></textarea>
+      <p class="share-role-hint">{{ t('share.noteHint') }}</p>
+    </div>
+
     <div class="share-create-row">
       <Button
         type="button"
@@ -179,34 +226,60 @@ function linkFor(share: ManagedShare): string | null {
       <p v-else-if="!shares.length" class="share-empty">{{ t('share.none') }}</p>
       <ul v-else class="share-list">
         <li v-for="share in shares" :key="share.shareId" class="share-list-item">
-          <div class="share-list-meta">
-            <span class="share-list-role">{{ roleLabel(share.role) }}</span>
-            <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
-            <span v-if="share.expiresAt" class="share-list-expiry">{{ t('share.expires', { date: fmtDate(share.expiresAt) }) }}</span>
-            <span v-if="!share.mine" class="share-list-note">{{ t('share.byMember') }}</span>
-            <span v-if="!share.enabled" class="share-list-note">{{ t('share.disabled') }}</span>
-            <code v-if="linkFor(share)" class="share-list-link">{{ linkFor(share) }}</code>
+          <div class="share-list-top">
+            <div class="share-list-meta">
+              <span class="share-list-role">{{ roleLabel(share.role) }}</span>
+              <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
+              <span v-if="share.expiresAt" class="share-list-expiry">{{ t('share.expires', { date: fmtDate(share.expiresAt) }) }}</span>
+              <span v-if="!share.mine" class="share-list-note">{{ t('share.byMember') }}</span>
+              <span v-if="!share.enabled" class="share-list-note">{{ t('share.disabled') }}</span>
+              <code v-if="linkFor(share)" class="share-list-link">{{ linkFor(share) }}</code>
+            </div>
+            <div class="share-list-actions">
+              <Button
+                v-if="share.mine && share.sealedShareKey && editingId !== share.shareId"
+                type="button"
+                :label="noteFor(share) ? t('share.noteEdit') : t('share.noteAdd')"
+                icon="pi pi-pencil"
+                severity="secondary"
+                text
+                @click="startEditNote(share)"
+              />
+              <Button
+                v-if="!share.enabled"
+                type="button"
+                :label="reactivatingId === share.shareId ? t('share.reactivating') : t('share.reactivate')"
+                icon="pi pi-refresh"
+                severity="secondary"
+                text
+                :disabled="reactivatingId === share.shareId"
+                @click="onReactivate(share.shareId)"
+              />
+              <Button
+                v-else-if="share.mine"
+                type="button"
+                :label="revokingId === share.shareId ? t('share.revoking') : t('share.revoke')"
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                :disabled="revokingId === share.shareId"
+                @click="onRevoke(share.shareId)"
+              />
+            </div>
           </div>
-          <Button
-            v-if="!share.enabled"
-            type="button"
-            :label="reactivatingId === share.shareId ? t('share.reactivating') : t('share.reactivate')"
-            icon="pi pi-refresh"
-            severity="secondary"
-            text
-            :disabled="reactivatingId === share.shareId"
-            @click="onReactivate(share.shareId)"
-          />
-          <Button
-            v-else-if="share.mine"
-            type="button"
-            :label="revokingId === share.shareId ? t('share.revoking') : t('share.revoke')"
-            icon="pi pi-trash"
-            severity="danger"
-            text
-            :disabled="revokingId === share.shareId"
-            @click="onRevoke(share.shareId)"
-          />
+
+          <!-- The current note (curator → viewer), shown when not editing. -->
+          <p v-if="editingId !== share.shareId && noteFor(share)" class="share-list-note-text">{{ noteFor(share) }}</p>
+
+          <!-- In-place note editor (cr-0115): recover K_share via K_mem, re-seal, PATCH — the link stays valid. -->
+          <div v-if="editingId === share.shareId" class="share-note-edit">
+            <textarea v-model="editNote" class="share-note-input" rows="2" :placeholder="t('share.notePlaceholder')"></textarea>
+            <div class="share-note-edit-actions">
+              <Button type="button" :label="savingNote ? t('share.noteSaving') : t('share.noteSave')" icon="pi pi-check" size="small" :disabled="savingNote" @click="saveNote(share)" />
+              <Button type="button" :label="t('share.noteCancel')" severity="secondary" text size="small" :disabled="savingNote" @click="cancelEditNote" />
+            </div>
+            <p v-if="noteError" class="share-error">{{ t('share.noteSaveFailed') }}</p>
+          </div>
         </li>
       </ul>
       <p v-if="revokeError" class="share-error">{{ t('share.revokeFailed') }}</p>
@@ -300,19 +373,65 @@ function linkFor(share: ManagedShare): string | null {
   gap: 0.5rem;
 }
 .share-list-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--app-line);
   border-radius: 10px;
   background: var(--app-surface);
 }
+.share-list-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.share-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
 .share-list-meta {
   display: grid;
   gap: 0.15rem;
   min-width: 0;
+}
+.share-list-note-text {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: var(--app-surface-muted, rgba(127, 127, 127, 0.08));
+  color: var(--app-text);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.share-note-block {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.share-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+.share-note-edit {
+  display: grid;
+  gap: 0.4rem;
+}
+.share-note-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 .share-list-when {
   font-size: 0.85rem;

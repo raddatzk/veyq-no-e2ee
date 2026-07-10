@@ -38,6 +38,12 @@ least-privilege is crypto-enforced, and the server stays blind.
   ownership**; `K_mem` is stable across rotation so the share follows new content and the server-side deactivation
   is the honest-server revocation; [ADR 0029](../../decisions/0029-public-viewer-share.md) §6)
 
+- [uc.sharing.share-note](use-cases/uc.sharing.share-note.md) — **built (web, cr-0115)** (an optional **editable
+  curator note** on a share, sealed under `K_share` + rendered (markdown) on the share page; **editable in place**
+  via a `K_mem`-recoverable share key `sealed_share_key = symWrap(K_mem, K_share)` + an owner-gated `updateShare` —
+  the link stays valid; all roles, personal-scope v1; native later;
+  [ADR 0036](../../decisions/0036-editable-share-note-recoverable-share-key.md))
+
 ## Deferred (later slices, each with its own dependency)
 
 - **Buckets** — the per-uploader grouping (each contributor's uploads under their sealed name) is now refined as

@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, ShareUnavailableError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShareNote, readShareNote, ShareUnavailableError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -190,5 +190,62 @@ describe('deleteSharePhoto (cr-0102 uploader delete-own)', () => {
     await deleteSharePhoto('share-1', 'tok-1', 'media-9')
 
     expect(del).toHaveBeenCalledWith({ shareId: 'share-1', mediaId: 'media-9', xContributorToken: 'tok-1' })
+  })
+})
+
+describe('share note (cr-0115)', () => {
+  it('seals an optional note under K_share + a recoverable K_share under K_mem; the viewer reads the note', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-n1' })
+    mockCurator(create)
+    const kMem = v1.randomBytes(32)
+
+    const minted = await createShare(NODE_ID, kMem, 'Rom 2026', undefined, null, 'Enjoy our trip!')
+    const req = create.mock.calls[0][0].createShareRequest
+    // both ciphertexts are opaque base64; the plaintext note never appears in the request
+    expect(req.sealedNote).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
+    expect(req.sealedShareKey).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
+    expect(JSON.stringify(req)).not.toContain('Enjoy our trip')
+
+    // the anonymous viewer opens the note with the fragment key
+    mockGuest({
+      role: 'VIEWER', wrap: req.wrap, sealedName: req.sealedName, sealedNote: req.sealedNote,
+      nodes: [{ id: NODE_ID, parentId: null, kind: 'MEMORY' }], media: [],
+    })
+    const resolved = await resolveShare('share-n1', keyFromLink(minted.link))
+    expect(resolved.note).toBe('Enjoy our trip!')
+  })
+
+  it('edits the note in place: recovers K_share via K_mem, re-seals, PATCHes (shareId unchanged)', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-n2' })
+    const update = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(sharesApi).mockReturnValue({ createShare: create, updateShare: update } as unknown as ReturnType<typeof sharesApi>)
+    const kMem = v1.randomBytes(32)
+    await createShare(NODE_ID, kMem, 'Rom', undefined, null, 'v1 note')
+    const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
+
+    await updateShareNote('share-n2', kMem, sealedShareKey, 'v2 note')
+    const patch = update.mock.calls[0][0]
+    expect(patch.shareId).toBe('share-n2')
+    // the new note is opaque ciphertext that round-trips to the new text via the recovered K_share
+    expect(patch.updateShareRequest.sealedNote).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
+    expect(readShareNote(kMem, sealedShareKey, patch.updateShareRequest.sealedNote)).toBe('v2 note')
+  })
+
+  it('clears the note with a blank edit (PATCH sealedNote null)', async () => {
+    const create = vi.fn().mockResolvedValue({ shareId: 'share-n3' })
+    const update = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(sharesApi).mockReturnValue({ createShare: create, updateShare: update } as unknown as ReturnType<typeof sharesApi>)
+    const kMem = v1.randomBytes(32)
+    await createShare(NODE_ID, kMem, 'Rom', undefined, null, 'note')
+    const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
+
+    await updateShareNote('share-n3', kMem, sealedShareKey, '   ')
+    expect(update.mock.calls[0][0].updateShareRequest.sealedNote).toBeNull()
+  })
+
+  it('readShareNote returns "" when a share has no note or no recoverable key', () => {
+    const kMem = v1.randomBytes(32)
+    expect(readShareNote(kMem, null, 'x')).toBe('')
+    expect(readShareNote(kMem, 'x', null)).toBe('')
   })
 })
