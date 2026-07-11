@@ -94,6 +94,10 @@ class NodesHandler(private val store: NodesStore) {
     fun delete(userId: String, scopeId: String, nodeId: String): DeleteNodeOutcome {
         if (!store.isMember(userId, scopeId)) return DeleteNodeOutcome.NoScope
         if (store.isPendingDeletion(scopeId)) return DeleteNodeOutcome.ScopeDeleting // read-only during grace (cr-0090)
+        // Bind the node to THIS scope before deleting (mirrors update, cr-0126): membership on scopeId alone does
+        // not authorize deleting a node that lives in another scope. Same NoScope 404 whether the node is foreign
+        // or absent — non-enumerable, and it stops the cross-scope delete the primary-key path used to allow.
+        store.findInScope(scopeId, nodeId) ?: return DeleteNodeOutcome.NoScope
         store.deleteSubtree(scopeId, nodeId)
         return DeleteNodeOutcome.Deleted
     }

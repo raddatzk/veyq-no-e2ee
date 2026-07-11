@@ -108,6 +108,25 @@ class NodesSliceTest {
     }
 
     @Test
+    fun crossScopeDeleteIsRejected() {
+        // victim scope B holds a Memory
+        val (userB, scopeB) = seedMemberScope()
+        val victimNode = createNode(userB, scopeB, """{"kind":"MEMORY","encryptedName":"dmljdGlt","slugToken":"dmljLXM=","orderIndex":0,"wrappedContentKey":"aw=="}""")
+        // attacker is a member of their OWN scope A, not of B (every account is a member of its personal scope)
+        val (userA, scopeA) = seedMemberScope()
+
+        // addressing the foreign node through the attacker's own scope must NOT delete it: a NoScope-shaped 404,
+        // indistinguishable from an absent scope (non-enumerable) — never a 204 that hard-deletes another scope's node.
+        given().header("Authorization", token(userA))
+            .`when`().delete("/api/scopes/$scopeA/nodes/$victimNode")
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
+
+        // the foreign node survives under B
+        given().header("Authorization", token(userB)).`when`().get("/api/scopes/$scopeB/nodes")
+            .then().statusCode(200).body("id", hasItems(victimNode))
+    }
+
+    @Test
     fun wrappedMetaRoundTripsAndPartialUpdateLeavesItUnchanged() {
         val (userId, scopeId) = seedMemberScope()
         // create a Memory carrying an opaque sealed wrappedMeta blob (cr-0067) — the server never inspects it

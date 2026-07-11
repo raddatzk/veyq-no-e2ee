@@ -144,6 +144,8 @@ class NodesStore(
         // (their counters vanish, no open gallery can poll a deleted node), and it leaves each node's own media
         // rows untouched — so no *surviving* node's gallery set changes. The observable delete-reconcile is the
         // share delete-own path (cr-0102), which does bump both counters; own-node galleries are the whole scope.
-        NodeEntity.delete("id in ?1", doomed)
+        // Defense in depth (cr-0126): scope the primary-key delete so a foreign nodeId can never be removed even
+        // if a caller reached here — the seed + traversal already stay in-scope, this closes the raw-PK path.
+        NodeEntity.delete("scopeId = ?1 and id in ?2", scopeId, doomed)
     }
 }
