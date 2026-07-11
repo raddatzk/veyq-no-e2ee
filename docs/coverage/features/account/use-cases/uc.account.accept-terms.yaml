@@ -32,7 +32,12 @@ acceptanceCriteria:
   - id: operator-blind
     text: accepted_terms_version is coarse operational metadata (like membership), never content; the terms text itself is public. A non-member read/accept is 404 (indistinguishable), and no server record is kept for an accountless visitor (anonymity preserved).
     coverage:
-      backend: { integration: [TenantTermsSliceTest.readOrAcceptByANonMemberIs404] }
+      # memberAccepts…AStaleAcceptIs409 proves acceptance is stored/compared as a bare integer version (coarse
+      # operational metadata, never content); readOrAcceptByANonMemberIs404 proves the non-member 404 is
+      # indistinguishable for read AND accept. The accountless-visitor "no record kept" clause is true by
+      # construction (both endpoints are membership-gated — no path writes a record without a session) and has
+      # no dedicated test; an anonymous-visitor assertion is the honest remaining thin spot, not a false citation.
+      backend: { integration: [TenantTermsSliceTest.memberAcceptsThenABumpReStalesAndAStaleAcceptIs409, TenantTermsSliceTest.readOrAcceptByANonMemberIs404] }
 gaps:
   apple: "The accept gate is Apple's own later CR (web-first, ADR 0010); the generated data layer carries the terms/acceptance after regen."
   android: "The accept gate is Android's own later CR (web-first, ADR 0010); the generated data layer carries the terms/acceptance after regen."
