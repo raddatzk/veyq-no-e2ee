@@ -1,9 +1,9 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 import java.time.Instant
 
@@ -16,8 +16,9 @@ import java.time.Instant
 @ApplicationScoped
 class TenantInvitePurge(
     private val store: TenantStore,
-    @param:ConfigProperty(name = "veyq.tenant.invite.retention", defaultValue = "P30D") private val retention: Duration,
+    config: VeyqConfig,
 ) {
+    private val retention: Duration = config.tenant().invite().retention()
 
     // @Transactional so the expire + delete share ONE session/transaction on the scheduler thread — without it
     // the first nested @Transactional closes the session and the next call fails ("EntityManager is closed", the

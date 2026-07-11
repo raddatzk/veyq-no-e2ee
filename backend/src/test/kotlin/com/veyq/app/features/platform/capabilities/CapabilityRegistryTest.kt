@@ -1,12 +1,12 @@
 package com.veyq.app.features.platform.capabilities
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.veyq.app.shared.config.testVeyqConfig
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
-import java.util.Optional
 
 /**
  * Conformance pin (cr-0103, ADR 0032): every capability id the backend ships as a constant must be a real entry
@@ -31,7 +31,7 @@ class CapabilityRegistryTest {
 
     @Test
     fun activeIsEveryAdvertisedIdWhenNothingDisabled() {
-        val registry = CapabilityRegistry(Optional.empty())
+        val registry = CapabilityRegistry(testVeyqConfig())
         assertEquals(CapabilityIds.ADVERTISED, registry.active)
         assertTrue(registry.isActive(CapabilityIds.SHARING_PUBLIC_LINKS))
     }
@@ -39,7 +39,12 @@ class CapabilityRegistryTest {
     @Test
     fun disabledIdsAreSubtractedFromActive() {
         val registry = CapabilityRegistry(
-            Optional.of(listOf(CapabilityIds.SHARING_UPLOADER_LINKS, "  ", CapabilityIds.SPACES_GROUPS)),
+            testVeyqConfig(
+                mapOf(
+                    "veyq.capabilities.disabled" to
+                        listOf(CapabilityIds.SHARING_UPLOADER_LINKS, "  ", CapabilityIds.SPACES_GROUPS).joinToString(","),
+                ),
+            ),
         )
         assertFalse(registry.isActive(CapabilityIds.SHARING_UPLOADER_LINKS))
         assertFalse(registry.isActive(CapabilityIds.SPACES_GROUPS))

@@ -1,7 +1,7 @@
 package com.veyq.app.features.tasks
 
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 
 /**
@@ -12,9 +12,10 @@ import java.time.Duration
 @ApplicationScoped
 class TasksHandler(
     private val store: TasksStore,
-    @param:ConfigProperty(name = "veyq.tasks.lease.ttl", defaultValue = "PT5M") private val leaseTtl: Duration,
-    @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
+    config: VeyqConfig,
 ) {
+    private val leaseTtl: Duration = config.tasks().lease().ttl()
+    private val maxAttempts: Int = config.tasks().maxAttempts()
 
     fun claim(userId: String, tags: List<String>, scopeFilter: String?): ClaimedJobView? =
         store.claim(userId, tags, scopeFilter, leaseTtl, maxAttempts)

@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.shared.config.testVeyqConfig
 import io.quarkus.test.junit.QuarkusTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.Optional
 
 /**
  * The dev-only invite **file** (cr-0046): with `veyq.tenant.invite.dev-file` set, the mailer appends the
@@ -23,7 +23,7 @@ class TenantInviteMailerDevFileTest {
     @Test
     fun appendsOneJsonLinePerInviteWhenDevFileSet(@TempDir tmp: Path) {
         val file = tmp.resolve("nested/invites.jsonl") // parent created on demand
-        val mailer = LoggingTenantInviteMailer(Optional.of(file.toString()))
+        val mailer = LoggingTenantInviteMailer(testVeyqConfig(mapOf("veyq.tenant.invite.dev-file" to file.toString())))
 
         mailer.sendInvite("media.test", "owner@veyq.test", "BOOT-SECRET-123", Instant.parse("2026-07-06T00:00:00Z"))
         mailer.sendInvite("media.test", "second@veyq.test", "BOOT-SECRET-456", Instant.parse("2026-07-06T00:00:00Z"))
@@ -38,7 +38,7 @@ class TenantInviteMailerDevFileTest {
     @Test
     fun writesNoFileWhenDevFileUnset(@TempDir tmp: Path) {
         val file = tmp.resolve("never.jsonl")
-        LoggingTenantInviteMailer(Optional.empty()).sendInvite("media.test", "owner@veyq.test", "T", Instant.parse("2026-07-06T00:00:00Z"))
+        LoggingTenantInviteMailer(testVeyqConfig()).sendInvite("media.test", "owner@veyq.test", "T", Instant.parse("2026-07-06T00:00:00Z"))
         assertFalse(Files.exists(file), "no file written when the config is empty (default)")
     }
 }

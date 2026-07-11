@@ -1,9 +1,9 @@
 package com.veyq.app.features.admin.setup
 
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
+import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.instance.InstanceStore
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /** Current setup state for the status endpoint. */
 data class SetupState(
@@ -41,11 +41,12 @@ class SetupHandler(
     private val store: SetupStore,
     private val instanceStore: InstanceStore,
     private val capabilities: CapabilityRegistry,
+    config: VeyqConfig,
+) {
     // Build-set version (ADR 0032). `major` is the ONLY hard gate — bump it exclusively when a capability is
     // removed; everything additive bumps `build`. Defaulted so a fresh instance/config still advertises 1.1.
-    @param:ConfigProperty(name = "veyq.version.major", defaultValue = "1") private val versionMajor: Int,
-    @param:ConfigProperty(name = "veyq.version.build", defaultValue = "1") private val versionBuild: Int,
-) {
+    private val versionMajor: Int = config.version().major()
+    private val versionBuild: Int = config.version().build()
     private val supportedSuites = listOf("v1")
 
     fun state(): SetupState = SetupState(

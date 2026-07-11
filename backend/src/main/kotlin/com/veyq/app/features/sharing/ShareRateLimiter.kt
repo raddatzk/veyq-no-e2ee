@@ -1,7 +1,7 @@
 package com.veyq.app.features.sharing
 
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
@@ -13,9 +13,11 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @ApplicationScoped
 class ShareRateLimiter(
-    @param:ConfigProperty(name = "veyq.share.upload.rate.max-per-window", defaultValue = "300") private val maxPerWindow: Int,
-    @param:ConfigProperty(name = "veyq.share.upload.rate.window-seconds", defaultValue = "60") private val windowSeconds: Long,
+    config: VeyqConfig,
 ) {
+    private val maxPerWindow: Int = config.share().upload().rate().maxPerWindow()
+    private val windowSeconds: Long = config.share().upload().rate().windowSeconds()
+
     private data class Window(val startEpochSec: Long, val count: Int)
 
     private val windows = ConcurrentHashMap<String, Window>()

@@ -1,8 +1,8 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.runtime.LaunchMode
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.jboss.logging.Logger
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,8 +38,9 @@ interface TenantInviteMailer {
  */
 @ApplicationScoped
 class LoggingTenantInviteMailer(
-    @param:ConfigProperty(name = "veyq.tenant.invite.dev-file") private val devFile: Optional<String>,
+    config: VeyqConfig,
 ) : TenantInviteMailer {
+    private val devFile: Optional<String> = config.tenant().invite().devFile()
     private val log = Logger.getLogger(LoggingTenantInviteMailer::class.java)
 
     override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant) {

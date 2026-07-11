@@ -1,9 +1,9 @@
 package com.veyq.app.features.tasks
 
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * The scheduled backstop for grant-delivery **origination** (ADR 0021, cr-0076): the server structurally
@@ -15,8 +15,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 @ApplicationScoped
 class GrantDeliveryOriginator(
     private val store: TasksStore,
-    @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
+    config: VeyqConfig,
 ) {
+    private val maxAttempts: Int = config.tasks().maxAttempts()
+
     @Transactional
     @Scheduled(every = "{veyq.tasks.grant-delivery.reconcile.every}")
     fun run() {

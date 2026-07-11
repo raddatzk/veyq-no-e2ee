@@ -1,9 +1,9 @@
 package com.veyq.app.features.account.login
 
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.NewCookie
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * The web refresh-token cookie (ADR 0004 transport; cr-0052, cr-0055). `httpOnly` (never readable by JS) +
@@ -20,8 +20,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  */
 @ApplicationScoped
 class SessionCookie(
-    @param:ConfigProperty(name = "veyq.session.cookie.secure", defaultValue = "true") private val secure: Boolean,
+    config: VeyqConfig,
 ) {
+    private val secure: Boolean = config.session().cookie().secure()
+
     /** The refresh token read off a request + which lifetime cookie carried it (so rotation re-sets the same). */
     data class Read(val token: String, val persistent: Boolean)
 

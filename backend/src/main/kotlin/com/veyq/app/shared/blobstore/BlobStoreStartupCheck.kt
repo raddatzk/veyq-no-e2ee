@@ -1,10 +1,10 @@
 package com.veyq.app.shared.blobstore
 
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.runtime.LaunchMode
 import io.quarkus.runtime.StartupEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.util.Optional
 
 /**
@@ -15,8 +15,10 @@ import java.util.Optional
  */
 @ApplicationScoped
 class BlobStoreStartupCheck(
-    @param:ConfigProperty(name = "veyq.blob-store.endpoint") private val endpoint: Optional<String>,
+    config: VeyqConfig,
 ) {
+    private val endpoint: Optional<String> = config.blobStore().endpoint()
+
     fun onStart(@Observes ev: StartupEvent) {
         check(hasStore(endpoint.orElse(""), LaunchMode.current())) { REQUIRED_MSG }
     }

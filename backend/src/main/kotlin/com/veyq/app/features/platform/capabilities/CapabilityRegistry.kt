@@ -1,8 +1,7 @@
 package com.veyq.app.features.platform.capabilities
 
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
-import java.util.Optional
 
 /**
  * Computes the instance's **active** capability set (ADR 0032): the built-and-advertised catalog ids
@@ -17,11 +16,10 @@ import java.util.Optional
  */
 @ApplicationScoped
 class CapabilityRegistry(
-    @ConfigProperty(name = "veyq.capabilities.disabled")
-    disabled: Optional<List<String>>,
+    config: VeyqConfig,
 ) {
     private val disabledSet: Set<String> =
-        disabled.orElse(emptyList()).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        config.capabilities().disabled().orElse(emptyList()).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
     /** The active capability ids, in [CapabilityIds.ADVERTISED] order, with the operator's disabled ones removed. */
     val active: List<String> = CapabilityIds.ADVERTISED.filterNot { it in disabledSet }

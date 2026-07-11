@@ -4,10 +4,10 @@ import com.veyq.app.features.sharing.SharingStore
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
+import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 import java.time.Instant
 
@@ -86,9 +86,10 @@ class TenantHandler(
     private val tasks: TasksStore,
     private val mailer: TenantInviteMailer,
     private val shares: SharingStore,
-    @param:ConfigProperty(name = "veyq.tenant.invite.ttl", defaultValue = "P7D") private val inviteTtl: Duration,
-    @param:ConfigProperty(name = "veyq.tasks.max-attempts", defaultValue = "5") private val maxAttempts: Int,
+    config: VeyqConfig,
 ) {
+    private val inviteTtl: Duration = config.tenant().invite().ttl()
+    private val maxAttempts: Int = config.tasks().maxAttempts()
 
     @Transactional
     fun create(name: String, domain: String, ownerEmail: String): CreateTenantOutcome {

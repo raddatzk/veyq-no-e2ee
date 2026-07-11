@@ -1,9 +1,9 @@
 package com.veyq.app.features.media
 
 import com.veyq.app.shared.blobstore.BlobStore
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 import java.time.Instant
 
@@ -21,8 +21,9 @@ import java.time.Instant
 class MediaTrashPurge(
     private val store: MediaStore,
     private val blobStore: BlobStore,
-    @param:ConfigProperty(name = "veyq.media.trash.retention", defaultValue = "P30D") private val retention: Duration,
+    config: VeyqConfig,
 ) {
+    private val retention: Duration = config.media().trash().retention()
 
     @Scheduled(every = "{veyq.media.trash.purge.every}")
     fun run() {

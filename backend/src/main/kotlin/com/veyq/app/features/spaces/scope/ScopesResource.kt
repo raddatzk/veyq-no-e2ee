@@ -17,12 +17,12 @@ import com.veyq.app.generated.model.ScopeMember
 import com.veyq.app.generated.model.ScopeRotated
 import com.veyq.app.generated.model.ScopeSummary
 import com.veyq.app.generated.model.SetMemberRoleRequest
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -40,9 +40,10 @@ import java.util.UUID
 class ScopesResource(
     private val handler: ScopesHandler,
     private val identity: SecurityIdentity,
-    // The grace window (cr-0090) — used to derive `purgeAfter = deletedAt + retention` for a pending-deletion group.
-    @param:ConfigProperty(name = "veyq.scope.delete.retention", defaultValue = "P30D") private val deleteRetention: Duration,
+    config: VeyqConfig,
 ) : ScopesApi {
+    // The grace window (cr-0090) — used to derive `purgeAfter = deletedAt + retention` for a pending-deletion group.
+    private val deleteRetention: Duration = config.scope().delete().retention()
 
     @Context
     lateinit var headers: HttpHeaders

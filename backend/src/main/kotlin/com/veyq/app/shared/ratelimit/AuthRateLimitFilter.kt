@@ -1,6 +1,8 @@
 package com.veyq.app.shared.ratelimit
 
 import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.shared.config.VeyqConfig
+import io.smallrye.config.SmallRyeConfig
 import io.vertx.core.http.HttpServerRequest
 import jakarta.annotation.Priority
 import jakarta.ws.rs.Priorities
@@ -9,7 +11,7 @@ import jakarta.ws.rs.container.ContainerRequestFilter
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.ext.Provider
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.eclipse.microprofile.config.ConfigProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -33,15 +35,20 @@ import java.util.concurrent.atomic.AtomicLong
 @Provider
 @RateLimited
 @Priority(Priorities.AUTHENTICATION)
-class AuthRateLimitFilter(
-    @param:ConfigProperty(name = "veyq.ratelimit.auth.max-requests", defaultValue = "60")
-    private val maxRequests: Long,
-    @param:ConfigProperty(name = "veyq.ratelimit.auth.window-seconds", defaultValue = "60")
-    private val windowSeconds: Long,
-) : ContainerRequestFilter {
+class AuthRateLimitFilter : ContainerRequestFilter {
 
     @Context
     private lateinit var request: HttpServerRequest
+
+    // A JAX-RS @Provider is instantiated too early in Quarkus boot to take the VeyqConfig @ConfigMapping as a
+    // CDI dependency (constructor OR field injection fails config-mapping registration). So we read the mapping
+    // via a programmatic lookup, lazily on first request — the mapping is registered by then — keeping VeyqConfig
+    // the single typed source for these knobs rather than falling back to scattered @ConfigProperty.
+    private val auth: VeyqConfig.RateLimit.Auth by lazy {
+        (ConfigProvider.getConfig() as SmallRyeConfig).getConfigMapping(VeyqConfig::class.java).ratelimit().auth()
+    }
+    private val maxRequests: Long by lazy { auth.maxRequests() }
+    private val windowSeconds: Long by lazy { auth.windowSeconds() }
 
     private class Window(val windowStart: Long) { val count = AtomicLong(0) }
 

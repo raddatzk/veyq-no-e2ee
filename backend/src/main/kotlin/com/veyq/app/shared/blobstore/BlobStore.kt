@@ -1,8 +1,8 @@
 package com.veyq.app.shared.blobstore
 
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -123,14 +123,16 @@ class S3BlobStore(
  */
 @ApplicationScoped
 class BlobStoreProducer(
-    @param:ConfigProperty(name = "veyq.blob-store.endpoint") private val endpoint: Optional<String>,
-    @param:ConfigProperty(name = "veyq.blob-store.public-endpoint") private val publicEndpoint: Optional<String>,
-    @param:ConfigProperty(name = "veyq.blob-store.access-key") private val accessKey: Optional<String>,
-    @param:ConfigProperty(name = "veyq.blob-store.secret-key") private val secretKey: Optional<String>,
-    @param:ConfigProperty(name = "veyq.blob-store.bucket", defaultValue = "veyq") private val bucket: String,
-    @param:ConfigProperty(name = "veyq.blob-store.region", defaultValue = "us-east-1") private val region: String,
-    @param:ConfigProperty(name = "veyq.blob-store.presign-ttl-seconds", defaultValue = "600") private val presignTtlSeconds: Int,
+    config: VeyqConfig,
 ) {
+    private val endpoint: Optional<String> = config.blobStore().endpoint()
+    private val publicEndpoint: Optional<String> = config.blobStore().publicEndpoint()
+    private val accessKey: Optional<String> = config.blobStore().accessKey()
+    private val secretKey: Optional<String> = config.blobStore().secretKey()
+    private val bucket: String = config.blobStore().bucket()
+    private val region: String = config.blobStore().region()
+    private val presignTtlSeconds: Int = config.blobStore().presignTtlSeconds()
+
     @Produces
     @ApplicationScoped
     fun blobStore(): BlobStore {

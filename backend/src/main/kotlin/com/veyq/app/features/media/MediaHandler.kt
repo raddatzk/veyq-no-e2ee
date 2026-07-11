@@ -3,8 +3,8 @@ package com.veyq.app.features.media
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
+import com.veyq.app.shared.config.VeyqConfig
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.util.UUID
 
 /** A presigned URL for one chunk (index in chunk order). */
@@ -169,9 +169,10 @@ sealed interface MoveMediaOutcome {
 class MediaHandler(
     private val store: MediaStore,
     private val blobStore: BlobStore,
-    @param:ConfigProperty(name = "veyq.blob.max-bytes", defaultValue = "2147483648") private val maxBytes: Long,
-    @param:ConfigProperty(name = "veyq.blob.max-chunks", defaultValue = "100000") private val maxChunks: Int,
+    config: VeyqConfig,
 ) {
+    private val maxBytes: Long = config.blob().maxBytes()
+    private val maxChunks: Int = config.blob().maxChunks()
 
     fun start(userId: String, scopeId: String, declares: List<UploadDeclare>): StartOutcome {
         if (!store.isMember(userId, scopeId)) return StartOutcome.NoScope

@@ -9,10 +9,10 @@ import com.veyq.app.features.media.MediaEntity
 import com.veyq.app.features.media.UploadSessionEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
+import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Duration
 import java.time.Instant
 
@@ -28,8 +28,9 @@ import java.time.Instant
 class ScopePurge(
     private val store: ScopesStore,
     private val blobStore: BlobStore,
-    @param:ConfigProperty(name = "veyq.scope.delete.retention", defaultValue = "P30D") private val retention: Duration,
+    config: VeyqConfig,
 ) {
+    private val retention: Duration = config.scope().delete().retention()
 
     // @Transactional on run() so the whole sweep shares one session (the Quarkus @Scheduled + Panache pattern,
     // cr-0053) — and so the internal eraseScope() calls run transactionally (a self-invoked @Transactional would
