@@ -420,7 +420,7 @@ class MediaHandler(
             if (!parent.isPrimary) return CreateBucketOutcome.Forbidden // nest one level, under a primary only
             parent.ownerKey
         } else {
-            "${BucketEntity.OWNER_USER_PREFIX}$userId"
+            OwnerKey.User(userId).format()
         }
         return CreateBucketOutcome.Ok(store.createSubBucket(scopeId, nodeId, ownerKey, sealedName))
     }

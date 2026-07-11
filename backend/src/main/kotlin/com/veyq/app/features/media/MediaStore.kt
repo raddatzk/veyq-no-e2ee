@@ -253,41 +253,40 @@ class MediaStore {
             .list().mapNotNull(::toRow)
 
     /**
-     * Hard-delete a single **trashed** media now (cr-0111, the member-expedited purge). Drops derivative → media →
-     * blob rows in FK order (reusing [deleteBlobRow]) and returns the store chunk keys to purge. Only a trashed
-     * media (`deletedAt != null`) is purgeable — a live or unknown media returns null (⇒ a 404). No revision bump:
-     * a trashed row is already excluded from every list. The blob-object purge is the caller's (best-effort).
+     * Hard-delete one media's rows in FK order (derivative → media → blob) and return the store chunk keys to
+     * reclaim — the single shared body behind the retention purge, the member-expedited purge and the
+     * contributor delete-own. The caller owns the `@Transactional` boundary, the best-effort post-commit
+     * `blobStore.delete` of the returned keys, and any revision bump (only a LIVE-media removal bumps a revision;
+     * a trashed row is already hidden from every list, so the two trash purges don't).
      */
-    @Transactional
-    fun purgeMedia(scopeId: String, mediaId: String): List<String>? {
-        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId && it.deletedAt != null } ?: return null
+    fun purgeMediaRows(media: MediaEntity): List<String> {
         val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
         val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
         derivatives.forEach { MediaDerivativeEntity.deleteById(it.id) } // FK: the referencing rows go first
         MediaEntity.deleteById(media.id)
-        val reclaimKeys = ArrayList<String>()
-        blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
-        return reclaimKeys
+        return blobIds.flatMap { deleteBlobRow(it) }
     }
 
     /**
-     * Hard-delete every media trashed before [cutoff] — the retention purge (cr-0110, MediaTrashPurge). Drops
-     * derivative → media → blob rows in FK order (parallels the cr-0102 delete-own reclaim) across all scopes,
-     * returning the store chunk keys to purge. NO revision bump: trashed rows are already excluded from every
-     * list, so no client ever saw them. The blob-object purge is the caller's (best-effort, after this tx).
+     * Hard-delete a single **trashed** media now (cr-0111, the member-expedited purge). Only a trashed media
+     * (`deletedAt != null`) is purgeable — a live or unknown media returns null (⇒ a 404). No revision bump: a
+     * trashed row is already excluded from every list. The blob-object purge is the caller's (best-effort).
+     */
+    @Transactional
+    fun purgeMedia(scopeId: String, mediaId: String): List<String>? {
+        val media = MediaEntity.findById(mediaId)?.takeIf { it.scopeId == scopeId && it.deletedAt != null } ?: return null
+        return purgeMediaRows(media)
+    }
+
+    /**
+     * Hard-delete every media trashed before [cutoff] — the retention purge (cr-0110, MediaTrashPurge), across
+     * all scopes. NO revision bump: trashed rows are already excluded from every list, so no client ever saw
+     * them. The blob-object purge is the caller's (best-effort, after this tx).
      */
     @Transactional
     fun purgeTrashedBefore(cutoff: Instant): List<String> {
         val expired = MediaEntity.find("deletedAt is not null and deletedAt < ?1", cutoff).list()
-        val reclaimKeys = ArrayList<String>()
-        for (media in expired) {
-            val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
-            val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
-            derivatives.forEach { MediaDerivativeEntity.deleteById(it.id) } // FK: the referencing rows go first
-            MediaEntity.deleteById(media.id)
-            blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
-        }
-        return reclaimKeys
+        return expired.flatMap { purgeMediaRows(it) }
     }
 
     /** Map a media entity to its read-back row, resolving the original + derivative blobs; null when the original blob is missing. */
@@ -301,7 +300,7 @@ class MediaStore {
             m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest),
             derivatives, m.wrappedMeta, m.updatedAt ?: m.createdAt, // cr-0107: coalesce for pre-backfill safety
             m.deletedAt, m.deletedBy, // cr-0110: null for live media, populated in the trashed listing
-            m.createdBy ?: m.shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }, m.bucketId, // cr-0113
+            m.createdBy ?: m.shareIdentityId?.let { OwnerKey.Share(it).format() }, m.bucketId, // cr-0113
         )
     }
 
@@ -382,20 +381,23 @@ class MediaStore {
     /** A media's owner_key: the denormalized `created_by`, else the contributor `share:{id}`, else the scope owner. */
     private fun ownerKeyOf(m: MediaEntity, scopeOwnerUserId: String?): String =
         m.createdBy
-            ?: m.shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }
-            ?: "${BucketEntity.OWNER_USER_PREFIX}${scopeOwnerUserId ?: "unknown"}"
+            ?: m.shareIdentityId?.let { OwnerKey.Share(it).format() }
+            ?: OwnerKey.User(scopeOwnerUserId ?: "unknown").format()
 
     /** The owner_key for a NEW upload: a contributor `share:{id}`, else a member `user:{id}`. */
     private fun ownerKeyFor(uploaderUserId: String?, shareIdentityId: String?): String =
-        shareIdentityId?.let { "${BucketEntity.OWNER_SHARE_PREFIX}$it" }
-            ?: uploaderUserId?.let { "${BucketEntity.OWNER_USER_PREFIX}$it" }
-            ?: "${BucketEntity.OWNER_USER_PREFIX}unknown"
+        when {
+            shareIdentityId != null -> OwnerKey.Share(shareIdentityId)
+            uploaderUserId != null -> OwnerKey.User(uploaderUserId)
+            else -> OwnerKey.User("unknown")
+        }.format()
 
     /** A primary's sealed name: for a contributor (`share:{id}`) copy the identity's sealed name; else null (member → username). */
     private fun primarySealedNameFor(ownerKey: String): String? =
-        if (ownerKey.startsWith(BucketEntity.OWNER_SHARE_PREFIX))
-            ShareIdentityEntity.findById(ownerKey.removePrefix(BucketEntity.OWNER_SHARE_PREFIX))?.sealedDisplayName
-        else null
+        when (val owner = OwnerKey.parse(ownerKey)) {
+            is OwnerKey.Share -> ShareIdentityEntity.findById(owner.shareIdentityId)?.sealedDisplayName
+            is OwnerKey.User -> null
+        }
 
     /**
      * Find-or-create the uploader's PRIMARY bucket in a node (lazy, virtual-until-first-use). Primary uniqueness

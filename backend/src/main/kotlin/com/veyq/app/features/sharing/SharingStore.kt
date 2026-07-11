@@ -6,7 +6,6 @@ import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.media.MediaDerivativeEntity
 import com.veyq.app.features.media.MediaEntity
 import com.veyq.app.features.media.MediaStore
-import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import com.veyq.app.shared.crypto.Tokens
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -210,26 +209,13 @@ class SharingStore(
         val media = MediaEntity.findById(mediaId)
             ?.takeIf { it.scopeId == scopeId && it.shareIdentityId == identityId } ?: return null
         val nodeId = media.nodeId // captured before the row is deleted — the node whose gallery must reconcile
-        val derivatives = MediaDerivativeEntity.find("mediaId = ?1", media.id).list()
-        val blobIds = listOf(media.blobId) + derivatives.map { it.blobId }
-        // The referencing rows must go first (FK: `veyq_media.blob_id`, `veyq_media_derivative.blob_id`).
-        derivatives.forEach { MediaDerivativeEntity.deleteById(it.id) }
-        MediaEntity.deleteById(media.id)
-        val reclaimKeys = ArrayList<String>()
-        blobIds.forEach { reclaimKeys += deleteBlobRow(it) }
+        val reclaimKeys = mediaStore.purgeMediaRows(media) // derivative → media → blob rows, FK order (shared helper)
         // cr-0107 (ADR 0033): a media-row removal moves BOTH counters — media_revision (the change signal) and
         // delete_revision (which gates the id-set), so an open gallery's next poll gets the current mediaId set
-        // and drops the removed tile. Same transaction ⇒ atomic with the delete.
+        // and drops the removed tile. Same transaction ⇒ atomic with the delete. (A LIVE media is removed here —
+        // unlike the two trash purges — so it bumps; purgeMediaRows leaves the revision bump to the caller.)
         mediaStore.bumpMediaRevision(nodeId, deleted = true)
         return reclaimKeys
-    }
-
-    /** Delete a blob row by id (if present) and return its chunk keys for a best-effort store purge. */
-    private fun deleteBlobRow(blobId: String): List<String> {
-        val blob = BlobEntity.findById(blobId) ?: return emptyList()
-        val keys = (0 until blob.chunkCount).map { chunkKey(blob.storageKey, it) }
-        BlobEntity.deleteById(blob.id)
-        return keys
     }
 
     /** The sealed subtree rooted at [rootNodeId] within [scopeId]: nodes (for the `K_mem` chain) + all media. */

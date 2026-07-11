@@ -204,8 +204,5 @@ class BucketEntity : PanacheEntityBase {
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
-    companion object : PanacheCompanionBase<BucketEntity, String> {
-        const val OWNER_USER_PREFIX = "user:"
-        const val OWNER_SHARE_PREFIX = "share:"
-    }
+    companion object : PanacheCompanionBase<BucketEntity, String>
 }
