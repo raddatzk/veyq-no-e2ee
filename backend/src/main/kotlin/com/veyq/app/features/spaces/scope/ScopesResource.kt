@@ -78,7 +78,7 @@ class ScopesResource(
             is ListScopesOutcome.Scopes ->
                 Response.ok(outcome.rows.map {
                     ScopeSummary(
-                        id = UUID.fromString(it.id), kind = ScopeKind.valueOf(it.kind),
+                        id = UUID.fromString(it.id), kind = ScopeKind.decode(it.kind),
                         tenantId = UUID.fromString(it.tenantId), role = it.role,
                         currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
                         wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName, nameEpoch = it.nameEpoch,

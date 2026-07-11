@@ -72,7 +72,7 @@ class ContentResource(
     /** Map a stored row to the API shape: the root's parent slot (= scope id) surfaces as `parentId = null`. */
     private fun NodeRow.toSummary(scopeId: String) = NodeSummary(
         id = UUID.fromString(id),
-        kind = NodeKind.valueOf(kind),
+        kind = NodeKind.decode(kind),
         encryptedName = encryptedName,
         slugToken = slugToken,
         orderIndex = orderIndex,

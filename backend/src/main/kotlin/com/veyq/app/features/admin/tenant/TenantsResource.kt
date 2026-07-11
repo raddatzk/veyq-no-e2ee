@@ -84,7 +84,7 @@ class TenantsResource(
     override fun inviteTenantMember(tenantId: UUID, memberInviteRequest: MemberInviteRequest): Response =
         when (val outcome = handler.inviteMember(identity.principal.name, tenantId.toString(), memberInviteRequest.email)) {
             is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
-                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
             ).build()
             MemberInviteOutcome.NotFound -> notFound()
             MemberInviteOutcome.NotOwner -> Response.status(Response.Status.FORBIDDEN)
@@ -100,7 +100,7 @@ class TenantsResource(
         when (val outcome = handler.listMemberInvites(identity.principal.name, tenantId.toString())) {
             is MemberInvitesOutcome.Listed -> Response.ok(
                 outcome.invites.map {
-                    PendingMemberInvite(UUID.fromString(it.inviteId), it.email, InviteStatus.valueOf(it.status), it.expiresAt.utc())
+                    PendingMemberInvite(UUID.fromString(it.inviteId), it.email, InviteStatus.decode(it.status), it.expiresAt.utc())
                 },
             ).build()
             MemberInvitesOutcome.NotFound -> notFound()
@@ -111,7 +111,7 @@ class TenantsResource(
     override fun reissueMemberInvite(tenantId: UUID, inviteId: UUID): Response =
         when (val outcome = handler.reissueMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
             is ReissueOutcome.Done -> Response.ok(
-                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.valueOf(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
             ).build()
             ReissueOutcome.NotFound -> notFound()
             ReissueOutcome.NotOwner -> notTenantOwner()
@@ -151,7 +151,7 @@ class TenantsResource(
                     domain = outcome.domain,
                     ownerEmail = outcome.ownerEmail,
                     hasAccount = outcome.hasAccount,
-                    role = InviteRole.valueOf(outcome.role),
+                    role = InviteRole.decode(outcome.role),
                 ),
             ).build()
             PreviewOutcome.NotFound -> inviteNotFound()
@@ -242,7 +242,7 @@ class TenantsResource(
 
     private fun InviteOutcome.toResponse(): Response = when (this) {
         is InviteOutcome.Done -> Response.ok(
-            TenantInviteState(invite.ownerEmail, InviteStatus.valueOf(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!),
+            TenantInviteState(invite.ownerEmail, InviteStatus.decode(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!),
         ).build()
         InviteOutcome.NotFound -> notFound()
         InviteOutcome.NotPending -> conflict("tenant_not_pending")
@@ -253,8 +253,8 @@ class TenantsResource(
         name = name,
         domain = domain,
         ownerEmail = ownerEmail,
-        status = TenantStatus.valueOf(status),
-        inviteStatus = inviteStatus?.let { InviteStatus.valueOf(it) },
+        status = TenantStatus.decode(status),
+        inviteStatus = inviteStatus?.let { InviteStatus.decode(it) },
         inviteExpiresAt = inviteExpiresAt?.utc(),
     )
 
