@@ -12,12 +12,12 @@
 // the built-in default and overridable via env (`VITE_VEYQ_MAP_TILE_URL`, `VITE_VEYQ_MAP_GEOCODER_URL`) or a
 // per-device localStorage override. With no tile URL there is no map; with no geocoder URL, names are typed only.
 import { computed, readonly, ref } from 'vue'
-
-/** Reference provider defaults (ADR 0016/0018): public OSM raster tiles + Nominatim reverse geocoder. */
-const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const DEFAULT_TILE_ATTRIBUTION = '© OpenStreetMap contributors'
-const DEFAULT_TILE_MAX_ZOOM = 19
-const DEFAULT_GEOCODER_URL = 'https://nominatim.openstreetmap.org'
+import {
+  DEFAULT_GEOCODER_URL,
+  DEFAULT_TILE_ATTRIBUTION,
+  DEFAULT_TILE_MAX_ZOOM,
+  DEFAULT_TILE_URL,
+} from './mapDefaults'
 
 const CONSENT_KEY = 'veyq:maps-consent'
 const TILE_URL_KEY = 'veyq:map-tile-url'
