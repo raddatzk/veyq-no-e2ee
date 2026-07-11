@@ -29,13 +29,15 @@ export async function loadFavoritesFor(scopeId: string, epochs: EpochKeys): Prom
 /** Toggle a Memory's pinned state — optimistic, reverts on a failed write. */
 export async function toggleFavorite(nodeId: string, scopeId: string, epochs: EpochKeys): Promise<void> {
   const next = new Set(favoritesStore.ids)
-  next.has(nodeId) ? next.delete(nodeId) : next.add(nodeId)
+  if (next.has(nodeId)) next.delete(nodeId)
+  else next.add(nodeId)
   favoritesStore.ids = next
   try {
     await saveFavorites(scopeId, stableKey(epochs), next)
   } catch {
     const reverted = new Set(next)
-    reverted.has(nodeId) ? reverted.delete(nodeId) : reverted.add(nodeId)
+    if (reverted.has(nodeId)) reverted.delete(nodeId)
+    else reverted.add(nodeId)
     favoritesStore.ids = reverted
   }
 }

@@ -110,8 +110,6 @@ const categories = computed<NavCategory[]>(() => {
   return cats
 })
 
-const allItems = computed<NavItem[]>(() => categories.value.flatMap((c) => c.items))
-
 // The gear (no param) opens the active scope's entity: a group → its page, the Tenant scope → its members, else
 // Persönlich. Narrow with no param shows the list only.
 const defaultId = computed(() =>

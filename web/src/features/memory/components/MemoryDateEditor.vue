@@ -44,6 +44,8 @@ const canSave = computed(() => {
       return Boolean(from.value)
     case 'range':
       return isValidMemoryDateRange(from.value, to.value)
+    default:
+      return false
   }
 })
 

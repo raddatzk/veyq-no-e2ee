@@ -116,7 +116,7 @@ describe('resolveShare (anonymous viewer)', () => {
   it('rejects a wrong fragment key — the id alone is inert (E1)', async () => {
     const create = vi.fn().mockResolvedValue({ shareId: 'share-3' })
     mockCurator(create)
-    const minted = await createShare(NODE_ID, v1.randomBytes(32), 'Rom')
+    await createShare(NODE_ID, v1.randomBytes(32), 'Rom')
     const { wrap, sealedName } = create.mock.calls[0][0].createShareRequest
     mockGuest({ role: 'VIEWER', wrap, sealedName, nodes: [{ id: NODE_ID, parentId: null, kind: 'MEMORY' }], media: [] })
 

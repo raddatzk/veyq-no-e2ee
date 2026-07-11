@@ -265,7 +265,8 @@ async function confirmDeleteBucket() {
 
 function toggleSelect(id: string) {
   const next = new Set(selected.value)
-  next.has(id) ? next.delete(id) : next.add(id)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
   selected.value = next
 }
 const allSelected = computed(() => filteredMedia.value.length > 0 && filteredMedia.value.every((m) => selected.value.has(m.mediaId)))
