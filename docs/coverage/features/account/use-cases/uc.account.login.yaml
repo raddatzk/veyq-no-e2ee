@@ -25,9 +25,10 @@ acceptanceCriteria:
       backend: { integration: [LoginSliceTest.wrongSignatureIsGenericFailure, LoginSliceTest.unknownAccountIsIdenticalGenericFailure] }
       web: { unit: [src/features/account/login/login.test.ts] }
   - id: nonce-single-use
-    text: A replayed nonce is rejected (the challenge is consumed on verify).
+    text: A replayed nonce is rejected (the challenge is consumed on verify) — both sequentially and under
+      concurrent verifies of the same nonce, which the atomic (row-locked) consume serializes so only one wins.
     coverage:
-      backend: { integration: [LoginSliceTest.replayedNonceIsRejected] }
+      backend: { integration: [LoginSliceTest.replayedNonceIsRejected, LoginSliceTest.concurrentVerifyConsumesTheChallengeOnce] }
   - id: refresh-rotates
     text: Refreshing rotates the access+refresh pair and the chain keeps rotating.
     coverage:

@@ -84,6 +84,31 @@ class LoginSliceTest {
     }
 
     @Test
+    fun concurrentVerifyConsumesTheChallengeOnce() {
+        // Two requests race the SAME signed challenge. Single-use must be ATOMIC: exactly one issues a session,
+        // the other loses the consume and gets a generic 401. Without the row-lock both reads see the nonce
+        // before either delete lands, so one captured signature would mint two sessions in parallel (P2f).
+        val nonce = requestChallenge(EMAIL)
+        val sig = sign(KEYPAIR, nonce)
+        val barrier = java.util.concurrent.CyclicBarrier(2)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val codes = pool.invokeAll(
+                (0 until 2).map {
+                    java.util.concurrent.Callable {
+                        barrier.await() // release both requests as tightly together as possible
+                        verify(EMAIL, sig).then().extract().statusCode()
+                    }
+                },
+            ).map { it.get() }
+            assertEquals(1, codes.count { it == 200 }, "exactly one concurrent verify may consume the challenge, got $codes")
+            assertEquals(1, codes.count { it == 401 }, "the losing concurrent verify must get a generic 401, got $codes")
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
+    @Test
     fun expiredNonceIsRejected() {
         val nonce = requestChallenge(EMAIL)
         // Force the stored challenge past its TTL (5 min) without waiting it out — a correctly-signed but

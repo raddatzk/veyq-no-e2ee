@@ -4,6 +4,7 @@ import com.veyq.app.shared.crypto.Ed25519Verifier
 import com.veyq.app.shared.instance.InstanceStore
 import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.LockModeType
 import jakarta.transaction.Transactional
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
@@ -51,8 +52,14 @@ class LoginHandler(
     @Transactional
     fun verify(email: String, signatureB64: String): IssuedSession? {
         val normalized = normalize(email)
-        val challenge = LoginChallengeEntity.find("email", normalized).firstResult()
-        if (challenge != null) LoginChallengeEntity.deleteById(normalized) // single-use
+        // Consume the single-use challenge atomically: a PESSIMISTIC_WRITE lock on the row (mirrors
+        // SessionService) serializes concurrent verifies of the SAME nonce — the first locks, deletes and
+        // commits; a racing request then blocks, re-reads nothing, and fails. Without the lock both requests
+        // read the row before either deletes it, so a captured signature could be replayed in parallel for two
+        // sessions off one challenge (audit P2f).
+        val challenge = LoginChallengeEntity.find("email", normalized)
+            .withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
+        if (challenge != null) LoginChallengeEntity.deleteById(normalized) // single-use, consumed under the lock
         val user = VeyqUser.find("email", normalized).firstResult()
 
         val ok = verifySignature(challenge, user, signatureB64)
