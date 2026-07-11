@@ -143,7 +143,7 @@ async function signOut() {
   overflow-y: auto;
   padding: 0.85rem 1rem;
   margin: 0.75rem 0;
-  border: 1px solid var(--app-border, var(--p-content-border-color, rgba(127, 127, 127, 0.25)));
+  border: 1px solid var(--app-line);
   border-radius: 0.6rem;
   font-size: 0.92rem;
   line-height: 1.5;

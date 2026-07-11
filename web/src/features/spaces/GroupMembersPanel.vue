@@ -511,7 +511,7 @@ async function onRestore() {
 .danger-zone {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--app-border, rgba(128, 128, 128, 0.25));
+  border-top: 1px solid var(--app-line);
 }
 .trust-actions {
   display: flex;

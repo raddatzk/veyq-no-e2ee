@@ -624,7 +624,7 @@ onBeforeUnmount(revokeThumbs)
 }
 /* The uploader badge is a persistent warning tone (session-only own-view), not the neutral read-only badge. */
 .share-view-badge-uploader {
-  color: var(--app-warn, #b45309);
+  color: var(--app-warning-text);
   font-weight: 700;
 }
 /* The uploader's ephemerality warning in the name pre-screen + the persistent session note above the grid. */
@@ -635,9 +635,9 @@ onBeforeUnmount(revokeThumbs)
   gap: 0.5rem;
   margin: 0.2rem 0 0.5rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--app-warn, #b45309) 45%, var(--app-line));
+  border: 1px solid color-mix(in srgb, var(--app-warning) 45%, var(--app-line));
   border-radius: 10px;
-  background: color-mix(in srgb, var(--app-warn, #b45309) 10%, transparent);
+  background: color-mix(in srgb, var(--app-warning) 10%, transparent);
   color: var(--app-text);
   font-size: 0.85rem;
   line-height: 1.4;
@@ -648,7 +648,7 @@ onBeforeUnmount(revokeThumbs)
 .share-uploader-warning .pi,
 .share-uploader-note .pi {
   margin-top: 0.1rem;
-  color: var(--app-warn, #b45309);
+  color: var(--app-warning-text);
 }
 /* cr-0115: the curator note — a card banner (in the header flow) / instruction (in the name pre-screen). The
    inner elements come from the safe markdown renderer via v-html, so they need :deep. */

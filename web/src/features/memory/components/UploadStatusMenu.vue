@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
   max-height: 70vh;
   overflow-y: auto;
   padding: 0.75rem;
-  border: 1px solid var(--app-border, #d4d4d8);
+  border: 1px solid var(--app-line);
   border-radius: 0.75rem;
   background: var(--app-surface, #fff);
   box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
 }
 .uploads-batch {
   padding: 0.5rem 0;
-  border-top: 1px solid var(--app-border, #e4e4e7);
+  border-top: 1px solid var(--app-line);
 }
 .uploads-batch-head {
   display: flex;
@@ -222,7 +222,7 @@ onBeforeUnmount(() => {
 .uploads-bar {
   height: 0.35rem;
   border-radius: 999px;
-  background: var(--app-border, #e4e4e7);
+  background: var(--app-line);
   overflow: hidden;
 }
 .uploads-bar > span {
