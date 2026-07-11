@@ -7,6 +7,7 @@ import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.SetupResult
 import com.veyq.app.generated.model.SetupStatus
 import com.veyq.app.generated.model.Version
+import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.util.UUID
@@ -33,6 +34,7 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
         ).build()
     }
 
+    @RateLimited // per-IP bound on the pre-auth server-owner creation (defense in depth; not on the status read)
     override fun createServerOwner(createServerOwnerRequest: CreateServerOwnerRequest): Response =
         try {
             val userId = handler.createOwner(createServerOwnerRequest.toRegistration())

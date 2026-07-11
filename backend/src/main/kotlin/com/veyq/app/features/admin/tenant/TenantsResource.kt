@@ -25,6 +25,7 @@ import com.veyq.app.generated.model.TenantTerms
 import com.veyq.app.generated.model.TenantTermsUpdate
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
 import com.veyq.app.shared.identity.WrapData
+import com.veyq.app.shared.ratelimit.RateLimited
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.annotation.security.PermitAll
@@ -142,6 +143,7 @@ class TenantsResource(
     // @RolesAllowed: preview + register are @PermitAll (secret-gated), accept is @Authenticated (any user;
     // the email-match is a domain check, not the Server-Owner role).
     @PermitAll
+    @RateLimited // unauthenticated bootstrap-secret lookup oracle — per-IP bound it
     override fun previewTenantInvite(acceptPreviewRequest: AcceptPreviewRequest): Response =
         when (val outcome = acceptHandler.preview(acceptPreviewRequest.bootstrapSecret)) {
             is PreviewOutcome.Found -> Response.ok(
@@ -179,6 +181,7 @@ class TenantsResource(
         }
 
     @PermitAll
+    @RateLimited // unauthenticated account creation — per-IP bound it
     override fun registerAndAcceptTenantInvite(registerAndAcceptRequest: RegisterAndAcceptRequest): Response {
         val a = registerAndAcceptRequest.account
         val account = NewAccount(
