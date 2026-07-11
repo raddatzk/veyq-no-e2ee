@@ -78,7 +78,7 @@ class MediaTest {
         assertTrue(blobId.isNotEmpty() && mediaId.isNotEmpty())
 
         assertEquals(3, dispatcher.startItemCount)                                 // original + 2 derivatives, one batch
-        assertEquals(listOf(400 to 80, 2048 to 85), deriver.imageCalls)            // pinned tier specs
+        assertEquals(listOf(512 to 80, 2048 to 85), deriver.imageCalls)            // pinned tier specs (thumbnail 512, cr-0070)
         assertEquals(0, deriver.posterCalls)
         assertEquals(listOf("THUMBNAIL", "PREVIEW"), dispatcher.lastCompleteDerivativeKinds)
 
@@ -170,7 +170,7 @@ class MediaTest {
         assertEquals(3, wraps.size)
 
         // grid = thumbnail bytes, lightbox = preview bytes, original = the pristine bytes
-        assertContentEquals(StubDeriver.image(400), c.openMedia(scopeId, memoryKey, item, VeyqClient.MediaTier.GRID))
+        assertContentEquals(StubDeriver.image(512), c.openMedia(scopeId, memoryKey, item, VeyqClient.MediaTier.GRID))
         assertContentEquals(StubDeriver.image(2048), c.openMedia(scopeId, memoryKey, item, VeyqClient.MediaTier.LIGHTBOX))
         assertContentEquals(original, c.openMedia(scopeId, memoryKey, item, VeyqClient.MediaTier.ORIGINAL))
     }
@@ -267,8 +267,8 @@ class MediaTest {
                 val urls = (0 until b.chunkCount).joinToString(",") { """{"index":$it,"url":"mem://${b.storageKey}/$it"}""" }
                 return json(200, """{"results":[{"presignedGets":[$urls]}]}""")
             }
-            if (path.endsWith("/media") && method == "GET") {
-                val node = path.removeSuffix("/media").substringAfterLast("/")
+            if (path.substringBefore("?").endsWith("/media") && method == "GET") { // listNodeMedia now sends ?sinceDelete&state
+                val node = path.substringBefore("?").removeSuffix("/media").substringAfterLast("/")
                 val rows = (mediaByNode[node] ?: emptyList()).mapNotNull { m ->
                     val b = blobs[m.blobId] ?: return@mapNotNull null
                     val derivativeJson = m.derivatives.mapNotNull { (kind, dBlobId) ->
@@ -277,9 +277,9 @@ class MediaTest {
                         }
                     }
                     val derivativesField = if (derivativeJson.isNotEmpty()) ""","derivatives":[${derivativeJson.joinToString(",")}]""" else ""
-                    """{"mediaId":"${m.mediaId}","blobId":"${m.blobId}","chunkCount":${b.chunkCount},"byteSize":${b.byteSize},"wrappedBlobKey":"${b.wrap}"$derivativesField}"""
+                    """{"mediaId":"${m.mediaId}","blobId":"${m.blobId}","chunkCount":${b.chunkCount},"byteSize":${b.byteSize},"wrappedBlobKey":"${b.wrap}","updatedAt":"2026-01-01T00:00:00Z"$derivativesField}"""
                 }
-                return json(200, "[${rows.joinToString(",")}]")
+                return json(200, """{"media":[${rows.joinToString(",")}],"mediaRevision":0,"deleteRevision":0}""") // MediaListPage wrapper
             }
             return MockResponse().setResponseCode(404)
         }

@@ -70,9 +70,9 @@ class ScopesTest {
     }
 
     private fun tenantScope() =
-        """{"id":"11111111-1111-1111-1111-111111111111","kind":"TENANT","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"AQ=="}"""
+        """{"id":"11111111-1111-1111-1111-111111111111","kind":"TENANT","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"AQ==","role":"OWNER","nameEpoch":0,"currentEpoch":0,"grantedEpoch":0}"""
     private fun personalScope() =
-        """{"id":"22222222-2222-2222-2222-222222222222","kind":"PERSONAL","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"AQ=="}"""
+        """{"id":"22222222-2222-2222-2222-222222222222","kind":"PERSONAL","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"AQ==","role":"OWNER","nameEpoch":0,"currentEpoch":0,"grantedEpoch":0}"""
 
     /** Serves /api/scopes: GET returns the list; POST captures the grant, appends a PERSONAL scope, 201. */
     private class ScopesDispatcher(private val scopes: MutableList<String>) : Dispatcher() {
@@ -93,7 +93,7 @@ class ScopesTest {
                 synchronized(this) {
                     sawPost = true
                     lastGrant = grant
-                    scopes.add("""{"id":"33333333-3333-3333-3333-333333333333","kind":"PERSONAL","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"$grant"}""")
+                    scopes.add("""{"id":"33333333-3333-3333-3333-333333333333","kind":"PERSONAL","tenantId":"11111111-1111-1111-1111-111111111111","wrappedGrant":"$grant","role":"OWNER","nameEpoch":0,"currentEpoch":0,"grantedEpoch":0}""")
                 }
                 return json(201, """{"scopeId":"33333333-3333-3333-3333-333333333333","kind":"PERSONAL"}""")
             }

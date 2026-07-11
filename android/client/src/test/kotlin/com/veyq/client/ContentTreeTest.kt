@@ -124,7 +124,7 @@ class ContentTreeTest {
             "\"$name\":\"([^\"]*)\"".toRegex().find(body)?.groupValues?.get(1)
 
         private fun Node.toJson(): String = buildString {
-            append("""{"id":"$id","kind":"$kind","encryptedName":"$encryptedName","slugToken":"$slugToken","orderIndex":$orderIndex""")
+            append("""{"id":"$id","kind":"$kind","encryptedName":"$encryptedName","slugToken":"$slugToken","orderIndex":$orderIndex,"epoch":0""")
             parentId?.let { append(""","parentId":"$it"""") }
             wrappedContentKey?.let { append(""","wrappedContentKey":"$it"""") }
             append("}")
