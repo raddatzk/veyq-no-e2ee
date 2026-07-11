@@ -7,7 +7,7 @@ multi-ecosystem-groups:
 
 updates:
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/web"
     patterns:
       - "*"
     multi-ecosystem-group: "app-runtime"
@@ -31,26 +31,8 @@ updates:
           - "*"
     open-pull-requests-limit: 1
 
-  - package-ecosystem: "docker"
-    directory: "/"
-    patterns:
-      - "*"
-    multi-ecosystem-group: "app-runtime"
-    open-pull-requests-limit: 1
-
-  - package-ecosystem: "docker"
-    directory: "/frontend"
-    patterns:
-      - "*"
-    multi-ecosystem-group: "app-runtime"
-    open-pull-requests-limit: 1
-
-  - package-ecosystem: "docker"
-    directory: "/infra/reset"
-    patterns:
-      - "*"
-    multi-ecosystem-group: "app-runtime"
-    open-pull-requests-limit: 1
+  # Docker ecosystems are intentionally absent: there is no root Dockerfile yet (the container-image
+  # build+publish pipeline is deferred, cr-0127). Add a docker entry per Dockerfile once one exists.
 
   - package-ecosystem: "github-actions"
     directory: "/"

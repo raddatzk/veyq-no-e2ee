@@ -61,14 +61,14 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: web
         run: npm ci
 
       - name: Run frontend checks
-        working-directory: frontend
+        working-directory: web
         run: npm run check
 
   trust-chain:
@@ -118,7 +118,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       # Build the runnable fast-jar once; the orchestrator boots a fresh copy (fresh in-mem DB) per e2e file,
       # because every suite registers its own single-owner-per-boot Server Owner.
@@ -127,7 +127,7 @@ jobs:
         run: ./gradlew --no-daemon quarkusBuild
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: web
         run: npm ci
 
       - name: Run web E2E suites against a live backend

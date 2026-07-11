@@ -50,9 +50,9 @@ jobs:
               - 'docs/api/**'
             javascript-typescript:
               - '.github/workflows/codeql.yml'
-              - 'frontend/**'
+              - 'web/**'
               # OpenAPI specs generate the TypeScript fetch clients consumed by
-              # the frontend.
+              # the web client.
               - 'docs/api/**'
               - 'load/**'
               - 'site/**'
