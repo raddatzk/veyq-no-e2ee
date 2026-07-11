@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import com.veyq.app.i18n.LocalL10n
 import com.veyq.app.security.BiometricGate
+import com.veyq.app.security.DeviceSecureGate
 import com.veyq.app.ui.AppModel
 import com.veyq.app.ui.components.AuthCard
 import com.veyq.app.ui.components.DeviceSecurityChooser
@@ -55,6 +56,7 @@ fun UnlockScreen(app: AppModel) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val biometricAvailable = activity != null && BiometricGate.available(activity)
+    val deviceSecure = DeviceSecureGate.isSecure(context)
     val l = LocalL10n.current
 
     val uploadKit = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -86,7 +88,12 @@ fun UnlockScreen(app: AppModel) {
                 onUpload = { uploadKit.launch(arrayOf("application/pdf", "text/*")) },
                 onScan = { scanning = true },
             )
-            DeviceSecurityChooser(selection = level, onSelect = { level = it }, biometricAvailable = biometricAvailable)
+            DeviceSecurityChooser(
+                selection = level,
+                onSelect = { level = it },
+                biometricAvailable = biometricAvailable,
+                deviceSecure = deviceSecure,
+            )
             PrimaryButton(title = l.t("unlock.action"), busy = busy, enabled = secretKey.isNotEmpty() && level != null) {
                 val chosen = level ?: return@PrimaryButton
                 busy = true

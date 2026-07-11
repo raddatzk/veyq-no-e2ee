@@ -102,7 +102,11 @@ class VeyqClient(
                 else -> VeyqError.UnexpectedStatus(e.statusCode)
             }
         }
-        session.set(issued.accessToken, issued.refreshToken, issued.family.id.toString(), account = email)
+        // refreshToken is optional on the wire (it rides a cookie in the web remember-me transport, cr-0052);
+        // the Android data layer never opts into cookies, so the body token is always present — a null is a
+        // protocol error, not a normal state.
+        val refresh = issued.refreshToken ?: throw VeyqError.AuthenticationFailed
+        session.set(issued.accessToken, refresh, issued.family.id.toString(), account = email)
     }
 
     /**
@@ -113,7 +117,7 @@ class VeyqClient(
         val refreshToken = session.refreshToken ?: throw VeyqError.NoSession
         try {
             val pair = token.refreshSession(RefreshRequest(refreshToken = refreshToken))
-            session.set(pair.accessToken, pair.refreshToken)
+            session.set(pair.accessToken, pair.refreshToken ?: throw VeyqError.RefreshRejected)
             persistRotatedTokenIfPasswordless()
         } catch (e: Exception) {
             session.clear()
@@ -566,7 +570,7 @@ class VeyqClient(
 
     /** List a node's media (opaque metadata + the K_blob wraps for the original + every derivative tier). */
     fun listMedia(scopeId: String, nodeId: String): List<MediaItem> =
-        withRefresh { fetchNodeMedia(scopeId, nodeId) }.map { s ->
+        withRefresh { fetchNodeMedia(scopeId, nodeId) }.media.map { s ->
             MediaItem(
                 mediaId = s.mediaId.toString(),
                 original = BlobRef(s.blobId.toString(), s.chunkCount, s.byteSize, s.wrappedBlobKey),
@@ -640,7 +644,15 @@ class VeyqClient(
     private fun completeMedia(scopeId: String, originalUploadId: String, nodeId: String, derivatives: List<MediaDerivativeUpload>) = try {
         media.completeMedia(
             java.util.UUID.fromString(scopeId),
-            MediaBatchRequest(items = listOf(MediaRequestItem(java.util.UUID.fromString(originalUploadId), java.util.UUID.fromString(nodeId), derivatives))),
+            MediaBatchRequest(
+                items = listOf(
+                    MediaRequestItem(
+                        originalUploadId = java.util.UUID.fromString(originalUploadId),
+                        nodeId = java.util.UUID.fromString(nodeId),
+                        derivatives = derivatives,
+                    ),
+                ),
+            ),
         ).results
     } catch (e: MediaClientException) {
         throw mapMedia(e)

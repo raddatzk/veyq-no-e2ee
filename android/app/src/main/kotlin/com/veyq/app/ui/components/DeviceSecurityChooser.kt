@@ -36,16 +36,29 @@ enum class DeviceUnlockLevel(val titleKey: String, val subKey: String) {
     NO_LOGIN("device.noLogin.title", "device.noLogin.sub"),
 }
 
+/**
+ * Whether a level may be offered given the device's capabilities: **L2 (BIOMETRIC)** needs an enrolled strong
+ * biometric; **L3 (NO_LOGIN)** needs a secure lock screen (its key is stored auth-less, so a device credential
+ * is the only barrier — enforced for real in `AppModel.applyLevel`); the rest are always offerable. Pure so it
+ * unit-tests on the JVM without the Android SDK.
+ */
+fun deviceLevelAvailable(level: DeviceUnlockLevel, biometricAvailable: Boolean, deviceSecure: Boolean): Boolean =
+    when (level) {
+        DeviceUnlockLevel.BIOMETRIC -> biometricAvailable
+        DeviceUnlockLevel.NO_LOGIN -> deviceSecure
+        else -> true
+    }
+
 @Composable
 fun DeviceSecurityChooser(
     selection: DeviceUnlockLevel?,
     onSelect: (DeviceUnlockLevel) -> Unit,
     biometricAvailable: Boolean = true,
+    deviceSecure: Boolean = true,
 ) {
     val c = veyqColors
     val l = LocalL10n.current
-    // L2 needs an enrolled biometric; the rest are always offerable (L3 is an explicit, OS-lock-only choice).
-    fun available(level: DeviceUnlockLevel) = level != DeviceUnlockLevel.BIOMETRIC || biometricAvailable
+    fun available(level: DeviceUnlockLevel) = deviceLevelAvailable(level, biometricAvailable, deviceSecure)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(l.t("device.prompt"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
         DeviceUnlockLevel.entries.forEach { level ->

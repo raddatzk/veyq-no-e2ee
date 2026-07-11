@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
 import com.veyq.app.security.BiometricGate
+import com.veyq.app.security.DeviceSecureGate
 import com.veyq.app.security.KeystoreDeviceSecurityStore
 import com.veyq.app.ui.components.DeviceUnlockLevel
 import com.veyq.client.DeviceLevel
@@ -165,6 +166,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 deviceTrusted = true
             }
             DeviceUnlockLevel.NO_LOGIN -> {
+                // Gate the auth-less L3 key on a secure lock screen (mirrors Apple's AppModel guard). Without a
+                // device credential, storeKeyUngated's setUnlockedDeviceRequired is vacuous and K would be
+                // recoverable with no authentication. Throwing surfaces deviceTrustFailed; the unlock still lands.
+                if (!DeviceSecureGate.isSecure(getApplication())) error("device has no secure lock screen for No-Login")
                 val k = randomKey()
                 withContext(Dispatchers.IO) { deviceSecurity.storeKeyUngated(email, k) }
                 withContext(Dispatchers.IO) { client.setPasswordlessLevel(email, DeviceLevel.NO_LOGIN, k) }
