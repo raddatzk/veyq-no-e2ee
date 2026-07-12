@@ -1,0 +1,189 @@
+// uc.memory.delete-media (web) — the Memory Trash-tab reactive slice of MemoryDetail, extracted into a composable
+// (cr-0147, audit #77/P4a). A lightbox delete soft-deletes a photo into a per-Memory trash; this tab lists the
+// trashed media (restorable until the retention purge, cr-0110), loaded lazily on open, with batch selection, a
+// per-tile restore/purge menu, and the irreversible-purge confirm (cr-0111). It owns its own thumbnail object-URL
+// lifecycle (revoked on unmount). Two outward effects go back to the host via callbacks: a restore/purge lifts the
+// gallery's optimistic-delete tombstone (`liftTombstone`) and a restore re-lists the gallery (`reloadGallery`).
+import { ref, computed, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
+import { openGrid, hasDerivatives, unsealMeta, listTrash, restoreMedia, purgeMedia, type MediaItem } from './media'
+import { galleryDisplayAspectRatio } from './mediaGridLayout'
+import type { TreeNode } from './tree'
+
+/** The reactive context MemoryDetail hands the trash slice — getters so props stay reactive, plus the two host
+ *  effects: re-list the gallery after a restore, and lift the gallery's pending-delete tombstone. */
+export interface MediaTrashContext {
+  scopeId: () => string
+  node: () => TreeNode
+  memoryKey: () => Uint8Array | null
+  reloadGallery: () => void
+  liftTombstone: (mediaId: string) => void
+}
+
+export function useMediaTrash(ctx: MediaTrashContext) {
+  const { t } = useI18n()
+
+  const trashedItems = ref<MediaItem[]>([])
+  const trashThumbs = ref<Map<string, string>>(new Map())
+  const trashStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  // Trash tab (cr-0111): batch selection + the per-tile overflow menu + the irreversible-purge confirm.
+  const selectedTrash = ref<Set<string>>(new Set())
+  const trashMenu = ref<InstanceType<typeof Menu> | null>(null)
+  const menuTargetId = ref<string | null>(null)
+  const purgeConfirm = ref<{ ids: string[] } | null>(null)
+
+  /** Restore a media from the Trash tab: drop it from the tab (optimistic), restore server-side, re-list the gallery. */
+  async function onRestoreFromTrash(mediaId: string) {
+    dropFromTrash(mediaId)
+    ctx.liftTombstone(mediaId) // cr-0111: a genuine restore lifts the gallery tombstone
+    try {
+      await restoreMedia(ctx.scopeId(), mediaId)
+    } finally {
+      ctx.reloadGallery()
+    }
+  }
+
+  /** Drop a media from the Trash tab locally (revoke its thumb + deselect) — the optimistic half of restore/purge. */
+  function dropFromTrash(mediaId: string) {
+    const url = trashThumbs.value.get(mediaId)
+    if (url) URL.revokeObjectURL(url)
+    trashThumbs.value.delete(mediaId)
+    trashThumbs.value = new Map(trashThumbs.value)
+    trashedItems.value = trashedItems.value.filter((it) => it.mediaId !== mediaId)
+    if (selectedTrash.value.has(mediaId)) {
+      const n = new Set(selectedTrash.value)
+      n.delete(mediaId)
+      selectedTrash.value = n
+    }
+  }
+
+  /** Load the Memory's trashed media for the Trash tab (lazy, on open) — decrypt each thumbnail like the gallery. */
+  async function loadTrash() {
+    const key = ctx.memoryKey()
+    if (!key) return
+    const nodeId = ctx.node().id
+    trashStatus.value = 'loading'
+    revokeTrashThumbs()
+    try {
+      const list = await listTrash(ctx.scopeId(), nodeId)
+      if (ctx.node().id !== nodeId) return
+      trashedItems.value = list
+      trashStatus.value = 'ready'
+      await Promise.all(
+        list.map(async (m) => {
+          if (!hasDerivatives(m)) return
+          try {
+            const bytes = await openGrid(ctx.scopeId(), key, m)
+            if (ctx.node().id === nodeId) setTrashThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
+          } catch {
+            // a failed tile stays a placeholder
+          }
+        }),
+      )
+    } catch {
+      if (ctx.node().id === nodeId) trashStatus.value = 'error'
+    }
+  }
+
+  function setTrashThumb(mediaId: string, url: string) {
+    const prev = trashThumbs.value.get(mediaId)
+    if (prev) URL.revokeObjectURL(prev)
+    trashThumbs.value.set(mediaId, url)
+    trashThumbs.value = new Map(trashThumbs.value)
+  }
+  function revokeTrashThumbs() {
+    for (const url of trashThumbs.value.values()) URL.revokeObjectURL(url)
+    trashThumbs.value = new Map()
+  }
+  onBeforeUnmount(revokeTrashThumbs)
+
+  /** Drop the previous Memory's trash state when a different Memory/chapter opens (cr-0110/0111). */
+  function resetTrash() {
+    revokeTrashThumbs()
+    trashedItems.value = []
+    trashStatus.value = 'idle'
+    selectedTrash.value = new Set()
+  }
+
+  // --- Trash tab redesign (cr-0111): the SAME MediaGrid, a per-tile checkbox (batch select) + a 3-dot menu
+  // (restore / purge), and a confirm for the irreversible hard-delete. ---
+
+  /** The trashed media as MediaGrid tiles — the same justified layout as the gallery (aspect from the sealed dims). */
+  const trashLayoutItems = computed(() =>
+    trashedItems.value.map((m, index) => {
+      const dims = ctx.memoryKey() ? unsealMeta(ctx.memoryKey()!, m) : null
+      return { id: m.mediaId, aspectRatio: galleryDisplayAspectRatio(dims?.w, dims?.h), media: m, index }
+    }),
+  )
+
+  function toggleTrashSelect(mediaId: string) {
+    const next = new Set(selectedTrash.value)
+    if (next.has(mediaId)) next.delete(mediaId)
+    else next.add(mediaId)
+    selectedTrash.value = next
+  }
+  function clearTrashSelection() {
+    selectedTrash.value = new Set()
+  }
+
+  /** Open the per-tile overflow menu (restore / purge) anchored at the click, targeting [mediaId]. */
+  function openTrashMenu(event: Event, mediaId: string) {
+    menuTargetId.value = mediaId
+    trashMenu.value?.toggle(event)
+  }
+  const trashMenuModel = computed<MenuItem[]>(() => {
+    const id = menuTargetId.value
+    return [
+      { label: t('memory.trash.restore'), icon: 'pi pi-replay', command: () => { if (id) void onRestoreFromTrash(id) } },
+      { label: t('memory.trash.purge'), icon: 'pi pi-trash', command: () => { if (id) requestPurge([id]) } },
+    ]
+  })
+
+  /** Ask to confirm the irreversible purge of [ids] (a single item from the menu, or the batch selection). */
+  function requestPurge(ids: string[]) {
+    if (ids.length) purgeConfirm.value = { ids: [...ids] }
+  }
+
+  /** Batch restore the current selection: optimistic drop, restore each server-side, one re-list of the gallery. */
+  async function restoreSelected() {
+    const ids = [...selectedTrash.value]
+    if (!ids.length) return
+    ids.forEach((id) => { dropFromTrash(id); ctx.liftTombstone(id) })
+    await Promise.allSettled(ids.map((id) => restoreMedia(ctx.scopeId(), id)))
+    ctx.reloadGallery()
+  }
+  function purgeSelected() {
+    requestPurge([...selectedTrash.value])
+  }
+
+  /** Permanently delete the confirmed ids now (cr-0111): optimistic drop from the tab, then the hard-delete purge. */
+  async function confirmPurge() {
+    const ids = purgeConfirm.value?.ids ?? []
+    purgeConfirm.value = null
+    if (!ids.length) return
+    ids.forEach(dropFromTrash)
+    const results = await Promise.allSettled(ids.map((id) => purgeMedia(ctx.scopeId(), id)))
+    if (results.some((r) => r.status === 'rejected')) void loadTrash() // resync the tab on any failure
+  }
+
+  return {
+    trashedItems, // read-only to the host (its empty-state check); mutated only inside this composable
+    trashThumbs,
+    trashStatus,
+    selectedTrash,
+    trashMenu,
+    purgeConfirm,
+    trashLayoutItems,
+    trashMenuModel,
+    loadTrash,
+    resetTrash,
+    toggleTrashSelect,
+    clearTrashSelection,
+    openTrashMenu,
+    restoreSelected,
+    purgeSelected,
+    confirmPurge,
+  }
+}
