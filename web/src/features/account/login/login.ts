@@ -11,6 +11,7 @@ import { setAccount, clearAccount } from '../../../app/account'
 import { clearDeviceKey } from '../rememberMe/deviceKeyWrap'
 import { clearSessionVault } from '../rememberMe/sessionVault'
 import { LoginVerifyRequestSessionScopeEnum } from '../../../api/generated/auth'
+import { isUnauthorized } from '../../../shared/httpError'
 
 /**
  * Log in with email + password. Requests a challenge, derives the auth keypair with the instance salt the
@@ -76,24 +77,9 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Is this a 401 from a generated client? Duck-typed on purpose: each generated client package
- * (`generated/auth`, `generated/account`, …) defines its OWN `ResponseError` class, so
- * `instanceof ResponseError` from one package is false for an error thrown by another. We match the shared
- * shape (`name === 'ResponseError'` + `response.status`) instead, so the refresh-retry works for every
- * authed client, not just the auth one.
- */
-function isUnauthorized(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { name?: unknown }).name === 'ResponseError' &&
-    (e as { response?: { status?: unknown } }).response?.status === 401
-  )
-}
-
-/**
  * Run an authed call, transparently refreshing once on a 401 and retrying — the retry-on-401→refresh wiring
- * authed resource calls (e.g. unlock's key-material fetch) use.
+ * authed resource calls (e.g. unlock's key-material fetch) use. The 401 detection duck-types the shared
+ * response shape ({@link isUnauthorized}) so it fires for every generated client package, not just the auth one.
  */
 export async function withRefresh<T>(call: () => Promise<T>): Promise<T> {
   try {

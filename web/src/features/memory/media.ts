@@ -13,9 +13,10 @@
 import exifr from 'exifr'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
+import { isHttpStatus } from '../../shared/httpError'
 import { mediaApi, bucketsApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import { ResponseError, type MediaSummary, type BucketSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
+import { type MediaSummary, type BucketSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
 
 const KBLOB_CTX = 'blob-key'
 /**
@@ -789,7 +790,7 @@ export async function listMediaPage(
       mediaIds: page.mediaIds ?? null,
     }
   } catch (e) {
-    if (e instanceof ResponseError && e.response.status === 304) return { notModified: true } // idle fast path — nothing changed
+    if (isHttpStatus(e, 304)) return { notModified: true } // idle fast path — nothing changed
     throw e
   }
 }

@@ -9,6 +9,7 @@ import { getTenantTerms } from '../features/admin/createTenant/tenants'
 import { zeroEpochKeys, type EpochKeys } from '../features/spaces/epochs'
 import { ScopeKind } from '../api/generated/scopes'
 import { TENANT_SCOPE } from '../features/memory/location'
+import { isHttpStatus } from '../shared/httpError'
 import { resetTree, loadTree } from '../features/memory/treeStore'
 import { clearFavorites, loadFavoritesFor } from './favoritesStore'
 import { startGrantDeliveryPolling, stopGrantDeliveryPolling } from '../features/tasks/grantDeliveryPolling'
@@ -183,7 +184,7 @@ export function clearActiveSpace(): void {
 
 /** A 404 from the scope endpoints means no tenant claims this Host (`tenant_not_found`). */
 function isNoTenant(err: unknown): boolean {
-  return Boolean(err) && typeof err === 'object' && (err as { response?: { status?: number } }).response?.status === 404
+  return isHttpStatus(err, 404)
 }
 
 /** Fetch the active tenant's terms status into `activeSpace` (cr-0114). Fail-open: on any error the versions

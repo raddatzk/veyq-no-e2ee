@@ -4,6 +4,7 @@
 // grant-present) — never a scope key. The actual key DELIVERY runs as a grant-delivery job (cr-0076), not here.
 import { tenantsApi, scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
+import { decodeHttpError } from '../../shared/httpError'
 import type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
 import { SetMemberRoleRequestRoleEnum, type ScopeMember, type ResolvedGroupCandidate, type GroupInvitation } from '../../api/generated/scopes'
 
@@ -109,19 +110,9 @@ export function removeGroupMember(scopeId: string, userId: string): Promise<void
 
 /**
  * Decode a failed member call into `{ status, code }` for UI mapping (401 → re-login, 403 → not owner /
- * not a member, 409 → already_member / tenant_not_active). Duck-typed so it handles the ResponseError of
- * either generated package. Returns status 0 for a non-HTTP failure (e.g. network).
+ * not a member, 409 → already_member / tenant_not_active). Thin domain-named alias over the shared
+ * {@link decodeHttpError} — kept so its call sites read in member terms.
  */
-export async function memberError(e: unknown): Promise<{ status: number; code: string | null }> {
-  const res = (e as { response?: Response })?.response
-  if (res && typeof res.status === 'number') {
-    let code: string | null = null
-    try {
-      code = ((await res.clone().json()) as { code?: string })?.code ?? null
-    } catch {
-      // no / non-JSON body — leave code null
-    }
-    return { status: res.status, code }
-  }
-  return { status: 0, code: null }
+export function memberError(e: unknown): Promise<{ status: number; code: string | null }> {
+  return decodeHttpError(e)
 }

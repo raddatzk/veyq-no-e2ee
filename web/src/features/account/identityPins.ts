@@ -12,6 +12,7 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { accountIdentityPinsApi } from '../../api/client'
 import { withRefresh } from './login/login'
+import { isCodedError } from '../../shared/httpError'
 import { masterKey, identityPrivate } from '../../app/vault'
 
 /** The AAD context binding the pin-store seal (ADR 0009, vector-pinned `sym_identity_pins`). */
@@ -104,14 +105,8 @@ async function loadStore(): Promise<OpenedStore> {
 }
 
 /** Whether a failed call is a `409 stale_version` (a concurrent device advanced the store under our write). */
-async function isStaleVersion(e: unknown): Promise<boolean> {
-  const res = (e as { response?: Response })?.response
-  if (!res || res.status !== 409) return false
-  try {
-    return ((await res.clone().json()) as { code?: string })?.code === 'stale_version'
-  } catch {
-    return false
-  }
+function isStaleVersion(e: unknown): Promise<boolean> {
+  return isCodedError(e, 409, 'stale_version')
 }
 
 /**

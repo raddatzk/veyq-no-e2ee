@@ -3,7 +3,7 @@
 // key (the cold TENANT-scope birth that activates a tenant is Slice B). Thin facade over the generated
 // tenants client: views depend on this typed surface, never on the generator runtime.
 import { tenantsApi } from '../../../api/client'
-import { ResponseError } from '../../../api/generated/tenants'
+import { decodeHttpError } from '../../../shared/httpError'
 import type {
   InvitePreview,
   LocalizedMarkdown,
@@ -130,17 +130,8 @@ export function scopeGrant(identityPublic: HybridPublic): string {
 
 /**
  * Decode a failed tenant call into `{ status, code }` for UI mapping (401 → re-login, 403 → not owner,
- * 409 → domain_taken / tenant_not_pending). Returns status 0 for a non-HTTP failure (e.g. network).
+ * 409 → domain_taken / tenant_not_pending). Thin domain-named alias over the shared {@link decodeHttpError}.
  */
-export async function tenantError(e: unknown): Promise<{ status: number; code: string | null }> {
-  if (e instanceof ResponseError) {
-    let code: string | null = null
-    try {
-      code = ((await e.response.clone().json()) as { code?: string })?.code ?? null
-    } catch {
-      // no / non-JSON body — leave code null
-    }
-    return { status: e.response.status, code }
-  }
-  return { status: 0, code: null }
+export function tenantError(e: unknown): Promise<{ status: number; code: string | null }> {
+  return decodeHttpError(e)
 }

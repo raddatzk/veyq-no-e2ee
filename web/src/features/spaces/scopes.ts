@@ -5,6 +5,7 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { scopesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
+import { isCodedError } from '../../shared/httpError'
 import { identityPrivate } from '../../app/vault'
 import { sealName, openName, slugify } from '../memory/tree'
 import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type EpochKeys } from './epochs'
@@ -316,14 +317,8 @@ export async function renameGroup(scopeId: string, newName: string): Promise<voi
 }
 
 /** Whether a failed call is a `409 stale_epoch` (a concurrent rotation advanced the epoch under a rename). */
-async function isStaleEpoch(e: unknown): Promise<boolean> {
-  const res = (e as { response?: Response })?.response
-  if (!res || res.status !== 409) return false
-  try {
-    return ((await res.clone().json()) as { code?: string })?.code === 'stale_epoch'
-  } catch {
-    return false
-  }
+function isStaleEpoch(e: unknown): Promise<boolean> {
+  return isCodedError(e, 409, 'stale_epoch')
 }
 
 /**
