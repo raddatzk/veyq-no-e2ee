@@ -34,11 +34,6 @@ import com.veyq.crypto.V1
 import okhttp3.OkHttpClient
 import java.security.SecureRandom
 import java.util.Base64
-import com.veyq.api.account.infrastructure.ClientException as AccountClientException
-import com.veyq.api.auth.infrastructure.ClientException as AuthClientException
-import com.veyq.api.scopes.infrastructure.ClientException as ScopesClientException
-import com.veyq.api.content.infrastructure.ClientException as ContentClientException
-import com.veyq.api.media.infrastructure.ClientException as MediaClientException
 
 /**
  * The operator-blind login + unlock data layer — the Android twin of Apple's `VeyqClient` and the web
@@ -83,25 +78,21 @@ class VeyqClient(
      * password or unknown account both surface as [VeyqError.AuthenticationFailed] (non-enumerable).
      */
     fun login(email: String, password: String) {
-        val challenge = try {
-            login.requestLoginChallenge(LoginChallengeRequest(email = email))
-        } catch (e: AuthClientException) {
-            throw if (e.statusCode == 400) VeyqError.InvalidRequest(null) else VeyqError.UnexpectedStatus(e.statusCode)
-        }
+        val challenge = mapStatus({ status ->
+            if (status == 400) VeyqError.InvalidRequest(null) else VeyqError.UnexpectedStatus(status)
+        }) { login.requestLoginChallenge(LoginChallengeRequest(email = email)) }
 
         val authSalt = V1.deriveAuthSalt(b64decode(challenge.instanceSalt), email)
         val keypair = V1.deriveAuthKeypair(password, authSalt)
         val signature = V1.authSign(keypair.privateKey, b64decode(challenge.nonce))
 
-        val issued = try {
-            login.verifyLogin(LoginVerifyRequest(email = email, signature = b64encode(signature)))
-        } catch (e: AuthClientException) {
-            throw when (e.statusCode) {
+        val issued = mapStatus({ status ->
+            when (status) {
                 401 -> VeyqError.AuthenticationFailed
                 400 -> VeyqError.InvalidRequest(null)
-                else -> VeyqError.UnexpectedStatus(e.statusCode)
+                else -> VeyqError.UnexpectedStatus(status)
             }
-        }
+        }) { login.verifyLogin(LoginVerifyRequest(email = email, signature = b64encode(signature))) }
         // refreshToken is optional on the wire (it rides a cookie in the web remember-me transport, cr-0052);
         // the Android data layer never opts into cookies, so the body token is always present — a null is a
         // protocol error, not a normal state.
@@ -632,16 +623,14 @@ class VeyqClient(
         return SealedBlob(wrappedBlobKey, frames)
     }
 
-    private fun startUploads(scopeId: String, blobs: List<SealedBlob>) = try {
+    private fun startUploads(scopeId: String, blobs: List<SealedBlob>) = mapStatus(::mapMedia) {
         media.startBlobUploads(
             java.util.UUID.fromString(scopeId),
             BlobUploadsBatchRequest(items = blobs.map { BlobUploadRequestItem(it.chunkCount, it.byteSize, it.wrappedBlobKey) }),
         ).results
-    } catch (e: MediaClientException) {
-        throw mapMedia(e)
     }
 
-    private fun completeMedia(scopeId: String, originalUploadId: String, nodeId: String, derivatives: List<MediaDerivativeUpload>) = try {
+    private fun completeMedia(scopeId: String, originalUploadId: String, nodeId: String, derivatives: List<MediaDerivativeUpload>) = mapStatus(::mapMedia) {
         media.completeMedia(
             java.util.UUID.fromString(scopeId),
             MediaBatchRequest(
@@ -654,31 +643,26 @@ class VeyqClient(
                 ),
             ),
         ).results
-    } catch (e: MediaClientException) {
-        throw mapMedia(e)
     }
 
-    private fun fetchNodeMedia(scopeId: String, nodeId: String) = try {
-        media.listNodeMedia(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId))
-    } catch (e: MediaClientException) {
-        throw if (e.statusCode == 404) VeyqError.NodeNotFound else mapMedia(e)
-    }
+    private fun fetchNodeMedia(scopeId: String, nodeId: String) =
+        mapStatus({ status -> if (status == 404) VeyqError.NodeNotFound else mapMedia(status) }) {
+            media.listNodeMedia(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId))
+        }
 
-    private fun presignDownload(scopeId: String, blobId: String) = try {
+    private fun presignDownload(scopeId: String, blobId: String) = mapStatus(::mapMedia) {
         media.presignBlobDownloads(
             java.util.UUID.fromString(scopeId),
             BlobDownloadsBatchRequest(items = listOf(BlobDownloadRequestItem(java.util.UUID.fromString(blobId)))),
         ).results
-    } catch (e: MediaClientException) {
-        throw mapMedia(e)
     }
 
-    private fun mapMedia(e: MediaClientException): VeyqError = when (e.statusCode) {
+    private fun mapMedia(status: Int): VeyqError = when (status) {
         503 -> VeyqError.StoreUnavailable
         404 -> VeyqError.ScopeNotFound
         401 -> VeyqError.SessionExpired
         400 -> VeyqError.InvalidRequest(null)
-        else -> VeyqError.UnexpectedStatus(e.statusCode)
+        else -> VeyqError.UnexpectedStatus(status)
     }
 
     /** Shared create path for FOLDER/MEMORY — seal the name under `K_SC`, blind the slug, POST only ciphertext. */
@@ -704,107 +688,91 @@ class VeyqClient(
     private fun openName(scopeKey: ByteArray, encryptedName: String): String =
         String(V1.symUnwrap(scopeKey, b64decode(encryptedName), NAME_CTX), Charsets.UTF_8)
 
-    private fun fetchNodes(scopeId: String): List<NodeSummary> = try {
-        content.listNodes(java.util.UUID.fromString(scopeId))
-    } catch (e: ContentClientException) {
-        throw when (e.statusCode) {
+    private fun fetchNodes(scopeId: String): List<NodeSummary> = mapStatus({ status ->
+        when (status) {
             404 -> VeyqError.ScopeNotFound
             401 -> VeyqError.SessionExpired
-            else -> VeyqError.UnexpectedStatus(e.statusCode)
+            else -> VeyqError.UnexpectedStatus(status)
         }
-    }
+    }) { content.listNodes(java.util.UUID.fromString(scopeId)) }
 
-    private fun postNode(scopeId: String, body: CreateNodeRequest): String = try {
-        content.createNode(java.util.UUID.fromString(scopeId), body).nodeId.toString()
-    } catch (e: ContentClientException) {
-        throw when (e.statusCode) {
+    private fun postNode(scopeId: String, body: CreateNodeRequest): String = mapStatus({ status ->
+        when (status) {
             409 -> VeyqError.SlugTaken
             422 -> VeyqError.IllegalStructure
             404 -> VeyqError.ScopeNotFound
             401 -> VeyqError.SessionExpired
             400 -> VeyqError.InvalidRequest(null)
-            else -> VeyqError.UnexpectedStatus(e.statusCode)
+            else -> VeyqError.UnexpectedStatus(status)
         }
-    }
+    }) { content.createNode(java.util.UUID.fromString(scopeId), body).nodeId.toString() }
 
-    private fun patchNode(scopeId: String, nodeId: String, body: UpdateNodeRequest) = try {
-        content.updateNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId), body)
-    } catch (e: ContentClientException) {
-        throw when (e.statusCode) {
+    private fun patchNode(scopeId: String, nodeId: String, body: UpdateNodeRequest) = mapStatus({ status ->
+        when (status) {
             409 -> VeyqError.SlugTaken
             422 -> VeyqError.IllegalStructure
             404 -> VeyqError.NodeNotFound
             401 -> VeyqError.SessionExpired
             400 -> VeyqError.InvalidRequest(null)
-            else -> VeyqError.UnexpectedStatus(e.statusCode)
+            else -> VeyqError.UnexpectedStatus(status)
         }
-    }
+    }) { content.updateNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId), body) }
 
-    private fun removeNode(scopeId: String, nodeId: String) = try {
-        content.deleteNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId))
-    } catch (e: ContentClientException) {
-        throw when (e.statusCode) {
+    private fun removeNode(scopeId: String, nodeId: String) = mapStatus({ status ->
+        when (status) {
             404 -> VeyqError.NodeNotFound
             401 -> VeyqError.SessionExpired
-            else -> VeyqError.UnexpectedStatus(e.statusCode)
+            else -> VeyqError.UnexpectedStatus(status)
         }
-    }
+    }) { content.deleteNode(java.util.UUID.fromString(scopeId), java.util.UUID.fromString(nodeId)) }
 
     /** GET the caller's scopes. 401 → [VeyqError.SessionExpired] so [withRefresh] rotates-and-retries. */
-    private fun fetchScopes(): List<ScopeSummary> = try {
-        scopes.listMyScopes()
-    } catch (e: ScopesClientException) {
-        throw if (e.statusCode == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(e.statusCode)
-    }
+    private fun fetchScopes(): List<ScopeSummary> = mapStatus({ status ->
+        if (status == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(status)
+    }) { scopes.listMyScopes() }
 
     /** POST the personal-scope grant (opaque ciphertext). 409 → already exists, 404 → no tenant context. */
     private fun postPersonalScope(grant: String) {
-        try {
-            scopes.createPersonalScope(CreatePersonalScopeRequest(wrappedGrant = grant))
-        } catch (e: ScopesClientException) {
-            throw when (e.statusCode) {
+        mapStatus({ status ->
+            when (status) {
                 409 -> VeyqError.PersonalScopeExists
                 404 -> VeyqError.ScopeTenantUnavailable
                 401 -> VeyqError.SessionExpired
                 400 -> VeyqError.InvalidRequest(null)
-                else -> VeyqError.UnexpectedStatus(e.statusCode)
+                else -> VeyqError.UnexpectedStatus(status)
             }
-        }
+        }) { scopes.createPersonalScope(CreatePersonalScopeRequest(wrappedGrant = grant)) }
     }
 
     /** POST a DEVICE wrap; returns its server id. 401 → [VeyqError.SessionExpired] (so [withRefresh] rotates
      *  and retries), 409 → [VeyqError.TooManyDevices], 400 → [VeyqError.InvalidRequest]. */
-    private fun addDeviceWrap(wrappedKey: String, kdfParams: String): String = try {
-        accountWraps.addAccountWrap(
-            AddWrapRequest(method = AddWrapRequest.Method.DEVICE, wrappedKey = wrappedKey, kdfParams = kdfParams)
-        ).id
-    } catch (e: AccountClientException) {
-        throw when (e.statusCode) {
+    private fun addDeviceWrap(wrappedKey: String, kdfParams: String): String = mapStatus({ status ->
+        when (status) {
             409 -> VeyqError.TooManyDevices
             401 -> VeyqError.SessionExpired
             400 -> VeyqError.InvalidRequest(null)
-            else -> VeyqError.UnexpectedStatus(e.statusCode)
+            else -> VeyqError.UnexpectedStatus(status)
         }
+    }) {
+        accountWraps.addAccountWrap(
+            AddWrapRequest(method = AddWrapRequest.Method.DEVICE, wrappedKey = wrappedKey, kdfParams = kdfParams)
+        ).id
     }
 
     /** DELETE a wrap by id (idempotent 204 server-side). 401 → [VeyqError.SessionExpired] for [withRefresh]. */
     private fun deleteWrap(id: String) {
-        try {
-            accountWraps.deleteAccountWrap(id)
-        } catch (e: AccountClientException) {
-            throw if (e.statusCode == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(e.statusCode)
-        }
+        mapStatus({ status ->
+            if (status == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(status)
+        }) { accountWraps.deleteAccountWrap(id) }
     }
 
     /**
      * Fetch the caller's wrapped key material. A 401 is surfaced as [VeyqError.SessionExpired] so
      * [withRefresh] can rotate-and-retry (the resource analog of the web 401→refresh wiring).
      */
-    private fun fetchKeyMaterial(): AccountKeyMaterial = try {
-        account.getAccountKeyMaterial()
-    } catch (e: AccountClientException) {
-        throw if (e.statusCode == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(e.statusCode)
-    }
+    private fun fetchKeyMaterial(): AccountKeyMaterial = mapStatus({ status ->
+        if (status == 401) VeyqError.SessionExpired else VeyqError.UnexpectedStatus(status)
+    }) { account.getAccountKeyMaterial() }
 
     /**
      * Run an authed call, transparently refreshing once on a [VeyqError.SessionExpired] and retrying — the
