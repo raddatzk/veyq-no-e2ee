@@ -66,7 +66,7 @@ final class V1ConformanceTests: XCTestCase {
     }
 
     func testSymWrap() throws {
-        for key in ["sym_master_key", "session_token", "sym_identity_pins"] {
+        for key in ["sym_master_key", "session_token", "sym_identity_pins", "sym_invite_temp_key"] {
             let v = sub(["wrap", key])
             let blob = V1.symWrap(kek: hex(v["kek"]), targetKey: hex(v["plaintext"]), context: v["context"] as! String, nonce: hex(v["nonce"]))
             XCTAssertEqual(blob, hex(v["blob"]), "symWrap vector \(key)")
@@ -80,13 +80,17 @@ final class V1ConformanceTests: XCTestCase {
         XCTAssertEqual(V1.recoveryAuthTag(masterKey: hex(v["masterKey"])), hex(v["tag"]))
     }
 
-    /// No v1.json auth vector yet; the keypair composes vectored Argon2id (seed) + standard Ed25519, so this
-    /// pins the native wiring via a sign/verify round-trip (derived salt → keypair → signature).
-    func testAuthKeypairRoundTrip() throws {
-        let salt = V1.deriveAuthSalt(instanceSalt: Data(repeating: 7, count: 16), email: "  Owner@Example.com ")
-        XCTAssertEqual(salt.count, 16)
-        let kp = V1.deriveAuthKeypair(password: "correct horse battery staple", authSalt: salt)
-        XCTAssertEqual(kp.publicKey.count, 32)
+    /// auth_salt + auth_keypair pinned against the SHARED vectors (ADR 0003) — byte-parity with web/android;
+    /// plus a sign/verify round-trip on the vectored keypair to pin the authSign/authVerify wiring.
+    func testAuthSaltKeypairAndSign() throws {
+        let s = sub(["auth", "auth_salt"])
+        XCTAssertEqual(V1.deriveAuthSalt(instanceSalt: hex(s["instance_salt"]), email: s["email_utf8"] as! String), hex(s["auth_salt"]))
+
+        let k = sub(["auth", "auth_keypair"])
+        let kp = V1.deriveAuthKeypair(password: k["password_utf8"] as! String, authSalt: hex(k["auth_salt"]), params: params(k))
+        XCTAssertEqual(kp.privateKey, hex(k["private_key"]))
+        XCTAssertEqual(kp.publicKey, hex(k["public_key"]))
+
         let msg = Data("login-nonce".utf8)
         let sig = V1.authSign(privateKey: kp.privateKey, message: msg)
         XCTAssertTrue(V1.authVerify(publicKey: kp.publicKey, message: msg, signature: sig))

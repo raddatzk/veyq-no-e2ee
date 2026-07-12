@@ -60,7 +60,7 @@ class V1ConformanceTest {
     }
 
     @Test fun symWrap() {
-        for (key in listOf("sym_master_key", "session_token", "sym_identity_pins")) {
+        for (key in listOf("sym_master_key", "session_token", "sym_identity_pins", "sym_invite_temp_key")) {
             val v = vectors.getJSONObject("wrap").getJSONObject(key)
             val blob = V1.symWrap(hex(v, "kek"), hex(v, "plaintext"), v.getString("context"), hex(v, "nonce"))
             assertContentEquals(hex(v, "blob"), blob, "symWrap vector $key")
@@ -73,11 +73,17 @@ class V1ConformanceTest {
         assertContentEquals(hex(v, "tag"), V1.recoveryAuthTag(hex(v, "masterKey")))
     }
 
-    @Test fun authKeypairRoundTrip() {
-        val salt = V1.deriveAuthSalt(ByteArray(16) { 7 }, "  Owner@Example.com ")
-        assertEquals(16, salt.size)
-        val kp = V1.deriveAuthKeypair("correct horse battery staple", salt)
-        assertEquals(32, kp.publicKey.size)
+    /** auth_salt + auth_keypair pinned against the SHARED vectors (ADR 0003) — byte-parity with web/apple;
+     *  plus a sign/verify round-trip on the vectored keypair to pin the authSign/authVerify wiring. */
+    @Test fun authSaltKeypairAndSign() {
+        val s = vectors.getJSONObject("auth").getJSONObject("auth_salt")
+        assertContentEquals(hex(s, "auth_salt"), V1.deriveAuthSalt(hex(s, "instance_salt"), s.getString("email_utf8")))
+
+        val k = vectors.getJSONObject("auth").getJSONObject("auth_keypair")
+        val kp = V1.deriveAuthKeypair(k.getString("password_utf8"), hex(k, "auth_salt"), params(k))
+        assertContentEquals(hex(k, "private_key"), kp.privateKey)
+        assertContentEquals(hex(k, "public_key"), kp.publicKey)
+
         val msg = "login-nonce".toByteArray()
         val sig = V1.authSign(kp.privateKey, msg)
         assertTrue(V1.authVerify(kp.publicKey, msg, sig))

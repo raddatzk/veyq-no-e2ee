@@ -1,6 +1,6 @@
 {
   "suite": "v1",
-  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Most Argon2 vectors use light params (m=8 MiB) for fast conformance; recovery_argon2id_m32768 + share_pw deliberately pin the PRODUCTION param (m=32 MiB, t=3 — the value all clients ship in ARGON) to drift-proof the password-derived KEKs and stop the B1-class mismatch (m=65536 vs 32768) recurring. ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
+  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Most Argon2 vectors use light params (m=8 MiB) for fast conformance; recovery_argon2id_m32768 + auth.auth_keypair deliberately pin the PRODUCTION param (m=32 MiB, t=3 — the value all clients ship in ARGON) to drift-proof the password-derived KEK + the auth keypair and stop the B1-class mismatch (m=65536 vs 32768) recurring. ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
   "primitives": {
     "hkdf_sha256_rfc5869_case1": {
       "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
@@ -54,10 +54,6 @@
       "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
       "kek": "e28662b5cff7c3d8f2a259c1e3f3f28e79d714022f0635a2a4ab708600a976ba"
     },
-    "passkey_prf_hkdf": {
-      "prf_output": "3333333333333333333333333333333333333333333333333333333333333333",
-      "kek": "148f9195f1b9d54a01d868d0ac56d4481f8d049c20c308beabe701c4f06f557a"
-    },
     "recovery_argon2id_m32768": {
       "note": "kekRecovery at PRODUCTION Argon2 params (m=32 MiB) \u2014 pins the invite-temp-key KEK so the B1-class param mismatch (m=65536 vs 32768) cannot silently recur. Same inputs as recovery_argon2id, only m differs.",
       "params": {
@@ -69,13 +65,27 @@
       "recovery_code": "22222222222222222222222222222222",
       "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
       "kek": "ccddfe96872cf9e46c3ea4ba109b12f48b6690ffd7bf9b7a77b7748314f15381"
+    }
+  },
+  "auth": {
+    "auth_salt": {
+      "note": "deriveAuthSalt (ADR 0003): HKDF-SHA256(ikm=utf8(email.trim().toLowerCase()), salt=instance_salt, info=\"veyq/v1/auth-salt\", 16). email_utf8 is the raw pre-normalization input the impl normalizes. Asserted on web+apple+android; the operator-blind backend only VERIFIES signatures, so it does not derive this.",
+      "instance_salt": "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0",
+      "email_utf8": "user@example.com",
+      "auth_salt": "3adf4158b2c29361edb0b00ae3666b17"
     },
-    "share_pw": {
-      "note": "shareWrapKey = HKDF(shareKey, kekRecovery(NFC(password),salt @ m=32768), \"veyq/v1/share-pw\", 32). WEB-ONLY by design: iOS/Android do not create password-protected shares, so this vector is asserted only in the web suite.",
-      "share_key": "3333333333333333333333333333333333333333333333333333333333333333",
+    "auth_keypair": {
+      "note": "deriveAuthKeypair (ADR 0003): seed=Argon2id(utf8(password), auth_salt, PRODUCTION params m=32768); private_key=seed, public_key=Ed25519.getPublicKey(seed). Pins the password->Ed25519 auth identity byte-identically across web+apple+android (was only a non-vector sign/verify round-trip). auth_salt is auth.auth_salt.auth_salt.",
+      "params": {
+        "t": 3,
+        "m": 32768,
+        "p": 1,
+        "dkLen": 32
+      },
       "password_utf8": "correct horse battery staple",
-      "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
-      "wrap_key": "93c10dfa6a4cd58681183b063f0aa514ab354d12445395fa4600fc273a97b75d"
+      "auth_salt": "3adf4158b2c29361edb0b00ae3666b17",
+      "private_key": "29dae0dcd9d6d25cf1e80dd8cf879bf9f2b995b5b724cf3f57da6cc4697b850e",
+      "public_key": "a8398761b4f507850be99c242eddd3d02487c35da04ff2cf278f8fc5f09dcd6a"
     }
   },
   "kem_v1": {

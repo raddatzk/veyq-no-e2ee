@@ -85,7 +85,10 @@ public final class VeyqClient: Sendable {
         switch verifyOut {
         case .ok(let ok):
             let s = try ok.body.json
-            await session.set(access: s.accessToken, refresh: s.refreshToken, familyId: s.family.id, account: email)
+            // refreshToken is optional on the wire (it rides a cookie in the web remember-me transport, cr-0052);
+            // the native data layer never opts into cookies, so a null body token is a protocol error.
+            guard let refresh = s.refreshToken else { throw VeyqError.authenticationFailed }
+            await session.set(access: s.accessToken, refresh: refresh, familyId: s.family.id, account: email)
         case .unauthorized:
             throw VeyqError.authenticationFailed
         case .badRequest(let bad):
@@ -103,7 +106,8 @@ public final class VeyqClient: Sendable {
         switch out {
         case .ok(let ok):
             let pair = try ok.body.json
-            await session.set(access: pair.accessToken, refresh: pair.refreshToken)
+            guard let refresh = pair.refreshToken else { await session.clear(); throw VeyqError.refreshRejected }
+            await session.set(access: pair.accessToken, refresh: refresh)
             await persistRotatedTokenIfPasswordless()
         case .badRequest, .unauthorized, .undocumented:
             await session.clear()
@@ -376,6 +380,8 @@ public final class VeyqClient: Sendable {
             throw VeyqError.tooManyDevices
         case .badRequest(let bad):
             throw VeyqError.invalidRequest(try? bad.body.json.code)
+        case .unprocessableContent:
+            throw VeyqError.unexpectedStatus(422)
         case .unauthorized:
             throw VeyqError.sessionExpired
         case .undocumented(let status, _):
@@ -622,6 +628,7 @@ public final class VeyqClient: Sendable {
         switch out {
         case .noContent: return
         case .notFound: throw VeyqError.nodeNotFound
+        case .conflict: throw VeyqError.unexpectedStatus(409)
         case .unauthorized: throw VeyqError.sessionExpired
         case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)
         }
@@ -859,7 +866,8 @@ public final class VeyqClient: Sendable {
     {
         let out = try await media.listNodeMedia(.init(path: .init(scopeId: scopeId, nodeId: nodeId)))
         switch out {
-        case .ok(let ok): return try ok.body.json
+        case .ok(let ok): return try ok.body.json.media // listNodeMedia now returns a MediaListPage wrapper
+        case .notModified: throw VeyqError.unexpectedStatus(304) // we send no conditional header, so this shouldn't occur
         case .notFound: throw VeyqError.nodeNotFound
         case .unauthorized: throw VeyqError.sessionExpired
         case .undocumented(let status, _): throw VeyqError.unexpectedStatus(status)

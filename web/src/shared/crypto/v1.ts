@@ -257,14 +257,6 @@ export const authSign = (privateKey: Uint8Array, message: Uint8Array): Uint8Arra
 export const authVerify = (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean =>
   ed25519.verify(signature, message, publicKey)
 
-// A password-protected share folds the password into the unwrap key: HKDF(shareKey, Argon2id(password,salt)).
-// The link's fragment shareKey alone can't decrypt — you also need the password. The server stays blind.
-export const shareWrapKey = (shareKey: Uint8Array, password: string, salt: Uint8Array): Uint8Array =>
-  hkdf(sha256, shareKey, kekRecovery(utf8(password), salt), utf8('veyq/v1/share-pw'), 32)
-
-export const shareUploadToken = (shareUnwrapKey: Uint8Array): Uint8Array =>
-  hkdf(sha256, shareUnwrapKey, new Uint8Array(0), utf8('veyq/v1/share-upload'), 32)
-
 export const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
 
 /** The user's identity: a hybrid KEM keypair (X25519 + ML-KEM-768) + an Ed25519 signing keypair. */

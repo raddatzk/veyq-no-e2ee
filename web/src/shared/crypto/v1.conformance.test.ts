@@ -50,9 +50,16 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.kekRecovery(unhex(k.recovery_code), unhex(k.salt), k.params))).toBe(k.kek)
   })
 
-  it('password-protected share wrap key (web-only by design)', () => {
-    const s = vectors.kek.share_pw
-    expect(hex(v1.shareWrapKey(unhex(s.share_key), s.password_utf8, unhex(s.salt)))).toBe(s.wrap_key)
+  it('auth salt (deriveAuthSalt — HKDF, ADR 0003)', () => {
+    const a = vectors.auth.auth_salt
+    expect(hex(v1.deriveAuthSalt(unhex(a.instance_salt), a.email_utf8))).toBe(a.auth_salt)
+  })
+
+  it('auth keypair (deriveAuthKeypair — Argon2id → Ed25519, ADR 0003)', () => {
+    const a = vectors.auth.auth_keypair
+    const kp = v1.deriveAuthKeypair(a.password_utf8, unhex(a.auth_salt), a.params)
+    expect(hex(kp.privateKey)).toBe(a.private_key)
+    expect(hex(kp.publicKey)).toBe(a.public_key)
   })
 
   it('kdfParams wire format (encode + decode round-trip)', () => {
