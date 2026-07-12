@@ -1,11 +1,11 @@
-# ADR 0038 — Shared contract components via `_common.openapi.yaml` + a bundling step
+# ADR 0038 — Shared contract components stay inline, kept honest by a drift guard (not a bundler)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-12
 
-> Realises audit finding **#76 (P3f)**. Reverses the "specs are self-contained (no external `$ref`)" note in
-> `backend/gradle/openapi.gradle.kts` and `contracts/api/account.openapi.yaml`. The behaviour is carried by the
-> CR that implements this ADR; until then each spec keeps its inline copies.
+> Realises audit finding **#76 (P3f)**. **Keeps** the "specs are self-contained (no external `$ref`)" invariant
+> (`backend/gradle/openapi.gradle.kts`, `contracts/api/account.openapi.yaml`) and adds a guard instead of a
+> bundler — see *Decision*. Implemented by [cr-0144](../../changes/cr-0144-contracts-common-drift-guard.md).
 
 ## Context
 
@@ -32,42 +32,43 @@ external-`$ref` support**, established empirically:
 `OperationDescription.swift:63`: *"Swift OpenAPI Generator currently doesn't support external references."*
 
 So a naive `$ref` extraction **breaks apple and android**. apple is unfixable at the generator level (and SPM's
-build-tool plugin gives no hook to run a bundler before it), so apple must consume a **pre-bundled, self-contained
-spec**. Since `swift test` must pass standalone (no manual pre-step), that bundled spec must be **committed**.
+build-tool plugin gives no hook to run a bundler before it), so apple would have to consume a **pre-bundled,
+self-contained spec**; and since `swift test` must pass standalone (no manual pre-step), that bundled spec would
+have to be **committed** — a generated artifact in the tree. A bundler is the only way to physically DRY the YAML,
+and it costs a reversal of a documented invariant plus committed generated specs.
+
+The duplication it would remove, however, is ~50 lines of **stable** boilerplate: the `ErrorResponse` schema is
+already byte-identical across all 9 specs (only the per-domain `code.example` varies), `bearerAuth` differs only
+in `description`, and the shared enums are duplicated-not-drifted. The actual risk is **future** drift, not present
+disorder. That risk is fully addressed by a check — which needs none of the machinery.
 
 ## Decision
 
-Introduce `contracts/api/_common.openapi.yaml` as the single source for the shared components, have the per-domain
-specs reference it by external `$ref`, and add a **Python bundler + drift guard** so the two generators that can't
-resolve external refs consume a self-contained artifact.
+**Keep the specs self-contained; add a drift guard instead of a bundler.** Do not extract `_common.openapi.yaml`,
+do not introduce external `$ref`, do not touch any generator toolchain.
 
-1. **`_common.openapi.yaml`** holds `ErrorResponse`, the `bearerAuth` scheme, common parameters (`ScopeId`,
-   `TenantId`), and the shared enums. Domain-specific nuance that legitimately varies (e.g. each `code.example`,
-   the per-domain `bearerAuth.description`) stays on the **referencing** side, not in `_common`.
-2. **Source specs (`contracts/api/*.openapi.yaml`) `$ref` `_common`** for those components. They remain the
-   hand-authored edit point. This is the invariant reversal.
-3. **Consumption per toolchain:**
-   - **web, backend** — unchanged; they resolve `./_common.openapi.yaml#/...` in place.
-   - **android** — `sanitizeSpecs` also copies `_common.openapi.yaml` into the flat dir; refs are written
-     `./_common.openapi.yaml` so they resolve as a sibling there.
-   - **apple** — a Python bundler (`contracts/scripts/bundle_openapi.py`) inlines `_common` into each of the 6
-     apple domains and writes **committed** self-contained specs the apple targets read (the current per-target
-     symlinks are replaced by these generated files). apple/android only cover 6 domains
-     (setup/auth/account/scopes/content/media), so only those bundle.
-4. **Drift guard** (trust-chain, Python): re-run the bundler and fail if a committed apple bundle is stale;
-   assert no source spec redefines a `_common` component inline. Runs in the same place the other guards do.
-5. **Docs** asserting self-containment are updated to the new model.
+1. **The invariant stays.** Each `contracts/api/*.openapi.yaml` remains a single self-contained document, exactly
+   as the toolchains require and the docs promise. Zero risk to web/backend/apple/android generation.
+2. **A trust-chain guard (`scripts/validate_contracts_common.py`) enforces consistency** where the components are
+   copied: `ErrorResponse` identical across specs (ignoring the per-domain `code.example`), `bearerAuth`
+   `type`+`scheme` identical (ignoring `description`), the `ScopeId`/`TenantId` path-params structurally identical,
+   and every copy of a shared enum (node-kind / derivative-kind / membership-role / credential-method /
+   suite-version) carrying the same values — a diverged copy fails unless it is a declared intentional variant
+   (e.g. the device-only `[DEVICE, DEVICE_KEY]` subset). It runs in CI beside the other `validate_*` guards.
+3. **Collection-wrapping is left alone** — the bare-array / `{results}` / `{items}` / domain-key mix encodes an
+   intentional batch-vs-list distinction, so it is a design choice, not drift; the guard does not police it.
 
 ## Consequences
 
-- **Single source of truth for the shared components** — `ErrorResponse` et al. can no longer drift silently
-  across specs; the guard enforces it. Cleans up the backend's "identical duplicates overwrite harmlessly" trick.
-- **New build machinery** — a Python bundler + a guard, and the reversal of a documented invariant. This is the
-  cost the "Start light / pain before tool" ethos weighs against ~50 lines of *stable, non-drifting* boilerplate.
-- **apple bundles are committed generated artifacts** — an exception to "generated artifacts are gitignored",
-  forced by SPM offering no pre-generate hook. The guard keeps them honest; a reviewer sees generated YAML in
-  the tree. This is the least-pretty consequence and the main reason to sanity-check the decision.
-- **Alternative not taken (guard-only):** keep specs self-contained and add *only* the drift guard (assert the
-  inline copies stay byte-identical). Gets the drift-prevention value with **no** bundler, no invariant reversal,
-  no committed generated specs — but keeps the on-disk duplication. Recorded here because the cost/benefit is
-  close.
+- **The single-source *guarantee* without the single-source *file*.** The shared components can no longer drift
+  silently — the guard is the enforcement a bundler's `$ref` would have given — while every generator keeps
+  consuming exactly what it does today. This is the "Start light / pain before tool" trade: a ~120-line check
+  beats new build machinery for ~50 lines of stable boilerplate.
+- **On-disk duplication remains.** A reviewer still sees `ErrorResponse` in nine files; editing it means editing
+  nine (the guard then fails until they agree). Accepted: the components change ~never, and the guard makes a
+  half-done edit loud instead of silent.
+- **Rejected — the bundler (this ADR's original proposal).** `_common.openapi.yaml` + external `$ref` + a Python
+  bundler + committed apple bundles would give a true single source file, but at the cost of reversing a
+  documented invariant and checking generated YAML into the tree, to DRY boilerplate that does not actually drift
+  today. If the shared surface grows large or genuinely starts drifting under the guard, revisit this — the guard
+  makes that signal visible.
