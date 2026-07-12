@@ -17,6 +17,11 @@ import { isHttpStatus } from '../../shared/httpError'
 import { mediaApi, bucketsApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { type MediaSummary, type BucketSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
+import { createBrowserDeriver, deriveTiers, type MediaDeriver, type AddMediaSource, type Dimensions } from './mediaDeriver'
+
+// The on-device pixel stage lives in `./mediaDeriver` (cr-0143). Re-exported here so existing importers of
+// `./media` (share.ts, useOptimisticTiles.ts, uploadQueue.ts, tests) keep their import path unchanged.
+export { scaleToMaxEdge, TIER_SPECS, createBrowserDeriver, type MediaDeriver, type AddMediaSource, type Dimensions } from './mediaDeriver'
 
 const KBLOB_CTX = 'blob-key'
 /**
@@ -35,16 +40,6 @@ const BUCKET_NAME_CTX = 'bucket-name'
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
 
-/**
- * Derivative tier specs (en.memory.derivatives → *The three tiers*). `preview` is pinned from the legacy E2EE
- * client; `thumbnail` was raised 400→512 px (cr-0070) so hi-DPI grid tiles aren't upscaled into mush. Parity is
- * by-property (a valid JPEG at the target edge), so apple/android carry the same 512.
- */
-export const TIER_SPECS: Record<MediaDerivativeKind, { maxEdge: number; quality: number }> = {
-  THUMBNAIL: { maxEdge: 512, quality: 0.8 }, // gallery grid (512 for retina headroom, cr-0070)
-  PREVIEW: { maxEdge: 2048, quality: 0.85 }, // lightbox
-}
-
 // --- read-back model -------------------------------------------------------
 
 /** Everything needed to open one blob: its id + the metadata + the K_blob wrap (under K_mem). */
@@ -57,9 +52,6 @@ export type BlobRef = {
 
 /** One role-tagged derivative tier of a media. */
 export type MediaDerivative = { kind: MediaDerivativeKind; ref: BlobRef }
-
-/** A media's pristine pixel dimensions, used to lay out the justified gallery grid (cr-0059). */
-export type Dimensions = { w: number; h: number }
 
 /**
  * The **listed-metadata tier** sealed under `K_mem` (cr-0068) — one always-listed blob (returned with every
@@ -181,159 +173,6 @@ export function unsealMeta(memoryKey: Uint8Array, item: MediaItem): MediaMeta | 
 /** The effective capture time of a media's metadata tier: the user's correction if set, else the derived original. */
 export function effectiveCapturedAt(meta: MediaMeta | null): number | undefined {
   return finiteNum(meta?.capturedAtOverride) ?? finiteNum(meta?.capturedAt)
-}
-
-// --- the pixel stage (injectable; jsdom cannot decode real Canvas/Image/Video) ---------------------------
-
-/** The source to attach: the pristine original bytes + their MIME type, plus the file's creation date (cr-0066). */
-export type AddMediaSource = { bytes: Uint8Array; mediaType: string; lastModified?: number }
-
-/**
- * The platform-native pixel stage behind an interface: the real one uses Canvas + `<video>`; tests inject a
- * stub. A derivative need only be a valid JPEG at the target longest edge — parity here is by **property**, not
- * bytes (en.memory.derivatives → *Quality notes*).
- */
-export interface MediaDeriver {
-  /** Downscale an image Blob to a JPEG with longest edge ≤ `maxEdge` at `quality`. */
-  deriveImage(source: Blob, opts: { maxEdge: number; quality: number }): Promise<Uint8Array>
-  /** Decode a video's first frame to a JPEG poster (used for both the thumbnail and the preview tier). */
-  deriveVideoPoster(source: Blob): Promise<Uint8Array>
-  /** Probe the source's intrinsic pixel `{w,h}` for the justified grid (cr-0059). Optional + best-effort. */
-  probeDimensions?(source: Blob, mediaType: string): Promise<Dimensions | null>
-}
-
-/**
- * Longest-edge target math (pure): scale `width`×`height` so the longest edge is ≤ `maxEdge`, preserving the
- * aspect ratio and **never upscaling**. Each side is at least 1px.
- */
-export function scaleToMaxEdge(width: number, height: number, maxEdge: number): { width: number; height: number } {
-  const longest = Math.max(width, height)
-  if (longest <= maxEdge || longest === 0) return { width, height }
-  const scale = maxEdge / longest
-  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
-}
-
-/** The real browser deriver — Canvas decode/downscale + `<video>` first-frame poster. DOM-only (used live). */
-export function createBrowserDeriver(): MediaDeriver {
-  return {
-    async deriveImage(source, { maxEdge, quality }) {
-      const bitmap = await createImageBitmap(source)
-      try {
-        return drawToJpeg(bitmap, bitmap.width, bitmap.height, maxEdge, quality)
-      } finally {
-        bitmap.close()
-      }
-    },
-    async deriveVideoPoster(source) {
-      const url = URL.createObjectURL(source)
-      try {
-        const video = document.createElement('video')
-        video.muted = true
-        video.preload = 'auto'
-        video.src = url
-        await onceEvent(video, 'loadeddata') // first frame decoded
-        if (video.currentTime !== 0) {
-          video.currentTime = 0
-          await onceEvent(video, 'seeked')
-        }
-        // the poster is encoded at the preview tier and reused for the (smaller) thumbnail tier as-is
-        return drawToJpeg(video, video.videoWidth, video.videoHeight, TIER_SPECS.PREVIEW.maxEdge, TIER_SPECS.PREVIEW.quality)
-      } finally {
-        URL.revokeObjectURL(url)
-      }
-    },
-    async probeDimensions(source, mediaType) {
-      if (mediaType.startsWith('image/')) {
-        const bitmap = await createImageBitmap(source)
-        try {
-          return { w: bitmap.width, h: bitmap.height }
-        } finally {
-          bitmap.close()
-        }
-      }
-      if (mediaType.startsWith('video/')) {
-        const url = URL.createObjectURL(source)
-        try {
-          const video = document.createElement('video')
-          video.muted = true
-          video.preload = 'metadata'
-          video.src = url
-          await onceEvent(video, 'loadeddata')
-          return { w: video.videoWidth, h: video.videoHeight }
-        } finally {
-          URL.revokeObjectURL(url)
-        }
-      }
-      return null
-    },
-  }
-}
-
-async function drawToJpeg(src: CanvasImageSource, w: number, h: number, maxEdge: number, quality: number): Promise<Uint8Array> {
-  const { width, height } = scaleToMaxEdge(w, h, maxEdge)
-  // Progressive-halving downscale. A single large drawImage (e.g. 4032→512 ≈ 8×) stays soft even at
-  // imageSmoothingQuality:'high' — the browser applies ONE bilinear pass, not an iterative filter, so it drops
-  // high-frequency detail. Halving in ≤2× steps (each with high smoothing) preserves that detail, approximating
-  // the multi-tap resample the legacy server did with libvips (frontend-noe2ee derived server-side; operator-blind
-  // forces it on-device here). scaleToMaxEdge never upscales, so a small source just skips the loop.
-  let curSrc: CanvasImageSource = src
-  let curW = w
-  let curH = h
-  while (curW > width * 2 || curH > height * 2) {
-    const nextW = Math.max(Math.round(curW / 2), width)
-    const nextH = Math.max(Math.round(curH / 2), height)
-    curSrc = drawStep(curSrc, nextW, nextH)
-    curW = nextW
-    curH = nextH
-  }
-  const canvas = drawStep(curSrc, width, height)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
-  if (!blob) throw new Error('encode_failed')
-  return new Uint8Array(await blob.arrayBuffer())
-}
-
-/** One high-quality `drawImage` onto a fresh canvas at `width`×`height` (each downscale step of drawToJpeg). */
-function drawStep(src: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('canvas_unavailable')
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(src, 0, 0, width, height)
-  return canvas
-}
-
-function onceEvent(el: HTMLMediaElement, ev: 'loadeddata' | 'seeked'): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const ok = () => { cleanup(); resolve() }
-    const bad = () => { cleanup(); reject(new Error(`video_${ev}_failed`)) }
-    const cleanup = () => { el.removeEventListener(ev, ok); el.removeEventListener('error', bad) }
-    el.addEventListener(ev, ok, { once: true })
-    el.addEventListener('error', bad, { once: true })
-  })
-}
-
-/** Generate the role-tagged derivatives for a source (image: two downscales; video: one poster for both). */
-async function deriveTiers(source: AddMediaSource, deriver: MediaDeriver): Promise<{ kind: MediaDerivativeKind; bytes: Uint8Array }[]> {
-  const blob = new Blob([source.bytes as BlobPart], { type: source.mediaType })
-  // Best-effort: a codec the browser can't decode (e.g. HEIC off Safari), an empty MIME type, or corrupt bytes
-  // must NOT fail the upload — fall back to original-only (the gallery shows an icon, uc.memory.upload E4).
-  try {
-    if (source.mediaType.startsWith('image/')) {
-      const thumbnail = await deriver.deriveImage(blob, TIER_SPECS.THUMBNAIL)
-      const preview = await deriver.deriveImage(blob, TIER_SPECS.PREVIEW)
-      return [{ kind: 'THUMBNAIL', bytes: thumbnail }, { kind: 'PREVIEW', bytes: preview }]
-    }
-    if (source.mediaType.startsWith('video/')) {
-      const poster = await deriver.deriveVideoPoster(blob) // one poster serves both tiers
-      return [{ kind: 'THUMBNAIL', bytes: poster }, { kind: 'PREVIEW', bytes: poster }]
-    }
-  } catch {
-    /* underivable → original only */
-  }
-  return [] // no derivable frame → original only (the gallery falls back to an icon)
 }
 
 // --- add-media -------------------------------------------------------------
