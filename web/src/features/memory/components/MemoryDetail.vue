@@ -15,20 +15,11 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, deleteMedia, restoreMedia, listTrash, purgeMedia, type MediaItem } from '../media'
+import { openGrid, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, deleteMedia, restoreMedia, listTrash, purgeMedia, type MediaItem } from '../media'
 import { startMediaRevisionPolling, stopMediaRevisionPolling } from '../mediaRevisionPolling'
 import { useMemoryDate } from '../useMemoryDate'
-import {
-  unsealMemoryLocation,
-  setMemoryLocation,
-  computeMedoid,
-  mediaGpsPoints,
-  sameMemoryLocation,
-  isLocationPending,
-  type MemoryLocation,
-} from '../memoryLocation'
-import { unsealMemoryCover, setMemoryCover, FULL_FRAME, type MemoryCover, type CoverSaveIntent } from '../memoryCover'
-import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
+import { useMemoryLocation } from '../useMemoryLocation'
+import { useMemoryCover } from '../useMemoryCover'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import MediaGrid from './MediaGrid.vue'
 import MediaTile from './MediaTile.vue'
@@ -48,7 +39,6 @@ import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { useViewMode } from '../../../shared/state/useViewMode'
-import { useMapConfig, setMapsConsent } from '../../../shared/state/useMapConfig'
 import { useCapabilities } from '../../../shared/state/useCapabilities'
 import { SHARING_UPLOADER_LINKS } from '../../platform/capabilities'
 
@@ -71,7 +61,7 @@ const emit = defineEmits<{
   metaUpdated: [{ nodeId: string; wrappedMeta: string }]
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { viewMode } = useViewMode()
 const { hasCapability } = useCapabilities()
 // The uploader (drop-box) link is its OWN memory action (a separate dialog), offered only when the instance keeps
@@ -145,197 +135,52 @@ const { dateEditorOpen, storedDate, autoRange, dateLabel, datedChapters, onDateS
   onMetaUpdated: (payload) => emit('metaUpdated', payload),
 })
 
-// --- Memory location (cr-0069, uc.memory.place). A deliberate per-Memory named place sealed in the SAME node
-// `wrappedMeta` blob as the date (read-modify-write, operator-blind). The map + geocoding are gated behind a
-// personal two-stage opt-in (ADR 0016/0018); the position is the medoid of the Memory's photo GPS (`auto`,
-// self-heals as media arrive) or a hand-dropped pin (`fixed`).
-const { mapsAvailable, geocoderUrl, geocodingAvailable } = useMapConfig()
-const locationEditorOpen = ref(false)
-const consentDialogOpen = ref(false)
-const storedLocation = computed(() => (props.memoryKey ? unsealMemoryLocation(props.memoryKey, props.node) : null))
-const gpsPoints = computed(() => (props.memoryKey ? mediaGpsPoints(items.value, props.memoryKey) : []))
-const medoid = computed(() => computeMedoid(gpsPoints.value))
-// A pending auto place (armed, name deferred) is only genuinely "being determined" when there's a geotagged
-// medium to derive a position from; with no GPS media there is nothing to detect, so say "no location detected"
-// rather than imply an in-progress lookup that will never resolve.
-const locationLabel = computed(() => {
-  const loc = storedLocation.value
-  if (!loc) return ''
-  if (!isLocationPending(loc)) return loc.name
-  return gpsPoints.value.length ? t('memory.place.pending') : t('memory.place.none')
-})
-// A location the header can show as a real, set place (a materialized name) — vs. the "set / pending / none"
-// placeholder states, which render in the muted `is-empty` style.
-const locationResolved = computed(() => {
-  const loc = storedLocation.value
-  return Boolean(loc && !isLocationPending(loc))
+// --- Memory location (cr-0069, uc.memory.place) → extracted into `useMemoryLocation` (cr-0146). A deliberate
+// per-Memory named place sealed in the SAME node `wrappedMeta` blob as the date (read-modify-write); the map +
+// geocoding gate behind a personal two-stage opt-in (ADR 0016/0018). `reconcileAutoLocation` is called at the
+// settle points below. Props are passed as getters so the composable stays reactive to them.
+const {
+  locationEditorOpen,
+  consentDialogOpen,
+  storedLocation,
+  gpsPoints,
+  medoid,
+  locationLabel,
+  locationResolved,
+  openLocationEditor,
+  enableMaps,
+  onLocationSave,
+  reconcileAutoLocation,
+} = useMemoryLocation({
+  scopeId: () => props.scopeId,
+  node: () => props.node,
+  memoryKey: () => props.memoryKey,
+  items,
+  onMetaUpdated: (payload) => emit('metaUpdated', payload),
 })
 
-/** Open the location editor — but first gate on the personal maps opt-in (no consent ⇒ ask, no external calls). */
-function openLocationEditor() {
-  if (!props.memoryKey) return
-  if (mapsAvailable.value) locationEditorOpen.value = true
-  else consentDialogOpen.value = true
-}
-
-/** The user grants the coupled tiles+geocoding consent → enable and proceed into the editor. */
-function enableMaps() {
-  setMapsConsent(true)
-  consentDialogOpen.value = false
-  if (mapsAvailable.value) locationEditorOpen.value = true
-}
-
-/** Save (or, for null, remove) the location: read-modify-write under K_mem — the date is preserved either way. */
-async function onLocationSave(location: MemoryLocation | null) {
-  const key = props.memoryKey
-  if (!key) return
-  const nodeId = props.node.id
-  try {
-    const wrappedMeta = await setMemoryLocation(props.scopeId, nodeId, key, location, props.node.wrappedMeta)
-    emit('metaUpdated', { nodeId, wrappedMeta })
-  } catch {
-    // best-effort: keep the header stable; a retry re-seals
-  }
-}
-
-/** Re-medoid an `auto` location from the media, and materialize a **pending** name by reverse-geocoding the
- *  medoid once (opt-in) — the self-heal that turns a create-time `auto` arm into a named place on the first
- *  geotagged upload. Re-seals only when something changed. A `manual` name / a `fixed` place is never touched. */
-async function reconcileAutoLocation() {
-  const key = props.memoryKey
-  if (!key) return
-  const stored = unsealMemoryLocation(key, props.node)
-  if (!stored || stored.derivedMode !== 'auto') return // no location / a `fixed` place is the user's — never moved
-  const point = computeMedoid(mediaGpsPoints(items.value, key))
-  if (!point) return // no GPS yet (e.g. an `auto` pre-armed at creation) — nothing to derive from
-  let next: MemoryLocation = { ...stored, derived: point }
-  // Materialize/refresh a geocoded name from the medoid at the stored granularity `level` (client-direct
-  // third-party, ADR 0016 standing consent): a pending arm gets its first name; a moved medoid refreshes it.
-  const medoidMoved = stored.derived?.lat !== point.lat || stored.derived?.lng !== point.lng
-  if (stored.nameSource === 'geocoded' && geocodingAvailable.value && (isLocationPending(stored) || medoidMoved)) {
-    const levels = await reverseGeocode(geocoderUrl.value, point.lat, point.lng, locale.value)
-    const level = levels ? (stored.nameAnchor?.level && levels.find((l) => l.key === stored.nameAnchor?.level) ? { key: stored.nameAnchor.level, name: nameAtLevel(levels, stored.nameAnchor.level)! } : defaultLevel(levels)) : null
-    if (level) next = { ...next, name: level.name, nameAnchor: { lat: point.lat, lng: point.lng, level: level.key } }
-  }
-  if (sameMemoryLocation(stored, next)) return
-  const nodeId = props.node.id
-  try {
-    const wrappedMeta = await setMemoryLocation(props.scopeId, nodeId, key, next, props.node.wrappedMeta)
-    if (props.node.id === nodeId) emit('metaUpdated', { nodeId, wrappedMeta })
-  } catch {
-    // leave the stale position; the next Memory open self-heals it
-  }
-}
-
-// --- Memory cover (cr-0072 + cr-0073, uc.memory.cover). A deliberately chosen image + a 16:9 crop, sealed in the
-// SAME node `wrappedMeta` blob as the date/location (read-modify-write, operator-blind). The source is one of the
-// Memory's own media OR a brand-new uploaded image (a standalone cover blob, cr-0073); the header shows it via the
-// shared crop formula. No auto-cover — unset ⇒ the placeholder tile.
-const coverEditorOpen = ref(false)
-// When the cover editor is opened from the lightbox "Set as cover", it is seeded to crop THAT photo (its already-
-// decrypted thumbnail is the crop source); null = the header "edit current cover" flow. Cleared on close.
-const coverEditorMedia = ref<{ mediaId: string; src: string } | null>(null)
-const storedCover = computed(() => (props.memoryKey ? unsealMemoryCover(props.memoryKey, props.node) : null))
-// An **upload**-source cover isn't in `thumbs` (no media row), so its standalone blob is decrypted on demand into
-// this object URL (revoked on change/unmount). A **media**-source cover reuses the already-decrypted thumbnail.
-const uploadCoverUrl = ref<string | null>(null)
-function revokeUploadCover() {
-  if (uploadCoverUrl.value) URL.revokeObjectURL(uploadCoverUrl.value)
-  uploadCoverUrl.value = null
-}
-watch(
+// --- Memory cover (cr-0072 + cr-0073, uc.memory.cover) → extracted into `useMemoryCover` (cr-0146). A chosen
+// image + a 16:9 crop, sealed in the SAME node `wrappedMeta` blob as the date/location (read-modify-write). The
+// source is a Memory photo (reusing its decrypted `thumbs` entry) or an uploaded standalone blob (decrypted on
+// demand; the composable owns that object-URL's lifecycle incl. unmount cleanup). Props passed as getters.
+const {
+  coverEditorOpen,
+  coverEditorMedia,
   storedCover,
-  async (cover) => {
-    revokeUploadCover()
-    const key = props.memoryKey
-    if (!key || cover?.source.kind !== 'upload') return
-    try {
-      const bytes = await openBlob(props.scopeId, key, cover.source.ref)
-      uploadCoverUrl.value = URL.createObjectURL(new Blob([bytes as BlobPart]))
-    } catch {
-      // best-effort: a locked/absent cover blob ⇒ the placeholder tile
-    }
-  },
-  { immediate: true },
-)
-// The decrypted image of the current cover: the media thumbnail (already in `thumbs`) or the uploaded cover blob.
-const coverSrc = computed(() => {
-  const cover = storedCover.value
-  if (!cover) return null
-  return cover.source.kind === 'upload' ? uploadCoverUrl.value : thumbs.value.get(cover.source.mediaId) ?? null
+  coverSrc,
+  coverExistingSrc,
+  coverMediaId,
+  onSetCoverFromPhoto,
+  openCoverEditor,
+  closeCoverEditor,
+  onCoverSave,
+} = useMemoryCover({
+  scopeId: () => props.scopeId,
+  node: () => props.node,
+  memoryKey: () => props.memoryKey,
+  thumbs,
+  onMetaUpdated: (payload) => emit('metaUpdated', payload),
 })
-// The current cover, decrypted, to re-crop in the dialog (its cropper needs the source image — esp. for uploads).
-const coverExistingSrc = computed(() => coverSrc.value)
-// The current cover's media id (when the cover is a Memory photo) — the lightbox marks that photo as the cover.
-const coverMediaId = computed(() => (storedCover.value?.source.kind === 'media' ? storedCover.value.source.mediaId : null))
-
-/**
- * "Set as cover" from the lightbox: open the cover **cropper** seeded on that photo so the user frames the 16:9
- * crop right away (the earlier cr-0073 behaviour set a one-click full-frame cover, skipping framing). The crop
- * source is the photo's already-decrypted thumbnail — the exact tier the cover renders from — so no extra
- * decrypt. The lightbox stays open under the modal (its keyboard is suspended via `:suspend-keys`). Fallback:
- * a photo with no thumbnail yet (non-derivable / still loading) reverts to the one-click full-frame set.
- */
-function onSetCoverFromPhoto(payload: { mediaId: string }) {
-  const src = thumbs.value.get(payload.mediaId)
-  if (!src) {
-    void onCoverSave({ kind: 'media', mediaId: payload.mediaId, crop: { ...FULL_FRAME } })
-    return
-  }
-  coverEditorMedia.value = { mediaId: payload.mediaId, src }
-  coverEditorOpen.value = true
-}
-
-/** Open the header "edit current cover" flow — not seeded to a specific photo (upload / re-crop the current cover). */
-function openCoverEditor() {
-  coverEditorMedia.value = null
-  coverEditorOpen.value = true
-}
-
-/** Close the cover editor and drop any lightbox seeding (so the next header open is the plain edit flow). */
-function closeCoverEditor() {
-  coverEditorOpen.value = false
-  coverEditorMedia.value = null
-}
-
-/**
- * Apply the cover dialog's save intent (cr-0072 media + cr-0073 upload): read-modify-write the node meta under
- * K_mem (the date + location are preserved). An **upload** uploads + commits a standalone cover blob (whose
- * commit atomically reclaims any prior cover blob); switching **away** from a prior upload cover (to a media
- * cover or none) reclaims its now-orphaned blob via `deleteCoverBlob`. `keep` re-seals the current source with a
- * moved crop only.
- */
-async function onCoverSave(intent: CoverSaveIntent) {
-  const key = props.memoryKey
-  if (!key) return
-  const nodeId = props.node.id
-  const priorUpload = storedCover.value?.source.kind === 'upload'
-  try {
-    let cover: MemoryCover | null
-    if (intent.kind === 'upload') {
-      const ref = await uploadCoverBlob(props.scopeId, nodeId, key, {
-        bytes: new Uint8Array(await intent.file.arrayBuffer()),
-        mediaType: intent.file.type,
-        lastModified: intent.file.lastModified,
-      })
-      cover = { source: { kind: 'upload', ref }, crop: intent.crop }
-    } else if (intent.kind === 'media') {
-      if (priorUpload) await deleteCoverBlob(props.scopeId, nodeId) // reclaim the now-orphaned upload blob
-      cover = { source: { kind: 'media', mediaId: intent.mediaId }, crop: intent.crop }
-    } else if (intent.kind === 'keep') {
-      const source = storedCover.value?.source
-      if (!source) return
-      cover = { source, crop: intent.crop }
-    } else {
-      if (priorUpload) await deleteCoverBlob(props.scopeId, nodeId)
-      cover = null
-    }
-    const wrappedMeta = await setMemoryCover(props.scopeId, nodeId, key, cover, props.node.wrappedMeta)
-    emit('metaUpdated', { nodeId, wrappedMeta })
-  } catch {
-    // best-effort: keep the header stable; a retry re-seals
-  }
-}
 
 // --- delete / trash (uc.memory.delete-media, cr-0110) ---
 
@@ -816,7 +661,6 @@ watch(
 onBeforeUnmount(() => {
   stopMediaRevisionPolling() // stop the live poll on close/navigate away
   revokeThumbs()
-  revokeUploadCover()
   revokeTrashThumbs() // cr-0110
   clearUndo()
   // the optimistic preview urls are owned + revoked by useOptimisticTiles
