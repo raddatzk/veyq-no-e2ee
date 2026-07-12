@@ -17,7 +17,7 @@ import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
 import { openGrid, openBlob, uploadCoverBlob, deleteCoverBlob, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, deleteMedia, restoreMedia, listTrash, purgeMedia, type MediaItem } from '../media'
 import { startMediaRevisionPolling, stopMediaRevisionPolling } from '../mediaRevisionPolling'
-import { unsealMemoryDate, computeAutoRange, setMemoryDate, sameMemoryDate, sortNodesByDate, type MemoryDate } from '../memoryDate'
+import { useMemoryDate } from '../useMemoryDate'
 import {
   unsealMemoryLocation,
   setMemoryLocation,
@@ -29,7 +29,6 @@ import {
 } from '../memoryLocation'
 import { unsealMemoryCover, setMemoryCover, FULL_FRAME, type MemoryCover, type CoverSaveIntent } from '../memoryCover'
 import { reverseGeocode, defaultLevel, nameAtLevel } from '../geocode'
-import { formatClosedRange, formatDay } from '../memoryDateRange'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import MediaGrid from './MediaGrid.vue'
 import MediaTile from './MediaTile.vue'
@@ -133,60 +132,18 @@ const sortedItems = computed(() => {
     .map((x) => x.it)
 })
 
-// --- Memory date (cr-0067, uc.memory.date-place). The effective range is sealed on the NODE under K_mem
-// (operator-blind) and shown in the header; an editor sets a manual mode or `auto`. `auto` is **materialized**
-// from the Memory's own media and self-heals on open + after an upload batch (a media-delete surface doesn't
-// exist yet — the open-time self-heal covers it once it lands).
-const dateEditorOpen = ref(false)
-const storedDate = computed(() => (props.memoryKey ? unsealMemoryDate(props.memoryKey, props.node) : null))
-const autoRange = computed<MemoryDate>(() =>
-  props.memoryKey ? computeAutoRange(items.value, props.memoryKey) : { mode: 'auto' },
-)
-// What the header shows: a manual date as sealed, else the live materialized `auto` range (before/without a seal).
-const effectiveDate = computed<MemoryDate>(() => {
-  const s = storedDate.value
-  return s && (s.mode !== 'auto' || s.from) ? s : autoRange.value
+// --- Memory date (cr-0067, uc.memory.date-place) → extracted into `useMemoryDate` (cr-0145). The effective range
+// is sealed on the NODE under K_mem (operator-blind) and shown in the header; `auto` materializes from the
+// Memory's own media and self-heals on open + after an upload batch (via `reconcileAuto`, called at the settle
+// points below). Props are passed as getters so the composable stays reactive to them.
+const { dateEditorOpen, storedDate, autoRange, dateLabel, datedChapters, onDateSave, reconcileAuto } = useMemoryDate({
+  scopeId: () => props.scopeId,
+  node: () => props.node,
+  memoryKey: () => props.memoryKey,
+  chapters: () => props.chapters,
+  items,
+  onMetaUpdated: (payload) => emit('metaUpdated', payload),
 })
-const dateLabel = computed(() => {
-  const d = effectiveDate.value
-  if (d.mode === 'ongoing') return d.from ? t('memory.date.since', { day: formatDay(d.from, locale.value) }) : ''
-  return formatClosedRange(d.from, d.to, locale.value)
-})
-// Chapters ordered by their own sealed start date — a chapter's K_mem opens under THIS Memory's K_mem (cr-0067),
-// epoch-independent (only the top-level wrap keys off the epoch), so every chapter resolves under the one memoryKey.
-const datedChapters = computed(() => sortNodesByDate(() => props.memoryKey, props.chapters ?? []))
-
-/** Save an edited date: re-seal under K_mem, PATCH via updateNode, and let the host update the tree. */
-async function onDateSave(date: MemoryDate) {
-  const key = props.memoryKey
-  if (!key) return
-  const nodeId = props.node.id
-  try {
-    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, date, props.node.wrappedMeta)
-    emit('metaUpdated', { nodeId, wrappedMeta })
-  } catch {
-    // best-effort: keep the header stable; the next open-time reconcile can re-materialize an `auto` range
-  }
-}
-
-/** Materialize the `auto` range from the full media list and re-seal only when it changed (the self-heal). */
-async function reconcileAuto() {
-  const key = props.memoryKey
-  if (!key) return
-  const stored = unsealMemoryDate(key, props.node)
-  if (stored && stored.mode !== 'auto') return // a manual date is the user's — never overwritten
-  const next = computeAutoRange(items.value, key)
-  const current: MemoryDate = stored ?? { mode: 'auto' }
-  if (sameMemoryDate(current, next)) return
-  if (!stored && next.from === undefined) return // absent meta already == the empty `auto` state; nothing to seal
-  const nodeId = props.node.id
-  try {
-    const wrappedMeta = await setMemoryDate(props.scopeId, nodeId, key, next, props.node.wrappedMeta)
-    if (props.node.id === nodeId) emit('metaUpdated', { nodeId, wrappedMeta })
-  } catch {
-    // leave the stale range; the next Memory open self-heals it
-  }
-}
 
 // --- Memory location (cr-0069, uc.memory.place). A deliberate per-Memory named place sealed in the SAME node
 // `wrappedMeta` blob as the date (read-modify-write, operator-blind). The map + geocoding are gated behind a
