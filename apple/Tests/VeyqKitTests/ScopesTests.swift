@@ -62,10 +62,10 @@ final class ScopesTests: XCTestCase {
     // --- fixtures ---
 
     private static func tenantScope() -> [String: Any] {
-        ["id": "tenant-1", "kind": "TENANT", "tenantId": "tenant-1", "wrappedGrant": "AQ=="]
+        ["id": "tenant-1", "kind": "TENANT", "tenantId": "tenant-1", "wrappedGrant": "AQ==", "role": "OWNER", "nameEpoch": 0, "currentEpoch": 0, "grantedEpoch": 0]
     }
     private static func personalScope() -> [String: Any] {
-        ["id": "personal-1", "kind": "PERSONAL", "tenantId": "tenant-1", "wrappedGrant": "AQ=="]
+        ["id": "personal-1", "kind": "PERSONAL", "tenantId": "tenant-1", "wrappedGrant": "AQ==", "role": "OWNER", "nameEpoch": 0, "currentEpoch": 0, "grantedEpoch": 0]
     }
 }
 
@@ -97,7 +97,7 @@ private final class ScopesStub: ClientTransport, @unchecked Sendable {
             lock.withLock {
                 sawPost = true
                 _lastGrant = Data(base64Encoded: grantB64)
-                scopes.append(["id": "personal-new", "kind": "PERSONAL", "tenantId": "tenant-1", "wrappedGrant": grantB64])
+                scopes.append(["id": "personal-new", "kind": "PERSONAL", "tenantId": "tenant-1", "wrappedGrant": grantB64, "role": "OWNER", "nameEpoch": 0, "currentEpoch": 0, "grantedEpoch": 0])
             }
             return Self.json(201, ["scopeId": "personal-new", "kind": "PERSONAL"])
         }

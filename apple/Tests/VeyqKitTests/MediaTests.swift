@@ -314,7 +314,8 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
                 (mediaByNode[nodeId] ?? []).compactMap { m in
                     guard let b = blobs[m.blobId] else { return nil }
                     var summary: [String: Any] = ["mediaId": m.mediaId, "blobId": m.blobId,
-                                                  "chunkCount": b.chunkCount, "byteSize": b.byteSize, "wrappedBlobKey": b.wrap]
+                                                  "chunkCount": b.chunkCount, "byteSize": b.byteSize, "wrappedBlobKey": b.wrap,
+                                                  "updatedAt": "2026-01-01T00:00:00Z"]
                     let derivatives: [[String: Any]] = m.derivatives.compactMap { d in
                         guard let db = blobs[d.blobId] else { return nil }
                         return ["kind": d.kind, "blobId": d.blobId, "chunkCount": db.chunkCount,
@@ -324,7 +325,7 @@ private final class MediaStub: ClientTransport, @unchecked Sendable {
                     return summary
                 }
             }
-            return Self.json(200, summaries)
+            return Self.json(200, ["media": summaries, "mediaRevision": 0, "deleteRevision": 0]) // MediaListPage wrapper
 
         case "presignBlobDownloads":
             let results: [[String: Any]] = lock.withLock {

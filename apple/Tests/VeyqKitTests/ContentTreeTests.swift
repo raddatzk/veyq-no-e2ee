@@ -99,6 +99,7 @@ private final class NodesStub: ClientTransport, @unchecked Sendable {
                 var row = obj
                 row["id"] = nid
                 row["orderIndex"] = obj["orderIndex"] ?? 0
+                row["epoch"] = 0 // NodeSummary.epoch (0 = pre-rotation); the client doesn't send it on create
                 nodes.append(row)
                 _creates.append(obj)
                 return nid
