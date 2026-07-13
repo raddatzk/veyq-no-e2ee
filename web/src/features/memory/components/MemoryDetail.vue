@@ -6,7 +6,7 @@
 // Ported presentation from the design source (legacy/frontend-noe2ee); only the data layer is ours. Decrypted
 // thumbnails become object URLs that are **revoked** on reload / unmount (no lingering plaintext blob URLs).
 // Out of scope (own CRs): journal, chapters + chapter-nested media, map/tracks, playlists, buckets, sharing.
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tabs from 'primevue/tabs'
@@ -15,20 +15,17 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { openGrid, hasDerivatives, unsealMeta, effectiveCapturedAt, listMediaPage, newestCursor, deleteMedia, restoreMedia, type MediaItem } from '../media'
-import { startMediaRevisionPolling, stopMediaRevisionPolling } from '../mediaRevisionPolling'
+import { hasDerivatives } from '../media'
 import { useMemoryDate } from '../useMemoryDate'
 import { useMemoryLocation } from '../useMemoryLocation'
 import { useMemoryCover } from '../useMemoryCover'
 import { useMediaTrash } from '../useMediaTrash'
-import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import MediaGrid from './MediaGrid.vue'
 import MediaTile from './MediaTile.vue'
 import MemoryBuckets from './MemoryBuckets.vue'
 import OptimisticTile from './OptimisticTile.vue'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile } from '../uploadQueue'
-import { useThumbnailPipeline } from '../useThumbnailPipeline'
-import { useOptimisticTiles, type OptimisticTileVM } from '../useOptimisticTiles'
+import { useMediaGalleryLive } from '../useMediaGalleryLive'
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryDateEditor from './MemoryDateEditor.vue'
 import MemoryLocationEditor from './MemoryLocationEditor.vue'
@@ -68,36 +65,33 @@ const { hasCapability } = useCapabilities()
 // the uploader-links capability (ADR 0032) — the server also 422-rejects createShare(UPLOADER) when it is off.
 const canUploadShare = computed(() => !!props.shareable && hasCapability(SHARING_UPLOADER_LINKS))
 
-const items = ref<MediaItem[]>([])
-// Optimistic in-grid upload tiles (uc.memory.upload, cr-0074): the shared queue's still-in-flight files for THIS
-// node (grouping key = the node id) as instant preview tiles + progress/retry, reconciled into the real thumbnail
-// by mediaId. `donorPreviewFor` feeds the thumbnail pipeline the preview to hand off. Reused by the contributor viewer.
-const listedMediaIds = computed(() => new Set(items.value.map((it) => it.mediaId)))
-const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => props.node.id), listedMediaIds)
-// The gallery thumbnail pipeline (cr-0150) — the decrypt-per-tile → object-URL map, shared with ShareView and the
-// single revoke owner of every thumbnail (incl. a donated optimistic preview). `thumbs` is its reactive map.
-const pipeline = useThumbnailPipeline<MediaItem>({
-  idOf: (m) => m.mediaId,
-  isDerivable: hasDerivatives,
-  decryptTile: (m) => (props.memoryKey ? openGrid(props.scopeId, props.memoryKey, m) : Promise.resolve(null)),
-  donorPreviewFor,
+// The live-gallery core (uc.memory.gallery) — listed media, the thumbnail pipeline (cr-0150) + optimistic tiles,
+// the cr-0107 live poll (load/merge/upsert), the justified layout, and the optimistic-delete/undo — extracted into
+// `useMediaGalleryLive` (cr-0151). `onSettle` runs the auto-date then auto-location reconcile after a list refresh.
+const {
+  items,
+  thumbs,
+  layoutItems,
+  hasContent,
+  status,
+  sortDir,
+  lightboxItems,
+  lightboxIndex,
+  openLightboxAt,
+  openBucketLightbox,
+  onDeleteFromLightbox,
+  onCapturedAtUpdated,
+  onUndoDelete,
+  undo,
+  load,
+  pollMedia,
+  liftTombstone,
+} = useMediaGalleryLive({
+  scopeId: () => props.scopeId,
+  node: () => props.node,
+  memoryKey: () => props.memoryKey,
+  onSettle: () => settle(),
 })
-const thumbs = pipeline.thumbs // mediaId → thumbnail object URL (derivable items only)
-const status = ref<'loading' | 'ready' | 'error'>('loading')
-// live media updates (uc.memory.live-updates, cr-0107): the cached per-node counters — mediaRevision (the ETag
-// echoed as If-None-Match; null until the first load) + deleteRevision (echoed as sinceDelete to gate the id-set).
-const mediaRevision = ref<number | null>(null)
-const deleteRevision = ref(0)
-const lightboxIndex = ref<number | null>(null)
-const lightboxItems = ref<MediaItem[]>([]) // a snapshot of the sorted order at open time (so an in-lightbox date edit can't reorder underfoot)
-// --- trash (uc.memory.delete-media, cr-0110). A lightbox-only delete soft-deletes a photo into a per-Memory
-// trash. The undo snackbar offers an immediate restore right after a lightbox delete.
-const undo = ref<{ mediaId: string } | null>(null)
-let undoTimer: ReturnType<typeof setTimeout> | null = null
-// Tombstone of mediaIds optimistically removed by a trash but not yet confirmed gone by the server (cr-0111):
-// filtered out of the merge/poll paths so a stale live read (a poll firing before the delete commits) can't
-// re-add them — the "two-quick-trashes reappear" race.
-const pendingDelete = new Set<string>()
 // The Trash tab (cr-0110/0111) lives in `useMediaTrash` (cr-0147): its listing, thumbnails, batch select, the
 // restore/purge menu + confirm. A restore/purge lifts the gallery tombstone; a restore re-lists the gallery.
 const {
@@ -122,35 +116,10 @@ const {
   node: () => props.node,
   memoryKey: () => props.memoryKey,
   reloadGallery: () => void load(),
-  liftTombstone: (mediaId) => pendingDelete.delete(mediaId),
+  liftTombstone,
 })
-// date sort (cr-0066): tiles order by effective capturedAt; newest first by default.
-const sortDir = ref<'newest' | 'oldest'>('newest')
 const activeTab = ref<'gallery' | 'chapters' | 'beitraege' | 'trash'>('gallery') // local (the #fragment carries the tree path, cr-0031)
 const fileInput = ref<HTMLInputElement | null>(null)
-
-// --- justified grid (uc.memory.gallery, cr-0059). Each tile's aspect ratio comes from the E2EE-sealed
-// dimensions unwrapped under K_mem (operator-blind); items without sealed dimensions fall back to a default
-// aspect. The container measurement + justified layout live in the shared [MediaGrid] (reused by the public
-// share viewer, cr-0100); here we only assemble the tile list + render each tile's content in its slot.
-
-// The effective capture time of an item (from its sealed metadata tier), or undefined when it has none.
-function capturedAtOf(item: MediaItem): number | undefined {
-  return props.memoryKey ? effectiveCapturedAt(unsealMeta(props.memoryKey, item)) : undefined
-}
-// Tiles ordered by effective capture time (newest first by default, toggleable); undated media always last.
-const sortedItems = computed(() => {
-  const dir = sortDir.value === 'newest' ? -1 : 1
-  return items.value
-    .map((it, i) => ({ it, i, t: capturedAtOf(it) }))
-    .sort((a, b) => {
-      if (a.t === undefined && b.t === undefined) return a.i - b.i // both undated → stable list order
-      if (a.t === undefined) return 1 // undated last, regardless of direction
-      if (b.t === undefined) return -1
-      return (a.t - b.t) * dir
-    })
-    .map((x) => x.it)
-})
 
 // --- Memory date (cr-0067, uc.memory.date-place) → extracted into `useMemoryDate` (cr-0145). The effective range
 // is sealed on the NODE under K_mem (operator-blind) and shown in the header; `auto` materializes from the
@@ -212,95 +181,18 @@ const {
   onMetaUpdated: (payload) => emit('metaUpdated', payload),
 })
 
-// --- delete / trash (uc.memory.delete-media, cr-0110) ---
-
-/**
- * Trash the current lightbox photo: optimistic removal from the grid + lightbox snapshot, the server soft-delete,
- * and a transient undo snackbar (restore). The live poll would also drop it; the optimistic removal is instant.
- */
-async function onDeleteFromLightbox(payload: { mediaId: string }) {
-  if (!props.memoryKey) return
-  removeFromGrid(payload.mediaId)
-  showUndo(payload.mediaId)
-  try {
-    await deleteMedia(props.scopeId, payload.mediaId)
-  } catch {
-    clearUndo() // the trash failed → re-list to restore the true state
-    void load()
-  }
+/** The reconcile settle point `useMediaGalleryLive` calls after each list refresh: auto-date first, then
+ *  auto-location (which reads the date-reconciled wrappedMeta patched in place → read-modify-write safe). */
+async function settle() {
+  await reconcileAuto()
+  await reconcileAutoLocation()
 }
-
-/** Drop a media from the open grid + lightbox snapshot (optimistic), revoking its thumbnail object URL. */
-function removeFromGrid(mediaId: string) {
-  pendingDelete.add(mediaId) // cr-0111: tombstone so a racing live read can't re-add it before the delete commits
-  pipeline.dropThumb(mediaId)
-  items.value = items.value.filter((it) => it.mediaId !== mediaId)
-  lightboxItems.value = lightboxItems.value.filter((it) => it.mediaId !== mediaId)
-}
-
-function showUndo(mediaId: string) {
-  if (undoTimer) clearTimeout(undoTimer)
-  undo.value = { mediaId }
-  undoTimer = setTimeout(() => { undo.value = null; undoTimer = null }, 6000)
-}
-function clearUndo() {
-  if (undoTimer) clearTimeout(undoTimer)
-  undoTimer = null
-  undo.value = null
-}
-
-/** Undo the just-trashed media: restore it server-side, then re-list so it re-appears in the grid. */
-async function onUndoDelete() {
-  const u = undo.value
-  clearUndo()
-  if (!u) return
-  pendingDelete.delete(u.mediaId) // cr-0111: a genuine restore lifts the tombstone so the media can re-list
-  try {
-    await restoreMedia(props.scopeId, u.mediaId)
-  } finally {
-    void load()
-  }
-}
-
-const aspectRatios = computed(() => {
-  const key = props.memoryKey
-  const m = new Map<string, number>()
-  for (const item of items.value) {
-    const dims = key ? unsealMeta(key, item) : null
-    m.set(item.mediaId, galleryDisplayAspectRatio(dims?.w, dims?.h))
-  }
-  return m
-})
-// The tile list handed to [MediaGrid] — optimistic upload tiles pinned ahead of the listed media (the freshest
-// action, in enqueue order), each carrying its content so the grid slot renders it without a lookup. MediaGrid
-// runs the justified layout + positions each tile; here we just declare id + aspect + content.
-type MemoryTileItem =
-  | { id: string; aspectRatio: number; kind: 'optimistic'; optimistic: OptimisticTileVM }
-  | { id: string; aspectRatio: number; kind: 'media'; media: MediaItem; index: number }
-const FALLBACK_ASPECT = galleryDisplayAspectRatio(undefined, undefined)
-const layoutItems = computed<MemoryTileItem[]>(() => [
-  ...optimisticTiles.value.map((t) => ({ id: t.layoutId, aspectRatio: t.aspectRatio, kind: 'optimistic' as const, optimistic: t })),
-  ...sortedItems.value.map((it, index) => ({
-    id: it.mediaId,
-    aspectRatio: aspectRatios.value.get(it.mediaId) ?? FALLBACK_ASPECT,
-    kind: 'media' as const,
-    media: it,
-    index,
-  })),
-])
-// Whether the gallery has anything to show — real media or in-flight optimistic uploads.
-const hasContent = computed(() => items.value.length > 0 || optimisticTiles.value.length > 0)
 
 // The Beiträge tab (the media organizer, MemoryBuckets.vue) is ALWAYS available — it's where you create sub-buckets
 // and file your own uploads (cr-0113). Its own state/loading live in that component; here we only host it + wire the
 // lightbox/upload/reload it emits.
 const showBeitraege = computed(() => true)
 
-/** Open the lightbox on a bucket-scoped list the organizer hands up (so prev/next stays within the picked bucket). */
-function openBucketLightbox(payload: { items: MediaItem[]; index: number }) {
-  lightboxItems.value = payload.items.slice()
-  lightboxIndex.value = payload.index
-}
 /** The organizer changed buckets/media (create/rename/delete/move) — re-list so each item's ownerKey/bucketId refresh. */
 function onBucketChanged() { void load() }
 /** Upload from the organizer — reuses the Memory upload; the caller's primary materializes on complete (moving into a
@@ -357,150 +249,19 @@ function flushSelection() {
   )
 }
 
-/** Merge a fresh media list into `items` WITHOUT an empty-flash: the pipeline revokes only dropped thumbnails and
- *  donates a done upload's preview for each newly-listed media (so its optimistic tile hands off with no gray gap,
- *  the real thumbnail replacing the donation once it decrypts); this keeps the `pendingDelete` tombstone. */
-function mergeItems(listed: MediaItem[]) {
-  for (const id of [...pendingDelete]) if (!listed.some((m) => m.mediaId === id)) pendingDelete.delete(id) // cr-0111: confirmed gone
-  const visible = listed.filter((m) => !pendingDelete.has(m.mediaId)) // cr-0111: keep optimistically-trashed media out until the delete commits
-  pipeline.reconcile(visible)
-  items.value = visible
-}
-
-/** Open the lightbox on a grid tile, snapshotting the current sorted order so an in-lightbox edit can't reorder it. */
-function openLightboxAt(index: number) {
-  lightboxItems.value = sortedItems.value.slice()
-  lightboxIndex.value = index
-}
-/** A date correction from the lightbox → patch the item's sealed tier so the grid re-sorts (no refetch). The
- *  item object is shared with the open lightbox's snapshot, so the reopened detail stays consistent too. */
-function onCapturedAtUpdated(payload: { mediaId: string; wrappedMeta: string | null }) {
-  const item = items.value.find((it) => it.mediaId === payload.mediaId)
-  if (!item) return
-  item.wrappedMeta = payload.wrappedMeta ?? undefined
-  items.value = [...items.value] // reassign so sortedItems recomputes and the grid re-sorts
-}
-
-// `reset` (a Memory/chapter switch) clears the grid up front; an incremental reload (post-upload batch) merges
-// the fresh list into place so existing tiles don't blink empty — jarring next to the optimistic tiles (cr-0074).
-async function load({ reset = false }: { reset?: boolean } = {}) {
-  const key = props.memoryKey
-  const nodeId = props.node.id
-  if (!key) {
-    pipeline.revokeAll()
-    items.value = []
-    mediaRevision.value = null // E4: no K_mem (locked / not openable) → gallery unavailable, no live poll
-    deleteRevision.value = 0
-    status.value = 'error'
-    return
-  }
-  if (reset) {
-    pipeline.revokeAll()
-    items.value = []
-    mediaRevision.value = null
-    deleteRevision.value = 0
-  }
-  status.value = items.value.length ? 'ready' : 'loading'
-  try {
-    const page = await listMediaPage(props.scopeId, nodeId) // full list — no ETag/cursor, so never a 304
-    if (props.node.id !== nodeId || page.notModified) return // navigated away while listing / (unreachable) 304
-    mergeItems(page.items)
-    mediaRevision.value = page.mediaRevision // cache the ETag + delete gate for the live poll
-    deleteRevision.value = page.deleteRevision
-    status.value = 'ready'
-    await pipeline.decrypt(page.items, () => props.node.id === nodeId)
-    if (props.node.id === nodeId) {
-      await reconcileAuto() // settle point: open-time self-heal + post-upload-batch (date, then location)
-      await reconcileAutoLocation() // reads the date-reconciled wrappedMeta (patched in place) → RMW-safe
-    }
-  } catch {
-    if (props.node.id === nodeId) status.value = 'error'
-  }
-}
-
-/** One live poll (uc.memory.live-updates, cr-0107): a conditional GET keyed on the cached `mediaRevision`. A 304
- *  is a no-op; a change upserts the keyset delta (new tiles auto-insert), reconciles removals via the id-set, and
- *  decrypts just the delta's tiles. Errors are swallowed — the last-rendered grid stays and the next poll re-syncs
- *  in one round-trip (E6). Node-race-guarded so a mid-poll navigation can't write into the wrong gallery. */
-async function pollMedia() {
-  const key = props.memoryKey
-  const nodeId = props.node.id
-  if (!key || mediaRevision.value === null) return // not an open, loaded gallery
-  try {
-    const page = await listMediaPage(props.scopeId, nodeId, {
-      ifNoneMatch: String(mediaRevision.value),
-      since: newestCursor(items.value),
-      sinceDelete: deleteRevision.value,
-    })
-    if (props.node.id !== nodeId || page.notModified) return // navigated away / nothing changed (304)
-    upsertItems(page.items, page.mediaIds)
-    mediaRevision.value = page.mediaRevision
-    deleteRevision.value = page.deleteRevision
-    await pipeline.decrypt(page.items, () => props.node.id === nodeId) // decrypt only the delta's new/changed tiles
-    if (props.node.id === nodeId) {
-      await reconcileAuto() // others' new media surfacing tightens the cr-0067 auto-date self-heal (ADR 0033)
-      await reconcileAutoLocation()
-    }
-  } catch {
-    // offline/transient: keep the current grid; the revision compare makes the next successful poll a single round-trip
-  }
-}
-
-/** Merge a live delta into `items` (cr-0107): upsert each delta media by `mediaId` — a new media auto-inserts, an
- *  in-place meta edit patches the existing tile (keeping object identity, so an open lightbox snapshot stays
- *  consistent) — and, **only when the id-set is present** (a delete advanced `delete_revision`), drop any cached
- *  media absent from it, revoking its thumbnail. Reassigns `items` so the justified grid re-sorts. */
-function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
-  const byId = new Map(items.value.map((it) => [it.mediaId, it] as const))
-  for (const m of delta) {
-    if (pendingDelete.has(m.mediaId)) continue // cr-0111: don't re-add an optimistically-trashed media (a stale pre-commit read)
-    const existing = byId.get(m.mediaId)
-    if (existing) {
-      existing.wrappedMeta = m.wrappedMeta // a meta edit re-sealed the tier; patch in place (shared with the lightbox snapshot)
-      existing.updatedAt = m.updatedAt
-    } else {
-      byId.set(m.mediaId, m)
-    }
-  }
-  if (mediaIds) {
-    const keep = new Set(mediaIds)
-    for (const id of [...pendingDelete]) if (!keep.has(id)) pendingDelete.delete(id) // cr-0111: server confirmed it's gone → lift the tombstone
-    for (const id of [...byId.keys()]) {
-      if (keep.has(id)) continue
-      pipeline.dropThumb(id)
-      byId.delete(id)
-    }
-  }
-  items.value = [...byId.values()]
-}
-
 // The Trash tab loads lazily on open — no extra list on every Memory open.
 watch(activeTab, (tab) => { if (tab === 'trash') void loadTrash() })
 
+// On a Memory/chapter switch: reset the tab to the gallery + drop the previous Memory's trash state. (The gallery
+// grid + live-poll lifecycle is owned by `useMediaGalleryLive`, which watches the same node/key + tears down itself.)
 watch(
   () => [props.node.id, props.memoryKey] as const,
   () => {
-    lightboxIndex.value = null
-    activeTab.value = 'gallery' // reset to the gallery when a different Memory/chapter opens
+    activeTab.value = 'gallery'
     resetTrash() // cr-0110/0111: drop the previous Memory's trash listing/thumbs/selection
-    pendingDelete.clear()
-    clearUndo()
-    stopMediaRevisionPolling() // tear down the previous Memory's live poll before switching
-    // a different Memory/chapter → clear the grid; a post-upload reload merges (below). Once the full list has
-    // loaded, start the live poll — but only for an open, unlocked gallery (E4: no K_mem ⇒ no polling).
-    void load({ reset: true }).then(() => {
-      if (props.memoryKey) startMediaRevisionPolling(() => void pollMedia())
-    })
   },
   { immediate: true },
 )
-
-onBeforeUnmount(() => {
-  stopMediaRevisionPolling() // stop the live poll on close/navigate away
-  pipeline.revokeAll()
-  clearUndo()
-  // trash thumbs are owned + revoked by useMediaTrash; the optimistic preview urls by useOptimisticTiles
-})
 </script>
 
 <template>
