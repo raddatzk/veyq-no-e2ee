@@ -21,7 +21,13 @@ import { listTrash, restoreMedia, purgeMedia, type MediaItem } from './media'
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
-  messages: { en: { memory: { trash: { restore: 'Restore', purge: 'Delete forever' } } } },
+  messages: {
+    en: {
+      memory: {
+        trash: { restore: 'Restore', purge: 'Delete forever', selected: '{selected} of {visible} selected' },
+      },
+    },
+  },
 })
 
 const KEY = new Uint8Array(32)
@@ -99,6 +105,24 @@ describe('useMediaTrash', () => {
     expect(purgeMedia).toHaveBeenCalledWith('scope-1', 'a')
     expect(vm.trashedItems).toHaveLength(0)
     expect(vm.purgeConfirm).toBeNull()
+  })
+
+  it('toggleSelectAllTrash selects all visible ↔ clears, tracked by allTrashSelected + the bar label (cr-0152)', async () => {
+    vi.mocked(listTrash).mockResolvedValue([item('a'), item('b')])
+    const { vm } = setup()
+    expect(vm.allTrashSelected).toBe(false) // empty trash never counts as "all selected"
+    await vm.loadTrash()
+    await flushPromises()
+    vm.toggleTrashSelect('a') // partial selection → select-all still offers "select all"
+    expect(vm.allTrashSelected).toBe(false)
+    expect(vm.selectedTrashLabel).toBe('1 of 2 selected')
+    vm.toggleSelectAllTrash()
+    expect(vm.selectedTrash.size).toBe(2)
+    expect(vm.allTrashSelected).toBe(true)
+    expect(vm.selectedTrashLabel).toBe('2 of 2 selected')
+    vm.toggleSelectAllTrash() // all selected → the same toggle deselects
+    expect(vm.selectedTrash.size).toBe(0)
+    expect(vm.allTrashSelected).toBe(false)
   })
 
   it('resetTrash clears listing/status/selection (Memory switch)', async () => {

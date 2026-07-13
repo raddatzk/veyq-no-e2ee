@@ -106,7 +106,9 @@ const {
   loadTrash,
   resetTrash,
   toggleTrashSelect,
-  clearTrashSelection,
+  allTrashSelected,
+  toggleSelectAllTrash,
+  selectedTrashLabel,
   openTrashMenu,
   restoreSelected,
   purgeSelected,
@@ -511,16 +513,17 @@ watch(
           <template v-else>
             <div class="memory-trash-toolbar">
               <span class="memory-trash-hint">{{ t('memory.trash.hint') }}</span>
-              <div v-if="selectedTrash.size" class="memory-trash-batch">
-                <span class="memory-trash-batch-count">{{ t('memory.trash.selected', { count: selectedTrash.size }) }}</span>
-                <button type="button" class="veyq-text-button" @click="restoreSelected">
-                  <span class="pi pi-replay" /><span>{{ t('memory.trash.restore') }}</span>
+              <!-- Selection bar — always visible; actions enable with a selection (cr-0152, the Beiträge mechanic). -->
+              <div class="memory-trash-batch">
+                <span class="memory-trash-batch-count">{{ selectedTrashLabel }}</span>
+                <button type="button" class="veyq-text-button" @click="toggleSelectAllTrash">
+                  {{ allTrashSelected ? t('memory.trash.deselectAll') : t('memory.trash.selectAllVisible') }}
                 </button>
-                <button type="button" class="veyq-text-button memory-trash-purge-action" @click="purgeSelected">
-                  <span class="pi pi-trash" /><span>{{ t('memory.trash.purge') }}</span>
+                <button type="button" class="bucket-action-button" :disabled="!selectedTrash.size" @click="restoreSelected">
+                  <span class="pi pi-replay" /><span class="bucket-action-label">{{ t('memory.trash.restore') }}</span>
                 </button>
-                <button type="button" class="veyq-text-button" @click="clearTrashSelection">
-                  <span class="pi pi-times" /><span>{{ t('common.cancel') }}</span>
+                <button type="button" class="bucket-action-button bucket-action-danger" :disabled="!selectedTrash.size" @click="purgeSelected">
+                  <span class="pi pi-trash" /><span class="bucket-action-label">{{ t('memory.trash.purge') }}</span>
                 </button>
               </div>
             </div>
@@ -540,9 +543,10 @@ watch(
                   @open="toggleTrashSelect(item.media.mediaId)"
                 >
                   <template #overlay>
-                    <span class="media-tile-check" :class="{ 'is-on': selectedTrash.has(item.media.mediaId) }" aria-hidden="true">
-                      <span class="pi pi-check" />
-                    </span>
+                    <label class="media-tile-check" :class="{ 'is-on': selectedTrash.has(item.media.mediaId) }">
+                      <input type="checkbox" :checked="selectedTrash.has(item.media.mediaId)" :aria-label="t('media.openItem', { index: item.index + 1 })" @click.stop @change="toggleTrashSelect(item.media.mediaId)" />
+                      <span class="pi pi-check" aria-hidden="true" />
+                    </label>
                     <button
                       type="button"
                       class="media-tile-menu"
@@ -893,27 +897,17 @@ watch(
   color: var(--app-muted);
   font-size: 0.85rem;
 }
+/* The selection bar mirrors the Beiträge .bucket-selection-bar exactly (cr-0152): muted un-bolded count,
+   the stock .veyq-text-button select-all toggle, and the shared .bucket-action-button actions (memory.css). */
 .memory-trash-batch {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 .memory-trash-batch-count {
-  margin-right: 0.2rem;
   color: var(--app-muted);
   font-size: 0.85rem;
-  font-weight: 700;
-}
-.memory-trash-batch .veyq-text-button {
-  min-height: 2rem;
-  padding: 0 0.6rem;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-}
-.memory-trash-purge-action {
-  color: var(--app-danger);
-  border-color: color-mix(in srgb, var(--app-danger) 40%, var(--app-line));
 }
 /* A trashed tile IS the shared MediaTile (cr-0125), just with the trashed media dimmed (the check/menu/outline are
    the standard `.media-tile*`). `:deep` reaches the image inside the child component. */

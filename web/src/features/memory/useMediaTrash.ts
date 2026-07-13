@@ -111,9 +111,17 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     else next.add(mediaId)
     selectedTrash.value = next
   }
-  function clearTrashSelection() {
-    selectedTrash.value = new Set()
+  /** Whether every trashed item is selected — drives the select-all ↔ deselect-all toggle (cr-0152). */
+  const allTrashSelected = computed(
+    () => trashedItems.value.length > 0 && trashedItems.value.every((m) => selectedTrash.value.has(m.mediaId)),
+  )
+  function toggleSelectAllTrash() {
+    selectedTrash.value = allTrashSelected.value ? new Set() : new Set(trashedItems.value.map((m) => m.mediaId))
   }
+  /** "{selected} of {visible} selected" — the always-visible bar's count (matches the Beiträge bar, cr-0122). */
+  const selectedTrashLabel = computed(() =>
+    t('memory.trash.selected', { selected: selectedTrash.value.size, visible: trashedItems.value.length }),
+  )
 
   /** Open the per-tile overflow menu (restore / purge) anchored at the click, targeting [mediaId]. */
   function openTrashMenu(event: Event, mediaId: string) {
@@ -167,7 +175,9 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     loadTrash,
     resetTrash,
     toggleTrashSelect,
-    clearTrashSelection,
+    allTrashSelected,
+    toggleSelectAllTrash,
+    selectedTrashLabel,
     openTrashMenu,
     restoreSelected,
     purgeSelected,
