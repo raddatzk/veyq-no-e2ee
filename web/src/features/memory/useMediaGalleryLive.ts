@@ -3,6 +3,9 @@
 // live poll (load/merge/upsert), the justified layout, and the optimistic-delete/undo. MemoryDetail keeps only
 // orchestration + the template. Operator-blind: thumbnails decrypt on device under K_mem; nothing plaintext crosses.
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useToast } from '../../shared/state/useToast'
+import { useUndo } from '../../shared/state/useUndo'
 import type { TreeNode } from './tree'
 import {
   openGrid,
@@ -35,6 +38,8 @@ export type MemoryTileItem =
   | { id: string; aspectRatio: number; kind: 'media'; media: MediaItem; index: number }
 
 export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
+  const { t } = useI18n()
+  const toast = useToast()
   const items = ref<MediaItem[]>([])
   // Optimistic in-grid upload tiles (uc.memory.upload, cr-0074): the shared queue's still-in-flight files for THIS
   // node (grouping key = the node id) as instant preview tiles, reconciled into the real thumbnail by mediaId.
@@ -60,9 +65,10 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
   const deleteRevision = ref(0)
   const lightboxIndex = ref<number | null>(null)
   const lightboxItems = ref<MediaItem[]>([]) // a snapshot of the sorted order at open time (so an in-lightbox edit can't reorder underfoot)
-  // trash undo (cr-0110): a lightbox-only delete soft-deletes into a per-Memory trash; the snackbar offers restore.
-  const undo = ref<{ mediaId: string } | null>(null)
-  let undoTimer: ReturnType<typeof setTimeout> | null = null
+  // trash undo (cr-0110): a lightbox-only delete soft-deletes into a per-Memory trash; an undo-toast offers restore
+  // (cr-0157/ADR 0039). The soft-delete is eager, so the window elapsing commits nothing — it just lets the trash
+  // stand; only `onUndoDelete` (restore) is a real action, hence no `onExpire`.
+  const undo = useUndo<{ mediaId: string }>({ timeoutMs: 6000 })
   // Tombstone of mediaIds optimistically removed by a trash but not yet confirmed gone (cr-0111): filtered out of
   // the merge/poll paths so a stale live read (a poll firing before the delete commits) can't re-add them.
   const pendingDelete = new Set<string>()
@@ -116,15 +122,17 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
   // --- optimistic delete / undo (uc.memory.delete-media, cr-0110/0111) ---
 
   /** Trash the current lightbox photo: optimistic grid/lightbox removal, the server soft-delete, and a transient
-   *  undo snackbar. The live poll would also drop it; the optimistic removal is instant. */
+   *  undo-toast. The live poll would also drop it; the optimistic removal is instant. */
   async function onDeleteFromLightbox(payload: { mediaId: string }) {
     if (!ctx.memoryKey()) return
     removeFromGrid(payload.mediaId)
-    showUndo(payload.mediaId)
+    undo.arm({ mediaId: payload.mediaId })
+    toast.showUndo({ summary: t('memory.trash.movedToTrash'), onUndo: onUndoDelete, life: 6000 })
     try {
       await deleteMedia(ctx.scopeId(), payload.mediaId)
     } catch {
-      clearUndo() // the trash failed → re-list to restore the true state
+      undo.cancel() // the trash failed → drop the stale undo-toast, re-list to restore the true state
+      toast.dismissUndo()
       void load()
     }
   }
@@ -137,21 +145,9 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
     lightboxItems.value = lightboxItems.value.filter((it) => it.mediaId !== mediaId)
   }
 
-  function showUndo(mediaId: string) {
-    if (undoTimer) clearTimeout(undoTimer)
-    undo.value = { mediaId }
-    undoTimer = setTimeout(() => { undo.value = null; undoTimer = null }, 6000)
-  }
-  function clearUndo() {
-    if (undoTimer) clearTimeout(undoTimer)
-    undoTimer = null
-    undo.value = null
-  }
-
   /** Undo the just-trashed media: restore it server-side, then re-list so it re-appears in the grid. */
   async function onUndoDelete() {
-    const u = undo.value
-    clearUndo()
+    const u = undo.cancel()
     if (!u) return
     pendingDelete.delete(u.mediaId) // cr-0111: a genuine restore lifts the tombstone so the media can re-list
     try {
@@ -287,7 +283,8 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
     () => {
       lightboxIndex.value = null
       pendingDelete.clear()
-      clearUndo()
+      undo.cancel() // a node switch drops any open undo window (the trash stands) + its toast
+      toast.dismissUndo()
       stopMediaRevisionPolling()
       void load({ reset: true }).then(() => {
         if (ctx.memoryKey()) startMediaRevisionPolling(() => void pollMedia())
@@ -299,7 +296,7 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
   onBeforeUnmount(() => {
     stopMediaRevisionPolling() // stop the live poll on close/navigate away
     pipeline.revokeAll()
-    clearUndo()
+    toast.dismissUndo() // drop any lingering undo-toast (the `useUndo` window tears itself down)
   })
 
   return {
@@ -315,8 +312,6 @@ export function useMediaGalleryLive(ctx: MediaGalleryLiveCtx) {
     openBucketLightbox,
     onDeleteFromLightbox,
     onCapturedAtUpdated,
-    onUndoDelete,
-    undo,
     load,
     pollMedia,
     liftTombstone,

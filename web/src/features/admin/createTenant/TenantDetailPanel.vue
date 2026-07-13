@@ -14,6 +14,7 @@ import { listTenants, reassignInvite, resendInvite, revokeTenant, type TenantSum
 import { buildInviteLink, copyText } from '../../../shared/inviteLink'
 import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { useToast } from '../../../shared/state/useToast'
 import { handle401 } from '../../../shared/handle401'
 import { isUnauthorized } from '../../../shared/httpError'
 
@@ -21,11 +22,11 @@ import { isUnauthorized } from '../../../shared/httpError'
 const props = defineProps<{ tenantId: string }>()
 
 const { t } = useI18n()
+const toast = useToast()
 const router = useRouter()
 const on401 = handle401(router)
 
 const tenant = ref<TenantSummary | null>(null)
-const notice = ref('')
 const actionError = ref('')
 
 const email = ref('')
@@ -36,7 +37,6 @@ const copied = ref(false)
 const isPending = computed(() => tenant.value?.status === 'PENDING')
 
 const { pending: loading, error: loadErr, reload } = useAsyncData(async () => {
-  notice.value = ''
   actionError.value = ''
   inviteUrl.value = ''
   const found = (await listTenants()).find((x) => x.tenantId === props.tenantId) ?? null
@@ -57,7 +57,7 @@ const loadError = computed<'' | 'notAuthorized' | 'failed' | 'gone'>(() => {
 const { run: runMint, pending: busy } = useAsyncAction(
   async (action: () => Promise<{ bootstrapSecret: string }>, successKey: string) => {
     const state = await action()
-    notice.value = t(successKey)
+    toast.success(t(successKey))
     if (tenant.value) inviteUrl.value = buildInviteLink(state.bootstrapSecret, tenant.value.domain)
   },
   { onError: (e) => { on401(e); if (!isUnauthorized(e)) actionError.value = t('tenant.actionFailed') } },
@@ -109,7 +109,6 @@ async function copyInviteLink() {
         </span>
       </div>
 
-      <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
 
       <!-- A PENDING tenant's owner invite can be re-pointed (reassign), resent, or revoked; ACTIVE tenants are

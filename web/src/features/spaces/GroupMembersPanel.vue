@@ -17,6 +17,7 @@ import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
 import { isUnauthorized } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
+import { useToast } from '../../shared/state/useToast'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
@@ -25,12 +26,12 @@ import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 const props = defineProps<{ scopeId: string; name?: string }>()
 
 const { t, locale } = useI18n()
+const toast = useToast()
 const emit = defineEmits<{ lifecycleChanged: [] }>()
 
 const myUsername = ref('')
 const username = ref('')
 const addError = ref('')
-const addNotice = ref('')
 const adding = ref(false)
 // A pending add blocked because the invitee's identity key CHANGED since we last pinned it (cr-0098, ADR 0028) —
 // the human accepts (re-pin) then the add retries. Never silently sealed to the new key.
@@ -80,7 +81,6 @@ const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value
 async function submit() {
   if (!canAdd.value || !props.scopeId) return
   addError.value = ''
-  addNotice.value = ''
   adding.value = true
   const uname = username.value.trim().toLowerCase()
   let candidate: Awaited<ReturnType<typeof resolveGroupMember>> | null = null
@@ -93,7 +93,7 @@ async function submit() {
       const sealedNameKey = await wrapGroupNameKeyForInvitee(props.scopeId, candidate.userId, candidate.identityPublicKey)
       if (!sealedNameKey) throw new Error('cannot open the group to seal the invite name-key')
       await addGroupMember(props.scopeId, uname, sealedNameKey)
-      addNotice.value = t('groups.invitationSent')
+      toast.success(t('groups.invitationSent'))
     } else {
       await addGroupMember(props.scopeId, uname)
     }
@@ -322,7 +322,6 @@ async function onRestore() {
           <Button type="submit" :label="t('groups.addMember')" icon="pi pi-user-plus" :loading="adding" :disabled="!canAdd" />
         </div>
         <Message v-if="addError" severity="error" :closable="false">{{ addError }}</Message>
-        <Message v-if="addNotice" severity="success" :closable="false">{{ addNotice }}</Message>
         <!-- Changed-identity notice (cr-0098): accept re-pins the new key and retries the add (human path). -->
         <div v-if="pendingKeyChange" class="group-key-change">
           <Button

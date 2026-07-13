@@ -26,14 +26,15 @@ import { buildInviteLink, copyText } from '../../shared/inviteLink'
 import { unsealName, type MemberName } from '../account/profile/profile'
 import { isUnauthorized } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
+import { useToast } from '../../shared/state/useToast'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 const { t } = useI18n()
+const toast = useToast()
 
 // Locally-decrypted real names (first+last) keyed by userId — the sealed blob opened with K_tenant on-device.
 const names = ref<Record<string, MemberName | null>>({})
 const pendingInvites = ref<PendingMemberInvite[]>([])
-const notice = ref('')
 const actionError = ref('')
 const inviteOpen = ref(false)
 
@@ -67,19 +68,18 @@ function fullName(userId: string): string {
 }
 
 async function onInvited() {
-  notice.value = t('members.inviteSent')
+  toast.success(t('members.inviteSent'))
   await reload()
 }
 
 async function reissue(invite: PendingMemberInvite) {
   actionError.value = ''
-  notice.value = ''
   reissueUrl.value = ''
   reissueCopied.value = false
   try {
     const state = await reissueMemberInvite(activeSpace.tenantId!, invite.inviteId)
     reissueUrl.value = buildInviteLink(state.bootstrapSecret) // same host — the owner invites into their tenant
-    notice.value = t('members.inviteReissued')
+    toast.success(t('members.inviteReissued'))
     await reload()
   } catch (e) {
     on401(e)
@@ -97,11 +97,10 @@ async function copyReissueLink() {
 async function remove(member: ScopeMember) {
   if (!window.confirm(t('members.removeConfirm'))) return
   actionError.value = ''
-  notice.value = ''
   reissueUrl.value = ''
   try {
     await removeTenantMember(activeSpace.tenantId!, member.userId)
-    notice.value = t('members.removed')
+    toast.success(t('members.removed'))
     await reload()
   } catch (e) {
     on401(e)
@@ -112,11 +111,10 @@ async function remove(member: ScopeMember) {
 async function revoke(invite: PendingMemberInvite) {
   if (!window.confirm(t('members.revokeConfirm'))) return
   actionError.value = ''
-  notice.value = ''
   reissueUrl.value = ''
   try {
     await revokeMemberInvite(activeSpace.tenantId!, invite.inviteId)
-    notice.value = t('members.inviteRevoked')
+    toast.success(t('members.inviteRevoked'))
     await reload()
   } catch (e) {
     on401(e)
@@ -142,7 +140,6 @@ async function revoke(invite: PendingMemberInvite) {
         />
       </div>
 
-      <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
 
       <!-- Fresh re-issued link to copy (cr-0080) — shown until the owner copies/dismisses it. -->

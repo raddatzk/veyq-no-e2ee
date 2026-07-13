@@ -19,6 +19,14 @@ vi.mock('../media', () => ({
 }))
 vi.mock('../../spaces/members', () => ({ listScopeMembers: vi.fn(async () => []) }))
 
+// The undo affordance is now a global toast (cr-0157): stub the shared composable so the test can capture the
+// `showUndo({ onUndo })` call and invoke the restore action (the toast surface itself lives in App.vue).
+const { showUndo } = vi.hoisted(() => ({ showUndo: vi.fn() }))
+vi.mock('../../../shared/state/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), showUndo, dismissUndo: vi.fn() }),
+  UNDO_GROUP: 'undo',
+}))
+
 import MemoryBuckets from './MemoryBuckets.vue'
 import { listBuckets, deleteMedia, restoreMedia, type MediaItem, type BucketItem } from '../media'
 
@@ -95,11 +103,11 @@ describe('MemoryBuckets — selection + delete-to-trash + undo (cr-0122)', () =>
     await flushPromises()
 
     expect(deleteMedia).toHaveBeenCalledTimes(2) // straight to trash, no confirm dialog
-    const undoBar = wrapper.find('.bucket-undo-bar')
-    expect(undoBar.exists()).toBe(true)
-    expect(undoBar.text()).toContain('2 items moved to trash')
+    expect(showUndo).toHaveBeenCalledTimes(1) // offers an undo-toast instead of an inline bar
+    const undoArg = showUndo.mock.calls[0][0]
+    expect(undoArg.summary).toContain('2 items moved to trash')
 
-    await wrapper.find('.bucket-undo-bar .bucket-undo-action').trigger('click')
+    undoArg.onUndo() // the toast's "Rückgängig" action
     await flushPromises()
     expect(restoreMedia).toHaveBeenCalledTimes(2) // undo restores each id
   })

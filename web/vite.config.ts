@@ -1,4 +1,7 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { loadEnv, type Plugin } from 'vite'
+// `vitest/config`'s defineConfig extends Vite's with the `test` block (setupFiles below) while staying a valid
+// Vite config for `npm run dev`/`build`.
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { buildCsp, providerOrigin } from './src/shared/security/csp'
 import { DEFAULT_GEOCODER_URL, DEFAULT_TILE_URL } from './src/shared/state/mapDefaults'
@@ -46,6 +49,10 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [vue(), cspPlugin(env, command === 'serve')],
+    test: {
+      // Provide the PrimeVue toast service to every mounted component (cr-0157) — see src/test/setup.ts.
+      setupFiles: ['./src/test/setup.ts'],
+    },
     server: {
       host: '127.0.0.1',
       port,

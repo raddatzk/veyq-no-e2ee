@@ -81,8 +81,6 @@ const {
   openBucketLightbox,
   onDeleteFromLightbox,
   onCapturedAtUpdated,
-  onUndoDelete,
-  undo,
   load,
   pollMedia,
   liftTombstone,
@@ -638,12 +636,6 @@ watch(
         <Button type="button" :label="t('memory.trash.purge')" icon="pi pi-trash" severity="danger" :loading="purgeBusy" @click="confirmPurge" />
       </div>
     </Dialog>
-
-    <!-- Undo snackbar after a lightbox delete (cr-0110): a transient restore, above the lightbox so it's visible mid-culling. -->
-    <div v-if="undo" class="memory-undo-snackbar" role="status">
-      <span>{{ t('memory.trash.movedToTrash') }}</span>
-      <button type="button" class="veyq-text-button memory-undo-action" @click="onUndoDelete">{{ t('common.undo') }}</button>
-    </div>
   </div>
 </template>
 
@@ -919,34 +911,5 @@ watch(
 }
 .memory-trash-tile.is-selected :deep(.media-tile-img) {
   opacity: 0.92;
-}
-/* The undo snackbar sits above the lightbox (z-index 1000) so it's visible mid-culling. */
-.memory-undo-snackbar {
-  position: fixed;
-  left: 50%;
-  bottom: 1.5rem;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.6rem 0.6rem 0.6rem 1.1rem;
-  border-radius: 999px;
-  background: var(--app-backdrop-strong);
-  color: #fff;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
-  z-index: 1200;
-}
-/* The undo button on the DARK snackbar: transparent (not the light .veyq-text-button surface) + white text. */
-.memory-undo-action {
-  min-height: auto;
-  padding: 0.2rem 0.5rem;
-  border: none;
-  background: transparent;
-  color: #fff;
-  font-weight: 700;
-  text-decoration: underline;
-}
-.memory-undo-action:hover:not(:disabled) {
-  background: rgb(255 255 255 / 14%);
 }
 </style>

@@ -13,10 +13,12 @@ import Message from 'primevue/message'
 import { getMyProfile, updateMyProfile, sealName, unsealName, openTenantKey } from './profile'
 import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { useToast } from '../../../shared/state/useToast'
 import { handle401 } from '../../../shared/handle401'
 import { isUnauthorized, decodeHttpError } from '../../../shared/httpError'
 
 const { t } = useI18n()
+const toast = useToast()
 const on401 = handle401(useRouter())
 
 const username = ref('')
@@ -25,7 +27,6 @@ const lastName = ref('')
 // Account-global "ask before adding me to groups" preference (cr-0094) — a server-visible boolean, not a key.
 const requireGroupAddConsent = ref(false)
 const error = ref('')
-const notice = ref('')
 // K_tenant is held outside any reactive proxy — key material must not flow through Vue reactivity.
 let tenantKey: Uint8Array | null = null
 
@@ -55,7 +56,7 @@ const { run: runSave, pending: saving } = useAsyncAction(
       sealedName,
       requireGroupAddConsent: requireGroupAddConsent.value,
     })
-    notice.value = t('profile.saved')
+    toast.success(t('profile.saved'))
   },
   {
     onError: async (e) => {
@@ -70,7 +71,6 @@ const { run: runSave, pending: saving } = useAsyncAction(
 async function save() {
   if (!username.value.trim()) return
   error.value = ''
-  notice.value = ''
   await runSave()
 }
 </script>
@@ -108,7 +108,6 @@ async function save() {
           </label>
         </div>
 
-        <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
         <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <div class="veyq-dialog-action-row">
           <Button type="submit" :label="t('profile.save')" icon="pi pi-check" :loading="saving" :disabled="!username.trim()" />

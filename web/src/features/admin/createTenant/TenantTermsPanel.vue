@@ -15,17 +15,18 @@ import { activeSpace } from '../../../app/activeSpace'
 import { renderMarkdown } from '../../../shared/markdown'
 import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { useToast } from '../../../shared/state/useToast'
 import { handle401 } from '../../../shared/handle401'
 import { httpStatus, isUnauthorized } from '../../../shared/httpError'
 
 const { t, locale } = useI18n()
+const toast = useToast()
 const on401 = handle401(useRouter())
 
 const de = ref('')
 const en = ref('')
 const version = ref(0)
 const isOwner = ref(false)
-const notice = ref('')
 const actionError = ref('')
 
 // The terms in the active UI locale (fallback to the other) — drives the owner's live preview and the non-owner
@@ -56,7 +57,7 @@ const { run: runSave, pending: saving } = useAsyncAction(
     version.value = updated.termsVersion
     de.value = updated.terms?.de ?? ''
     en.value = updated.terms?.en ?? ''
-    notice.value = t('terms.saved', { version: updated.termsVersion })
+    toast.success(t('terms.saved', { version: updated.termsVersion }))
   },
   {
     onError: (e) => {
@@ -69,7 +70,6 @@ const { run: runSave, pending: saving } = useAsyncAction(
 
 async function save() {
   actionError.value = ''
-  notice.value = ''
   await runSave()
 }
 </script>
@@ -90,7 +90,6 @@ async function save() {
 
       <!-- Owner: the per-locale markdown editor + a live preview. Non-owner: the rendered terms, read-only. -->
       <template v-else-if="isOwner">
-        <Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
         <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
 
         <div class="locale-markdown-editor">

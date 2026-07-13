@@ -22,6 +22,14 @@ vi.mock('./useOptimisticTiles', async () => {
   const { computed } = await import('vue')
   return { useOptimisticTiles: () => ({ optimisticTiles: computed(() => []), donorPreviewFor: () => null }) }
 })
+// The undo affordance is now a global toast (cr-0157) + i18n summary: stub both so the isolated composable runs and
+// the test can capture the `showUndo({ onUndo })` call to drive the restore (the toast surface lives in App.vue).
+const { showUndo, dismissUndo } = vi.hoisted(() => ({ showUndo: vi.fn(), dismissUndo: vi.fn() }))
+vi.mock('../../shared/state/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), showUndo, dismissUndo }),
+  UNDO_GROUP: 'undo',
+}))
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (k: string) => k }) }))
 
 import { defineComponent, h, type UnwrapRef } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -77,7 +85,7 @@ describe('useMediaGalleryLive', () => {
 
     await vm.onDeleteFromLightbox({ mediaId: 'a' })
     expect(vm.items.map((i) => i.mediaId)).toEqual(['b']) // optimistically removed
-    expect(vm.undo?.mediaId).toBe('a') // undo armed
+    expect(showUndo).toHaveBeenCalledTimes(1) // undo-toast armed
     expect(deleteMedia).toHaveBeenCalledWith('scope-1', 'a')
 
     // a live poll that still lists 'a' (pre-commit read) must NOT resurrect it (cr-0111 tombstone)
@@ -94,7 +102,7 @@ describe('useMediaGalleryLive', () => {
     expect(vm.items).toEqual([])
 
     vi.mocked(listMediaPage).mockResolvedValue(page([item('a')]))
-    await vm.onUndoDelete()
+    await showUndo.mock.calls[0][0].onUndo() // the toast's "Rückgängig" action
     await flushPromises()
     expect(restoreMedia).toHaveBeenCalledWith('scope-1', 'a')
     expect(vm.items.map((i) => i.mediaId)).toEqual(['a']) // re-listed after the tombstone lifted

@@ -21,6 +21,8 @@ import {
   unsealMeta, hasDerivatives, type MediaItem, type BucketItem,
 } from '../media'
 import { listScopeMembers } from '../../spaces/members'
+import { useToast } from '../../../shared/state/useToast'
+import { useUndo } from '../../../shared/state/useUndo'
 
 const props = defineProps<{
   scopeId: string
@@ -36,6 +38,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const toast = useToast()
 const SELF_PRIMARY = '__veyq_self_primary__'
 
 type BucketVM = {
@@ -68,9 +71,9 @@ const deleteBucketDialog = ref<{ open: boolean; typed: string; saving: boolean; 
 const moveDialog = ref<{ open: boolean; target: string; saving: boolean; error: string }>(
   { open: false, target: '', saving: false, error: '' },
 )
-// A soft-delete just landed — a local undo bar (no toast infra) offers to restore it until it auto-dismisses.
-const undo = ref<{ ids: string[]; count: number } | null>(null)
-let undoTimer: ReturnType<typeof setTimeout> | null = null
+// A soft-delete just landed — an undo-toast offers to restore it until it auto-dismisses (cr-0157/ADR 0039). The
+// soft-delete is eager, so the window elapsing commits nothing; only `undoDelete` (restore) is a real action.
+const undo = useUndo<{ ids: string[]; count: number }>({ timeoutMs: 8000 })
 const dropActive = ref(false)
 
 // --- load + label resolution ------------------------------------------------
@@ -302,11 +305,7 @@ async function submitMove() {
   }
 }
 
-// Delete = a recoverable soft-delete straight to the Papierkorb — no confirm modal, just an undo bar (cr-0122).
-function dismissUndo() {
-  if (undoTimer) { clearTimeout(undoTimer); undoTimer = null }
-  undo.value = null
-}
+// Delete = a recoverable soft-delete straight to the Papierkorb — no confirm modal, just an undo-toast (cr-0122).
 async function deleteSelected() {
   const ids = [...selected.value]
   if (!ids.length) return
@@ -314,19 +313,17 @@ async function deleteSelected() {
   await Promise.allSettled(ids.map((id) => deleteMedia(props.scopeId, id))) // soft-delete → trash
   await loadBuckets()
   emit('changed')
-  undo.value = { ids, count: ids.length }
-  if (undoTimer) clearTimeout(undoTimer)
-  undoTimer = setTimeout(() => { undo.value = null; undoTimer = null }, 8000)
+  undo.arm({ ids, count: ids.length })
+  toast.showUndo({ summary: t('memory.buckets.deletedToTrash', { count: ids.length }, ids.length), onUndo: undoDelete, life: 8000 })
 }
 async function undoDelete() {
-  const u = undo.value
-  dismissUndo()
+  const u = undo.cancel()
   if (!u) return
   await Promise.allSettled(u.ids.map((id) => restoreMedia(props.scopeId, id)))
   await loadBuckets()
   emit('changed')
 }
-onBeforeUnmount(() => { if (undoTimer) clearTimeout(undoTimer) })
+onBeforeUnmount(() => { toast.dismissUndo() }) // drop any lingering undo-toast (the `useUndo` window tears itself down)
 
 // --- upload / drag-drop into the active bucket ------------------------------
 
@@ -413,14 +410,6 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
             <span class="pi pi-trash" /><span class="bucket-action-label">{{ t('memory.buckets.delete') }}</span>
           </button>
         </div>
-      </div>
-
-      <!-- undo bar (a local, auto-dismissing affordance after a soft-delete) -->
-      <div v-if="undo" class="bucket-undo-bar" role="status">
-        <span class="pi pi-trash" aria-hidden="true" />
-        <span>{{ t('memory.buckets.deletedToTrash', { count: undo.count }, undo.count) }}</span>
-        <button type="button" class="veyq-text-button bucket-undo-action" @click="undoDelete">{{ t('memory.buckets.undo') }}</button>
-        <button type="button" class="bucket-undo-close" :aria-label="t('common.cancel')" @click="dismissUndo"><span class="pi pi-times" /></button>
       </div>
 
       <!-- dropzone banner -->
@@ -536,13 +525,6 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 /* .bucket-action-button + -label/-danger live in global memory.css — shared with the Papierkorb bar (cr-0152). */
 .bucket-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .bucket-selection-count { color: var(--app-muted); font-size: 0.85rem; }
-.bucket-undo-bar {
-  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.85rem; border: 1px solid var(--app-line);
-  border-radius: 10px; background: var(--app-control-bg); font-size: 0.9rem;
-}
-.bucket-undo-bar > .pi-trash { color: var(--app-muted); }
-.bucket-undo-action { margin-left: auto; font-weight: 700; }
-.bucket-undo-close { border: 0; background: transparent; color: var(--app-muted); cursor: pointer; padding: 0.15rem; }
 .bucket-dropzone {
   display: grid; grid-template-columns: 40px 1fr; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;
   border: 1px dashed color-mix(in srgb, var(--app-accent) 55%, var(--app-line)); border-radius: 10px;
