@@ -8,15 +8,20 @@ docs/coverage/features/<feature>/use-cases/uc.<feature>.<goal>.yaml
 ```
 
 Each file lists acceptance criteria; every criterion's tests are keyed by **area** (which surface) then
-**level** (which kind of test). Surfaces that are intentionally not yet covered are declared under
+**level** (which kind of test). Surfaces with **no** coverage ref for the use-case are declared under
 `gaps` with a reason — never left silent.
+
+> **`http` is not a coverage surface** ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).
+> The `http/**/*.http` files remain IntelliJ dev tooling — handy for firing requests by hand — but run in
+> no CI job, so they make no coverage claim; the same behaviour is proven by the backend slice tests. Do
+> not reference an `.http` file here.
 
 `scripts/validate_coverage.py` enforces the chain (run it after changing a use-case, a coverage file,
 or the tests they point to).
 
 ## Dimensions
 
-**Area** — *where* the test runs (the surface): `backend` · `http` · `web` · `apple` · `android`.
+**Area** — *where* the test runs (the surface): `backend` · `web` · `apple` · `android`.
 
 **Level** — *what kind* of test it is. Classify by the **scope of behaviour under test**, not by the
 test harness:
@@ -25,10 +30,10 @@ test harness:
 | --- | --- |
 | `unit` | a single component in isolation (even if it uses the DI container to obtain it) |
 | `integration` | several components together across an internal boundary, in-process (e.g. HTTP resource → handler → DB) |
-| `e2e` | the system through its external interface against a running instance (e.g. `.http` via ijhttp, or a browser) |
+| `e2e` | the system through its external interface against a running instance (e.g. a browser, or a web suite against a live backend) |
 
 > Examples: a Quarkus `…SliceTest` (RestAssured → resource → handler → H2) is **integration**; a focused
-> deserialization test is **unit**; `http/**/*.http` run by ijhttp is **e2e**.
+> deserialization test is **unit**; a web suite run against a live backend (`run_web_e2e.py`) is **e2e**.
 
 ## Shape
 
@@ -41,9 +46,9 @@ acceptanceCriteria:
     text: <one sentence>
     coverage:
       <area>:
-        <level>: [<ref>, ...]   # backend ref: "ClassName.testMethod"; http ref: "http/<area>/<file>.http"
+        <level>: [<ref>, ...]   # backend/apple/android ref: "ClassName.testMethod"; web ref: a path under web/
 gaps:
-  <area>: <reason>              # surfaces intentionally not (yet) covered
+  <area>: <reason>              # a surface with NO coverage ref for this use-case (never also covered)
 ```
 
 ## Rules
@@ -53,9 +58,11 @@ gaps:
   visible (e.g. "happy path has integration but no e2e yet") — the validator does **not** require any
   particular level, because coverage is risk-based, not box-ticking.
 - **Areas and levels come from the fixed sets above**; unknown names fail validation (catches typos).
-- **References must resolve:** a `backend` ref's test method must exist in `backend/src/test`; an `http`
-  ref's file must exist. `web`/`apple`/`android` refs are not verified until those surfaces have code.
-- **Gaps are explicit:** an uncovered surface is listed under `gaps` with a reason; silent omission is
-  not allowed.
+- **References must resolve:** a `backend`/`apple`/`android` `ClassName.method` ref resolves against *that*
+  test class (a file whose stem is `ClassName`, containing `method`); a `web` (or path-form apple/android)
+  ref's file must exist.
+- **Gaps are explicit *and* mean uncovered:** a surface with no coverage ref is listed under `gaps` with a
+  reason (silent omission is not allowed); a surface that **is** covered may not also be a gap — that overlap
+  is a stale gap (a build-note or deferred-slice left behind) and fails validation ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).
 - **Stop at area × level.** Do not add finer per-test metadata (individual assertions, requirement ids) —
   classification noise without a decision payoff.

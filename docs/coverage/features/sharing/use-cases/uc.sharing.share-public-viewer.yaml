@@ -16,8 +16,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareSliceTest.createThenAnonymousResolveReturnsSealedSubtree, ShareSliceTest.listReturnsCallersSharesForTheMemory]
-      http:
-        e2e: [http/sharing/sharing.http]
       web:
         unit: [src/features/memory/share.test.ts]
   - id: anonymous-resolve-decrypt
@@ -32,8 +30,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareSliceTest.gatedBlobAllowsInSubtreeAnd404sOutOfSubtree]
-      http:
-        e2e: [http/sharing/sharing.http]
   - id: soft-revoke-and-expiry
     text: enabled=false or a passed expiresAt makes the resolve AND the gated blob endpoint 404 (same shape as an unknown id — non-enumerable). There is no content-key rotation for a viewer share; content a visitor already downloaded is not retractable (stated limitation).
     coverage:
@@ -53,8 +49,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareSliceTest.createThenAnonymousResolveReturnsSealedSubtree, ShareSliceTest.createRequiresAuth]
-      http:
-        e2e: [http/sharing/sharing.http]
       web:
         unit: [src/features/memory/share.test.ts]
 gaps:

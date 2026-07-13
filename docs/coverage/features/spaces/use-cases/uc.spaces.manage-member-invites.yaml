@@ -15,8 +15,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [MemberInviteManagementSliceTest.ownerListsPendingMemberInvitesNonOwnerIsForbidden, MemberInviteManagementSliceTest.manageOnAnUnknownTenantIs404NotFound]
-      http:
-        e2e: [http/admin/tenant.http]
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: reissue-invite-link
@@ -24,8 +22,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [MemberInviteManagementSliceTest.reissueSupersedesOldSecretAndMintsAUsableFreshLink, MemberInviteManagementSliceTest.reissueAndRevokeOfAnUnknownInviteAre404]
-      http:
-        e2e: [http/admin/tenant.http]
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: revoke-member-invite
@@ -33,8 +29,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [MemberInviteManagementSliceTest.revokeMakesTheSecretNoLongerAcceptableAndDropsItFromTheList, MemberInviteManagementSliceTest.reissueAndRevokeOfAnUnknownInviteAre404]
-      http:
-        e2e: [http/admin/tenant.http]
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
 gaps:

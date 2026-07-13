@@ -63,7 +63,7 @@ crosscutting concern(s), ADR(s), and the specific invariants at risk.
 - [ ] 1 contracts — <scope> · Done when: <verifiable checkpoint>
 - [ ] 2 backend  — <scope> · Done when: <verify command green>
 - [ ] 3 web      — <scope> · Done when: <verify command green>
-- [ ] N coverage — docs/coverage YAML(s) for each `satisfies:` use-case + any http/ acceptance ·
+- [ ] N coverage — docs/coverage YAML(s) for each `satisfies:` use-case ·
       Done when: `python3 scripts/validate_coverage.py` green
 
 ## Definition of done

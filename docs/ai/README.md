@@ -44,10 +44,13 @@ invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
 
 ## Parity & verification surfaces
 
-A feature/use-case is "covered" across **four client surfaces**: `http · web · apple · android`
-(plus `backend`). `http/` holds IntelliJ `.http` files **with response-handler assertions**, so it is
-a real contract-level verification surface, not docs that rot. CR phases follow the dependency order:
-**contracts → backend → http → web → apple → android**.
+A feature/use-case is "covered" across **three client surfaces**: `web · apple · android` (plus
+`backend`). `http/` holds IntelliJ `.http` files with response-handler assertions — a **dev aid** for
+firing requests by hand, **not** a coverage surface: they run in no CI job, so the coverage trust chain
+does not count them ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)); the same
+behaviour is proven by the backend slice tests. CR phases follow the dependency order:
+**contracts → backend → web → apple → android** (a `.http` file may still be written alongside the
+backend as a manual smoke, but it is not a phase gate).
 
 ## Working rules
 

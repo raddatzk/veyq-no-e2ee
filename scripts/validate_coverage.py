@@ -6,9 +6,12 @@ criterion is covered by at least one test, keyed by area then level; uncovered s
 gaps), and that **every** referenced test actually exists — across all surfaces — so dead refs fail early:
     backend            -> "ClassName.method", resolved against *that* class (test file whose stem is
                           ClassName must exist AND contain method)
-    http / web         -> a file path (http rel. to repo root; web rel. to web/)
+    web                -> a file path (relative to web/)
     apple / android    -> a file path (contains '/', rel. to repo root) OR "ClassName.method"
                           (resolved against that class, as backend)
+
+`http` is NOT a coverage surface (ADR 0040): the `.http` files remain IntelliJ dev tooling but run in
+no CI job, so they make no coverage claim — the same behaviour is proven by the backend slice tests.
 
 Class-scoped resolution: a "ClassName.method" ref is checked against the test file whose stem is
 ClassName, not a flat set of every method name on the surface — so a ref pointing at the wrong class
@@ -16,11 +19,12 @@ fails even if some other class happens to have a method of that (generic) name.
 
 Coverage shape (per acceptance criterion):
     coverage:
-      <area>:            # backend | http | web | apple | android
+      <area>:            # backend | web | apple | android
         <level>:         # unit | integration | e2e
           - <ref>        # see resolution rules above
     gaps:
-      <area>: <reason>   # surfaces intentionally not (yet) covered
+      <area>: <reason>   # surfaces with NO coverage ref for this use-case (an area that IS covered
+                         # may not appear here — overlap is a stale gap and fails, ADR 0040)
 """
 import pathlib
 import re
@@ -40,7 +44,7 @@ WEB = ROOT / "web"
 APPLE_TEST_DIRS = [ROOT / "apple" / "Tests", ROOT / "apple" / "UITests"]
 ANDROID = ROOT / "android"
 
-KNOWN_AREAS = {"backend", "http", "web", "apple", "android"}
+KNOWN_AREAS = {"backend", "web", "apple", "android"}
 KNOWN_LEVELS = {"unit", "integration", "e2e"}
 
 errors: list[str] = []
@@ -111,9 +115,6 @@ def _check_class_method(area: str, ref: str, stem_map: dict[str, set[str]], wher
 def check_ref(area: str, ref: str, where: str) -> None:
     if area == "backend":
         _check_class_method(area, ref, backend_methods, where)
-    elif area == "http":
-        if not (ROOT / ref).exists():
-            errors.append(f"{where}: http file not found: {ref}")
     elif area == "web":
         # web refs are file paths relative to web/
         if not (WEB / ref).exists():
@@ -159,6 +160,7 @@ for uc in usecases:
         errors.append(f"{where0}: unknown status '{status}' (omit for implemented, or 'planned')")
     planned = status == "planned"
 
+    covered_areas: set[str] = set()  # areas that carry a coverage ref anywhere in this use-case
     for ac in data.get("acceptanceCriteria") or []:
         acid = ac.get("id", "?")
         where = f"{where0}: criterion '{acid}'"
@@ -167,6 +169,7 @@ for uc in usecases:
         for area, levels in coverage.items():
             if area not in KNOWN_AREAS:
                 errors.append(f"{where}: unknown area '{area}'")
+            covered_areas.add(area)
             if not isinstance(levels, dict):
                 errors.append(f"{where}: area '{area}' must map level -> [refs]")
                 continue
@@ -190,6 +193,11 @@ for uc in usecases:
             errors.append(f"{where0}: gap for unknown area '{area}'")
         if not reason:
             errors.append(f"{where0}: gap for area '{area}' needs a reason")
+        # A gap means "this surface has NO coverage ref for this use-case" (ADR 0040). An area that is
+        # also covered is a stale gap — build-note or deferred-slice prose that no longer belongs here.
+        if area in covered_areas:
+            errors.append(f"{where0}: area '{area}' is both covered and a gap "
+                          f"(a gap must be an uncovered surface; move build-notes/deferred prose out)")
 
 # Orphan coverage files (coverage without a matching use-case).
 for cov in COVERAGE.glob("*/use-cases/uc.*.yaml"):

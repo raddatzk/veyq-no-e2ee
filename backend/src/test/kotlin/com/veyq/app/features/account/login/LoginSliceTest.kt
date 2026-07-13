@@ -122,6 +122,27 @@ class LoginSliceTest {
             .then().statusCode(401).body("code", equalTo("authentication_failed"))
     }
 
+    // --- boundary validation (uc.account.login/boundary-validation) ---
+
+    @Test
+    fun malformedRequestsRejectedAtTheBoundary() {
+        // The spec's x-field-extra-annotation makes @Valid reject malformed input with 400 BEFORE the handler;
+        // these are shape violations, so the response is the container's 400 (no veyq {code}, matching the
+        // .http boundary surface this replaces — cr-0159/ADR 0040 drops http as a coverage surface).
+        // Missing email on the challenge → @NotBlank.
+        given().contentType(ContentType.JSON).body("{}")
+            .`when`().post("/api/login/challenge")
+            .then().statusCode(400)
+        // Malformed email on the challenge → @Email.
+        given().contentType(ContentType.JSON).body("""{"email":"not-an-email"}""")
+            .`when`().post("/api/login/challenge")
+            .then().statusCode(400)
+        // Non-base64 signature on verify → @Pattern, rejected before any nonce lookup.
+        given().contentType(ContentType.JSON).body("""{"email":"$EMAIL","signature":"not base64!!"}""")
+            .`when`().post("/api/login/verify")
+            .then().statusCode(400)
+    }
+
     // --- token rotation + reuse detection ---
 
     @Test

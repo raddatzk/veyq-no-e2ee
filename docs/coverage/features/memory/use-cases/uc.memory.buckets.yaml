@@ -15,8 +15,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [MediaBucketsSliceTest.uploadStampsOwnerKeyAndMaterializesPrimary]
-      http:
-        e2e: [http/media/buckets.http]
       web:
         unit: [src/features/memory/media.buckets.test.ts]
   - id: derived-primary-buckets
@@ -49,8 +47,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/media.buckets.test.ts]
 gaps:
-  backend: "Built (cr-0113); curation authz relaxed (cr-0123). V35 veyq_bucket + veyq_media.bucket_id/created_by; BucketEntity; store ensurePrimaryBucket/listBuckets/createSubBucket/renameBucket/deleteBucketReparent/moveMedia (move now derives the shared source owner + requires the target to match — no cross-owner); BucketsResource; createBucket takes parentBucketId (nest under any primary root); rename/delete gate on is_primary only (any member, sub only). MediaBucketsSliceTest (9). No schema change (pure authz). media.share_identity_id left untouched."
-  http: "Built (cr-0113). buckets.http asserts the 401 auth boundary of the five endpoints; the authenticated happy-path + own-bucket authz are at MediaBucketsSliceTest (the scope-grant flow isn't reproducible from a bare .http, per trash.http)."
-  web: "Built (cr-0113); action-bar redesign (cr-0122) + curation wiring (cr-0123). media.ts bucket wrappers (createBucket now takes parentBucketId) + openBucketName unseal; MediaItem carries ownerKey/bucketId; the Beiträge tab (MemoryBuckets.vue) is a full organizer — bucket picker + bucket-action buttons, per-tile selection, a select-all toggle, visible Move (same-owner targets) / Delete (soft-delete to trash + local undo). media.buckets.test.ts unit-tests the unseal + wrappers; MemoryBuckets.test.ts covers selection/delete-undo + the contributor move-gating. A full live Beiträge-tab click-through is pending the dev backend."
   apple: "Not built. Native buckets are Apple's own later CR (web-first, ADR 0010); the data layer carries ownerKey/bucketId + the bucket endpoints after regen."
   android: "Not built. Native buckets are Android's own later CR (web-first, ADR 0010); the data layer carries ownerKey/bucketId + the bucket endpoints after regen."

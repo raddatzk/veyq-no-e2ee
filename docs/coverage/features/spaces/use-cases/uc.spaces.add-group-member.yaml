@@ -11,13 +11,11 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.addGroupMemberUnknownUsernameIs404] }
       web: { unit: [src/features/spaces/members.test.ts] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: admit-group-member
     text: The GroupOwner adds a resolved member → the server records a grant-less GROUP membership (role=MEMBER); no key crosses the wire, and the group name stays sealed. A non-owner caller is rejected; adding an existing member is a no-op.
     coverage:
       backend: { integration: [ScopesSliceTest.addGroupMemberByUsernameRecordsGrantlessMember, ScopesSliceTest.addGroupMemberNonOwnerIs403, ScopesSliceTest.addGroupMemberAlreadyMemberIs409] }
       web: { unit: [src/features/spaces/members.test.ts] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: auto-deliver-group-grant
     text: The admitted member lands grant-less (hasGrant=false, "awaiting access") in the group directory — the input the grant-delivery reconciler (cr-0076) picks up to wrap K_SC, first-online-wins; the delivery wrap itself is the shared primitive's coverage (cr-0076/0079).
     coverage:

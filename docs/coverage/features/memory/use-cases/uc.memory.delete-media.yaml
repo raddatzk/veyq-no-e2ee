@@ -12,13 +12,11 @@ acceptanceCriteria:
     text: Any member of the scope may trash a media item — the server marks it trashed (deleted_at + deleted_by), it leaves listNodeMedia and the delete-reconcile id-set, and bumps the node's delete_revision so every open gallery drops the tile on its next poll (uc.memory.live-updates). Operator-blind — a flag flip, no content, no key. A non-member gets a non-enumerable 404; unauthenticated is 401.
     coverage:
       # Server-side trash semantics (flag flip + drop from list/id-set + revision bump + non-member 404 +
-      # unauth 401) are proven by the backend slice + the http e2e. The lightbox UI affordance that emits the
+      # unauth 401) are proven by the backend slice. The lightbox UI affordance that emits the
       # delete lives in MediaLightbox.test.ts but belongs to lightbox-delete-and-hotkey (which cites it); it
       # proved no server behaviour here, so the tangential web ref is removed.
       backend:
         integration: [MediaTrashSliceTest.trashHidesFromListBumpsBothCountersAndDropsFromIdSet, MediaTrashSliceTest.deleteByNonMemberIs404, MediaTrashSliceTest.unauthenticatedDeleteIs401]
-      http:
-        e2e: [http/media/trash.http]
   - id: restore-from-trash
     text: Any member may restore a trashed media before it is purged — clearing deleted_at, bumping the revision — and the tile returns to the gallery in its date position (its blobs were never removed, only the flag flipped). Restoring an already-purged media is a 404.
     coverage:
@@ -57,6 +55,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/memoryCover.test.ts]
 gaps:
-  web: "Built (cr-0110). media.ts deleteMedia/restoreMedia/listTrash wrappers; MediaLightbox trash button + Delete/Backspace hotkey (respecting suspendKeys, hidden when readonly) + the delete emit — unit-tested (MediaLightbox.test.ts). The MemoryDetail glue — optimistic grid+lightbox removal, the undo snackbar, the lazy Trash tab + Restore — is verified by the cr-0110 live smoke on veyq.localhost (trash from the lightbox drops the tile + advances + undo restores; the Trash tab lists the trashed photo + restores it; operator-blind at the DB: only deleted_at/deleted_by, ciphertext intact until purge). Surfacing the trasher's display name (self vs. other) is deferred — deleted_by is carried in the data, but a friendly name needs a username resolve. cr-0111 added the member-expedited purge (media.ts purgeMedia; backend MediaTrashSliceTest.purge*) and redesigned the Trash tab onto the shared MediaGrid (per-tile checkbox batch-select + a 3-dot Restore/Delete-forever menu + a batch toolbar + a purge confirm dialog) — the redesign UI is cr-0111-live-smoke-verified on veyq.localhost. cr-0111 also fixed the upload per-file reconcile (uploadQueue onFileDone → a targeted poll; unit-tested in uploadQueue.test.ts) and the trashed-still-in-grid race (a client-side pendingDelete tombstone in MemoryDetail filtered in upsertItems/mergeItems; smoke-verified)."
   apple: "Not built. Native gallery/delete/trash is Apple's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."
   android: "Not built. Native gallery/delete/trash is Android's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."

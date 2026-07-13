@@ -58,11 +58,7 @@ acceptanceCriteria:
     text: A non-member of the scope gets 404; an unauthenticated caller gets a generic 401.
     coverage:
       backend: { integration: [NodesSliceTest.nonMemberIs404, NodesSliceTest.unauthenticatedIs401] }
-      http: { e2e: [http/content/content.http] }
   - id: delete-scoped-to-node
     text: Deleting a node is bound to the node's own scope — a member of a different scope cannot delete it by addressing it through their own scope; the cross-scope delete is refused (404, non-enumerable) and the foreign node survives.
     coverage:
       backend: { integration: [NodesSliceTest.crossScopeDeleteIsRejected] }
-gaps:
-  apple: "Shell UI built (cr-0034, compiles on iOS + macOS) over the covered data layer; browse logic is unit-covered (MemoryBrowseTests — level + breadcrumb derivation AND the drill path-stack navigation: navigate-to-crumb + step-back-on-delete, cr-0038). The remaining gap is a live UITest round-trip exercising the shell UI end-to-end; favorites/settings/switcher are later slices."
-  android: "Shell UI built (cr-0039, `:app:assembleDebug` green) over the covered data layer; browse logic is unit-covered (MemoryBrowseTest). A live UITest round-trip + favorites/settings/switcher are pending."

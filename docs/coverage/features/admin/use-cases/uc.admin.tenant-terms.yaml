@@ -14,12 +14,10 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantTermsSliceTest.ownerSetsTermsBumpsVersionAndIdempotentReSaveDoesNot, TenantTermsSliceTest.nonOwnerCannotUpdateTerms] }
       web: { unit: [src/features/admin/createTenant/terms.test.ts] }
-      http: { e2e: [http/admin/tenant-terms-authed.http] }
   - id: version-bumped-on-change
     text: Saving normalizes the markdown and bumps terms_version only when it actually changed (an idempotent re-save does not bump — the pre-E2EE logic). The higher version re-gates every member.
     coverage:
       backend: { integration: [TenantTermsSliceTest.ownerSetsTermsBumpsVersionAndIdempotentReSaveDoesNot] }
-      http: { e2e: [http/admin/tenant-terms-authed.http] }
   - id: operator-blind
     text: The terms text is the operator's public policy (served, no content key); terms_version is a plain int. No user content, no E2EE key — the operator-blind boundary is unaffected (ADR 0035).
     coverage:

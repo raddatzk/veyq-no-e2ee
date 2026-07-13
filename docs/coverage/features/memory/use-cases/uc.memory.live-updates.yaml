@@ -20,7 +20,6 @@ acceptanceCriteria:
         unit:
           - src/features/memory/media.test.ts
           - src/features/memory/mediaRevisionPolling.test.ts
-      http: { e2e: [http/media/live-updates.http] }
   - id: keyset-delta-on-change
     text: On a revision change the server returns only media with updated_at past the client's (updatedAt, mediaId) cursor — a keyset delta, not the whole list — so an active upload by another member streams the few new items each poll. The client upserts by mediaId and advances the cursor. Requires a new veyq_media.updated_at (= created_at at attach, bumped on meta edit).
     coverage:
@@ -61,6 +60,5 @@ acceptanceCriteria:
         unit:
           - src/features/memory/media.test.ts
 gaps:
-  web: "Built (cr-0107): a mediaRevisionPolling loop (interval + visibility gate, mirroring grantDeliveryPolling) wired into MemoryDetail — the initial full load caches both revisions + the (updatedAt,mediaId) cursor; each poll sends If-None-Match (media_revision) + since (cursor) + sinceDelete (delete_revision), skips on 304, upserts the keyset delta via listMediaPage, and drops cached ids absent from the id-set when a delete advanced delete_revision. Unit-tested: the conditional-GET data layer + newestCursor + the 304 fast path (media.test.ts), the visibility-gated poll loop start/stop (mediaRevisionPolling.test.ts), and the gallery wiring (MemoryDetail.test.ts). A full two-member live smoke against the real V33 backend confirmed the wire end-to-end: a curator held the gallery open in the browser while a second actor drove the public-share CONTRIBUTOR path over the API (share.ts resolve→identity→addSharePhoto/deleteSharePhoto). Observed on the curator's Network + the DB: idle polls short-circuit to 304 (and the poll pauses while the tab is hidden, resuming on visibilitychange); the contributor's API upload surfaces cross-member (2 Objekte); its API delete (deleteContributedMedia) bumps both counters (DB media_revision 2→3, delete_revision 0→1) and the curator's poll returns {media:[], mediaRevision:3, deleteRevision:1, mediaIds:[kept]} → the tile drops (2→1); a second upload returns {media:[new], mediaRevision:4, deleteRevision:1, mediaIds:null} (delta-only, no id-set on a pure add) → the tile auto-inserts (1→2). All matched the design."
   apple: "Live updates are web-first — native parity is a deferred catch-up (platform-parity). The native gallery UI itself is not built yet (its own later CR), so there is nothing to keep live."
   android: "Live updates are web-first — native parity is a deferred catch-up (platform-parity). The native gallery UI itself is not built yet (its own later CR), so there is nothing to keep live."

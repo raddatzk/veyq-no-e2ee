@@ -6,22 +6,18 @@ acceptanceCriteria:
     text: A fresh instance reports setupRequired=true and advertises the supported suites.
     coverage:
       backend: { integration: [SetupServerSliceTest.setupRequiredInitially] }
-      http: { e2e: [http/admin/setup.http] }
   - id: create-owner-and-complete
     text: A valid request creates the Server Owner (201) and marks setup complete.
     coverage:
       backend: { integration: [SetupServerSliceTest.createsOwner, SetupServerSliceTest.setupNoLongerRequired] }
-      http: { e2e: [http/admin/setup.http] }
   - id: single-owner-lock
     text: A second owner is rejected with 409 once setup is complete.
     coverage:
       backend: { integration: [SetupServerSliceTest.rejectsSecondOwner] }
-      http: { e2e: [http/admin/setup.http] }
   - id: reject-non-base64-key
     text: Non-base64 key material is rejected (400).
     coverage:
       backend: { integration: [SetupServerSliceTest.rejectsNonBase64Key] }
-      http: { e2e: [http/admin/setup.http] }
   - id: reject-invalid-email
     text: A malformed email is rejected at the boundary (400).
     coverage:

@@ -31,8 +31,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareContributorSliceTest.contributeFlowAttachesStampsIdentityAndSurfacesInResolve, ShareContributorSliceTest.badTokenRejectedOnUpload]
-      http:
-        e2e: [http/sharing/contribute.http]
   - id: direct-append-attribution
     text: Contributed media attaches to the shared Memory root node (share.nodeId), stamped with the contributor's share_identity_id, and appears immediately (direct-append, no review gate). The anonymous resolve returns each media with its identityId and each identity's sealed name; v1 renders all contributed media inline (the buckets grouping UI is deferred, the identity link is the hook).
     coverage:
@@ -50,8 +48,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareContributorSliceTest.viewerShareRejectsContribution, ShareContributorSliceTest.revokeStopsContribution]
-      http:
-        e2e: [http/sharing/contribute.http]
   - id: role-mutable-in-place
     text: A curator changes an existing share's role in place (VIEWER <-> CONTRIBUTOR) via PATCH updateShare { role } (cr-0119, ADR 0036) — the same link / wrap / K_share are untouched (role is server-enforced plaintext authz, no re-crypto), so the new grant bites on the next guest request (a promote enables contribution at once; a demote 403s new uploads, already-contributed photos stay). Restricted to VIEWER <-> CONTRIBUTOR - setting role=UPLOADER, or changing an UPLOADER share's role, is 422 invalid_role_change (the write-only drop-box is its own separate action, its promise not flippable on distributed links). Owner-gated (a non-owner is 404, like the note edit); role is optional on the PATCH (omitted for a plain note/name edit). Web - the normal edit dialog shows the VIEWER/CONTRIBUTOR switcher (never the uploader variant).
     coverage:

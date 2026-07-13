@@ -17,18 +17,15 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantTermsSliceTest.memberAcceptsThenABumpReStalesAndAStaleAcceptIs409] }
       web: { unit: [src/features/admin/createTenant/terms.test.ts] }
-      http: { e2e: [http/admin/tenant-terms-authed.http] }
   - id: accept-recorded-server-side
     text: Accepting records the member's accepted_terms_version = the current terms_version (+ accepted_at) server-side, keyed by (user_id, tenant_id). The gate then clears and the shell renders.
     coverage:
       backend: { integration: [TenantTermsSliceTest.memberAcceptsThenABumpReStalesAndAStaleAcceptIs409] }
       web: { unit: [src/features/admin/createTenant/terms.test.ts] }
-      http: { e2e: [http/admin/tenant-terms-authed.http] }
   - id: re-accept-on-version-bump
     text: When the operator bumps terms_version, the member's stored acceptance is now stale, so the gate re-appears; accepting the now-stale version is refused (409 terms_version_changed) until they re-read and re-accept the current one.
     coverage:
       backend: { integration: [TenantTermsSliceTest.memberAcceptsThenABumpReStalesAndAStaleAcceptIs409] }
-      http: { e2e: [http/admin/tenant-terms-authed.http] }
   - id: operator-blind
     text: accepted_terms_version is coarse operational metadata (like membership), never content; the terms text itself is public. A non-member read/accept is 404 (indistinguishable), and no server record is kept for an accountless visitor (anonymity preserved).
     coverage:

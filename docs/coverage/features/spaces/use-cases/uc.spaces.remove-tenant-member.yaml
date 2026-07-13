@@ -20,7 +20,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.nonOwnerForbiddenAndUnknownMemberNotFound] }
       web: { unit: [src/features/spaces/members.test.ts] }
-      http: { e2e: [http/admin/tenant.http] }
   - id: orphan-transfer
     text: A group the removed member solely owned that still has other members auto-transfers OWNER to the oldest remaining member (earliest createdAt); the group carries on, the tenant owner never gains access.
     coverage:
@@ -37,7 +36,6 @@ acceptanceCriteria:
     text: The last tenant OWNER cannot be removed (a tenant keeps ≥1 owner); the action is rejected (409 last_owner).
     coverage:
       backend: { integration: [MemberRemoveSliceTest.lastTenantOwnerCannotBeRemoved] }
-      http: { e2e: [http/admin/tenant.http] }
   - id: coshared-group-rotation
     text: >
       A removed member's co-shared GROUPs each queue a SCOPE_ROTATION job on the operator-blind task queue (the
@@ -48,13 +46,10 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [MemberRemoveSliceTest.removalQueuesRotationOnlyForCoSharedGroupsNotOwnScopesOrTenant, MemberRemoveSliceTest.queuedRotationClaimableByRemainingKeyHolderOnlyThenCompletionClearsIt, MemberRemoveSliceTest.secondRemovalCoalescesIntoTheOneLiveRotationJob] }
       web: { unit: [src/features/tasks/scopeRotationWorker.test.ts], e2e: [src/features/tasks/scopeRotation.e2e.test.ts] }
-      http: { e2e: [http/tasks/tasks.http] }
   - id: operator-blind
     text: The server only deletes/soft-deletes opaque rows + flips a lifecycle timestamp — never a key or a name; the tenant key is not rotated.
     coverage:
       backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.scopePurgeErasesTheGraceTombstonedOwnScope] }
 gaps:
-  web: "The remove action + data layer are delivered (cr-0091) and the owner→member remove→drop-out round-trip was verified live; the deeper two-account LIVE smoke (the removed member signs in and still reads their own grace-tombstoned space read-only) is verified interactively, not in CI."
-  http: "The removeTenantMember unauth boundary is covered headless; the owner-gated cascade + 403/404/409 boundaries need a signed owner session and are covered by MemberRemoveSliceTest."
   apple: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."
   android: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."

@@ -10,7 +10,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.deleteGroupSoftThenRestoreWithReadOnlyGrace, ScopesSliceTest.deleteRestoreGuards] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: grace-read-only-viewable
     text: During the grace window the group stays listed + readable but read-only (create/update/delete node rejected 409 scope_deleting) and carries deletedAt/purgeAfter so the client marks it.
     coverage:
@@ -29,6 +28,5 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.purgeErasesExpiredScopeAndContentButKeepsFreshOnes] }
 gaps:
-  web: "The web danger-zone/banner/restore UI is delivered (cr-0090); the interactive LIVE smoke (owner deletes → a member still views the marked group → owner restores → the scheduled purge erases it) is verified interactively, not in CI."
   apple: "Group lifecycle is web-first — not built natively (own CR later), like the rest of the groups epic."
   android: "Group lifecycle is web-first — not built natively (own CR later), like the rest of the groups epic."

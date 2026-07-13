@@ -7,7 +7,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.listMyTenantsReturnsTheCallersTenants] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: list-spaces
     text: GET /api/scopes lists the member's scopes in the active tenant (the TENANT root + their PERSONAL scope), each with the caller's own role (cr-0087 — lets the settings hub list the groups they own).
     coverage:
@@ -25,7 +24,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.createGroupThenListShowsItWithSealedNameAndSelfGrant, ScopesSliceTest.createGroupNonMemberIs404] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: list-groups-in-switcher
     # cr-0032 (G1): groups appear in the sidebar switcher; each name is decrypted on-device from GET /api/scopes.
     text: The member's groups are listed in the switcher with their names decrypted on-device; the server row carries only the ciphertext name (sealed under the group's own K_SC) — a group is entered via the `#@<id>` fragment.
@@ -58,13 +56,9 @@ acceptanceCriteria:
     text: The scope endpoints reject an unauthenticated caller with a generic 401.
     coverage:
       backend: { integration: [ScopesSliceTest.unauthenticatedIs401] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: mobile-nav-sheet
     # cr-0084: below the compact threshold the inline nav is CSS-hidden, so a hamburger opens a bottom sheet with
     # the full navigation (ported from the design source; CSS already vendored). Keeps Personal reachable on a phone.
     text: On a narrow viewport a hamburger opens a bottom-sheet with the full navigation — the active-tenant row (which enters the shared Tenant home, cr-0108), other tenants to switch to, Personal, and favorites; each item navigates and closes the sheet.
     coverage:
       web: { unit: [src/components/app/AppSidebar.test.ts] }
-gaps:
-  apple: "Scope data layer covered (ScopesTests); the tenant switcher (my-tenants), per-space UI switching, the token-less tenant home + Personal ↔ Tenant switching (cr-0075), and group create/list/switch (cr-0032) are web-first — not built natively."
-  android: "Scope data layer covered (ScopesTest); the tenant switcher (my-tenants), per-space UI switching, the token-less tenant home + Personal ↔ Tenant switching (cr-0075), and group create/list/switch (cr-0032) are web-first — not built natively."

@@ -41,8 +41,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareUploaderSliceTest.uploaderNamesUploadsAttachesStampedAndDeletesOwn, ShareUploaderSliceTest.foreignIdentityDeleteIs404, ShareUploaderSliceTest.badTokenDeleteIs403]
-      http:
-        e2e: [http/sharing/uploader.http]
       web:
         unit: [src/features/memory/share.test.ts, src/features/memory/uploadQueue.test.ts]
   - id: ephemerality-warned

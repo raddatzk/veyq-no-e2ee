@@ -13,12 +13,10 @@ acceptanceCriteria:
     text: A person turns on an account-global "ask before adding me to groups" preference (default off); a server-visible boolean (operational metadata, no key/content). With it off, add is the direct-add of uc.spaces.add-group-member.
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.accountConsentToggleRoundTrips, ConsentGroupAddSliceTest.consentOffIsUnchangedDirectAdd] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: soft-membership-gates-key
     text: With consent on, a GroupOwner's add records a SOFT (pendingConsent) grant-less membership; grant-delivery SKIPS soft memberships, so K_SC is never wrapped to a pending invitee (consent-first, never wrap-then-soft). The gate holds on the ROTATION path too — a scope-key rotation never (re-)grants a pendingConsent row (cr-0095). A consent-on target added without a wrapped name-key is rejected (consent_required).
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.consentOnAddRecordsSoftRowAndGrantDeliverySkipsIt, ConsentGroupAddSliceTest.consentRequiredWithoutSealIs400, ConsentGroupAddSliceTest.rotationNeverGrantsAPendingProposal] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: derived-name-key
     text: The owner's device derives the group's name-key K_name = HKDF(E_e, "group-name-key") from the name's content-epoch key and wraps IT (not a name copy) to the invitee's identity (asymWrap under the distinct `group-name-key` AAD context). The invitee unwraps K_name and opens the scope's CANONICAL encryptedName — the SAME ciphertext the members read — so a modified owner cannot privately show a divergent name (ADR 0027). Domain-separated from `scope-grant` (a name-key wrap can never open as a key-grant); K_name leaks the name and nothing else (HKDF one-way — not E_e, not K_SC). The invitee never receives K_SC and no plaintext name reaches the server.
     coverage:
@@ -28,12 +26,10 @@ acceptanceCriteria:
     text: Accept clears pendingConsent → the proposal becomes a normal grant-less membership → ordinary grant-delivery wraps K_SC (awaiting access → Active), identical to direct-add from there. Re-accept is an idempotent no-op.
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.acceptFlipsToDeliverableAndClearsTheInvitation] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: decline-silent-drop
     text: Decline deletes the soft membership with no trace (no "declined" state) and no rotation; nothing was ever wrapped. A re-invite later is allowed (a fresh proposal). Decline with no open proposal is still a silent 204 (no enumeration); accept with none is 404.
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.declineDropsTheSoftRowWithNoTraceAndNoRotation, ConsentGroupAddSliceTest.acceptWithNoProposalIs404] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: owner-only-pending
     text: A pendingConsent invitee is visible in the group's member directory as "awaiting consent" to group OWNERS only; ordinary key-holders in the group do not see them until they accept.
     coverage:

@@ -47,8 +47,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [TasksSliceTest.grantDeliveryOriginatedOnGrantlessMembershipThenClaimedAndCompletedIdempotently, TasksSliceTest.grantDeliveryCompletionWithoutAWrapIs400]
-      http:
-        e2e: [http/tasks/tasks.http]
       web:
         unit: [src/features/tasks/grantDeliveryWorker.test.ts]
   - id: admission-vs-delivery
@@ -69,6 +67,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/tasks/grantDeliveryWorker.test.ts]
 gaps:
-  http: "Built where reproducible from a bare .http (cr-0076): http/tasks/tasks.http asserts the tasks auth boundary + validation + no-grant/non-member/unknown-job paths. The full happy-paths that need the ML-KEM scope-grant flow (grant-delivery's claim→wrap→complete, and the member cold-birth register→join) are NOT reproducible from a bare .http (same wall content.http hit) — proven at the integration layer (TasksSliceTest / MemberAddSliceTest, which drive the loop over the HTTP stack). A scripted add-member .http can follow if the harness gains an ML-KEM wrap."
   apple: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Apple's own later CR (web-first, ADR 0010)."
   android: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Android's own later CR (web-first, ADR 0010)."

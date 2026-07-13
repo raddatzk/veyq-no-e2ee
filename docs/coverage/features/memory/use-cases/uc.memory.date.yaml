@@ -48,7 +48,5 @@ acceptanceCriteria:
         unit:
           - src/features/memory/memoryDate.test.ts
 gaps:
-  http: "No new endpoint — the sealed date folds into the existing createNode / updateNode / listNodes (a MEMORY/CHAPTER now round-trips an extra opaque `wrappedMeta` field), whose contract-level e2e is covered by uc.memory.browse's http surface. The blind round-trip of the field is asserted at the backend integration level (NodesSliceTest); no date-specific .http file is added."
   apple: "Data layer carries `wrappedMeta` after contract regen, but the native date UI (4-mode editor, card range, sort) is not built — web-first (ADR 0010); it is Apple's own later CR."
   android: "Data layer carries `wrappedMeta` after contract regen, but the native date UI is not built — web-first (ADR 0010); it is Android's own later CR."
-  web: "Date slice built (cr-0067): sealed `wrappedMeta` seal/unseal under K_mem, the 4-mode header editor (IsoDateField ported from the design source), the materialized `auto` range with open-time + post-upload self-heal, and the browse card range + date-sort — all unit-tested with real v1 crypto and mocked content/media APIs. Remaining gap: the aggregated cross-chapter timeline is a later CR; the live browser smoke (upload dated media → auto range materializes + card shows it + grid sorts + wrapped_meta sealed) was confirmed per the CR done-gate."

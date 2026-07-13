@@ -14,8 +14,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareSharedScopeSliceTest.groupMemberCanShareAndAnonymousResolveWorks, ShareSliceTest.nonMemberCreateIs404, ShareSliceTest.folderNodeIsRejected]
-      http:
-        e2e: [http/sharing/sharing.http]
       web:
         unit: [src/features/memory/share.test.ts]
   - id: removal-deactivates-shares
@@ -28,8 +26,6 @@ acceptanceCriteria:
     coverage:
       backend:
         integration: [ShareSharedScopeSliceTest.reactivateByAnotherMemberTransfersOwnershipAndResolves, ShareSharedScopeSliceTest.reactivateByNonMemberIs404]
-      http:
-        e2e: [http/sharing/sharing.http]
       web:
         unit: [src/features/memory/share.test.ts]
   - id: follows-new-content

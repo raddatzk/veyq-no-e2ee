@@ -9,7 +9,6 @@ acceptanceCriteria:
     text: A Server Owner creates a PENDING tenant (201) with an owner invite.
     coverage:
       backend: { integration: [TenantsSliceTest.createReturns201Pending] }
-      http: { e2e: [http/admin/tenant-authed.http] }
       web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts] }
   - id: reject-duplicate-domain
     text: A domain already mapped to a tenant is rejected (409 domain_taken).
@@ -24,7 +23,6 @@ acceptanceCriteria:
     text: A Server Owner lists all tenants with each one's current invite status.
     coverage:
       backend: { integration: [TenantsSliceTest.listIncludesCreatedTenantWithActiveInvite] }
-      http: { e2e: [http/admin/tenant-authed.http] }
       # cr-0050/cr-0087: the Server → Tenants collection in the settings hub lists all tenants; Server-Owner-gated
       # by the backend 403 + the client serverRole probe.
       web: { unit: [src/views/SettingsHubView.test.ts] }
@@ -32,17 +30,14 @@ acceptanceCriteria:
     text: Resend soft-supersedes the current ACTIVE invite and mints a fresh ACTIVE one (one ACTIVE kept).
     coverage:
       backend: { integration: [TenantsSliceTest.resendSupersedesOldInviteAndKeepsOneActive] }
-      http: { e2e: [http/admin/tenant-authed.http] }
   - id: reassign-rebinds-email
     text: Reassign re-binds the owner email and supersedes the prior invite.
     coverage:
       backend: { integration: [TenantsSliceTest.reassignRebindsEmailAndSupersedes] }
-      http: { e2e: [http/admin/tenant-authed.http] }
   - id: revoke-pending-tenant
     text: A pending tenant is revoked (204) and disappears; a follow-up action returns 404.
     coverage:
       backend: { integration: [TenantsSliceTest.revokePendingTenantDeletesIt] }
-      http: { e2e: [http/admin/tenant-authed.http] }
   - id: server-owner-only
     text: A signed-in non-owner is refused (403 not_server_owner).
     coverage:
@@ -51,17 +46,14 @@ acceptanceCriteria:
     text: An unauthenticated caller is refused (401), and auth is checked before tenant lookup.
     coverage:
       backend: { integration: [TenantsSliceTest.unauthenticatedIs401] }
-      http: { e2e: [http/admin/tenant.http] }
   - id: reject-invalid-domain
     text: A malformed domain is rejected at the boundary (400).
     coverage:
       backend: { integration: [TenantsSliceTest.invalidDomainIs400] }
-      http: { e2e: [http/admin/tenant.http] }
   - id: unknown-tenant-404
     text: An action on an unknown tenant id returns 404 tenant_not_found.
     coverage:
       backend: { integration: [TenantsSliceTest.resendOnUnknownTenantIs404] }
-      http: { e2e: [http/admin/tenant-authed.http] }
   - id: invite-purge
     text: Overdue ACTIVE invites are expired and terminal-state invites are purged on a schedule.
     coverage:
@@ -96,18 +88,10 @@ acceptanceCriteria:
     text: An unknown bootstrap secret returns 404 invite_not_found (public preview/register reach the handler).
     coverage:
       backend: { integration: [TenantAcceptSliceTest.unknownSecretIs404] }
-      http: { e2e: [http/admin/tenant.http] }
   - id: accept-requires-auth
     text: The existing-user accept endpoint requires a session (401 when anonymous).
     coverage:
       backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
-      http: { e2e: [http/admin/tenant.http] }
 gaps:
-  web: Slice A is automation-covered (cr-0038, cr-0050, cr-0087) — facade unit tests (tenants.test.ts) + component
-    acceptance for the create→PENDING flow (CreateTenantDialog.test.ts shapes the call). In the settings hub the
-    Server → Tenants **collection** lists tenants (SettingsHubView.test.ts) and each tenant's **detail** page
-    handles resend/reassign/revoke (TenantDetailPanel.test.ts — PENDING invite controls + copyable link,
-    confirm-gated revoke, 403 not-authorized, 401-redirect). All Server-Owner-gated by the backend 403. Slice B activation UI (TenantJoinView — register/sign-in accept building the identity + cold
-    grant) is still backend-only here; its component harness is pending.
   apple: not built yet — web-first slice; native parity is a later CR
   android: not built yet — web-first slice; native parity is a later CR

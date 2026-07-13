@@ -29,7 +29,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ShareNoteSliceTest.ownerEditsTheNoteInPlaceAtTheSameShareId, ShareNoteSliceTest.editingWithNullClearsTheNote, ShareNoteSliceTest.aNonOwnerEditIs404AndLeavesTheNoteUnchanged, ShareNoteSliceTest.renameViaUpdateShareChangesTheNameKeepsTheNoteAndTheLink] }
       web: { unit: [src/features/memory/share.test.ts] }
-      http: { e2e: [http/sharing/sharing.http] }
   - id: operator-blind
     text: The server stores only ciphertext — sealed_note (per-locale) + sealed_share_name + sealed_share_key (openable only with K_mem, which the operator lacks); K_share is never in the clear, the name is never served to the viewer, and updateShare swaps one ciphertext for another. No key or plaintext crosses the boundary (ADR 0036).
     coverage:

@@ -6,7 +6,6 @@ acceptanceCriteria:
     text: Trusting a device enrols a DEVICE wrap (it appears in the caller's key material) backed by a non-extractable device key.
     coverage:
       backend: { integration: [AccountWrapsSliceTest.addDeviceWrapAppearsInKeyMaterialAndReturnsId] }
-      http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
       apple: { unit: [TrustDeviceTests.testTrustThenDeviceUnlockRoundTrip], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
       android: { unit: [TrustDeviceTest.trustThenDeviceUnlockRoundTrip, DeviceSecurityStoreTest.l1EnrolCommitClearRoundTrip], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
@@ -44,7 +43,6 @@ acceptanceCriteria:
     text: Untrusting removes that device's wrap by id (and the local key); other devices keep theirs.
     coverage:
       backend: { integration: [AccountWrapsSliceTest.deleteByIdRemovesTheWrap] }
-      http: { e2e: [http/account/authed-flow.http] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
       apple: { unit: [TrustDeviceTests.testUntrustRemovesWrapAndRecord], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
       android: { unit: [TrustDeviceTest.untrustRemovesWrapAndRecord], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
@@ -60,8 +58,5 @@ acceptanceCriteria:
     text: Adding/removing wraps requires authentication; a malformed or non-DEVICE add is rejected at the boundary (400).
     coverage:
       backend: { integration: [AccountWrapsSliceTest.unauthenticatedAddAndDeleteAre401, AccountWrapsSliceTest.nonDeviceMethodIsRejected] }
-      http: { e2e: [http/account/trust-device.http] }
-# Note: the authed add (201 + id) / untrust (204) round-trip IS now on the http surface —
-# account/authed-flow.http obtains a real session by signing the nonce in-client via _lib/ed25519.js
-# (fresh-instance, cr-0013), alongside the backend slice and the web round-trip (and the live preview
-# smoke). trust-device.http still covers the signature-free 401/400 boundaries above.
+# Note: the authed add (201 + id) / untrust (204) round-trip is covered by the backend slice and the web
+# round-trip (and the live preview smoke).

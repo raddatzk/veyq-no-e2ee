@@ -25,7 +25,6 @@ acceptanceCriteria:
     text: Only a GROUP OWNER may rename (403 not_scope_owner for a MEMBER; ADR 0014 sec.4 — the owner is the name authority). A rename on a pending-deletion group is rejected (409 scope_pending_deletion, name-write blocked during the grace period, uc.spaces.delete-group A4). The unauthenticated boundary is 401 before the body.
     coverage:
       backend: { integration: [ScopesSliceTest.renameNonOwnerIs403, ScopesSliceTest.renamePendingDeletionIs409] }
-      http: { e2e: [http/spaces/scopes.http] }
   - id: name-only-no-rotation
     text: A rename is name-only — it does NOT rotate K_SC and re-grants no member (unlike a removal). It overwrites two fields on one scope row; no epoch-chain link, no per-member wrap (currentEpoch is unchanged by a rename). Operator-blind — the server sees new opaque ciphertext + a bumped small integer, never the name or a key.
     coverage:
