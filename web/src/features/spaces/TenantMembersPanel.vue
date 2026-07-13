@@ -4,9 +4,8 @@
 // email dialog. Markup + classes mirror the create-tenant admin panel (settings-section-header + veyq-list-row +
 // veyq-badge). Operator-blind: only operational metadata is shown — pubkeys/roles/grant-present, never a key.
 // Admission (invite) is owner-only (the backend 403s otherwise); the directory is any key-holder's.
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -14,7 +13,6 @@ import InviteMemberDialog from './InviteMemberDialog.vue'
 import {
   listMemberInvites,
   listScopeMembers,
-  memberError,
   reissueMemberInvite,
   removeTenantMember,
   revokeMemberInvite,
@@ -26,28 +24,18 @@ import { activeSpace, activeScopeKey } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
 import { unsealName, type MemberName } from '../account/profile/profile'
-import { trustStates, type TrustState } from '../account/identityPins'
+import { isUnauthorized } from '../../shared/httpError'
+import { useMemberDirectory } from './useMemberDirectory'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 const { t } = useI18n()
-const router = useRouter()
 
-const members = ref<ScopeMember[]>([])
 // Locally-decrypted real names (first+last) keyed by userId — the sealed blob opened with K_tenant on-device.
 const names = ref<Record<string, MemberName | null>>({})
 const pendingInvites = ref<PendingMemberInvite[]>([])
-const loading = ref(true)
-const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const notice = ref('')
 const actionError = ref('')
-const isOwner = ref(false)
 const inviteOpen = ref(false)
-// Identity trust (cr-0099): per-member trust state from the sealed pin store. Only the `changed` state is surfaced
-// (a key differing from the pin); verified/recognized are intentionally not shown (proactive verify returns gated
-// behind scope-wide strict-mode, cr-0100). Drives the changed-key review dialog.
-const trust = ref<Record<string, TrustState>>({})
-const reviewTarget = ref<ScopeMember | null>(null)
-const reviewOpen = ref(false)
 
 // After a re-issue, show the fresh invite link to copy (cr-0080) — the owner hands it off again, no mailer.
 const reissueUrl = ref('')
@@ -55,62 +43,32 @@ const reissueCopied = ref(false)
 
 const inTenant = computed(() => activeSpace.kind === ScopeKind.Tenant && activeSpace.scopeId !== null)
 
+// Shared directory core (members/trust/review/isOwner/load, cr-0156). The load body is Tenant-specific: fetch
+// the roster, decrypt each real name with K_tenant (operator-blind, on-device), then read the owner-only invite
+// list — and resolve ownership from the tenant role.
+const { members, isOwner, trust, reviewTarget, reviewOpen, loading, loadError, refreshTrust, openReview, reload, on401 } =
+  useMemberDirectory(async () => {
+    if (!inTenant.value || !activeSpace.scopeId || !activeSpace.tenantId) throw new Error('no-active-tenant')
+    const rows = await listScopeMembers(activeSpace.scopeId)
+    // A grant-less "awaiting access" member has no sealed name yet → null (the row shows only the @username).
+    const kTenant = activeScopeKey()
+    names.value = kTenant ? Object.fromEntries(rows.map((m) => [m.userId, unsealName(kTenant, m.sealedName)])) : {}
+    const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
+    const owner = mine?.role === 'OWNER'
+    // Only the owner may read the pending-invite list (the backend 403s any non-owner).
+    pendingInvites.value = owner ? await listMemberInvites(activeSpace.tenantId) : []
+    return { rows, isOwner: owner }
+  })
+
 /** The member's decrypted "First Last", or '' when not yet sealed (awaiting access) / unreadable. */
 function fullName(userId: string): string {
   const n = names.value[userId]
   return n ? `${n.firstName} ${n.lastName}`.trim() : ''
 }
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  if (!inTenant.value || !activeSpace.scopeId || !activeSpace.tenantId) {
-    loading.value = false
-    loadError.value = 'failed'
-    return
-  }
-  try {
-    members.value = await listScopeMembers(activeSpace.scopeId)
-    // Decrypt each member's sealed real name with the active tenant key (K_tenant) — on-device, operator-blind.
-    // A grant-less "awaiting access" member has no sealed name yet → null (the row shows only the @username).
-    const kTenant = activeScopeKey()
-    names.value = kTenant
-      ? Object.fromEntries(members.value.map((m) => [m.userId, unsealName(kTenant, m.sealedName)]))
-      : {}
-    const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
-    isOwner.value = mine?.role === 'OWNER'
-    // Only the owner may read the pending-invite list (the backend 403s any non-owner).
-    pendingInvites.value = isOwner.value ? await listMemberInvites(activeSpace.tenantId) : []
-    await refreshTrust()
-  } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = status === 403 ? 'notAuthorized' : 'failed'
-  } finally {
-    loading.value = false
-  }
-}
-
 async function onInvited() {
   notice.value = t('members.inviteSent')
-  await load()
-}
-
-// Read every member's trust state from the sealed pin store in one fetch (cr-0099) — used only to flag `changed`
-// keys. Vault-gated: degrade to no flags rather than break the directory if the store/identity is unavailable.
-async function refreshTrust() {
-  try {
-    trust.value = await trustStates(members.value.map((m) => ({ userId: m.userId, directoryKey: m.identityPublicKey })))
-  } catch {
-    trust.value = {}
-  }
-}
-
-function openReview(member: ScopeMember) {
-  reviewTarget.value = member
-  reviewOpen.value = true
+  await reload()
 }
 
 async function reissue(invite: PendingMemberInvite) {
@@ -122,11 +80,10 @@ async function reissue(invite: PendingMemberInvite) {
     const state = await reissueMemberInvite(activeSpace.tenantId!, invite.inviteId)
     reissueUrl.value = buildInviteLink(state.bootstrapSecret) // same host — the owner invites into their tenant
     notice.value = t('members.inviteReissued')
-    await load()
+    await reload()
   } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('members.actionFailed')
+    on401(e)
+    if (!isUnauthorized(e)) actionError.value = t('members.actionFailed')
   }
 }
 
@@ -145,11 +102,10 @@ async function remove(member: ScopeMember) {
   try {
     await removeTenantMember(activeSpace.tenantId!, member.userId)
     notice.value = t('members.removed')
-    await load()
+    await reload()
   } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('members.actionFailed')
+    on401(e)
+    if (!isUnauthorized(e)) actionError.value = t('members.actionFailed')
   }
 }
 
@@ -161,11 +117,10 @@ async function revoke(invite: PendingMemberInvite) {
   try {
     await revokeMemberInvite(activeSpace.tenantId!, invite.inviteId)
     notice.value = t('members.inviteRevoked')
-    await load()
+    await reload()
   } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('members.actionFailed')
+    on401(e)
+    if (!isUnauthorized(e)) actionError.value = t('members.actionFailed')
   }
 }
 </script>

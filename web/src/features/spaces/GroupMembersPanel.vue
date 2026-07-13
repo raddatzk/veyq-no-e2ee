@@ -5,17 +5,18 @@
 // blind: only operational metadata (usernames/roles/grant-present) is shown; the add records a grant-less
 // membership, the key is delivered later by grant-delivery (cr-0076), no crypto here. Real names stay `@username`
 // — they're sealed under K_tenant, which a group owner needn't hold (the active key here is the group's K_SC).
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
 import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup } from './scopes'
-import { acceptKeyChange, IdentityChangedError, trustStates, type TrustState } from '../account/identityPins'
+import { acceptKeyChange, IdentityChangedError } from '../account/identityPins'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
+import { isUnauthorized } from '../../shared/httpError'
+import { useMemberDirectory } from './useMemberDirectory'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
@@ -24,20 +25,9 @@ import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 const props = defineProps<{ scopeId: string; name?: string }>()
 
 const { t, locale } = useI18n()
-const router = useRouter()
 const emit = defineEmits<{ lifecycleChanged: [] }>()
 
-const members = ref<ScopeMember[]>([])
-const isOwner = ref(false)
 const myUsername = ref('')
-// Identity trust (cr-0099) — the per-member trust state from the sealed pin store. Only the `changed` state is
-// surfaced (a key that differs from the pin — a rotation or a substitution); verified/recognized are intentionally
-// not shown (proactive verification returns gated behind scope-wide strict-mode, cr-0100). Drives the review dialog.
-const trust = ref<Record<string, TrustState>>({})
-const reviewTarget = ref<ScopeMember | null>(null)
-const reviewOpen = ref(false)
-const loading = ref(true)
-const loadError = ref<'' | 'notAuthorized' | 'failed'>('')
 const username = ref('')
 const addError = ref('')
 const addNotice = ref('')
@@ -62,54 +52,24 @@ const lifecycleBusy = ref(false)
 const lifecycleError = ref('')
 const purgeDay = computed(() => (purgeAfter.value ? purgeAfter.value.toLocaleDateString(locale.value) : ''))
 
-// Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
-const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
-
-onMounted(load)
-watch(() => props.scopeId, load)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  addError.value = ''
-  if (!props.scopeId) {
-    loading.value = false
-    loadError.value = 'failed'
-    return
-  }
-  try {
-    // My group role isn't the tenant role — derive it from the directory by matching my per-tenant username.
+// Shared directory core (members/trust/review/isOwner/load, cr-0156). The Group load body derives ownership from
+// the directory (the group role isn't the tenant role — match my per-tenant username) and reads the lifecycle
+// (pending-deletion) state alongside the roster.
+const { members, isOwner, trust, reviewTarget, reviewOpen, loading, loadError, refreshTrust, openReview, reload, on401 } =
+  useMemberDirectory(async () => {
+    addError.value = ''
+    if (!props.scopeId) throw new Error('no-scope')
     const [rows, me, lifecycle] = await Promise.all([
       listScopeMembers(props.scopeId), getMyProfile().catch(() => null), scopeLifecycle(props.scopeId).catch(() => null),
     ])
-    members.value = rows
     myUsername.value = me?.username ?? ''
-    isOwner.value = !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER')
     purgeAfter.value = lifecycle?.purgeAfter ?? null
-    await refreshTrust()
-  } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = status === 403 ? 'notAuthorized' : 'failed'
-  } finally {
-    loading.value = false
-  }
-}
+    return { rows, isOwner: !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER') }
+  })
+watch(() => props.scopeId, () => reload())
 
-// Read every member's trust state from the sealed pin store in one fetch (cr-0099) — used only to flag `changed`
-// keys. Vault-gated: if the store/identity is unavailable, degrade to no flags rather than break the directory.
-async function refreshTrust() {
-  try {
-    trust.value = await trustStates(members.value.map((m) => ({ userId: m.userId, directoryKey: m.identityPublicKey })))
-  } catch {
-    trust.value = {}
-  }
-}
-
-function openReview(m: ScopeMember) {
-  reviewTarget.value = m
-  reviewOpen.value = true
-}
+// Min length mirrors the contract (username minLength 2); the server does the real validation + resolve.
+const canAdd = computed(() => username.value.trim().length >= 2 && !adding.value)
 
 // Add a member (cr-0086) — with the consent opt-in (cr-0096). First resolve the username (records nothing): if
 // the target asked to be consulted, derive this group's name-key `K_name` and wrap it to their identity
@@ -149,8 +109,9 @@ async function submit() {
       addError.value = t('groups.identityChanged')
       return
     }
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     addError.value =
       code === 'member_not_found'
         ? t('groups.memberNotFound')
@@ -189,8 +150,9 @@ async function rescind(m: ScopeMember) {
     await removeGroupMember(props.scopeId, m.userId)
     members.value = await listScopeMembers(props.scopeId)
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     actionError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.rescindFailed')
   }
 }
@@ -203,8 +165,9 @@ async function changeRole(m: ScopeMember, role: SetMemberRoleRequestRoleEnum) {
     await setMemberRole(props.scopeId, m.userId, role)
     members.value = await listScopeMembers(props.scopeId)
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     actionError.value =
       code === 'last_owner'
         ? t('groups.lastOwner')
@@ -228,8 +191,9 @@ async function removeMember(m: ScopeMember) {
     members.value = remaining
     if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     actionError.value =
       code === 'last_owner'
         ? t('groups.lastOwner')
@@ -251,11 +215,12 @@ async function onDelete() {
   try {
     await deleteGroup(props.scopeId)
     if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
-    await load()
+    await reload()
     emit('lifecycleChanged')
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     lifecycleError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.deleteFailed')
   } finally {
     lifecycleBusy.value = false
@@ -285,8 +250,9 @@ async function saveRename() {
     emit('lifecycleChanged') // the hub reloads its owned-groups list → the nav label + our `name` prop update
     renaming.value = false
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     renameError.value =
       code === 'not_scope_owner'
         ? t('members.notOwner')
@@ -305,11 +271,12 @@ async function onRestore() {
   try {
     await restoreGroup(props.scopeId)
     if (activeSpace.scopeId === props.scopeId) await refreshActiveScope()
-    await load()
+    await reload()
     emit('lifecycleChanged')
   } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await memberError(e)
     lifecycleError.value = code === 'not_scope_owner' ? t('members.notOwner') : t('groups.restoreFailed')
   } finally {
     lifecycleBusy.value = false
