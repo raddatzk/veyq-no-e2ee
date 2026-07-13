@@ -267,54 +267,28 @@ watch(
 <template>
   <div class="memory-route-surface memory-detail">
     <header class="gallery-header">
-      <div class="gallery-header-lead">
-        <button
-          type="button"
-          class="memory-cover-preview"
-          :class="{ 'is-empty': !coverSrc }"
-          :disabled="!memoryKey"
-          :aria-label="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
-          :title="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
-          @click="openCoverEditor"
-        >
-          <MemoryCoverImage :src="coverSrc" :crop="storedCover?.crop ?? null" :alt="node.name" />
-          <span class="memory-cover-preview-hint">
-            <span class="pi pi-image" />
-            <span>{{ storedCover ? t('memory.cover.edit') : t('memory.cover.set') }}</span>
-          </span>
-        </button>
-      <div class="gallery-header-copy">
-        <h1 class="gallery-title">{{ node.name }}</h1>
-        <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
-        <div class="memory-meta-row">
-          <button
-            type="button"
-            class="memory-date-chip"
-            :class="{ 'is-empty': !dateLabel }"
-            :disabled="!memoryKey"
-            :aria-label="t('memory.date.edit')"
-            :title="t('memory.date.edit')"
-            @click="dateEditorOpen = true"
-          >
-            <span class="pi pi-calendar" />
-            <span>{{ dateLabel || t('memory.date.noDate') }}</span>
-          </button>
-          <button
-            type="button"
-            class="memory-date-chip memory-location-chip"
-            :class="{ 'is-empty': !locationResolved }"
-            :disabled="!memoryKey"
-            :aria-label="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
-            :title="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
-            @click="openLocationEditor"
-          >
-            <span class="pi pi-map-marker" />
-            <span>{{ locationLabel || t('memory.place.set') }}</span>
-          </button>
-        </div>
-      </div>
-      </div>
-      <div class="gallery-header-actions">
+      <button
+        type="button"
+        class="memory-cover-preview"
+        :class="{ 'is-empty': !coverSrc }"
+        :disabled="!memoryKey"
+        :aria-label="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
+        :title="storedCover ? t('memory.cover.edit') : t('memory.cover.set')"
+        @click="openCoverEditor"
+      >
+        <MemoryCoverImage :src="coverSrc" :crop="storedCover?.crop ?? null" :alt="node.name" />
+        <span class="memory-cover-preview-hint">
+          <span class="pi pi-image" />
+          <span>{{ storedCover ? t('memory.cover.edit') : t('memory.cover.set') }}</span>
+        </span>
+      </button>
+      <!-- Body column beside the cover: row 1 = title + actions, row 2 = count, row 3 = date + location. Because
+           each row spans the body width (not squeezed by the actions, which live only in row 1), the date +
+           location chips sit side by side at any width. -->
+      <div class="gallery-header-body">
+        <div class="gallery-header-titlerow">
+          <h1 class="gallery-title">{{ node.name }}</h1>
+          <div class="gallery-header-actions">
         <Button
           v-tooltip.bottom="t('media.upload')"
           type="button"
@@ -383,6 +357,35 @@ watch(
           text
           @click="$emit('delete')"
         />
+          </div>
+        </div>
+        <span class="gallery-count">{{ t('media.itemCount', { count: items.length }, items.length) }}</span>
+        <div class="memory-meta-row">
+          <button
+            type="button"
+            class="memory-date-chip"
+            :class="{ 'is-empty': !dateLabel }"
+            :disabled="!memoryKey"
+            :aria-label="t('memory.date.edit')"
+            :title="t('memory.date.edit')"
+            @click="dateEditorOpen = true"
+          >
+            <span class="pi pi-calendar" />
+            <span>{{ dateLabel || t('memory.date.noDate') }}</span>
+          </button>
+          <button
+            type="button"
+            class="memory-date-chip memory-location-chip"
+            :class="{ 'is-empty': !locationResolved }"
+            :disabled="!memoryKey"
+            :aria-label="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
+            :title="locationResolved ? t('memory.place.edit') : t('memory.place.set')"
+            @click="openLocationEditor"
+          >
+            <span class="pi pi-map-marker" />
+            <span>{{ locationLabel || t('memory.place.set') }}</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -667,20 +670,35 @@ watch(
 .gallery-sort-toggle .pi {
   font-size: 0.9rem;
 }
+/* Query container on the detail surface so the header responds to its OWN width (not the viewport — the sidebar
+   eats ~230px, so a viewport media query stacks too late). */
+.memory-detail {
+  container: memory-detail-surface / inline-size;
+}
+/* Cover on the left, the body column beside it. */
 .gallery-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 1rem;
   padding-bottom: 1.15rem;
   border-bottom: 1px solid var(--app-line);
 }
-/* The leading group: the cover preview beside the title + chips. */
-.gallery-header-lead {
+/* The body column: row 1 = title + actions, row 2 = count, row 3 = date · location. Grows to fill; each row
+   spans its full width, so the count + meta rows are never squeezed by the action bar (which lives in row 1). */
+.gallery-header-body {
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 auto;
   min-width: 0;
+}
+/* Row 1: title on the left, the action bar pushed to the right (wraps under the title only on a tiny header). */
+.gallery-header-titlerow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
 }
 
 /* The Memory cover (cr-0072): a 16:9 tile showing the chosen, cropped cover (or the placeholder). It IS the
@@ -726,10 +744,7 @@ watch(
 .memory-cover-preview-hint .pi {
   font-size: 0.85rem;
 }
-@media (max-width: 640px) {
-  .gallery-header-lead {
-    flex-direction: column;
-  }
+@container memory-detail-surface (max-width: 460px) {
   .memory-cover-preview {
     width: 100%;
     max-width: 260px;
@@ -744,7 +759,9 @@ watch(
   flex-wrap: wrap;
   align-items: center;
   gap: 0.2rem 0.4rem;
-  margin-top: 0.4rem;
+  /* Pull left by the chip's horizontal padding so the first chip's CONTENT (not its padded box) starts flush with
+     the title + count above — the chips still keep their hover/tap padding. */
+  margin-left: -0.45rem;
 }
 .memory-date-chip {
   display: inline-flex;
@@ -757,6 +774,7 @@ watch(
   color: var(--app-text);
   font-size: 0.9rem;
   font-weight: 600;
+  white-space: nowrap; /* the label (e.g. "Kein Ort erkannt") stays on one line, never breaks mid-phrase */
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -785,14 +803,11 @@ watch(
   justify-content: flex-end;
   gap: 0.5rem;
 }
-/* Narrow viewports: stack the actions under the title so the title keeps the full row width (otherwise the
-   actions squeeze it into a sliver and it breaks mid-word). */
-@media (max-width: 640px) {
+/* Genuinely narrow header (mobile): stack the cover above the body so the body (title/count/meta) gets the full
+   width. The action bar stays in the title row; the title font eases down. */
+@container memory-detail-surface (max-width: 540px) {
   .gallery-header {
     flex-direction: column;
-  }
-  .gallery-header-actions {
-    justify-content: flex-start;
   }
   .gallery-title {
     font-size: 1.5rem;
