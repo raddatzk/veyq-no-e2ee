@@ -29,7 +29,7 @@ import {
 import { unsealMeta, effectiveCapturedAt, hasDerivatives, type MediaItem } from '../features/memory/media'
 import { isSupportedMediaFile, inferMediaType, enqueueUploads, retryFile, removeFile } from '../features/memory/uploadQueue'
 import { useOptimisticTiles, type OptimisticTileVM } from '../features/memory/useOptimisticTiles'
-import { removedThumbIds } from '../features/memory/optimisticUpload'
+import { useThumbnailPipeline } from '../features/memory/useThumbnailPipeline'
 import { galleryDisplayAspectRatio } from '../features/memory/mediaGridLayout'
 import { renderMarkdown } from '../shared/markdown'
 import { ShareRole } from '../api/generated/sharing'
@@ -63,14 +63,21 @@ const memoryName = ref('')
 const note = ref('')
 const renderedNote = computed(() => (note.value ? renderMarkdown(note.value) : ''))
 const items = ref<ShareItem[]>([])
-const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL
-const donatedThumbs = new Set<string>() // mediaIds whose thumb is currently a donated optimistic-upload preview
 // mediaId → ShareItem, so the injected lightbox loaders resolve each item's own K_mem (chapters differ).
 const shareById = computed(() => new Map(items.value.map((si) => [si.item.mediaId, si])))
 const listedMediaIds = computed(() => new Set(items.value.map((si) => si.item.mediaId)))
 // Optimistic in-grid upload tiles (cr-0074) — the SAME shared composable as the internal gallery, grouped by
 // this shareId: a contributor's picked photos appear instantly with a progress ring, reconciled once listed.
 const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => shareId), listedMediaIds)
+// The thumbnail pipeline (cr-0150) — the SAME decrypt-per-tile → object-URL map as the internal gallery, here
+// keyed on the share's per-item K_mem and gated presign (`openShareGrid`); the single revoke owner of every thumb.
+const pipeline = useThumbnailPipeline<ShareItem>({
+  idOf: (si) => si.item.mediaId,
+  isDerivable: (si) => hasDerivatives(si.item),
+  decryptTile: (si) => openShareGrid(shareId, si, pwToken.value),
+  donorPreviewFor,
+})
+const thumbs = pipeline.thumbs // mediaId → thumbnail object URL
 
 // The security-doc footer link (ADR 0026 trust-tier honesty) — the published wiki, locale-aware.
 const securityDocUrl = computed(() =>
@@ -107,11 +114,6 @@ const layoutItems = computed<ShareTileItem[]>(() => [
 // Show the grid when there's anything to render — listed media OR an in-flight optimistic upload.
 const hasContent = computed(() => items.value.length > 0 || optimisticTiles.value.length > 0)
 
-function revokeThumbs() {
-  for (const url of thumbs.value.values()) URL.revokeObjectURL(url) // incl. donated previews (thumbs owns them post-handoff)
-  thumbs.value = new Map()
-  donatedThumbs.clear()
-}
 
 // --- contributor / uploader (CONTRIBUTOR + UPLOADER shares, cr-0101 / cr-0102) ----------------------------
 // The share role + the root Memory's K_mem (for a contributor/uploader to seal their name + uploads under).
@@ -230,41 +232,12 @@ async function load() {
     note.value = pickLocaleText(resolved.noteByLocale, locale.value)
     role.value = resolved.role
     rootMemoryKey.value = resolved.rootMemoryKey
-    // incremental merge (no empty-flash): drop thumbs of removed media; donate a just-uploaded photo's optimistic
-    // preview into `thumbs` so its tile hands off with no gray gap (the real thumbnail replaces it once decrypted).
-    for (const id of removedThumbIds(thumbs.value.keys(), resolved.items.map((si) => si.item))) {
-      const url = thumbs.value.get(id)
-      if (url && !donatedThumbs.has(id)) URL.revokeObjectURL(url)
-      thumbs.value.delete(id)
-      donatedThumbs.delete(id)
-    }
-    for (const si of resolved.items) {
-      if (thumbs.value.has(si.item.mediaId) || !hasDerivatives(si.item)) continue
-      const donorUrl = donorPreviewFor(si.item.mediaId)
-      if (!donorUrl) continue
-      thumbs.value.set(si.item.mediaId, donorUrl)
-      donatedThumbs.add(si.item.mediaId)
-    }
-    thumbs.value = new Map(thumbs.value)
+    // incremental merge (no empty-flash): the pipeline drops thumbs of removed media + donates a just-uploaded
+    // photo's optimistic preview (hands off with no gray gap), then decrypts each derivable item's real thumbnail.
+    pipeline.reconcile(resolved.items)
     items.value = resolved.items
     status.value = 'ready'
-    // fetch each derivable item's real thumbnail that isn't already shown (parallel, operator-blind)
-    await Promise.all(
-      resolved.items.map(async (si) => {
-        if (!hasDerivatives(si.item)) return
-        if (thumbs.value.has(si.item.mediaId) && !donatedThumbs.has(si.item.mediaId)) return // real thumb already in place
-        try {
-          const bytes = await openShareGrid(shareId, si, pwToken.value)
-          const prev = thumbs.value.get(si.item.mediaId)
-          if (prev && !donatedThumbs.has(si.item.mediaId)) URL.revokeObjectURL(prev)
-          thumbs.value.set(si.item.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
-          donatedThumbs.delete(si.item.mediaId)
-          thumbs.value = new Map(thumbs.value)
-        } catch {
-          /* a single failed thumbnail stays a placeholder; the rest render */
-        }
-      }),
-    )
+    await pipeline.decrypt(resolved.items)
   } catch (e) {
     // cr-0118: a password-protected share → prompt (or re-prompt on a wrong password); otherwise the honest
     // "unavailable" state (bad key / 404 / unexpected).
@@ -299,7 +272,7 @@ onMounted(() => {
   void load()
 })
 
-onBeforeUnmount(revokeThumbs)
+onBeforeUnmount(() => pipeline.revokeAll())
 </script>
 
 <template>

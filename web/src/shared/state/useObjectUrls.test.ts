@@ -109,4 +109,36 @@ describe('useObjectUrls', () => {
     wrapper.unmount()
     expect(revoked).toEqual(['blob:0', 'blob:1'])
   })
+
+  it('adopt stores an externally-minted URL and takes over its lifecycle', () => {
+    const { api, wrapper } = harness(useObjectUrls)
+    api.adopt('a', 'blob:external')
+    expect(api.get('a')).toBe('blob:external')
+    wrapper.unmount() // the adopted URL is now owned here → revoked on unmount
+    expect(revoked).toEqual(['blob:external'])
+  })
+
+  it('set after adopt revokes the adopted URL exactly once', () => {
+    const { api } = harness(useObjectUrls)
+    api.adopt('a', 'blob:donated') // e.g. an optimistic-preview donation
+    api.set('a', blob()) // the real thumbnail supersedes it
+    expect(api.get('a')).toBe('blob:0')
+    expect(revoked).toEqual(['blob:donated'])
+  })
+
+  it('drop revokes an adopted URL', () => {
+    const { api } = harness(useObjectUrls)
+    api.adopt('a', 'blob:donated')
+    api.drop('a')
+    expect(revoked).toEqual(['blob:donated'])
+    expect(api.get('a')).toBeUndefined()
+  })
+
+  it('adopting the same URL again is idempotent (no revoke)', () => {
+    const { api } = harness(useObjectUrls)
+    api.adopt('a', 'blob:donated')
+    api.adopt('a', 'blob:donated')
+    expect(revoked).toEqual([])
+    expect(api.get('a')).toBe('blob:donated')
+  })
 })

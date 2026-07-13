@@ -27,7 +27,7 @@ import MediaTile from './MediaTile.vue'
 import MemoryBuckets from './MemoryBuckets.vue'
 import OptimisticTile from './OptimisticTile.vue'
 import { enqueueUploads, isSupportedMediaFile, inferMediaType, mergeFiles, retryFile } from '../uploadQueue'
-import { removedThumbIds } from '../optimisticUpload'
+import { useThumbnailPipeline } from '../useThumbnailPipeline'
 import { useOptimisticTiles, type OptimisticTileVM } from '../useOptimisticTiles'
 import MediaLightbox from './MediaLightbox.vue'
 import MemoryDateEditor from './MemoryDateEditor.vue'
@@ -69,7 +69,20 @@ const { hasCapability } = useCapabilities()
 const canUploadShare = computed(() => !!props.shareable && hasCapability(SHARING_UPLOADER_LINKS))
 
 const items = ref<MediaItem[]>([])
-const thumbs = ref<Map<string, string>>(new Map()) // mediaId → thumbnail object URL (derivable items only)
+// Optimistic in-grid upload tiles (uc.memory.upload, cr-0074): the shared queue's still-in-flight files for THIS
+// node (grouping key = the node id) as instant preview tiles + progress/retry, reconciled into the real thumbnail
+// by mediaId. `donorPreviewFor` feeds the thumbnail pipeline the preview to hand off. Reused by the contributor viewer.
+const listedMediaIds = computed(() => new Set(items.value.map((it) => it.mediaId)))
+const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => props.node.id), listedMediaIds)
+// The gallery thumbnail pipeline (cr-0150) — the decrypt-per-tile → object-URL map, shared with ShareView and the
+// single revoke owner of every thumbnail (incl. a donated optimistic preview). `thumbs` is its reactive map.
+const pipeline = useThumbnailPipeline<MediaItem>({
+  idOf: (m) => m.mediaId,
+  isDerivable: hasDerivatives,
+  decryptTile: (m) => (props.memoryKey ? openGrid(props.scopeId, props.memoryKey, m) : Promise.resolve(null)),
+  donorPreviewFor,
+})
+const thumbs = pipeline.thumbs // mediaId → thumbnail object URL (derivable items only)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 // live media updates (uc.memory.live-updates, cr-0107): the cached per-node counters — mediaRevision (the ETag
 // echoed as If-None-Match; null until the first load) + deleteRevision (echoed as sinceDelete to gate the id-set).
@@ -220,11 +233,7 @@ async function onDeleteFromLightbox(payload: { mediaId: string }) {
 /** Drop a media from the open grid + lightbox snapshot (optimistic), revoking its thumbnail object URL. */
 function removeFromGrid(mediaId: string) {
   pendingDelete.add(mediaId) // cr-0111: tombstone so a racing live read can't re-add it before the delete commits
-  const url = thumbs.value.get(mediaId)
-  if (url) URL.revokeObjectURL(url)
-  thumbs.value.delete(mediaId)
-  donatedThumbs.delete(mediaId)
-  thumbs.value = new Map(thumbs.value)
+  pipeline.dropThumb(mediaId)
   items.value = items.value.filter((it) => it.mediaId !== mediaId)
   lightboxItems.value = lightboxItems.value.filter((it) => it.mediaId !== mediaId)
 }
@@ -262,14 +271,6 @@ const aspectRatios = computed(() => {
   }
   return m
 })
-// --- optimistic in-grid upload tiles (uc.memory.upload, cr-0074). The shared [useOptimisticTiles] composable
-// renders the global upload queue's still-in-flight files for THIS node (grouping key = the node id) as instant
-// preview tiles + progress/retry, pinned ahead of the listed media, reconciled into the real thumbnail by
-// `mediaId`. Reused by the anonymous contributor viewer (cr-0101).
-const listedMediaIds = computed(() => new Set(items.value.map((it) => it.mediaId)))
-const donatedThumbs = new Set<string>() // mediaIds in `thumbs` currently backed by a donated preview url
-const { optimisticTiles, donorPreviewFor } = useOptimisticTiles(computed(() => props.node.id), listedMediaIds)
-
 // The tile list handed to [MediaGrid] — optimistic upload tiles pinned ahead of the listed media (the freshest
 // action, in enqueue order), each carrying its content so the grid slot renders it without a lookup. MediaGrid
 // runs the justified layout + positions each tile; here we just declare id + aspect + content.
@@ -356,46 +357,16 @@ function flushSelection() {
   )
 }
 
-function revokeThumbs() {
-  for (const url of thumbs.value.values()) URL.revokeObjectURL(url)
-  thumbs.value = new Map()
-  donatedThumbs.clear()
-}
-
-/** Set (or replace) a media's decrypted thumbnail, revoking any prior url — incl. a donated preview it supersedes. */
-function setThumb(mediaId: string, url: string) {
-  const prev = thumbs.value.get(mediaId)
-  if (prev) URL.revokeObjectURL(prev)
-  thumbs.value.set(mediaId, url)
-  donatedThumbs.delete(mediaId)
-  thumbs.value = new Map(thumbs.value) // reassign so the template reacts
-}
-
-/** Merge a fresh media list into `items` WITHOUT an empty-flash: revoke only the thumbnails of dropped media,
- *  keep the rest in place, and donate a done upload's preview into `thumbs` for each newly-listed media so its
- *  optimistic tile hands off with no gray gap (the real thumbnail replaces the donation once it decrypts). */
+/** Merge a fresh media list into `items` WITHOUT an empty-flash: the pipeline revokes only dropped thumbnails and
+ *  donates a done upload's preview for each newly-listed media (so its optimistic tile hands off with no gray gap,
+ *  the real thumbnail replacing the donation once it decrypts); this keeps the `pendingDelete` tombstone. */
 function mergeItems(listed: MediaItem[]) {
   for (const id of [...pendingDelete]) if (!listed.some((m) => m.mediaId === id)) pendingDelete.delete(id) // cr-0111: confirmed gone
   const visible = listed.filter((m) => !pendingDelete.has(m.mediaId)) // cr-0111: keep optimistically-trashed media out until the delete commits
-  for (const id of removedThumbIds(thumbs.value.keys(), visible)) {
-    const url = thumbs.value.get(id)
-    if (url) URL.revokeObjectURL(url)
-    thumbs.value.delete(id)
-    donatedThumbs.delete(id)
-  }
-  const known = listedMediaIds.value
-  for (const m of visible) {
-    if (known.has(m.mediaId) || thumbs.value.has(m.mediaId) || !hasDerivatives(m)) continue
-    const donorUrl = donorPreviewFor(m.mediaId) // the composable marks the preview donated + returns its url
-    if (!donorUrl) continue
-    thumbs.value.set(m.mediaId, donorUrl)
-    donatedThumbs.add(m.mediaId)
-  }
-  thumbs.value = new Map(thumbs.value)
+  pipeline.reconcile(visible)
   items.value = visible
 }
 
-/** List the Memory's media and fetch each derivable item's thumbnail tier (parallel, operator-blind). */
 /** Open the lightbox on a grid tile, snapshotting the current sorted order so an in-lightbox edit can't reorder it. */
 function openLightboxAt(index: number) {
   lightboxItems.value = sortedItems.value.slice()
@@ -410,32 +381,13 @@ function onCapturedAtUpdated(payload: { mediaId: string; wrappedMeta: string | n
   items.value = [...items.value] // reassign so sortedItems recomputes and the grid re-sorts
 }
 
-/** Fetch + decrypt the thumbnail tier for each derivable item lacking a real thumbnail (parallel, operator-blind).
- *  Used by both the full [load] and the live delta [pollMedia] — the poll passes only the delta, so it decrypts
- *  just the new/changed tiles, never the whole grid. */
-async function fetchThumbs(list: MediaItem[], key: Uint8Array, nodeId: string) {
-  await Promise.all(
-    list.map(async (m) => {
-      if (!hasDerivatives(m)) return // E1: non-image/video → icon tile, no fetch
-      if (thumbs.value.has(m.mediaId) && !donatedThumbs.has(m.mediaId)) return // real thumbnail already in place
-      try {
-        const bytes = await openGrid(props.scopeId, key, m)
-        if (props.node.id !== nodeId) return
-        setThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
-      } catch {
-        // E5: a single failed tile stays a placeholder (or its donated preview); the rest of the grid is unaffected
-      }
-    }),
-  )
-}
-
 // `reset` (a Memory/chapter switch) clears the grid up front; an incremental reload (post-upload batch) merges
 // the fresh list into place so existing tiles don't blink empty — jarring next to the optimistic tiles (cr-0074).
 async function load({ reset = false }: { reset?: boolean } = {}) {
   const key = props.memoryKey
   const nodeId = props.node.id
   if (!key) {
-    revokeThumbs()
+    pipeline.revokeAll()
     items.value = []
     mediaRevision.value = null // E4: no K_mem (locked / not openable) → gallery unavailable, no live poll
     deleteRevision.value = 0
@@ -443,7 +395,7 @@ async function load({ reset = false }: { reset?: boolean } = {}) {
     return
   }
   if (reset) {
-    revokeThumbs()
+    pipeline.revokeAll()
     items.value = []
     mediaRevision.value = null
     deleteRevision.value = 0
@@ -456,7 +408,7 @@ async function load({ reset = false }: { reset?: boolean } = {}) {
     mediaRevision.value = page.mediaRevision // cache the ETag + delete gate for the live poll
     deleteRevision.value = page.deleteRevision
     status.value = 'ready'
-    await fetchThumbs(page.items, key, nodeId)
+    await pipeline.decrypt(page.items, () => props.node.id === nodeId)
     if (props.node.id === nodeId) {
       await reconcileAuto() // settle point: open-time self-heal + post-upload-batch (date, then location)
       await reconcileAutoLocation() // reads the date-reconciled wrappedMeta (patched in place) → RMW-safe
@@ -484,7 +436,7 @@ async function pollMedia() {
     upsertItems(page.items, page.mediaIds)
     mediaRevision.value = page.mediaRevision
     deleteRevision.value = page.deleteRevision
-    await fetchThumbs(page.items, key, nodeId) // decrypt only the delta's new/changed tiles
+    await pipeline.decrypt(page.items, () => props.node.id === nodeId) // decrypt only the delta's new/changed tiles
     if (props.node.id === nodeId) {
       await reconcileAuto() // others' new media surfacing tightens the cr-0067 auto-date self-heal (ADR 0033)
       await reconcileAutoLocation()
@@ -515,13 +467,9 @@ function upsertItems(delta: MediaItem[], mediaIds: string[] | null) {
     for (const id of [...pendingDelete]) if (!keep.has(id)) pendingDelete.delete(id) // cr-0111: server confirmed it's gone → lift the tombstone
     for (const id of [...byId.keys()]) {
       if (keep.has(id)) continue
-      const url = thumbs.value.get(id)
-      if (url) URL.revokeObjectURL(url)
-      thumbs.value.delete(id)
-      donatedThumbs.delete(id)
+      pipeline.dropThumb(id)
       byId.delete(id)
     }
-    thumbs.value = new Map(thumbs.value) // reassign so the template drops removed tiles
   }
   items.value = [...byId.values()]
 }
@@ -549,7 +497,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopMediaRevisionPolling() // stop the live poll on close/navigate away
-  revokeThumbs()
+  pipeline.revokeAll()
   clearUndo()
   // trash thumbs are owned + revoked by useMediaTrash; the optimistic preview urls by useOptimisticTiles
 })

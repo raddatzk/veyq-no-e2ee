@@ -31,17 +31,23 @@ export function useObjectUrls(): {
   urls: Ref<Map<string, string>>
   get: (key: string) => string | undefined
   set: (key: string, blob: Blob) => void
+  adopt: (key: string, url: string) => void
   drop: (key: string) => void
   clear: () => void
 } {
   const urls = ref<Map<string, string>>(new Map())
   const get = (key: string) => urls.value.get(key)
-  function set(key: string, blob: Blob) {
+  // Store `url` under `key`, revoking whatever was there (unless it IS `url`), then churn the Map for reactivity.
+  function put(key: string, url: string) {
     const prev = urls.value.get(key)
-    if (prev) URL.revokeObjectURL(prev)
-    urls.value.set(key, URL.createObjectURL(blob))
+    if (prev && prev !== url) URL.revokeObjectURL(prev)
+    urls.value.set(key, url)
     urls.value = new Map(urls.value)
   }
+  const set = (key: string, blob: Blob) => put(key, URL.createObjectURL(blob))
+  // Take ownership of an **externally-minted** URL (e.g. an optimistic-preview donation): same single-owner
+  // lifecycle as `set` (revoke on replace/drop/clear/unmount), but for a URL the caller already created.
+  const adopt = (key: string, url: string) => put(key, url)
   function drop(key: string) {
     const prev = urls.value.get(key)
     if (prev) URL.revokeObjectURL(prev)
@@ -52,5 +58,5 @@ export function useObjectUrls(): {
     urls.value = new Map()
   }
   onBeforeUnmount(clear)
-  return { urls, get, set, drop, clear }
+  return { urls, get, set, adopt, drop, clear }
 }
