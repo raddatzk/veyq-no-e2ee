@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
   padding: 0 0.25rem;
   border-radius: 999px;
   background: var(--app-accent);
-  color: #fff;
+  color: var(--app-on-strong);
   font-size: 0.7rem;
   line-height: 1.1rem;
   text-align: center;
@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--app-line);
   border-radius: 0.75rem;
   background: var(--app-surface);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  box-shadow: var(--app-shadow-md);
   z-index: 50;
 }
 .uploads-header {

@@ -49,7 +49,7 @@ async function accept() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="t('verify.reviewTitle', { name: '@' + member.username })" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('verify.reviewTitle', { name: '@' + member.username })" modal class="tenant-dialog" :closable="!busy" :close-on-escape="!busy">
     <div class="veyq-form review-body">
       <Message severity="warn" :closable="false">{{ t('verify.reviewIntro') }}</Message>
 
@@ -67,7 +67,7 @@ async function accept() {
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
       <div class="veyq-dialog-action-row">
-        <Button type="button" :label="t('verify.refuse')" icon="pi pi-times" severity="secondary" outlined @click="visible = false" />
+        <Button type="button" :label="t('verify.refuse')" icon="pi pi-times" severity="secondary" outlined :disabled="busy" @click="visible = false" />
         <Button type="button" :label="t('verify.accept')" icon="pi pi-shield" severity="warn" :loading="busy" @click="accept" />
       </div>
     </div>

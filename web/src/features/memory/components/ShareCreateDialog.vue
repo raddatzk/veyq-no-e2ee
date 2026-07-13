@@ -139,6 +139,8 @@ async function onCopy() {
     :header="headerLabel"
     modal
     class="share-dialog"
+    :closable="!busy"
+    :close-on-escape="!busy"
     @update:visible="emit('close')"
   >
     <!-- The freshly-minted link (create only, after success). -->
@@ -150,6 +152,7 @@ async function onCopy() {
           type="text"
           :value="link"
           readonly
+          :aria-label="t('share.linkLabel')"
           @focus="($event.target as HTMLInputElement).select()"
         />
         <Button
@@ -159,8 +162,10 @@ async function onCopy() {
           @click="onCopy"
         />
       </div>
-      <div class="share-create-actions">
-        <Button :label="t('common.done')" icon="pi pi-check" @click="emit('close')" />
+      <div class="veyq-dialog-action-row">
+        <div class="veyq-action-group">
+          <Button :label="t('common.done')" icon="pi pi-check" @click="emit('close')" />
+        </div>
       </div>
     </template>
 
@@ -168,14 +173,14 @@ async function onCopy() {
     <template v-else>
       <div class="share-field">
         <label for="share-create-name">{{ t('share.name') }}</label>
-        <InputText id="share-create-name" v-model="name" :placeholder="t('share.nameOptional')" />
+        <InputText id="share-create-name" v-model="name" :placeholder="t('share.nameOptional')" :disabled="busy" />
       </div>
 
       <!-- Normal flow: pick VIEWER/CONTRIBUTOR on create AND edit (cr-0119, re-grade in place). Uploader flow: no
            switcher — just a short description of what a drop-box link does. -->
       <div v-if="showRoleSwitcher" class="share-field">
         <label>{{ t('share.roleLabel') }}</label>
-        <SelectButton v-model="role" :options="roleOptions" option-label="label" option-value="value" :allow-empty="false" class="share-role-switcher" />
+        <SelectButton v-model="role" :options="roleOptions" option-label="label" option-value="value" :allow-empty="false" :disabled="busy" class="share-role-switcher" />
         <p class="share-hint">{{ roleHint }}</p>
       </div>
       <p v-else-if="uploader && !isEdit" class="share-hint share-uploader-desc">{{ t('share.roleUploaderHint') }}</p>
@@ -187,7 +192,7 @@ async function onCopy() {
             <div class="share-group-title">{{ t('share.noteSection') }}</div>
             <p class="share-group-sub">{{ t('share.noteSectionHint') }}</p>
           </div>
-          <ToggleSwitch v-model="noteEnabled" :aria-label="t('share.noteSection')" />
+          <ToggleSwitch v-model="noteEnabled" :aria-label="t('share.noteSection')" :disabled="busy" />
         </div>
         <div v-if="noteEnabled" class="share-group-body">
           <LocaleMarkdownEditor v-model="note" />
@@ -204,7 +209,7 @@ async function onCopy() {
             <div class="share-group-title">{{ t('share.passwordSection') }}</div>
             <p class="share-group-sub">{{ t('share.passwordSectionHint', { min: MIN_PW }) }}</p>
           </div>
-          <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordSection')" />
+          <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordSection')" :disabled="busy" />
         </div>
         <div v-if="passwordEnabled" class="share-group-body">
           <label for="share-create-password">{{ t('share.passwordLabel') }}</label>
@@ -215,6 +220,7 @@ async function onCopy() {
               :type="revealPw ? 'text' : 'password'"
               autocomplete="new-password"
               :placeholder="t('share.passwordPlaceholder')"
+              :disabled="busy"
             />
             <Button
               type="button"
@@ -223,6 +229,7 @@ async function onCopy() {
               :title="revealPw ? t('common.hide') : t('common.show')"
               severity="secondary"
               text
+              :disabled="busy"
               @click="revealPw = !revealPw"
             />
           </div>
@@ -231,10 +238,12 @@ async function onCopy() {
       </div>
 
       <p v-if="error" class="share-error">{{ isEdit ? t('share.noteSaveFailed') : t('share.createFailed') }}</p>
-      <div class="share-create-actions">
+      <div class="veyq-dialog-action-row">
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined :disabled="busy" @click="emit('close')" />
         <Button
           :label="busy ? (isEdit ? t('share.noteSaving') : t('share.creating')) : (isEdit ? t('share.noteSave') : t('share.create'))"
           :icon="isEdit ? 'pi pi-check' : 'pi pi-link'"
+          :loading="busy"
           :disabled="busy || passwordTooShort"
           @click="onSubmit"
         />
@@ -320,10 +329,6 @@ async function onCopy() {
   margin: 0 0 0.5rem;
   color: var(--app-danger);
   font-size: 0.85rem;
-}
-.share-create-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .share-created-copy {
   margin: 0 0 0.6rem;

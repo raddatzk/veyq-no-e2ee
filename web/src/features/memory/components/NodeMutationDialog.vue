@@ -80,15 +80,15 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog :visible="true" :header="header" modal @update:visible="emit('close')">
+  <Dialog :visible="true" :header="header" modal :closable="!loading" :close-on-escape="!loading" @update:visible="emit('close')">
     <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('memory.nameLabel') }}
-        <InputText v-model="name" autocomplete="off" required autofocus />
+        <InputText v-model="name" autocomplete="off" required autofocus :disabled="loading" />
       </label>
 
       <div v-if="showLocationStep" class="node-location-optin">
-        <Checkbox v-model="wantsLocation" input-id="wants-location" binary />
+        <Checkbox v-model="wantsLocation" input-id="wants-location" binary :disabled="loading" />
         <label for="wants-location" class="node-location-optin-text">
           <span>{{ t('memory.place.autoOptIn') }}</span>
           <span class="node-location-optin-hint">{{ t('memory.place.autoOptInHint') }}</span>
@@ -97,7 +97,7 @@ async function submit() {
 
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="veyq-dialog-action-row">
-        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined :disabled="loading" @click="emit('close')" />
         <Button type="submit" :label="confirmLabel" icon="pi pi-check" :loading="loading" :disabled="!canSubmit" />
       </div>
     </form>

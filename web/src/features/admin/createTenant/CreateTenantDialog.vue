@@ -60,20 +60,20 @@ async function copyLink() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="t('tenant.create')" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('tenant.create')" modal class="tenant-dialog" :closable="!loading" :close-on-escape="!loading">
     <form v-if="!inviteUrl" class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('tenant.name') }}
-        <InputText v-model="name" autocomplete="off" required />
+        <InputText v-model="name" autocomplete="off" required :disabled="loading" />
       </label>
       <label>
         {{ t('tenant.domain') }}
-        <InputText v-model="domain" autocomplete="off" required />
+        <InputText v-model="domain" autocomplete="off" required :disabled="loading" />
         <small class="field-hint">{{ t('tenant.domainHint') }}</small>
       </label>
       <label>
         {{ t('tenant.ownerEmail') }}
-        <InputText v-model="ownerEmail" type="email" autocomplete="email" required />
+        <InputText v-model="ownerEmail" type="email" autocomplete="email" required :disabled="loading" />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="veyq-dialog-action-row">
@@ -83,6 +83,7 @@ async function copyLink() {
           icon="pi pi-times"
           severity="secondary"
           outlined
+          :disabled="loading"
           @click="visible = false"
         />
         <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" :disabled="!canSubmit" />

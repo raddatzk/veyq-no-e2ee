@@ -411,7 +411,7 @@ function closeMobileMenu() {
           <span class="sidebar-scope-icon pi pi-users" />
           <span><strong>{{ group.name }}</strong></span>
         </span>
-        <button class="compact-group-overflow-button" type="button" data-compact-group-overflow>
+        <button class="compact-group-overflow-button" type="button" tabindex="-1" data-compact-group-overflow>
           <span class="pi pi-chevron-down" />
         </button>
       </div>

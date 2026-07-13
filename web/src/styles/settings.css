@@ -514,7 +514,7 @@
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius-sm);
   background: var(--app-surface);
-  box-shadow: 0 12px 28px rgb(15 23 42 / 0.12);
+  box-shadow: var(--app-shadow-md);
 }
 
 .suggest-row {
@@ -754,7 +754,7 @@
   border-radius: 999px;
   overflow: hidden;
   background: var(--app-accent-soft);
-  color: var(--app-accent-strong);
+  color: var(--app-accent);
   font-size: 1.25rem;
   font-weight: 800;
 }

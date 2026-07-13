@@ -533,14 +533,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-select-option { width: 100%; }
 .bucket-select-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bucket-select-branch { color: var(--app-muted); }
-.bucket-action-button {
-  height: 40px; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 0.7rem; border: 1px solid var(--app-line);
-  border-radius: 8px; background: transparent; color: inherit; cursor: pointer; white-space: nowrap;
-}
-.bucket-action-button:hover:not(:disabled) { background: var(--app-control-bg); }
-.bucket-action-button:disabled { opacity: 0.45; cursor: default; }
-.bucket-action-button .bucket-action-label { font-size: 0.85rem; }
-.bucket-action-danger:hover:not(:disabled) { color: var(--app-danger); }
+/* .bucket-action-button + -label/-danger live in global memory.css — shared with the Papierkorb bar (cr-0152). */
 .bucket-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .bucket-selection-count { color: var(--app-muted); font-size: 0.85rem; }
 .bucket-undo-bar {
@@ -564,7 +557,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
   width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--app-line); border-radius: 8px;
   background: var(--app-surface); color: inherit; font: inherit;
 }
-.veyq-dialog-button-danger { background: var(--app-danger); color: #fff; }
+.veyq-dialog-button-danger { background: var(--app-danger); color: var(--app-on-strong); }
 @media (max-width: 760px) {
   .bucket-action-row { justify-content: flex-start; }
   .bucket-picker { width: 100%; }

@@ -101,6 +101,7 @@ const {
   selectedTrash,
   trashMenu,
   purgeConfirm,
+  purgeBusy,
   trashLayoutItems,
   trashMenuModel,
   loadTrash,
@@ -627,12 +628,14 @@ watch(
       :header="t('memory.trash.purgeConfirmTitle')"
       modal
       class="memory-trash-purge-dialog"
+      :closable="!purgeBusy"
+      :close-on-escape="!purgeBusy"
       @update:visible="purgeConfirm = null"
     >
       <p>{{ t('memory.trash.purgeConfirmBody', { count: purgeConfirm?.ids.length ?? 0 }, purgeConfirm?.ids.length ?? 0) }}</p>
       <div class="veyq-dialog-action-row">
-        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="purgeConfirm = null" />
-        <Button type="button" :label="t('memory.trash.purge')" icon="pi pi-trash" severity="danger" @click="confirmPurge" />
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined :disabled="purgeBusy" @click="purgeConfirm = null" />
+        <Button type="button" :label="t('memory.trash.purge')" icon="pi pi-trash" severity="danger" :loading="purgeBusy" @click="confirmPurge" />
       </div>
     </Dialog>
 
@@ -817,9 +820,8 @@ watch(
     font-size: 1.5rem;
   }
 }
-/* The active heart is a heart-red blended with the brand accent, matching the card pin. */
 .memory-detail-fav.is-favorite :deep(.p-button-icon) {
-  color: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
+  color: var(--app-favorite);
 }
 
 /* The Chapters tab's view toggle, right-aligned above the card grid. */

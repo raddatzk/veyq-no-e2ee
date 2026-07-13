@@ -129,8 +129,10 @@ async function copyInviteLink() {
           </label>
           <div class="veyq-dialog-action-row">
             <Button type="button" :label="t('tenant.resend')" icon="pi pi-send" severity="secondary" outlined :loading="busy" @click="resend" />
-            <Button type="submit" :label="t('tenant.reassignSubmit')" :loading="busy" :disabled="email.trim().length === 0" />
-            <Button type="button" :label="t('tenant.revoke')" icon="pi pi-trash" severity="danger" outlined @click="revoke" />
+            <div class="veyq-action-group">
+              <Button type="button" :label="t('tenant.revoke')" icon="pi pi-trash" severity="danger" outlined :disabled="busy" @click="revoke" />
+              <Button type="submit" :label="t('tenant.reassignSubmit')" :loading="busy" :disabled="email.trim().length === 0" />
+            </div>
           </div>
         </form>
 

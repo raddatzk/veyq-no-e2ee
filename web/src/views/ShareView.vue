@@ -507,7 +507,7 @@ onBeforeUnmount(() => pipeline.revokeAll())
   border: 0;
   border-radius: 999px;
   background: var(--app-accent);
-  color: #fff;
+  color: var(--app-on-strong);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -554,7 +554,7 @@ onBeforeUnmount(() => pipeline.revokeAll())
   border: 0;
   border-radius: 8px;
   background: var(--app-accent);
-  color: #fff;
+  color: var(--app-on-strong);
   font-weight: 600;
   cursor: pointer;
 }

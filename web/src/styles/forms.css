@@ -3,7 +3,7 @@
   min-width: 0;
   border: 1px solid var(--app-line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent);
   box-shadow: var(--app-shadow-md);
 }
 
@@ -169,7 +169,7 @@
 .auth-method-switch button.active {
   color: var(--app-text);
   background: var(--app-on-strong);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .form-message {

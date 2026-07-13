@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
 }
 /* The "Set as cover" button, when THIS photo is the current cover: an accent-filled state ("it's the cover"). */
 .lightbox-cover-active {
-  color: #fff;
+  color: var(--app-on-strong);
   background: var(--app-accent);
   border-color: var(--app-accent);
 }

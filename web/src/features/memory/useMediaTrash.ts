@@ -153,14 +153,24 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     requestPurge([...selectedTrash.value])
   }
 
-  /** Permanently delete the confirmed ids now (cr-0111): optimistic drop from the tab, then the hard-delete purge. */
+  /** Permanently delete the confirmed ids now (cr-0111): optimistic drop from the tab, then the hard-delete purge.
+   *  Busy while the round-trip runs (cr-0154) — the confirm dialog shows progress and gates cancel/close on it. */
+  const purgeBusy = ref(false)
   async function confirmPurge() {
     const ids = purgeConfirm.value?.ids ?? []
-    purgeConfirm.value = null
-    if (!ids.length) return
-    ids.forEach(dropFromTrash)
-    const results = await Promise.allSettled(ids.map((id) => purgeMedia(ctx.scopeId(), id)))
-    if (results.some((r) => r.status === 'rejected')) void loadTrash() // resync the tab on any failure
+    if (!ids.length) {
+      purgeConfirm.value = null
+      return
+    }
+    purgeBusy.value = true
+    try {
+      ids.forEach(dropFromTrash)
+      const results = await Promise.allSettled(ids.map((id) => purgeMedia(ctx.scopeId(), id)))
+      if (results.some((r) => r.status === 'rejected')) void loadTrash() // resync the tab on any failure
+    } finally {
+      purgeBusy.value = false
+      purgeConfirm.value = null
+    }
   }
 
   return {
@@ -170,6 +180,7 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     selectedTrash,
     trashMenu,
     purgeConfirm,
+    purgeBusy,
     trashLayoutItems,
     trashMenuModel,
     loadTrash,

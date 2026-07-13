@@ -60,12 +60,12 @@ async function copyLink() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="t('members.invite')" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('members.invite')" modal class="tenant-dialog" :closable="!loading" :close-on-escape="!loading">
     <form v-if="!inviteUrl" class="veyq-form" @submit.prevent="submit">
       <p class="dialog-intro">{{ t('members.inviteIntro') }}</p>
       <label>
         {{ t('members.email') }}
-        <InputText v-model="email" type="email" autocomplete="email" required />
+        <InputText v-model="email" type="email" autocomplete="email" required :disabled="loading" />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="veyq-dialog-action-row">
@@ -75,6 +75,7 @@ async function copyLink() {
           icon="pi pi-times"
           severity="secondary"
           outlined
+          :disabled="loading"
           @click="visible = false"
         />
         <Button type="submit" :label="t('members.inviteSubmit')" icon="pi pi-send" :loading="loading" :disabled="!canSubmit" />

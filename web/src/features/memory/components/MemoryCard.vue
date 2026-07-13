@@ -90,8 +90,7 @@ const dateLabel = computed(() => {
    it stays legible over the (accent-tinted) cover; active = the accent-soft tile + filled accent heart, the
    same purple tile the sidebar icons use. */
 .memory-card-pin {
-  /* A heart-red that keeps a hint of the brand purple — a blend of the accent and a rosé red. */
-  --fav-heart: color-mix(in srgb, var(--app-accent) 45%, #e11d48);
+  --fav-heart: var(--app-favorite);
   position: absolute;
   top: 0.55rem;
   left: 0.55rem;

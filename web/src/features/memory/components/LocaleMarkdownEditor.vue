@@ -118,8 +118,8 @@ function cancelEdit() {
         rows="16"
         :placeholder="t('share.notePlaceholder')"
       ></textarea>
-      <div class="locale-md-dialog-actions">
-        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" text severity="secondary" @click="cancelEdit" />
+      <div class="veyq-dialog-action-row">
+        <Button type="button" :label="t('common.cancel')" icon="pi pi-times" severity="secondary" outlined @click="cancelEdit" />
         <Button type="button" :label="t('common.save')" icon="pi pi-save" @click="saveEdit" />
       </div>
     </Dialog>
@@ -183,11 +183,5 @@ function cancelEdit() {
   font: inherit;
   font-size: 0.9rem;
   resize: vertical;
-}
-.locale-md-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
 }
 </style>

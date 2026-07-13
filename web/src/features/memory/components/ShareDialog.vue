@@ -170,10 +170,10 @@ function fmtDate(d: Date): string {
           <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
           <div class="share-list-badges">
             <span class="share-list-role">{{ roleLabel(share.role) }}</span>
-            <span v-if="decoded.get(share.shareId)?.hasNote" class="share-badge">{{ t('share.hasNote') }}</span>
-            <span v-if="share.passwordRequired" class="share-badge"><span class="pi pi-lock" /> {{ t('share.passwordBadge') }}</span>
-            <span v-if="!share.mine" class="share-badge muted">{{ t('share.byMember') }}</span>
-            <span v-if="!share.enabled" class="share-badge muted">{{ t('share.disabled') }}</span>
+            <span v-if="decoded.get(share.shareId)?.hasNote" class="veyq-badge">{{ t('share.hasNote') }}</span>
+            <span v-if="share.passwordRequired" class="veyq-badge"><span class="pi pi-lock" /> {{ t('share.passwordBadge') }}</span>
+            <span v-if="!share.mine" class="veyq-badge muted">{{ t('share.byMember') }}</span>
+            <span v-if="!share.enabled" class="veyq-badge muted">{{ t('share.disabled') }}</span>
           </div>
         </div>
         <div class="share-list-actions">
@@ -307,16 +307,6 @@ function fmtDate(d: Date): string {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--app-accent);
-}
-.share-badge {
-  font-size: 0.72rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--app-surface-muted);
-  color: var(--app-text);
-}
-.share-badge.muted {
-  color: var(--app-muted);
 }
 .share-list-actions {
   display: flex;
