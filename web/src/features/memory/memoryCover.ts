@@ -171,19 +171,23 @@ const sameCrop = (a: CoverCrop, b: CoverCrop): boolean =>
 /** A resolved cover ready to display: a decrypted thumbnail object URL for the chosen media + its crop. */
 export type LoadedCover = { url: string; crop: CoverCrop }
 
+/** A node's decrypted cover image as **bytes** (not yet an object URL) + its crop. The caller mints the object
+ *  URL via `useObjectUrls`, which owns its lifecycle — so no URL is ever handed off by contract from here. */
+export type DecryptedCover = { blob: Blob; crop: CoverCrop }
+
 /**
  * Resolve a node's chosen cover for the browse card + detail header + map pin: unseal `cover` under `nodeKey`
  * (`K_mem`), then decrypt its image on device — a **media** source opens the chosen media's THUMBNAIL tier
  * (`listMedia` → `openGrid`), an **upload** source opens the standalone cover blob directly (`openBlob`, cr-0073)
- * — the same operator-blind path (ciphertext + K_blob wraps, no plaintext crosses). Returns the object URL +
- * crop, or **null** when the node has no cover, the chosen media is gone (E2 — a dangling `mediaId` ⇒
- * placeholder), or any decrypt fails. **The caller owns the URL and must `revokeObjectURL` it.**
+ * — the same operator-blind path (ciphertext + K_blob wraps, no plaintext crosses). Returns the decrypted image
+ * **bytes** + crop, or **null** when the node has no cover, the chosen media is gone (E2 — a dangling `mediaId`
+ * ⇒ placeholder), or any decrypt fails. The caller mints + owns the object URL (via `useObjectUrls`).
  */
 export async function loadNodeCover(
   scopeId: string,
   nodeKey: Uint8Array,
   node: { id: string; wrappedMeta: string | null },
-): Promise<LoadedCover | null> {
+): Promise<DecryptedCover | null> {
   const cover = unsealMemoryCover(nodeKey, node)
   if (!cover) return null
   try {
@@ -192,7 +196,7 @@ export async function loadNodeCover(
         ? await openBlob(scopeId, nodeKey, cover.source.ref)
         : await openMediaGrid(scopeId, nodeKey, node.id, cover.source.mediaId)
     if (!bytes) return null // E2: the chosen media was deleted ⇒ fall back to the placeholder, never a broken tile
-    return { url: URL.createObjectURL(new Blob([bytes as BlobPart])), crop: cover.crop }
+    return { blob: new Blob([bytes as BlobPart]), crop: cover.crop }
   } catch {
     return null // best-effort: locked blob, network hiccup, malformed tier ⇒ placeholder
   }

@@ -208,7 +208,7 @@ describe('sameMemoryCover', () => {
 
 describe('loadNodeCover', () => {
   const SCOPE = '22222222-2222-2222-2222-222222222222'
-  beforeEach(() => vi.stubGlobal('URL', { createObjectURL: () => 'blob:cover', revokeObjectURL: () => {} }))
+  const coverBytes = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer())
 
   it('an upload-source cover opens the standalone blob directly (openBlob), no media list', async () => {
     vi.mocked(openBlob).mockResolvedValue(new Uint8Array([1, 2, 3]))
@@ -216,7 +216,8 @@ describe('loadNodeCover', () => {
     const node = { id: 'n1', wrappedMeta: sealMeta({ v: 1, cover: { source: { kind: 'upload', ref: UPLOAD_REF }, crop } }) }
 
     const loaded = await loadNodeCover(SCOPE, nodeKey, node)
-    expect(loaded).toEqual({ url: 'blob:cover', crop })
+    expect(loaded?.crop).toEqual(crop)
+    expect(await coverBytes(loaded!.blob)).toEqual(new Uint8Array([1, 2, 3])) // decrypted bytes, not yet an object URL
     expect(openBlob).toHaveBeenCalledWith(SCOPE, nodeKey, UPLOAD_REF)
     expect(listMedia).not.toHaveBeenCalled()
   })
@@ -228,7 +229,8 @@ describe('loadNodeCover', () => {
     const node = { id: 'n1', wrappedMeta: sealMeta({ v: 1, cover: { source: { kind: 'media', mediaId: 'm1' }, crop } }) }
 
     const loaded = await loadNodeCover(SCOPE, nodeKey, node)
-    expect(loaded).toEqual({ url: 'blob:cover', crop })
+    expect(loaded?.crop).toEqual(crop)
+    expect(await coverBytes(loaded!.blob)).toEqual(new Uint8Array([9]))
     expect(openGrid).toHaveBeenCalled()
     expect(openBlob).not.toHaveBeenCalled()
   })

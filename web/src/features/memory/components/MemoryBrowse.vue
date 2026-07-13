@@ -4,7 +4,7 @@
 // "create" card) so memory.css styles it identically; only the data is ours — decrypted TreeNodes instead of
 // server Memory/MemoryFolder DTOs, and the breadcrumb/navigation are derived on device (the server is blind).
 // The folder header carries delete (as in the original) plus rename, added in-style.
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -14,10 +14,11 @@ import { sortNodesByDate } from '../memoryDate'
 import { nodeById } from '../browse'
 import { treeStore } from '../treeStore'
 import { collectLocatedPins } from '../spaceMap'
-import { loadNodeCover, type LoadedCover } from '../memoryCover'
+import { loadNodeCover, type LoadedCover, type CoverCrop } from '../memoryCover'
 import { isFavorite } from '../../../app/favoritesStore'
 import { activeSpace } from '../../../app/activeSpace'
 import { useViewMode } from '../../../shared/state/useViewMode'
+import { useObjectUrls } from '../../../shared/state/useObjectUrls'
 import MemoryCard from './MemoryCard.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import SpaceMap from './SpaceMap.vue'
@@ -58,18 +59,23 @@ function onPinOpen(nodeId: string) {
   if (node) emit('openMemory', node)
 }
 
-// Each node's chosen cover (nodeId → decrypted thumbnail URL + crop, cr-0072), loaded lazily on device. Kept here
+// Each node's chosen cover (nodeId → decrypted thumbnail + crop, cr-0072), loaded lazily on device. Kept here
 // (we hold `scopeKey` + `scopeId`); passed read-only to the cards AND SpaceMap. `nodeContentKey` is resolved off
 // the reactive proxy so K_mem bytes never enter Vue's reactivity (matching activeSpace's key handling). A node
 // without a cover (or a not-yet-openable key) is retried until settled, so a `null` outcome isn't looked up forever.
-const covers = reactive(new Map<string, LoadedCover>())
+// The object-URL lifecycle (incl. revoke-on-unmount) is owned by `useObjectUrls`; the crop rides alongside.
+const coverUrls = useObjectUrls()
+const coverCrops = reactive(new Map<string, CoverCrop>())
 const coverTried = new Set<string>() // nodeIds resolved to a definite cover-or-none (so a "no cover" isn't retried)
-
-function revokeCovers() {
-  for (const cover of covers.values()) URL.revokeObjectURL(cover.url)
-  covers.clear()
-  coverTried.clear()
-}
+// The display map the cards + SpaceMap read: pair each minted URL with its crop.
+const covers = computed(() => {
+  const m = new Map<string, LoadedCover>()
+  for (const [id, url] of coverUrls.urls.value) {
+    const crop = coverCrops.get(id)
+    if (crop) m.set(id, { url, crop })
+  }
+  return m
+})
 
 /** Resolve the chosen cover for the currently-visible nodes — the card grid's Memories, or the map's pins —
  *  decrypting the chosen media's thumbnail on device (best-effort, parallel), cached so a settled node isn't redone. */
@@ -84,13 +90,14 @@ function syncCovers() {
     if (!nodeKey) continue // K_mem not openable yet (e.g. still unlocking) — leave un-tried so a later pass retries
     coverTried.add(node.id)
     void loadNodeCover(scopeId, nodeKey, node).then((cover) => {
-      if (cover) covers.set(node.id, cover)
+      if (!cover) return
+      coverCrops.set(node.id, cover.crop)
+      coverUrls.set(node.id, cover.blob)
     })
   }
 }
 
 watch([viewMode, pins, () => props.memories], syncCovers, { immediate: true })
-onBeforeUnmount(revokeCovers)
 </script>
 
 <template>

@@ -21,6 +21,7 @@ import {
   type MediaMeta,
 } from '../media'
 import { derivedDownloadName, saveBytes } from '../download'
+import { useObjectUrl } from '../../../shared/state/useObjectUrls'
 
 const props = defineProps<{
   scopeId: string
@@ -57,7 +58,8 @@ const exifOf = (it: MediaItem): Promise<MediaExif | null> =>
   props.exifLoader ? props.exifLoader(it) : props.readonly ? Promise.resolve(null) : loadMediaExif(props.scopeId, it.mediaId, props.memoryKey)
 
 const current = ref(props.startIndex)
-const previewUrl = ref<string | null>(null)
+// The current item's decrypted preview tier as an object URL — minted + revoked (on switch/unmount) by the primitive.
+const { url: previewUrl, set: setPreview, clear: clearPreview } = useObjectUrl()
 const loading = ref(false)
 const error = ref(false)
 const downloading = ref(false)
@@ -79,17 +81,10 @@ const canPrev = computed(() => current.value > 0)
 const canNext = computed(() => current.value < props.items.length - 1)
 const previewable = computed(() => (item.value ? hasDerivatives(item.value) : false))
 
-function revokePreview() {
-  if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = null
-  }
-}
-
 // Load the current item's preview tier (operator-blind: ciphertext → decrypt → object URL). A non-derivable
 // item (E1) carries no preview tier, so the stage shows a download fallback instead of fetching its original.
 async function loadPreview() {
-  revokePreview()
+  clearPreview()
   error.value = false
   if (!item.value || !previewable.value) return
   loading.value = true
@@ -97,7 +92,7 @@ async function loadPreview() {
   try {
     const bytes = await previewOf(target)
     if (item.value !== target) return // navigated away while decrypting — drop this result
-    previewUrl.value = URL.createObjectURL(new Blob([bytes as BlobPart]))
+    setPreview(new Blob([bytes as BlobPart]))
   } catch {
     if (item.value === target) error.value = true
   } finally {
@@ -272,7 +267,6 @@ window.addEventListener('keydown', onKeydown)
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  revokePreview()
 })
 </script>
 

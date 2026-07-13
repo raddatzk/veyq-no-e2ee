@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import type { CoverCrop, CoverSaveIntent, MemoryCover } from '../memoryCover'
+import { useObjectUrl } from '../../../shared/state/useObjectUrls'
 
 const props = defineProps<{
   cover: MemoryCover | null // the current stored cover (restore its crop + enable Remove), or null
@@ -41,7 +42,7 @@ function measureCropper() {
 type Pick = { kind: 'upload'; file: File } | { kind: 'keep' } | { kind: 'media'; mediaId: string }
 const pick = ref<Pick | null>(null)
 const sourceUrl = ref('')
-const uploadObjectUrl = ref<string | null>(null) // an owned object URL for a freshly picked file (revoke on replace/close)
+const upload = useObjectUrl() // an owned object URL for a freshly picked file (revoked on replace/close by the primitive)
 const fileInput = ref<HTMLInputElement | null>(null)
 const imageElement = ref<HTMLImageElement | null>(null)
 const naturalWidth = ref(0)
@@ -100,11 +101,6 @@ function resetView() {
   offsetY.value = 0
 }
 
-function revokeUpload() {
-  if (uploadObjectUrl.value) URL.revokeObjectURL(uploadObjectUrl.value)
-  uploadObjectUrl.value = null
-}
-
 function chooseUpload() {
   fileInput.value?.click()
 }
@@ -114,11 +110,10 @@ function onFilePicked(event: Event) {
   const file = input.files?.[0] ?? null
   input.value = '' // allow re-picking the same file
   if (!file || !file.type.startsWith('image/')) return
-  revokeUpload()
   pick.value = { kind: 'upload', file }
   resetView()
-  uploadObjectUrl.value = URL.createObjectURL(file)
-  sourceUrl.value = uploadObjectUrl.value
+  upload.set(file) // revokes the previously picked file's URL, mints the new one
+  sourceUrl.value = upload.url.value ?? ''
 }
 
 async function loadImage() {
@@ -231,7 +226,6 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
-  revokeUpload()
 })
 </script>
 

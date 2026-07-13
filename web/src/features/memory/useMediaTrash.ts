@@ -4,12 +4,13 @@
 // per-tile restore/purge menu, and the irreversible-purge confirm (cr-0111). It owns its own thumbnail object-URL
 // lifecycle (revoked on unmount). Two outward effects go back to the host via callbacks: a restore/purge lifts the
 // gallery's optimistic-delete tombstone (`liftTombstone`) and a restore re-lists the gallery (`reloadGallery`).
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { openGrid, hasDerivatives, unsealMeta, listTrash, restoreMedia, purgeMedia, type MediaItem } from './media'
 import { galleryDisplayAspectRatio } from './mediaGridLayout'
+import { useObjectUrls } from '../../shared/state/useObjectUrls'
 import type { TreeNode } from './tree'
 
 /** The reactive context MemoryDetail hands the trash slice — getters so props stay reactive, plus the two host
@@ -26,7 +27,8 @@ export function useMediaTrash(ctx: MediaTrashContext) {
   const { t } = useI18n()
 
   const trashedItems = ref<MediaItem[]>([])
-  const trashThumbs = ref<Map<string, string>>(new Map())
+  // Per-tile decrypted thumbnails — the object-URL lifecycle (replace/drop/reset/unmount) is owned by the primitive.
+  const thumbs = useObjectUrls()
   const trashStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   // Trash tab (cr-0111): batch selection + the per-tile overflow menu + the irreversible-purge confirm.
   const selectedTrash = ref<Set<string>>(new Set())
@@ -47,10 +49,7 @@ export function useMediaTrash(ctx: MediaTrashContext) {
 
   /** Drop a media from the Trash tab locally (revoke its thumb + deselect) — the optimistic half of restore/purge. */
   function dropFromTrash(mediaId: string) {
-    const url = trashThumbs.value.get(mediaId)
-    if (url) URL.revokeObjectURL(url)
-    trashThumbs.value.delete(mediaId)
-    trashThumbs.value = new Map(trashThumbs.value)
+    thumbs.drop(mediaId)
     trashedItems.value = trashedItems.value.filter((it) => it.mediaId !== mediaId)
     if (selectedTrash.value.has(mediaId)) {
       const n = new Set(selectedTrash.value)
@@ -65,7 +64,7 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     if (!key) return
     const nodeId = ctx.node().id
     trashStatus.value = 'loading'
-    revokeTrashThumbs()
+    thumbs.clear()
     try {
       const list = await listTrash(ctx.scopeId(), nodeId)
       if (ctx.node().id !== nodeId) return
@@ -76,7 +75,7 @@ export function useMediaTrash(ctx: MediaTrashContext) {
           if (!hasDerivatives(m)) return
           try {
             const bytes = await openGrid(ctx.scopeId(), key, m)
-            if (ctx.node().id === nodeId) setTrashThumb(m.mediaId, URL.createObjectURL(new Blob([bytes as BlobPart])))
+            if (ctx.node().id === nodeId) thumbs.set(m.mediaId, new Blob([bytes as BlobPart]))
           } catch {
             // a failed tile stays a placeholder
           }
@@ -87,21 +86,9 @@ export function useMediaTrash(ctx: MediaTrashContext) {
     }
   }
 
-  function setTrashThumb(mediaId: string, url: string) {
-    const prev = trashThumbs.value.get(mediaId)
-    if (prev) URL.revokeObjectURL(prev)
-    trashThumbs.value.set(mediaId, url)
-    trashThumbs.value = new Map(trashThumbs.value)
-  }
-  function revokeTrashThumbs() {
-    for (const url of trashThumbs.value.values()) URL.revokeObjectURL(url)
-    trashThumbs.value = new Map()
-  }
-  onBeforeUnmount(revokeTrashThumbs)
-
   /** Drop the previous Memory's trash state when a different Memory/chapter opens (cr-0110/0111). */
   function resetTrash() {
-    revokeTrashThumbs()
+    thumbs.clear()
     trashedItems.value = []
     trashStatus.value = 'idle'
     selectedTrash.value = new Set()
@@ -170,7 +157,7 @@ export function useMediaTrash(ctx: MediaTrashContext) {
 
   return {
     trashedItems, // read-only to the host (its empty-state check); mutated only inside this composable
-    trashThumbs,
+    trashThumbs: thumbs.urls,
     trashStatus,
     selectedTrash,
     trashMenu,

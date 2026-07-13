@@ -4,9 +4,10 @@
 // its already-decrypted thumbnail) OR a brand-new uploaded image (a standalone cover blob decrypted on demand,
 // cr-0073). This owns the reactive wiring: editor/lightbox-seed state, the decrypted cover src (incl. the upload
 // object-URL lifecycle), and the read-modify-write save.
-import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { unsealMemoryCover, setMemoryCover, FULL_FRAME, type MemoryCover, type CoverSaveIntent } from './memoryCover'
 import { openBlob, uploadCoverBlob, deleteCoverBlob } from './media'
+import { useObjectUrl } from '../../shared/state/useObjectUrls'
 import type { TreeNode } from './tree'
 
 /** The reactive context MemoryDetail hands the cover slice — getters so props stay reactive, plus the live gallery
@@ -26,33 +27,28 @@ export function useMemoryCover(ctx: MemoryCoverContext) {
   const coverEditorMedia = ref<{ mediaId: string; src: string } | null>(null)
   const storedCover = computed(() => (ctx.memoryKey() ? unsealMemoryCover(ctx.memoryKey()!, ctx.node()) : null))
   // An **upload**-source cover isn't in `thumbs` (no media row), so its standalone blob is decrypted on demand into
-  // this object URL (revoked on change/unmount). A **media**-source cover reuses the already-decrypted thumbnail.
-  const uploadCoverUrl = ref<string | null>(null)
-  function revokeUploadCover() {
-    if (uploadCoverUrl.value) URL.revokeObjectURL(uploadCoverUrl.value)
-    uploadCoverUrl.value = null
-  }
+  // this object URL (revoked on change/unmount by the primitive). A **media**-source cover reuses the thumbnail.
+  const uploadCover = useObjectUrl()
   watch(
     storedCover,
     async (cover) => {
-      revokeUploadCover()
+      uploadCover.set(null)
       const key = ctx.memoryKey()
       if (!key || cover?.source.kind !== 'upload') return
       try {
         const bytes = await openBlob(ctx.scopeId(), key, cover.source.ref)
-        uploadCoverUrl.value = URL.createObjectURL(new Blob([bytes as BlobPart]))
+        uploadCover.set(new Blob([bytes as BlobPart]))
       } catch {
         // best-effort: a locked/absent cover blob ⇒ the placeholder tile
       }
     },
     { immediate: true },
   )
-  onBeforeUnmount(revokeUploadCover)
   // The decrypted image of the current cover: the media thumbnail (already in `thumbs`) or the uploaded cover blob.
   const coverSrc = computed(() => {
     const cover = storedCover.value
     if (!cover) return null
-    return cover.source.kind === 'upload' ? uploadCoverUrl.value : ctx.thumbs.value.get(cover.source.mediaId) ?? null
+    return cover.source.kind === 'upload' ? uploadCover.url.value : ctx.thumbs.value.get(cover.source.mediaId) ?? null
   })
   // The current cover, decrypted, to re-crop in the dialog (its cropper needs the source image — esp. for uploads).
   const coverExistingSrc = computed(() => coverSrc.value)
