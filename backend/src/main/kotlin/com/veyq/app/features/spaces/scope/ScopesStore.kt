@@ -1,9 +1,10 @@
 package com.veyq.app.features.spaces.scope
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.admin.tenant.TenantEntity
 import com.veyq.app.shared.identity.TenantProfileStore
 import com.veyq.app.shared.identity.VeyqUser
+import com.veyq.app.shared.membership.MembershipEntity
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -66,15 +67,14 @@ enum class ConsentState { PENDING, ACTIVE, NONE }
  * ciphertext grant on the membership; never a scope key. The active tenant is resolved by domain (Host).
  */
 @ApplicationScoped
-class ScopesStore(private val profiles: TenantProfileStore) {
+class ScopesStore(private val profiles: TenantProfileStore, private val membership: MembershipStore) {
 
     /** The tenant id for a Host/domain, or null if no tenant claims it. */
     fun findTenantIdByDomain(domain: String): String? =
         TenantEntity.find("domain", domain).firstResult()?.id
 
     /** Whether the caller already holds a membership in this tenant (i.e. belongs to it). */
-    fun isMember(userId: String, tenantId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and tenantId = ?2", userId, tenantId) > 0
+    fun isMember(userId: String, tenantId: String): Boolean = membership.isMember(userId, tenantId)
 
     /** Whether the caller already has a PERSONAL scope in this tenant (one per member, per tenant). */
     fun personalScopeExists(userId: String, tenantId: String): Boolean {
@@ -158,8 +158,7 @@ class ScopesStore(private val profiles: TenantProfileStore) {
         }
 
     /** Whether the caller holds a grant in this scope (is a key-holder there) — the member-directory gate. */
-    fun holdsGrant(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2 and wrappedGrant is not null", userId, scopeId) > 0
+    fun holdsGrant(userId: String, scopeId: String): Boolean = membership.holdsGrant(userId, scopeId)
 
     /** The tenant a scope lives in (for the directory's per-tenant profile join + owner-email gating). */
     fun scopeTenantId(scopeId: String): String? = ScopeEntity.findById(scopeId)?.tenantId
@@ -168,12 +167,10 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     fun scopeKind(scopeId: String): String? = ScopeEntity.findById(scopeId)?.kind
 
     /** Whether the caller holds an OWNER membership on this scope (the group-admission gate, ADR 0014 §4). */
-    fun isScopeOwner(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2 and role = ?3", userId, scopeId, MembershipEntity.OWNER) > 0
+    fun isScopeOwner(userId: String, scopeId: String): Boolean = membership.isScopeOwner(userId, scopeId)
 
     /** Whether the user already holds any membership on this scope (grant or not) — the idempotency check. */
-    fun isScopeMember(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+    fun isScopeMember(userId: String, scopeId: String): Boolean = membership.isScopeMember(userId, scopeId)
 
     /** Resolve a per-tenant username to a userId within a tenant (cr-0086) — the tenant-scoped resolve. */
     fun resolveUsernameInTenant(tenantId: String, username: String): String? =
@@ -182,12 +179,10 @@ class ScopesStore(private val profiles: TenantProfileStore) {
     // --- member management + rotation (cr-0088) ---
 
     /** The number of OWNER memberships on a scope — the last-owner guard (ADR 0007). */
-    fun ownerCount(scopeId: String): Long =
-        MembershipEntity.count("scopeId = ?1 and role = ?2", scopeId, MembershipEntity.OWNER)
+    fun ownerCount(scopeId: String): Long = membership.ownerCount(scopeId)
 
     /** A member's role in a scope, or null if they hold no membership there. */
-    fun memberRole(userId: String, scopeId: String): String? =
-        MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult()?.role
+    fun memberRole(userId: String, scopeId: String): String? = membership.memberRole(userId, scopeId)
 
     /** Set a member's role (promote/demote). No-op if not a member. */
     @Transactional

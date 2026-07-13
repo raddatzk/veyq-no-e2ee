@@ -1,12 +1,12 @@
 package com.veyq.app.features.sharing
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.media.MediaDerivativeEntity
 import com.veyq.app.features.media.MediaEntity
 import com.veyq.app.features.media.MediaStore
 import com.veyq.app.shared.crypto.Tokens
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -64,10 +64,10 @@ data class ShareBlobRef(val storageKey: String, val chunkCount: Int)
 class SharingStore(
     /** cr-0107: the delete-own path bumps the node's live-updates counters via the media store's single bump helper. */
     private val mediaStore: MediaStore,
+    private val membership: MembershipStore,
 ) {
 
-    fun isMember(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+    fun isMember(userId: String, scopeId: String): Boolean = membership.isScopeMember(userId, scopeId)
 
     fun findNode(nodeId: String): NodeEntity? = NodeEntity.findById(nodeId)
 

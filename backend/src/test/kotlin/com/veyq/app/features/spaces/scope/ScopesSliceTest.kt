@@ -1,7 +1,7 @@
 package com.veyq.app.features.spaces.scope
 
 import com.veyq.app.features.account.login.SessionService
-import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.admin.tenant.TenantEntity
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.shared.identity.TenantProfileEntity

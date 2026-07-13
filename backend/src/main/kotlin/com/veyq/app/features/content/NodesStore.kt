@@ -1,10 +1,10 @@
 package com.veyq.app.features.content
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -40,10 +40,10 @@ class NodesStore(
     // media row). The link lives on the node, so node-delete is where covers are reclaimed — hence the blob
     // store (shared transport) + BlobEntity (media) here, mirroring media's one-way dependency on content.
     private val blobStore: BlobStore,
+    private val membership: MembershipStore,
 ) {
 
-    fun isMember(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+    fun isMember(userId: String, scopeId: String): Boolean = membership.isScopeMember(userId, scopeId)
 
     fun scopeExists(scopeId: String): Boolean = ScopeEntity.findById(scopeId) != null
 

@@ -1,6 +1,6 @@
 package com.veyq.app.features.spaces.scope
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.features.sharing.SharingStore

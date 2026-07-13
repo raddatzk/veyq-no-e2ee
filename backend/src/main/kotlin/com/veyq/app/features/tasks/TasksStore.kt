@@ -1,6 +1,6 @@
 package com.veyq.app.features.tasks
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped

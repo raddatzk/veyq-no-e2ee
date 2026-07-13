@@ -6,6 +6,7 @@ import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
 import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.crypto.Tokens
+import com.veyq.app.shared.membership.MembershipEntity
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Duration

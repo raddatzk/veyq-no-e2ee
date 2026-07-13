@@ -1,9 +1,10 @@
 package com.veyq.app.features.media
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.sharing.ShareIdentityEntity
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
+import com.veyq.app.shared.membership.MembershipEntity
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -75,10 +76,9 @@ data class BucketRow(
  * sizes) is held as a small JSON array of integers — itself only ciphertext-size metadata.
  */
 @ApplicationScoped
-class MediaStore {
+class MediaStore(private val membership: MembershipStore) {
 
-    fun isMember(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+    fun isMember(userId: String, scopeId: String): Boolean = membership.isScopeMember(userId, scopeId)
 
     /** The node, if it exists in this scope (its `kind` decides the media-target rule). */
     fun findNode(scopeId: String, nodeId: String): NodeEntity? =

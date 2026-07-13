@@ -5,6 +5,7 @@ import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.crypto.Tokens
 import com.veyq.app.shared.identity.TenantProfileStore
 import com.veyq.app.shared.identity.VeyqUser
+import com.veyq.app.shared.membership.MembershipEntity
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given

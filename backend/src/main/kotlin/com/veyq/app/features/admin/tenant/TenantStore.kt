@@ -2,6 +2,8 @@ package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.identity.VeyqUser
+import com.veyq.app.shared.membership.MembershipEntity
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -35,7 +37,7 @@ data class TenantTermsRow(val version: Int, val acceptedVersion: Int, val markdo
  * EXPIRED) — nothing is hard-deleted inline; a scheduled purge removes terminal rows later.
  */
 @ApplicationScoped
-class TenantStore {
+class TenantStore(private val membership: MembershipStore) {
 
     fun domainExists(domain: String): Boolean = TenantEntity.count("domain", domain) > 0
 
@@ -98,8 +100,7 @@ class TenantStore {
     }
 
     /** Whether the user holds any membership in the tenant. */
-    fun hasMembership(userId: String, tenantId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and tenantId = ?2", userId, tenantId) > 0
+    fun hasMembership(userId: String, tenantId: String): Boolean = membership.isMember(userId, tenantId)
 
     /** Whether the user holds the OWNER membership of the tenant (the admission gate for member invites). */
     fun isOwner(userId: String, tenantId: String): Boolean =
@@ -108,9 +109,8 @@ class TenantStore {
         ) > 0
 
     /** The number of OWNER memberships on the tenant root scope (`scopeId == tenantId`) — the tenant last-owner
-     *  guard (ADR 0007): the last tenant OWNER may not be removed (cr-0091). */
-    fun tenantOwnerCount(tenantId: String): Long =
-        MembershipEntity.count("scopeId = ?1 and role = ?2", tenantId, MembershipEntity.OWNER)
+     *  guard (ADR 0007): the last tenant OWNER may not be removed (cr-0091). Delegates to the shared owner-count. */
+    fun tenantOwnerCount(tenantId: String): Long = membership.ownerCount(tenantId)
 
     /** Whether some account with this email is already a member of the tenant (dedup on member invite). */
     fun isEmailMember(tenantId: String, email: String): Boolean {

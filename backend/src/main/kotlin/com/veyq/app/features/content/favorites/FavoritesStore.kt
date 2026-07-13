@@ -1,6 +1,6 @@
 package com.veyq.app.features.content.favorites
 
-import com.veyq.app.features.admin.tenant.MembershipEntity
+import com.veyq.app.shared.membership.MembershipStore
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -10,10 +10,9 @@ import java.time.Instant
  * Scope access = the caller holds a membership for the scope (same gate as the Memory tree, cr-0026/0027).
  */
 @ApplicationScoped
-class FavoritesStore {
+class FavoritesStore(private val membership: MembershipStore) {
 
-    fun isMember(userId: String, scopeId: String): Boolean =
-        MembershipEntity.count("userId = ?1 and scopeId = ?2", userId, scopeId) > 0
+    fun isMember(userId: String, scopeId: String): Boolean = membership.isScopeMember(userId, scopeId)
 
     /** The caller's sealed favorites blob for the scope, or null if none was ever stored. */
     fun get(userId: String, scopeId: String): String? =
