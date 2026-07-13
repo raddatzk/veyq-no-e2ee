@@ -9,6 +9,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { createGroup } from './scopes'
+import { useAsyncAction } from '../../shared/state/useAsyncAction'
 
 // Mounted via v-if while open; closing = the parent unmounting it on `close` (no two-way `visible`).
 const emit = defineEmits<{ done: [scopeId: string]; close: [] }>()
@@ -16,22 +17,21 @@ const { t } = useI18n()
 
 const name = ref('')
 const error = ref('')
-const loading = ref(false)
+
+const { run: runSubmit, pending: loading } = useAsyncAction(
+  async () => {
+    const scopeId = await createGroup(name.value.trim())
+    emit('done', scopeId)
+    emit('close')
+  },
+  { onError: () => { error.value = t('groups.createFailed') } },
+)
 const canSubmit = computed(() => name.value.trim().length > 0 && !loading.value)
 
 async function submit() {
   if (!canSubmit.value) return
   error.value = ''
-  loading.value = true
-  try {
-    const scopeId = await createGroup(name.value.trim())
-    emit('done', scopeId)
-    emit('close')
-  } catch {
-    error.value = t('groups.createFailed')
-  } finally {
-    loading.value = false
-  }
+  await runSubmit()
 }
 </script>
 

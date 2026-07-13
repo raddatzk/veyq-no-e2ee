@@ -20,9 +20,12 @@ import { takeRoute } from '../app/pendingRoute'
 import { logout } from '../features/account/login/login'
 import { resetServerRole } from '../features/admin/serverRole'
 import { renderMarkdown } from '../shared/markdown'
+import { handle401 } from '../shared/handle401'
+import { isUnauthorized } from '../shared/httpError'
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const on401 = handle401(router)
 
 type Phase = 'loading' | 'ready' | 'loadFailed' | 'done'
 const phase = ref<Phase>('loading')
@@ -59,9 +62,8 @@ async function load() {
     terms.value = await getTenantTerms(activeSpace.tenantId!)
     phase.value = 'ready'
   } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    phase.value = 'loadFailed'
+    on401(e)
+    if (!isUnauthorized(e)) phase.value = 'loadFailed'
   }
 }
 
@@ -76,8 +78,9 @@ async function accept() {
     // Return the member to where the guard intercepted them (remembered deep link), else the shell home.
     await router.push(takeRoute() ?? { name: 'home' })
   } catch (e) {
-    const { status, code } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
+    on401(e)
+    if (isUnauthorized(e)) return
+    const { code } = await tenantError(e)
     if (code === 'terms_version_changed') {
       // The operator bumped the terms while this was open — re-load + re-present the newer version.
       error.value = t('terms.versionChanged')

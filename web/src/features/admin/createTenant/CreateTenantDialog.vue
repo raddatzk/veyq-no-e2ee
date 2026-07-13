@@ -10,6 +10,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { createTenant, tenantError } from './tenants'
 import { buildInviteLink, copyText } from '../../../shared/inviteLink'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ created: [] }>()
@@ -19,7 +20,6 @@ const name = ref('')
 const domain = ref('')
 const ownerEmail = ref('')
 const error = ref('')
-const loading = ref(false)
 const inviteUrl = ref('') // set on success → switches to the copy-link view (the owner hands the link off)
 const copied = ref(false)
 const canSubmit = computed(
@@ -37,21 +37,25 @@ watch(visible, (isVisible) => {
   }
 })
 
-async function submit() {
-  if (!canSubmit.value) return
-  error.value = ''
-  loading.value = true
-  try {
+const { run: runSubmit, pending: loading } = useAsyncAction(
+  async () => {
     const normalizedDomain = domain.value.trim().toLowerCase()
     const created = await createTenant(name.value.trim(), normalizedDomain, ownerEmail.value.trim())
     inviteUrl.value = buildInviteLink(created.bootstrapSecret, normalizedDomain) // the owner lives on another host
     emit('created')
-  } catch (e) {
-    const { code } = await tenantError(e)
-    error.value = code === 'domain_taken' ? t('tenant.domainTaken') : t('tenant.createFailed')
-  } finally {
-    loading.value = false
-  }
+  },
+  {
+    onError: async (e) => {
+      const { code } = await tenantError(e)
+      error.value = code === 'domain_taken' ? t('tenant.domainTaken') : t('tenant.createFailed')
+    },
+  },
+)
+
+async function submit() {
+  if (!canSubmit.value) return
+  error.value = ''
+  await runSubmit()
 }
 
 async function copyLink() {

@@ -17,6 +17,8 @@ import Message from 'primevue/message'
 import { createFolder, createMemory, createChapter, renameNode, type TreeNode } from '../tree'
 import type { EpochKeys } from '../../spaces/epochs'
 import { useMapConfig } from '../../../shared/state/useMapConfig'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { httpStatus } from '../../../shared/httpError'
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 
@@ -35,7 +37,6 @@ const { mapsAvailable } = useMapConfig()
 
 const name = ref(props.mode === 'rename' ? (props.node?.name ?? '') : '')
 const error = ref('')
-const loading = ref(false)
 const wantsLocation = ref(false) // opt into a pending `auto` place (create-memory, behind the maps opt-in)
 const showLocationStep = computed(() => props.mode === 'create-memory' && mapsAvailable.value)
 
@@ -49,13 +50,9 @@ const header = computed(() =>
         : t('memory.createFolderTitle'),
 )
 const confirmLabel = computed(() => (props.mode === 'rename' ? t('memory.save') : t('common.create')))
-const canSubmit = computed(() => name.value.trim().length > 0 && !loading.value)
 
-async function submit() {
-  if (!canSubmit.value) return
-  error.value = ''
-  loading.value = true
-  try {
+const { run: runSubmit, pending: loading } = useAsyncAction(
+  async () => {
     const trimmed = name.value.trim()
     if (props.mode === 'create-folder') {
       await createFolder(props.scopeId, props.epochs, trimmed, props.parentId ?? null)
@@ -70,12 +67,20 @@ async function submit() {
     }
     emit('done')
     emit('close')
-  } catch (e) {
-    const status = (e as { response?: { status?: number } }).response?.status
-    error.value = status === 409 ? t('memory.slugTaken') : status === 422 ? t('memory.illegalStructure') : t('memory.saveFailed')
-  } finally {
-    loading.value = false
-  }
+  },
+  {
+    onError: (e) => {
+      const status = httpStatus(e)
+      error.value = status === 409 ? t('memory.slugTaken') : status === 422 ? t('memory.illegalStructure') : t('memory.saveFailed')
+    },
+  },
+)
+const canSubmit = computed(() => name.value.trim().length > 0 && !loading.value)
+
+async function submit() {
+  if (!canSubmit.value) return
+  error.value = ''
+  await runSubmit()
 }
 </script>
 

@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { safetyNumber, getPin, acceptKeyChange } from '../account/identityPins'
+import { useAsyncAction } from '../../shared/state/useAsyncAction'
 
 const props = defineProps<{ member: { userId: string; username: string; identityPublicKey: string } }>()
 const visible = defineModel<boolean>('visible', { required: true })
@@ -18,7 +19,6 @@ const { t } = useI18n()
 
 const expected = ref('') // the pinned key's safety-number (what the caller trusted before)
 const current = ref('') // the directory key's safety-number (what is shown now)
-const busy = ref(false)
 const error = ref('')
 
 watch(
@@ -33,18 +33,18 @@ watch(
   { immediate: true },
 )
 
-async function accept() {
-  busy.value = true
-  error.value = ''
-  try {
+const { run: runAccept, pending: busy } = useAsyncAction(
+  async () => {
     await acceptKeyChange(props.member.userId, props.member.identityPublicKey)
     emit('accepted')
     visible.value = false
-  } catch {
-    error.value = t('verify.acceptFailed')
-  } finally {
-    busy.value = false
-  }
+  },
+  { onError: () => { error.value = t('verify.acceptFailed') } },
+)
+
+async function accept() {
+  error.value = ''
+  await runAccept()
 }
 </script>
 

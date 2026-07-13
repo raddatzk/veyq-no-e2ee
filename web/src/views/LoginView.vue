@@ -14,6 +14,7 @@ import { trustThisDevice, untrustThisDevice, isTrusted } from '../features/accou
 import { enrolDeviceKey, clearDeviceKey, isRememberSupported } from '../features/account/rememberMe/deviceKeyWrap'
 import { cacheSessionVault, clearSessionVault } from '../features/account/rememberMe/sessionVault'
 import { useCapabilities } from '../shared/state/useCapabilities'
+import { useAsyncAction } from '../shared/state/useAsyncAction'
 import { ACCOUNT_DEVICE_TRUST } from '../features/platform/capabilities'
 import { LoginVerifyRequestSessionScopeEnum } from '../api/generated/auth'
 import { importKitFromFile, type KitData } from '../features/account/emergencyKit/emergencyKit'
@@ -36,7 +37,6 @@ const router = useRouter()
 const email = ref('')
 const password = ref('')
 const secretKey = ref('')
-const busy = ref(false)
 const error = ref('')
 // Adaptive: the Secret-Key field shows unless THIS device has a password DEVICE wrap for the entered email
 // (a trusted device unlocks with email + password and never shows it). Default true (shown) — the safe
@@ -100,10 +100,8 @@ async function finishAndRoute() {
   await router.push(takeRoute() ?? { name: 'home' })
 }
 
-async function submit() {
-  error.value = ''
-  busy.value = true
-  try {
+const { run: runSubmit, pending: busy } = useAsyncAction(
+  async () => {
     // The password both authenticates and derives the unlock KEK, so a first submit logs in; a Secret-Key
     // retry (session already up) skips straight to unlock.
     if (!sessionReady.value) {
@@ -136,13 +134,17 @@ async function submit() {
     await unlockMasterKey(password.value, secretKey.value)
     await enrolConvenienceWrap()
     await finishAndRoute()
-  } catch {
+  },
+  {
     // Before login: wrong password / unknown account → one generic failure. After: wrong Secret Key (keep the
     // session + inputs for a retry). Both non-enumerable.
-    error.value = sessionReady.value ? t('unlock.failed') : t('login.failed')
-  } finally {
-    busy.value = false
-  }
+    onError: () => { error.value = sessionReady.value ? t('unlock.failed') : t('login.failed') },
+  },
+)
+
+async function submit() {
+  error.value = ''
+  await runSubmit()
 }
 
 function triggerUpload() {

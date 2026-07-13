@@ -15,6 +15,7 @@ import { usePwnedWarning } from '../features/account/passwordWarning'
 import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../shared/passwordPolicy'
 import { setAuthPrefill } from '../app/authPrefill'
 import { useServerState } from '../shared/state/useServerState'
+import { useAsyncAction } from '../shared/state/useAsyncAction'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -22,27 +23,26 @@ const { setSetupCompleted } = useServerState()
 const email = ref('')
 const password = ref('')
 const { breachCount } = usePwnedWarning(password)
-const busy = ref(false)
 const error = ref('')
 const secretKey = ref<string | null>(null)
 const kitReady = ref(false)
 let kitEmail = ''
 
-async function submit() {
-  if (password.value.length < MIN_PASSWORD_LENGTH) return
-  error.value = ''
-  busy.value = true
-  try {
+const { run: runSubmit, pending: busy } = useAsyncAction(
+  async () => {
     const { emergencyKit } = await registerServerOwner(email.value, password.value)
     kitEmail = email.value
     secretKey.value = emergencyKit.secretKey
     kitReady.value = false
     setSetupCompleted(true)
-  } catch {
-    error.value = t('setup.failed')
-  } finally {
-    busy.value = false
-  }
+  },
+  { onError: () => { error.value = t('setup.failed') } },
+)
+
+async function submit() {
+  if (password.value.length < MIN_PASSWORD_LENGTH) return
+  error.value = ''
+  await runSubmit()
 }
 
 async function proceed() {

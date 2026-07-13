@@ -16,6 +16,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import LocaleMarkdownEditor from './LocaleMarkdownEditor.vue'
 import { createShare, updateShare, readShareNoteMap, readShareName, readSharePassword, hasLocaleText, type LocaleMap, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
 
 /** cr-0118: a password-protected share requires at least this many characters (a client-side convention — the
  *  server never sees the password). */
@@ -52,7 +53,6 @@ const revealPw = ref(false)
 // from the existing share (a note present / a password set); on create both start off.
 const noteEnabled = ref(false)
 const passwordEnabled = ref(false)
-const busy = ref(false)
 const error = ref(false)
 const link = ref('')
 const copied = ref(false)
@@ -82,13 +82,10 @@ const roleHint = computed(() =>
   role.value === ShareRole.Contributor ? t('share.roleContributorHint') : t('share.roleViewerHint'),
 )
 
-async function onSubmit() {
-  if (passwordTooShort.value) return // guarded (the button is also disabled) — never mint an under-length password
-  busy.value = true
-  error.value = false
-  // A disabled toggle means "no note / no password" — send an empty note / clear the password.
-  const effectiveNote = noteEnabled.value ? note.value : {}
-  try {
+const { run: runSubmit, pending: busy } = useAsyncAction(
+  async () => {
+    // A disabled toggle means "no note / no password" — send an empty note / clear the password.
+    const effectiveNote = noteEnabled.value ? note.value : {}
     if (isEdit.value && props.editShare?.sealedShareKey) {
       // cr-0118: the password tri-state from the toggle — off clears any existing one, on sets/changes it, an
       // unchanged value is left untouched.
@@ -115,11 +112,14 @@ async function onSubmit() {
       link.value = minted.link
       emit('saved')
     }
-  } catch {
-    error.value = true
-  } finally {
-    busy.value = false
-  }
+  },
+  { onError: () => { error.value = true } },
+)
+
+async function onSubmit() {
+  if (passwordTooShort.value) return // guarded (the button is also disabled) — never mint an under-length password
+  error.value = false
+  await runSubmit()
 }
 
 async function onCopy() {

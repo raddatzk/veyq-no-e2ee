@@ -3,7 +3,7 @@
 // per-tenant `username` (plaintext handle) + your real name (first + last), which is **sealed under K_tenant**
 // on-device before it leaves the browser (operator-blind). The tenant key is opened on demand (openTenantKey)
 // so the panel works from any active space; a member without a tenant grant yet can still set their username.
-import { onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -11,50 +11,39 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { getMyProfile, updateMyProfile, sealName, unsealName, openTenantKey } from './profile'
-import { memberError } from '../../spaces/members'
+import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { handle401 } from '../../../shared/handle401'
+import { isUnauthorized, decodeHttpError } from '../../../shared/httpError'
 
 const { t } = useI18n()
-const router = useRouter()
+const on401 = handle401(useRouter())
 
 const username = ref('')
 const firstName = ref('')
 const lastName = ref('')
 // Account-global "ask before adding me to groups" preference (cr-0094) — a server-visible boolean, not a key.
 const requireGroupAddConsent = ref(false)
-const loading = ref(true)
-const loadError = ref(false)
-const saving = ref(false)
 const error = ref('')
 const notice = ref('')
 // K_tenant is held outside any reactive proxy — key material must not flow through Vue reactivity.
 let tenantKey: Uint8Array | null = null
 
-onMounted(async () => {
-  try {
-    const profile = await getMyProfile()
-    username.value = profile.username
-    requireGroupAddConsent.value = profile.requireGroupAddConsent
-    tenantKey = await openTenantKey()
-    if (tenantKey) {
-      const name = unsealName(tenantKey, profile.sealedName)
-      firstName.value = name?.firstName ?? ''
-      lastName.value = name?.lastName ?? ''
-    }
-  } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = true
-  } finally {
-    loading.value = false
+const { pending: loading, error: loadErr } = useAsyncData(async () => {
+  const profile = await getMyProfile()
+  username.value = profile.username
+  requireGroupAddConsent.value = profile.requireGroupAddConsent
+  tenantKey = await openTenantKey()
+  if (tenantKey) {
+    const name = unsealName(tenantKey, profile.sealedName)
+    firstName.value = name?.firstName ?? ''
+    lastName.value = name?.lastName ?? ''
   }
-})
+}, { onError: on401 })
+const loadError = computed(() => loadErrorKind(loadErr.value) !== null)
 
-async function save() {
-  if (!username.value.trim()) return
-  error.value = ''
-  notice.value = ''
-  saving.value = true
-  try {
+const { run: runSave, pending: saving } = useAsyncAction(
+  async () => {
     // Seal the real name under K_tenant when we hold it; otherwise update only the username (the name can be
     // added once the member's grant lands and they re-open this panel).
     const sealedName =
@@ -67,13 +56,22 @@ async function save() {
       requireGroupAddConsent: requireGroupAddConsent.value,
     })
     notice.value = t('profile.saved')
-  } catch (e) {
-    const { status, code } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    error.value = code === 'username_taken' ? t('profile.usernameTaken') : t('profile.saveFailed')
-  } finally {
-    saving.value = false
-  }
+  },
+  {
+    onError: async (e) => {
+      on401(e)
+      if (isUnauthorized(e)) return
+      const { code } = await decodeHttpError(e)
+      error.value = code === 'username_taken' ? t('profile.usernameTaken') : t('profile.saveFailed')
+    },
+  },
+)
+
+async function save() {
+  if (!username.value.trim()) return
+  error.value = ''
+  notice.value = ''
+  await runSave()
 }
 </script>
 

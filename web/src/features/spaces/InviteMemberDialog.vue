@@ -11,6 +11,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { inviteMember, memberError } from './members'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
+import { useAsyncAction } from '../../shared/state/useAsyncAction'
 
 const props = defineProps<{ tenantId: string }>()
 const visible = defineModel<boolean>('visible', { required: true })
@@ -19,7 +20,6 @@ const { t } = useI18n()
 
 const email = ref('')
 const error = ref('')
-const loading = ref(false)
 const inviteUrl = ref('') // set on success → switches the dialog to the copy-link view
 const copied = ref(false)
 const canSubmit = computed(() => email.value.trim().length > 0)
@@ -33,25 +33,29 @@ watch(visible, (isVisible) => {
   }
 })
 
-async function submit() {
-  if (!canSubmit.value) return
-  error.value = ''
-  loading.value = true
-  try {
+const { run: runSubmit, pending: loading } = useAsyncAction(
+  async () => {
     const state = await inviteMember(props.tenantId, email.value.trim().toLowerCase())
     inviteUrl.value = buildInviteLink(state.bootstrapSecret) // same host — a tenant owner invites into their tenant
     emit('invited') // refresh the directory behind the dialog while the owner copies the link
-  } catch (e) {
-    const { code } = await memberError(e)
-    error.value =
-      code === 'already_member'
-        ? t('members.alreadyMember')
-        : code === 'not_tenant_owner'
-          ? t('members.notOwner')
-          : t('members.inviteFailed')
-  } finally {
-    loading.value = false
-  }
+  },
+  {
+    onError: async (e) => {
+      const { code } = await memberError(e)
+      error.value =
+        code === 'already_member'
+          ? t('members.alreadyMember')
+          : code === 'not_tenant_owner'
+            ? t('members.notOwner')
+            : t('members.inviteFailed')
+    },
+  },
+)
+
+async function submit() {
+  if (!canSubmit.value) return
+  error.value = ''
+  await runSubmit()
 }
 
 async function copyLink() {

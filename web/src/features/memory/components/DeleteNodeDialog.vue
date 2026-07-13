@@ -7,6 +7,7 @@ import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { deleteNode, type TreeNode } from '../tree'
 import { NodeKind } from '../../../api/generated/content'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
 
 // Mounted via v-if while open; closing = the parent unmounting it on `close`.
 const props = defineProps<{ scopeId: string; node: TreeNode }>()
@@ -14,7 +15,6 @@ const emit = defineEmits<{ done: []; close: [] }>()
 const { t } = useI18n()
 
 const error = ref('')
-const loading = ref(false)
 const isFolder = computed(() => props.node.kind === NodeKind.Folder)
 const header = computed(() => (isFolder.value ? t('memory.deleteFolderTitle') : t('memory.deleteMemoryTitle')))
 const copy = computed(() =>
@@ -23,18 +23,18 @@ const copy = computed(() =>
     : t('memory.deleteMemoryCopy', { name: props.node.name }),
 )
 
-async function confirm() {
-  error.value = ''
-  loading.value = true
-  try {
+const { run: runConfirm, pending: loading } = useAsyncAction(
+  async () => {
     await deleteNode(props.scopeId, props.node.id)
     emit('done')
     emit('close')
-  } catch {
-    error.value = t('memory.deleteFailed')
-  } finally {
-    loading.value = false
-  }
+  },
+  { onError: () => { error.value = t('memory.deleteFailed') } },
+)
+
+async function confirm() {
+  error.value = ''
+  await runConfirm()
 }
 </script>
 

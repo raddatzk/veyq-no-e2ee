@@ -4,74 +4,68 @@
 // (the Tenants collection in the settings rail routes here); mirrors the old TenantAdminPanel row + edit, scoped
 // to a single tenant. Operator-blind: only operational metadata (name/domain/owner email/status). The backend
 // enforces Server-Owner with a 403 regardless of what the client renders.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { listTenants, reassignInvite, resendInvite, revokeTenant, tenantError, type TenantSummary } from './tenants'
+import { listTenants, reassignInvite, resendInvite, revokeTenant, type TenantSummary } from './tenants'
 import { buildInviteLink, copyText } from '../../../shared/inviteLink'
+import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { handle401 } from '../../../shared/handle401'
+import { isUnauthorized } from '../../../shared/httpError'
 
 // Addressed by id (cr-0087) — the settings rail renders one panel per tenant; the tenantId watch re-loads on switch.
 const props = defineProps<{ tenantId: string }>()
 
 const { t } = useI18n()
 const router = useRouter()
+const on401 = handle401(router)
 
 const tenant = ref<TenantSummary | null>(null)
-const loading = ref(true)
-const loadError = ref<'' | 'notAuthorized' | 'failed' | 'gone'>('')
 const notice = ref('')
 const actionError = ref('')
 
 const email = ref('')
-const busy = ref(false)
 // After a resend/reassign, show the fresh invite link to copy (cr-0080 — the owner hands it off, no mailer).
 const inviteUrl = ref('')
 const copied = ref(false)
 
 const isPending = computed(() => tenant.value?.status === 'PENDING')
 
-onMounted(load)
-watch(() => props.tenantId, load)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
+const { pending: loading, error: loadErr, reload } = useAsyncData(async () => {
   notice.value = ''
   actionError.value = ''
   inviteUrl.value = ''
-  try {
-    const found = (await listTenants()).find((x) => x.tenantId === props.tenantId) ?? null
-    tenant.value = found
-    if (!found) return void (loadError.value = 'gone')
-    email.value = found.ownerEmail
-  } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = status === 403 ? 'notAuthorized' : 'failed'
-  } finally {
-    loading.value = false
-  }
-}
+  const found = (await listTenants()).find((x) => x.tenantId === props.tenantId) ?? null
+  tenant.value = found
+  if (found) email.value = found.ownerEmail
+  return found
+}, { onError: on401 })
+watch(() => props.tenantId, () => reload())
+// The load error, plus the business `gone` state (loaded fine, no such tenant) the error slot can't carry.
+const loadError = computed<'' | 'notAuthorized' | 'failed' | 'gone'>(() => {
+  const kind = loadErrorKind(loadErr.value)
+  if (kind) return kind
+  if (!loading.value && tenant.value === null) return 'gone'
+  return ''
+})
 
 // Resend/reassign both re-mint the invite → capture the fresh secret + show its link; reloads the tenant behind it.
-async function mint(action: () => Promise<{ bootstrapSecret: string }>, successKey: string) {
-  if (!tenant.value) return
-  busy.value = true
-  actionError.value = ''
-  try {
+const { run: runMint, pending: busy } = useAsyncAction(
+  async (action: () => Promise<{ bootstrapSecret: string }>, successKey: string) => {
     const state = await action()
     notice.value = t(successKey)
-    inviteUrl.value = buildInviteLink(state.bootstrapSecret, tenant.value.domain)
-  } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('tenant.actionFailed')
-  } finally {
-    busy.value = false
-  }
+    if (tenant.value) inviteUrl.value = buildInviteLink(state.bootstrapSecret, tenant.value.domain)
+  },
+  { onError: (e) => { on401(e); if (!isUnauthorized(e)) actionError.value = t('tenant.actionFailed') } },
+)
+function mint(action: () => Promise<{ bootstrapSecret: string }>, successKey: string) {
+  if (!tenant.value) return
+  actionError.value = ''
+  return runMint(action, successKey)
 }
 
 const resend = () => mint(() => resendInvite(props.tenantId), 'tenant.resent')
@@ -87,9 +81,8 @@ async function revoke() {
     await revokeTenant(props.tenantId)
     await router.push('/settings') // the tenant is gone → drop back to the hub default
   } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('tenant.actionFailed')
+    on401(e)
+    if (!isUnauthorized(e)) actionError.value = t('tenant.actionFailed')
   }
 }
 

@@ -103,9 +103,8 @@ describe('TenantDetailPanel (uc.admin.create-tenant, web)', () => {
   })
 
   it('shows a not-authorized state on a 403', async () => {
-    const { tenantError } = await import('./tenants')
-    vi.mocked(listTenants).mockRejectedValueOnce(new Error('403'))
-    vi.mocked(tenantError).mockResolvedValueOnce({ status: 403, code: null })
+    // A real generated-client failure carries `.response.status`; the panel classifies it via `httpStatus`.
+    vi.mocked(listTenants).mockRejectedValueOnce({ response: { status: 403 } } as never)
     const w = mountPanel()
     await flushPromises()
     expect(w.find('.msg').exists()).toBe(true)
@@ -113,9 +112,7 @@ describe('TenantDetailPanel (uc.admin.create-tenant, web)', () => {
   })
 
   it('redirects to login on a 401', async () => {
-    const { tenantError } = await import('./tenants')
-    vi.mocked(listTenants).mockRejectedValueOnce(new Error('401'))
-    vi.mocked(tenantError).mockResolvedValueOnce({ status: 401, code: null })
+    vi.mocked(listTenants).mockRejectedValueOnce({ response: { status: 401 } } as never)
     mountPanel()
     await flushPromises()
     expect(push).toHaveBeenCalledWith({ name: 'login' })

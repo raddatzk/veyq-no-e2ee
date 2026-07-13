@@ -24,6 +24,7 @@ import { account } from '../app/account'
 import { setupApi } from '../api/client'
 import { fromB64std } from '../shared/base64'
 import { hybridPublic } from '../shared/crypto/v1'
+import { isUnauthorized } from '../shared/httpError'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -186,10 +187,10 @@ async function sealAndAccept() {
 /** A "no live session" failure (access expired AND the silent refresh had nothing to rotate) — distinct from
  *  a real invite error (400 malformed grant / 403 / 404 / 410), which must surface via mapError instead.
  *  Only a 401 means the session lapsed: withRefresh already rotated once and still got 401, or the refresh
- *  endpoint itself rejected. Duck-typed on the HTTP status: each generated client package throws its own
- *  ResponseError class, so a cross-package instanceof wouldn't match (same reason as login's withRefresh). */
+ *  endpoint itself rejected. Delegates to the shared `isUnauthorized` (the same cross-package status duck-type
+ *  as login's withRefresh), just under a name that carries the invite-flow meaning. */
 function isAuthLapse(e: unknown): boolean {
-  return (e as { response?: { status?: unknown } })?.response?.status === 401
+  return isUnauthorized(e)
 }
 
 /** One-click accept when this browser already holds the invited owner's unlocked vault. */

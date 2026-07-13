@@ -3,60 +3,46 @@
 // sets the server's terms as per-locale (DE+EN) markdown; a normalized change bumps the version server-side,
 // re-gating members (uc.account.accept-terms). Member-readable → non-owners see it read-only; the editor + Save
 // are owner-only (the backend 403s otherwise). Operator-blind: terms are the operator's PUBLIC policy, no key.
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import { getTenantTerms, updateTenantTerms, tenantError } from './tenants'
+import { getTenantTerms, updateTenantTerms } from './tenants'
 import { TERMS_TEMPLATE } from './termsTemplate'
 import { listMyTenants } from '../../spaces/scopes'
 import { activeSpace } from '../../../app/activeSpace'
 import { renderMarkdown } from '../../../shared/markdown'
+import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
+import { useAsyncAction } from '../../../shared/state/useAsyncAction'
+import { handle401 } from '../../../shared/handle401'
+import { httpStatus, isUnauthorized } from '../../../shared/httpError'
 
 const { t, locale } = useI18n()
-const router = useRouter()
+const on401 = handle401(useRouter())
 
 const de = ref('')
 const en = ref('')
 const version = ref(0)
 const isOwner = ref(false)
-const loading = ref(true)
-const loadError = ref<'' | 'failed'>('')
 const notice = ref('')
 const actionError = ref('')
-const saving = ref(false)
 
 // The terms in the active UI locale (fallback to the other) — drives the owner's live preview and the non-owner
 // read-only view. Rendered to a safe HTML subset (escape-first), so `v-html` is safe.
 const previewBody = computed(() => (locale.value === 'de' ? de.value : en.value) || en.value || de.value || '')
 const renderedPreview = computed(() => renderMarkdown(previewBody.value))
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  if (!activeSpace.tenantId) {
-    loading.value = false
-    loadError.value = 'failed'
-    return
-  }
-  try {
-    const terms = await getTenantTerms(activeSpace.tenantId)
-    version.value = terms.termsVersion
-    de.value = terms.terms?.de ?? ''
-    en.value = terms.terms?.en ?? ''
-    const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
-    isOwner.value = mine?.role === 'OWNER'
-  } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = 'failed'
-  } finally {
-    loading.value = false
-  }
-}
+const { pending: loading, error: loadErr } = useAsyncData(async () => {
+  if (!activeSpace.tenantId) throw new Error('no-active-tenant') // no HTTP status → classified as 'failed' below
+  const terms = await getTenantTerms(activeSpace.tenantId)
+  version.value = terms.termsVersion
+  de.value = terms.terms?.de ?? ''
+  en.value = terms.terms?.en ?? ''
+  const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
+  isOwner.value = mine?.role === 'OWNER'
+}, { onError: on401 })
+const loadError = computed<'' | 'failed'>(() => (loadErrorKind(loadErr.value) ? 'failed' : ''))
 
 /** Seed an empty locale from the clause template (never clobbers text the owner already wrote). */
 function insertTemplate() {
@@ -64,23 +50,27 @@ function insertTemplate() {
   if (!en.value.trim()) en.value = TERMS_TEMPLATE.en
 }
 
-async function save() {
-  actionError.value = ''
-  notice.value = ''
-  saving.value = true
-  try {
+const { run: runSave, pending: saving } = useAsyncAction(
+  async () => {
     const updated = await updateTenantTerms(activeSpace.tenantId!, { de: de.value, en: en.value })
     version.value = updated.termsVersion
     de.value = updated.terms?.de ?? ''
     en.value = updated.terms?.en ?? ''
     notice.value = t('terms.saved', { version: updated.termsVersion })
-  } catch (e) {
-    const { status } = await tenantError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = status === 403 ? t('terms.notOwner') : t('terms.saveFailed')
-  } finally {
-    saving.value = false
-  }
+  },
+  {
+    onError: (e) => {
+      on401(e)
+      if (isUnauthorized(e)) return
+      actionError.value = httpStatus(e) === 403 ? t('terms.notOwner') : t('terms.saveFailed')
+    },
+  },
+)
+
+async function save() {
+  actionError.value = ''
+  notice.value = ''
+  await runSave()
 }
 </script>
 

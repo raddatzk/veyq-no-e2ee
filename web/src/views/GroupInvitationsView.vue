@@ -6,7 +6,7 @@
 // decides: Accept (→ grant-delivery wraps K_SC the usual way) or Decline (a silent drop — nothing was ever wrapped).
 // Operator-blind: the server only ever held an opaque wrapped name-key + the already-stored name ciphertext + the
 // membership row, never K_SC, the name-key it can use, or the name.
-import { onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -15,69 +15,48 @@ import {
   listMyGroupInvitations,
   acceptGroupInvitation,
   declineGroupInvitation,
-  memberError,
 } from '../features/spaces/members'
 import { openInviteeName } from '../features/spaces/inviteName'
+import { useAsyncData, loadErrorKind } from '../shared/state/useAsyncData'
+import { handle401 } from '../shared/handle401'
+import { isUnauthorized } from '../shared/httpError'
 
 /** A pending invitation with its group name decrypted on-device (`name` null when the ciphertext won't open). */
 type InvitationRow = { scopeId: string; addedBy: string; name: string | null }
 
 const { t } = useI18n()
-const router = useRouter()
+const on401 = handle401(useRouter())
 
-const invitations = ref<InvitationRow[]>([])
-const loading = ref(true)
-const loadError = ref(false)
 const actionError = ref('')
 const busy = ref<string | null>(null) // scopeId currently being accepted/declined
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  loadError.value = false
-  actionError.value = ''
-  try {
+const { data, pending: loading, error } = useAsyncData<InvitationRow[]>(
+  async () => {
+    actionError.value = ''
     const rows = await listMyGroupInvitations()
-    invitations.value = rows.map((r) => ({ scopeId: r.scopeId, addedBy: r.addedBy, name: openInviteeName(r.sealedNameKey, r.encryptedName) }))
-  } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    loadError.value = true
-  } finally {
-    loading.value = false
-  }
-}
+    return rows.map((r) => ({ scopeId: r.scopeId, addedBy: r.addedBy, name: openInviteeName(r.sealedNameKey, r.encryptedName) }))
+  },
+  { onError: on401 },
+)
+const invitations = computed(() => data.value ?? [])
+const loadError = computed(() => loadErrorKind(error.value) !== null)
 
-async function accept(inv: InvitationRow) {
+// Accept and decline differ only in the endpoint they call; both drop the row on success.
+async function runRowAction(inv: InvitationRow, action: (scopeId: string) => Promise<unknown>) {
   actionError.value = ''
   busy.value = inv.scopeId
   try {
-    await acceptGroupInvitation(inv.scopeId)
-    invitations.value = invitations.value.filter((i) => i.scopeId !== inv.scopeId)
+    await action(inv.scopeId)
+    data.value = invitations.value.filter((i) => i.scopeId !== inv.scopeId)
   } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('invitations.actionFailed')
+    on401(e)
+    if (!isUnauthorized(e)) actionError.value = t('invitations.actionFailed')
   } finally {
     busy.value = null
   }
 }
-
-async function decline(inv: InvitationRow) {
-  actionError.value = ''
-  busy.value = inv.scopeId
-  try {
-    await declineGroupInvitation(inv.scopeId)
-    invitations.value = invitations.value.filter((i) => i.scopeId !== inv.scopeId)
-  } catch (e) {
-    const { status } = await memberError(e)
-    if (status === 401) return void router.push({ name: 'login' })
-    actionError.value = t('invitations.actionFailed')
-  } finally {
-    busy.value = null
-  }
-}
+const accept = (inv: InvitationRow) => runRowAction(inv, acceptGroupInvitation)
+const decline = (inv: InvitationRow) => runRowAction(inv, declineGroupInvitation)
 </script>
 
 <template>
