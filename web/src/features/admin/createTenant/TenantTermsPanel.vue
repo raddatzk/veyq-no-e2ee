@@ -144,10 +144,7 @@ async function save() {
 </template>
 
 <style scoped>
-.settings-muted {
-  margin: 0;
-  color: var(--app-muted);
-}
+
 .terms-editor-actions {
   display: flex;
   gap: 0.75rem;
@@ -172,9 +169,9 @@ async function save() {
 }
 .markdown-body {
   padding: 0.85rem 1rem;
-  border: 1px solid var(--app-line, rgba(127, 127, 127, 0.25));
-  border-radius: var(--app-radius-sm, 0.6rem);
-  background: var(--app-surface, transparent);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
   font-size: 0.92rem;
   line-height: 1.55;
 }

@@ -58,7 +58,7 @@ async function download() {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  color: var(--app-success, #22c55e);
+  color: var(--app-success);
 }
 .kit-confirm {
   display: flex;

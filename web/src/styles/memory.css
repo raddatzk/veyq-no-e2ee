@@ -4120,3 +4120,23 @@
     padding: 1.25rem 0;
   }
 }
+
+/* Gallery header copy/title/count — promoted from MemoryDetail's scoped base + ShareView's
+   duplicate scoped copy so both share one source (cr-0149, audit #64/P2a). MemoryDetail keeps its
+   own @media responsive `.gallery-title` override. */
+.gallery-header-copy {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.gallery-title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.gallery-count {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}

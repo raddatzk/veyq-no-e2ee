@@ -129,7 +129,7 @@ defineExpose({
   left: 50%;
   transform: translate(-50%, -100%); /* the pin tip sits on the exact centre */
   font-size: 1.9rem;
-  color: var(--app-accent, #c0392b);
+  color: var(--app-accent);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
   pointer-events: none;
   z-index: 500;

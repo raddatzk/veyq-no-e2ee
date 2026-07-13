@@ -591,25 +591,10 @@ onBeforeUnmount(revokeThumbs)
 }
 .share-error {
   margin: 0.25rem 0 0;
-  color: var(--app-danger, #e11d48);
+  color: var(--app-danger);
   font-size: 0.85rem;
 }
-.share-view-header .gallery-header-copy {
-  display: grid;
-  gap: 0.3rem;
-  min-width: 0;
-}
-.share-view-header .gallery-title {
-  margin: 0;
-  font-size: 2rem;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-.share-view-header .gallery-count {
-  color: var(--app-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
+
 .share-view-badge {
   display: inline-flex;
   align-items: center;
@@ -657,7 +642,7 @@ onBeforeUnmount(revokeThumbs)
   padding: 0.85rem 1rem;
   border: 1px solid var(--app-line);
   border-radius: 12px;
-  background: var(--app-surface-muted, rgba(127, 127, 127, 0.06));
+  background: var(--app-surface-muted);
   color: var(--app-text);
   font-size: 0.95rem;
   line-height: 1.55;

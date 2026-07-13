@@ -540,7 +540,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-action-button:hover:not(:disabled) { background: var(--app-control-bg); }
 .bucket-action-button:disabled { opacity: 0.45; cursor: default; }
 .bucket-action-button .bucket-action-label { font-size: 0.85rem; }
-.bucket-action-danger:hover:not(:disabled) { color: var(--app-danger, #e11d48); }
+.bucket-action-danger:hover:not(:disabled) { color: var(--app-danger); }
 .bucket-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .bucket-selection-count { color: var(--app-muted); font-size: 0.85rem; }
 .bucket-undo-bar {
@@ -562,9 +562,9 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
 .bucket-dialog-copy { color: var(--app-muted); margin: 0; }
 .bucket-dialog-form input[type='text'], .bucket-dialog-form select {
   width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--app-line); border-radius: 8px;
-  background: var(--app-surface, transparent); color: inherit; font: inherit;
+  background: var(--app-surface); color: inherit; font: inherit;
 }
-.veyq-dialog-button-danger { background: var(--app-danger, #e11d48); color: #fff; }
+.veyq-dialog-button-danger { background: var(--app-danger); color: #fff; }
 @media (max-width: 760px) {
   .bucket-action-row { justify-content: flex-start; }
   .bucket-picker { width: 100%; }

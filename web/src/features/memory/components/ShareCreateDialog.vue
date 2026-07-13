@@ -268,7 +268,7 @@ async function onCopy() {
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--app-line);
   border-radius: 12px;
-  background: var(--app-surface-muted, rgba(127, 127, 127, 0.08));
+  background: var(--app-surface-muted);
 }
 .share-group-head {
   display: flex;
@@ -318,7 +318,7 @@ async function onCopy() {
 }
 .share-error {
   margin: 0 0 0.5rem;
-  color: var(--app-danger, #e11d48);
+  color: var(--app-danger);
   font-size: 0.85rem;
 }
 .share-create-actions {

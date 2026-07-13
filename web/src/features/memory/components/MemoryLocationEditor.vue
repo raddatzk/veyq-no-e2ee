@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
 .memory-location-follow {
   border: 0;
   background: none;
-  color: var(--app-accent, #6d5ae6);
+  color: var(--app-accent);
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0;
@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
   border: 0;
   background: none;
   padding: 0;
-  color: var(--app-accent, #6d5ae6);
+  color: var(--app-accent);
   cursor: pointer;
   font-size: 0.8rem;
 }

@@ -130,8 +130,5 @@ async function decline(inv: InvitationRow) {
 </template>
 
 <style scoped>
-.settings-muted {
-  margin: 0;
-  color: var(--app-muted);
-}
+
 </style>

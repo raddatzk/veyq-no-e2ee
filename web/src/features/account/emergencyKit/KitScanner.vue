@@ -89,7 +89,7 @@ onUnmounted(stop)
   z-index: 1000;
 }
 .scanner-box {
-  background: var(--app-surface, #fff);
+  background: var(--app-surface);
   padding: 1.25rem;
   border-radius: 12px;
   display: flex;

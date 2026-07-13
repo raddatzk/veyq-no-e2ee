@@ -149,19 +149,4 @@ async function copyInviteLink() {
 </template>
 
 <style scoped>
-.settings-muted {
-  margin: 0;
-  color: var(--app-muted);
-}
-.invite-link-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.invite-link-input {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.85em;
-}
 </style>

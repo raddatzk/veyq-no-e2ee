@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
   height: 1.1rem;
   padding: 0 0.25rem;
   border-radius: 999px;
-  background: var(--app-accent, #10b981);
+  background: var(--app-accent);
   color: #fff;
   font-size: 0.7rem;
   line-height: 1.1rem;
@@ -176,7 +176,7 @@ onBeforeUnmount(() => {
   padding: 0.75rem;
   border: 1px solid var(--app-line);
   border-radius: 0.75rem;
-  background: var(--app-surface, #fff);
+  background: var(--app-surface);
   box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
   z-index: 50;
 }
@@ -194,19 +194,19 @@ onBeforeUnmount(() => {
 .uploads-header p {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
 }
 .uploads-cancel-all {
   border: none;
   background: none;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
   cursor: pointer;
   font-size: 0.8rem;
 }
 .uploads-empty {
   margin: 0.25rem 0;
   font-size: 0.85rem;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
 }
 .uploads-batch {
   padding: 0.5rem 0;
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
   margin-bottom: 0.25rem;
 }
 .uploads-bar {
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
 .uploads-bar > span {
   display: block;
   height: 100%;
-  background: var(--app-accent, #10b981);
+  background: var(--app-accent);
   transition: width 0.2s ease;
 }
 .uploads-files {
@@ -251,29 +251,29 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .uploads-file-status {
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
 }
 .uploads-file.is-failed .uploads-file-status {
-  color: var(--app-danger, #dc2626);
+  color: var(--app-danger);
 }
 .uploads-file-icon.pi-check {
-  color: var(--app-accent, #10b981);
+  color: var(--app-accent);
 }
 .uploads-file-icon.pi-times,
 .uploads-file-icon.pi-ban {
-  color: var(--app-danger, #dc2626);
+  color: var(--app-danger);
 }
 .uploads-file-action {
   border: none;
   background: none;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
   cursor: pointer;
 }
 .uploads-dismiss {
   margin-top: 0.4rem;
   border: none;
   background: none;
-  color: var(--app-muted, #71717a);
+  color: var(--app-muted);
   cursor: pointer;
   font-size: 0.8rem;
 }

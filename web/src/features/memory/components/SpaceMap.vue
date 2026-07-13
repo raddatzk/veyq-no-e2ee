@@ -308,7 +308,7 @@ function enableMaps() {
 .space-map-canvas {
   width: 100%;
   height: min(60vh, 520px);
-  border-radius: var(--app-radius, 12px);
+  border-radius: var(--app-radius);
   overflow: hidden;
   border: 1px solid var(--app-line);
 }
@@ -319,7 +319,7 @@ function enableMaps() {
   text-align: center;
   padding: 2.5rem 1.5rem;
   border: 1px dashed var(--app-line);
-  border-radius: var(--app-radius, 12px);
+  border-radius: var(--app-radius);
   background: var(--app-control-bg);
   color: var(--app-muted);
 }
@@ -336,7 +336,7 @@ function enableMaps() {
 }
 .space-map-panel-icon {
   font-size: 2rem;
-  color: var(--app-accent, #6d5ae6);
+  color: var(--app-accent);
 }
 /* A round count badge for a group of too-close pins. */
 :deep(.veyq-space-cluster) {
@@ -368,7 +368,7 @@ function enableMaps() {
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem 0.6rem 0.3rem 0.3rem;
-  background: var(--app-surface, #fff);
+  background: var(--app-surface);
   border: 1px solid var(--app-line);
   border-radius: 12px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
@@ -386,7 +386,7 @@ function enableMaps() {
   bottom: -6px;
   width: 13px;
   height: 13px;
-  background: var(--app-surface, #fff);
+  background: var(--app-surface);
   border-right: 1px solid var(--app-line);
   border-bottom: 1px solid var(--app-line);
   transform: translateX(-50%) rotate(45deg);
@@ -417,8 +417,8 @@ function enableMaps() {
 :deep(.veyq-space-card-thumb-ph) {
   display: grid;
   place-items: center;
-  background: var(--app-accent-soft, #ece9fb);
-  color: var(--app-accent, #6d5ae6);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
 }
 :deep(.veyq-space-card-thumb-ph .pi) {
   font-size: 0.95rem;

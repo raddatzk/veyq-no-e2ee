@@ -121,10 +121,7 @@ async function save() {
 </template>
 
 <style scoped>
-.settings-muted {
-  margin: 0;
-  color: var(--app-muted);
-}
+
 .name-row {
   display: flex;
   gap: 1rem;

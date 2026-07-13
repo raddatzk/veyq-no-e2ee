@@ -106,15 +106,5 @@ async function copyLink() {
   color: var(--app-muted);
   font-size: 0.9em;
 }
-.invite-link-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.invite-link-input {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.85em;
-}
+
 </style>

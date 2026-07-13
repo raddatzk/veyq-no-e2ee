@@ -973,11 +973,7 @@ onBeforeUnmount(() => {
   gap: 1rem;
   min-width: 0;
 }
-.gallery-header-copy {
-  display: grid;
-  gap: 0.3rem;
-  min-width: 0;
-}
+
 /* The Memory cover (cr-0072): a 16:9 tile showing the chosen, cropped cover (or the placeholder). It IS the
    "set/edit cover" button — clicking it opens the crop dialog. A hint label sits over it (always when empty,
    on hover once a cover is set). */
@@ -1030,17 +1026,7 @@ onBeforeUnmount(() => {
     max-width: 260px;
   }
 }
-.gallery-title {
-  margin: 0;
-  font-size: 2rem;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-.gallery-count {
-  color: var(--app-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
+
 /* Date + location under the title, side by side (cr-0067/0069). A light metadata row rather than bordered pills:
    each is a borderless button (accent icon + label) that opens its editor, with a subtle hover so it still reads
    as clickable. The "set / pending / no-location" placeholder states render muted via `.is-empty`. */

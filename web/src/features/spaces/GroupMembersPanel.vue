@@ -504,10 +504,7 @@ async function onRestore() {
 </template>
 
 <style scoped>
-.settings-muted {
-  margin: 0;
-  color: var(--app-muted);
-}
+
 .danger-zone {
   margin-top: 1.5rem;
   padding-top: 1.25rem;

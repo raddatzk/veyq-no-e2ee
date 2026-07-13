@@ -257,7 +257,7 @@ function fmtDate(d: Date): string {
 }
 .share-error {
   margin: 0.5rem 0 0;
-  color: var(--app-danger, #e11d48);
+  color: var(--app-danger);
   font-size: 0.85rem;
 }
 .share-empty {
@@ -312,7 +312,7 @@ function fmtDate(d: Date): string {
   font-size: 0.72rem;
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
-  background: var(--app-surface-muted, rgba(127, 127, 127, 0.12));
+  background: var(--app-surface-muted);
   color: var(--app-text);
 }
 .share-badge.muted {

@@ -262,7 +262,7 @@ watch(() => route.params.section, () => void loadTenants())
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--app-muted, var(--p-text-muted-color));
+  color: var(--app-muted);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
@@ -284,7 +284,7 @@ watch(() => route.params.section, () => void loadTenants())
   border: none;
   border-radius: 0.4rem;
   background: transparent;
-  color: var(--app-muted, var(--p-text-muted-color));
+  color: var(--app-muted);
   cursor: pointer;
 }
 .settings-nav-cat-action:hover {
@@ -293,7 +293,7 @@ watch(() => route.params.section, () => void loadTenants())
 }
 .settings-nav-empty {
   margin: 0.1rem 0.5rem 0.25rem;
-  color: var(--app-muted, var(--p-text-muted-color));
+  color: var(--app-muted);
   font-size: 0.85rem;
 }
 .settings-nav-item {

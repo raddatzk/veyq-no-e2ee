@@ -118,7 +118,7 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
   cursor: pointer;
 }
 .upload-tile-delete:hover {
-  background: var(--app-danger, #e11d48);
+  background: var(--app-danger);
 }
 .upload-tile-delete:disabled {
   opacity: 0.6;
