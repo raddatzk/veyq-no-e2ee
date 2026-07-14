@@ -4,122 +4,129 @@ import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.features.sharing.SharingStore
+import com.veyq.app.shared.http.FailureStatus.BAD_REQUEST
+import com.veyq.app.shared.http.FailureStatus.CONFLICT
+import com.veyq.app.shared.http.FailureStatus.FORBIDDEN
+import com.veyq.app.shared.http.FailureStatus.NOT_FOUND
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 
 /** Outcome of birthing a personal scope. */
 sealed interface CreatePersonalOutcome {
     data class Created(val scopeId: String) : CreatePersonalOutcome
-    object NoTenant : CreatePersonalOutcome
-    object AlreadyExists : CreatePersonalOutcome
+    object NoTenant : CreatePersonalOutcome, HttpFailure by Failures.tenantNotFound
+    object AlreadyExists : CreatePersonalOutcome, HttpFailure by httpFailure("personal_scope_exists", CONFLICT)
 }
 
 /** Outcome of creating a group scope. Group names are not unique, so there is no "already exists" case. */
 sealed interface CreateGroupOutcome {
     data class Created(val scopeId: String) : CreateGroupOutcome
-    object NoTenant : CreateGroupOutcome
+    object NoTenant : CreateGroupOutcome, HttpFailure by Failures.tenantNotFound
     /** The `spaces.groups` capability is disabled instance-wide (ADR 0032) — a 422, a personal-only instance. */
-    object CapabilityDisabled : CreateGroupOutcome
+    object CapabilityDisabled : CreateGroupOutcome, HttpFailure by Failures.capabilityDisabled
 }
 
 /** Outcome of listing the caller's scopes. */
 sealed interface ListScopesOutcome {
     data class Scopes(val rows: List<ScopeRow>) : ListScopesOutcome
-    object NoTenant : ListScopesOutcome
+    object NoTenant : ListScopesOutcome, HttpFailure by Failures.tenantNotFound
 }
 
 /** Outcome of adding a member to a group by username (cr-0086). Admission only — the key is delivered later.
  *  `ConsentRequired` (cr-0096): the target has consent on but no `sealedNameKey` was supplied. */
 sealed interface AddGroupMemberOutcome {
     data class Added(val row: ScopeMemberRow) : AddGroupMemberOutcome
-    object ScopeNotFound : AddGroupMemberOutcome
-    object NotOwner : AddGroupMemberOutcome
-    object MemberNotFound : AddGroupMemberOutcome
-    object AlreadyMember : AddGroupMemberOutcome
-    object ConsentRequired : AddGroupMemberOutcome
+    object ScopeNotFound : AddGroupMemberOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : AddGroupMemberOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object MemberNotFound : AddGroupMemberOutcome, HttpFailure by Failures.memberNotFound
+    object AlreadyMember : AddGroupMemberOutcome, HttpFailure by Failures.alreadyMember
+    object ConsentRequired : AddGroupMemberOutcome, HttpFailure by httpFailure("consent_required", BAD_REQUEST)
 }
 
 /** Outcome of resolving a per-tenant username to a group-add candidate (cr-0094) — records nothing. */
 sealed interface ResolveCandidateOutcome {
     data class Ok(val row: ResolvedCandidateRow) : ResolveCandidateOutcome
-    object ScopeNotFound : ResolveCandidateOutcome
-    object NotOwner : ResolveCandidateOutcome
-    object MemberNotFound : ResolveCandidateOutcome
+    object ScopeNotFound : ResolveCandidateOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : ResolveCandidateOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object MemberNotFound : ResolveCandidateOutcome, HttpFailure by Failures.memberNotFound
 }
 
 /** Outcome of accepting a consent proposal (cr-0094). Decline is unconditionally idempotent, so it has no outcome. */
 sealed interface AcceptInvitationOutcome {
     object Ok : AcceptInvitationOutcome
-    object NotFound : AcceptInvitationOutcome
+    object NotFound : AcceptInvitationOutcome, HttpFailure by httpFailure("invitation_not_found", NOT_FOUND)
 }
 
 /** Outcome of listing the caller's pending group invitations (cr-0094). */
 sealed interface ListInvitationsOutcome {
     data class Invitations(val rows: List<GroupInvitationRow>) : ListInvitationsOutcome
-    object NoTenant : ListInvitationsOutcome
+    object NoTenant : ListInvitationsOutcome, HttpFailure by Failures.tenantNotFound
 }
 
 /** Outcome of listing a scope's members (the directory, cr-0077). */
 /** Outcome of promote/demote (cr-0088). */
 sealed interface SetRoleOutcome {
     data class Ok(val row: ScopeMemberRow) : SetRoleOutcome
-    object ScopeNotFound : SetRoleOutcome
-    object NotOwner : SetRoleOutcome
-    object MemberNotFound : SetRoleOutcome
-    object LastOwner : SetRoleOutcome
+    object ScopeNotFound : SetRoleOutcome, HttpFailure by Failures.memberNotFound
+    object NotOwner : SetRoleOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object MemberNotFound : SetRoleOutcome, HttpFailure by Failures.memberNotFound
+    object LastOwner : SetRoleOutcome, HttpFailure by Failures.lastOwner
 }
 
 /** Outcome of removing a member (cr-0088). */
 sealed interface RemoveMemberOutcome {
     object Ok : RemoveMemberOutcome
-    object ScopeNotFound : RemoveMemberOutcome
-    object NotOwner : RemoveMemberOutcome
-    object MemberNotFound : RemoveMemberOutcome
-    object LastOwner : RemoveMemberOutcome
+    object ScopeNotFound : RemoveMemberOutcome, HttpFailure by Failures.memberNotFound
+    object NotOwner : RemoveMemberOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object MemberNotFound : RemoveMemberOutcome, HttpFailure by Failures.memberNotFound
+    object LastOwner : RemoveMemberOutcome, HttpFailure by Failures.lastOwner
 }
 
 /** Outcome of a rotation-commit (cr-0088). */
 sealed interface RotateOutcome {
     data class Ok(val epoch: Int) : RotateOutcome
-    object ScopeNotFound : RotateOutcome
-    object NotOwner : RotateOutcome
+    object ScopeNotFound : RotateOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : RotateOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
 }
 
 /** Outcome of reading the epoch-chain links (cr-0088). */
 sealed interface EpochsOutcome {
     data class Links(val links: List<Pair<Int, String>>) : EpochsOutcome
-    object Forbidden : EpochsOutcome
-    object ScopeNotFound : EpochsOutcome
+    object Forbidden : EpochsOutcome, HttpFailure by Failures.notScopeMember
+    object ScopeNotFound : EpochsOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 /** Outcome of renaming a group (cr-0097). Owner-gated, GROUP-only, active-only, current-epoch-only. */
 sealed interface RenameGroupOutcome {
     object Ok : RenameGroupOutcome
-    object ScopeNotFound : RenameGroupOutcome
-    object NotOwner : RenameGroupOutcome
-    object PendingDeletion : RenameGroupOutcome
-    object StaleEpoch : RenameGroupOutcome
+    object ScopeNotFound : RenameGroupOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : RenameGroupOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object PendingDeletion : RenameGroupOutcome, HttpFailure by httpFailure("scope_pending_deletion", CONFLICT)
+    object StaleEpoch : RenameGroupOutcome, HttpFailure by httpFailure("stale_epoch", CONFLICT)
 }
 
 /** Outcome of soft-deleting a group (cr-0090). */
 sealed interface DeleteGroupOutcome {
     object Ok : DeleteGroupOutcome
-    object ScopeNotFound : DeleteGroupOutcome
-    object NotGroup : DeleteGroupOutcome
-    object NotOwner : DeleteGroupOutcome
-    object AlreadyDeleted : DeleteGroupOutcome
+    object ScopeNotFound : DeleteGroupOutcome, HttpFailure by Failures.scopeNotFound
+    object NotGroup : DeleteGroupOutcome, HttpFailure by httpFailure("not_group", CONFLICT)
+    object NotOwner : DeleteGroupOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object AlreadyDeleted : DeleteGroupOutcome, HttpFailure by httpFailure("scope_already_deleted", CONFLICT)
 }
 
 /** Outcome of restoring a soft-deleted group (cr-0090). */
 sealed interface RestoreGroupOutcome {
     object Ok : RestoreGroupOutcome
-    object ScopeNotFound : RestoreGroupOutcome
-    object NotOwner : RestoreGroupOutcome
-    object NotDeleted : RestoreGroupOutcome
+    object ScopeNotFound : RestoreGroupOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : RestoreGroupOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object NotDeleted : RestoreGroupOutcome, HttpFailure by httpFailure("not_deleted", CONFLICT)
 }
 
 sealed interface ListMembersOutcome {
     data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
-    object Forbidden : ListMembersOutcome
+    object Forbidden : ListMembersOutcome, HttpFailure by Failures.notScopeMember
 }
 
 /**

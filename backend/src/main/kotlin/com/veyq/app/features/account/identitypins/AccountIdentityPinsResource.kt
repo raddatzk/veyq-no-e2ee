@@ -1,9 +1,10 @@
 package com.veyq.app.features.account.identitypins
 
 import com.veyq.app.generated.api.AccountIdentityPinsApi
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.IdentityPins
 import com.veyq.app.generated.model.IdentityPinsUpdate
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -34,7 +35,6 @@ class AccountIdentityPinsResource(
     override fun putIdentityPins(identityPinsUpdate: IdentityPinsUpdate): Response =
         when (val r = handler.store(identity.principal.name, identityPinsUpdate.blob, identityPinsUpdate.version)) {
             is PutResult.Written -> Response.ok(IdentityPins(blob = identityPinsUpdate.blob, version = r.version)).build()
-            PutResult.Stale ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "stale_version")).build()
+            is HttpFailure -> httpError(r)
         }
 }

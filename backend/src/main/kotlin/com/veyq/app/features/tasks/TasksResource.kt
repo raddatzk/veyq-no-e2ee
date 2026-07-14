@@ -6,12 +6,14 @@ import com.veyq.app.generated.model.ClaimedJob
 import com.veyq.app.generated.model.CompleteRequest
 import com.veyq.app.generated.model.DeclineRequest
 import com.veyq.app.generated.model.EnqueueRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.FailRequest
 import com.veyq.app.generated.model.GrantDeliveryTarget
 import com.veyq.app.generated.model.JobCreated
 import com.veyq.app.generated.model.JobStatus
 import com.veyq.app.generated.model.LeaseState
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -42,13 +44,14 @@ class TasksResource(
         // Structural tags are server-originated only — reject them at the front door with a clear 400 (the store
         // enforces this too as defence in depth). A client may only enqueue content-processing jobs.
         if (enqueueRequest.capabilityTag == CapabilityTags.GRANT_DELIVERY) {
-            return Response.status(Response.Status.BAD_REQUEST).entity(ErrorResponse(code = "invalid_request")).build()
+            return httpError(Failures.invalidRequest)
         }
         return when (val jobId = handler.enqueue(
             me, enqueueRequest.scopeId.toString(), enqueueRequest.capabilityTag,
             enqueueRequest.resourceRef, enqueueRequest.sealedBody,
         )) {
-            null -> Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_member")).build()
+            // Non-member enqueue → 403 not_scope_member (operator-blind status drift kept intact; inbox #83).
+            null -> httpError(Failures.notScopeMember)
             else -> Response.status(Response.Status.CREATED).entity(JobCreated(jobId = UUID.fromString(jobId))).build()
         }
     }
@@ -57,35 +60,25 @@ class TasksResource(
         when (val r = handler.heartbeat(me, jobId.toString())) {
             is HeartbeatResult.Extended ->
                 Response.ok(LeaseState(leaseExpiresAt = r.leaseExpiresAt.atOffset(ZoneOffset.UTC))).build()
-            HeartbeatResult.NotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
-            HeartbeatResult.NotHolder ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "not_lease_holder")).build()
+            is HttpFailure -> httpError(r)
         }
 
     override fun completeTask(jobId: UUID, completeRequest: CompleteRequest?): Response =
-        when (handler.complete(me, jobId.toString(), completeRequest?.sealedResult)) {
+        when (val r = handler.complete(me, jobId.toString(), completeRequest?.sealedResult)) {
             CompleteResult.Done -> Response.noContent().build()
-            CompleteResult.NotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
-            CompleteResult.MissingResult ->
-                Response.status(Response.Status.BAD_REQUEST).entity(ErrorResponse(code = "invalid_request")).build()
+            is HttpFailure -> httpError(r)
         }
 
     override fun failTask(jobId: UUID, failRequest: FailRequest?): Response =
         when (val r = handler.fail(me, jobId.toString())) {
             is FailResult.Recorded -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
-            FailResult.NotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
+            is HttpFailure -> httpError(r)
         }
 
     override fun declineTask(jobId: UUID, declineRequest: DeclineRequest?): Response =
         when (val r = handler.decline(me, jobId.toString(), declineRequest?.reason)) {
             is DeclineResult.Released -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
-            DeclineResult.NotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "job_not_found")).build()
-            DeclineResult.NotHolder ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "not_lease_holder")).build()
+            is HttpFailure -> httpError(r)
         }
 
     private fun ClaimedJobView.toDto() = ClaimedJob(

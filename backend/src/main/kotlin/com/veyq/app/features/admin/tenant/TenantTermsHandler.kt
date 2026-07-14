@@ -1,6 +1,10 @@
 package com.veyq.app.features.admin.tenant
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.veyq.app.shared.http.FailureStatus
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.TreeMap
@@ -11,21 +15,21 @@ data class TermsContent(val de: String?, val en: String?)
 /** Result of reading a tenant's terms + the caller's accepted version (cr-0114). */
 sealed interface TermsReadOutcome {
     data class Ok(val version: Int, val acceptedVersion: Int, val terms: TermsContent?) : TermsReadOutcome
-    data object NotFound : TermsReadOutcome // no such tenant, or the caller is not a member (indistinguishable)
+    data object NotFound : TermsReadOutcome, HttpFailure by Failures.tenantNotFound // no such tenant, or the caller is not a member (indistinguishable)
 }
 
 /** Result of an owner setting/replacing a tenant's terms (cr-0114). */
 sealed interface TermsUpdateOutcome {
     data class Ok(val version: Int, val acceptedVersion: Int, val terms: TermsContent?) : TermsUpdateOutcome
-    data object NotFound : TermsUpdateOutcome
-    data object NotOwner : TermsUpdateOutcome
+    data object NotFound : TermsUpdateOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotOwner : TermsUpdateOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
 }
 
 /** Result of a member accepting the tenant's current terms (cr-0114). */
 sealed interface TermsAcceptOutcome {
     data class Ok(val version: Int, val acceptedVersion: Int, val terms: TermsContent?) : TermsAcceptOutcome
-    data object NotFound : TermsAcceptOutcome
-    data object VersionChanged : TermsAcceptOutcome // the operator bumped the terms since they were shown
+    data object NotFound : TermsAcceptOutcome, HttpFailure by Failures.tenantNotFound
+    data object VersionChanged : TermsAcceptOutcome, HttpFailure by httpFailure("terms_version_changed", FailureStatus.CONFLICT) // the operator bumped the terms since they were shown
 }
 
 /**

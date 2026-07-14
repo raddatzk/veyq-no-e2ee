@@ -6,6 +6,10 @@ import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
 import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.crypto.Tokens
+import com.veyq.app.shared.http.FailureStatus
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.membership.MembershipEntity
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -15,61 +19,61 @@ import java.time.Instant
 /** Result of a create-tenant attempt. */
 sealed interface CreateTenantOutcome {
     data class Created(val tenantId: String, val expiresAt: Instant, val bootstrapSecret: String) : CreateTenantOutcome
-    data object DomainTaken : CreateTenantOutcome
+    data object DomainTaken : CreateTenantOutcome, HttpFailure by httpFailure("domain_taken", FailureStatus.CONFLICT)
 }
 
 /** Result of a resend/reassign on a pending tenant's invite. */
 sealed interface InviteOutcome {
     data class Done(val invite: InviteView) : InviteOutcome
-    data object NotFound : InviteOutcome
-    data object NotPending : InviteOutcome
+    data object NotFound : InviteOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotPending : InviteOutcome, HttpFailure by httpFailure("tenant_not_pending", FailureStatus.CONFLICT)
 }
 
 /** Result of revoking a pending tenant. */
 sealed interface RevokeOutcome {
     data object Done : RevokeOutcome
-    data object NotFound : RevokeOutcome
-    data object NotPending : RevokeOutcome
+    data object NotFound : RevokeOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotPending : RevokeOutcome, HttpFailure by httpFailure("tenant_not_pending", FailureStatus.CONFLICT)
 }
 
 /** Result of a tenant owner inviting a member by email (cr-0077). */
 sealed interface MemberInviteOutcome {
     data class Done(val invite: InviteView) : MemberInviteOutcome
-    data object NotFound : MemberInviteOutcome
-    data object NotOwner : MemberInviteOutcome
-    data object NotActive : MemberInviteOutcome
-    data object AlreadyMember : MemberInviteOutcome
+    data object NotFound : MemberInviteOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotOwner : MemberInviteOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
+    data object NotActive : MemberInviteOutcome, HttpFailure by httpFailure("tenant_not_active", FailureStatus.CONFLICT)
+    data object AlreadyMember : MemberInviteOutcome, HttpFailure by Failures.alreadyMember
 }
 
 /** Result of listing a tenant's pending member invites (cr-0082). */
 sealed interface MemberInvitesOutcome {
     data class Listed(val invites: List<PendingInviteRow>) : MemberInvitesOutcome
-    data object NotFound : MemberInvitesOutcome
-    data object NotOwner : MemberInvitesOutcome
+    data object NotFound : MemberInvitesOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotOwner : MemberInvitesOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
 }
 
 /** Result of re-issuing a pending member invite (cr-0082). */
 sealed interface ReissueOutcome {
     data class Done(val invite: InviteView) : ReissueOutcome
-    data object NotFound : ReissueOutcome        // no such tenant
-    data object NotOwner : ReissueOutcome
-    data object InviteNotFound : ReissueOutcome  // no such pending invite for this tenant
+    data object NotFound : ReissueOutcome, HttpFailure by Failures.tenantNotFound        // no such tenant
+    data object NotOwner : ReissueOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
+    data object InviteNotFound : ReissueOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)  // no such pending invite for this tenant
 }
 
 /** Result of revoking a pending member invite (cr-0082). */
 sealed interface RevokeMemberInviteOutcome {
     data object Done : RevokeMemberInviteOutcome
-    data object NotFound : RevokeMemberInviteOutcome
-    data object NotOwner : RevokeMemberInviteOutcome
-    data object InviteNotFound : RevokeMemberInviteOutcome
+    data object NotFound : RevokeMemberInviteOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotOwner : RevokeMemberInviteOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
+    data object InviteNotFound : RevokeMemberInviteOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)
 }
 
 /** Result of a tenant owner removing a member — the ACL-revoke cascade + orphan rule (cr-0091). */
 sealed interface RemoveTenantMemberOutcome {
     data object Ok : RemoveTenantMemberOutcome
-    data object NotOwner : RemoveTenantMemberOutcome       // caller is not the tenant OWNER
-    data object MemberNotFound : RemoveTenantMemberOutcome  // target holds no tenant-scope membership
-    data object LastOwner : RemoveTenantMemberOutcome       // target is the last tenant OWNER
+    data object NotOwner : RemoveTenantMemberOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)       // caller is not the tenant OWNER
+    data object MemberNotFound : RemoveTenantMemberOutcome, HttpFailure by Failures.memberNotFound  // target holds no tenant-scope membership
+    data object LastOwner : RemoveTenantMemberOutcome, HttpFailure by Failures.lastOwner       // target is the last tenant OWNER
 }
 
 /**

@@ -3,7 +3,8 @@ package com.veyq.app.features.account.keymaterial
 import com.veyq.app.generated.api.AccountWrapsApi
 import com.veyq.app.generated.model.AddWrapRequest
 import com.veyq.app.generated.model.AddWrapResult
-import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -31,10 +32,7 @@ class AccountWrapsResource(
         )) {
             is AddWrapOutcome.Created ->
                 Response.status(Response.Status.CREATED).entity(AddWrapResult(id = outcome.id)).build()
-            AddWrapOutcome.LimitReached ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "too_many_devices")).build()
-            AddWrapOutcome.CapabilityDisabled ->
-                Response.status(422).entity(ErrorResponse(code = "capability_disabled")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun deleteAccountWrap(id: String): Response {

@@ -9,7 +9,6 @@ import com.veyq.app.generated.model.BlobDownloadsBatchResponse
 import com.veyq.app.generated.model.BlobUploadResultItem
 import com.veyq.app.generated.model.BlobUploadsBatchRequest
 import com.veyq.app.generated.model.BlobUploadsBatchResponse
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MediaBatchRequest
 import com.veyq.app.generated.model.MediaBatchResponse
 import com.veyq.app.generated.model.MediaDerivativeKind
@@ -21,6 +20,8 @@ import com.veyq.app.generated.model.MediaMetaUpdate
 import com.veyq.app.generated.model.MediaResultItem
 import com.veyq.app.generated.model.MediaSummary
 import com.veyq.app.generated.model.PresignedUrl
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -58,7 +59,7 @@ class MediaResource(
                     },
                 ),
             ).build()
-            StartOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            is HttpFailure -> httpError(o)
         }
     }
 
@@ -85,7 +86,7 @@ class MediaResource(
                     },
                 ),
             ).build()
-            CompleteOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            is HttpFailure -> httpError(o)
         }
     }
 
@@ -105,7 +106,7 @@ class MediaResource(
                 ),
             ).header("ETag", "\"${o.mediaRevision}\"").build() // the ETag doubles as the client's next If-None-Match
             ListMediaOutcome.NotModified -> Response.notModified().build() // 304 — no body, no media query (idle fast path)
-            ListMediaOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     /** The client's `If-None-Match` echo of `media_revision` — lenient (strips a weak marker + quotes); null when absent/unparseable ⇒ never a 304. */
@@ -132,31 +133,31 @@ class MediaResource(
     override fun getMediaExif(scopeId: UUID, mediaId: UUID): Response =
         when (val o = handler.mediaExif(identity.principal.name, scopeId.toString(), mediaId.toString())) {
             is MediaExifOutcome.Found -> Response.ok(MediaExifResponse(wrappedExif = o.wrappedExif)).build()
-            MediaExifOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun updateMediaMeta(scopeId: UUID, mediaId: UUID, mediaMetaUpdate: MediaMetaUpdate): Response =
         when (val o = handler.updateMeta(identity.principal.name, scopeId.toString(), mediaId.toString(), mediaMetaUpdate.wrappedMeta)) {
             is MetaOutcome.Found -> Response.ok(MediaMetaResponse(wrappedMeta = o.wrappedMeta)).build()
-            MetaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun deleteMedia(scopeId: UUID, mediaId: UUID): Response =
-        when (handler.deleteMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+        when (val o = handler.deleteMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
             DeleteMediaOutcome.Done -> Response.noContent().build()
-            DeleteMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun restoreMedia(scopeId: UUID, mediaId: UUID): Response =
-        when (handler.restoreMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+        when (val o = handler.restoreMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
             RestoreMediaOutcome.Done -> Response.noContent().build()
-            RestoreMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun purgeMedia(scopeId: UUID, mediaId: UUID): Response =
-        when (handler.purgeMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
+        when (val o = handler.purgeMedia(identity.principal.name, scopeId.toString(), mediaId.toString())) {
             PurgeMediaOutcome.Done -> Response.noContent().build()
-            PurgeMediaOutcome.NoMedia -> error(Response.Status.NOT_FOUND, "media_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun commitCoverBlob(scopeId: UUID, nodeId: UUID, coverBlobCommitRequest: CoverBlobCommitRequest): Response =
@@ -170,15 +171,13 @@ class MediaResource(
                     manifest = o.ref.manifest,
                 ),
             ).build()
-            CoverCommitOutcome.NoTarget -> error(Response.Status.NOT_FOUND, "node_not_found")
-            CoverCommitOutcome.IllegalTarget -> error(422, "illegal_target")
-            CoverCommitOutcome.Budget -> error(Response.Status.BAD_REQUEST, "budget_exceeded")
+            is HttpFailure -> httpError(o)
         }
 
     override fun deleteCoverBlob(scopeId: UUID, nodeId: UUID): Response =
-        when (handler.deleteCover(identity.principal.name, scopeId.toString(), nodeId.toString())) {
+        when (val o = handler.deleteCover(identity.principal.name, scopeId.toString(), nodeId.toString())) {
             CoverDeleteOutcome.Done -> Response.noContent().build()
-            CoverDeleteOutcome.NoTarget -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun presignBlobDownloads(scopeId: UUID, blobDownloadsBatchRequest: BlobDownloadsBatchRequest): Response {
@@ -191,7 +190,7 @@ class MediaResource(
                     },
                 ),
             ).build()
-            DownloadOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            is HttpFailure -> httpError(o)
         }
     }
 
@@ -221,10 +220,4 @@ class MediaResource(
         wrappedBlobKey = d.wrappedBlobKey,
         manifest = d.manifest,
     )
-
-    private fun error(status: Response.Status, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
-
-    private fun error(status: Int, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
 }

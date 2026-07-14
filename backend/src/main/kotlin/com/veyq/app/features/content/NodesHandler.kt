@@ -1,32 +1,34 @@
 package com.veyq.app.features.content
 
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
 import jakarta.enterprise.context.ApplicationScoped
 
 sealed interface CreateNodeOutcome {
     data class Created(val nodeId: String) : CreateNodeOutcome
-    object NoScope : CreateNodeOutcome
-    object ScopeDeleting : CreateNodeOutcome
-    object IllegalStructure : CreateNodeOutcome
-    object SlugTaken : CreateNodeOutcome
+    object NoScope : CreateNodeOutcome, HttpFailure by Failures.scopeNotFound
+    object ScopeDeleting : CreateNodeOutcome, HttpFailure by Failures.scopeDeleting
+    object IllegalStructure : CreateNodeOutcome, HttpFailure by Failures.illegalStructure
+    object SlugTaken : CreateNodeOutcome, HttpFailure by Failures.slugTaken
 }
 
 sealed interface ListNodesOutcome {
     data class Nodes(val rows: List<NodeRow>) : ListNodesOutcome
-    object NoScope : ListNodesOutcome
+    object NoScope : ListNodesOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 sealed interface UpdateNodeOutcome {
     object Updated : UpdateNodeOutcome
-    object NotFound : UpdateNodeOutcome
-    object ScopeDeleting : UpdateNodeOutcome
-    object IllegalStructure : UpdateNodeOutcome
-    object SlugTaken : UpdateNodeOutcome
+    object NotFound : UpdateNodeOutcome, HttpFailure by Failures.nodeNotFound
+    object ScopeDeleting : UpdateNodeOutcome, HttpFailure by Failures.scopeDeleting
+    object IllegalStructure : UpdateNodeOutcome, HttpFailure by Failures.illegalStructure
+    object SlugTaken : UpdateNodeOutcome, HttpFailure by Failures.slugTaken
 }
 
 sealed interface DeleteNodeOutcome {
     object Deleted : DeleteNodeOutcome
-    object NoScope : DeleteNodeOutcome
-    object ScopeDeleting : DeleteNodeOutcome
+    object NoScope : DeleteNodeOutcome, HttpFailure by Failures.scopeNotFound
+    object ScopeDeleting : DeleteNodeOutcome, HttpFailure by Failures.scopeDeleting
 }
 
 /**

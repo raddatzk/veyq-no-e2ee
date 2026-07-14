@@ -4,9 +4,10 @@ import com.veyq.app.generated.api.BucketsApi
 import com.veyq.app.generated.model.BucketListResponse
 import com.veyq.app.generated.model.BucketSummary
 import com.veyq.app.generated.model.CreateBucketRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MoveMediaRequest
 import com.veyq.app.generated.model.RenameBucketRequest
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -28,7 +29,7 @@ class BucketsResource(
     override fun listNodeBuckets(scopeId: UUID, nodeId: UUID): Response =
         when (val o = handler.listBuckets(identity.principal.name, scopeId.toString(), nodeId.toString())) {
             is ListBucketsOutcome.Ok -> Response.ok(BucketListResponse(buckets = o.buckets.map(::toSummary))).build()
-            ListBucketsOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun createBucket(scopeId: UUID, nodeId: UUID, createBucketRequest: CreateBucketRequest): Response =
@@ -39,34 +40,30 @@ class BucketsResource(
             )
         ) {
             is CreateBucketOutcome.Ok -> Response.ok(toSummary(o.bucket)).build()
-            CreateBucketOutcome.Forbidden -> error(Response.Status.FORBIDDEN, "illegal_target")
-            CreateBucketOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun renameBucket(scopeId: UUID, nodeId: UUID, bucketId: UUID, renameBucketRequest: RenameBucketRequest): Response =
         when (val o = handler.renameBucket(identity.principal.name, scopeId.toString(), nodeId.toString(), bucketId.toString(), renameBucketRequest.sealedName)) {
             is RenameBucketOutcome.Ok -> Response.ok(toSummary(o.bucket)).build()
-            RenameBucketOutcome.Forbidden -> error(Response.Status.FORBIDDEN, "illegal_target")
-            RenameBucketOutcome.NoBucket -> error(Response.Status.NOT_FOUND, "bucket_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun deleteBucket(scopeId: UUID, nodeId: UUID, bucketId: UUID): Response =
-        when (handler.deleteBucket(identity.principal.name, scopeId.toString(), nodeId.toString(), bucketId.toString())) {
+        when (val o = handler.deleteBucket(identity.principal.name, scopeId.toString(), nodeId.toString(), bucketId.toString())) {
             DeleteBucketOutcome.Done -> Response.noContent().build()
-            DeleteBucketOutcome.Forbidden -> error(Response.Status.FORBIDDEN, "illegal_target")
-            DeleteBucketOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun moveBucketMedia(scopeId: UUID, nodeId: UUID, moveMediaRequest: MoveMediaRequest): Response =
         when (
-            handler.moveMedia(
+            val o = handler.moveMedia(
                 identity.principal.name, scopeId.toString(), nodeId.toString(),
                 moveMediaRequest.mediaIds.map { it.toString() }, moveMediaRequest.targetBucketId?.toString(),
             )
         ) {
             MoveMediaOutcome.Done -> Response.noContent().build()
-            MoveMediaOutcome.Forbidden -> error(Response.Status.FORBIDDEN, "illegal_target")
-            MoveMediaOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     private fun toSummary(b: BucketRow) = BucketSummary(
@@ -77,7 +74,4 @@ class BucketsResource(
         parentBucketId = b.parentBucketId?.let(UUID::fromString),
         sealedName = b.sealedName,
     )
-
-    private fun error(status: Response.Status, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
 }

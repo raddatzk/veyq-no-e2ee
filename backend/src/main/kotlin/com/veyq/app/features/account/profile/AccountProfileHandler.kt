@@ -1,6 +1,10 @@
 package com.veyq.app.features.account.profile
 
 import com.veyq.app.features.admin.tenant.TenantEntity
+import com.veyq.app.shared.http.FailureStatus.NOT_FOUND
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.identity.TenantProfileStore
 import com.veyq.app.shared.identity.VeyqUser
 import jakarta.enterprise.context.ApplicationScoped
@@ -10,8 +14,10 @@ import jakarta.transaction.Transactional
  *  (cr-0094) surfaced here — the caller's own settings surface. */
 sealed interface ProfileOutcome {
     data class Found(val username: String, val sealedName: String?, val requireGroupAddConsent: Boolean) : ProfileOutcome
-    data object NoTenant : ProfileOutcome        // no tenant for the Host, or no profile there → 404
-    data object UsernameTaken : ProfileOutcome   // the new handle is taken by someone else in this tenant → 409
+    // no tenant for the Host, or no profile there → 404
+    data object NoTenant : ProfileOutcome, HttpFailure by httpFailure("profile_not_found", NOT_FOUND)
+    // the new handle is taken by someone else in this tenant → 409
+    data object UsernameTaken : ProfileOutcome, HttpFailure by Failures.usernameTaken
 }
 
 /**

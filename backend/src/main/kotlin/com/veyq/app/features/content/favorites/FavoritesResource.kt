@@ -1,9 +1,10 @@
 package com.veyq.app.features.content.favorites
 
 import com.veyq.app.generated.api.FavoritesApi
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.Favorites
 import com.veyq.app.generated.model.PutFavoritesRequest
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -22,17 +23,14 @@ class FavoritesResource(
 ) : FavoritesApi {
 
     override fun getFavorites(scopeId: UUID): Response =
-        when (val outcome = handler.get(identity.principal.name, scopeId.toString())) {
-            is GetFavoritesOutcome.Found -> Response.ok(Favorites(ciphertext = outcome.ciphertext)).build()
-            GetFavoritesOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+        when (val o = handler.get(identity.principal.name, scopeId.toString())) {
+            is GetFavoritesOutcome.Found -> Response.ok(Favorites(ciphertext = o.ciphertext)).build()
+            is HttpFailure -> httpError(o)
         }
 
     override fun putFavorites(scopeId: UUID, putFavoritesRequest: PutFavoritesRequest): Response =
-        when (handler.put(identity.principal.name, scopeId.toString(), putFavoritesRequest.ciphertext)) {
+        when (val o = handler.put(identity.principal.name, scopeId.toString(), putFavoritesRequest.ciphertext)) {
             PutFavoritesOutcome.Stored -> Response.noContent().build()
-            PutFavoritesOutcome.NoScope -> error(Response.Status.NOT_FOUND, "scope_not_found")
+            is HttpFailure -> httpError(o)
         }
-
-    private fun error(status: Response.Status, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
 }

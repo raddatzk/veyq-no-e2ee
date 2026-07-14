@@ -4,6 +4,13 @@ import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import com.veyq.app.shared.config.VeyqConfig
+import com.veyq.app.shared.http.FailureStatus.BAD_REQUEST
+import com.veyq.app.shared.http.FailureStatus.FORBIDDEN
+import com.veyq.app.shared.http.FailureStatus.NOT_FOUND
+import com.veyq.app.shared.http.FailureStatus.UNPROCESSABLE
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import java.util.UUID
 
@@ -37,12 +44,12 @@ data class DownloadItemResult(val presignedGets: List<PresignedRef>?, val error:
 
 sealed interface StartOutcome {
     data class Results(val items: List<UploadItemResult>) : StartOutcome
-    object NoScope : StartOutcome
+    object NoScope : StartOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 sealed interface CompleteOutcome {
     data class Results(val items: List<CompleteItemResult>) : CompleteOutcome
-    object NoScope : CompleteOutcome
+    object NoScope : CompleteOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 sealed interface ListMediaOutcome {
@@ -55,103 +62,103 @@ sealed interface ListMediaOutcome {
     ) : ListMediaOutcome
     /** The client's `If-None-Match` equals the node's `media_revision` — nothing changed (a 304, no media query ran). */
     object NotModified : ListMediaOutcome
-    object NoNode : ListMediaOutcome
+    object NoNode : ListMediaOutcome, HttpFailure by Failures.nodeNotFound
 }
 
 sealed interface DownloadOutcome {
     data class Results(val items: List<DownloadItemResult>) : DownloadOutcome
-    object NoScope : DownloadOutcome
+    object NoScope : DownloadOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 sealed interface MediaExifOutcome {
     /** The media's sealed heavy EXIF (opaque base64), or null when none was sealed. */
     data class Found(val wrappedExif: String?) : MediaExifOutcome
-    object NoMedia : MediaExifOutcome
+    object NoMedia : MediaExifOutcome, HttpFailure by httpFailure("media_not_found", NOT_FOUND)
 }
 
 sealed interface MetaOutcome {
     /** The media's sealed listed-metadata blob (opaque base64), or null when none/cleared. */
     data class Found(val wrappedMeta: String?) : MetaOutcome
-    object NoMedia : MetaOutcome
+    object NoMedia : MetaOutcome, HttpFailure by httpFailure("media_not_found", NOT_FOUND)
 }
 
 sealed interface CoverCommitOutcome {
     /** The committed cover blob ref (any prior cover blob was reclaimed). */
     data class Ok(val ref: BlobRefData) : CoverCommitOutcome
     /** No such scope/node/upload, or the caller holds no grant (a 404, no reveal). */
-    object NoTarget : CoverCommitOutcome
+    object NoTarget : CoverCommitOutcome, HttpFailure by Failures.nodeNotFound
     /** The target node is a FOLDER (owns no `K_mem`) — a 422. */
-    object IllegalTarget : CoverCommitOutcome
+    object IllegalTarget : CoverCommitOutcome, HttpFailure by httpFailure("illegal_target", UNPROCESSABLE)
     /** The upload failed declare-then-verify (staged objects purged) — a 400. */
-    object Budget : CoverCommitOutcome
+    object Budget : CoverCommitOutcome, HttpFailure by httpFailure("budget_exceeded", BAD_REQUEST)
 }
 
 sealed interface CoverDeleteOutcome {
     /** The cover blob was detached + reclaimed (or the node had none — idempotent). */
     object Done : CoverDeleteOutcome
     /** No such scope/node, or the caller holds no grant (a 404). */
-    object NoTarget : CoverDeleteOutcome
+    object NoTarget : CoverDeleteOutcome, HttpFailure by Failures.nodeNotFound
 }
 
 sealed interface DeleteMediaOutcome {
     /** The media is trashed (or was already trashed — idempotent). */
     object Done : DeleteMediaOutcome
     /** No such scope/media, or the caller holds no grant (a 404, no reveal). */
-    object NoMedia : DeleteMediaOutcome
+    object NoMedia : DeleteMediaOutcome, HttpFailure by httpFailure("media_not_found", NOT_FOUND)
 }
 
 sealed interface RestoreMediaOutcome {
     /** The media is restored (or was already live — idempotent). */
     object Done : RestoreMediaOutcome
     /** No such scope/media (e.g. already purged), or the caller holds no grant (a 404). */
-    object NoMedia : RestoreMediaOutcome
+    object NoMedia : RestoreMediaOutcome, HttpFailure by httpFailure("media_not_found", NOT_FOUND)
 }
 
 sealed interface PurgeMediaOutcome {
     /** The trashed media was permanently deleted. */
     object Done : PurgeMediaOutcome
     /** No such trashed media (unknown / already purged / still live), or no grant (a 404). */
-    object NoMedia : PurgeMediaOutcome
+    object NoMedia : PurgeMediaOutcome, HttpFailure by httpFailure("media_not_found", NOT_FOUND)
 }
 
 sealed interface ListBucketsOutcome {
     data class Ok(val buckets: List<BucketRow>) : ListBucketsOutcome
     /** No such scope/node, or the caller holds no grant (a 404, no reveal). */
-    object NoNode : ListBucketsOutcome
+    object NoNode : ListBucketsOutcome, HttpFailure by Failures.nodeNotFound
 }
 
 sealed interface CreateBucketOutcome {
     data class Ok(val bucket: BucketRow) : CreateBucketOutcome
     /** A given parentBucketId is missing or not a primary (sub-buckets nest one level) — a 403. */
-    object Forbidden : CreateBucketOutcome
+    object Forbidden : CreateBucketOutcome, HttpFailure by httpFailure("illegal_target", FORBIDDEN)
     /** No such scope/node, or the caller holds no grant (a 404). */
-    object NoNode : CreateBucketOutcome
+    object NoNode : CreateBucketOutcome, HttpFailure by Failures.nodeNotFound
 }
 
 sealed interface RenameBucketOutcome {
     data class Ok(val bucket: BucketRow) : RenameBucketOutcome
     /** No such scope/node/bucket, or the caller holds no grant (a 404). */
-    object NoBucket : RenameBucketOutcome
+    object NoBucket : RenameBucketOutcome, HttpFailure by httpFailure("bucket_not_found", NOT_FOUND)
     /** The bucket is a primary (not renameable) — a 403. */
-    object Forbidden : RenameBucketOutcome
+    object Forbidden : RenameBucketOutcome, HttpFailure by httpFailure("illegal_target", FORBIDDEN)
 }
 
 sealed interface DeleteBucketOutcome {
     /** The sub-bucket was deleted + its media reparented (or it did not exist — idempotent). */
     object Done : DeleteBucketOutcome
     /** No such scope/node, or the caller holds no grant (a 404). */
-    object NoNode : DeleteBucketOutcome
+    object NoNode : DeleteBucketOutcome, HttpFailure by Failures.nodeNotFound
     /** The bucket is a primary (not deletable) — a 403. */
-    object Forbidden : DeleteBucketOutcome
+    object Forbidden : DeleteBucketOutcome, HttpFailure by httpFailure("illegal_target", FORBIDDEN)
 }
 
 sealed interface MoveMediaOutcome {
     /** The media were moved. */
     object Done : MoveMediaOutcome
     /** No such scope/node, or the caller holds no grant (a 404). */
-    object NoNode : MoveMediaOutcome
+    object NoNode : MoveMediaOutcome, HttpFailure by Failures.nodeNotFound
     /** A medium or the target bucket is not the caller's own — a 403. */
-    object Forbidden : MoveMediaOutcome
+    object Forbidden : MoveMediaOutcome, HttpFailure by httpFailure("illegal_target", FORBIDDEN)
 }
 
 /**

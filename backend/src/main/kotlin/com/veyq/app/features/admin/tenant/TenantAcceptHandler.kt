@@ -1,6 +1,10 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.shared.crypto.Tokens
+import com.veyq.app.shared.http.FailureStatus
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.identity.AccountStore
 import com.veyq.app.shared.identity.ServerRoles
 import com.veyq.app.shared.identity.TenantProfileStore
@@ -31,27 +35,27 @@ sealed interface PreviewOutcome {
         val hasAccount: Boolean,
         val role: String,
     ) : PreviewOutcome
-    data object NotFound : PreviewOutcome
-    data object NoLongerValid : PreviewOutcome
+    data object NotFound : PreviewOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)
+    data object NoLongerValid : PreviewOutcome, HttpFailure by httpFailure("invite_no_longer_valid", FailureStatus.GONE)
 }
 
 sealed interface AcceptOutcome {
     data class Activated(val tenantId: String) : AcceptOutcome
-    data object NotFound : AcceptOutcome
-    data object NoLongerValid : AcceptOutcome
-    data object NotInvitedOwner : AcceptOutcome
-    data object AlreadyActive : AcceptOutcome
-    data object MissingGrant : AcceptOutcome
-    data object UsernameTaken : AcceptOutcome
+    data object NotFound : AcceptOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)
+    data object NoLongerValid : AcceptOutcome, HttpFailure by httpFailure("invite_no_longer_valid", FailureStatus.GONE)
+    data object NotInvitedOwner : AcceptOutcome, HttpFailure by httpFailure("not_invited_owner", FailureStatus.FORBIDDEN)
+    data object AlreadyActive : AcceptOutcome, HttpFailure by httpFailure("tenant_not_pending", FailureStatus.CONFLICT)
+    data object MissingGrant : AcceptOutcome, HttpFailure by Failures.invalidRequest
+    data object UsernameTaken : AcceptOutcome, HttpFailure by Failures.usernameTaken
 }
 
 sealed interface RegisterAcceptOutcome {
     data class Activated(val tenantId: String, val userId: String) : RegisterAcceptOutcome
-    data object NotFound : RegisterAcceptOutcome
-    data object NoLongerValid : RegisterAcceptOutcome
-    data object EmailTaken : RegisterAcceptOutcome
-    data object MissingGrant : RegisterAcceptOutcome
-    data object UsernameTaken : RegisterAcceptOutcome
+    data object NotFound : RegisterAcceptOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)
+    data object NoLongerValid : RegisterAcceptOutcome, HttpFailure by httpFailure("invite_no_longer_valid", FailureStatus.GONE)
+    data object EmailTaken : RegisterAcceptOutcome, HttpFailure by httpFailure("email_taken", FailureStatus.CONFLICT)
+    data object MissingGrant : RegisterAcceptOutcome, HttpFailure by Failures.invalidRequest
+    data object UsernameTaken : RegisterAcceptOutcome, HttpFailure by Failures.usernameTaken
 }
 
 /**

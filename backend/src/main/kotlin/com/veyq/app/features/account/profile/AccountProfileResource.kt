@@ -1,9 +1,10 @@
 package com.veyq.app.features.account.profile
 
 import com.veyq.app.generated.api.AccountProfileApi
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MemberProfile
 import com.veyq.app.generated.model.ProfileUpdateRequest
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
@@ -28,7 +29,7 @@ class AccountProfileResource(
     override fun getMyProfile(): Response =
         when (val outcome = handler.get(identity.principal.name, activeHost())) {
             is ProfileOutcome.Found -> Response.ok(memberProfile(outcome)).build()
-            else -> profileNotFound()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun updateMyProfile(profileUpdateRequest: ProfileUpdateRequest): Response =
@@ -37,16 +38,11 @@ class AccountProfileResource(
             profileUpdateRequest.requireGroupAddConsent,
         )) {
             is ProfileOutcome.Found -> Response.ok(memberProfile(outcome)).build()
-            ProfileOutcome.NoTenant -> profileNotFound()
-            ProfileOutcome.UsernameTaken -> Response.status(Response.Status.CONFLICT)
-                .entity(ErrorResponse(code = "username_taken")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     private fun memberProfile(o: ProfileOutcome.Found) =
         MemberProfile(username = o.username, requireGroupAddConsent = o.requireGroupAddConsent, sealedName = o.sealedName)
-
-    private fun profileNotFound() = Response.status(Response.Status.NOT_FOUND)
-        .entity(ErrorResponse(code = "profile_not_found")).build()
 
     /** The active tenant's host: the reverse-proxy `X-Forwarded-Host`, else `Host`; first value, port stripped. */
     private fun activeHost(): String? =

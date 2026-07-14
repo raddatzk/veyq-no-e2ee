@@ -1,5 +1,8 @@
 package com.veyq.app.features.account.identitypins
 
+import com.veyq.app.shared.http.FailureStatus.CONFLICT
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -10,7 +13,7 @@ data class IdentityPinsView(val blob: String?, val version: Long)
 /** Outcome of a version-guarded write — the new version, or a stale-version conflict (client must re-read + merge). */
 sealed interface PutResult {
     data class Written(val version: Long) : PutResult
-    object Stale : PutResult
+    object Stale : PutResult, HttpFailure by httpFailure("stale_version", CONFLICT)
 }
 
 /**

@@ -1,6 +1,9 @@
 package com.veyq.app.shared.auth
 
-import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.shared.http.FailureStatus.FORBIDDEN
+import com.veyq.app.shared.http.FailureStatus.UNAUTHORIZED
+import com.veyq.app.shared.http.httpError
+import com.veyq.app.shared.http.httpFailure
 import io.quarkus.security.AuthenticationFailedException
 import io.quarkus.security.ForbiddenException
 import io.quarkus.security.UnauthorizedException
@@ -30,12 +33,7 @@ class UnauthorizedExceptionMapper : ExceptionMapper<UnauthorizedException> {
 @Provider
 class ForbiddenExceptionMapper : ExceptionMapper<ForbiddenException> {
     override fun toResponse(exception: ForbiddenException): Response =
-        Response.status(Response.Status.FORBIDDEN)
-            .entity(ErrorResponse(code = "not_server_owner"))
-            .build()
+        httpError(httpFailure("not_server_owner", FORBIDDEN))
 }
 
-private fun unauthorized(): Response =
-    Response.status(Response.Status.UNAUTHORIZED)
-        .entity(ErrorResponse(code = "authentication_failed"))
-        .build()
+private fun unauthorized(): Response = httpError(httpFailure("authentication_failed", UNAUTHORIZED))

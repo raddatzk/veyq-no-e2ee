@@ -2,15 +2,19 @@ package com.veyq.app.features.account.keymaterial
 
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
+import com.veyq.app.shared.http.FailureStatus.CONFLICT
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
 /** Outcome of adding a wrap, so the resource can map each case to its status without leaking detail. */
 sealed interface AddWrapOutcome {
     data class Created(val id: String) : AddWrapOutcome
-    object LimitReached : AddWrapOutcome
+    object LimitReached : AddWrapOutcome, HttpFailure by httpFailure("too_many_devices", CONFLICT)
     /** The `account.device-trust` capability is disabled instance-wide (ADR 0032) — a 422, full password only. */
-    object CapabilityDisabled : AddWrapOutcome
+    object CapabilityDisabled : AddWrapOutcome, HttpFailure by Failures.capabilityDisabled
 }
 
 /**

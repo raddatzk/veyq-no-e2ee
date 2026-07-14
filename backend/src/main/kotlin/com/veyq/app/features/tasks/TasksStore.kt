@@ -3,6 +3,11 @@ package com.veyq.app.features.tasks
 import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.shared.identity.VeyqUser
+import com.veyq.app.shared.http.FailureStatus.CONFLICT
+import com.veyq.app.shared.http.FailureStatus.NOT_FOUND
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -30,28 +35,28 @@ data class ClaimedJobView(
 /** Outcome of a heartbeat: the job was found in the caller's scope but may not be leased to them. */
 sealed interface HeartbeatResult {
     data class Extended(val leaseExpiresAt: Instant) : HeartbeatResult
-    object NotFound : HeartbeatResult
-    object NotHolder : HeartbeatResult
+    object NotFound : HeartbeatResult, HttpFailure by httpFailure("job_not_found", NOT_FOUND)
+    object NotHolder : HeartbeatResult, HttpFailure by httpFailure("not_lease_holder", CONFLICT)
 }
 
 /** Outcome of a completion. */
 sealed interface CompleteResult {
     object Done : CompleteResult
-    object NotFound : CompleteResult
-    object MissingResult : CompleteResult
+    object NotFound : CompleteResult, HttpFailure by httpFailure("job_not_found", NOT_FOUND)
+    object MissingResult : CompleteResult, HttpFailure by Failures.invalidRequest
 }
 
 /** Outcome of a failure report — the job's status + attempts after requeue-or-dead-letter. */
 sealed interface FailResult {
     data class Recorded(val status: String, val attempts: Int) : FailResult
-    object NotFound : FailResult
+    object NotFound : FailResult, HttpFailure by httpFailure("job_not_found", NOT_FOUND)
 }
 
 /** Outcome of a decline — the job released back to pending, or the caller wasn't its lease-holder. */
 sealed interface DeclineResult {
     data class Released(val status: String, val attempts: Int) : DeclineResult
-    object NotFound : DeclineResult
-    object NotHolder : DeclineResult
+    object NotFound : DeclineResult, HttpFailure by httpFailure("job_not_found", NOT_FOUND)
+    object NotHolder : DeclineResult, HttpFailure by httpFailure("not_lease_holder", CONFLICT)
 }
 
 /**

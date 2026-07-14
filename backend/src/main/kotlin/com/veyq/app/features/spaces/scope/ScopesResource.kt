@@ -4,7 +4,6 @@ import com.veyq.app.generated.api.ScopesApi
 import com.veyq.app.generated.model.AddGroupMemberRequest
 import com.veyq.app.generated.model.CreateGroupRequest
 import com.veyq.app.generated.model.CreatePersonalScopeRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.GroupInvitation
 import com.veyq.app.generated.model.MyTenant
 import com.veyq.app.generated.model.ResolvedGroupCandidate
@@ -18,6 +17,8 @@ import com.veyq.app.generated.model.ScopeRotated
 import com.veyq.app.generated.model.ScopeSummary
 import com.veyq.app.generated.model.SetMemberRoleRequest
 import com.veyq.app.shared.config.VeyqConfig
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
@@ -55,10 +56,7 @@ class ScopesResource(
             is CreatePersonalOutcome.Created ->
                 Response.status(Response.Status.CREATED)
                     .entity(ScopeCreated(scopeId = UUID.fromString(outcome.scopeId), kind = ScopeKind.PERSONAL)).build()
-            CreatePersonalOutcome.NoTenant ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
-            CreatePersonalOutcome.AlreadyExists ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "personal_scope_exists")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun createGroup(createGroupRequest: CreateGroupRequest): Response =
@@ -68,10 +66,7 @@ class ScopesResource(
             is CreateGroupOutcome.Created ->
                 Response.status(Response.Status.CREATED)
                     .entity(ScopeCreated(scopeId = UUID.fromString(outcome.scopeId), kind = ScopeKind.GROUP)).build()
-            CreateGroupOutcome.NoTenant ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
-            CreateGroupOutcome.CapabilityDisabled ->
-                Response.status(422).entity(ErrorResponse(code = "capability_disabled")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun listMyScopes(): Response =
@@ -87,8 +82,7 @@ class ScopesResource(
                         purgeAfter = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d.plus(deleteRetention), ZoneOffset.UTC) },
                     )
                 }).build()
-            ListScopesOutcome.NoTenant ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "tenant_not_found")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun addGroupMember(scopeId: UUID, addGroupMemberRequest: AddGroupMemberRequest): Response =
@@ -96,16 +90,7 @@ class ScopesResource(
             identity.principal.name, scopeId.toString(), addGroupMemberRequest.username, addGroupMemberRequest.sealedNameKey,
         )) {
             is AddGroupMemberOutcome.Added -> Response.status(Response.Status.CREATED).entity(scopeMember(outcome.row)).build()
-            AddGroupMemberOutcome.NotOwner ->
-                Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_owner")).build()
-            AddGroupMemberOutcome.ScopeNotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "scope_not_found")).build()
-            AddGroupMemberOutcome.MemberNotFound ->
-                Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = "member_not_found")).build()
-            AddGroupMemberOutcome.AlreadyMember ->
-                Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = "already_member")).build()
-            AddGroupMemberOutcome.ConsentRequired ->
-                Response.status(Response.Status.BAD_REQUEST).entity(ErrorResponse(code = "consent_required")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun resolveGroupMember(scopeId: UUID, addGroupMemberRequest: AddGroupMemberRequest): Response =
@@ -116,15 +101,13 @@ class ScopesResource(
                     identityPublicKey = outcome.row.identityPublicKey, requiresConsent = outcome.row.requiresConsent,
                 ),
             ).build()
-            ResolveCandidateOutcome.NotOwner -> forbidden("not_scope_owner")
-            ResolveCandidateOutcome.ScopeNotFound -> notFound("scope_not_found")
-            ResolveCandidateOutcome.MemberNotFound -> notFound("member_not_found")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun acceptGroupInvitation(scopeId: UUID): Response =
-        when (handler.acceptInvitation(identity.principal.name, scopeId.toString())) {
+        when (val o = handler.acceptInvitation(identity.principal.name, scopeId.toString())) {
             AcceptInvitationOutcome.Ok -> Response.noContent().build()
-            AcceptInvitationOutcome.NotFound -> notFound("invitation_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun declineGroupInvitation(scopeId: UUID): Response {
@@ -142,23 +125,19 @@ class ScopesResource(
                     )
                 },
             ).build()
-            ListInvitationsOutcome.NoTenant -> notFound("tenant_not_found")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun setMemberRole(scopeId: UUID, userId: UUID, setMemberRoleRequest: SetMemberRoleRequest): Response =
         when (val outcome = handler.setMemberRole(identity.principal.name, scopeId.toString(), userId.toString(), setMemberRoleRequest.role.value)) {
             is SetRoleOutcome.Ok -> Response.ok(scopeMember(outcome.row)).build()
-            SetRoleOutcome.NotOwner -> forbidden("not_scope_owner")
-            SetRoleOutcome.ScopeNotFound, SetRoleOutcome.MemberNotFound -> notFound("member_not_found")
-            SetRoleOutcome.LastOwner -> conflict("last_owner")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun removeMember(scopeId: UUID, userId: UUID): Response =
-        when (handler.removeMember(identity.principal.name, scopeId.toString(), userId.toString())) {
+        when (val o = handler.removeMember(identity.principal.name, scopeId.toString(), userId.toString())) {
             RemoveMemberOutcome.Ok -> Response.noContent().build()
-            RemoveMemberOutcome.NotOwner -> forbidden("not_scope_owner")
-            RemoveMemberOutcome.ScopeNotFound, RemoveMemberOutcome.MemberNotFound -> notFound("member_not_found")
-            RemoveMemberOutcome.LastOwner -> conflict("last_owner")
+            is HttpFailure -> httpError(o)
         }
 
     override fun rotateScope(scopeId: UUID, rotateScopeRequest: RotateScopeRequest): Response =
@@ -167,50 +146,39 @@ class ScopesResource(
             rotateScopeRequest.grants.map { it.userId.toString() to it.wrappedGrant },
         )) {
             is RotateOutcome.Ok -> Response.status(Response.Status.CREATED).entity(ScopeRotated(epoch = outcome.epoch)).build()
-            RotateOutcome.NotOwner -> forbidden("not_scope_owner")
-            RotateOutcome.ScopeNotFound -> notFound("scope_not_found")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun listScopeEpochs(scopeId: UUID): Response =
         when (val outcome = handler.listEpochs(identity.principal.name, scopeId.toString())) {
             is EpochsOutcome.Links -> Response.ok(outcome.links.map { ScopeEpochLink(epoch = it.first, wrappedPrev = it.second) }).build()
-            EpochsOutcome.Forbidden -> forbidden("not_scope_member")
-            EpochsOutcome.ScopeNotFound -> notFound("scope_not_found")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun deleteGroup(scopeId: UUID): Response =
-        when (handler.deleteGroup(identity.principal.name, scopeId.toString())) {
+        when (val o = handler.deleteGroup(identity.principal.name, scopeId.toString())) {
             DeleteGroupOutcome.Ok -> Response.noContent().build()
-            DeleteGroupOutcome.NotOwner -> forbidden("not_scope_owner")
-            DeleteGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
-            DeleteGroupOutcome.NotGroup -> conflict("not_group")
-            DeleteGroupOutcome.AlreadyDeleted -> conflict("scope_already_deleted")
+            is HttpFailure -> httpError(o)
         }
 
     override fun renameGroup(scopeId: UUID, renameGroupRequest: RenameGroupRequest): Response =
-        when (handler.renameGroup(
+        when (val o = handler.renameGroup(
             identity.principal.name, scopeId.toString(), renameGroupRequest.encryptedName, renameGroupRequest.nameEpoch,
         )) {
             RenameGroupOutcome.Ok -> Response.noContent().build()
-            RenameGroupOutcome.NotOwner -> forbidden("not_scope_owner")
-            RenameGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
-            RenameGroupOutcome.PendingDeletion -> conflict("scope_pending_deletion")
-            RenameGroupOutcome.StaleEpoch -> conflict("stale_epoch")
+            is HttpFailure -> httpError(o)
         }
 
     override fun restoreGroup(scopeId: UUID): Response =
-        when (handler.restoreGroup(identity.principal.name, scopeId.toString())) {
+        when (val o = handler.restoreGroup(identity.principal.name, scopeId.toString())) {
             RestoreGroupOutcome.Ok -> Response.noContent().build()
-            RestoreGroupOutcome.NotOwner -> forbidden("not_scope_owner")
-            RestoreGroupOutcome.ScopeNotFound -> notFound("scope_not_found")
-            RestoreGroupOutcome.NotDeleted -> conflict("not_deleted")
+            is HttpFailure -> httpError(o)
         }
 
     override fun listScopeMembers(scopeId: UUID): Response =
         when (val outcome = handler.listMembers(identity.principal.name, scopeId.toString())) {
             is ListMembersOutcome.Members -> Response.ok(outcome.rows.map { scopeMember(it) }).build()
-            ListMembersOutcome.Forbidden ->
-                Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = "not_scope_member")).build()
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun listMyTenants(): Response =
@@ -226,10 +194,6 @@ class ScopesResource(
         email = row.email, role = row.role, identityPublicKey = row.identityPublicKey,
         hasGrant = row.hasGrant, pendingConsent = row.pendingConsent,
     )
-
-    private fun forbidden(code: String) = Response.status(Response.Status.FORBIDDEN).entity(ErrorResponse(code = code)).build()
-    private fun notFound(code: String) = Response.status(Response.Status.NOT_FOUND).entity(ErrorResponse(code = code)).build()
-    private fun conflict(code: String) = Response.status(Response.Status.CONFLICT).entity(ErrorResponse(code = code)).build()
 
     /** The active tenant's host: the reverse-proxy `X-Forwarded-Host`, else `Host`; first value, port stripped. */
     private fun activeHost(): String? =

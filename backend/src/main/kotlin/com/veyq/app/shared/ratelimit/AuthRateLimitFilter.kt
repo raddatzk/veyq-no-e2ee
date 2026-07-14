@@ -1,7 +1,8 @@
 package com.veyq.app.shared.ratelimit
 
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.shared.config.VeyqConfig
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.httpError
 import io.smallrye.config.SmallRyeConfig
 import io.vertx.core.http.HttpServerRequest
 import jakarta.annotation.Priority
@@ -71,10 +72,10 @@ class AuthRateLimitFilter : ContainerRequestFilter {
 
         if (window.count.incrementAndGet() > maxRequests) {
             val retryAfter = windowSeconds - (nowSec % windowSeconds)
+            // The body is the shared ErrorResponse envelope (via httpError); this filter only adds Retry-After.
             ctx.abortWith(
-                Response.status(429)
+                Response.fromResponse(httpError(Failures.rateLimited))
                     .header("Retry-After", retryAfter)
-                    .entity(ErrorResponse(code = "rate_limited"))
                     .build(),
             )
         }

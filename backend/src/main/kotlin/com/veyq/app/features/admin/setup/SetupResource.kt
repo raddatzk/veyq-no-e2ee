@@ -3,10 +3,12 @@ package com.veyq.app.features.admin.setup
 import com.veyq.app.generated.api.SetupApi
 import com.veyq.app.generated.model.Capability
 import com.veyq.app.generated.model.CreateServerOwnerRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.SetupResult
 import com.veyq.app.generated.model.SetupStatus
 import com.veyq.app.generated.model.Version
+import com.veyq.app.shared.http.FailureStatus.CONFLICT
+import com.veyq.app.shared.http.httpError
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
@@ -42,9 +44,7 @@ class SetupResource(private val handler: SetupHandler) : SetupApi {
                 .entity(SetupResult(userId = UUID.fromString(userId)))
                 .build()
         } catch (e: SetupAlreadyComplete) {
-            Response.status(Response.Status.CONFLICT)
-                .entity(ErrorResponse(code = "setup_already_complete"))
-                .build()
+            httpError(httpFailure("setup_already_complete", CONFLICT))
         }
 }
 

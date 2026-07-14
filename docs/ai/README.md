@@ -47,6 +47,16 @@ worst.
   **cannot** proceed from the doc alone, the CR was under-refined — a cheap signal, fed straight back into the
   CR. Produce code + proof + a filled retrospective, and **close with an active process retro** (below).
 
+**Same-session refine+implement is a named, risk-based exception — not the norm.** A **tightly-scoped, mechanical,
+behaviour-preserving** CR backed by a **strong automatic gate** (e.g. `./gradlew check` over a broad slice-test
+suite that pins the behaviour, as in cr-0161) may be refined and implemented in one session: the gate stands in
+for the clean-room completeness proof (the fresh implementer would only have re-derived what the suite already
+verifies). **Design-heavy, multi-surface, or novel-abstraction CRs — anything whose own doc is the main safety
+net — stay split.** The warm refine context is precisely what the clean-room gate distrusts, so leaning on it is a
+deliberate trade, not a free win; when in doubt, split. The exception never applies to the *other* direction —
+**refine always runs fresh, never tacked onto an implementation's tail.** The buffer below keeps "split" from
+meaning "wait": a CR refined 1–2 ahead starts the next session warm *from the doc*, not from zero.
+
 **The closing process retro is mandatory and spoken, not just filed.** When implementation is done, before the
 session ends, I proactively tell the user — in the conversation, not only in the CR's `## Retrospective` — **what
 could improve about *how we work together*** (the Arbeitsweise): the process, the collaboration, the tooling, the

@@ -85,6 +85,7 @@ jobs:
       #   validate_feature_wiring — every uc/en is indexed; enabler Serves ↔ back-reference is symmetric
       #   validate_capabilities   — every capability's serves resolves to a real, built use-case (ADR 0032)
       #   validate_contracts_common — shared OpenAPI components (ErrorResponse/bearerAuth/params/enums) don't drift (ADR 0038)
+      #   validate_http_failure_projection — ErrorResponse is built only in the shared/http/ writer (ADR 0042)
       - name: Validate trust-chain guards
         run: |
           python3 -m venv .venv
@@ -95,6 +96,7 @@ jobs:
           .venv/bin/python scripts/validate_feature_wiring.py
           .venv/bin/python scripts/validate_capabilities.py
           .venv/bin/python scripts/validate_contracts_common.py
+          .venv/bin/python scripts/validate_http_failure_projection.py
 
   web-e2e:
     name: Web E2E (live backend)

@@ -5,7 +5,6 @@ import com.veyq.app.features.media.UploadDeclare
 import com.veyq.app.generated.api.SharingApi
 import com.veyq.app.generated.model.CreateShareIdentityRequest
 import com.veyq.app.generated.model.CreateShareRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.PresignedUrl
 import com.veyq.app.generated.model.PublicShare
 import com.veyq.app.generated.model.ShareBlobDownload
@@ -25,6 +24,8 @@ import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.ShareSummary
 import com.veyq.app.generated.model.UpdateShareRequest
 import com.veyq.app.generated.model.NodeKind
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.annotation.security.PermitAll
@@ -63,9 +64,7 @@ class SharingResource(
         )) {
             is CreateShareOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareCreated(shareId = o.shareId)).build()
-            CreateShareOutcome.CapabilityDisabled -> error(422, "capability_disabled")
-            CreateShareOutcome.NoNode -> error(Response.Status.NOT_FOUND, "node_not_found")
-            CreateShareOutcome.IllegalScope -> error(422, "illegal_scope")
+            is HttpFailure -> httpError(o)
         }
 
     override fun listShares(nodeId: UUID?): Response {
@@ -93,29 +92,28 @@ class SharingResource(
     }
 
     override fun revokeShare(shareId: String): Response =
-        when (handler.revoke(identity.principal.name, shareId)) {
+        when (val o = handler.revoke(identity.principal.name, shareId)) {
             RevokeShareOutcome.Done -> Response.noContent().build()
-            RevokeShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     override fun reactivateShare(shareId: String): Response =
-        when (handler.reactivate(identity.principal.name, shareId)) {
+        when (val o = handler.reactivate(identity.principal.name, shareId)) {
             ReactivateShareOutcome.Done -> Response.noContent().build()
-            ReactivateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     // Edit a share in place (cr-0115/cr-0116/cr-0119, ADR 0036) — owner-gated in the handler (404 if not the
     // caller's). The K_share-sealed ciphertexts (note + name) are re-sealed client-side; an optional `role` changes
     // the grant in place (VIEWER ↔ CONTRIBUTOR — UPLOADER is 422). The link/K_share/wrap are untouched either way.
     override fun updateShare(shareId: String, updateShareRequest: UpdateShareRequest): Response =
-        when (handler.updateShare(
+        when (val o = handler.updateShare(
             identity.principal.name, shareId,
             updateShareRequest.sealedNote, updateShareRequest.sealedShareName, updateShareRequest.role?.value,
             updateShareRequest.passwordRequired, updateShareRequest.pwSalt, updateShareRequest.pwVerifier, updateShareRequest.sealedPassword,
         )) {
             UpdateShareOutcome.Done -> Response.noContent().build()
-            UpdateShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
-            UpdateShareOutcome.InvalidRole -> error(422, "invalid_role_change")
+            is HttpFailure -> httpError(o)
         }
 
     @PermitAll
@@ -144,8 +142,7 @@ class SharingResource(
                     nodes = emptyList(), media = emptyList(), identities = null,
                 ),
             ).build()
-            ResolveShareOutcome.PasswordIncorrect -> error(403, "share_password_incorrect")
-            ResolveShareOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     @PermitAll
@@ -154,9 +151,7 @@ class SharingResource(
             is ShareBlobOutcome.Found -> Response.ok(
                 ShareBlobDownload(presignedGets = o.gets.map { PresignedUrl(index = it.index, url = it.url) }),
             ).build()
-            ShareBlobOutcome.PasswordIncorrect -> error(403, "share_password_incorrect")
-            ShareBlobOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
-            ShareBlobOutcome.StoreUnavailable -> error(503, "store_unavailable")
+            is HttpFailure -> httpError(o)
         }
 
     private fun toShareNode(n: ShareNodeRow) = ShareNode(
@@ -197,8 +192,7 @@ class SharingResource(
         when (val o = handler.createIdentity(shareId, createShareIdentityRequest.sealedDisplayName)) {
             is CreateIdentityOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareIdentityCreated(identityId = UUID.fromString(o.identityId), contributorToken = o.contributorToken)).build()
-            CreateIdentityOutcome.NotContributable -> error(403, "share_not_contributable")
-            CreateIdentityOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            is HttpFailure -> httpError(o)
         }
 
     @PermitAll
@@ -216,9 +210,7 @@ class SharingResource(
                     },
                 ),
             ).build()
-            ShareUploadOutcome.NotContributable -> error(403, "share_not_contributable")
-            ShareUploadOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
-            ShareUploadOutcome.RateLimited -> error(429, "rate_limited")
+            is HttpFailure -> httpError(o)
         }
     }
 
@@ -238,22 +230,14 @@ class SharingResource(
                     results = o.items.map { ShareMediaResultItem(blobId = it.blobId?.let(UUID::fromString), mediaId = it.mediaId?.let(UUID::fromString), error = it.error) },
                 ),
             ).build()
-            ShareCompleteOutcome.NotContributable -> error(403, "share_not_contributable")
-            ShareCompleteOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_not_found")
+            is HttpFailure -> httpError(o)
         }
     }
 
     @PermitAll
     override fun deleteShareMedia(shareId: String, mediaId: UUID, xContributorToken: String): Response =
-        when (handler.deleteMedia(shareId, xContributorToken, mediaId.toString())) {
+        when (val o = handler.deleteMedia(shareId, xContributorToken, mediaId.toString())) {
             ShareDeleteOutcome.Done -> Response.noContent().build()
-            ShareDeleteOutcome.NotContributable -> error(403, "share_not_contributable")
-            ShareDeleteOutcome.NotFound -> error(Response.Status.NOT_FOUND, "share_media_not_found")
+            is HttpFailure -> httpError(o)
         }
-
-    private fun error(status: Response.Status, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
-
-    private fun error(status: Int, code: String): Response =
-        Response.status(status).entity(ErrorResponse(code = code)).build()
 }

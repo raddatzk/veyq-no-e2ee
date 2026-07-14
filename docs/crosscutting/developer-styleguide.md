@@ -168,6 +168,14 @@ not documented; the code is the source of truth for that.
   expiry/terminal-state so any reuse-detection window (e.g. a superseded refresh token, ADR 0004) is
   preserved until it lapses; delete child rows before parents (FK order). First two: `TenantInvitePurge`
   (cr-0009), `SessionPurge` (cr-0011).
+- **HTTP failure projection → `shared/http/`.** A backend operation's sealed `…Outcome` failure variants project
+  to the wire `ErrorResponse{code}` through the **single** `shared/http/` envelope writer + status-bucket table;
+  no `…Resource` constructs `ErrorResponse` or keeps a per-resource `error`/`forbidden`/`notFound` helper. The
+  variant self-describes its `code` + status bucket (recurring failures via a shared `Failures` catalog), so the
+  projection is single-sourced and status drift is structurally impossible. **Membership-gated absence is 404** —
+  a non-member must not distinguish "forbidden" (403) from "not found" (404), or the response discloses existence
+  across the membership boundary; 403 is only for a caller who legitimately knows the resource exists.
+  ([ADR 0042](../decisions/0042-http-failure-projection.md), first: cr-0161.)
 - *(to decide)* Cross-context communication — direct call vs. domain events — settled when bounded
   contexts are cut.
 

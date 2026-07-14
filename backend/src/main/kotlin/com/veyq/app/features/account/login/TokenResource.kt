@@ -1,9 +1,13 @@
 package com.veyq.app.features.account.login
 
 import com.veyq.app.generated.api.TokenApi
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.RefreshRequest
 import com.veyq.app.generated.model.TokenPair
+import com.veyq.app.shared.http.FailureStatus.BAD_REQUEST
+import com.veyq.app.shared.http.FailureStatus.UNAUTHORIZED
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.httpError
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Context
@@ -25,13 +29,9 @@ class TokenResource(private val sessions: SessionService, private val cookie: Se
     override fun refreshSession(refreshRequest: RefreshRequest): Response {
         val fromCookie = cookie.read(headers)
         val token = fromCookie?.token ?: refreshRequest.refreshToken
-            ?: return Response.status(Response.Status.BAD_REQUEST)
-                .entity(ErrorResponse(code = "invalid_request"))
-                .build()
+            ?: return httpError(Failures.invalidRequest)
         val rotated = sessions.refresh(token)
-            ?: return Response.status(Response.Status.UNAUTHORIZED)
-                .entity(ErrorResponse(code = "refresh_rejected"))
-                .build()
+            ?: return httpError(httpFailure("refresh_rejected", UNAUTHORIZED))
         return if (fromCookie != null) {
             // Re-issue the SAME lifetime the request carried (persistent vs session) — so rotation never
             // silently upgrades/downgrades it (ADR 0004 addendum) — and clear the other lifetime, via the one

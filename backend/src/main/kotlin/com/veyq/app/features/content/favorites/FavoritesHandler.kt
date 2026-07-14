@@ -1,15 +1,17 @@
 package com.veyq.app.features.content.favorites
 
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
 import jakarta.enterprise.context.ApplicationScoped
 
 sealed interface GetFavoritesOutcome {
     data class Found(val ciphertext: String?) : GetFavoritesOutcome
-    object NoScope : GetFavoritesOutcome
+    object NoScope : GetFavoritesOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 sealed interface PutFavoritesOutcome {
     object Stored : PutFavoritesOutcome
-    object NoScope : PutFavoritesOutcome
+    object NoScope : PutFavoritesOutcome, HttpFailure by Failures.scopeNotFound
 }
 
 /**

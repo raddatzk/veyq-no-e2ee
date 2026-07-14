@@ -2,8 +2,10 @@ package com.veyq.app.features.account.keymaterial
 
 import com.veyq.app.generated.api.AccountApi
 import com.veyq.app.generated.model.AccountKeyMaterial
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.MasterKeyWrap
+import com.veyq.app.shared.http.FailureStatus.SERVER_ERROR
+import com.veyq.app.shared.http.httpError
+import com.veyq.app.shared.http.httpFailure
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
@@ -33,13 +35,13 @@ class AccountResource(
         // The caller is authenticated, so missing material is a server inconsistency (every account is created
         // with its wraps), not an auth failure → a controlled 500, never a misleading 401.
         val material = handler.forUser(identity.principal.name)
-            ?: return Response.serverError().entity(ErrorResponse(code = "internal_error")).build()
+            ?: return httpError(httpFailure("internal_error", SERVER_ERROR))
 
         // Map stored strings to the generated enums by their wire VALUE, not Enum.valueOf (which matches by
         // constant NAME and throws on any drift). Unknown wrap methods are skipped (forward-compatible);
         // an unknown suite the server can't serve is a controlled 500, never an uncaught exception.
         val suiteId = AccountKeyMaterial.SuiteId.entries.firstOrNull { it.value == material.suiteId }
-            ?: return Response.serverError().entity(ErrorResponse(code = "internal_error")).build()
+            ?: return httpError(httpFailure("internal_error", SERVER_ERROR))
         val wraps = material.wraps.mapNotNull { wrap ->
             val method = MasterKeyWrap.Method.entries.firstOrNull { it.value == wrap.method }
             if (method == null) {

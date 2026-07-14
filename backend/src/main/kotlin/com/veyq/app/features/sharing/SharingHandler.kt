@@ -11,6 +11,13 @@ import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
+import com.veyq.app.shared.http.FailureStatus.FORBIDDEN
+import com.veyq.app.shared.http.FailureStatus.NOT_FOUND
+import com.veyq.app.shared.http.FailureStatus.SERVICE_UNAVAILABLE
+import com.veyq.app.shared.http.FailureStatus.UNPROCESSABLE
+import com.veyq.app.shared.http.Failures
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import java.security.MessageDigest
 import java.time.Instant
@@ -30,82 +37,82 @@ data class ShareCompleteItem(
 sealed interface CreateShareOutcome {
     data class Created(val shareId: String) : CreateShareOutcome
     /** The sharing capability this role needs is disabled instance-wide (ADR 0032) — a 422, instance policy. */
-    object CapabilityDisabled : CreateShareOutcome
+    object CapabilityDisabled : CreateShareOutcome, HttpFailure by Failures.capabilityDisabled
     /** No such node, or the caller holds no grant for its scope (a 404, no reveal). */
-    object NoNode : CreateShareOutcome
+    object NoNode : CreateShareOutcome, HttpFailure by Failures.nodeNotFound
     /** The node is not a MEMORY (only a Memory can be public-shared, ADR 0029 §6) — a 422. */
-    object IllegalScope : CreateShareOutcome
+    object IllegalScope : CreateShareOutcome, HttpFailure by httpFailure("illegal_scope", UNPROCESSABLE)
 }
 
 sealed interface ResolveShareOutcome {
     data class Found(val share: ShareEntity, val subtree: SubtreeData, val identities: List<ShareIdentityEntity>) : ResolveShareOutcome
     /** Unknown, disabled, or expired — a non-enumerable 404 (identical in every case). */
-    object NotFound : ResolveShareOutcome
+    object NotFound : ResolveShareOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** Password-protected + no token given (cr-0118) — a LOCKED shell (only `passwordRequired` + `pwSalt`). */
     data class Locked(val share: ShareEntity) : ResolveShareOutcome
     /** Password-protected + a wrong token (cr-0118) — a 403. */
-    object PasswordIncorrect : ResolveShareOutcome
+    object PasswordIncorrect : ResolveShareOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
 }
 
 sealed interface CreateIdentityOutcome {
     data class Created(val identityId: String, val contributorToken: String) : CreateIdentityOutcome
     /** Unknown/disabled/expired share — a 404. */
-    object NotFound : CreateIdentityOutcome
+    object NotFound : CreateIdentityOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** The share does not accept contributions (not CONTRIBUTOR/UPLOADER) — a 403. */
-    object NotContributable : CreateIdentityOutcome
+    object NotContributable : CreateIdentityOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
 }
 
 sealed interface ShareDeleteOutcome {
     object Done : ShareDeleteOutcome
     /** No such share/media, or the media is not owned by this identity — a non-enumerable 404. */
-    object NotFound : ShareDeleteOutcome
+    object NotFound : ShareDeleteOutcome, HttpFailure by httpFailure("share_media_not_found", NOT_FOUND)
     /** The share does not accept contributions, or the contributor token is invalid — a 403. */
-    object NotContributable : ShareDeleteOutcome
+    object NotContributable : ShareDeleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
 }
 
 sealed interface ShareUploadOutcome {
     data class Results(val items: List<UploadItemResult>) : ShareUploadOutcome
-    object NotFound : ShareUploadOutcome
+    object NotFound : ShareUploadOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** Not a CONTRIBUTOR share, or the contributor token is invalid — a 403. */
-    object NotContributable : ShareUploadOutcome
+    object NotContributable : ShareUploadOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
     /** Per-share rate limit exceeded — a 429. */
-    object RateLimited : ShareUploadOutcome
+    object RateLimited : ShareUploadOutcome, HttpFailure by Failures.rateLimited
 }
 
 sealed interface ShareCompleteOutcome {
     data class Results(val items: List<CompleteItemResult>) : ShareCompleteOutcome
-    object NotFound : ShareCompleteOutcome
-    object NotContributable : ShareCompleteOutcome
+    object NotFound : ShareCompleteOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
+    object NotContributable : ShareCompleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
 }
 
 sealed interface ShareBlobOutcome {
     data class Found(val gets: List<PresignRef>) : ShareBlobOutcome
     /** Unknown/disabled/expired share, the blob is not under the shared subtree, or a required password token is
      *  absent — a non-enumerable 404. */
-    object NotFound : ShareBlobOutcome
+    object NotFound : ShareBlobOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** Password-protected + a wrong token (cr-0118) — a 403. */
-    object PasswordIncorrect : ShareBlobOutcome
+    object PasswordIncorrect : ShareBlobOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
     /** The store cannot presign (the in-memory dev store) — a 503. */
-    object StoreUnavailable : ShareBlobOutcome
+    object StoreUnavailable : ShareBlobOutcome, HttpFailure by httpFailure("store_unavailable", SERVICE_UNAVAILABLE)
 }
 
 sealed interface RevokeShareOutcome {
     object Done : RevokeShareOutcome
-    object NotFound : RevokeShareOutcome
+    object NotFound : RevokeShareOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
 }
 
 sealed interface UpdateShareOutcome {
     object Done : UpdateShareOutcome
     /** No such share owned by the caller — a non-enumerable 404 (owner-gated, like revoke). */
-    object NotFound : UpdateShareOutcome
+    object NotFound : UpdateShareOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** An illegal role change (cr-0119) — `role = UPLOADER`, or a change on an UPLOADER share → 422. */
-    object InvalidRole : UpdateShareOutcome
+    object InvalidRole : UpdateShareOutcome, HttpFailure by httpFailure("invalid_role_change", UNPROCESSABLE)
 }
 
 sealed interface ReactivateShareOutcome {
     object Done : ReactivateShareOutcome
     /** No such share, or the caller is not a member of its scope — a non-enumerable 404. */
-    object NotFound : ReactivateShareOutcome
+    object NotFound : ReactivateShareOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
 }
 
 /**

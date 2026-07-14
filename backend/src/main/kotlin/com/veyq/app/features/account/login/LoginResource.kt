@@ -1,12 +1,14 @@
 package com.veyq.app.features.account.login
 
 import com.veyq.app.generated.api.LoginApi
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.LoginChallenge
 import com.veyq.app.generated.model.LoginChallengeRequest
 import com.veyq.app.generated.model.LoginVerifyRequest
 import com.veyq.app.generated.model.SessionFamily
 import com.veyq.app.generated.model.SessionResponse
+import com.veyq.app.shared.http.FailureStatus.UNAUTHORIZED
+import com.veyq.app.shared.http.httpError
+import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.ratelimit.RateLimited
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
@@ -30,9 +32,7 @@ class LoginResource(private val handler: LoginHandler, private val cookie: Sessi
 
     override fun verifyLogin(loginVerifyRequest: LoginVerifyRequest): Response {
         val session = handler.verify(loginVerifyRequest.email, loginVerifyRequest.signature)
-            ?: return Response.status(Response.Status.UNAUTHORIZED)
-                .entity(ErrorResponse(code = "authentication_failed"))
-                .build()
+            ?: return httpError(httpFailure("authentication_failed", UNAUTHORIZED))
         val family = SessionFamily(id = UUID.fromString(session.familyId))
         // Pick the refresh transport (ADR 0004 addendum / ADR 0005 §22). Web sends `sessionScope`; native omits
         // it. Compare by wire value so the exact generated enum constant doesn't matter. `remember` is the legacy

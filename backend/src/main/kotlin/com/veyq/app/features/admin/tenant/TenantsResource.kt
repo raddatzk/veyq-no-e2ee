@@ -5,7 +5,6 @@ import com.veyq.app.generated.model.AcceptInviteRequest
 import com.veyq.app.generated.model.AcceptPreviewRequest
 import com.veyq.app.generated.model.AcceptTermsRequest
 import com.veyq.app.generated.model.CreateTenantRequest
-import com.veyq.app.generated.model.ErrorResponse
 import com.veyq.app.generated.model.InviteRole
 import com.veyq.app.generated.model.InviteStatus
 import com.veyq.app.generated.model.LocalizedMarkdown
@@ -23,6 +22,8 @@ import com.veyq.app.generated.model.TenantStatus
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.generated.model.TenantTerms
 import com.veyq.app.generated.model.TenantTermsUpdate
+import com.veyq.app.shared.http.HttpFailure
+import com.veyq.app.shared.http.httpError
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
 import com.veyq.app.shared.identity.WrapData
 import com.veyq.app.shared.ratelimit.RateLimited
@@ -60,7 +61,7 @@ class TenantsResource(
             is CreateTenantOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(TenantCreated(UUID.fromString(outcome.tenantId), TenantStatus.PENDING, outcome.expiresAt.utc(), outcome.bootstrapSecret))
                 .build()
-            CreateTenantOutcome.DomainTaken -> conflict("domain_taken")
+            is HttpFailure -> httpError(outcome)
         }
 
     override fun listTenants(): Response =
@@ -73,10 +74,9 @@ class TenantsResource(
         handler.reassignInvite(tenantId.toString(), reassignOwnerRequest.ownerEmail).toResponse()
 
     override fun revokeTenant(tenantId: UUID): Response =
-        when (handler.revoke(tenantId.toString())) {
+        when (val o = handler.revoke(tenantId.toString())) {
             RevokeOutcome.Done -> Response.noContent().build()
-            RevokeOutcome.NotFound -> notFound()
-            RevokeOutcome.NotPending -> conflict("tenant_not_pending")
+            is HttpFailure -> httpError(o)
         }
 
     // Member invite (cr-0077): NOT Server-Owner — the tenant OWNER admits members. @Authenticated overrides the
@@ -87,11 +87,7 @@ class TenantsResource(
             is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
                 MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
             ).build()
-            MemberInviteOutcome.NotFound -> notFound()
-            MemberInviteOutcome.NotOwner -> Response.status(Response.Status.FORBIDDEN)
-                .entity(ErrorResponse(code = "not_tenant_owner")).build()
-            MemberInviteOutcome.NotActive -> conflict("tenant_not_active")
-            MemberInviteOutcome.AlreadyMember -> conflict("already_member")
+            is HttpFailure -> httpError(outcome)
         }
 
     // Member-invite management (cr-0082) — owner-gated tracking of pending member invites: list / re-issue link /
@@ -104,8 +100,7 @@ class TenantsResource(
                     PendingMemberInvite(UUID.fromString(it.inviteId), it.email, InviteStatus.decode(it.status), it.expiresAt.utc())
                 },
             ).build()
-            MemberInvitesOutcome.NotFound -> notFound()
-            MemberInvitesOutcome.NotOwner -> notTenantOwner()
+            is HttpFailure -> httpError(outcome)
         }
 
     @Authenticated
@@ -114,29 +109,23 @@ class TenantsResource(
             is ReissueOutcome.Done -> Response.ok(
                 MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
             ).build()
-            ReissueOutcome.NotFound -> notFound()
-            ReissueOutcome.NotOwner -> notTenantOwner()
-            ReissueOutcome.InviteNotFound -> inviteNotFound()
+            is HttpFailure -> httpError(outcome)
         }
 
     @Authenticated
     override fun revokeMemberInvite(tenantId: UUID, inviteId: UUID): Response =
-        when (handler.revokeMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
+        when (val o = handler.revokeMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
             RevokeMemberInviteOutcome.Done -> Response.noContent().build()
-            RevokeMemberInviteOutcome.NotFound -> notFound()
-            RevokeMemberInviteOutcome.NotOwner -> notTenantOwner()
-            RevokeMemberInviteOutcome.InviteNotFound -> inviteNotFound()
+            is HttpFailure -> httpError(o)
         }
 
     // Remove a member (cr-0091): the ACL-revoke cascade + orphan rule. @Authenticated (not Server-Owner); the
     // owner-gate + last-owner guard live in the handler (403 not_tenant_owner / 409 last_owner).
     @Authenticated
     override fun removeTenantMember(tenantId: UUID, userId: UUID): Response =
-        when (handler.removeMember(identity.principal.name, tenantId.toString(), userId.toString())) {
+        when (val o = handler.removeMember(identity.principal.name, tenantId.toString(), userId.toString())) {
             RemoveTenantMemberOutcome.Ok -> Response.noContent().build()
-            RemoveTenantMemberOutcome.NotOwner -> notTenantOwner()
-            RemoveTenantMemberOutcome.MemberNotFound -> memberNotFound()
-            RemoveTenantMemberOutcome.LastOwner -> conflict("last_owner")
+            is HttpFailure -> httpError(o)
         }
 
     // --- Slice B (cr-0010): invite acceptance / activation. Method-level annotations override the class
@@ -156,8 +145,7 @@ class TenantsResource(
                     role = InviteRole.decode(outcome.role),
                 ),
             ).build()
-            PreviewOutcome.NotFound -> inviteNotFound()
-            PreviewOutcome.NoLongerValid -> inviteGone()
+            is HttpFailure -> httpError(outcome)
         }
 
     @Authenticated
@@ -171,13 +159,7 @@ class TenantsResource(
         )) {
             is AcceptOutcome.Activated ->
                 Response.ok(TenantActivated(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE)).build()
-            AcceptOutcome.NotFound -> inviteNotFound()
-            AcceptOutcome.NoLongerValid -> inviteGone()
-            AcceptOutcome.NotInvitedOwner -> Response.status(Response.Status.FORBIDDEN)
-                .entity(ErrorResponse(code = "not_invited_owner")).build()
-            AcceptOutcome.AlreadyActive -> conflict("tenant_not_pending")
-            AcceptOutcome.UsernameTaken -> conflict("username_taken")
-            AcceptOutcome.MissingGrant -> badRequest()
+            is HttpFailure -> httpError(outcome)
         }
 
     @PermitAll
@@ -199,11 +181,7 @@ class TenantsResource(
             is RegisterAcceptOutcome.Activated -> Response.status(Response.Status.CREATED)
                 .entity(TenantActivatedWithUser(UUID.fromString(outcome.tenantId), TenantStatus.ACTIVE, UUID.fromString(outcome.userId)))
                 .build()
-            RegisterAcceptOutcome.NotFound -> inviteNotFound()
-            RegisterAcceptOutcome.NoLongerValid -> inviteGone()
-            RegisterAcceptOutcome.EmailTaken -> conflict("email_taken")
-            RegisterAcceptOutcome.UsernameTaken -> conflict("username_taken")
-            RegisterAcceptOutcome.MissingGrant -> badRequest()
+            is HttpFailure -> httpError(outcome)
         }
     }
 
@@ -214,7 +192,7 @@ class TenantsResource(
     override fun getTenantTerms(tenantId: UUID): Response =
         when (val o = termsHandler.read(identity.principal.name, tenantId.toString())) {
             is TermsReadOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
-            TermsReadOutcome.NotFound -> notFound()
+            is HttpFailure -> httpError(o)
         }
 
     @Authenticated
@@ -223,32 +201,24 @@ class TenantsResource(
             identity.principal.name, tenantId.toString(), tenantTermsUpdate.terms.de, tenantTermsUpdate.terms.en,
         )) {
             is TermsUpdateOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
-            TermsUpdateOutcome.NotFound -> notFound()
-            TermsUpdateOutcome.NotOwner -> notTenantOwner()
+            is HttpFailure -> httpError(o)
         }
 
     @Authenticated
     override fun acceptTenantTerms(tenantId: UUID, acceptTermsRequest: AcceptTermsRequest): Response =
         when (val o = termsHandler.accept(identity.principal.name, tenantId.toString(), acceptTermsRequest.version)) {
             is TermsAcceptOutcome.Ok -> Response.ok(TenantTerms(o.version, o.acceptedVersion, o.terms?.toDto())).build()
-            TermsAcceptOutcome.NotFound -> notFound()
-            TermsAcceptOutcome.VersionChanged -> conflict("terms_version_changed")
+            is HttpFailure -> httpError(o)
         }
 
     private fun TermsContent.toDto() = LocalizedMarkdown(de, en)
 
-    private fun inviteNotFound() = Response.status(Response.Status.NOT_FOUND)
-        .entity(ErrorResponse(code = "invite_not_found")).build()
-
-    private fun inviteGone() = Response.status(Response.Status.GONE)
-        .entity(ErrorResponse(code = "invite_no_longer_valid")).build()
 
     private fun InviteOutcome.toResponse(): Response = when (this) {
         is InviteOutcome.Done -> Response.ok(
             TenantInviteState(invite.ownerEmail, InviteStatus.decode(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!),
         ).build()
-        InviteOutcome.NotFound -> notFound()
-        InviteOutcome.NotPending -> conflict("tenant_not_pending")
+        is HttpFailure -> httpError(this)
     }
 
     private fun TenantView.toSummary() = TenantSummary(
@@ -262,19 +232,4 @@ class TenantsResource(
     )
 
     private fun Instant.utc() = atOffset(ZoneOffset.UTC)
-
-    private fun notFound() = Response.status(Response.Status.NOT_FOUND)
-        .entity(ErrorResponse(code = "tenant_not_found")).build()
-
-    private fun notTenantOwner() = Response.status(Response.Status.FORBIDDEN)
-        .entity(ErrorResponse(code = "not_tenant_owner")).build()
-
-    private fun memberNotFound() = Response.status(Response.Status.NOT_FOUND)
-        .entity(ErrorResponse(code = "member_not_found")).build()
-
-    private fun badRequest() = Response.status(Response.Status.BAD_REQUEST)
-        .entity(ErrorResponse(code = "invalid_request")).build()
-
-    private fun conflict(code: String) = Response.status(Response.Status.CONFLICT)
-        .entity(ErrorResponse(code = code)).build()
 }
