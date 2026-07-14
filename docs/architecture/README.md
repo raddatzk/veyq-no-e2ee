@@ -184,6 +184,7 @@ The 17 ADRs grouped — the "why" behind each spine above.
   [group-scope](../features/spaces/enablers/en.spaces.group-scope.md))
 - **Cross-cutting concerns:** [security-model](../crosscutting/security-model.md),
   [scopes & tenancy](../crosscutting/scopes-and-tenancy.md),
+  [authorization](../crosscutting/cc.security.authorization.md),
   [rate-limit](../crosscutting/cc.security.rate-limit.md),
   [platform-parity](../crosscutting/platform-parity.md), the dev + ui styleguides
   ([developer](../crosscutting/developer-styleguide.md))

@@ -41,7 +41,7 @@ asymmetric *transport* of it, and its plaintext **is** `E_latest` — no key sit
   ownerCount(t)`. The `tenantId` column is for *belonging* (`isMember`), never *authorization*. (cr-0163 fixed
   three copies of a `tenantId`-only owner gate that were functionally `isMember` — a privilege escalation.)
 - **Per scope kind:**
-  - **Server role** is a single global column per user (`veyq_user.server_role`, `OWNER` / `MEMBER`) — a user
+  - **Server role** is a single global column per user (`veyq_user.server_role`, `SERVER_OWNER` / `MEMBER`) — a user
     belongs to exactly one server. **Multiple `SERVER_OWNER`s are allowed** (subject to the guard above); a flow
     to mint a second is a later use-case. A server-scope **grant** is added only if the operator domain is later
     modelled as a server-scope (a separate, parked idea).

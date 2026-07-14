@@ -75,8 +75,10 @@ and the default-deny machinery — re-inventing what the SPI gives for free.
   strict improvement (no validation detail leaks pre-auth). The malformed-body **400** contract is retained
   for *authenticated* callers (asserted with a real token in the slice tests).
 - **Two authz layers, by design.** The annotation is the **coarse HTTP gate** (authenticated? which server
-  role?). **Fine-grained, content-level authorization stays a small domain guard** in the handler (scope-access
-  requiring a valid grant + ACTIVE membership, containment, tenant-admin over a specific tenant) — those were
-  never about an HTTP role and remain (see [developer-styleguide](../crosscutting/developer-styleguide.md) §2).
+  role?). **Fine-grained, content-level authorization stays a small domain guard** in the handler (scope access —
+  the membership boundary first, then the grant / key-holder check ([ADR 0042](0042-http-failure-projection.md));
+  containment; tenant-admin over a specific tenant) — those were never about an HTTP role and remain. The map of
+  both layers is [cc.security.authorization](../crosscutting/cc.security.authorization.md); see also
+  [developer-styleguide](../crosscutting/developer-styleguide.md) §2.
 - **Cost.** A custom mechanism + identity provider, a binding to the Quarkus security SPI, and the role name
   living in code rather than the contract. Accepted for the single-boundary, fail-closed posture.
