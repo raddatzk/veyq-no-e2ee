@@ -14,7 +14,10 @@ Kept current as work lands; it is a map, not a satisfiable record (no CR `satisf
 @startuml
 title veyq containers (the operator-blind server is the trust boundary)
 skinparam shadowing false
-skinparam rectangle { BackgroundColor #FAFAFA BorderColor #888888 }
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
 
 rectangle "Clients\nweb (Vue) · apple (SwiftUI) · android (Compose)\nhttp/ (ijhttp contract tests)" as C
 rectangle "Backend\nQuarkus / Kotlin — **operator-blind**\nfeature-sliced (resource→handler→store)" as B
@@ -54,7 +57,10 @@ many-wrapped, so every level is an independent sharing grain.
 @startuml
 title Key-hierarchy spine — unlock → content (each key random, many-wrapped)
 skinparam shadowing false
-skinparam rectangle { BackgroundColor #FAFAFA BorderColor #888888 }
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
 
 rectangle "Unlock methods\n(password+Secret Key floor, passkey PRF,\nrecovery code, device key L1/L2/L3)" as U
 rectangle "Master Key\n(one per account, one wrap per method)" as MK
@@ -130,7 +136,10 @@ Where each level lives: **unlock + Master Key + identity** →
 @startuml
 title Self-hosted node (central infrastructure always optional)
 skinparam shadowing false
-skinparam rectangle { BackgroundColor #FAFAFA BorderColor #888888 }
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
 
 rectangle "One self-hosted node" as N {
   rectangle "Backend (Quarkus/Kotlin)" as B

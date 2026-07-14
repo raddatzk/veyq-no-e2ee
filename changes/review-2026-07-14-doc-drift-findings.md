@@ -110,10 +110,31 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
    Do: edit to current-state in place (docs are edited in place, git holds history).
 
 8. **`architecture/README.md` indexes 17 of 42 ADRs, 9 of 14 enablers** *(verified/agent).* Self-describes as
-   "kept current"; last touched 2026-07-01, 1 commit.
+   "kept current"; last touched 2026-07-01, 1 commit (2 since `abec9887` indexed the authz concern).
    Confirm: `ls docs/decisions/[0-9]*.md | wc -l` → 42 · `grep -c '00[0-4][0-9]' docs/architecture/README.md`
    Do: decide — either commit to keeping it a live index (a guard could check ADR/enabler coverage) or demote its
-   self-claim. **This is the arc42 question in miniature** (see Tier 3, #14).
+   self-claim. **This is the arc42 question in miniature** (see Tier 3, ~~#14~~ **#17**).
+
+   **Harder evidence, found 2026-07-14 while implementing cr-0168 — the rot was *invisible*, not just
+   unattended.** All **three** of this file's PlantUML diagrams failed `plantuml -checkonly` and had **never
+   rendered**: each used the single-line `skinparam rectangle { … }` form, which PlantUML rejects, and the broken
+   form was present in the file's **first commit** (`c43e1419`). Fixed (the multi-line form; 32/32 diagram docs
+   now parse) — but the fix is the small half. **Rendering them exposed content no sweep had ever seen:**
+   - `:22` is the **last place repo-wide** calling `http/` "ijhttp contract tests" —
+     [ADR 0040](../docs/decisions/0040-coverage-gaps-and-http-not-a-surface.md)'s **title** says the opposite, and
+     this is finding **#11**'s stance-drift in a second file. cr-0159's sweep never touched this file: it grepped
+     `verifies the contract`; the diagram says `contract tests`. **The meta-lesson again — the sweep's command was
+     narrower than the defect**, and the text was inside a diagram nobody could see.
+   - `grep -c 'parked\|web-first\|0043' docs/architecture/README.md` → **0**. Both client rectangles (`:22`,
+     `:149`) still present apple/android as live surfaces, against
+     [ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md).
+
+   **Neither is fixed** — both are content decisions that belong to this finding's "Do" (and #11's), not to a
+   syntax repair. **And note what this says about diagrams-as-code:** `docs/ai/README.md` mandates inline
+   PlantUML, no validator covers it, `plantuml` is absent from `ci.yml`, and a docs-only PR triggers **no CI at
+   all** (cr-0168 decision 7, undecided) — so a diagram can carry false claims indefinitely with nothing able to
+   red. A `validate_plantuml.py` is the obvious guard and is **blocked on that CI decision**; refine it fresh, not
+   as a drive-by (it would be green by construction today).
 
 9. **`platform-parity.md` matrix covers 7 of 39 UCs; `en.memory.tree` marked not-built** *(agent).* The one
    artifact meant to show "which UC on which surface" is 82% empty and partly stale (tree is live).
