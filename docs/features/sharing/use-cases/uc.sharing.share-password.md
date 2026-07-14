@@ -60,8 +60,10 @@ note right of S : stores password_required + pw_salt + pw_verifier + sealed_pass
 ## Alternate / exception flows
 
 - **A1 — no password:** unchanged from today; the resolve returns the full share directly (`passwordRequired: false`).
-- **A2 — wrong password:** `403 share_password_incorrect`; the guest re-prompts. Online guessing is per-IP
-  rate-limited ([cc.security.rate-limit](../../../crosscutting/cc.security.rate-limit.md)); the verifier is never served.
+- **A2 — wrong password:** `403 share_password_incorrect`; the guest re-prompts. Online guessing is bounded by a
+  **per-share limit on wrong attempts** ([cc.security.rate-limit](../../../crosscutting/cc.security.rate-limit.md),
+  cr-0165) — over the cap the guest gets `429` instead; a correct password is never blocked (it is admitted before
+  the counter is touched) and the tokenless challenge-fetch never counts. The verifier is never served.
 - **A3 — revoked / expired:** `404` as ever — the password gate sits **after** the enabled/expiry check; a revoked
   share is non-enumerable regardless of the password.
 - **A4 — curator forgets the password:** they **reveal** it from the manage list (recovering `K_share` via `K_mem`),

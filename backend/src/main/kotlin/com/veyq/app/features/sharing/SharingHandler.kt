@@ -52,6 +52,8 @@ sealed interface ResolveShareOutcome {
     data class Locked(val share: ShareEntity) : ResolveShareOutcome
     /** Password-protected + a wrong token (cr-0118) — a 403. */
     object PasswordIncorrect : ResolveShareOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
+    /** Too many wrong password attempts on this share (cr-0165) — a 429. */
+    object RateLimited : ResolveShareOutcome, HttpFailure by Failures.rateLimited
 }
 
 sealed interface CreateIdentityOutcome {
@@ -62,6 +64,8 @@ sealed interface CreateIdentityOutcome {
     object NotContributable : CreateIdentityOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
     /** Password-protected + a wrong token (cr-0164) — a 403. */
     object PasswordIncorrect : CreateIdentityOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
+    /** Too many wrong password attempts on this share (cr-0165) — a 429. */
+    object RateLimited : CreateIdentityOutcome, HttpFailure by Failures.rateLimited
 }
 
 sealed interface ShareDeleteOutcome {
@@ -73,6 +77,8 @@ sealed interface ShareDeleteOutcome {
     object NotContributable : ShareDeleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
     /** Password-protected + a wrong token (cr-0164) — a 403. */
     object PasswordIncorrect : ShareDeleteOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
+    /** Too many wrong password attempts on this share (cr-0165) — a 429. */
+    object RateLimited : ShareDeleteOutcome, HttpFailure by Failures.rateLimited
 }
 
 sealed interface ShareUploadOutcome {
@@ -92,6 +98,8 @@ sealed interface ShareCompleteOutcome {
     object NotContributable : ShareCompleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
     /** Password-protected + a wrong token (cr-0164) — a 403. */
     object PasswordIncorrect : ShareCompleteOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
+    /** Too many wrong password attempts on this share (cr-0165) — a 429. */
+    object RateLimited : ShareCompleteOutcome, HttpFailure by Failures.rateLimited
 }
 
 sealed interface ShareBlobOutcome {
@@ -101,6 +109,8 @@ sealed interface ShareBlobOutcome {
     object NotFound : ShareBlobOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** Password-protected + a wrong token (cr-0118) — a 403. */
     object PasswordIncorrect : ShareBlobOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
+    /** Too many wrong password attempts on this share (cr-0165) — a 429. */
+    object RateLimited : ShareBlobOutcome, HttpFailure by Failures.rateLimited
     /** The store cannot presign (the in-memory dev store) — a 503. */
     object StoreUnavailable : ShareBlobOutcome, HttpFailure by httpFailure("store_unavailable", SERVICE_UNAVAILABLE)
 }
@@ -139,6 +149,7 @@ class SharingHandler(
     private val blobStore: BlobStore,
     private val mediaHandler: MediaHandler,
     private val rateLimiter: ShareRateLimiter,
+    private val passwordAttemptLimiter: SharePasswordAttemptLimiter,
     private val capabilities: CapabilityRegistry,
 ) {
 
@@ -207,6 +218,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0118: nothing is served without a valid password token
             PwCheck.MISSING -> return ResolveShareOutcome.Locked(share)
             PwCheck.WRONG -> return ResolveShareOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return ResolveShareOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         if (canView(share.role)) {
@@ -226,6 +238,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0164: the password gate fronts the write path, before the role check
             PwCheck.MISSING -> return CreateIdentityOutcome.NotFound // no token → non-enumerable 404 (no role reveal)
             PwCheck.WRONG -> return CreateIdentityOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return CreateIdentityOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         if (!canUpload(share.role)) return CreateIdentityOutcome.NotContributable
@@ -239,6 +252,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
             PwCheck.MISSING -> return ShareUploadOutcome.NotFound
             PwCheck.WRONG -> return ShareUploadOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return ShareUploadOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         if (!canUpload(share.role)) return ShareUploadOutcome.NotContributable
@@ -253,6 +267,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
             PwCheck.MISSING -> return ShareCompleteOutcome.NotFound
             PwCheck.WRONG -> return ShareCompleteOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return ShareCompleteOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         if (!canUpload(share.role)) return ShareCompleteOutcome.NotContributable
@@ -280,6 +295,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
             PwCheck.MISSING -> return ShareDeleteOutcome.NotFound
             PwCheck.WRONG -> return ShareDeleteOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return ShareDeleteOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         if (!canUpload(share.role)) return ShareDeleteOutcome.NotContributable
@@ -295,6 +311,7 @@ class SharingHandler(
         when (passwordCheck(share, pwToken)) { // cr-0118: no bytes without the password (missing → 404, wrong → 403)
             PwCheck.MISSING -> return ShareBlobOutcome.NotFound
             PwCheck.WRONG -> return ShareBlobOutcome.PasswordIncorrect
+            PwCheck.TOO_MANY -> return ShareBlobOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
         // A write-only role has NO download capability (ADR 0031) — an UPLOADER share serves no blob, even for an
@@ -317,24 +334,31 @@ class SharingHandler(
     /** Roles that accept anonymous contributions (identity + upload + delete-own): CONTRIBUTOR/UPLOADER. */
     private fun canUpload(role: String) = role == ShareEntity.CONTRIBUTOR || role == ShareEntity.UPLOADER
 
-    private enum class PwCheck { OK, MISSING, WRONG }
+    private enum class PwCheck { OK, MISSING, WRONG, TOO_MANY }
 
     /** cr-0118 (ADR 0037): the access-control password gate. A non-password share is always OK; a password share
      *  needs the guest's `pwToken` (base64) to `SHA-256`-hash to the stored `pw_verifier` (constant-time compare).
      *  No token → MISSING (locked); a mismatch or a malformed token → WRONG. The server runs **no** Argon2id (the
-     *  KDF is client-side) and never sees the raw password. */
+     *  KDF is client-side) and never sees the raw password.
+     *
+     *  cr-0165: a **wrong** attempt consumes one per-share slot of the brute-force bound; once the window's cap is
+     *  exceeded it returns TOO_MANY (→ 429) instead of WRONG (→ 403). A **correct** password is admitted *before*
+     *  the counter is touched, so a legitimate guest is never locked out; MISSING (the challenge fetch) never spends
+     *  budget. This is the online bound ADR 0037 relies on, keyed per share (not per IP — a proxy collapses guest IPs). */
     private fun passwordCheck(share: ShareEntity, pwToken: String?): PwCheck {
         if (!share.passwordRequired) return PwCheck.OK
         if (pwToken.isNullOrBlank()) return PwCheck.MISSING
         val verifier = share.pwVerifier ?: return PwCheck.MISSING
-        return try {
+        val match = try {
             val digest = Base64.getEncoder().encodeToString(
                 MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(pwToken)),
             )
-            if (MessageDigest.isEqual(digest.toByteArray(), verifier.toByteArray())) PwCheck.OK else PwCheck.WRONG
+            MessageDigest.isEqual(digest.toByteArray(), verifier.toByteArray())
         } catch (e: IllegalArgumentException) {
-            PwCheck.WRONG // malformed base64 token
+            false // malformed base64 token → a wrong attempt
         }
+        if (match) return PwCheck.OK // correct password always passes, even past an exhausted budget
+        return if (passwordAttemptLimiter.allow(share.id)) PwCheck.WRONG else PwCheck.TOO_MANY
     }
 
     /** A share that exists, is enabled, and has not expired — else null (the single non-enumerable 404 gate). */

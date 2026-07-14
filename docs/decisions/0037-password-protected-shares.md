@@ -77,11 +77,23 @@ CONTRIBUTOR album, and an UPLOADER drop-box alike; the password field lives in t
   corollary in the [security model](../crosscutting/security-model.md)). For the realistic self-hosted / trusted
   case (operator = curator, or a trusted instance) the gate is fully effective. The stronger crypto-gate is a
   possible future upgrade for the malicious-operator case; it is deliberately not built here.
-- **Brute-force is honestly bounded.** A link-holder (who has `pw_salt` from the locked resolve) can brute-force
-  the password offline against nothing — they'd have to guess against the *server* (online, rate-limited per IP,
-  [cc.security.rate-limit](../crosscutting/cc.security.rate-limit.md)), since the verifier isn't served. A DB-leak
-  attacker who obtains `pw_verifier` can brute-force offline, but each guess costs an **Argon2id**. A weak password
-  is weak — the same honest limit as any password. Not a substitute for **revoke**.
+- **Brute-force is honestly bounded — per share, on wrong attempts (cr-0165).** A link-holder (who has `pw_salt`
+  from the locked resolve) can brute-force the password offline against nothing — they'd have to guess against the
+  *server* (online), since the verifier isn't served. That online path is bounded by a **per-share limit on wrong
+  attempts** ([cc.security.rate-limit](../crosscutting/cc.security.rate-limit.md)): each `share_password_incorrect`
+  consumes one slot of a per-`shareId` fixed window; over the cap the guest gets `429` instead of the `403`
+  oracle. **Per share, not per IP** — behind a reverse proxy every anonymous guest shares one source address, so a
+  per-IP bound would collapse to a global cap on the share (throttling its honest visitors) while an attacker
+  rotating IPs would evade it; the attack targets one `shareId`, so that is the axis the counter keys on. Only a
+  *wrong* attempt spends budget — a correct password is admitted first, so a legitimate guest is never locked out,
+  and the tokenless challenge-fetch never counts. A DB-leak attacker who obtains `pw_verifier` can still
+  brute-force offline, but each guess costs an **Argon2id**. Not a substitute for **revoke**.
+- **Password strength is client-enforced and the blind server cannot verify it — which is *why* the online bound
+  matters.** The server only ever sees `pw_verifier = SHA-256(pwToken)`; it never sees the password or its length,
+  so it cannot reject a weak one. The minimum length is a **client-side convention** (the web dialog enforces ten
+  characters); a hand-written or future client could set a shorter one. The per-share attempt bound above is
+  therefore the one guarantee the operator-blind server can make on its own, independent of how strong the client
+  made the password.
 
 ## Consequences
 

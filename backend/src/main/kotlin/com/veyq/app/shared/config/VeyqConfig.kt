@@ -178,11 +178,27 @@ interface VeyqConfig {
     interface Share {
         fun upload(): Upload
 
+        /** cr-0165: the brute-force bound on wrong share-password attempts (per share, per window). Distinct budget
+         *  from [upload] — an order of magnitude tighter, since a password guess is an attack and an upload is not. */
+        fun password(): Password
+
         interface Upload {
             fun rate(): Rate
 
             interface Rate {
                 @WithDefault("300")
+                fun maxPerWindow(): Int
+
+                @WithDefault("60")
+                fun windowSeconds(): Long
+            }
+        }
+
+        interface Password {
+            fun rate(): Rate
+
+            interface Rate {
+                @WithDefault("10")
                 fun maxPerWindow(): Int
 
                 @WithDefault("60")
