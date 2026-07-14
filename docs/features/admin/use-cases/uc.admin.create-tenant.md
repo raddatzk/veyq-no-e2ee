@@ -39,7 +39,7 @@ keys); the invited owner's act is where the tenant's cryptographic root is **bor
 5. On acceptance the client generates the **`TENANT` scope cold**: a fresh **scope key `K_SC`**, then seals
    it as the **first grant** to the owner's **own identity public key**, and uploads
    `{ scopeId, grant, possession-proof of the bootstrap secret }`.
-6. The server verifies the bootstrap secret, stores the grant, marks the owner an **`ACTIVE` member with
+6. The server verifies the bootstrap secret, stores the grant, marks the owner a **member with
    the tenant-owner role**, flips the tenant to **`ACTIVE`**, and marks the invite **`CONSUMED`**
    (soft-invalidated, **not** deleted — see the invite-lifecycle note).
 
@@ -61,7 +61,7 @@ S --> SO : tenant created (PENDING)
 IO -> IO : open link; log in OR register cold\n(identity keypair, Master Key, Emergency Kit)
 IO -> IO : generate TENANT scope cold —\nscope key K_SC; seal grant to OWN identity key
 IO -> S : POST accept\n{ scopeId, grant, bootstrap-secret proof }
-S -> S : verify secret; store grant;\nowner = ACTIVE tenant-owner;\ntenant = ACTIVE; invite = CONSUMED
+S -> S : verify secret; store grant;\nowner = tenant-owner;\ntenant = ACTIVE; invite = CONSUMED
 S --> IO : tenant active
 @enduml
 ```

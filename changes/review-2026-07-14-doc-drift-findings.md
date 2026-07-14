@@ -1,8 +1,8 @@
 # Doc-vs-implementation review — findings handoff (2026-07-14)
 
 A five-agent review compared `docs/` against the actual code and found ~30 confirmed drifts. The **three acute
-security defects and the sidebar-weight nit were fixed and committed**, and **Tier 1 (#1–4) is refined** (see
-*Already done* below); **everything from Tier 2 down is untouched and lived only in the review conversation** —
+security defects and the sidebar-weight nit were fixed and committed**; **Tier 1 (#1–4)**, **#13** and **#15** are
+**done** (see *Already done* below). The rest of Tier 2/3 is untouched and lived only in the review conversation —
 this doc persists it so a fresh session can pick items off it.
 
 **How to use this.** Each finding carries a **confirm-command** (run it first — it re-grounds the finding against
@@ -28,13 +28,20 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
   (5 governed endpoints not 2; the static check exists; verification is partial).
 - Sidebar entry-weight consistency `160e4dc0`; workflow rule `fcff3aec`.
 
-**Refined 2026-07-14 (Tier 1 — planned, not yet implemented):**
+**Tier 1 — refined and implemented 2026-07-14:**
 - **[ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md)** (Accepted) — web-first V1, apple/android
   parked, un-park by explicit call. The decision record finding #3 said was missing.
 - **[cr-0166](cr-0166-tenancy-roles-and-scope-key-terminology.md)** — findings #1 + #2 (roles + scope-key
   terminology → the code), ends in a lexical guard.
 - **[cr-0167](cr-0167-web-first-citations-and-crypto-core-crossrefs.md)** — findings #3 + #4 (44 citation
   repoints, ADR 0010's per-CR clause, `CLAUDE.md`, the three-way crypto-core cross-reference).
+
+**#13 + #15 — done 2026-07-14** (the same defect at two altitudes):
+- **[cc.security.authorization](../docs/crosscutting/cc.security.authorization.md)** `abec9887` — #15's real gap:
+  the authz model as a **map** (7 dimensions, 6 rules), not the generated matrix the finding asked for.
+- **[cr-0168](cr-0168-strike-phantom-active-membership.md)** — #13's four remaining phantom `ACTIVE`-membership
+  sites struck, behind a fourth invariant in `validate_scope_model_vocabulary.py`; **#13's and #15's own numbers
+  corrected in place**.
 
 ---
 
@@ -130,11 +137,20 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
     Confirm: `grep -n 'owner_key == caller\|owner-gated' docs/features/memory/enablers/en.memory.buckets.md` vs `MediaHandler.kt` bucket ops.
     Do: correct the enabler to member-gated; also `:41` claims a `UNIQUE` partial index that `V35` doesn't create.
 
-13. **Phantom `ACTIVE membership` state** *(verified).* `scopes-and-tenancy.md:94`, `ADR 0008:79`,
-    `developer-styleguide.md:53` say authz needs an "ACTIVE membership" — `MembershipEntity` has no status column,
-    and server authz needs no grant (the boundary guard is `isScopeMember`).
-    Confirm: `grep -rn 'status' backend/.../shared/membership/ db/migration/*membership*` → none.
-    Do: strike "ACTIVE"; state the real guard (membership row exists; grant is a *later* 403, ADR 0042).
+13. **Phantom `ACTIVE membership` state** → **[cr-0168](cr-0168-strike-phantom-active-membership.md)** — **done**,
+    behind a fourth invariant in `validate_scope_model_vocabulary.py`.
+    ~~`scopes-and-tenancy.md:94`, `ADR 0008:79`, `developer-styleguide.md:53` — 3 sites~~ → **5**. `:94` is really
+    `:96`, and **both** `uc.admin.create-tenant.md` sites (`:42`, `:64`) were missed entirely, because they phrase
+    the phantom differently — "`ACTIVE` **member**" and "ACTIVE **tenant-owner**", never the literal this
+    finding's own confirm-command greps for. **This is the meta-lesson in its sharpest form: the
+    confirm-command *was* the finding's definition of the defect, so the two agreed with each other and both were
+    wrong.** (ADR 0008:79 fixed in `abec9887`; the other four in cr-0168.)
+    ~~"server authz needs no grant"~~ — it does: the key-holder check (`holdsGrant`) is gate dimension #4 and the
+    residual **403**. The boundary is `isScopeMember` **first**, *then* the grant — the order is the property
+    (ADR 0042).
+    **The phantom is `ACTIVE` applied to a *membership*, never the word** — it is a real state on the **tenant**
+    (`PENDING → ACTIVE`) and **invite** (`ACTIVE → SUPERSEDED / CONSUMED / EXPIRED`) axes, 8 legitimate lines
+    across 4 files. A flat strike destroys them; that is why the guard keys on adjacency.
 
 14. **Dead i18n keys = documented-but-never-built features** *(agent).* `share.expires`, `unlock.untrust`,
     `unlock.trustFailed` are defined, unreferenced, and each maps to a UC-documented feature that was never built.
@@ -143,12 +159,27 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 
 ## Tier 3 — structural (the soil the drift grows in)
 
-15. **No authorization matrix** *(verified).* The auth rules exist *only* in code — 30 call sites, 6 handlers;
-    10 of 16 handlers appear in zero docs; two role systems (`OWNER/MEMBER`, `VIEWER/CONTRIBUTOR/UPLOADER`) never
-    documented together. This was the root cause of cr-0162/0163.
-    Confirm: `grep -rlc 'Handler' docs/` per handler; `grep -rn 'fun is\|not_' backend/.../features/*/`.
-    Do: an `authorization` crosscutting doc — ideally a **generated** gate matrix (op → guard → code), so it can't
-    drift. Highest-leverage item here.
+15. **No authorization matrix** → **[cc.security.authorization](../docs/crosscutting/cc.security.authorization.md)**
+    (`abec9887`) — **done as a map, not a matrix**. The gap was real; every `(verified)` number stating it was
+    wrong, and the load-bearing claim was false. Corrected in cr-0168 alongside #13 — the same defect at two
+    altitudes.
+    ~~"30 call sites, 6 handlers"~~ → **90** guard lines across **15** files under `features/`, of which **7** are
+    `Handler` and **6** are `Store` classes — the fused query predicates no call-site scan can see; the guard
+    *declarations* are 10 further lines in `shared/membership/MembershipStore.kt`.
+    `grep -rnE '\b(isScopeMember|isMember|holdsGrant|isScopeOwner|isTenantOwner|ownerCount|memberRole|canView|canUpload|passwordCheck)\b' backend/src/main/kotlin/com/veyq/app/features/ --include='*.kt' | wc -l` → **90**
+    ~~"16 handlers"~~ → **16 `Resource` classes *plus* 14 `Handler` classes** — two different nouns
+    ([ADR 0001](../docs/decisions/0001-backend-http-adapter-vs-application-slicing.md)), conflated into one count.
+    ~~"two role systems"~~ → **three** vocabularies at **four** definition sites. `SERVER_OWNER`/`MEMBER`
+    (`shared/identity/ServerRoles.kt`) was missed entirely — it is the one *declarative* gate — and
+    `features/admin/tenant/Entities.kt` is a second, unheld copy of `OWNER`/`MEMBER`.
+    ~~"This was the root cause of cr-0162/0163"~~ — **neither CR says it**
+    (`grep -rn -i 'root cause' changes/cr-016{2,3}*.md` → **0**), and this was the claim that would have built the
+    **wrong artifact**. Both CRs recorded that a static check is the *wrong* instrument for guard **order**, as do
+    [ADR 0042](../docs/decisions/0042-http-failure-projection.md):104 and `OperatorBlindProbeTest.kt:29`.
+    ~~"ideally a **generated** gate matrix, so it can't drift"~~ — a generated matrix cannot drift *and cannot
+    fail*: derived from the code, it can never disagree with it. On the day cr-0163 shipped it would have printed
+    `isTenantOwner` and been **green** — the defect was *inside* the predicate. The concern doc is therefore the
+    seven gate **dimensions** + the six **rules** that decide which apply; see its *Known limits*.
 
 16. **`inbox.md` bloat + phantom header path** *(verified).* 82k chars / ~20k tokens, 104 CR refs — the file every
     refine session reads first; its header points to `docs/wiki/`, which doesn't exist (structure is `docs/` +
@@ -187,10 +218,14 @@ They were *not* the "quick warm-up" this section billed them as: the real invent
 reported ones, and #3 needed a genuine new decision (not a correction), so it could not legally share a CR with
 #1/#2 — `docs/ai/README.md` requires the refined state *before* the CR that cites it.
 
-**#15 (authorization matrix, generated)** — it is the root cause of the two escalation CRs, it is the one Tier-3
-item that *prevents* a whole defect class rather than patching an instance, and a generated matrix can't re-drift.
-#16 (inbox) unblocks every future refine. #17 (arc42) is the big one and depends on the validator-conversion
-precondition.
+~~**#15 (authorization matrix, generated)** — it is the root cause of the two escalation CRs … and a generated
+matrix can't re-drift.~~ — **done 2026-07-14** (`abec9887` + cr-0168), and **all three of its premises were
+false**: neither CR names a root cause, a generated matrix can't re-drift *because it can't fail*, and the item
+it argued for is the one that would not have caught either escalation. What shipped is a **map** — dimensions +
+rules. See #15.
+
+**#16 (inbox)** unblocks every future refine. **#17 (arc42)** is the big one and depends on the
+validator-conversion precondition.
 
 **Read this before picking anything:** every *(agent)*-trust finding below still carries an unverified inventory,
 and Tier 1's track record is now 3-of-4 wrong — always under-counted, because the confirm-command was narrower

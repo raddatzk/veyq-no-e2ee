@@ -50,9 +50,10 @@
   per-resource `unauthorized()`. The one exception is the deliberately-lenient `logout`, which reads the token
   manually so it stays a 204 no-op for any token.
 - **Fine-grained, content-level authorization stays a small domain guard** in the handler — a *different layer*
-  from the HTTP role gate above (e.g. a scope-access guard requiring a valid grant + ACTIVE membership, a
-  containment guard, tenant-admin over a *specific* tenant). These need DB/grant state and are never an HTTP
-  role; keep them small, named and fail-closed.
+  from the HTTP role gate above (e.g. scope access — the membership boundary first, then the grant / key-holder
+  check ([ADR 0042](../decisions/0042-http-failure-projection.md)); a containment guard; tenant-admin over a
+  *specific* tenant). These need DB/grant state and are never an HTTP role; keep them small, named and
+  fail-closed. The map of both layers is [cc.security.authorization](cc.security.authorization.md).
 - **Mappers produce the target model directly** from the richer source — no
   `domain.toSummary().toSomethingElse()` chains. Generated API models stay at the resource/mapper
   boundary; handlers, guards and stores work with domain types.

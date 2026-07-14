@@ -93,8 +93,11 @@ The [Security Model](security-model.md#the-one-guarantee) owns the guarantee —
 authorization, the client enforces confidentiality with keys it never sees.* Here is how that split lands on
 scope architecture:
 
-- **Authorization (server):** a valid grant + `ACTIVE` membership, checked by small guards (a scope-access
-  guard, a tenant-owner guard) on **opaque IDs** — the server never reads content to decide.
+- **Authorization (server):** the **membership boundary first**, then the key-holder check
+  ([ADR 0042](../decisions/0042-http-failure-projection.md)) — checked by small guards (a scope-access guard, a
+  tenant-owner guard) on **opaque IDs**, so the server never reads content to decide. The order is the security
+  property: a member legitimately knows the scope exists, a stranger must not. Every gate dimension is mapped in
+  [cc.security.authorization](cc.security.authorization.md).
 - **Confidentiality (client):** only the grant unwraps the scope key, so a member can read a scope **only** if
   they hold one. *Visibility is cryptographic*, not a server promise.
 
