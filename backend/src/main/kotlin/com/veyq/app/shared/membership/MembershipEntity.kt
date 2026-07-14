@@ -71,9 +71,12 @@ class MembershipEntity : PanacheEntityBase {
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
+    /** The role vocabulary — `OWNER` / `MEMBER` at **every** level, no third role (ADR 0007, ADR 0014). These
+     *  constants are held equal to the contract's `SetMemberRoleRequest.role` enum by
+     *  `scripts/validate_scope_model_vocabulary.py`, which reads every `const val` here — so this companion
+     *  carries role constants and nothing else (cr-0166). */
     companion object : PanacheCompanionBase<MembershipEntity, String> {
         const val OWNER = "OWNER"
-        const val ADMIN = "ADMIN"
         const val MEMBER = "MEMBER"
     }
 }

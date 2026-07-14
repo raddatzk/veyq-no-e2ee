@@ -86,6 +86,7 @@ jobs:
       #   validate_capabilities   — every capability's serves resolves to a real, built use-case (ADR 0032)
       #   validate_contracts_common — shared OpenAPI components (ErrorResponse/bearerAuth/params/enums) don't drift (ADR 0038)
       #   validate_http_failure_projection — ErrorResponse is built only in the shared/http/ writer (ADR 0042)
+      #   validate_scope_model_vocabulary — docs name no scope keypair / ADMIN role; entity roles == contract enum (ADR 0007/0024)
       - name: Validate trust-chain guards
         run: |
           python3 -m venv .venv
@@ -97,6 +98,7 @@ jobs:
           .venv/bin/python scripts/validate_capabilities.py
           .venv/bin/python scripts/validate_contracts_common.py
           .venv/bin/python scripts/validate_http_failure_projection.py
+          .venv/bin/python scripts/validate_scope_model_vocabulary.py
 
   web-e2e:
     name: Web E2E (live backend)

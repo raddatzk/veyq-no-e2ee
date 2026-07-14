@@ -20,7 +20,7 @@ tenant:
 
 - **`TENANT`** — the tenant's shared root scope. One server hosts many tenants, each with its own domain.
 - **`GROUP`** — a collaborative space within a tenant, **no nesting**; all members have equal content
-  rights, admins manage membership and settings only.
+  rights, owners manage membership and settings only.
 - **`PERSONAL`** — a member's private space **within a tenant** (one per member, per tenant), created
   when the user joins that tenant. Maximum confidentiality; no other key-holder unless the member
   explicitly shares.
@@ -57,32 +57,34 @@ skinparam rectangle {
 
 rectangle "Member A\nidentity key" as ma
 rectangle "Member B\nidentity key" as mb
-rectangle "Scope private key" as spk
-rectangle "Per-subtree content keys" as ck
+rectangle "Scope content key K_SC\n(current epoch)" as ksc
+rectangle "Per-Memory content keys K_mem" as kmem
 rectangle "Content\n(nodes, media, journal, metadata)" as content
 rectangle "Public share\n(per-share key)" as share
 
-ma --> spk : unwraps (holds a grant)
-mb --> spk : unwraps (holds a grant)
-spk --> ck : unwraps
-ck  --> content : encrypts
-ck  --> share : one subtree key wrapped\nto a per-share key (token-unlocked)
+ma   --> ksc : opens (holds a grant)
+mb   --> ksc : opens (holds a grant)
+ksc  --> kmem : unwraps
+kmem --> content : encrypts
+kmem --> share : one Memory's K_mem wrapped\nto a per-share key (token-unlocked)
 
-note right of spk
-  A grant = the scope private key wrapped to a
-  member's identity public key (one wrap = the
-  whole scope). Each member unwraps it with their
+note right of ksc
+  A grant = the scope's current content-epoch key
+  sealed to a member's identity public key (one wrap
+  = the whole scope). Each member opens it with their
   own identity private key.
 end note
 @enduml
 ```
 
-- **Grant = the unit of access.** A member receives the **scope private key wrapped to their identity
-  public key** — one wrap grants the whole scope. Membership *is* this cryptographic grant; the server
-  stores that a grant exists, not a readable role that confers content.
-- **Shares are least-privilege.** A public share gets only the *specific* subtree's content key wrapped
-  to a per-share key, unlocked by the share token — never the scope key. (Detail in the sharing feature.)
-- **Group/tenant roles** live in membership rows (e.g. group admin, tenant admin) and gate *management*
+- **Grant = the unit of access.** A member receives the **scope's current content-epoch key sealed to
+  their identity public key** — one wrap grants the whole scope ([ADR 0024](../decisions/0024-scope-key-rotation.md)).
+  Membership *is* this cryptographic grant; the server stores that a grant exists, not a readable role that
+  confers content.
+- **Shares are least-privilege.** A public share gets only the *specific* Memory's content key (`K_mem`)
+  wrapped to a per-share key, unlocked by the share token — never the scope key. (Detail in the sharing
+  feature.)
+- **Group/tenant roles** live in membership rows (`OWNER` / `MEMBER`) and gate *management*
   actions, not content readability — content readability is purely the grant.
 
 ## Authorization vs. confidentiality — how the split maps to scopes
@@ -92,21 +94,23 @@ authorization, the client enforces confidentiality with keys it never sees.* Her
 scope architecture:
 
 - **Authorization (server):** a valid grant + `ACTIVE` membership, checked by small guards (a scope-access
-  guard, a tenant-admin guard) on **opaque IDs** — the server never reads content to decide.
+  guard, a tenant-owner guard) on **opaque IDs** — the server never reads content to decide.
 - **Confidentiality (client):** only the grant unwraps the scope key, so a member can read a scope **only** if
   they hold one. *Visibility is cryptographic*, not a server promise.
 
 ## Membership — the user↔scope relation (role + grant)
 
 Membership is the **relation between a user and a scope**, and it carries **both** axes of the model in
-one row: a **management role** (server-enforced) and a **grant** (the scope private key wrapped to the
-member's identity public key — client-enforced confidentiality). The same shape repeats per scope kind:
+one row: a **management role** (server-enforced) and a **grant** (the scope's current content-epoch key
+sealed to the member's identity public key — client-enforced confidentiality). Roles are `OWNER` /
+`MEMBER` at **every** level ([ADR 0007](../decisions/0007-membership-role-grant-relation.md)); there is no
+third role. The same shape repeats per scope kind:
 
 | Membership | Cardinality | Role values | Grant |
 |---|---|---|---|
 | **Server** | 1 per user (a user belongs to one server) | `OWNER` · `MEMBER` | optional — only if the operator domain is modelled as a server-scope (parked, see below) |
-| **Tenant** | n-m (user × tenant) | `OWNER` · `ADMIN` · `MEMBER` | grant to the `TENANT` scope key |
-| **Group** | n-m (user × group, within one tenant) | `ADMIN` · `MEMBER` | grant to the `GROUP` scope key |
+| **Tenant** | n-m (user × tenant) | `OWNER` · `MEMBER` | grant to the `TENANT` scope key |
+| **Group** | n-m (user × group, within one tenant) | `OWNER` · `MEMBER` | grant to the `GROUP` scope key |
 | **Personal** | the member alone | — | self-held; no other key-holder unless explicitly shared |
 
 - **Role gates *management*, grant gates *content*.** Promoting a member who already holds a grant is a
@@ -132,7 +136,7 @@ Who you can address depends on whether they already exist on the server:
 
 **Email visibility is a role rule, not crypto.** The owner email is server-visible operational metadata;
 the server returns it **only to roles that need it** (a `SERVER_OWNER`, or the tenant's own
-`OWNER`/`ADMIN`) and omits it for ordinary members. Encrypting such server-visible PII **at rest** (under
+`OWNER`) and omits it for ordinary members. Encrypting such server-visible PII **at rest** (under
 an operator-held key, so a stolen DB dump leaks nothing) is a **separate** defense-in-depth concern — it
 is *not* operator-blindness (the server must still decrypt to send mail), and it must be decided
 crosscutting over **all** server-visible emails (including `veyq_user.email`), not per field.
@@ -141,29 +145,29 @@ crosscutting over **all** server-visible emails (including `veyq_user.email`), n
 
 A new member has **no identity keypair yet**, so the scope key cannot be wrapped to them in advance.
 Access is **always an explicit, informed act by the granting owner** (the only way confidentiality is
-lowered). The mental model: **one passenger, two envelopes** — the *passenger* is the scope private key;
+lowered). The mental model: **one passenger, two envelopes** — the *passenger* is the scope key `K_SC`;
 a throwaway *invite-wrapping keypair* is the envelope in between.
 
 ```plantuml
 @startuml
-title Invite-wrap — one passenger (scope private key), two envelopes
+title Invite-wrap — one passenger (the scope key K_SC), two envelopes
 skinparam shadowing false
 actor "Owner\n(holds scope key)" as O
 participant "Server\n(blind)" as S
 actor "Invitee\n(no keypair yet)" as I
 
-O -> O : unwrap scope private key (the passenger)
+O -> O : open scope key K_SC (the passenger)
 O -> O : generate throwaway invite-wrapping keypair
 O -> O : seal passenger to invite-wrapping public key
-O -> S : POST invite { inviteWrappingPublicKey, wrappedScopePrivateKey }
+O -> S : POST invite { inviteWrappingPublicKey, wrappedScopeKey }
 note right of S : stores both, opens neither\n(envelope key absent)
 S --> O : { inviteId, bootstrapSecret }
 O ->> I : link  ( #fragment = invite-wrapping private key, never sent )
 I -> S : fetch material + bootstrapSecret (possession proof)
-S --> I : { inviteWrappingPublicKey, wrappedScopePrivateKey }
+S --> I : { inviteWrappingPublicKey, wrappedScopeKey }
 I -> I : open envelope with fragment key -> passenger
 I -> I : generate own identity; re-seal passenger to own identity key
-I -> S : register/accept { wrappedScopePrivateKey (persistent grant) }
+I -> S : register/accept { wrappedGrant (persistent grant) }
 note right of S : throwaway material deleted -> window closes
 @enduml
 ```
@@ -177,9 +181,9 @@ explicit approval.
 ## Revocation & rotation
 
 Revoking a member or share is **two-layered** (detail in the [Security Model](security-model.md)):
-server-side token/membership invalidation is **instant** (no keys needed); **scope-keypair rotation**
-(re-wrap to the remaining members) is the eventual defense-in-depth. Already-read content cannot be
-retracted.
+server-side token/membership invalidation is **instant** (no keys needed); **rotating `K_SC` forward into
+a new epoch** (granted to the remaining members, [ADR 0024](../decisions/0024-scope-key-rotation.md)) is
+the eventual defense-in-depth. Already-read content cannot be retracted.
 
 ## Navigation contract — unified across kinds
 

@@ -8,7 +8,7 @@
 A tenant is created by a **Server Owner**, but the Server Owner must stay **operator-blind**: they may
 not hold any content key for the tenant. Tenant creation therefore cannot follow the documented
 **invite-wrap** onboarding (see [Scopes & Tenancy](../crosscutting/scopes-and-tenancy.md)), because the
-invite-wrap presupposes an **existing key-holder** who reseals the scope private key to the invitee.
+invite-wrap presupposes an **existing key-holder** who reseals the scope key to the invitee.
 At the moment a tenant is created **no one holds its scope key** — it does not exist yet.
 
 The creation flow (see [uc.admin.create-tenant](../features/admin/use-cases/uc.admin.create-tenant.md))
@@ -24,9 +24,9 @@ from anyone.
 - Server Owner's creation act is **purely structural**: domain↔tenant mapping, a `PENDING` tenant, and
   a **single-use invite token** (a *bootstrap secret*, not a key). The server holds **no keys**.
 - The invited owner establishes an identity (log in if the email is an existing global user, otherwise
-  register cold), then **generates the `TENANT` scope keypair cold** and wraps the scope private key as
-  the **first grant to their own identity public key**. Uploading `{ scopeId, grant }` (with proof of
-  the bootstrap secret) flips the tenant to **`ACTIVE`**.
+  register cold), then **generates the `TENANT` scope key `K_SC` cold** and seals it as the **first grant to
+  their own identity public key**. Uploading `{ scopeId, grant }` (with proof of the bootstrap secret) flips
+  the tenant to **`ACTIVE`**.
 - The **invite token gates acceptance only**; it transports no content key, so the server may hold it
   without breaking operator-blindness.
 

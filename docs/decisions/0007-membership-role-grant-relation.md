@@ -14,8 +14,10 @@ membership model must be settled first. Open questions: how do we model the **ma
 ## Decision
 
 **Membership is a relation between a user and a scope, carrying both axes in one row:** a server-enforced
-**management role** and a client-enforced **grant** (the scope private key wrapped to the member's identity
-public key).
+**management role** and a client-enforced **grant** (the scope's **current content-epoch key** sealed to the
+member's identity public key — `asymWrap(memberIdentityPub, E_latest, "scope-grant")`,
+[ADR 0024](0024-scope-key-rotation.md)). `K_SC` is **symmetric** (a random 32-byte epoch key); the grant is
+asymmetric *transport* of it, and its plaintext **is** `E_latest` — no key sits between the grant and `K_SC`.
 
 - **Role gates management; grant gates content.** A role without a grant is a hollow title; promoting an
   existing grant-holder is a pure role change (no key moves), and demoting one is too.

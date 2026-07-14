@@ -8,9 +8,10 @@
 [ADR 0002](0002-personal-scope-per-tenant.md) + [cr-0026](../../changes/cr-0026-personal-scope.md) settled
 the **scope** layer (opaque `scopeId` + kind; a member holds a scope via a grant = the scope key sealed to
 their identity). What lives *inside* a scope — folders, Memories, chapters, media, journal — needs its own
-key model. The [Security Model](../crosscutting/security-model.md) sketches **per-subtree content keys** and
-"a share = one subtree content key wrapped to a per-share key"; the crypto vectors pin a `contentKey`-based
-`slug_token` / `chunk_frame` / `dedup_token` / `journal_open`. The open question (inbox #46) is the **exact
+key model. The [Security Model](../crosscutting/security-model.md) **sketched** per-subtree content keys and
+"a share = one subtree content key wrapped to a per-share key" (its hierarchy diagram now names this ADR's
+per-Memory `K_mem`); the crypto vectors pin a `contentKey`-based `slug_token` / `chunk_frame` /
+`dedup_token` / `journal_open`. The open question (inbox #46) is the **exact
 granularity and wrapping** — and specifically: *how do you share a single Memory without exposing the rest
 of the scope?* This ADR nails it. (Considered and rejected during refinement: **one content key per scope** —
 sharing one Memory would hand out the whole-scope key, leaving the confidentiality of the *other* Memories to
@@ -22,7 +23,8 @@ hierarchy + re-wrap-on-move complexity the product doesn't need.)
 **Content keys are per Memory — random, and wrapped to many recipients.** Three layers under the scope:
 
 1. **`K_SC` — scope content key (one per scope, rotatable in epochs — [ADR 0024](0024-scope-key-rotation.md)).**
-   Obtained by a member via their grant (the scope key unwraps it). It is the **navigation root**: node **names**
+   Obtained by a member by **opening their grant** — the grant's plaintext *is* the scope's current epoch key;
+   there is no key in between. It is the **navigation root**: node **names**
    (folder / Memory / chapter titles), paths and the **blinded slug tokens** (`slug_token`) key off the scope's
    **current content-epoch key**, so a member who holds the scope decrypts the **whole tree's structure + names
    with one key** — without touching any Memory's content. (The per-scope **dedup token** is the one exception: it

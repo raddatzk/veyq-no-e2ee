@@ -109,32 +109,33 @@ rectangle "Unlock methods\n(one wrap each — see account/key model)" as unlock
 rectangle "Master Key" as muk
 rectangle "Identity private key\n(you)" as idk
 rectangle "Identity private key\n(another member)" as idk2
-rectangle "Scope private key" as spk
-rectangle "Per-subtree content keys" as ck
+rectangle "Scope content key K_SC\n(current epoch)" as ksc
+rectangle "Per-Memory content keys K_mem" as kmem
 rectangle "Content\n(memories, media, journal, sensitive metadata)" as content
 rectangle "Public share\n(per-share key)" as share
 
 unlock --> muk : each wraps (one blob per method)
 muk  --> idk : unlocks
-idk  --> spk : unwraps
-idk2 --> spk : unwraps
-spk  --> ck : unwraps
-ck   --> content : encrypts
-ck   --> share : one subtree key wrapped to a\nper-share key (token-unlocked)
+idk  --> ksc : opens a grant
+idk2 --> ksc : opens a grant
+ksc  --> kmem : unwraps
+kmem --> content : encrypts
+kmem --> share : one Memory's K_mem wrapped to a\nper-share key (token-unlocked)
 
-note right of spk
-  The scope private key is wrapped once per member —
-  to each member's identity public key (one wrap =
-  the whole scope). Every member, you included,
-  unwraps it with their own identity private key.
+note right of ksc
+  The scope's current content-epoch key is sealed once
+  per member — to each member's identity public key
+  (one wrap = the whole scope). Every member, you
+  included, opens it with their own identity private key.
 end note
 @enduml
 ```
 
-- **Cheap grants, scoped shares.** Adding a member = one wrap of the scope private key. A public share
-  = one subtree content key wrapped to a per-share key. **Revoking a member = rotate the scope keypair**
-  and re-wrap to the remaining members; already-read content cannot be retroactively pulled back (a
-  documented limitation). The concrete per-Memory key model — `K_SC` (scope), `K_mem` (per Memory, the
+- **Cheap grants, scoped shares.** Adding a member = one seal of the scope's current content-epoch key to
+  their identity. A public share = one Memory's content key wrapped to a per-share key. **Revoking a member
+  = rotate `K_SC` forward into a new epoch** granted to the remaining members
+  ([ADR 0024](../decisions/0024-scope-key-rotation.md)); already-read content cannot be retroactively pulled
+  back (a documented limitation). The concrete per-Memory key model — `K_SC` (scope), `K_mem` (per Memory, the
   random, many-wrapped **share grain**), `K_blob` (per blob) — is pinned in
   [ADR 0012](../decisions/0012-content-key-hierarchy.md).
 - The identity private key is protected by the **Master Key**, itself wrapped **separately by each
