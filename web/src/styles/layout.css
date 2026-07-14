@@ -327,6 +327,10 @@
   min-width: 0;
 }
 
+/* Every sidebar entry title (the active tenant, favorites, groups) reads as a label, not a heading — regular
+   weight, level with the Personal nav link beside them; the avatar/cover carries the visual anchor, and the
+   section labels (BEREICHE/FAVORITEN/GRUPPEN) carry the hierarchy. One weight for all four so the list is
+   consistent (the `<strong>` tags remain for semantics/ellipsis). */
 .sidebar-tenant-text strong,
 .sidebar-memory-link strong,
 .sidebar-scope-link strong {
@@ -335,11 +339,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.92rem;
-}
-
-/* The active-tenant name reads as a label, not a heading — regular weight, so it sits level with the Personal nav
-   link beside it (the avatar already carries the visual anchor). Groups/favorites keep their bold. cr-0120 f/u. */
-.sidebar-tenant-text strong {
   font-weight: 400;
 }
 
@@ -430,6 +429,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Mobile sheet entries match the desktop sidebar: one regular weight across tenant / personal / groups /
+   favorites (the section headings carry the hierarchy). The sheet header keeps its own weight. */
+.mobile-nav-item strong {
+  font-weight: 400;
 }
 
 .mobile-nav-sheet-header small,
