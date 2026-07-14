@@ -269,12 +269,13 @@ class TasksSliceTest {
             .`when`().post("/api/tasks/enqueue")
             .then().statusCode(201).body("jobId", notNullValue())
 
-        // An outsider with no grant in the scope cannot enqueue there.
+        // An outsider cannot enqueue there — and gets the *scope-not-found* answer, not a "forbidden" that would
+        // confirm the scope exists (membership is the first guard, ADR 0042 / cr-0162).
         val outsider = seedUser()
         given().header("Authorization", bearer(outsider)).contentType(ContentType.JSON)
             .body("""{"scopeId":"$scopeId","capabilityTag":"9f3a1c04","sealedBody":"AQ=="}""")
             .`when`().post("/api/tasks/enqueue")
-            .then().statusCode(403).body("code", equalTo("not_scope_member"))
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
     }
 
     @Test

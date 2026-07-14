@@ -21,7 +21,7 @@ sealed interface TermsReadOutcome {
 /** Result of an owner setting/replacing a tenant's terms (cr-0114). */
 sealed interface TermsUpdateOutcome {
     data class Ok(val version: Int, val acceptedVersion: Int, val terms: TermsContent?) : TermsUpdateOutcome
-    data object NotFound : TermsUpdateOutcome, HttpFailure by Failures.tenantNotFound
+    data object NotFound : TermsUpdateOutcome, HttpFailure by Failures.tenantNotFound // no such tenant, or the caller is not a member (indistinguishable)
     data object NotOwner : TermsUpdateOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
 }
 
@@ -55,12 +55,15 @@ class TenantTermsHandler(
     }
 
     /**
-     * The **owner** sets/replaces the terms. Normalizes both locales; an **all-blank** update is a no-op (v1 has
+     * The **owner** sets/replaces the terms. Membership-gated first, like the sibling [read]/[accept] (a
+     * non-member gets the same 404 as a bogus tenant id, ADR 0042), then owner-gated.
+     * Normalizes both locales; an **all-blank** update is a no-op (v1 has
      * no "remove terms" — you can't publish an empty gated version). Otherwise stores the canonical serialized map
      * and bumps `terms_version` only if it actually changed.
      */
     @Transactional
     fun update(callerId: String, tenantId: String, de: String?, en: String?): TermsUpdateOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return TermsUpdateOutcome.NotFound
         if (store.findTenant(tenantId) == null) return TermsUpdateOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return TermsUpdateOutcome.NotOwner
         val normalized = normalize(de, en)

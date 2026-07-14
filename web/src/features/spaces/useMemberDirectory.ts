@@ -50,7 +50,8 @@ export function useMemberDirectory(loadBody: () => Promise<MemberLoad>) {
     isOwner.value = loaded.isOwner
     await refreshTrust()
   }, { onError: on401 })
-  // The panels' shared load-error enum: 403 → not a member, else → failed, 401 → the redirect handled it.
+  // The panels' shared load-error enum: 403 → in the scope but not a key-holder, else → failed, 401 → the
+  // redirect handled it. (A non-member gets 404 → failed; see `loadErrorKind`.)
   const loadError = computed<'' | 'notAuthorized' | 'failed'>(() => loadErrorKind(error.value) ?? '')
 
   return { members, isOwner, trust, reviewTarget, reviewOpen, loading, loadError, refreshTrust, openReview, reload, on401 }

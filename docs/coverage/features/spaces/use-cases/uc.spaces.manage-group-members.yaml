@@ -17,10 +17,20 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.promoteDemoteAndLastOwnerGuard, ScopesSliceTest.removeMemberThenLastOwnerGuard] }
   - id: remove-member
-    text: A GroupOwner removes a member → the membership is deleted (instant 403). A non-owner caller is rejected.
+    text: A GroupOwner removes a member → the membership is deleted (the group instantly reads as 404 to them, ADR 0042). A non-owner caller is rejected.
     coverage:
       backend: { integration: [ScopesSliceTest.removeMemberThenLastOwnerGuard] }
       web: { unit: [src/features/spaces/members.test.ts] }
+  - id: membership-boundary-first
+    text: >
+      Membership is the first guard on every scope-addressed operation (ADR 0042, cr-0162): a caller who is not a
+      member of the group gets 404 scope_not_found — byte-identical to the answer for a group id that does not
+      exist — so group ids are not enumerable across the membership boundary. Capability refusals inside the
+      boundary stay 403 (not_key_holder for a grant-less member, not_scope_owner for a non-owner member), which
+      discloses nothing because that caller already knows the group exists.
+    coverage:
+      backend:
+        integration: [ScopesSliceTest.listEpochsSeparatesTheMembershipBoundaryFromTheKeyHolderCapability, ScopesSliceTest.addGroupMemberByANonMemberOfTheGroupIs404, OperatorBlindProbeTest.noScopeAddressedEndpointDistinguishesANonMemberFromANonExistentScope]
   - id: remove-rotates-forward
     text: Removal rotates the scope content key forward into a new epoch, re-granted only to the remaining members; new content seals under it, so the removed member reads pre-removal content but never post-removal content (even against a malicious operator). The client mints the epoch, chain-links the old one, and re-grants the survivors (cr-0089).
     coverage:

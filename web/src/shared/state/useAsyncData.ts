@@ -42,9 +42,14 @@ export function useAsyncData<T>(
 }
 
 /**
- * Classify a load failure into a panel's `loadError` enum: `notAuthorized` for a 403 (signed in, not a member),
- * `failed` for anything else, and `null` for no error OR a 401 (the redirect handles that, so the panel shows
- * nothing). The 403-vs-other split the member/detail panels repeat, in one place.
+ * Classify a load failure into a panel's `loadError` enum: `notAuthorized` for a 403 (signed in and inside the
+ * scope, but lacking the capability — e.g. a member who holds no grant yet), `failed` for anything else, and
+ * `null` for no error OR a 401 (the redirect handles that, so the panel shows nothing). The 403-vs-other split
+ * the member/detail panels repeat, in one place.
+ *
+ * A caller who is **not a member** never lands on `notAuthorized`: the server answers 404 for them, identical to
+ * a scope that does not exist (ADR 0042), so they fall into `failed`. That is correct — do not "fix" it by
+ * mapping 404 to `notAuthorized`, which would re-create client-side the existence oracle the server closed.
  */
 export function loadErrorKind(e: unknown): 'notAuthorized' | 'failed' | null {
   if (e == null) return null

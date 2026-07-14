@@ -9,8 +9,13 @@ import jakarta.ws.rs.core.Response
  *
  * `FORBIDDEN` (403) is only for a caller who legitimately knows the resource exists; a **membership-gated
  * absence** must be `NOT_FOUND` (404) so a non-member cannot distinguish "forbidden" from "not found" and thereby
- * learn a scope exists across the membership boundary. The 3 sites still tagged `FORBIDDEN` for a non-member are
- * the operator-blind drift tracked for a separate, security-reviewed fix (inbox #83).
+ * learn a scope exists across the membership boundary.
+ *
+ * Which tag is correct is decided by **guard order**, not by the variant (ADR 0042, cr-0162): the membership
+ * boundary is the *first* guard on every scope-addressed operation, so a `FORBIDDEN` raised after it — a
+ * capability refusal like `not_key_holder` / `not_scope_owner` — discloses nothing, because that caller is a
+ * member and already knows the scope exists. Tag a failure `FORBIDDEN` only if **no** path reaches it before the
+ * membership guard; `OperatorBlindProbeTest` proves that for every endpoint.
  */
 enum class FailureStatus(val httpStatus: Int) {
     BAD_REQUEST(400),

@@ -142,6 +142,31 @@ class ScopesSliceTest {
     }
 
     @Test
+    fun listEpochsSeparatesTheMembershipBoundaryFromTheKeyHolderCapability() {
+        // The path cr-0162 fixed, and the reason the leak survived: it had no test at all. Three actors, three
+        // answers — a stranger must not be able to tell the real group from an invented id (ADR 0042).
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+
+        // A member who holds no grant yet (grant-less, pre-delivery) is inside the boundary → 403, not 404: they
+        // already know the group exists, so refusing them discloses nothing.
+        val grantless = seedTenantMember(tenantIdOf(domain), "grantless")
+        addToGroup(owner, domain, groupId, "grantless")
+        given().header("Authorization", "Bearer ${token(grantless)}")
+            .`when`().get("/api/scopes/$groupId/epochs")
+            .then().statusCode(403).body("code", equalTo("not_key_holder"))
+
+        // A stranger is outside it → 404, and byte-identical to the answer for a group id that does not exist.
+        val stranger = seedUser()
+        given().header("Authorization", "Bearer ${token(stranger)}")
+            .`when`().get("/api/scopes/$groupId/epochs")
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
+        given().header("Authorization", "Bearer ${token(stranger)}")
+            .`when`().get("/api/scopes/${UUID.randomUUID()}/epochs")
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
+    }
+
+    @Test
     fun rotateNonOwnerIs403() {
         val (owner, domain) = seedMember()
         val groupId = createGroupAs(owner, domain)
@@ -371,17 +396,19 @@ class ScopesSliceTest {
     }
 
     @Test
-    fun addGroupMemberNonOwnerIs403() {
-        // A fellow tenant member who is NOT the group's owner cannot admit anyone (admission is owner-gated).
+    fun addGroupMemberByANonMemberOfTheGroupIs404() {
+        // A fellow *tenant* member who does not belong to the group cannot admit anyone — and gets 404, the same
+        // answer as for a group that does not exist. Belonging to the tenant does not entitle you to learn which
+        // groups exist inside it (membership is the first guard, ADR 0042 / cr-0162).
         val (owner, domain) = seedMember()
         val groupId = createGroupAs(owner, domain)
-        val nonOwner = seedTenantMember(tenantIdOf(domain), "partner")
+        val nonMember = seedTenantMember(tenantIdOf(domain), "partner")
         seedTenantMember(tenantIdOf(domain), "third")
-        given().header("Authorization", "Bearer ${token(nonOwner)}")
+        given().header("Authorization", "Bearer ${token(nonMember)}")
             .header("X-Forwarded-Host", domain).contentType(ContentType.JSON)
             .body("""{"username":"third"}""")
             .`when`().post("/api/scopes/$groupId/members")
-            .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
     }
 
     @Test

@@ -65,11 +65,10 @@ sealed interface ListInvitationsOutcome {
     object NoTenant : ListInvitationsOutcome, HttpFailure by Failures.tenantNotFound
 }
 
-/** Outcome of listing a scope's members (the directory, cr-0077). */
 /** Outcome of promote/demote (cr-0088). */
 sealed interface SetRoleOutcome {
     data class Ok(val row: ScopeMemberRow) : SetRoleOutcome
-    object ScopeNotFound : SetRoleOutcome, HttpFailure by Failures.memberNotFound
+    object ScopeNotFound : SetRoleOutcome, HttpFailure by Failures.scopeNotFound
     object NotOwner : SetRoleOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
     object MemberNotFound : SetRoleOutcome, HttpFailure by Failures.memberNotFound
     object LastOwner : SetRoleOutcome, HttpFailure by Failures.lastOwner
@@ -78,7 +77,7 @@ sealed interface SetRoleOutcome {
 /** Outcome of removing a member (cr-0088). */
 sealed interface RemoveMemberOutcome {
     object Ok : RemoveMemberOutcome
-    object ScopeNotFound : RemoveMemberOutcome, HttpFailure by Failures.memberNotFound
+    object ScopeNotFound : RemoveMemberOutcome, HttpFailure by Failures.scopeNotFound
     object NotOwner : RemoveMemberOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
     object MemberNotFound : RemoveMemberOutcome, HttpFailure by Failures.memberNotFound
     object LastOwner : RemoveMemberOutcome, HttpFailure by Failures.lastOwner
@@ -94,7 +93,7 @@ sealed interface RotateOutcome {
 /** Outcome of reading the epoch-chain links (cr-0088). */
 sealed interface EpochsOutcome {
     data class Links(val links: List<Pair<Int, String>>) : EpochsOutcome
-    object Forbidden : EpochsOutcome, HttpFailure by Failures.notScopeMember
+    object NotKeyHolder : EpochsOutcome, HttpFailure by Failures.notKeyHolder
     object ScopeNotFound : EpochsOutcome, HttpFailure by Failures.scopeNotFound
 }
 
@@ -124,9 +123,11 @@ sealed interface RestoreGroupOutcome {
     object NotDeleted : RestoreGroupOutcome, HttpFailure by httpFailure("not_deleted", CONFLICT)
 }
 
+/** Outcome of listing a scope's members (the directory, cr-0077). */
 sealed interface ListMembersOutcome {
     data class Members(val rows: List<ScopeMemberRow>) : ListMembersOutcome
-    object Forbidden : ListMembersOutcome, HttpFailure by Failures.notScopeMember
+    object ScopeNotFound : ListMembersOutcome, HttpFailure by Failures.scopeNotFound
+    object NotKeyHolder : ListMembersOutcome, HttpFailure by Failures.notKeyHolder
 }
 
 /**
@@ -176,6 +177,7 @@ class ScopesHandler(
      * the server never sees a key or the plaintext name.
      */
     fun renameGroup(callerId: String, scopeId: String, encryptedName: String, nameEpoch: Int): RenameGroupOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return RenameGroupOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return RenameGroupOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RenameGroupOutcome.NotOwner
         if (store.deletedAt(scopeId) != null) return RenameGroupOutcome.PendingDeletion
@@ -192,6 +194,7 @@ class ScopesHandler(
      * returned row has its `email` nulled (the add response never exposes it).
      */
     fun addGroupMember(callerId: String, scopeId: String, username: String, sealedNameKey: String?): AddGroupMemberOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return AddGroupMemberOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return AddGroupMemberOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return AddGroupMemberOutcome.NotOwner
         val tenantId = store.scopeTenantId(scopeId) ?: return AddGroupMemberOutcome.ScopeNotFound
@@ -214,13 +217,17 @@ class ScopesHandler(
 
     /**
      * Resolve a per-tenant username to a group-add candidate (uc.spaces.consent-group-add, cr-0094) — records
-     * nothing. Owner-gated (the same gate as the add). This gate is convenience, **not** a confidentiality barrier:
-     * any tenant member can create a group and become its owner in O(1), so username → identity-public-key →
-     * consent-flag are effectively enumerable by every tenant member. That is within the metadata model (per-tenant
-     * usernames + identity pubkeys are tenant-visible, ADR 0023/0014 §5), not a leak — don't read the gate as one.
+     * nothing. Membership-gated first, then owner-gated (the same gates as the add). The **owner** gate is
+     * convenience, **not** a confidentiality barrier: any tenant member can create a group and become its owner in
+     * O(1), so username → identity-public-key → consent-flag are effectively enumerable by every tenant member.
+     * That is within the metadata model (per-tenant usernames + identity pubkeys are tenant-visible, ADR 0023/0014
+     * §5), not a leak — don't read the gate as one. That argument covers *username* enumerability only; the
+     * **membership** gate above it is load-bearing (ADR 0042) — it is what keeps a stranger from enumerating
+     * *scope ids*, which is not tenant-visible metadata.
      * Returns the candidate's identity public key (to seal the derived group name-key to) + whether consent is required.
      */
     fun resolveGroupMember(callerId: String, scopeId: String, username: String): ResolveCandidateOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return ResolveCandidateOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return ResolveCandidateOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return ResolveCandidateOutcome.NotOwner
         val tenantId = store.scopeTenantId(scopeId) ?: return ResolveCandidateOutcome.ScopeNotFound
@@ -264,6 +271,7 @@ class ScopesHandler(
      * the **last-owner guard** rejects demoting the last OWNER (ADR 0007). A pure role change — no key moves.
      */
     fun setMemberRole(callerId: String, scopeId: String, targetId: String, role: String): SetRoleOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return SetRoleOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return SetRoleOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return SetRoleOutcome.NotOwner
         val current = store.memberRole(targetId, scopeId) ?: return SetRoleOutcome.MemberNotFound
@@ -282,6 +290,7 @@ class ScopesHandler(
      * the last OWNER cannot be removed. **Layer-2** forward-secrecy is the caller's follow-up rotation.
      */
     fun removeMember(callerId: String, scopeId: String, targetId: String): RemoveMemberOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return RemoveMemberOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return RemoveMemberOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RemoveMemberOutcome.NotOwner
         val current = store.memberRole(targetId, scopeId) ?: return RemoveMemberOutcome.MemberNotFound
@@ -298,8 +307,9 @@ class ScopesHandler(
      * remaining members. Owner-gated; the client minted the new epoch on-device (the server stores only ciphertext).
      */
     fun rotateScope(callerId: String, scopeId: String, wrappedPrev: String, grants: List<Pair<String, String>>): RotateOutcome {
-        if (store.currentEpoch(scopeId) == null) return RotateOutcome.ScopeNotFound
+        if (!store.isScopeMember(callerId, scopeId)) return RotateOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RotateOutcome.NotOwner
+        if (store.currentEpoch(scopeId) == null) return RotateOutcome.ScopeNotFound
         return RotateOutcome.Ok(store.rotate(scopeId, wrappedPrev, grants))
     }
 
@@ -309,6 +319,7 @@ class ScopesHandler(
      * pending-deletion is rejected). Memberships/grants are untouched, so a restore is trivial.
      */
     fun deleteGroup(callerId: String, scopeId: String): DeleteGroupOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return DeleteGroupOutcome.ScopeNotFound
         val kind = store.scopeKind(scopeId) ?: return DeleteGroupOutcome.ScopeNotFound
         if (kind != ScopeEntity.GROUP) return DeleteGroupOutcome.NotGroup
         if (!store.isScopeOwner(callerId, scopeId)) return DeleteGroupOutcome.NotOwner
@@ -322,6 +333,7 @@ class ScopesHandler(
      * `409` if the group is not pending-deletion; a hard-purged scope is simply gone (404 from `scopeKind`).
      */
     fun restoreGroup(callerId: String, scopeId: String): RestoreGroupOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return RestoreGroupOutcome.ScopeNotFound
         if (store.scopeKind(scopeId) == null) return RestoreGroupOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RestoreGroupOutcome.NotOwner
         if (store.deletedAt(scopeId) == null) return RestoreGroupOutcome.NotDeleted
@@ -329,10 +341,15 @@ class ScopesHandler(
         return RestoreGroupOutcome.Ok
     }
 
-    /** The scope's epoch-chain links — any key-holder in the scope may read them (cr-0088, ADR 0024). */
+    /**
+     * The scope's epoch-chain links — any key-holder in the scope may read them (cr-0088, ADR 0024). Membership
+     * first (ADR 0042): a non-member gets the same 404 as a bogus id. A member without a grant gets 403 — they
+     * already know the scope exists, so that discloses nothing. (Until cr-0162 this probed the epoch **before**
+     * the gate, which made the 404-vs-403 split an existence oracle for a stranger.)
+     */
     fun listEpochs(callerId: String, scopeId: String): EpochsOutcome {
-        if (store.currentEpoch(scopeId) == null) return EpochsOutcome.ScopeNotFound
-        if (!store.holdsGrant(callerId, scopeId)) return EpochsOutcome.Forbidden
+        if (!store.isScopeMember(callerId, scopeId)) return EpochsOutcome.ScopeNotFound
+        if (!store.holdsGrant(callerId, scopeId)) return EpochsOutcome.NotKeyHolder
         return EpochsOutcome.Links(store.epochLinks(scopeId))
     }
 
@@ -341,13 +358,15 @@ class ScopesHandler(
 
     /**
      * The member directory of a scope (uc.spaces.add-member, ADR 0020). Only a **key-holder** in the scope may
-     * read it (gating on holding a grant also means a non-member — or a bogus scope id — gets a uniform 403, so
-     * scope existence is not enumerable). Returns each member's per-tenant identity (username + sealed name),
-     * pubkey + grant-present; **email is owner-only** — nulled for a non-owner caller (ADR 0023).
+     * read it. Membership first (ADR 0042): a non-member — or a bogus scope id — gets a uniform 404, so scope
+     * existence is not enumerable; a member without a grant gets 403. Returns each member's per-tenant identity
+     * (username + sealed name), pubkey + grant-present; **email is owner-only** — nulled for a non-owner caller
+     * (ADR 0023).
      */
     fun listMembers(userId: String, scopeId: String): ListMembersOutcome {
-        if (!store.holdsGrant(userId, scopeId)) return ListMembersOutcome.Forbidden
-        val tenantId = store.scopeTenantId(scopeId) ?: return ListMembersOutcome.Forbidden
+        if (!store.isScopeMember(userId, scopeId)) return ListMembersOutcome.ScopeNotFound
+        if (!store.holdsGrant(userId, scopeId)) return ListMembersOutcome.NotKeyHolder
+        val tenantId = store.scopeTenantId(scopeId) ?: return ListMembersOutcome.ScopeNotFound
         val tenantOwner = store.isTenantOwner(userId, tenantId)
         // Pending consent proposals (cr-0094) are visible to **group owners** only — ordinary members see a proposed
         // person only once they accept. Email stays tenant-owner-only (ADR 0023), as before.

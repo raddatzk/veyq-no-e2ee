@@ -124,7 +124,9 @@ client.test("empty tags rejected", function () {
 });
 %}
 
-### 8. enqueue onto a scope the caller does not hold a grant in → 403 not_scope_member
+### 8. enqueue onto a scope the caller is not a member of → 404 scope_not_found
+# Membership is the first guard (ADR 0042): a non-member gets the same answer as for a scope that does not
+# exist, so scope ids are not enumerable. (A *member* who holds no grant would get 403 not_key_holder.)
 POST {{host}}/api/tasks/enqueue
 Authorization: Bearer {{at}}
 Content-Type: application/json
@@ -132,9 +134,9 @@ Content-Type: application/json
 { "scopeId": "00000000-0000-0000-0000-000000000000", "capabilityTag": "9f3a1c04", "sealedBody": "AQ==" }
 
 > {%
-client.test("enqueue outside your scopes ⇒ 403", function () {
-    client.assert(response.status === 403, "expected 403, got " + response.status);
-    client.assert(response.body.code === "not_scope_member", "expected not_scope_member");
+client.test("enqueue outside your scopes ⇒ 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    client.assert(response.body.code === "scope_not_found", "expected scope_not_found");
 });
 %}
 

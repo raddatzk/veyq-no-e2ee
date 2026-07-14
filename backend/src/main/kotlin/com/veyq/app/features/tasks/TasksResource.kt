@@ -24,7 +24,8 @@ import java.util.UUID
  * HTTP adapter for the operator-blind background-task pull queue (ADR 0021, cr-0076). Implements the generated
  * [TasksApi]; thin (ADR 0001) — delegates to [TasksHandler]. Central auth (`@Authenticated`): a missing/invalid
  * token is a generic 401 before this runs; the caller's worker identity is the `SecurityIdentity` principal.
- * Authorization (the caller must hold a grant in the job's scope — be a key-holder there) lives in the store.
+ * Authorization (the caller must hold a grant in the job's scope — be a key-holder there) lives in the store;
+ * the membership boundary above it (ADR 0042) is the handler's first guard.
  */
 @Authenticated
 class TasksResource(
@@ -46,13 +47,13 @@ class TasksResource(
         if (enqueueRequest.capabilityTag == CapabilityTags.GRANT_DELIVERY) {
             return httpError(Failures.invalidRequest)
         }
-        return when (val jobId = handler.enqueue(
+        return when (val outcome = handler.enqueue(
             me, enqueueRequest.scopeId.toString(), enqueueRequest.capabilityTag,
             enqueueRequest.resourceRef, enqueueRequest.sealedBody,
         )) {
-            // Non-member enqueue → 403 not_scope_member (operator-blind status drift kept intact; inbox #83).
-            null -> httpError(Failures.notScopeMember)
-            else -> Response.status(Response.Status.CREATED).entity(JobCreated(jobId = UUID.fromString(jobId))).build()
+            is EnqueueOutcome.Created ->
+                Response.status(Response.Status.CREATED).entity(JobCreated(jobId = UUID.fromString(outcome.jobId))).build()
+            is HttpFailure -> httpError(outcome)
         }
     }
 

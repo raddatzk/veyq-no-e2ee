@@ -18,9 +18,10 @@ duplications result (audit finding **P3b**, [inbox #72](../inbox.md)):
    (8 resources + `tasks`), and the 2 central providers `shared/auth/AuthExceptionMappers` +
    `shared/ratelimit/AuthRateLimitFilter`.
 2. **The variant → (code, status) projection is re-derived per resource — and it has drifted.** The same
-   semantic "**caller is not a member of the scope**" is a **404** (`scope_not_found`) in
+   semantic "**caller is not a member of the scope**" was a **404** (`scope_not_found`) in
    content/media/favorites but a **403** (`not_scope_member`) in `scopes.epochs`, `scopes.listMembers` and
-   `tasks.createJob`. `ConsentRequired` → 400 is an outlier next to sibling 422 policy-violations.
+   `tasks.enqueue`. `ConsentRequired` → 400 is an outlier next to sibling 422 policy-violations. (That inventory
+   named the symptom, not the defect — see the guard-ordering rule below for what actually leaked, and where.)
 
 The sealed variants themselves are **not** duplication to delete — they are the typed domain vocabulary that
 gives compile-time exhaustiveness, self-documenting handler signatures, and typed handler tests
@@ -42,7 +43,7 @@ intact**:
   never per resource.
 - **Failure variants self-describe their projection.** Every failure variant carries its stable `code` + its
   bucket via a shared `HttpFailure` interface (`val code`, `val status`). Recurring failures (e.g.
-  `scope_not_found`, `not_scope_member`, `slug_taken`) are declared **once** in a shared `Failures` catalog and
+  `scope_not_found`, `not_key_holder`, `slug_taken`) are declared **once** in a shared `Failures` catalog and
   referenced, so the wire `code` + bucket for a given semantic failure has a single source of truth. **Drift
   becomes structurally impossible**: two sites cannot disagree on the status of "not a member" because the
   (code, bucket) lives on the one catalog entry, not in two `when` arms.
@@ -52,16 +53,36 @@ intact**:
   filter) all render through it. Each resource `when` collapses to `is <Success> → 2xx …; is HttpFailure →
   writer(outcome)`, which stays **exhaustive** (every non-success sealed subtype implements `HttpFailure`).
 
-**Operator-blind status convention (the drift target).** The correct status for "caller is not a member of the
-scope" is **404**, not 403: a non-member probing a `scopeId` must not distinguish "exists, you're forbidden"
-(403) from "no such scope" (404), or the response **discloses scope existence** across the membership boundary —
-a confidentiality leak (cf. the cross-scope IDOR class, [cr-0126](../../changes/cr-0126-fix-node-delete-idor.md)).
-The convention: **membership-gated absence → 404** (indistinguishable from non-existent); 403 is reserved for
-cases where the caller legitimately knows the resource exists (e.g. an owner-only action on a scope they belong
-to). The 3 sites currently returning 403 for a non-member violate this; they are corrected by a **separate,
-security-reviewed change** ([inbox #83](../inbox.md)). The projection refactor here is **behaviour-preserving** and
-only makes the drift *visible* (those variants keep a FORBIDDEN tag today; flipping the tag to NOT_FOUND is the
-follow-up's small, reviewed change).
+**Operator-blind guard ordering (the drift target).** A non-member probing a `scopeId` must not distinguish
+"exists, you're forbidden" (403) from "no such scope" (404), or the response **discloses scope existence** across
+the membership boundary — a confidentiality leak (cf. the cross-scope IDOR class,
+[cr-0126](../../changes/cr-0126-fix-node-delete-idor.md)).
+
+What leaks is the **order of the guards**, not a variant's status tag. Existence is disclosed when an operation
+probes *existence* (or scope **kind**) **before** the membership guard, so the two branches answer differently.
+Whether the second branch is tagged FORBIDDEN or NOT_FOUND is secondary; what matters is that a non-member and a
+bogus id are **indistinguishable**. The rule:
+
+> **The membership boundary is the first guard on every scope-addressed operation.** Capability checks
+> (grant-holder, owner) run *after* it and may answer 403 — a member legitimately knows the scope exists.
+
+    if (!isScopeMember(caller, scopeId)) return ScopeNotFound   // 404 — uniform for strangers and bogus ids
+    if (!holdsGrant(caller, scopeId))    return NotKeyHolder     // 403 — member without the key
+    // …existence / kind / state checks only from here on
+
+This applies to *scope-addressed* operations, where the caller names an id they may have guessed. It must **not**
+be applied to paths a non-member reaches legitimately by **possessing an unguessable token** — the `@PermitAll`
+share-guest ops and tenant `preview`/`register`/`accept`. Those callers already know the resource exists, so
+their 403s are correct.
+
+The projection refactor ([cr-0161](../../changes/cr-0161-http-failure-projection.md)) was deliberately
+**behaviour-preserving** and only made the drift *visible*; the ordering fix is
+[cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md), which also carries the enforcement
+guard below.
+
+**`not_scope_member` was a misnomer**, retired by cr-0162. The sites named it gated on `holdsGrant`, not on
+membership, so a member whose consent/grant was still pending (ADR 0020) was told they were "not a member". With
+the boundary guard first, the residual 403 means precisely "member, but not a key-holder" → **`not_key_holder`**.
 
 ## Consequences
 
@@ -70,13 +91,18 @@ follow-up's small, reviewed change).
   failure's stable identity, and colocating it is exactly what makes the projection single-sourced and
   drift-proof. Generated request/response **models** still stay at the resource boundary (styleguide §2); only
   the stable error `code` string travels with the failure.
-- **Sealed Outcomes, exhaustiveness, and handler tests are untouched** — same status + same code for every
-  existing case (including the 3 drifted 403s, preserved here and fixed separately). The regression guard is the
-  existing resource/HTTP-level status + code tests.
-- **Enforcement guard (permanent):** `ErrorResponse(` is constructed in **exactly one** `shared/http/` file; no
-  `…Resource` builds an error envelope directly and no per-resource `error`/`forbidden`/`notFound`/`conflict`
-  envelope helper remains. Promoted from the CR's one-shot proof grep to a CI check (per
-  [changes/README.md](../../changes/README.md)).
+- **Sealed Outcomes, exhaustiveness, and handler tests are untouched by the projection refactor** — cr-0161 kept
+  the status + code of every existing case, including the drifted 403s, which cr-0162 then corrected. The
+  regression guard is the existing resource/HTTP-level status + code tests.
+- **Enforcement guard (permanent), envelope:** `ErrorResponse(` is constructed in **exactly one** `shared/http/`
+  file; no `…Resource` builds an error envelope directly and no per-resource
+  `error`/`forbidden`/`notFound`/`conflict` envelope helper remains. Promoted from cr-0161's one-shot proof grep
+  to a CI check (per [changes/README.md](../../changes/README.md)).
+- **Enforcement guard (permanent), ordering:** `OperatorBlindProbeTest` fires every authenticated,
+  scope-addressed endpoint as a **non-member** against both a real scope id and an invented one, and asserts the
+  two answers are identical in status and `code`. A **grep is explicitly not the right guard here** and must not
+  replace it: guard *order* is not greppable, whereas the test fails on any future endpoint that probes before it
+  gates. Adding a scope-addressed endpoint means adding a row to its table.
 - **Styleguide §13** gains a short pointer ("HTTP failure projection → `shared/http/`; membership-gated absence
   → 404").
 - **Rejected — full collapse to `Either<Failure, Success>` (the finding's literal form).** Delete the sealed
@@ -86,4 +112,6 @@ follow-up's small, reviewed change).
 - **Rejected — envelope-only dedup.** Extract just the `error()` helper to `shared/http/`, leave each resource's
   variant → status `when`. Smallest change, but leaves the projection re-derived per resource and does nothing
   about the drift. Rejected as half the value.
-- Implemented by **cr-0161**; the operator-blind status fix by the follow-up ([inbox #83](../inbox.md)).
+- Implemented by **[cr-0161](../../changes/cr-0161-http-failure-projection.md)** (the projection);
+  **[cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md)** carries the guard-ordering
+  rule + its enforcement test.

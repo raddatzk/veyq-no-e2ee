@@ -172,10 +172,12 @@ not documented; the code is the source of truth for that.
   to the wire `ErrorResponse{code}` through the **single** `shared/http/` envelope writer + status-bucket table;
   no `…Resource` constructs `ErrorResponse` or keeps a per-resource `error`/`forbidden`/`notFound` helper. The
   variant self-describes its `code` + status bucket (recurring failures via a shared `Failures` catalog), so the
-  projection is single-sourced and status drift is structurally impossible. **Membership-gated absence is 404** —
-  a non-member must not distinguish "forbidden" (403) from "not found" (404), or the response discloses existence
-  across the membership boundary; 403 is only for a caller who legitimately knows the resource exists.
-  ([ADR 0042](../decisions/0042-http-failure-projection.md), first: cr-0161.)
+  projection is single-sourced and status drift is structurally impossible. **The membership boundary is the first
+  guard** on every scope-addressed operation — gate on membership *before* any existence/kind/state probe, so a
+  non-member and a bogus id get the same 404 and existence is not enumerable. Capability checks (grant-holder,
+  owner) run **after** it and may answer 403: that caller is a member and already knows the resource exists.
+  `OperatorBlindProbeTest` enforces this for every endpoint — add a row when you add one.
+  ([ADR 0042](../decisions/0042-http-failure-projection.md); cr-0161 the projection, cr-0162 the ordering.)
 - *(to decide)* Cross-context communication — direct call vs. domain events — settled when bounded
   contexts are cut.
 

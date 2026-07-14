@@ -98,7 +98,10 @@ paths:
         **sealed client-side** under a `K_SC`-derived key (context `job`) and handed over as opaque
         `sealedBody`; the server stores it verbatim and never unseals it. Server-structural jobs (like
         `grant-delivery`) are **not** created here — the backend originates those itself; this is the front
-        door for content-processing jobs a client/agent prepares ready.
+        door for content-processing jobs a client/agent prepares ready. Membership is the **first** gate (ADR
+        0042): a caller who is not a member of `scopeId` gets `404 scope_not_found` — the same answer as for a
+        scope id that does not exist, so scope existence is not enumerable. A member who holds no grant in the
+        scope (not a key-holder, so they could not have sealed the body) gets `403 not_key_holder`.
       security:
         - bearerAuth: []
       requestBody:
@@ -132,11 +135,18 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller is not a member of the target scope.
+          description: The caller is a member of the target scope but holds no grant in it.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-              example: { code: not_scope_member }
+              example: { code: not_key_holder }
+        "404":
+          description: >
+            No such scope — or the caller is not a member of it (deliberately indistinguishable, ADR 0042).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: scope_not_found }
 
   /api/tasks/{jobId}/heartbeat:
     post:

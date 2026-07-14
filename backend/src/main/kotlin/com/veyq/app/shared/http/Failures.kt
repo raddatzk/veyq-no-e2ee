@@ -16,24 +16,30 @@ import com.veyq.app.shared.http.FailureStatus.UNPROCESSABLE
  * of an entry here — a global catalog is for cross-cutting failures, not one slice's private vocabulary.
  */
 object Failures {
-    /** Caller holds no membership for the scope → 404, operator-blind (a non-member must not learn it exists). */
+    /**
+     * No such scope — **or** the caller holds no membership for it. The two are deliberately indistinguishable
+     * (ADR 0042): a non-member must not learn a scope exists. Every scope-addressed operation raises this from
+     * its **first** guard, before any existence/kind/state probe, so a stranger and a bogus id get one answer.
+     */
     val scopeNotFound: HttpFailure = httpFailure("scope_not_found", NOT_FOUND)
 
     /** Target node absent (or membership-gated away) → 404. */
     val nodeNotFound: HttpFailure = httpFailure("node_not_found", NOT_FOUND)
 
-    /** Target tenant absent → 404. */
+    /** No such tenant — or the caller is not a member of it, indistinguishable for the same reason as
+     *  [scopeNotFound] → 404. (The Server-Owner-gated tenant admin ops raise it for plain absence.) */
     val tenantNotFound: HttpFailure = httpFailure("tenant_not_found", NOT_FOUND)
 
     /** Target membership/member absent → 404. */
     val memberNotFound: HttpFailure = httpFailure("member_not_found", NOT_FOUND)
 
     /**
-     * Caller is not a member of the scope, surfaced as **403** at `scopes.epochs`/`scopes.listMembers`/
-     * `tasks.createJob`. This is the operator-blind status drift ADR 0042 records: it should be 404 (see
-     * [scopeNotFound]) and is flipped by inbox #83. Kept 403 here to preserve behaviour (cr-0161).
+     * The caller **is** a member of the scope but holds no grant there — not a key-holder (ADR 0020: a grant is
+     * a capability *within* the membership boundary, e.g. a member whose consent is still pending). A legitimate
+     * 403: the membership guard already ran, so this caller knows the scope exists and no existence is disclosed
+     * (ADR 0042). Do not raise it for a non-member — that is [scopeNotFound].
      */
-    val notScopeMember: HttpFailure = httpFailure("not_scope_member", FORBIDDEN)
+    val notKeyHolder: HttpFailure = httpFailure("not_key_holder", FORBIDDEN)
 
     /** Scope is pending deletion; mutating it conflicts with that terminal transition → 409. */
     val scopeDeleting: HttpFailure = httpFailure("scope_deleting", CONFLICT)

@@ -35,7 +35,7 @@ class MemberAddSliceTest {
     private fun bearer(userId: String) = "Bearer ${sessions.issue(userId).accessToken}"
 
     @Test
-    fun ownerMintsMemberInviteNonOwnerIsForbidden() {
+    fun ownerMintsMemberInviteOutsiderIs404() {
         val (tenantId, owner) = seedActiveTenant("mint.example.com", "owner@mint.example.com")
         given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
             .body("""{"email":"newbie@mint.example.com"}""")
@@ -43,12 +43,13 @@ class MemberAddSliceTest {
             .then().statusCode(201).body("email", equalTo("newbie@mint.example.com"))
             .body("inviteStatus", equalTo("ACTIVE")).body("inviteExpiresAt", notNullValue())
 
-        // An outsider (no OWNER membership) cannot admit members.
+        // An outsider (not a member of the tenant at all) cannot admit members — and gets the same answer as for
+        // a tenant that does not exist (membership is the first guard, ADR 0042 / cr-0162).
         val outsider = seedUser("outsider@mint.example.com")
         given().header("Authorization", bearer(outsider)).contentType(ContentType.JSON)
             .body("""{"email":"x@mint.example.com"}""")
             .`when`().post("/api/tenants/$tenantId/member-invites")
-            .then().statusCode(403).body("code", equalTo("not_tenant_owner"))
+            .then().statusCode(404).body("code", equalTo("tenant_not_found"))
     }
 
     @Test
@@ -149,11 +150,12 @@ class MemberAddSliceTest {
             .body("find { it.userId == '$pending' }.hasGrant", equalTo(false))
             .body("find { it.userId == '$pending' }.identityPublicKey", equalTo("cGVuZGluZy1wdWJrZXk="))
 
-        // A non-key-holder cannot read the directory (uniform 403, no scope enumeration).
+        // A non-member cannot read the directory, and gets the same answer as for a scope that does not exist
+        // (membership is the first guard, ADR 0042 / cr-0162 — no scope enumeration).
         val outsider = seedUser("nope@dir.example.com")
         given().header("Authorization", bearer(outsider))
             .`when`().get("/api/scopes/$tenantId/members")
-            .then().statusCode(403).body("code", equalTo("not_scope_member"))
+            .then().statusCode(404).body("code", equalTo("scope_not_found"))
     }
 
     // --- helpers ---

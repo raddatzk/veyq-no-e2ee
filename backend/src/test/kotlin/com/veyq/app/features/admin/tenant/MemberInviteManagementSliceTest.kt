@@ -21,8 +21,9 @@ import java.util.UUID
 /**
  * Slice tests for member-invite management (uc.spaces.manage-member-invites, cr-0082): the tenant **owner**
  * lists their pending MEMBER invites, **re-issues** one (superseding the old secret + minting a fresh copyable
- * link), and **revokes** one (soft-terminal so its secret replays as no-longer-valid). All owner-gated; a
- * non-owner is uniformly 403. Distinct domains/emails so the JVM-lived H2 mem DB can't bleed state.
+ * link), and **revokes** one (soft-terminal so its secret replays as no-longer-valid). All membership-gated
+ * first (a non-member gets 404, indistinguishable from an unknown tenant — ADR 0042), then owner-gated (403).
+ * Distinct domains/emails so the JVM-lived H2 mem DB can't bleed state.
  */
 @QuarkusTest
 class MemberInviteManagementSliceTest {
@@ -33,7 +34,7 @@ class MemberInviteManagementSliceTest {
     private fun bearer(userId: String) = "Bearer ${sessions.issue(userId).accessToken}"
 
     @Test
-    fun ownerListsPendingMemberInvitesNonOwnerIsForbidden() {
+    fun ownerListsPendingMemberInvitesOutsiderIs404() {
         val (tenantId, owner) = seedActiveTenant("list-mi.example.com", "owner@list-mi.example.com")
         seedMemberInvite(tenantId, "a@list-mi.example.com", "secret-a")
         seedMemberInvite(tenantId, "b@list-mi.example.com", "secret-b")
@@ -45,10 +46,12 @@ class MemberInviteManagementSliceTest {
             .body("find { it.email == 'a@list-mi.example.com' }.inviteId", notNullValue())
             .body("find { it.email == 'a@list-mi.example.com' }.inviteExpiresAt", notNullValue())
 
+        // An outsider is not a member of the tenant, so they get the same answer as for a tenant that does not
+        // exist — not a 403 that would confirm it (membership is the first guard, ADR 0042 / cr-0162).
         val outsider = seedUser("outsider@list-mi.example.com")
         given().header("Authorization", bearer(outsider))
             .`when`().get("/api/tenants/$tenantId/member-invites")
-            .then().statusCode(403).body("code", equalTo("not_tenant_owner"))
+            .then().statusCode(404).body("code", equalTo("tenant_not_found"))
     }
 
     @Test

@@ -285,13 +285,15 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller does not own this tenant (only the tenant owner may invite members).
+          description: The caller is a member of this tenant but not its owner (only the owner may invite members).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No tenant with that id.
+          description: >
+            No tenant with that id — or the caller is not a member of it (deliberately indistinguishable,
+            ADR 0042: membership is the first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -342,7 +344,9 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No tenant with that id.
+          description: >
+            No tenant with that id — or the caller is not a member of it (deliberately indistinguishable,
+            ADR 0042: membership is the first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -380,13 +384,16 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller does not own this tenant.
+          description: The caller is a member of this tenant but not its owner.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No such pending invite for this tenant (unknown, already consumed, or already terminal).
+          description: >
+            No such pending invite for this tenant — unknown, already consumed, or already terminal
+            (`invite_not_found`); or no such tenant, or the caller is not a member of it (`tenant_not_found`,
+            deliberately indistinguishable, ADR 0042: membership is the first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -417,13 +424,16 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller does not own this tenant.
+          description: The caller is a member of this tenant but not its owner.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No such pending invite for this tenant.
+          description: >
+            No such pending invite for this tenant (`invite_not_found`); or no such tenant, or the caller is
+            not a member of it (`tenant_not_found`, deliberately indistinguishable, ADR 0042: membership is
+            the first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -442,7 +452,8 @@ paths:
         the **orphan rule** to groups they solely owned: transfer OWNER to the **oldest** remaining member, else the
         solo group is grace-tombstoned. The target's **own** scopes (personal + any solo group) are grace-tombstoned
         with their **membership kept** (read-only grace, then `ScopePurge` — cr-0090), so they can read/export their
-        own memories before erasure. Owner-gated (`403 not_tenant_owner`); the **last-owner guard** rejects removing
+        own memories before erasure. Membership-gated first (a non-member gets `404 tenant_not_found`, ADR 0042),
+        then owner-gated (`403 not_tenant_owner`); the **last-owner guard** rejects removing
         the last tenant OWNER (`409 last_owner`, ADR 0007). Operator-blind: only membership deletions + a lifecycle
         timestamp — never a key. Enforced by code, not this spec (ADR 0008).
       security:
@@ -460,13 +471,16 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller does not own this tenant (only the tenant owner may remove members).
+          description: The caller is a member of this tenant but not its owner (only the owner may remove members).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No such member of this tenant.
+          description: >
+            No such member of this tenant (`member_not_found`); or no such tenant, or the caller is not a
+            member of it (`tenant_not_found`, deliberately indistinguishable, ADR 0042: membership is the
+            first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -567,7 +581,8 @@ paths:
         The tenant **owner** replaces the per-locale terms markdown. The server **normalizes** the markdown
         and, **only if it changed**, stores it and **bumps `terms_version`** (an idempotent re-save returns the
         same version — the pre-E2EE logic). The higher version re-gates every member (uc.account.accept-terms).
-        Gated on the caller holding the tenant **OWNER** membership (a code check, `403 not_tenant_owner`).
+        Membership-gated first (a non-member gets `404 tenant_not_found`, ADR 0042), then gated on the caller
+        holding the tenant **OWNER** membership (a code check, `403 not_tenant_owner`).
         Operator-blind: terms are public operational content, never a key.
       security:
         - bearerAuth: []
@@ -607,13 +622,15 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: authentication_failed }
         "403":
-          description: The caller does not own this tenant (only the tenant owner may edit terms).
+          description: The caller is a member of this tenant but not its owner (only the owner may edit terms).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: not_tenant_owner }
         "404":
-          description: No tenant with that id.
+          description: >
+            No tenant with that id — or the caller is not a member of it (deliberately indistinguishable,
+            ADR 0042: membership is the first gate).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }

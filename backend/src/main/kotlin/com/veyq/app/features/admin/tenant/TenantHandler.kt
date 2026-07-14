@@ -71,6 +71,7 @@ sealed interface RevokeMemberInviteOutcome {
 /** Result of a tenant owner removing a member — the ACL-revoke cascade + orphan rule (cr-0091). */
 sealed interface RemoveTenantMemberOutcome {
     data object Ok : RemoveTenantMemberOutcome
+    data object NotFound : RemoveTenantMemberOutcome, HttpFailure by Failures.tenantNotFound  // no such tenant, or the caller is not a member (indistinguishable)
     data object NotOwner : RemoveTenantMemberOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)       // caller is not the tenant OWNER
     data object MemberNotFound : RemoveTenantMemberOutcome, HttpFailure by Failures.memberNotFound  // target holds no tenant-scope membership
     data object LastOwner : RemoveTenantMemberOutcome, HttpFailure by Failures.lastOwner       // target is the last tenant OWNER
@@ -143,6 +144,7 @@ class TenantHandler(
      */
     @Transactional
     fun inviteMember(callerId: String, tenantId: String, email: String): MemberInviteOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return MemberInviteOutcome.NotFound
         val tenant = store.findTenant(tenantId) ?: return MemberInviteOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return MemberInviteOutcome.NotOwner
         if (tenant.status != TenantEntity.ACTIVE) return MemberInviteOutcome.NotActive
@@ -159,6 +161,7 @@ class TenantHandler(
     /** List a tenant's pending member invites — owner-gated (cr-0082). */
     @Transactional
     fun listMemberInvites(callerId: String, tenantId: String): MemberInvitesOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return MemberInvitesOutcome.NotFound
         store.findTenant(tenantId) ?: return MemberInvitesOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return MemberInvitesOutcome.NotOwner
         return MemberInvitesOutcome.Listed(store.listPendingMemberInvites(tenantId))
@@ -167,6 +170,7 @@ class TenantHandler(
     /** Re-issue a pending member invite: supersede it + mint a fresh secret for the same email (cr-0082). */
     @Transactional
     fun reissueMemberInvite(callerId: String, tenantId: String, inviteId: String): ReissueOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return ReissueOutcome.NotFound
         val tenant = store.findTenant(tenantId) ?: return ReissueOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return ReissueOutcome.NotOwner
         val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return ReissueOutcome.InviteNotFound
@@ -181,6 +185,7 @@ class TenantHandler(
     /** Revoke a pending member invite (soft-terminal, additive-safe) — owner-gated (cr-0082). */
     @Transactional
     fun revokeMemberInvite(callerId: String, tenantId: String, inviteId: String): RevokeMemberInviteOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return RevokeMemberInviteOutcome.NotFound
         store.findTenant(tenantId) ?: return RevokeMemberInviteOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return RevokeMemberInviteOutcome.NotOwner
         val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return RevokeMemberInviteOutcome.InviteNotFound
@@ -189,7 +194,8 @@ class TenantHandler(
     }
 
     /**
-     * A tenant **owner** removes a member (uc.spaces.remove-tenant-member, ADR 0014 §6 / ADR 0025). Owner-gated;
+     * A tenant **owner** removes a member (uc.spaces.remove-tenant-member, ADR 0014 §6 / ADR 0025).
+     * Membership-gated first (a non-member gets the same 404 as a bogus tenant id, ADR 0042), then owner-gated;
      * the tenant **last-owner guard** rejects removing the last tenant OWNER (ADR 0007). Then the cascade, per
      * scope the target belongs to in this tenant:
      *  - **TENANT** + a **shared GROUP** → **delete** the membership (instant layer-1 cut on shared content; the
@@ -205,6 +211,7 @@ class TenantHandler(
      */
     @Transactional
     fun removeMember(callerId: String, tenantId: String, targetId: String): RemoveTenantMemberOutcome {
+        if (!store.hasMembership(callerId, tenantId)) return RemoveTenantMemberOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return RemoveTenantMemberOutcome.NotOwner
         val memberships = scopes.membershipsInTenant(targetId, tenantId)
         val tenantMembership = memberships.firstOrNull { it.scopeId == tenantId }
