@@ -29,6 +29,12 @@ substitute for state docs.
   `validate_coverage.py` (use-case → test refs resolve on every surface), `validate_changes.py` (CR
   number/id unique, `satisfies:`/`adrs:` resolve, adrs quoted), `validate_doc_links.py` (every relative
   link under `docs/` resolves). A red guard means the CR isn't done.
+- **Promote one-shot proofs to permanent guards.** When a CR's correctness rests on a structural invariant it
+  proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that
+  check is added as a **permanent guard** (a `scripts/` validator step or CI grep) so the invariant can't
+  silently regress. The tell that this was needed: an audit finding for a rule that already existed *in prose* but
+  nothing enforced (e.g. the styleguide mandated `@ConfigMapping`, yet 28 sites drifted). If a one-shot check
+  genuinely suffices, the CR says why.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
@@ -38,7 +44,9 @@ substitute for state docs.
   memory notes)? A rule that already exists but was ignored is a *real* miss, not a non-event. Each
   retro ends with a forward-looking **"next time"** — one concrete, actionable thing to do differently.
   Two or three bullets is enough; the goal is a compounding record of process lessons, not ceremony.
-  If genuinely nothing went wrong, say so in one line — don't manufacture a fault.
+  If genuinely nothing went wrong, say so in one line — don't manufacture a fault. **The process/collaboration
+  part is also delivered *actively* to the user at implement-session close** — spoken in the conversation, not
+  only written into this section (see the closing process retro in [`docs/ai/README.md`](../docs/ai/README.md)).
 
 ## Template
 
@@ -69,7 +77,8 @@ crosscutting concern(s), ADR(s), and the specific invariants at risk.
 ## Definition of done
 Tests green across the listed platforms, AND `docs/coverage/` updated for each `satisfies:` use-case
 (every new acceptance criterion covered by a test or an explicit gap) with
-`python3 scripts/validate_coverage.py` green.
+`python3 scripts/validate_coverage.py` green. If the CR rests on a structural invariant, its proof is
+promoted to a permanent guard (or the CR notes why a one-shot check suffices).
 
 ## Retrospective
 What didn't go well — in planning, execution, AND process/collaboration (did we honor the conventions

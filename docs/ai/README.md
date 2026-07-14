@@ -32,6 +32,57 @@ invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
 > decided in refinement (step 2, with the user); the CR only turns it into a work-order. And a CR grants no
 > licence to build: **implementation waits for the user's explicit go-ahead on that CR.**
 
+## Session topology — one phase per session
+
+Refine and implement are **separate sessions**, and **refine runs in its own fresh session, up front** — never
+tacked onto the tail of an implementation session. Refinement is the highest-leverage, cheapest-to-catch phase (a
+design fault caught here is a doc edit; the same fault caught after multi-surface implementation is expensive), so
+it must not run in the polluted, compressed context left over from implementing — its best conditions, not its
+worst.
+
+- **Refine session** — fresh context, one CR. Ground it by reading recent **retrospectives** + targeted subagent
+  spikes over the surface; produce a tight CR (decisions + inventory + a Definition of done that carries the
+  enforcement guard). Delegate broad reading to subagents so the main context stays lean.
+- **Implement session** — fresh context; reads the refined CR + only what it points at. If a fresh session
+  **cannot** proceed from the doc alone, the CR was under-refined — a cheap signal, fed straight back into the
+  CR. Produce code + proof + a filled retrospective, and **close with an active process retro** (below).
+
+**The closing process retro is mandatory and spoken, not just filed.** When implementation is done, before the
+session ends, I proactively tell the user — in the conversation, not only in the CR's `## Retrospective` — **what
+could improve about *how we work together*** (the Arbeitsweise): the process, the collaboration, the tooling, the
+conventions we did or didn't honor. It runs **both directions** (my misses *and* the user's — a premature
+instruction, a missing constraint, an internally-inconsistent CR) and **every time, even when the technical work
+went cleanly** — a clean run still teaches process. Keep it 2–4 concrete, actionable points, and invite the
+user's side. This is the compounding channel that makes the *next* refinement better; the filed retro is its
+durable record, the spoken hand-off is what actually reaches the user.
+
+Why the split holds:
+- **The retrospective is the channel from implementation to the next refinement** — not a warm context window.
+  Lessons an implementation surfaces (e.g. "an entity relocation touches every referencing unit *and* its tests")
+  land in the CR's retro and are read by the next refine session, across the session boundary, in durable state.
+- **Clean-room implementation is a quality gate.** "Always a new session" earns its keep because a fresh
+  implementer *proves* the CR is complete; that proof is void if the same session refined it.
+- **Keep a shallow buffer (1–2 refined CRs ahead), not a deep queue.** A CR refined far ahead goes stale as
+  neighbouring code drifts; refine just ahead of need.
+
+## Refinement checklist
+
+A refined CR nails **decisions, not keystrokes**:
+- **Decisions over keystrokes.** Fix the *what / why / shape* — does this belong in `shared`? which invariant is
+  at risk? what is the Definition of done? Do **not** script line-level edits ("change line 46 of X"): prose can't
+  compile or be tested, line numbers drift, and a `grep`/build finds the exact sites for free at implement time.
+  Name the *inventory* (which files/surfaces, as a table) + the *decisions*; let implementation discover the exact
+  where-and-how-many. **The inventory greps the *test* trees too, not just source** — a symbol move/rename's blast
+  radius includes every test that references it (cr-0160 counted "~8 cross-slice imports" but the move actually
+  touched +2 same-package users **and 22 test files**, only surfaced at build time).
+- **Spike when the shape is unclear.** The right abstraction often only emerges from N real usages (that is why
+  `shared/membership/MembershipStore` came out clean — 5 usages, not a guess). If refinement can't settle the
+  shape from reasoning, run a time-boxed subagent spike over the surface and fold the inventory back in — don't
+  guess an abstraction into the CR.
+- **Carry the enforcement guard into the Definition of done.** If the CR rests on a structural invariant ("no
+  duplication of X", "Y lives only in `shared/`"), its one-shot proof grep becomes a **permanent** guard — see
+  [`changes/README.md`](../../changes/README.md).
+
 ## Two documentation audiences
 
 - **Internal** (`docs/`): precise, English, for devs + agents. The technical security model lives here.
@@ -101,6 +152,7 @@ these within a session and *propose* — I don't add tooling silently. Concrete 
 | graphify on `legacy/` | I run 2–3 broad Explore sweeps over legacy in one refine session |
 | graphify on veyq | code exists across ≥3 surfaces and tracing one use-case through them gets lossy |
 | trust-chain validators | the first use-case + first test exist (something to link) |
+| an invariant guard | a CR removes a duplication or establishes "X only in Y" — promote its one-shot proof grep to a permanent check |
 | a hook | a validator/formatter exists and we've run it manually a few times |
 | a slash command | the same prompt framing has been typed ~3 times |
 | split the inbox | it needs scrolling to navigate |
