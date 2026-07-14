@@ -188,17 +188,17 @@ class SharingResource(
     // --- contributor guest ops (cr-0101; @PermitAll — account-less, gated only by share state + token) ---
 
     @PermitAll
-    override fun createShareIdentity(shareId: String, createShareIdentityRequest: CreateShareIdentityRequest): Response =
-        when (val o = handler.createIdentity(shareId, createShareIdentityRequest.sealedDisplayName)) {
+    override fun createShareIdentity(shareId: String, createShareIdentityRequest: CreateShareIdentityRequest, xSharePassword: String?): Response =
+        when (val o = handler.createIdentity(shareId, xSharePassword, createShareIdentityRequest.sealedDisplayName)) {
             is CreateIdentityOutcome.Created -> Response.status(Response.Status.CREATED)
                 .entity(ShareIdentityCreated(identityId = UUID.fromString(o.identityId), contributorToken = o.contributorToken)).build()
             is HttpFailure -> httpError(o)
         }
 
     @PermitAll
-    override fun startShareBlobUploads(shareId: String, shareBlobUploadsRequest: ShareBlobUploadsRequest): Response {
+    override fun startShareBlobUploads(shareId: String, shareBlobUploadsRequest: ShareBlobUploadsRequest, xSharePassword: String?): Response {
         val declares = shareBlobUploadsRequest.items.map { UploadDeclare(it.chunkCount, it.byteSize, it.wrappedBlobKey) }
-        return when (val o = handler.startUploads(shareId, shareBlobUploadsRequest.contributorToken, declares)) {
+        return when (val o = handler.startUploads(shareId, xSharePassword, shareBlobUploadsRequest.contributorToken, declares)) {
             is ShareUploadOutcome.Results -> Response.ok(
                 ShareBlobUploadsResponse(
                     results = o.items.map {
@@ -215,7 +215,7 @@ class SharingResource(
     }
 
     @PermitAll
-    override fun completeShareMedia(shareId: String, shareMediaBatchRequest: ShareMediaBatchRequest): Response {
+    override fun completeShareMedia(shareId: String, shareMediaBatchRequest: ShareMediaBatchRequest, xSharePassword: String?): Response {
         val items = shareMediaBatchRequest.items.map { item ->
             ShareCompleteItem(
                 originalUploadId = item.originalUploadId.toString(),
@@ -224,7 +224,7 @@ class SharingResource(
                 wrappedExif = item.wrappedExif,
             )
         }
-        return when (val o = handler.completeUploads(shareId, shareMediaBatchRequest.contributorToken, items)) {
+        return when (val o = handler.completeUploads(shareId, xSharePassword, shareMediaBatchRequest.contributorToken, items)) {
             is ShareCompleteOutcome.Results -> Response.ok(
                 ShareMediaBatchResponse(
                     results = o.items.map { ShareMediaResultItem(blobId = it.blobId?.let(UUID::fromString), mediaId = it.mediaId?.let(UUID::fromString), error = it.error) },
@@ -235,8 +235,8 @@ class SharingResource(
     }
 
     @PermitAll
-    override fun deleteShareMedia(shareId: String, mediaId: UUID, xContributorToken: String): Response =
-        when (val o = handler.deleteMedia(shareId, xContributorToken, mediaId.toString())) {
+    override fun deleteShareMedia(shareId: String, mediaId: UUID, xContributorToken: String, xSharePassword: String?): Response =
+        when (val o = handler.deleteMedia(shareId, xSharePassword, xContributorToken, mediaId.toString())) {
             ShareDeleteOutcome.Done -> Response.noContent().build()
             is HttpFailure -> httpError(o)
         }

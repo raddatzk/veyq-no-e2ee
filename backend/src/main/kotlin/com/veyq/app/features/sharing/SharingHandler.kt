@@ -56,18 +56,23 @@ sealed interface ResolveShareOutcome {
 
 sealed interface CreateIdentityOutcome {
     data class Created(val identityId: String, val contributorToken: String) : CreateIdentityOutcome
-    /** Unknown/disabled/expired share — a 404. */
+    /** Unknown/disabled/expired share, or password-protected with no token given (cr-0164) — a 404. */
     object NotFound : CreateIdentityOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** The share does not accept contributions (not CONTRIBUTOR/UPLOADER) — a 403. */
     object NotContributable : CreateIdentityOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
+    /** Password-protected + a wrong token (cr-0164) — a 403. */
+    object PasswordIncorrect : CreateIdentityOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
 }
 
 sealed interface ShareDeleteOutcome {
     object Done : ShareDeleteOutcome
-    /** No such share/media, or the media is not owned by this identity — a non-enumerable 404. */
+    /** No such share/media, the media is not owned by this identity, or password-protected with no token
+     *  (cr-0164) — a non-enumerable 404. */
     object NotFound : ShareDeleteOutcome, HttpFailure by httpFailure("share_media_not_found", NOT_FOUND)
     /** The share does not accept contributions, or the contributor token is invalid — a 403. */
     object NotContributable : ShareDeleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
+    /** Password-protected + a wrong token (cr-0164) — a 403. */
+    object PasswordIncorrect : ShareDeleteOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
 }
 
 sealed interface ShareUploadOutcome {
@@ -75,6 +80,8 @@ sealed interface ShareUploadOutcome {
     object NotFound : ShareUploadOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     /** Not a CONTRIBUTOR share, or the contributor token is invalid — a 403. */
     object NotContributable : ShareUploadOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
+    /** Password-protected + a wrong token (cr-0164) — a 403. */
+    object PasswordIncorrect : ShareUploadOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
     /** Per-share rate limit exceeded — a 429. */
     object RateLimited : ShareUploadOutcome, HttpFailure by Failures.rateLimited
 }
@@ -83,6 +90,8 @@ sealed interface ShareCompleteOutcome {
     data class Results(val items: List<CompleteItemResult>) : ShareCompleteOutcome
     object NotFound : ShareCompleteOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
     object NotContributable : ShareCompleteOutcome, HttpFailure by httpFailure("share_not_contributable", FORBIDDEN)
+    /** Password-protected + a wrong token (cr-0164) — a 403. */
+    object PasswordIncorrect : ShareCompleteOutcome, HttpFailure by httpFailure("share_password_incorrect", FORBIDDEN)
 }
 
 sealed interface ShareBlobOutcome {
@@ -212,16 +221,26 @@ class SharingHandler(
     // --- contributor / uploader (cr-0101, cr-0102) -----------------------------
 
     /** Name yourself on a contributable share (CONTRIBUTOR/UPLOADER): seal-name in, an anonymous identity + token out. */
-    fun createIdentity(shareId: String, sealedDisplayName: String): CreateIdentityOutcome {
+    fun createIdentity(shareId: String, pwToken: String?, sealedDisplayName: String): CreateIdentityOutcome {
         val share = activeShare(shareId) ?: return CreateIdentityOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0164: the password gate fronts the write path, before the role check
+            PwCheck.MISSING -> return CreateIdentityOutcome.NotFound // no token → non-enumerable 404 (no role reveal)
+            PwCheck.WRONG -> return CreateIdentityOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         if (!canUpload(share.role)) return CreateIdentityOutcome.NotContributable
         val (identityId, token) = store.createIdentity(shareId, sealedDisplayName)
         return CreateIdentityOutcome.Created(identityId, token)
     }
 
     /** Start a contributor upload — gated on the share (contributable + enabled) + a valid token, then presign. */
-    fun startUploads(shareId: String, contributorToken: String, declares: List<UploadDeclare>): ShareUploadOutcome {
+    fun startUploads(shareId: String, pwToken: String?, contributorToken: String, declares: List<UploadDeclare>): ShareUploadOutcome {
         val share = activeShare(shareId) ?: return ShareUploadOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
+            PwCheck.MISSING -> return ShareUploadOutcome.NotFound
+            PwCheck.WRONG -> return ShareUploadOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         if (!canUpload(share.role)) return ShareUploadOutcome.NotContributable
         if (store.findIdentity(shareId, contributorToken) == null) return ShareUploadOutcome.NotContributable
         if (!rateLimiter.allow(shareId)) return ShareUploadOutcome.RateLimited
@@ -229,8 +248,13 @@ class SharingHandler(
     }
 
     /** Complete a contributor upload — attach to the share's own Memory node, stamped with the identity. */
-    fun completeUploads(shareId: String, contributorToken: String, items: List<ShareCompleteItem>): ShareCompleteOutcome {
+    fun completeUploads(shareId: String, pwToken: String?, contributorToken: String, items: List<ShareCompleteItem>): ShareCompleteOutcome {
         val share = activeShare(shareId) ?: return ShareCompleteOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
+            PwCheck.MISSING -> return ShareCompleteOutcome.NotFound
+            PwCheck.WRONG -> return ShareCompleteOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         if (!canUpload(share.role)) return ShareCompleteOutcome.NotContributable
         val identity = store.findIdentity(shareId, contributorToken) ?: return ShareCompleteOutcome.NotContributable
         val completeItems = items.map {
@@ -251,8 +275,13 @@ class SharingHandler(
      * `share_identity_id` equals the token's identity), never gallery filtering, and reclaims its blobs. A
      * foreign/unknown media is a non-enumerable 404.
      */
-    fun deleteMedia(shareId: String, contributorToken: String, mediaId: String): ShareDeleteOutcome {
+    fun deleteMedia(shareId: String, pwToken: String?, contributorToken: String, mediaId: String): ShareDeleteOutcome {
         val share = activeShare(shareId) ?: return ShareDeleteOutcome.NotFound
+        when (passwordCheck(share, pwToken)) { // cr-0164: password gate before the role/token check
+            PwCheck.MISSING -> return ShareDeleteOutcome.NotFound
+            PwCheck.WRONG -> return ShareDeleteOutcome.PasswordIncorrect
+            PwCheck.OK -> {}
+        }
         if (!canUpload(share.role)) return ShareDeleteOutcome.NotContributable
         val identity = store.findIdentity(shareId, contributorToken) ?: return ShareDeleteOutcome.NotContributable
         val reclaimKeys = store.deleteContributedMedia(share.scopeId, mediaId, identity.id)

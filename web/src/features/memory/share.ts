@@ -303,22 +303,25 @@ export async function createContributorIdentity(
   shareId: string,
   memoryKey: Uint8Array,
   displayName: string,
+  pwToken?: string,
 ): Promise<ContributorSession> {
   const sealedDisplayName = b64std(v1.symWrap(memoryKey, v1.utf8(displayName), SHARE_IDENTITY_NAME_CTX, v1.randomBytes(12)))
   const { identityId, contributorToken } = await publicSharesApi().createShareIdentity({
     shareId,
     createShareIdentityRequest: { sealedDisplayName },
+    xSharePassword: pwToken, // cr-0164: the password gate fronts the write path too
   })
   return { identityId, contributorToken }
 }
 
 /** The share-scoped upload transport (no auth) — reserve via `startShareBlobUploads`, complete via `completeShareMedia`. */
-function shareUploadTransport(shareId: string, contributorToken: string): MediaUploadTransport {
+function shareUploadTransport(shareId: string, contributorToken: string, pwToken?: string): MediaUploadTransport {
   return {
     async reserve(declares) {
       const started = await publicSharesApi().startShareBlobUploads({
         shareId,
         shareBlobUploadsRequest: { contributorToken, items: declares },
+        xSharePassword: pwToken, // cr-0164
       })
       if (started.results.length !== declares.length) throw new Error('upload_failed')
       return started.results.map((r) => {
@@ -339,6 +342,7 @@ function shareUploadTransport(shareId: string, contributorToken: string): MediaU
             wrappedExif: media.wrappedExif,
           }],
         },
+        xSharePassword: pwToken, // cr-0164
       })
       const m = done.results[0]
       if (!m || m.error || !m.blobId || !m.mediaId) throw new Error(m?.error ?? 'attach_failed')
@@ -353,12 +357,12 @@ function shareUploadTransport(shareId: string, contributorToken: string): MediaU
  * the curator's `addMedia`, only the transport is share-gated. Returns the new blob + media ids.
  */
 export async function addSharePhoto(
-  session: ContributorSession & { shareId: string; memoryKey: Uint8Array },
+  session: ContributorSession & { shareId: string; memoryKey: Uint8Array; pwToken?: string },
   source: AddMediaSource,
   deriver: MediaDeriver = createBrowserDeriver(),
   opts: AddMediaOptions = {},
 ): Promise<{ blobId: string; mediaId: string }> {
-  return uploadMediaVia(session.memoryKey, source, deriver, shareUploadTransport(session.shareId, session.contributorToken), opts)
+  return uploadMediaVia(session.memoryKey, source, deriver, shareUploadTransport(session.shareId, session.contributorToken, session.pwToken), opts)
 }
 
 /**
@@ -366,8 +370,8 @@ export async function addSharePhoto(
  * authorizes it by a single-row ownership check (the media's `share_identity_id` equals the token's identity) and
  * reclaims its blobs — a foreign/unknown media is a 404. Used by the uploader drop-box's session-only delete-own.
  */
-export async function deleteSharePhoto(shareId: string, contributorToken: string, mediaId: string): Promise<void> {
-  await publicSharesApi().deleteShareMedia({ shareId, mediaId, xContributorToken: contributorToken })
+export async function deleteSharePhoto(shareId: string, contributorToken: string, mediaId: string, pwToken?: string): Promise<void> {
+  await publicSharesApi().deleteShareMedia({ shareId, mediaId, xContributorToken: contributorToken, xSharePassword: pwToken }) // cr-0164
 }
 
 // --- viewer (anonymous, no session) ----------------------------------------

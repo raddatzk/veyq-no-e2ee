@@ -147,7 +147,7 @@ async function submitName() {
   naming.value = true
   nameError.value = false
   try {
-    const created = await createContributorIdentity(shareId, rootMemoryKey.value, name)
+    const created = await createContributorIdentity(shareId, rootMemoryKey.value, name, pwToken.value)
     localStorage.setItem(sessionKey, JSON.stringify(created))
     session.value = created
   } catch {
@@ -171,7 +171,7 @@ function onFilesPicked() {
   const key = rootMemoryKey.value
   if (!picked.length || !s || !key) return
   enqueueUploads(
-    { key: shareId, upload: (source, opts) => addSharePhoto({ shareId, memoryKey: key, ...s }, source, undefined, opts) },
+    { key: shareId, upload: (source, opts) => addSharePhoto({ shareId, memoryKey: key, ...s, pwToken: pwToken.value }, source, undefined, opts) },
     picked.map((file) => ({ file, mediaType: inferMediaType(file) })),
     // CONTRIBUTOR: re-resolve so the contributed photo lists. UPLOADER: never re-resolve (the resolve serves the
     // uploader no media) — the done optimistic tile stays as the session-only own-view from its local preview.
@@ -195,7 +195,7 @@ async function onDeleteUpload(fileId: string) {
   }
   deletingIds.value = new Set(deletingIds.value).add(fileId)
   try {
-    await deleteSharePhoto(shareId, s.contributorToken, mediaId)
+    await deleteSharePhoto(shareId, s.contributorToken, mediaId, pwToken.value)
     removeFile(fileId)
   } catch {
     deleteError.value = true // keep the tile so the visitor can retry the delete this session
