@@ -91,6 +91,6 @@ späteren Schritt; vorerst ist dies das Zuhause, das deinen verschlüsselten Ber
   [en.memory.media](../enablers/en.memory.media.md) (media — display is a later slice),
   [en.memory.favorites](../enablers/en.memory.favorites.md) (the sidebar Favorites section)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`→`K_mem`),
-  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native shells later)
+  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native shells later)
 - Related use-cases: [login](../../account/use-cases/uc.account.login.md), unlock — done; the **Memory detail
   view** (gallery / journal / chapters) — planned; multi-space switching, search — planned

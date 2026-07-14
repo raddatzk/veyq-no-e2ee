@@ -32,5 +32,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
 gaps:
-  apple: "Not built. Native member-invite management is Apple's own later CR (web-first, ADR 0010)."
-  android: "Not built. Native member-invite management is Android's own later CR (web-first, ADR 0010)."
+  apple: "Not built. Native member-invite management is Apple's own later CR (web-first, ADR 0043)."
+  android: "Not built. Native member-invite management is Android's own later CR (web-first, ADR 0043)."

@@ -94,7 +94,7 @@ de+en are well covered and further locales degrade, never break.
   on demand) was rejected: it would make `derivedMode: 'auto'` re-medoid an N-fetch operation on every upload.
   Still sealed under `K_mem`, still operator-blind; no backfill — legacy media without the listed tier don't
   contribute to the medoid (exactly as they don't to date-`auto`).
-- **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -124,7 +124,7 @@ veyq sieht sie nie.
   — this UC applies it at the node level), [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)
   (reverse-only, provider-neutral geocoding; Nominatim reference; veyq-blind),
   [ADR 0018](../../../decisions/0018-map-tiles-provider-neutrality.md) (map tiles: raster via Leaflet,
-  provider-neutral, self-host/opt-in-public, veyq-blind), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  provider-neutral, self-host/opt-in-public, veyq-blind), [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
 - Crosscutting: [security-model](../../../crosscutting/security-model.md) (operator-blind = the veyq operator;
   third-party services are a separate consented boundary)
 - Future: **on-device coarse names** (a bundled gazetteer, ADR 0016); **derived** place from GPS clusters

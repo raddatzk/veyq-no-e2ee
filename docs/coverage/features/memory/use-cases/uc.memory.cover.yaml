@@ -52,5 +52,5 @@ acceptanceCriteria:
         # DB: node cover_blob_id + cover_byte_size (downscaled), wrapped_meta ciphertext (no plaintext leak), 0
         # veyq_media rows, 1 veyq_blob; remove reclaimed it (cover_blob_id NULL, veyq_blob 0).
 gaps:
-  apple: "Not built. Native cover picker/crop + display (incl. the upload source) is Apple's own later CR (web-first, ADR 0010). The data layer carries `wrappedMeta.cover` + the cover-blob endpoints after regen."
-  android: "Not built. Native cover picker/crop + display (incl. the upload source) is Android's own later CR (web-first, ADR 0010). The data layer carries `wrappedMeta.cover` + the cover-blob endpoints after regen."
+  apple: "Not built. Native cover picker/crop + display (incl. the upload source) is Apple's own later CR (web-first, ADR 0043). The data layer carries `wrappedMeta.cover` + the cover-blob endpoints after regen."
+  android: "Not built. Native cover picker/crop + display (incl. the upload source) is Android's own later CR (web-first, ADR 0043). The data layer carries `wrappedMeta.cover` + the cover-blob endpoints after regen."

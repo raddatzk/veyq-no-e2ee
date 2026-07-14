@@ -39,5 +39,13 @@ caught by a red test, not by code review.
   toolchain (Rust + FFI build) to a Quarkus/Kotlin + Swift + TS stack. The vectors already provide the
   parity contract, so per-platform is lighter and on-brand. Revisit only if the hybrid-KEM combiner proves
   too error-prone to re-implement safely across platforms.
+  **This rejection is under live challenge — [ADR 0041](0041-shared-crypto-core-deferred.md)** (`Proposed`)
+  re-argues the same core with a narrower scope (the crypto *engine* only, thin native shells) against a
+  **broader trigger** than the revisit clause above: the native un-park
+  ([ADR 0043](0043-web-first-v1-native-parked.md)) — i.e. *before* apple/android crypto would be hand-written a
+  second and third time, whether or not the combiner has proven error-prone. That narrow trigger is **not**
+  withdrawn; it stands as a second, earlier one. 0041 does not supersede this ADR — it is a proposal, and a
+  proposal cannot supersede an accepted decision. [ADR 0010](0010-native-clients-shared-contracts-not-code.md)
+  generalises this rejection to the whole client and carries the same pointer.
 - **`legacy/apple` (`VeyqCrypto`, swift-sodium) is a structural reference only** — it predates the PQ pivot
   (classic X25519, no ML-KEM), so its auth/AEAD/Argon patterns port directly but its KEM does not.

@@ -44,7 +44,7 @@
 - **Reuse the existing UI/UX — never invent.** The grid + lightbox are ported from the pre-E2EE design source
   (`legacy/frontend-noe2ee/`, see its `_PROVENANCE.md`); only the **data layer** is swapped to the contracts
   client + client-side crypto.
-- **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)):
+- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)):
   web → apple → android — the shells already host the *open* hook ([uc.memory.browse](uc.memory.browse.md)).
 
 ## What this means for you / Was das für dich bedeutet
@@ -70,6 +70,6 @@ wirklich herunterlädst**. Journal, Kapitel, Karten und Playlists kommen in spä
   [en.memory.tree](../enablers/en.memory.tree.md) (`K_mem`)
 - Decisions: [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) (direct-to-store
   media), [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_mem` → `K_blob`),
-  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
 - Related use-cases: [uc.memory.browse](uc.memory.browse.md) (done — the shell this opens from);
   the journal / chapters / map — planned

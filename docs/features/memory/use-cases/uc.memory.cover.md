@@ -74,7 +74,7 @@ and offsets it.
 - **Reuse the existing UI/UX — never invent.** The picker + hand-rolled pan/zoom crop + the crop-display formula are
   ported from the design source (`legacy/frontend-noe2ee` — `MemoryCoverDialog` / `MemoryCoverImage` / `CoverCrop`);
   only the data layer is swapped to the contracts client + `K_mem` sealing. No crop library is added.
-- **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -95,7 +95,7 @@ Gerät verschlüsselt; der Server speichert nur verschlüsselte Daten.
   sub-objects on the same `wrappedMeta`), [uc.memory.gallery](uc.memory.gallery.md) (the media tiers the cover is
   chosen from + displayed with), [uc.memory.browse](uc.memory.browse.md) (the card + `updateNode` this folds into)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (K_mem seals node content),
-  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
 - Built: the existing-media source (web, cr-0072) and the **new-upload** source (a standalone cover blob —
   contract + backend + web, cr-0073). cr-0073 generalized the cr-0072 **`mediaId`-only** `cover` shape into a
   discriminated **`source` (media | upload blob ref)** — with a backward-compatible `normalizeMemoryCover` so

@@ -6,7 +6,7 @@ title: Delete media — remove a photo into a recoverable per-Memory trash
 # destruction), audited by deleted_by/deleted_at; the irreversible purge is the scheduled system job, never a
 # member hand-action — per the security-model `Deletion & erasure` posture. Reuses the cr-0107 delete_revision
 # reconcile (no new propagation) and the cr-0102 blob-reclaim path (the purge). Native (apple/android) is deferred
-# per ADR 0010 (web-first) — the data layer carries the delete/restore endpoints after regen.
+# per ADR 0043 (web-first) — the data layer carries the delete/restore endpoints after regen.
 acceptanceCriteria:
   - id: trash-soft-delete-any-member
     text: Any member of the scope may trash a media item — the server marks it trashed (deleted_at + deleted_by), it leaves listNodeMedia and the delete-reconcile id-set, and bumps the node's delete_revision so every open gallery drops the tile on its next poll (uc.memory.live-updates). Operator-blind — a flag flip, no content, no key. A non-member gets a non-enumerable 404; unauthenticated is 401.
@@ -55,5 +55,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/memoryCover.test.ts]
 gaps:
-  apple: "Not built. Native gallery/delete/trash is Apple's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."
-  android: "Not built. Native gallery/delete/trash is Android's own later CR (web-first, ADR 0010); the data layer carries the delete/restore endpoints after regen."
+  apple: "Not built. Native gallery/delete/trash is Apple's own later CR (web-first, ADR 0043); the data layer carries the delete/restore endpoints after regen."
+  android: "Not built. Native gallery/delete/trash is Android's own later CR (web-first, ADR 0043); the data layer carries the delete/restore endpoints after regen."

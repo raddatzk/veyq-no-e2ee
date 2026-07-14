@@ -1,9 +1,9 @@
 # Doc-vs-implementation review — findings handoff (2026-07-14)
 
 A five-agent review compared `docs/` against the actual code and found ~30 confirmed drifts. The **three acute
-security defects and the sidebar-weight nit were fixed and committed** (see *Already done* below); **everything
-else is untouched and lived only in the review conversation** — this doc persists it so a fresh session can pick
-items off it.
+security defects and the sidebar-weight nit were fixed and committed**, and **Tier 1 (#1–4) is refined** (see
+*Already done* below); **everything from Tier 2 down is untouched and lived only in the review conversation** —
+this doc persists it so a fresh session can pick items off it.
 
 **How to use this.** Each finding carries a **confirm-command** (run it first — it re-grounds the finding against
 the *current* code, which may have moved) and a suggested disposition. Pull one item → refine it with the user →
@@ -28,32 +28,62 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
   (5 governed endpoints not 2; the static check exists; verification is partial).
 - Sidebar entry-weight consistency `160e4dc0`; workflow rule `fcff3aec`.
 
+**Refined 2026-07-14 (Tier 1 — planned, not yet implemented):**
+- **[ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md)** (Accepted) — web-first V1, apple/android
+  parked, un-park by explicit call. The decision record finding #3 said was missing.
+- **[cr-0166](cr-0166-tenancy-roles-and-scope-key-terminology.md)** — findings #1 + #2 (roles + scope-key
+  terminology → the code), ends in a lexical guard.
+- **[cr-0167](cr-0167-web-first-citations-and-crypto-core-crossrefs.md)** — findings #3 + #4 (44 citation
+  repoints, ADR 0010's per-CR clause, `CLAUDE.md`, the three-way crypto-core cross-reference).
+
 ---
 
-## Tier 1 — contradictions that actively mislead (a reader who checks is *confirmed in the wrong belief*)
+## Tier 1 — contradictions that actively mislead — **DONE 2026-07-14 → cr-0166 · cr-0167 · ADR 0043**
 
-1. **Phantom `ADMIN` role** *(verified).* `scopes-and-tenancy.md:108-109` lists group roles as `ADMIN · MEMBER`;
-   ADR 0007 + 0014 forbid `ADMIN`, and the contract has `[OWNER, MEMBER]`. A dead `const val ADMIN` in the code
-   makes a naive grep *confirm* the wrong doc.
-   Confirm: `grep -rn 'ADMIN' backend/src/main` → 1 hit (dead const) · `grep -n 'enum' -A2 contracts/api/scopes.openapi.yaml | grep -A1 SetMemberRole`
-   Do: fix the tenancy-doc role lists to `OWNER/MEMBER`; delete the dead const (or promote a guard forbidding it).
+> **All four are implemented**, each behind a permanent lexical guard in `scripts/` (+ CI):
+> `validate_scope_model_vocabulary.py` (#1/#2) and `validate_webfirst_authority.py` (#3/#4). Re-grounding found
+> **three of the four inventories below were wrong** — always *under*-counted, and #4 was wrong on the facts.
+> The corrections are folded into the CRs; the original claims are struck here so nobody re-inherits them.
+> **This is the review's own meta-lesson biting the review:** every wrong number came from a grep that was too
+> narrow, and every one of them would have shipped a CR that closed as "done" while leaving most of the defect
+> in place.
+>
+> **It bit once more during implementation, and this is the sharper version of the lesson:** cr-0167's *own*
+> corrected inventory was still wrong — 1 of its 38 lines cited ADR 0010 for **0010's own subject**, so the
+> planned repoint would have broken a correct citation while fixing a wrong one. A grep finds *candidates*; the
+> invariant "cites X **as the authority for** Y" is a binding no grep can see. **Before repointing N citations
+> of X, grep for counter-evidence** — which of the N cite X for X's own subject? — and write the output into the
+> CR first. See cr-0167 § *Corrections found while implementing*.
 
-2. **Scope "keypair" that doesn't exist** *(verified).* `security-model.md` describes revoke as "rotate the scope
-   **keypair**" (~2 spots); ADR 0024 is a symmetric random-key epoch chain, no keypair.
-   Confirm: `grep -n 'keypair' docs/crosscutting/security-model.md` · `grep -rniE 'scopeKeyPair|scopePublicKey' backend/src web/src` → 0
-   Do: correct the terminology to the epoch-chain model (distinct from the *identity* keypair, which is real).
+1. **Phantom `ADMIN` role** → **[cr-0166](cr-0166-tenancy-roles-and-scope-key-terminology.md)**.
+   ~~`scopes-and-tenancy.md:108-109`, 2 spots~~ → **6 spots in that one file**: the **tenant** row (`:108`) is as
+   wrong as the group row, `:109` omits `OWNER` entirely, `:135` gives the owner email to a phantom `ADMIN`, and
+   `:23`/`:85`/`:95` seed the concept in prose. The role vocabulary is `OWNER`/`MEMBER` at **every** level
+   (ADR 0007:22,42,47,57). Dead const confirmed (`MembershipEntity.kt:76`).
 
-3. **Web-first has no home, cited 19× to the wrong ADR** *(verified).* Docs cite "ADR 0010" as the web-first
-   authority; ADR 0010 says nothing about it (says the opposite: "parity guaranteed by shared contracts"). ADR 0041
-   cites "CLAUDE.md", which also lacks it. `CLAUDE.md` says "kept at **parity**".
-   Confirm: `grep -rl 'web-first.*ADR 0010\|Web first, then native parity' docs/ | wc -l` → 19 · `grep -ic 'web.first\|defer\|park' docs/decisions/0010-*.md CLAUDE.md` → 0
-   Do: give web-first one real home (its own ADR, or a clause in an existing one), point the 19 citations there,
-   fix `CLAUDE.md`'s "kept at parity" to reflect the actual priority.
+2. **Scope "keypair" that doesn't exist** → **[cr-0166](cr-0166-tenancy-roles-and-scope-key-terminology.md)**.
+   ~~"~2 spots" in `security-model.md`~~ → **21 phrase-hits across 5 files**, incl. **ADR 0007:17-18 — the
+   canonical definition of "grant"** — plus what a phrase-grep cannot see: ~6 PlantUML lines aliasing the concept
+   as `spk`, 3 lines naming a payload field (`wrappedScopePrivateKey`) that **never existed**, and ADR 0012:25's
+   residue. Root cause is citable: ADR 0024:76-80 lists the docs it invalidates, names 0012/0020/0021 (executed,
+   clean) and **misses exactly the five that still say "keypair"**.
 
-4. **ADR 0009 ↔ ADR 0041 contradict, no cross-reference** *(agent).* 0009 (Accepted) rejects a shared Rust crypto
-   core; 0041 (Proposed) adopts it — different trigger, neither references the other.
-   Confirm: `grep -c '0041\|0009' docs/decisions/0009-*.md docs/decisions/0041-*.md`
-   Do: reconcile — 0041 supersedes/extends 0009's "revisit" clause, or one links the other.
+3. **Web-first has no home** → **[ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md)** (written) +
+   **[cr-0167](cr-0167-web-first-citations-and-crypto-core-crossrefs.md)** (the repoints).
+   ~~"cited 19×"~~ → **88 assertions across 41 files**; the "19" was an artifact of one grep phrasing (`4.6×`
+   under). Honest command: `grep -rn -iE 'web.first|web first' docs/` (excl. `inbox.md`, ADR 0043) → 88. Of
+   those, **44 carry a citation and all 44 are wrong** (38 → ADR 0010, 5 → `platform-parity.md`, 1 →
+   `CLAUDE.md`); the other 44 assert it bare. ~~"no home"~~ is also imprecise: `platform-parity.md:17-25`
+   *states* the rule — in a **state** doc, and **weaker** than the rule in force. Decisions taken with the user:
+   own ADR (not a clause in 0010/0041), and the un-park is an **explicit call, no measurable trigger**.
+
+4. **ADR 0009 ↔ 0041** → **[cr-0167](cr-0167-web-first-citations-and-crypto-core-crossrefs.md)**.
+   ~~"0041 (Proposed) **adopts** it"~~ — **it does not.** 0041 says "Adopt … but **not now**" and defers against
+   a trigger; the filename is literally `0041-shared-crypto-core-**deferred**.md`. The real gap is *wider*: **ADR
+   0010:73 also rejects the shared core**, so it is three ADRs, not two, and none references another
+   (`grep -c '0041' docs/decisions/{0009,0010}-*.md` → 0, 0). Nothing gets marked `Superseded` — 0041 is
+   `Proposed`, and a proposal cannot supersede an accepted decision. Whether 0041 → `Accepted` is left as an
+   open decision, not smuggled into a citation CR.
 
 ## Tier 2 — stale / false durable state (says X, code says not-X)
 
@@ -150,9 +180,19 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 
 ---
 
-## Suggested first pick
+## Suggested next pick
+
+~~Tier 1 (#1–4)~~ — **done 2026-07-14**: ADR 0043 + cr-0166 + cr-0167, both CRs closed with a guard in CI.
+They were *not* the "quick warm-up" this section billed them as: the real inventories were 3×, 10× and 4.6× the
+reported ones, and #3 needed a genuine new decision (not a correction), so it could not legally share a CR with
+#1/#2 — `docs/ai/README.md` requires the refined state *before* the CR that cites it.
 
 **#15 (authorization matrix, generated)** — it is the root cause of the two escalation CRs, it is the one Tier-3
 item that *prevents* a whole defect class rather than patching an instance, and a generated matrix can't re-drift.
-Tier 1 (#1–4) are quick, high-mislead-value doc corrections good for warming up a session. #16 (inbox) unblocks
-every future refine. #17 (arc42) is the big one and depends on the validator-conversion precondition.
+#16 (inbox) unblocks every future refine. #17 (arc42) is the big one and depends on the validator-conversion
+precondition.
+
+**Read this before picking anything:** every *(agent)*-trust finding below still carries an unverified inventory,
+and Tier 1's track record is now 3-of-4 wrong — always under-counted, because the confirm-command was narrower
+than the defect. **Re-ground with a deliberately *wider* command than the finding's**, and reconcile the two
+numbers before planning against either.

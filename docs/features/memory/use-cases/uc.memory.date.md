@@ -76,7 +76,7 @@ use-case adds is the **`auto`** behaviour — the other three modes just carry t
 - **Reuse the existing UI/UX — never invent.** The date picker + ISO formatting are ported from the design
   source (`legacy/frontend-noe2ee` `IsoDateField` / `memoryDateRange`); the 4-mode switch realizes the approved
   mockup (the pre-E2EE design carried only a flat start/end range).
-- **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -98,5 +98,5 @@ Daten und erfährt nie den Tag, an dem du dort warst.
   [uc.memory.gallery](uc.memory.gallery.md) (the capture-time tier that `auto` derives from),
   [uc.memory.chapters](uc.memory.chapters.md) (a chapter is a node too — it carries `wrappedMeta` the same way)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (K_mem seals "capture time, location"
-  — this UC applies it at the node level), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  — this UC applies it at the node level), [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
 - Future: the **aggregated** chronological date/gallery across a Memory + its chapters

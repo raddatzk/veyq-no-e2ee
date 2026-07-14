@@ -14,14 +14,29 @@ surface:** **WASM** (`wasm-bindgen`) for web, **uniffi**-generated Swift/Kotlin 
 for desktop.
 
 The open question is not *whether* the pattern works but **when** to adopt it. The current state settles that:
-**web-first V1, native deferred** (CLAUDE.md; project priority). Exactly **one** client surface is live today
-(web); apple/android are parked and no desktop surface exists yet.
+**web-first V1, apple/android parked** until an explicit un-park
+([ADR 0043](0043-web-first-v1-native-parked.md)). Exactly **one** client surface is live today (web); no
+desktop surface exists yet.
+
+**This ADR is the live proposal against two standing rejections — it supersedes neither.**
+[ADR 0009](0009-native-crypto-per-platform-vectors.md) (`Accepted`) rejected exactly this core: the vectors are
+already the parity contract, so per-platform is lighter than a Rust+FFI toolchain — revisit "only if the
+hybrid-KEM combiner proves too error-prone".
+[ADR 0010](0010-native-clients-shared-contracts-not-code.md) (`Accepted`) generalises that to the whole client
+— shared *contracts*, never shared *code* — and names a shared Rust/FFI crypto core among its rejected options
+(`0010`, Consequences). Both remain in force. What this ADR adds is a **narrower scope** than either rejected
+(the crypto engine only — not UI, not transport, not platform storage) against a **broader trigger** than
+0009's (the native un-park, whether or not the combiner has proven error-prone). 0009's narrow trigger is not
+deleted; it stands as a second, earlier one. And the status here is `Proposed` on purpose: **a proposal cannot
+supersede an accepted decision**, so until this one is accepted, 0009 and 0010 are what veyq does.
 
 ## Decision
 
 Adopt a shared **Rust crypto core** — but **not now**. Defer it against an explicit trigger.
 
-- **Trigger = the native un-park moment** — *before* apple/android crypto is (re-)implemented in Swift/Kotlin.
+- **Trigger = the native un-park moment** ([ADR 0043](0043-web-first-v1-native-parked.md) — the explicit call
+  to resume apple/android; there is no measurable trigger, by design) — *before* apple/android crypto is
+  (re-)implemented in Swift/Kotlin.
   That is when the second and third *live* consumers appear and the dedup math turns positive: adopting then
   means the native crypto is never hand-written twice, rather than deduplicating a 3× copy after the fact. Now =
   too early (only web is live); after native is rebuilt by hand = too late.
@@ -42,7 +57,10 @@ Adopt a shared **Rust crypto core** — but **not now**. Defer it against an exp
   complex (via WASM) for **zero** dedup benefit until native returns.
 - **At the trigger:** revisit; if adopted, move this ADR to `Accepted` with the concrete engine boundary +
   toolchain (`wasm-bindgen` + `uniffi`) and fold that toolchain into CI — noting that CI does **not** build the
-  native surfaces at all yet ([inbox #80](../inbox.md)), which is a prerequisite.
+  native surfaces at all yet ([inbox #80](../inbox.md)), which is a prerequisite. **Acceptance is also what
+  supersedes 0009's and 0010's rejections on this point** — narrowed to the crypto engine; 0010's shared-.NET
+  rejection and its "shared contracts, not shared code" rule for UI/transport/storage survive untouched. Until
+  then those rejections stand and this ADR changes nothing.
 - **Costs acknowledged:** Rust + WASM + uniffi adds build complexity to every surface and raises the contributor
   bar. Against *self-hostable by default / vendor-neutral* it is fine (Rust is OSS, no vendor lock). It is a
   deliberate foundation bet — which is exactly why it is an ADR with a trigger, not a silent slide-in.

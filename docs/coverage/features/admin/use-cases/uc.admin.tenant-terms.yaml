@@ -23,5 +23,5 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [TenantTermsSliceTest.ownerSetsTermsBumpsVersionAndIdempotentReSaveDoesNot] }
 gaps:
-  apple: "The terms editor is Apple's own later CR (web-first, ADR 0010); the generated data layer carries the terms fields after regen."
-  android: "The terms editor is Android's own later CR (web-first, ADR 0010); the generated data layer carries the terms fields after regen."
+  apple: "The terms editor is Apple's own later CR (web-first, ADR 0043); the generated data layer carries the terms fields after regen."
+  android: "The terms editor is Android's own later CR (web-first, ADR 0043); the generated data layer carries the terms fields after regen."

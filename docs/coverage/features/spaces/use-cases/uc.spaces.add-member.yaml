@@ -67,5 +67,5 @@ acceptanceCriteria:
       web:
         unit: [src/features/tasks/grantDeliveryWorker.test.ts]
 gaps:
-  apple: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Apple's own later CR (web-first, ADR 0010)."
-  android: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Android's own later CR (web-first, ADR 0010)."
+  apple: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Apple's own later CR (web-first, ADR 0043)."
+  android: "Not built. Native add-member (invite + directory + the grant-delivery worker loop) is Android's own later CR (web-first, ADR 0043)."

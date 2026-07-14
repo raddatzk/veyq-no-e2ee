@@ -135,4 +135,4 @@ add/edit never carries the O(N) id-set, and nothing does per idle tick.
 - **Rejected (deferred) — WebSocket/SSE push:** lower latency, but more infra and a **held per-viewer connection
   is a stronger presence signal** to the operator than a coarse poll; folded into a later push channel shared with
   #6 (live journal co-edit).
-- **Web first; native parity deferred** ([platform-parity](../crosscutting/platform-parity.md)).
+- **Web first; native parity deferred** ([ADR 0043](0043-web-first-v1-native-parked.md)).

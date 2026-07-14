@@ -44,7 +44,7 @@ in [ADR 0012](../../../decisions/0012-content-key-hierarchy.md).
   deeper — the contract change is only *allowing* `wrappedContentKey` on a `CHAPTER`, not a new field.
 - **Reuse the existing UI/UX — never invent.** Chapter creation + the nested gallery are ported from the
   pre-E2EE design source (`legacy/frontend-noe2ee/`, `uc.memory.create-tree`); only the data layer is ours.
-- **Web first, then native parity** ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -69,5 +69,5 @@ Gerät verschlüsselt alles, der Server sieht nur verschlüsselte Daten.
   [en.memory.media](../enablers/en.memory.media.md) (`K_blob` under the parent's `K_mem`)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (content-key hierarchy — this UC
   applies its **recursive `K_mem`** decision for chapters),
-  [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md) (web first; native parity)
+  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
 - Future: chapter **sharing** (#19) — the key layout here is the groundwork

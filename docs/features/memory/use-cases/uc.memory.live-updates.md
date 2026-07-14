@@ -61,7 +61,7 @@
   (cr-0074); the poll loop mirrors `grantDeliveryPolling` / `scopeRotationPolling` (interval + visibility gate).
 - **Deferred (out of scope):** long-poll / push for sub-second latency (shared later with the live journal, #6);
   a **subtree** (Memory + chapters) aggregated revision (the gallery is own-node); a keyset delta is add/edit-only
-  by design, deletes ride the id-set. **Web first, then native parity** ([platform-parity](../../../crosscutting/platform-parity.md)).
+  by design, deletes ride the id-set. **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 

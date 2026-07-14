@@ -6,7 +6,7 @@ title: Curate a Memory's place — one sealed, named location
 # set via the same partial updateNode, returned on listNodes. Deliberate set-up (never silent), a mandatory name,
 # position = the MEDOID of the media GPS, reverse-only opt-in geocoding (client-direct, Nominatim reference, ADR
 # 0016), and a per-folder-subtree "Karte" view plotting every located Memory/Chapter from listNodes without loading
-# media (cr-0071). Native place/map UI is each platform's own later CR (web-first, ADR 0010); the group consent
+# media (cr-0071). Native place/map UI is each platform's own later CR (web-first, ADR 0043); the group consent
 # state-machine + a blind gazetteer remain prose gaps (own CRs), not unref'd criteria.
 acceptanceCriteria:
   - id: sealed-location-on-node
@@ -60,5 +60,5 @@ acceptanceCriteria:
           - src/features/memory/components/MemoryBrowse.test.ts
           - src/features/memory/components/ViewModeToggle.test.ts
 gaps:
-  apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
-  android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0010). The OS geocoder is not a blind option."
+  apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0043). The OS geocoder is not a blind option."
+  android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0043). The OS geocoder is not a blind option."

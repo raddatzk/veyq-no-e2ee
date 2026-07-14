@@ -101,8 +101,11 @@ trust state is shared across the account, not re-TOFU'd per device.
   blind server must not adjudicate a crypto claim (ADR 0028 § Consequences).
 - **Tier-consistent ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** Crypto-grade on a trusted
   client, honest-operator on operator-served web — a tampered client could ignore its own pin.
-- **Native parity.** The seal context (`identity-pins`) is a conformance-vector-pinnable string; native heads adopt
-  the same store when they reach group sharing (web-first; native shares contracts, not code, [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+- **Native parity.** The seal context (`identity-pins`) is a conformance-vector-pinnable string, so native heads
+  adopt the same store when they reach group sharing — sharing contracts, not code
+  ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
+  They reach it when native un-parks, which is web-first's schedule
+  ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 > **No end-user section.** As an enabler this has no standalone "what this means for you" story — its value reaches
 > the user through the verification use-case + the member-add flows it protects (their bilingual sections carry the
