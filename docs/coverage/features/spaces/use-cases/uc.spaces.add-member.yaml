@@ -14,7 +14,7 @@ acceptanceCriteria:
     text: The owner mints a single-use MEMBER invite (email, secret hashed) reusing the owner-invite machinery; the invitee cold-registers (identity born on-device, public bundle published) — or accepts on an existing account — becoming a tenant member with NO grant, so they land in the Personal fallback (cr-0075) marked "awaiting access".
     coverage:
       backend:
-        integration: [MemberAddSliceTest.ownerMintsMemberInviteOutsiderIs404, MemberAddSliceTest.memberRegisterJoinsGrantLessAndOwnerClaimOriginatesDelivery, MemberAddSliceTest.existingAccountAcceptsMemberInviteAndJoinsGrantLess]
+        integration: [MemberAddSliceTest.ownerMintsMemberInviteOutsiderIs404, MemberAddSliceTest.memberRegisterJoinsGrantLessAndOwnerClaimOriginatesDelivery, MemberAddSliceTest.existingAccountAcceptsMemberInviteAndJoinsGrantLess, TenantOwnerGateTest.ordinaryMemberWhoOwnsScopesIsRefusedAtEveryOwnerGatedEndpoint, TenantOwnerGateTest.realRootScopeOwnerStillPasses]
       web:
         unit: [src/features/spaces/InviteMemberDialog.test.ts, src/components/app/AppSidebar.test.ts]
   - id: invite-link-handoff

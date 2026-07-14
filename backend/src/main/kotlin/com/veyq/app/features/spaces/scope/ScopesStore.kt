@@ -362,10 +362,9 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
     }
 
     /** Whether the user is the tenant's OWNER (gates the owner-only email in the directory). */
-    fun isTenantOwner(userId: String, tenantId: String): Boolean =
-        MembershipEntity.count(
-            "userId = ?1 and tenantId = ?2 and role = ?3", userId, tenantId, MembershipEntity.OWNER,
-        ) > 0
+    /** A tenant owner holds an OWNER membership on the tenant **root scope** (cr-0163), not merely any OWNER row
+     *  carrying this `tenantId` — gates the owner-only member email (ADR 0023). Delegates to the single home. */
+    fun isTenantOwner(userId: String, tenantId: String): Boolean = membership.isTenantOwner(userId, tenantId)
 
     /** Every member of a scope: identity (per-tenant username + sealed name), pubkey, grant-present, email. The
      *  email is included on every row here; the handler nulls it for non-owner callers (ADR 0023). */

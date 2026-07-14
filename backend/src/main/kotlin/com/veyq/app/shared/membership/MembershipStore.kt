@@ -31,6 +31,13 @@ class MembershipStore {
     fun isMember(userId: String, tenantId: String): Boolean =
         MembershipEntity.count("userId = ?1 and tenantId = ?2", userId, tenantId) > 0
 
+    /** Whether the user is a tenant **owner** — holds an `OWNER` membership on the tenant **root scope**
+     *  (`scopeId == tenantId`, cr-0026), **not** merely any `OWNER` row carrying this `tenantId` (every scope birth
+     *  mints its creator an `OWNER` row, so a `tenantId`-only check answers true for ordinary members — the cr-0163
+     *  escalation). `tenantId` expresses belonging (see [isMember]); every role check keys on `scopeId` (ADR 0007).
+     *  The owner sibling of [ownerCount] — both key the tenant's authority on the root scope. */
+    fun isTenantOwner(userId: String, tenantId: String): Boolean = isScopeOwner(userId, tenantId)
+
     /** A member's role in a scope, or null if they hold no membership there. */
     fun memberRole(userId: String, scopeId: String): String? =
         MembershipEntity.find("userId = ?1 and scopeId = ?2", userId, scopeId).firstResult()?.role

@@ -31,6 +31,13 @@ public key).
   the feature handler that owns the action; the shared module never depends back on `ScopeEntity` / `TenantEntity`,
   so `shared` stays a leaf and no cycle forms. (The tell that this belonged in `shared`: the guard was reimplemented
   verbatim across 5 stores + 2 slice cycles — audit P3a.)
+- **`tenantId` expresses belonging; every role check keys on `scopeId`.** A membership row carries both `tenantId`
+  (which tenant it belongs to) and `scopeId` (which scope it grants a role on). Because every scope birth mints its
+  creator an `OWNER` row, a role check filtered by `tenantId` **alone** answers true for any member who owns *any*
+  scope in the tenant — it degrades to `isMember`. So **tenant-level authority keys on the tenant root scope**
+  (`scopeId == tenantId`, cr-0026): `isTenantOwner(u, t) = isScopeOwner(u, t)`, mirroring `tenantOwnerCount =
+  ownerCount(t)`. The `tenantId` column is for *belonging* (`isMember`), never *authorization*. (cr-0163 fixed
+  three copies of a `tenantId`-only owner gate that were functionally `isMember` — a privilege escalation.)
 - **Per scope kind:**
   - **Server role** is a single global column per user (`veyq_user.server_role`, `OWNER` / `MEMBER`) — a user
     belongs to exactly one server. **Multiple `SERVER_OWNER`s are allowed** (subject to the guard above); a flow

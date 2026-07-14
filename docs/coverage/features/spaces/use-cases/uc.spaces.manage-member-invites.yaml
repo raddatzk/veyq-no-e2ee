@@ -14,7 +14,7 @@ acceptanceCriteria:
     text: The tenant owner lists the tenant's pending (ACTIVE, unexpired) MEMBER invites — each an email + invite status + expiry — beside the joined-member directory. Owner-gated (a non-owner gets 403); operator-blind (only invite metadata the server already stores; never the secret). Consumed/expired invites are not listed.
     coverage:
       backend:
-        integration: [MemberInviteManagementSliceTest.ownerListsPendingMemberInvitesOutsiderIs404, MemberInviteManagementSliceTest.manageOnAnUnknownTenantIs404NotFound]
+        integration: [MemberInviteManagementSliceTest.ownerListsPendingMemberInvitesOutsiderIs404, MemberInviteManagementSliceTest.manageOnAnUnknownTenantIs404NotFound, TenantOwnerGateTest.ordinaryMemberWhoOwnsScopesIsRefusedAtEveryOwnerGatedEndpoint, TenantOwnerGateTest.realRootScopeOwnerStillPasses]
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: reissue-invite-link

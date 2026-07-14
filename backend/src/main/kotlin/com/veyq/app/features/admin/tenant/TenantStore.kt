@@ -103,10 +103,9 @@ class TenantStore(private val membership: MembershipStore) {
     fun hasMembership(userId: String, tenantId: String): Boolean = membership.isMember(userId, tenantId)
 
     /** Whether the user holds the OWNER membership of the tenant (the admission gate for member invites). */
-    fun isOwner(userId: String, tenantId: String): Boolean =
-        MembershipEntity.count(
-            "userId = ?1 and tenantId = ?2 and role = ?3", userId, tenantId, MembershipEntity.OWNER,
-        ) > 0
+    /** A tenant owner holds an OWNER membership on the tenant **root scope** (cr-0163), not merely any OWNER row
+     *  carrying this `tenantId`. Delegates to the single home in `shared/membership/` — mirrors `tenantOwnerCount`. */
+    fun isOwner(userId: String, tenantId: String): Boolean = membership.isTenantOwner(userId, tenantId)
 
     /** The number of OWNER memberships on the tenant root scope (`scopeId == tenantId`) — the tenant last-owner
      *  guard (ADR 0007): the last tenant OWNER may not be removed (cr-0091). Delegates to the shared owner-count. */

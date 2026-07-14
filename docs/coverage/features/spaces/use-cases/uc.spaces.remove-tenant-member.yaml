@@ -18,7 +18,7 @@ acceptanceCriteria:
   - id: remove-shared-access
     text: A TenantOwner removes a member → their tenant-scope + co-shared group memberships are deleted (instant 403 on shared content); the tenant content key is NOT rotated (ADR 0025). Owner-gated (403 not_tenant_owner), 404 for a non-member.
     coverage:
-      backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.nonOwnerForbiddenAndUnknownMemberNotFound] }
+      backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.nonOwnerForbiddenAndUnknownMemberNotFound, TenantOwnerGateTest.ordinaryMemberWhoOwnsScopesIsRefusedAtEveryOwnerGatedEndpoint, TenantOwnerGateTest.realRootScopeOwnerStillPasses] }
       web: { unit: [src/features/spaces/members.test.ts] }
   - id: orphan-transfer
     text: A group the removed member solely owned that still has other members auto-transfers OWNER to the oldest remaining member (earliest createdAt); the group carries on, the tenant owner never gains access.
