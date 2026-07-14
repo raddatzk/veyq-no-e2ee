@@ -14,12 +14,13 @@ substitute for state docs.
   working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
   contracts → backend → web → apple → android.
 - **Genuinely independent work = separate CRs, not phases.**
-- **Verify checkable claims against the source — don't inherit them.** When a CR (or the state doc it builds
-  on) asserts something the code can confirm — endpoint paths, config keys, counts, "all N of X do Y" — grep
-  the source (OpenAPI, `application.properties`, the annotations) before making it a work-order premise. Such
-  claims propagate: an unverified one in a state doc becomes a wrong premise in the next CR. Better still,
-  **don't duplicate a canonical source in prose** — point at it. A hand-kept restatement of the spec can only
-  drift. (cr-0044 inherited a phantom `/api/token` row and a wrong rate-limit config key this way.)
+- **A checkable claim carries the command that produced it — run it, don't estimate.** A CR's inventory/plan
+  states code-confirmable facts — a symbol, a count, a path, "all N of X do Y" — as the **output of a command
+  written into the CR** (`grep -rc … → 4`), never a guess. This is a *format* requirement, not a "be careful"
+  plea (which broke nine times, e.g. cr-0162's phantom `tasks.createJob`) — a cited command is re-runnable, and
+  in this repo's history every bare estimate was an under-count. Two traps: a null result counts only once you've
+  confirmed the search hit the right place, and match the **marker**, not a hand-rolled regex (`grep -c '@Test'`,
+  not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's phantom `/api/token`).
 - **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
   use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
@@ -35,6 +36,12 @@ substitute for state docs.
   silently regress. The tell that this was needed: an audit finding for a rule that already existed *in prose* but
   nothing enforced (e.g. the styleguide mandated `@ConfigMapping`, yet 28 sites drifted). If a one-shot check
   genuinely suffices, the CR says why.
+- **Bite-proof a guard by snapshot-and-restore, never `git checkout`.** To prove a new test bites, revert the
+  fix and watch it red — the revert must be exact and reversible. Protocol: `cp <file> /tmp/snap` **before** the
+  injection, break the code, run the one test, then `command cp -f /tmp/snap <file>` (the `command` prefix skips
+  any interactive `cp -i` alias). **Never `git checkout -- <file>` to restore** — it resets to HEAD and silently
+  discards *uncommitted* work in that file; `git checkout` is safe only when the baseline is committed. Confirm
+  the restore (grep the fix marker) before moving on.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's

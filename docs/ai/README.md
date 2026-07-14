@@ -81,10 +81,12 @@ A refined CR nails **decisions, not keystrokes**:
 - **Decisions over keystrokes.** Fix the *what / why / shape* — does this belong in `shared`? which invariant is
   at risk? what is the Definition of done? Do **not** script line-level edits ("change line 46 of X"): prose can't
   compile or be tested, line numbers drift, and a `grep`/build finds the exact sites for free at implement time.
-  Name the *inventory* (which files/surfaces, as a table) + the *decisions*; let implementation discover the exact
-  where-and-how-many. **The inventory greps the *test* trees too, not just source** — a symbol move/rename's blast
-  radius includes every test that references it (cr-0160 counted "~8 cross-slice imports" but the move actually
-  touched +2 same-package users **and 22 test files**, only surfaced at build time).
+  Name the *inventory* (which files/surfaces, as a table) + the *decisions*; implementation discovers the exact
+  *where* (which line, which site), but any **count** in the inventory is a cited command's output, not an estimate
+  (see [`changes/README.md`](../../changes/README.md)). **The inventory greps the *test* trees too, not just
+  source** — a symbol move/rename's blast radius includes every test that references it: cr-0160's guessed "~8
+  cross-slice imports" was really +2 same-package users **and 22 test files**, a gap a `grep -rc` at refine would
+  have closed instead of the build.
 - **Spike when the shape is unclear.** The right abstraction often only emerges from N real usages (that is why
   `shared/membership/MembershipStore` came out clean — 5 usages, not a guess). If refinement can't settle the
   shape from reasoning, run a time-boxed subagent spike over the surface and fold the inventory back in — don't
