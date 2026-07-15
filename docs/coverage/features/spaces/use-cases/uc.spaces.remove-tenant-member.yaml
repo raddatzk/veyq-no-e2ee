@@ -46,7 +46,7 @@ acceptanceCriteria:
       (ADR 0025 — ACL-revoke) or the member's own/soft-deleted scopes; a non-key-holder cannot claim it. Closes A4.
     coverage:
       backend: { integration: [MemberRemoveSliceTest.removalQueuesRotationOnlyForCoSharedGroupsNotOwnScopesOrTenant, MemberRemoveSliceTest.queuedRotationClaimableByRemainingKeyHolderOnlyThenCompletionClearsIt, MemberRemoveSliceTest.secondRemovalCoalescesIntoTheOneLiveRotationJob] }
-      web: { unit: [src/features/tasks/scopeRotationWorker.test.ts], e2e: [src/features/tasks/scopeRotation.e2e.test.ts] }
+      web: { unit: [src/features/tasks/scopeRotationWorker.test.ts] }
   - id: operator-blind
     text: The server only deletes/soft-deletes opaque rows + flips a lifecycle timestamp — never a key or a name; the tenant key is not rotated.
     coverage:

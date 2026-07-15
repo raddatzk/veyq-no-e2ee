@@ -35,13 +35,20 @@ Two facts from the corpus + the real CI config decide the shape:
 
 | Fact | Measured |
 |---|---|
-| CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` + `run_web_e2e.py` (unit+e2e), the trust-chain validators |
-| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), `apple`/`android` (no job — #80), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`) |
+| CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` (lint+typecheck+**unit**+build), the trust-chain validators |
+| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), `apple`/`android` (no job — #80), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, skipped by every run; the `web-e2e` job that would set it is `if: false` |
 | `http` as **sole** coverage area | **1 of 256** criteria (`uc.account.login/boundary-validation`) — the other 66 pair it with a backend SliceTest that proves the same behaviour in CI |
-| Criteria with **no** CI-proven ref, post-#80 (native unit/integration counted as CI) | **5**: 4 native-UITest-only + the 1 http-only |
 
-So "CI-proven" is not a function of area alone (web e2e runs, `http` e2e never does, an env-gated backend smoke
-in an otherwise-CI area does not) — but the part of that which actually bites is tiny: essentially **`http`**.
+So **"CI-proven" is not a function of area alone**: an env-gated smoke inside an otherwise-CI area is not
+proven, whatever colour its column is. **The unit is the test, not the surface.**
+
+> **Correction (2026-07-14).** This table originally read *"web `npm run check` + `run_web_e2e.py` (unit+e2e)"*
+> and the sentence above it began *"web e2e runs"*. Both were false when written: `run_web_e2e.py` had already
+> been moved to `legacy/` in the greenfield reset, and its job carries `if: false` to this day. The measurement
+> that **carries this ADR's core decision** was itself unmeasured — a table headed "Measured" that nobody ran.
+> The decision survives (its argument is about `http`, which the table gets right), but four web `e2e` coverage
+> refs had been riding on the false half and are now removed; each criterion they touched keeps a CI-run ref.
+> The rule as stated above was always right — this ADR simply did not apply it to its own surface.
 
 ## Decision
 

@@ -97,7 +97,18 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 5. **ADR 0040's "Measured" CI table is false** *(verified).* Claims CI runs web e2e; `ci.yml:105` is `if: false`.
    This measurement *carries* ADR 0040's core decision.
    Confirm: `grep -n 'if: false' .github/workflows/ci.yml` · `grep -n 'run_web_e2e' .github/workflows/ci.yml`
-   Do: correct the table to what CI actually runs; re-check the decision still holds without the false premise.
+   **Done 2026-07-14 — and it was worse than "false".** The table was headed **"Measured"** and nobody had run
+   it: `run_web_e2e.py` had *already* been moved to `legacy/` when the row was written, and its job has carried
+   `if: false` ever since. The decision survives — its argument is about `http`, which the table gets right —
+   but the false half was load-bearing elsewhere: **four web `e2e` coverage refs were riding on it**, pointing
+   at tests gated behind `describe.skipIf(!process.env.VEYQ_E2E)` that every CI run skips. Removed; each
+   criterion they touched keeps a CI-run ref.
+
+   **The finding under-called it.** It said "correct the table". The table's own sentence — *"'CI-proven' is
+   not a function of area alone"* — was already the right rule; the ADR simply never applied it to `web`. So the
+   fix was not a correction, it was **enforcing a rule the ADR had already written and then exempted itself
+   from**. It also sharpened `docs/ai/README.md`, where the rule had been restated one level too coarse ("a
+   *surface* no CI runs" → "a *test* no CI run executes"): a live surface is no alibi.
 
 6. **ADR 0038 drift-guard catches 3 of 10 enum drifts** *(agent).* Overlap-≥2 heuristic misses drops/renames on
    2-value families; `suite-version` (1 value) is structurally unguarded.
@@ -164,7 +175,11 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 9. **`platform-parity.md` matrix covers 7 of 39 UCs; `en.memory.tree` marked not-built** *(agent).* The one
    artifact meant to show "which UC on which surface" is 82% empty and partly stale (tree is live).
    Confirm: `grep -c '◻\|✅' docs/crosscutting/platform-parity.md` vs 39 UCs.
-   Do: regenerate from coverage, or drop the matrix and point at `docs/coverage/`.
+   **Done 2026-07-14 — dropped, option B.** Today's coverage model *is* the regeneration: a use-case declares
+   its target surfaces (`- **Surfaces:**`), coverage proves the live ones, and a build backs the answer. The
+   matrix's `✅` column was a hand-copy of that; its `N/A` column is now the declaration; its `http` column
+   named a deleted directory. Its three genuine "intentional N/A" rationales were harvested into the use-cases
+   that own them first — one of them better than what I had written there.
 
 10. **`ui-web-styleguide.md` — wrong legacy source + phantom token system** *(agent).* Points to `legacy/frontend`
     (the rejected E2EE-wrong-concept descendant) instead of `legacy/frontend-noe2ee`; mandates `--app-font-size-*`

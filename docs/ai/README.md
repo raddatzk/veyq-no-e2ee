@@ -143,17 +143,25 @@ A refined CR nails **decisions, not keystrokes**:
 **The coverage surfaces are `backend` and `web` — that is the whole set.** CR phases follow the dependency
 order **contracts → backend → web**.
 
-The rule underneath, from [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md): **a surface
-that no CI job runs makes no coverage claim.** It is not about which directories exist — it is about what a
-green build actually proves. Two surfaces have failed that test:
+The rule underneath, from [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md): **a test that
+no CI run executes makes no coverage claim.** It is not about which directories exist, or even which surfaces —
+it is about what a green build actually proves. Note the granularity, which cost a second pass to get right: the
+unit is the **test**, not the surface. `web` is live, and four of its refs still pointed at
+`*.e2e.test.ts` files gated behind `describe.skipIf(!process.env.VEYQ_E2E)` — real tests, genuinely valuable,
+that every CI run **skips**. A live surface is no alibi. Three cases have failed this rule:
 
 - **`http/`** was IntelliJ requests fired by hand. ADR 0040 stopped counting it; it has since been **deleted**.
 - **`apple/` and `android/`** hold parked code ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)).
   No CI job builds or tests them, so **by the same rule their tests are not coverage** — however real the code
   is. They re-enter the surface set at an explicit un-park, together with the net ADR 0010 owes then.
+- **`web`'s `*.e2e.test.ts`** need a live backend, so they are gated on `VEYQ_E2E` and skipped by every CI run;
+  the `web-e2e` job that would set it is `if: false`, because its orchestrator was moved to `legacy/` and never
+  ported back. They are a hand-run smoke — the same shape as `http/`, inside a live surface. Their four refs are
+  gone; every criterion they touched keeps CI-run coverage. Re-enabling that job is real, tracked debt
+  ([architecture §11](../architecture/README.md)) — and the day it is green, the refs come back.
 
-**Do not add a surface back to the coverage model before its CI job is green.** The claim follows the build,
-never the intention.
+**Nothing enters the coverage model before a CI run executes it.** The claim follows the build, never the
+intention — and "the test exists" is an intention.
 
 ## Working rules
 
