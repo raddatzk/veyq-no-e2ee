@@ -21,7 +21,7 @@ docs/
   decisions/NNNN-<slug>.md          # ADRs
   architecture/README.md            # the synthesized whole-system view (the map above all)
   coverage/                         # acceptance coverage, mirrors the use-case tree
-  ai/README.md                      # working method (inbox → refine → change-request)
+  ai/README.md                      # working method — owns the pipeline
   inbox.md                          # flow, not state — raw topics awaiting refinement
 ```
 
@@ -120,4 +120,4 @@ docs/
 - Use-case + enabler format → [`features/README.md`](features/README.md)
 - ADR format → [`decisions/README.md`](decisions/README.md)
 - Coverage format → [`coverage/README.md`](coverage/README.md)
-- Working method (inbox → refine → change-request) → [`ai/README.md`](ai/README.md)
+- Working method → [`ai/README.md`](ai/README.md)

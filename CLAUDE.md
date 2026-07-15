@@ -5,7 +5,7 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 
 > Fresh start in progress. `legacy/` holds the previous full implementation and its
 > target-picture docs — **reference only, never edit it.** The fresh state is built up under
-> `docs/` via the inbox → refine → change-request workflow (see `docs/ai/README.md`).
+> `docs/` via the workflow in `docs/ai/README.md`.
 
 ## Hard invariants — never violate
 - **Operator-blind E2EE everywhere.** The server sees only ciphertext + opaque metadata (IDs,
@@ -36,7 +36,7 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
   the archive exists, name it here, and all ~100 resolve again.
 
 ## How we work
-- Working rules + workflow: **`docs/ai/README.md`** (inbox → refine → change-request).
+- Working rules + workflow: **`docs/ai/README.md`** — it owns the pipeline; never restate it here.
 - Be a **sparring partner**: question proposals (mine and the user's), surface tradeoffs and
   simpler alternatives — don't just agree. The hard invariants above are the only thing not up
   for debate.

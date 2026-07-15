@@ -53,7 +53,22 @@ Five rules follow:
    fits the old: reconcile into existing crosscutting concerns and features/use-cases; never create
    orphan concepts. Durable decisions → an ADR in `docs/decisions/`. This is a sparring
    conversation, not transcription. **Scope each refinement** — don't refine all of crypto at once.
-3. **Change-request** (`changes/cr-NNNN-slug.md`) — a self-contained, phased work order derived from
+3. **Diff the refined state against the code** — scoped to what you just refined, **measured, not recalled**
+   (every count is a cited command's output). This is the step that closes the loop: without it the pipeline
+   only runs forward, and nothing ever asks *"is this still true?"*. Read it **both ways** — a disagreement is
+   a **question back to the refinement** ("which side is right?"), never automatically a work item:
+   - **Code ahead** — a CR changed behaviour and the doc never learned. The doc is the stale side; do **not**
+     plan the code back to it. cr-0123 relaxed the bucket gate — *"the rule the user chose"*, in its own words
+     — while ADR 0034 §6 went on asserting the opposite.
+   - **Doc ahead** — a decision nobody built. *That* is the CR.
+   - **Doc unbuildable** — it asks for something the stack has no form of, so the code never could follow.
+     V35 was told to add a partial unique index the H2 ∩ MariaDB subset does not have.
+
+   **What this step cannot see: a rule the docs never wrote.** A public share served trashed media for the
+   whole retention window because the trash CR and the sharing CRs both read `veyq_media` and never met —
+   the doc↔code delta there was **empty**, and the defect was real. Doc drift and cross-feature gaps are
+   different problems; this step finds only the first.
+4. **Change-request** (`changes/cr-NNNN-slug.md`) — a self-contained, phased work order derived from
    the refined state. See [`changes/README.md`](../../changes/README.md). A CR is **scaffolding, deleted when
    done** — the durable truth lives in the updated state + ADRs, and what the work *taught* is moved to where
    it binds before the file goes (rule 5: not into git).
