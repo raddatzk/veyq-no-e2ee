@@ -218,7 +218,7 @@ class SharingStore(
         return reclaimKeys
     }
 
-    /** The sealed subtree rooted at [rootNodeId] within [scopeId]: nodes (for the `K_mem` chain) + all media. */
+    /** The sealed subtree rooted at [rootNodeId] within [scopeId]: nodes (for the `K_mem` chain) + its live media. */
     fun subtree(scopeId: String, rootNodeId: String): SubtreeData {
         val subtreeIds = collectSubtreeIds(scopeId, rootNodeId)
         val nodeById = NodeEntity.find("scopeId", scopeId).list().associateBy { it.id }
@@ -232,7 +232,10 @@ class SharingStore(
                 wrappedMeta = n.wrappedMeta,
             )
         }
-        val media = MediaEntity.find("scopeId = ?1 and nodeId in ?2", scopeId, subtreeIds).list().mapNotNull { m ->
+        // `deletedAt is null` — a trashed medium (uc.memory.delete-media, cr-0110) is a soft-delete, so without
+        // this predicate the guest paths keep serving it for the whole retention window. Both share reads must
+        // carry it: this listing and [subtreeBlobIds], which authorizes the blob GET.
+        val media = MediaEntity.find("scopeId = ?1 and nodeId in ?2 and deletedAt is null", scopeId, subtreeIds).list().mapNotNull { m ->
             val blob = BlobEntity.findById(m.blobId) ?: return@mapNotNull null
             val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
                 val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
@@ -254,11 +257,12 @@ class SharingStore(
         return ShareBlobRef(blob.storageKey, blob.chunkCount)
     }
 
-    /** Every blob id attached under the subtree: media originals + derivatives + node cover blobs. */
+    /** Every blob id attached under the subtree: live media originals + derivatives + node cover blobs. */
     private fun subtreeBlobIds(scopeId: String, rootNodeId: String): Set<String> {
         val subtreeIds = collectSubtreeIds(scopeId, rootNodeId)
         val ids = HashSet<String>()
-        val media = MediaEntity.find("scopeId = ?1 and nodeId in ?2", scopeId, subtreeIds).list()
+        // Trashed media are excluded here too — else the listing hides a medium the blob GET still presigns.
+        val media = MediaEntity.find("scopeId = ?1 and nodeId in ?2 and deletedAt is null", scopeId, subtreeIds).list()
         for (m in media) {
             ids.add(m.blobId)
             MediaDerivativeEntity.find("mediaId = ?1", m.id).list().forEach { ids.add(it.blobId) }
