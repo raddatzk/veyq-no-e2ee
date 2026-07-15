@@ -112,8 +112,14 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 8. **`architecture/README.md` indexes 17 of 42 ADRs, 9 of 14 enablers** *(verified/agent).* Self-describes as
    "kept current"; last touched 2026-07-01, 1 commit (2 since `abec9887` indexed the authz concern).
    Confirm: `ls docs/decisions/[0-9]*.md | wc -l` → 42 · `grep -c '00[0-4][0-9]' docs/architecture/README.md`
-   Do: decide — either commit to keeping it a live index (a guard could check ADR/enabler coverage) or demote its
-   self-claim. **This is the arc42 question in miniature** (see Tier 3, ~~#14~~ **#17**).
+   **Done 2026-07-14 — the self-claim is demoted, not guarded.** §9 now says outright that it is *"a reader's
+   path in, not the full set — all 42 live in `decisions/`, which is the only complete list"*, and the enabler
+   roll-call is gone: it points at `features/` instead of naming 9 of 14. A directory cannot be out of date
+   about its own contents; a hand-copied list always can. The alternative on the table — a guard checking
+   ADR/enabler coverage — would have forced this page to grow every time an ADR landed, to keep a list nobody
+   asked for. **The finding assumed the choice was "keep it accurate or admit defeat"; the third option was to
+   stop making the claim.** Two stale claims went with it: *"Four client surfaces at parity"* (one is live) and
+   *"The 17 ADRs"* (there are 42).
 
    **Harder evidence, found 2026-07-14 while implementing cr-0168 — the rot was *invisible*, not just
    unattended.** All **three** of this file's PlantUML diagrams failed `plantuml -checkonly` and had **never
@@ -228,13 +234,21 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
     Do: split the inbox by area (its own trigger, long overdue); fix the header path; move done-chronicle prose to
     git history.
 
-17. **arc42 + adoc conversion** *(decided this session).* Legitimate as an outward-facing communication format,
-    **not** as a drift fix (the existing `architecture/README.md` is already the worst-maintained doc — #8).
-    **Hard precondition:** adoc breaks **5 of 7 validators silently** (they are markdown-bound; e.g.
-    `validate_doc_links.py:21` is the markdown-link regex). Convert the validators alongside; the proof is a
-    *broken reference going red*, never "CI green" (a validator that finds nothing reports success on an empty set).
-    Confirm: `grep -n 'LINK = re.compile' scripts/validate_doc_links.py` · `grep -c '\.md' scripts/validate_feature_wiring.py`
-    Do: its own multi-phase CR; the validator conversion is phase 1 and gates the rest.
+17. **arc42** — **done 2026-07-14, in one edit. This finding's premise was false.**
+
+    It called for "arc42 **+ adoc** conversion" and derived a *"hard precondition: adoc breaks 5 of 7
+    validators silently"*, hence "its own multi-phase CR; the validator conversion is phase 1 and gates the
+    rest". **arc42 is not AsciiDoc.** It is a *section structure*, published in markdown among other formats.
+    The precondition never existed, no validator was touched, and the multi-phase CR evaporated. The finding
+    fused a structure with one of its file formats and then planned months of work around the fusion.
+    **Reusable error: check whether a standard mandates the thing you think it mandates, before pricing it.**
+
+    It was also right about one thing and wrong about its weight. Right: arc42 is a *communication* format, not
+    a drift fix. Wrong: that made it sound optional. The section that earned the change is **§11 Risks and
+    Technical Debt** — six live debts (this file included) that had no single address and were scattered across
+    an ADR's prose, two `gaps:` fields, an audit doc and a dead workflow. §10 (Quality Requirements) and §12
+    (Glossary) were also simply missing. The page grew 192 → 299 lines, all of it those three sections; the
+    pre-existing ones got *shorter*, because the enabler roll-call became a pointer (#8).
 
 ## Loose ends (never logged; small, real)
 
@@ -264,8 +278,17 @@ false**: neither CR names a root cause, a generated matrix can't re-drift *becau
 it argued for is the one that would not have caught either escalation. What shipped is a **map** — dimensions +
 rules. See #15.
 
-**#16 (inbox)** unblocks every future refine. **#17 (arc42)** is the big one and depends on the
-validator-conversion precondition.
+~~**#17 (arc42)** is the big one and depends on the validator-conversion precondition.~~ — **done 2026-07-14
+in one edit; the precondition was imaginary** (arc42 is not AsciiDoc). See #17.
+
+**#16 (inbox)** unblocks every future refine.
+
+> **Read this section's own track record before trusting its next ranking.** Of the items it sized: Tier 1 was
+> billed a "quick warm-up" and its inventories were 3×, 10× and 4.6× under-reported; #15's three premises were
+> all false; #17 was "the big one, blocked on a precondition" that did not exist; #8 offered two options and
+> the right answer was a third (stop making the claim). **This file is good at noticing that something is
+> wrong and bad at saying what it costs or what to do** — which is what an audit can be, and worth keeping in
+> mind: take the *observation*, re-derive the *plan*.
 
 **Read this before picking anything:** every *(agent)*-trust finding below still carries an unverified inventory,
 and Tier 1's track record is now 3-of-4 wrong — always under-counted, because the confirm-command was narrower

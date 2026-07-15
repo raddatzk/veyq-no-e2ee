@@ -1,14 +1,46 @@
-# veyq architecture — the whole-system map
+# veyq architecture
 
-The synthesized, current-state view of **how veyq is built** — the layer *above* the per-feature enablers,
-the cross-cutting concerns, and the ADRs. It **stitches together** the views that no single doc owns
-(components, the key-hierarchy spine end-to-end, deployment, data-flow) and **indexes** the rest. It
-**references, never duplicates** — the detail lives in the linked docs; this page is the map. Its place in the
-doc taxonomy: [docs/README](../README.md).
+The current-state view of **how veyq is built**, in [arc42](https://arc42.org) order — a structure an outside
+reader already knows, so they can find what they came for without learning ours first.
 
-Kept current as work lands; it is a map, not a satisfiable record (no CR `satisfies:` it).
+**This page is a map, not a compendium.** Every section states the shape and **points** at the doc that owns the
+detail; it never restates it. Its place in the taxonomy: [docs/README](../README.md). arc42 is used as its
+**markdown** template — it is a section structure, not a file format, and nothing here needs AsciiDoc. Twelve
+sections, fixed: that bound is half the reason for adopting it.
 
-## Containers — who talks to whom
+Kept current as work lands; a map, not a satisfiable record (no CR `satisfies:` it).
+
+## 1. Introduction and Goals
+
+veyq is a **self-hostable, end-to-end-encrypted memory-sharing app**. The product center is the **Memory**
+(nested into **Chapters**); folders only organize. People keep photos, dates, places and journal entries in
+private spaces and share them deliberately — with a person, a group, or a link.
+
+The three goals that outrank every other quality, in order:
+
+1. **The operator cannot read your content — including the operator you are.** A user's unshared personal space
+   is confidential even from whoever runs the server. This is not a feature; it is the product.
+2. **Anyone can run it.** Self-hosting is the default deployment, not a degraded mode.
+3. **The same product on every surface it ships to**, without shipping the same code twice.
+
+Stakeholders: the **person** whose memories these are; the **operator** who runs an instance (often the same
+person, and explicitly *not* trusted with content); a **developer or reviewer** judging whether the encryption
+claim holds.
+
+## 2. Architecture Constraints
+
+Non-negotiable, and every view below is downstream of them. Stated canonically in
+[CLAUDE.md](../../CLAUDE.md) — the list here is the reader's orientation, not a second source of truth:
+
+| Constraint | What it forbids |
+|---|---|
+| **Operator-blind E2EE everywhere** | any path where the server holds a content key, a password, or plaintext — including "just for a moment", including for the operator's own data |
+| **Self-hostable by default** | any required central service; central infrastructure is always optional |
+| **API-first** | hand-written DTOs; `contracts/` (OpenAPI + crypto vectors) is what code is generated from |
+| **Product language: Memory / Chapter** | Album / Explorer models, APIs or tables |
+| **No deprecated or vendor-locked dependencies** | anything EOL, archived, or whose only living successor is commercial — that would break self-hostability |
+
+## 3. Context and Scope
 
 ```mermaid
 ---
@@ -33,24 +65,46 @@ flowchart TB
   class NB note
 ```
 
-- **All content crypto is client-side.** The backend performs no content crypto and never sees the password
-  ([security-model](../crosscutting/security-model.md), [ADR 0003](../decisions/0003-operator-blind-password-auth.md)).
-- **API-first.** The contracts (`contracts/` — OpenAPI + crypto vectors) are the source of truth; backend DTOs
-  + client SDKs are **generated**, never hand-written. Backend shape: **resource → handler → store** feature
-  slices ([ADR 0001](../decisions/0001-backend-http-adapter-vs-application-slicing.md)); central auth/authz at
-  the boundary ([ADR 0008](../decisions/0008-centralized-http-auth.md)).
-- **Four client surfaces at parity** via shared contracts, not shared code
-  ([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md); the ported UI/UX +
-  [platform-parity](../crosscutting/platform-parity.md)).
-- **Third parties are a separate, consented boundary** — the client may reach a geocoder / tile server
-  *directly*, never proxied through veyq, so the veyq operator stays blind
-  ([ADR 0016](../decisions/0016-geocoding-provider-neutrality.md); the boundary is in
-  [security-model](../crosscutting/security-model.md)).
+**The trust boundary is the backend, and the adversary is on the inside of it.** What crosses it is ciphertext
+plus operational metadata the server needs to route and bill bytes: ids, kinds, sizes, coarse timestamps,
+membership, wraps, blinded tokens. What never crosses: a key, a password, a name, a day, a coordinate, a pixel.
 
-## The key-hierarchy spine (end-to-end)
+**Third parties are a separate, consented boundary.** A client may reach a geocoder or tile server *directly* —
+never proxied — so that using one leaks a bare coordinate to *that* party and still nothing to the veyq
+operator ([ADR 0016](../decisions/0016-geocoding-provider-neutrality.md); the boundary is drawn in
+[security-model](../crosscutting/security-model.md)).
 
-The one chain each doc shows only a slice of — from an unlock gesture down to a sealed field. Random keys,
-many-wrapped, so every level is an independent sharing grain.
+## 4. Solution Strategy
+
+| Goal (§1) | Strategy | Where it is decided |
+|---|---|---|
+| Operator cannot read content | **All content crypto is client-side.** The backend performs no content crypto and never sees the password: login is challenge-response against a derived public key, so there is no credential to steal. | [ADR 0003](../decisions/0003-operator-blind-password-auth.md), [security-model](../crosscutting/security-model.md) |
+| …and cannot read it *later*, in bulk | **Envelope encryption with random per-level keys, many-wrapped** (§6) — every level is an independent sharing grain, so sharing never means re-encrypting content. | [ADR 0012](../decisions/0012-content-key-hierarchy.md) |
+| …and cannot see bytes at all | **Blobs go direct-to-store via presigned URLs.** The backend signs; it never touches a blob byte. | [ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md) |
+| Same product, many surfaces | **Parity by shared contracts, not shared code** — one generated client per language + crypto conformance vectors. | [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md), [ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md) |
+| Anyone can run it | **One node, no required central service**, a vendor-neutral S3 store, Host-based tenant routing. | [ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md), [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md) |
+
+## 5. Building Block View
+
+- **`backend/`** — Quarkus / Kotlin. **Two axes on purpose:** the application layer is **use-case-sliced**
+  (`features/<area>/<use-case>/…Handler`) — that is where cohesion and the trust chain live; the HTTP adapter
+  layer is **resource-shaped** (one `…Resource` per generated API interface), because one endpoint can serve
+  several use-cases. Cross-cutting code lives in `shared/`, which must not depend on a feature.
+  → [ADR 0001](../decisions/0001-backend-http-adapter-vs-application-slicing.md),
+  [developer-styleguide](../crosscutting/developer-styleguide.md)
+- **Authentication and coarse authorization are central**, declared at the resource boundary and default-deny;
+  fine-grained content authorization is a small domain guard in the handler — a different layer.
+  → [ADR 0008](../decisions/0008-centralized-http-auth.md),
+  [cc.security.authorization](../crosscutting/cc.security.authorization.md)
+- **`web/`** — Vue 3 + PrimeVue, and **the one live client surface** ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)).
+  All content crypto runs here. `apple/` and `android/` hold parked code that no CI builds and that claims no
+  coverage; they re-enter when their CI job is green.
+- **`contracts/`** — OpenAPI + crypto vectors. The source of truth both sides are generated from; never a
+  hand-written DTO.
+
+## 6. Runtime View
+
+The one chain each doc shows only a slice of — an unlock gesture down to a sealed field:
 
 ```mermaid
 ---
@@ -76,55 +130,24 @@ flowchart TB
   KMEM -->|"one Memory/chapter key wrapped to a share"| SH
 ```
 
-Where each level lives: **unlock + Master Key + identity** →
+Where each level is owned: **unlock + Master Key + identity** →
 [en.account.key-model](../features/account/enablers/en.account.key-model.md)
-([ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md)); **K_SC / grants** →
-[scopes & tenancy](../crosscutting/scopes-and-tenancy.md) ([ADR 0007](../decisions/0007-membership-role-grant-relation.md)); **K_mem / K_blob / recursion / sharing** →
+([ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md)) · **K_SC / grants** →
+[scopes & tenancy](../crosscutting/scopes-and-tenancy.md)
+([ADR 0007](../decisions/0007-membership-role-grant-relation.md)) · **K_mem / K_blob / recursion / sharing** →
 [en.memory.tree](../features/memory/enablers/en.memory.tree.md) +
 [en.memory.media](../features/memory/enablers/en.memory.media.md)
-([ADR 0012](../decisions/0012-content-key-hierarchy.md)); **wrappedMeta** →
-[en.memory.node-meta](../features/memory/enablers/en.memory.node-meta.md); the crypto primitives that realize it
-→ [ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (vectors:
-[ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md)). The whole-system security argument is
+([ADR 0012](../decisions/0012-content-key-hierarchy.md)) · **wrappedMeta** →
+[en.memory.node-meta](../features/memory/enablers/en.memory.node-meta.md) · the primitives that realize it →
+[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (vectors:
+[ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md)).
+
+**Every other runtime flow is drawn where it belongs** — each use-case doc carries its own sequence diagram
+(login, unlock, add media, share, add member, rotate a scope key…). This page does not copy them:
+[features/](../features/). The whole-system security argument is
 [security-model](../crosscutting/security-model.md).
 
-## Cross-cutting spines (synthesis + where to read)
-
-- **Operator-blind invariant & trust boundaries** — the veyq operator is the adversary; the server sees
-  ciphertext + opaque operational metadata, never keys/content; third parties are a separate consented
-  boundary. → [security-model](../crosscutting/security-model.md)
-  ([ADR 0003](../decisions/0003-operator-blind-password-auth.md),
-  [ADR 0015](../decisions/0015-operator-blind-readable-urls.md),
-  [ADR 0016](../decisions/0016-geocoding-provider-neutrality.md)).
-- **Auth stack (end-to-end)** — password → **auth keypair** (Ed25519, derived, never sent) → challenge-response
-  login → **opaque, rotating session tokens** → the HTTP auth boundary. Deliberately **separate** from *unlock*.
-  → [ADR 0003](../decisions/0003-operator-blind-password-auth.md) →
-  [ADR 0004](../decisions/0004-session-tokens.md) → [ADR 0008](../decisions/0008-centralized-http-auth.md);
-  the auth-vs-unlock split is [en.account.key-model](../features/account/enablers/en.account.key-model.md).
-- **Passwordless-unlock orchestration** — a prompt-free data layer + a native app-layer secure-element gate,
-  identical on every platform. →
-  [en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)
-  ([ADR 0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md),
-  [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md)).
-- **Scope / tenancy model** — personal / group / tenant scopes; membership = (user, scope, role, grant); a
-  tenant scope is born cold; groups are private even from the tenant owner. →
-  [scopes & tenancy](../crosscutting/scopes-and-tenancy.md)
-  ([ADR 0002](../decisions/0002-personal-scope-per-tenant.md),
-  [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md),
-  [ADR 0007](../decisions/0007-membership-role-grant-relation.md),
-  [ADR 0014](../decisions/0014-group-scopes-and-governance.md)); enablers
-  [en.spaces.personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md) /
-  [en.spaces.group-scope](../features/spaces/enablers/en.spaces.group-scope.md).
-- **Media data-flow** — client generates derivatives + seals each blob under its own `K_blob` (under `K_mem`) →
-  uploads the ciphertext chunks **direct-to-store via presigned URLs**, never through the backend →
-  `completeMedia` records opaque metadata + the wraps. →
-  [en.memory.media](../features/memory/enablers/en.memory.media.md) +
-  [en.memory.derivatives](../features/memory/enablers/en.memory.derivatives.md)
-  ([ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md)).
-- **Readable-but-blind URLs** — the content path rides the URL `#fragment`, resolved client-side; the operator
-  never sees a name-derived slug. → [ADR 0015](../decisions/0015-operator-blind-readable-urls.md).
-
-## Deployment — self-hostable by default
+## 7. Deployment View
 
 ```mermaid
 ---
@@ -149,44 +172,128 @@ flowchart TB
   class NB note
 ```
 
-- **Self-hostable by default; central infrastructure always optional** (a hard invariant,
-  [CLAUDE.md](../../CLAUDE.md)). A common deployment is one node, usually one tenant, self-administered — the
-  Server Owner *is* the Tenant Owner ([ADR 0006](../decisions/0006-cold-tenant-scope-birth.md)).
+- **Self-hostable by default; central infrastructure always optional.** The common deployment is one node,
+  usually one tenant, self-administered — the Server Owner *is* the Tenant Owner
+  ([ADR 0006](../decisions/0006-cold-tenant-scope-birth.md)).
 - **S3-compatible, vendor-neutral store** — the backend signs via the AWS S3 SDK, never a vendor-locked client;
   the bundled dev store is a generic OSS S3 (Garage). Ops detail: [infra/README](../../infra/README.md)
   ([ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md)).
-- **Host-based tenant routing** — the active tenant resolves from the request Host (port stripped);
-  ([scopes & tenancy](../crosscutting/scopes-and-tenancy.md), [uc.admin.setup-server](../features/admin/use-cases/uc.admin.setup-server.md)).
+- **Host-based tenant routing** — the active tenant resolves from the request Host (port stripped)
+  ([scopes & tenancy](../crosscutting/scopes-and-tenancy.md),
+  [uc.admin.setup-server](../features/admin/use-cases/uc.admin.setup-server.md)).
 
-## Decision map (ADRs by theme)
+## 8. Cross-cutting Concepts
 
-The 17 ADRs grouped — the "why" behind each spine above.
+- **Operator-blind invariant & trust boundaries** — the operator is the adversary; the server sees ciphertext +
+  opaque operational metadata, never keys or content; third parties are a separate consented boundary. →
+  [security-model](../crosscutting/security-model.md)
+  ([ADR 0003](../decisions/0003-operator-blind-password-auth.md),
+  [ADR 0015](../decisions/0015-operator-blind-readable-urls.md),
+  [ADR 0016](../decisions/0016-geocoding-provider-neutrality.md))
+- **Auth ≠ unlock, and the split is deliberate.** Password → auth keypair (Ed25519, derived, never sent) →
+  challenge-response login → opaque rotating session tokens → the HTTP auth boundary. A session grants a role
+  over *ciphertext*; it never opens content. →
+  [ADR 0003](../decisions/0003-operator-blind-password-auth.md) →
+  [ADR 0004](../decisions/0004-session-tokens.md) → [ADR 0008](../decisions/0008-centralized-http-auth.md);
+  the split itself is [en.account.key-model](../features/account/enablers/en.account.key-model.md).
+- **Passwordless-unlock orchestration** — a prompt-free data layer + a native app-layer secure-element gate,
+  identical on every platform. →
+  [en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)
+  ([ADR 0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md),
+  [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md))
+- **Scope / tenancy model** — personal / group / tenant scopes; membership = (user, scope, role, grant); a
+  tenant scope is born cold; groups are private even from the tenant owner. →
+  [scopes & tenancy](../crosscutting/scopes-and-tenancy.md)
+  ([ADR 0002](../decisions/0002-personal-scope-per-tenant.md),
+  [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md),
+  [ADR 0007](../decisions/0007-membership-role-grant-relation.md),
+  [ADR 0014](../decisions/0014-group-scopes-and-governance.md))
+- **Media data-flow** — the client generates derivatives and seals each blob under its own `K_blob` (under
+  `K_mem`), uploads ciphertext chunks direct-to-store via presigned URLs, then records opaque metadata + the
+  wraps. → [en.memory.media](../features/memory/enablers/en.memory.media.md) +
+  [en.memory.derivatives](../features/memory/enablers/en.memory.derivatives.md)
+  ([ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md))
+- **Readable-but-blind URLs** — the content path rides the URL `#fragment`, resolved client-side; the operator
+  never sees a name-derived slug. → [ADR 0015](../decisions/0015-operator-blind-readable-urls.md)
+- **Forward secrecy per scope** — removing a member rotates the scope key forward an epoch; old content stays
+  readable to those who kept access, new content is closed to the removed member. →
+  [ADR 0024](../decisions/0024-scope-key-rotation.md), [ADR 0025](../decisions/0025-forward-secrecy-policy-per-scope.md)
+
+## 9. Architecture Decisions
+
+The decisions that shape the views above, by theme. **This is a reader's path in, not the full set** — all
+**42** live in [decisions/](../decisions/), which is the only complete list.
 
 | Theme | ADRs |
 |---|---|
-| **Backend structure** | [0001](../decisions/0001-backend-http-adapter-vs-application-slicing.md) adapters/slicing · [0008](../decisions/0008-centralized-http-auth.md) central auth/authz |
+| **Backend structure** | [0001](../decisions/0001-backend-http-adapter-vs-application-slicing.md) adapters/slicing · [0008](../decisions/0008-centralized-http-auth.md) central auth/authz · [0042](../decisions/0042-http-failure-projection.md) single-source failure projection |
 | **Auth & session** | [0003](../decisions/0003-operator-blind-password-auth.md) password keypair · [0004](../decisions/0004-session-tokens.md) session tokens · [0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md) passwordless orchestration |
 | **Keys & crypto** | [0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) primitives + PQ strategy · [0012](../decisions/0012-content-key-hierarchy.md) content-key hierarchy · [0005](../decisions/0005-unlock-methods-and-device-trust.md) unlock methods & device trust · [0009](../decisions/0009-native-crypto-per-platform-vectors.md) per-platform vectors |
-| **Scopes & tenancy** | [0002](../decisions/0002-personal-scope-per-tenant.md) personal scope per tenant · [0006](../decisions/0006-cold-tenant-scope-birth.md) cold tenant birth · [0007](../decisions/0007-membership-role-grant-relation.md) membership relation · [0014](../decisions/0014-group-scopes-and-governance.md) group scopes & governance |
+| **Scopes & tenancy** | [0002](../decisions/0002-personal-scope-per-tenant.md) personal scope per tenant · [0006](../decisions/0006-cold-tenant-scope-birth.md) cold tenant birth · [0007](../decisions/0007-membership-role-grant-relation.md) membership relation · [0014](../decisions/0014-group-scopes-and-governance.md) group scopes & governance · [0024](../decisions/0024-scope-key-rotation.md) key rotation |
 | **Storage & URLs** | [0013](../decisions/0013-blob-storage-presigned-direct-to-store.md) S3 direct-to-store · [0015](../decisions/0015-operator-blind-readable-urls.md) blind readable URLs |
-| **Clients & third parties** | [0010](../decisions/0010-native-clients-shared-contracts-not-code.md) shared contracts not code · [0016](../decisions/0016-geocoding-provider-neutrality.md) geocoding provider-neutrality |
+| **Client parity** | [0010](../decisions/0010-native-clients-shared-contracts-not-code.md) shared contracts, not shared code · [0016](../decisions/0016-geocoding-provider-neutrality.md) geocoding provider-neutrality |
+| **Scope of V1** | [0043](../decisions/0043-web-first-v1-native-parked.md) web-first V1; apple/android parked until an explicit un-park |
+| **Coverage & process** | [0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md) what counts as a covered surface |
+
+## 10. Quality Requirements
+
+In priority order. The first one wins every conflict, by construction rather than by discipline — the server
+has no key to misuse.
+
+| Quality | The bar | How it is held |
+|---|---|---|
+| **Confidentiality from the operator** | absolute. Not "hard to abuse" — *impossible without a client key*. A full DB + object-store dump yields ciphertext, public keys and wrapped blobs, and derives nothing. | §4's strategies; argued end-to-end in [security-model](../crosscutting/security-model.md) |
+| **Self-hostability** | one `docker compose up` + a JVM; no account with anyone, no phone-home, no required central service | [infra/README](../../infra/README.md) |
+| **Surface parity** | the same product behaviour on every *live* surface, without shared client code | contracts + crypto vectors ([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md)) — and see §11: the mechanism that caught behavioural drift is currently gone |
+| **Forward secrecy on removal** | a removed member cannot read content created after their removal | [ADR 0024](../decisions/0024-scope-key-rotation.md) |
+
+**Deliberately unstated:** there is no latency, throughput or availability target, and inventing one here would
+be fiction. veyq's load model is a household, and the expensive paths (crypto, derivatives) run on the client.
+If a target is ever needed, it becomes an ADR — not a line in this table.
+
+## 11. Risks and Technical Debt
+
+Known, current, and each with an owner document. This section exists so that debt has *one* address instead of
+being scattered across an ADR's prose, a coverage field, and an audit file.
+
+| Risk / debt | Why it matters | State |
+|---|---|---|
+| **"No shared code" has no drift net.** [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) relied on the `http/` acceptance suites to catch behavioural drift in re-implemented orchestration (login/unlock/accept — *not* vector-pinned like crypto). [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md) demoted that suite and it has since been deleted. | Only *one* live surface exists, so there is nothing to drift *from* — the risk is dormant, not solved. It wakes the moment a second orchestration exists. | **A replacement is due at the native un-park**, before any second surface — the same moment [ADR 0041](../decisions/0041-shared-crypto-core-deferred.md) triggers. Do not un-park without settling it. |
+| **Two use-cases are built but unproven.** `uc.admin.setup-server` on web, `uc.spaces.verify-identity` on backend — code shipped, no test linked. | A coverage claim is only worth the build behind it. These are the only two real gaps in the model. | Tracked as `gaps:` in [coverage/](../coverage/) — the honest kind: a debt on a surface we target. |
+| **`uc.spaces.verify-identity` contradicts itself** — `status: planned` while carrying real web coverage. | A file that lies about its own state teaches the next reader the wrong shape. | Open. Not guard-worthy: one file filled in wrong. |
+| **Parked native code is not built by any CI.** ~12.9k lines of Swift/Kotlin, last touched 2026-07-12, that nothing compiles. | It rots invisibly against contract changes, and the rot is only discovered at the un-park. | Accepted deliberately ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)): the cost of the rot is paid once, at un-park, and is lower than keeping two half-clients green. |
+| **`.github/workflows/wiki-sync.yml` is dead.** It triggers on `docs/wiki/**`, rsyncs `docs/wiki/`, and runs `scripts/render-wiki-diagrams.mjs` — none of which exist. | It can never fire; it is a workflow-shaped ghost that reads as live. | Open — delete or repair. |
+| **Git history is not durable.** At the v1 move to a fresh repo (`legacy/` splitting to its own archive), history drops. | Every "let git hold it" habit silently becomes "let it go". | Decided against as a default: what must survive lives in the tree ([ai/README](../ai/README.md) § rule 5). Whether the move itself preserves history is still open — `git filter-repo` could. |
+
+## 12. Glossary
+
+The words this project uses precisely. Where a term has a tempting synonym, the synonym is **wrong here**.
+
+| Term | Meaning |
+|---|---|
+| **Memory** | the product's unit of content — a moment with photos, a date, a place, journal text. **Not** an "album". |
+| **Chapter** | a Memory nested inside a Memory. Recursive: it has its own content key. **Not** a "sub-album". |
+| **Folder** | organizes only; carries no content and no key of its own. |
+| **Scope** | the keyed container everything lives in, and the unit of sharing. Three kinds: **personal** (one per user per tenant), **group** (private even from the tenant owner), **tenant** (the root, born cold at activation). |
+| **Tenant** | one instance's household/organization, resolved from the request **Host**. One server may host many. |
+| **Membership** | the relation `(user, scope, role, grant)` — being *in* a scope. Distinct from holding its key. |
+| **Grant** | a scope's current content key (`K_SC`) sealed to a member's identity public key. One wrap = the whole scope. Holding a membership without a grant means you are in the room but cannot read. |
+| **Wrap** | any key sealed under another key. The Master Key has one wrap per unlock method; a share has its own. |
+| **Master Key** | the account root (32 bytes), in client memory only, opened by any unlock method's KEK. |
+| **Secret Key** | the user's high-entropy second factor, combined with the password to derive the unlock KEK. **Never reaches the server.** Lives in the Emergency Kit. |
+| **Emergency Kit** | the Secret Key + a recovery code, saved by the user at setup. The only path back after a forgotten password. |
+| **Epoch** | a generation of a scope's content key. Removing a member rotates the scope forward one epoch. |
+| **K_SC / K_mem / K_blob** | scope content key / per-Memory key / per-media key. Each random, each wrapped by the level above — that is what makes every level an independent sharing grain. |
+| **Operator-blind** | the server stores and serves only ciphertext + opaque metadata, and *cannot* do otherwise — it holds no content key. The operator is modelled as the adversary. |
+| **Server Owner** | the person who installed the instance. A server role over ciphertext — **not** a reader of content. |
+| **Tenant Owner** | governs one tenant (members, groups, terms). In the common self-hosted case, the same person as the Server Owner — and still not a reader. |
+| **Live surface** | a client surface whose tests a CI job actually runs. Today: `backend` and `web`. A surface with code but no CI job claims no coverage ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)). |
 
 ## Where else to look
 
 - **Doc taxonomy + rules:** [docs/README](../README.md) · **ADR format:** [decisions/README](../decisions/README.md)
-- **Enablers (feature foundations):** account
-  ([key-model](../features/account/enablers/en.account.key-model.md),
-  [passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)), memory
-  ([tree](../features/memory/enablers/en.memory.tree.md), [media](../features/memory/enablers/en.memory.media.md),
-  [derivatives](../features/memory/enablers/en.memory.derivatives.md),
-  [node-meta](../features/memory/enablers/en.memory.node-meta.md),
-  [favorites](../features/memory/enablers/en.memory.favorites.md)), spaces
-  ([personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md),
-  [group-scope](../features/spaces/enablers/en.spaces.group-scope.md))
-- **Cross-cutting concerns:** [security-model](../crosscutting/security-model.md),
-  [scopes & tenancy](../crosscutting/scopes-and-tenancy.md),
-  [authorization](../crosscutting/cc.security.authorization.md),
-  [rate-limit](../crosscutting/cc.security.rate-limit.md),
-  [platform-parity](../crosscutting/platform-parity.md), the dev + ui styleguides
-  ([developer](../crosscutting/developer-styleguide.md))
-- **Conventions / working method:** [ai/README](../ai/README.md), root [CLAUDE.md](../../CLAUDE.md)
+- **Working method (and who these docs are for):** [ai/README](../ai/README.md) · root [CLAUDE.md](../../CLAUDE.md)
+- **Features** (use-cases + enablers, each with its own runtime diagram): [features/](../features/)
+- **Cross-cutting concerns:** [crosscutting/](../crosscutting/)
+- **What is proven, and where:** [coverage/](../coverage/)
+- **The published, plain-language view for end users (EN+DE):** [`wiki/`](../../wiki/)
