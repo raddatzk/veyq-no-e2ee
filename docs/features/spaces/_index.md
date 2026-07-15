@@ -74,6 +74,16 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   `K_name` from the **current** epoch and bumps `nameEpoch`, so a rename is **forward-secret** — a removed member
   can't read the new name; name-only, no `K_SC` rotation; server rejects a stale `nameEpoch`;
   [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md))
+- [Space icon](use-cases/uc.spaces.set-space-icon.md) — **refined** (the owner gives a space a **face**: one
+  square image, framed + re-encoded to a fixed box + **padded to a constant length** on device, then sealed under
+  `K_icon` derived from the **current** epoch → `sealedIcon` + `iconEpoch` on the scope row — a **field**, not a
+  blob. The tenant's *name* stays cleartext because at creation **no key exists**
+  ([ADR 0006](../../decisions/0006-cold-tenant-scope-birth.md)); an icon is chosen *after* activation, so
+  [ADR 0023](../../decisions/0023-per-tenant-member-identity.md)'s *only-the-plaintext-the-mechanism-requires*
+  rule seals it — making it the **first sealed content on a TENANT row**. Rendered cross-tenant off the
+  account-scoped `my-tenants` (which widens to carry each tenant's own grant,
+  [en.spaces.tenant-scope](enablers/en.spaces.tenant-scope.md)); initial stays the fallback. **v1 = TENANT**;
+  group is the identical field one level down)
 - [Manage a group's members](use-cases/uc.spaces.manage-group-members.md) — **web done (cr-0088, cr-0089)** (the
   GroupOwner runs the roster: **promote/demote** co-owners (multiple owners + a last-owner guard) and **remove** a
   member — removal rotates the content key forward ([en.spaces.scope-key-rotation](enablers/en.spaces.scope-key-rotation.md))

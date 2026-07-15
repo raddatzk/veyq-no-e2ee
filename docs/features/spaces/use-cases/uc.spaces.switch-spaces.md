@@ -10,20 +10,28 @@
 
 ## Main flow
 
-1. Under the sidebar's **"Bereiche/Spaces"** header the **active tenant** is shown as a single row — its avatar
-   (the tenant's initial), name and domain — from `GET /api/scopes/my-tenants`, each tenant reached at its own
-   domain ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)). A **chevron** on that row opens an
+1. Under the sidebar's **"Bereiche/Spaces"** header the **active tenant** is shown as a single row — its avatar,
+   name and domain — from `GET /api/scopes/my-tenants`, each tenant reached at its own domain
+   ([ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)). A **chevron** on that row opens an
    **overview of all the member's tenants** to switch between them; the chevron appears only when the member
    belongs to **more than one** tenant.
-2. That **same active-tenant row is the entry into the shared Tenant space**
+2. **Each avatar is decrypted on device.** `my-tenants` is **account**-scoped, not Host-scoped, so it carries per
+   tenant — beside the cleartext name + domain — the caller's **own** `wrappedGrant` for that tenant's root scope
+   and its `sealedIcon` + `iconEpoch` ([en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md), which owns
+   that read path and the reasoning for it). For each row the client opens the grant, peels the epoch chain to
+   `iconEpoch`, derives `K_icon`, decrypts the icon, and **zeroes that scope key immediately** — the same
+   transient open-decrypt-zero the group-name read already does. The result is the row's avatar; where no icon is
+   set, or no grant is held (A2), the tenant's **initial** stands
+   ([uc.spaces.set-space-icon](uc.spaces.set-space-icon.md)).
+3. That **same active-tenant row is the entry into the shared Tenant space**
    ([en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md), labelled with the **tenant's name**) — its
    body opens the token-less tenant home, so the tenant *switcher* and the Tenant-*space* entry are **one row**,
    not two. Below it the sidebar lists the remaining spaces in the active tenant: the **Personal** space
    ([en.spaces.personal-scope](../enablers/en.spaces.personal-scope.md)) and the member's **groups**
    ([en.spaces.group-scope](../enablers/en.spaces.group-scope.md), as they land).
-3. Selecting a **different tenant** from the overview navigates to that tenant's domain (a full navigation —
+4. Selecting a **different tenant** from the overview navigates to that tenant's domain (a full navigation —
    each tenant is its own origin).
-4. Selecting a **space** switches the in-shell content position via the URL `#fragment`, resolved entirely
+5. Selecting a **space** switches the in-shell content position via the URL `#fragment`, resolved entirely
    client-side ([ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md)). The grammar
    ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md)):
 
@@ -36,7 +44,7 @@
    The token-less default is the **Tenant** space — the shared commons is home; Personal rides the explicit
    `~me` prefix. The folder/Memory slugs stay in the fragment (operator-blind unchanged); only the leading
    token distinguishes the scope.
-5. **Re-entering a scope** (a leading-token change, or first entry) opens that scope's key from its grant
+6. **Re-entering a scope** (a leading-token change, or first entry) opens that scope's key from its grant
    ([en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md) /
    [en.spaces.personal-scope](../enablers/en.spaces.personal-scope.md)) and **resets the per-scope state** —
    the Memory **tree** and **favorites** are cleared and reloaded for the newly active scope, so no stale tree
@@ -47,20 +55,25 @@
 - A1 — **only one tenant / no groups:** the active-tenant row is shown **without the overview chevron** (there
   is nothing to switch to) and still enters the Tenant space, with Personal below; the groups section is hidden
   until a group exists.
-- A2 — **no tenant grant → Personal is home.** If the member holds **no `TENANT` grant** (today the common
-  case for anyone but the cold-birth owner — tenant member-invite is not built yet), the token-less default is
-  **not** openable, so the shell **falls back to Personal** (`~me`) as the effective home and surfaces the
-  Tenant entry as unavailable ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md),
-  [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md)). No empty shared room is shown.
+- A2 — **no tenant grant → Personal is home.** If the member holds **no `TENANT` grant** — the
+  **awaiting-access** window between admission and grant-delivery wrapping `K_SC` to them
+  ([uc.spaces.add-member](uc.spaces.add-member.md)), so transient — the token-less default is **not** openable,
+  so the shell **falls back to Personal** (`~me`) as the effective home and surfaces the Tenant entry as
+  unavailable ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md),
+  [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md)). No empty shared room is shown, and that
+  tenant's row keeps its **initial** — without the grant its icon cannot be opened either.
 - E1 — **a space can't be opened** (grant unwrap fails): that space is surfaced as unavailable; the others
   remain switchable.
 
 ## Quality notes
 
-- **Operator-blind.** The tenant list returns only **membership** metadata (sanctioned by the invariant) —
-  tenant name + domain + the caller's role; **group names are sealed** and decrypted on device
-  ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)). Switching a space is **client-side**
-  navigation; the server is not asked to resolve a path.
+- **Operator-blind.** The tenant list returns **membership** metadata — tenant name + domain + the caller's role,
+  all sanctioned operational cleartext — plus, per tenant, **ciphertext only the caller can open**: their own
+  `wrappedGrant` and the tenant's `sealedIcon`. Handing those over discloses nothing the server does not already
+  hold; the reasoning, and the trust-tier cost it *does* carry, live once in
+  [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md). **Group names are sealed** the same way and
+  decrypted on device ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)). Switching a space is
+  **client-side** navigation; the server is not asked to resolve a path.
 - **Auth ≠ content.** Switching shows a space only if its grant opens (the identity-unwrapped scope key); a
   session alone reveals nothing.
 
@@ -82,9 +95,12 @@ liegt.
 ## Related
 
 - Feature: [Spaces (scopes)](../_index.md)
-- Enablers: [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md) (the shared space, opened),
+- Enablers: [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md) (the shared space, opened — and the
+  owner of the account-scoped `my-tenants` read this switcher renders from),
   [en.spaces.personal-scope](../enablers/en.spaces.personal-scope.md),
   [en.spaces.group-scope](../enablers/en.spaces.group-scope.md)
+- Use-cases: [uc.spaces.set-space-icon](uc.spaces.set-space-icon.md) (the sealed avatar each row shows, and its
+  initial fallback), [uc.spaces.add-member](uc.spaces.add-member.md) (grant-delivery — why A2 is transient)
 - Decisions: [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (tenant-bound scopes),
   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (groups, sealed names),
   [ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md) (fragment routing),

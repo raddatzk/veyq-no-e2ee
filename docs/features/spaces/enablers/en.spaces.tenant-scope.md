@@ -11,7 +11,10 @@
   here (below).
 - **Serves (use-cases/enablers):** [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) — the
   tenant space becomes the **token-less default home** ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md))
-  and a switchable entry beside Personal. The [Memory](../../memory/_index.md) tree/browse then fills it, but it is
+  and a switchable entry beside Personal — and
+  [uc.spaces.set-space-icon](../use-cases/uc.spaces.set-space-icon.md), which gives that space a **sealed face**
+  and reads it back for *other* tenants over the widened cross-tenant path below. The
+  [Memory](../../memory/_index.md) tree/browse then fills it, but it is
   a **generic scope consumer** (it lives in *any* scope — personal, tenant, or group), not something built on the
   tenant scope specifically, so it is not a `Serves` target here.
 - **Depends on:** [en.spaces.personal-scope](en.spaces.personal-scope.md) (the generalised **scope identity**
@@ -39,12 +42,20 @@ with the vaulted identity → the scope key in memory) with **one deliberate sub
 2. **Shared, many key-holders.** A personal scope has exactly one grant (its owner). A tenant scope is held by
    **every member** who was granted it — the owner's cold-birth self-grant plus each member's invite-wrapped
    grant. This enabler **opens whichever grant the caller holds**; it neither adds nor distributes grants —
-   **distribution is now its own refined flow** ([uc.spaces.add-member](../use-cases/uc.spaces.add-member.md),
-   [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)), see the honesty note below.
-3. **Anonymous, like personal.** The tenant scope carries **no sealed name** — its label comes from
-   **membership metadata** (the tenant name, already server-visible operational cleartext,
-   [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md)), not from a `K_SC`-sealed name like a group
-   ([en.spaces.group-scope](en.spaces.group-scope.md)). The switcher labels it with the tenant's own name.
+   **distribution is its own built flow** ([uc.spaces.add-member](../use-cases/uc.spaces.add-member.md),
+   [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)), see the Quality notes.
+3. **Unnamed — but no longer anonymous.** The tenant scope carries **no sealed name**: its label is the tenant's
+   own name, server-visible operational cleartext, not a sealed name like a group's
+   ([en.spaces.group-scope](en.spaces.group-scope.md)). That is a **necessity, not a preference** — the Server
+   Owner types the name while the tenant is still `PENDING`, and `K_SC` does not exist until the invited owner
+   activates ([ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md),
+   [uc.admin.create-tenant](../../admin/use-cases/uc.admin.create-tenant.md)). Anything chosen **after**
+   activation has a key to be sealed under, and is therefore sealed
+   ([ADR 0023](../../../decisions/0023-per-tenant-member-identity.md): *only the plaintext the mechanism requires
+   stays plaintext*). The scope's **icon** is the first such field on the row
+   ([uc.spaces.set-space-icon](../use-cases/uc.spaces.set-space-icon.md)) — so this scope is no longer *anonymous
+   like personal*: it holds sealed **content**, it simply holds no sealed **name**. The switcher labels it with
+   the cleartext name and, where the caller holds the grant, the sealed icon.
 
 Because the scope, the owner grant, and the scope row already exist, this enabler is **thin on purpose**:
 generalising "open a scope by kind" so `kind=TENANT` is opened the same way `kind=PERSONAL` already is.
@@ -77,9 +88,10 @@ sequenceDiagram
 
 ## Alternate / exception flows
 
-- **E1 — no tenant grant for this member:** the caller is a tenant member but holds **no `TENANT` grant**
-  (today the common case for anyone but the cold-birth owner — member-invite to the tenant scope is not built
-  yet). The tenant space is **not openable** → the shell **falls back to Personal** as the effective home
+- **E1 — no tenant grant for this member:** the caller is a tenant member but holds **no `TENANT` grant** — the
+  **awaiting-access** window between admission and grant-delivery wrapping `K_SC` to them
+  ([uc.spaces.add-member](../use-cases/uc.spaces.add-member.md)), so a **transient** state, not a standing one.
+  While it lasts the tenant space is **not openable** → the shell **falls back to Personal** as the effective home
   ([ADR 0019](../../../decisions/0019-token-less-tenant-home.md)); the tenant entry is surfaced as unavailable,
   not offered as an empty room.
 - **E2 — not unlocked:** without the identity private bundle the client cannot open the grant → entering the
@@ -104,12 +116,31 @@ sequenceDiagram
   key), but the intended reach is the whole tenant, not one person.
 - **Auth ≠ content.** Holding a session does not open the tenant scope; only the identity-unwrapped grant
   yields the key (client-enforced confidentiality, [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md)).
-- **Honesty — grant distribution is a separate flow.** This enabler assumes the caller **already holds** a
-  tenant grant (the owner does, from cold birth). **Distributing** tenant grants to new members — invite a
-  person, then wrap `K_SC` to their identity — is refined as [uc.spaces.add-member](../use-cases/uc.spaces.add-member.md)
-  ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)) but **not yet built**; until it lands,
-  the shared space is in practice **owner-reachable only**, and every other member sees the Personal fallback.
-  Documented so the switcher's behaviour is not mistaken for a bug.
+- **Grant distribution is a separate flow.** This enabler assumes the caller **already holds** a tenant grant
+  (the owner does, from cold birth). **Distributing** tenant grants to new members — invite a person, then wrap
+  `K_SC` to their identity — is [uc.spaces.add-member](../use-cases/uc.spaces.add-member.md)
+  ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)), and it is **built**: a new member is
+  grant-less only until a key-holder comes online (E1), not indefinitely.
+- **Every tenant's grant, in one Host-independent call.** `GET /api/scopes` is **Host-scoped** — it serves the
+  scope rows of the tenant resolved from the request `Host`, and nothing of any other tenant.
+  `GET /api/scopes/my-tenants` is **account-scoped** (`MembershipEntity.find("userId", …)`, no Host at all) and
+  therefore carries, per tenant, the caller's **own** `wrappedGrant` for that tenant's **root** scope plus its
+  `sealedIcon` + `iconEpoch` — so a member can render *other* tenants' sealed identity without entering them
+  ([uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md),
+  [uc.spaces.set-space-icon](../use-cases/uc.spaces.set-space-icon.md)). **This discloses nothing to the
+  operator**: a grant is ciphertext sealed to the caller's identity key, the server already holds every one at
+  rest, and it already computes this exact membership set to answer the call
+  ([scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md) — *visibility is cryptographic, not a server
+  promise*). Two decisions that look like they forbid it do not:
+  [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md)'s "no host-less scope" reads broader than its
+  rationale, which is **share-link host correctness**, and no share link or content moves here; and
+  [ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)'s refusal of a global key directory
+  governs **other people's** public keys, not the caller's own grants. What it **does** change is booked, not
+  waved away: opening the switcher at one tenant's origin hands that origin's client every tenant's `K_SC`, so a
+  malicious operator serving that client harvests keys for tenants the user never visits. That falls in the tier
+  [ADR 0026](../../../decisions/0026-client-trust-tiers.md) already books as lost (served web + an active
+  operator) and not at all on a self-served client. The client opens each foreign grant **transiently** and
+  **zeroes** it as soon as the icon is decrypted — the pattern the group-name read already uses.
 
 > **No end-user section.** As an enabler this has no standalone "what this means for you" story — the shared
 > space reaches the user through [uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md) and the

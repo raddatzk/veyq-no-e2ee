@@ -1,0 +1,32 @@
+useCase: uc.spaces.set-space-icon
+feature: spaces
+title: Space icon
+status: planned
+# Refined 2026-07-15 (inbox #58), not built on any surface. The direction was pre-decided with the user (seal the
+# icon), and the refine replaced its stated reason, which did not hold — the grounding read the icon as a sibling of
+# veyq_scope.encrypted_name, but a TENANT row has no sealed name at all (en.spaces.tenant-scope calls it "anonymous,
+# like personal"), and since ADR 0027 the group name is sealed under a DERIVED K_name, not under K_SC. The reason
+# that does hold is uc.admin.create-tenant's own -- the tenant name is cleartext because at creation NO KEY EXISTS
+# (cold birth at activation, ADR 0006), a mechanism necessity rather than a judgement about sensitivity. An icon is
+# set after activation by a grant-holder, so ADR 0023's rule binds -- only the plaintext the mechanism requires stays
+# plaintext -> seal. v1 slice = TENANT; GROUP is the identical field one level down and is deferred; PERSONAL never.
+acceptanceCriteria:
+  - id: owner-gated-icon-write
+    text: Only the space's OWNER may set, replace or remove the icon; a plain member gets 403 not_scope_owner and a non-member gets the same 404 as a bogus scope id (membership guard first, ADR 0042). For a TENANT the gate is isScopeOwner against the root scope row (id == tenantId) — a member who owns only a personal or group scope carrying the same tenantId is refused, which is the cr-0163 escalation shape and must be pinned by a test that seeds exactly that actor.
+  - id: operator-blind-icon
+    text: The server stores only sealed_icon (opaque ciphertext) + icon_epoch (a small integer) and never the image, a key, or an image size. It performs no image decode and no key derivation. Proven at the DB against a live instance — the stored bytes are not a decodable image and match no plaintext of the uploaded file.
+  - id: constant-ciphertext-length
+    text: Every sealed_icon has the identical byte length regardless of the source image, because the plaintext is padded to a constant before sealing. A flat two-colour logo and a dense photo produce ciphertexts of equal length, so the operator cannot fingerprint or correlate icons by size — including across the several tenants one my-tenants response returns.
+  - id: icon-size-cap-fits-mariadb
+    text: The contract's @Size for sealedIcon is the exact computed base64 length of the sealed constant and is provably below MariaDB's 65535-byte TEXT limit — not inherited from identity_pins.sealed_blob (which declares 1048576 over a TEXT column) nor from veyq_scope_favorites.ciphertext (65536 against 65535). H2 is effectively unbounded, so this cannot be proven by the hermetic suite alone and needs a real-MariaDB write at the cap.
+  - id: icon-sealed-under-current-epoch
+    text: The icon is sealed under K_icon_e = HKDF(E_e, "veyq/v1/space-icon-key") for e = the scope's CURRENT epoch, and iconEpoch records e. A write whose iconEpoch is not the current epoch is refused with 409 stale_epoch; the client refetches, re-seals and retries once. A plain rotation leaves sealed_icon and icon_epoch untouched, and a member holding a later epoch still reads the icon by peeling the chain down to iconEpoch. A member removed before a replacement cannot derive the new K_icon_e.
+  - id: initial-fallback-without-grant
+    text: A reader who holds no grant for the space — the awaiting-access window before grant-delivery wraps K_SC to a newly admitted member — sees the initial, not an error, a blank, or a broken image. The same holds for a malformed or wrong-key sealed_icon, and for a space with no icon set. The initial is never a failure state.
+  - id: cross-tenant-icon-read
+    text: The tenant overview renders each tenant's icon by opening that tenant's own wrappedGrant from the account-scoped my-tenants response, which is Host-independent. Each foreign scope key is opened transiently and zeroed as soon as the icon is decrypted (the listMyGroups pattern), and the decrypted bytes' object URL is owned by useObjectUrls so it is revoked on unmount.
+  - id: remove-restores-initial
+    text: Removing the icon clears sealed_icon and icon_epoch on the row; every member falls back to the initial on their next list. Same owner gate, same epoch check as a set.
+gaps:
+  backend: "Unbuilt — nothing exists. Needs V40 (sealed_icon TEXT NULL + icon_epoch INT NOT NULL DEFAULT 0 on veyq_scope; V39 is the current head), POST /api/scopes/{scopeId}/icon shaped like renameGroup (owner-gate on the scope row, kind != GROUP swapped for kind != TENANT, stale-epoch 409), and sealedIcon + iconEpoch on ScopeSummary. The my-tenants widening is its own change and carries a live bug with it — ScopesStore.myTenants selects memberships.first().role instead of the root-scope membership, so it can report OWNER for a plain member; selecting the root-scope row fixes the role AND yields the wrappedGrant in one edit. The spec's current claim that my-tenants involves no key material stops being true and needs rewording."
+  web: "Unbuilt — nothing exists beyond the render seam. TenantAvatar already has the icon prop, the <img> and its CSS, and no call site passes it. Needs the cropper EXTRACTED from MemoryCoverDialog.vue (it is inline and 16:9-hardcoded; CoverCrop is a type, not a component) with a 1:1 ratio, deriveImage taught a mimeType so the icon can be WebP-with-alpha (it is JPEG-only and fills no background, so a transparent logo would flatten onto a black canvas), the pad/unpad pair, the K_icon derivation + its conformance vector, and the per-tenant grant-open/zero loop in the switcher."
