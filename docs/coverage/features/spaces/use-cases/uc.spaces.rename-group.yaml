@@ -33,6 +33,3 @@ acceptanceCriteria:
     text: A rename between a consent-invite and its accept leaves the pending invitee's sealedNameKey (for the old name epoch) unable to open the new encryptedName -> the preview shows "unnamed"; they can still accept and then see the current name. The mechanism (a key that does not open the served ciphertext yields null, non-fatally) is the same one cr-0096 ships; the rename only realizes the edge.
     coverage:
       web: { unit: [src/features/spaces/inviteName.test.ts] }
-gaps:
-  apple: "Group rename is web-first — a later native CR, like the rest of the groups epic."
-  android: "Group rename is web-first — a later native CR, like the rest of the groups epic."

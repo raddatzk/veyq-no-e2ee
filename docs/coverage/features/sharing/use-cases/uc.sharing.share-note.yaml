@@ -34,6 +34,3 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ShareNoteSliceTest.createWithoutNoteResolvesNullAndTheManageListCarriesTheRecoverableKey, ShareNoteSliceTest.createWithANameShowsItInTheManageListButNeverToTheViewer] }
       web: { unit: [src/features/memory/share.test.ts] }
-gaps:
-  apple: "Not built. The share note (editor + share-page render) is Apple's own later CR (web-first, ADR 0043); the generated data layer carries the fields after regen."
-  android: "Not built. The share note (editor + share-page render) is Android's own later CR (web-first, ADR 0043); the generated data layer carries the fields after regen."

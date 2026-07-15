@@ -57,6 +57,3 @@ acceptanceCriteria:
 # built use-case), run in the CI trust-chain alongside validate_feature_wiring. The Phase-3 live smoke (uploader
 # disabled -> option gone + forced createShare UPLOADER rejected; a major bump -> the incompatibility screen) is a
 # manual browser check the ShareCreateDialog + IncompatibleScreen unit tests automate at component level.
-gaps:
-  apple: "Platform discovery is web-first — native parity is a later CR (the native clients read the same /api/setup manifest + major gate + capability soft-gates)."
-  android: "Platform discovery is web-first — native parity is a later CR."

@@ -55,6 +55,3 @@ acceptanceCriteria:
         integration: [ShareNoteSliceTest.promoteViewerToContributorInPlaceKeepsTheLinkAndEnablesContribution, ShareNoteSliceTest.roleChangeToUploaderIs422, ShareNoteSliceTest.changingAnUploaderShareRoleIs422]
       web:
         unit: [src/features/memory/components/ShareCreateDialog.test.ts]
-gaps:
-  apple: "Sharing is web-first — a later native CR, like the rest of the feature epics. (A native curator can create a contributor share; the anonymous contributor is inherently the no-install web page.)"
-  android: "Sharing is web-first — a later native CR, like the rest of the feature epics."

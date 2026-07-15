@@ -1,6 +1,9 @@
 # UC: Sign in & remember this device (web — one screen, one toggle)
 
 - **ID:** uc.account.remember-this-device
+- **Surfaces:** backend · web — **web-only by design.** Native keeps the richer L0–L3 chooser
+  ([uc.account.set-device-security](uc.account.set-device-security.md), [ADR 0005 §14–21](../../../decisions/0005-unlock-methods-and-device-trust.md));
+  this one-screen-one-toggle collapse is web's answer, not a port target.
 - **Primary actor:** Account holder on the **web** client, signing in on a device they control.
 - **Goal:** Collapse the web sign-in + unlock into **one adaptive screen** with a single **"remember me"**
   toggle that decides — once — how this device opens next time, and **auto-enrols** the matching convenience

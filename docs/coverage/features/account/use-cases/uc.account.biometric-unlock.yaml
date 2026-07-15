@@ -42,8 +42,6 @@ acceptanceCriteria:
     coverage:
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { unit: [TrustDeviceTest.biometricEnrolResumeUnlockRoundTrip] }
-gaps:
-  web: N/A on web — the web biometric path is WebAuthn passkey + PRF (the separate, planned PASSKEY use-case), not this native method.
 # Verification note: the data layer (enrol → resume → device-key unlock, with the .biometric level) is
 # unit-tested on both natives; the live OS gate is MANUAL SMOKE.
 #  - apple: the Face ID prompt releasing K + .biometryCurrentSet invalidation — the iOS-sim biometric

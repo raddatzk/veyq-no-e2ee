@@ -59,6 +59,3 @@ acceptanceCriteria:
       web:
         unit:
           - src/features/memory/media.test.ts
-gaps:
-  apple: "Live updates are web-first — apple is parked until an explicit un-park (ADR 0043). The native gallery UI itself is not built yet, so there is nothing to keep live."
-  android: "Live updates are web-first — android is parked until an explicit un-park (ADR 0043). The native gallery UI itself is not built yet, so there is nothing to keep live."

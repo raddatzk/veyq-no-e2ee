@@ -44,8 +44,27 @@ WEB = ROOT / "web"
 APPLE_TEST_DIRS = [ROOT / "apple" / "Tests", ROOT / "apple" / "UITests"]
 ANDROID = ROOT / "android"
 
-KNOWN_AREAS = {"backend", "web", "apple", "android"}
+KNOWN_AREAS = {"backend", "web", "apple", "android"}   # what a use-case may *declare*
 KNOWN_LEVELS = {"unit", "integration", "e2e"}
+
+# A surface is **live** when a CI job actually runs its tests — the ADR 0040 principle, applied by rule rather
+# than by name: the claim follows the build. `apple`/`android` hold real code and real tests, but no CI job
+# builds them (ADR 0043 parks them), so they prove nothing and are owed nothing. They re-enter here when their
+# CI job is green — one line, and nothing else has to change (adding a surface only ever *permits* refs).
+LIVE_SURFACES = {"backend", "web"}
+
+# Which surfaces a use-case targets **by design**. Default is parity (ADR 0010) — only deviations declare, via
+# a `- **Surfaces:** a · b — why` line in the use-case doc. This is the declaration; coverage is the proof.
+# Before this existed, `gaps:` did both jobs, and 54 of 63 gaps were hand-copies of one sentence from ADR 0043.
+SURFACES_LINE = re.compile(r"^-\s+\*\*Surfaces:\*\*\s*(.+)$", re.M)
+
+
+def declared_surfaces(uc_doc: pathlib.Path) -> set[str]:
+    m = SURFACES_LINE.search(uc_doc.read_text())
+    if not m:
+        return set(KNOWN_AREAS)                      # no declaration = parity default (ADR 0010)
+    head = re.split(r"\s+—\s+", m.group(1))[0]       # the list, before the em-dash rationale
+    return {s.strip() for s in head.split("·") if s.strip()}
 
 errors: list[str] = []
 
@@ -160,6 +179,12 @@ for uc in usecases:
         errors.append(f"{where0}: unknown status '{status}' (omit for implemented, or 'planned')")
     planned = status == "planned"
 
+    # What this use-case owes *today*: the surfaces it targets by design, minus the ones no CI runs. A use-case
+    # whose only targets are parked (e.g. the native L0–L3 chooser, ADR 0005 §14-21) owes nothing — it is not a
+    # gap, it is out of scope until the un-park. Refs it already carries for a parked surface stay as they are:
+    # unchecked as coverage, still checked for existence, and ready to count again the day that CI turns green.
+    owed = declared_surfaces(uc) & LIVE_SURFACES
+
     covered_areas: set[str] = set()  # areas that carry a coverage ref anywhere in this use-case
     for ac in data.get("acceptanceCriteria") or []:
         acid = ac.get("id", "?")
@@ -169,7 +194,8 @@ for uc in usecases:
         for area, levels in coverage.items():
             if area not in KNOWN_AREAS:
                 errors.append(f"{where}: unknown area '{area}'")
-            covered_areas.add(area)
+            if area in LIVE_SURFACES:
+                covered_areas.add(area)  # only a live surface can *cover* — a parked ref proves nothing
             if not isinstance(levels, dict):
                 errors.append(f"{where}: area '{area}' must map level -> [refs]")
                 continue
@@ -180,12 +206,19 @@ for uc in usecases:
                     errors.append(f"{where}: area '{area}' level '{level}' has no refs")
                     continue
                 for ref in refs:
-                    ref_count += 1
+                    if area in LIVE_SURFACES:
+                        ref_count += 1
                     check_ref(area, ref, where)
-        if ref_count == 0 and not planned:
-            errors.append(f"{where}: no tests (every criterion needs at least one)")
+        if ref_count == 0 and not planned and owed:
+            errors.append(f"{where}: no tests on a live surface (needs at least one on {sorted(owed)})")
 
     gaps = data.get("gaps") or {}
+    for area in gaps:
+        if area in KNOWN_AREAS and area not in owed:
+            errors.append(
+                f"{where0}: gap for '{area}', which this use-case does not owe (targets "
+                f"{sorted(declared_surfaces(uc))}, live: {sorted(LIVE_SURFACES)}). A gap is a **debt on a "
+                f"surface you target** — not an N/A note, and never a restatement of ADR 0043")
     if planned and not gaps:
         errors.append(f"{where0}: status 'planned' must declare at least one gap (the surfaces not yet built)")
     for area, reason in gaps.items():

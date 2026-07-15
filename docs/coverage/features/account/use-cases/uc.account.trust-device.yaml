@@ -7,45 +7,31 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [AccountWrapsSliceTest.addDeviceWrapAppearsInKeyMaterialAndReturnsId] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
-      apple: { unit: [TrustDeviceTests.testTrustThenDeviceUnlockRoundTrip], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
-      android: { unit: [TrustDeviceTest.trustThenDeviceUnlockRoundTrip, DeviceSecurityStoreTest.l1EnrolCommitClearRoundTrip], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: device-unlock-password-only
     text: A trusted device opens the Master Key with only the password (its DEVICE wrap), no Secret Key — and on apple the unlock folds into login.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.device.test.ts] }
-      apple: { unit: [TrustDeviceTests.testTrustThenDeviceUnlockRoundTrip], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
-      android: { unit: [TrustDeviceTest.trustThenDeviceUnlockRoundTrip], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: device-kek-conformance
     text: The DEVICE-wrap KEK derivation (Argon2id(deviceFactor + password)) matches the pinned crypto vector.
     coverage:
       web: { unit: [src/shared/crypto/v1.conformance.test.ts] }
-      apple: { unit: [V1ConformanceTests.testKekDevicePassword] }
-      android: { unit: [V1ConformanceTest.kekDevicePassword] }
   - id: wrong-password-generic-failure
     text: A wrong password on a trusted device fails generically (AEAD tag mismatch) and holds no key material.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.device.test.ts] }
-      apple: { unit: [TrustDeviceTests.testDeviceUnlockWrongPasswordThrowsAndLeavesVaultLocked], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance] }
-      android: { unit: [TrustDeviceTest.deviceUnlockWrongPasswordThrowsAndLeavesVaultLocked] }
   - id: device-key-absent-falls-back
     text: With no local device key or an orphaned wrap, the DEVICE method is unavailable (the local key is NOT wiped on a single server response) and unlock falls back to the PASSWORD floor.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.device.test.ts] }
-      apple: { unit: [TrustDeviceTests.testNotTrustedReturnsFalse, TrustDeviceTests.testMissingServerWrapReturnsFalseAndKeepsRecord] }
-      android: { unit: [TrustDeviceTest.notTrustedReturnsFalse, TrustDeviceTest.missingServerWrapReturnsFalseAndKeepsRecord] }
   - id: re-trust-replaces
     text: Re-trusting an already-trusted device removes its old wrap before adding the new one (no duplicate).
     coverage:
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
-      apple: { unit: [TrustDeviceTests.testReTrustReplacesPriorWrap] }
-      android: { unit: [TrustDeviceTest.reTrustReplacesPriorWrap] }
   - id: untrust-removes-wrap
     text: Untrusting removes that device's wrap by id (and the local key); other devices keep theirs.
     coverage:
       backend: { integration: [AccountWrapsSliceTest.deleteByIdRemovesTheWrap] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
-      apple: { unit: [TrustDeviceTests.testUntrustRemovesWrapAndRecord], e2e: [LiveRoundTripTests.testTrustDeviceRoundTripAgainstLiveInstance, RoundTripUITests.testTrustDeviceLifecycle] }
-      android: { unit: [TrustDeviceTest.untrustRemovesWrapAndRecord], e2e: [RoundTripUiTest.trustDeviceLifecycle] }
   - id: multi-device
     text: Multiple devices each enrol their own DEVICE wrap on the same Master Key (they coexist).
     coverage:

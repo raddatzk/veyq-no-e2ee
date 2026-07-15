@@ -11,12 +11,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [LoginSliceTest.validLoginIssuesSession] }
       web: { unit: [src/features/account/login/login.test.ts] }
-      apple:
-        unit: [apple/Tests/VeyqKitTests/LoginTests.swift]
-        e2e: [apple/Tests/VeyqKitTests/LiveRoundTripTests.swift, apple/UITests/RoundTripUITests.swift]
-      android:
-        unit: [android/client/src/test/kotlin/com/veyq/client/LoginTest.kt]
-        e2e: [android/client/src/test/kotlin/com/veyq/client/LiveRoundTripTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/RoundTripUiTest.kt]
   - id: wrong-credentials-generic
     text: A wrong signature or an unknown account both fail with a single generic 401.
     coverage:
@@ -32,8 +26,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [LoginSliceTest.refreshRotatesAndChains] }
       web: { unit: [src/features/account/login/login.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/LoginTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/LoginTest.kt] }
   - id: refresh-reuse-detection
     text: A replayed superseded refresh token revokes the whole family (reuse detection).
     coverage:

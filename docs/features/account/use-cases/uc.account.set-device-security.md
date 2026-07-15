@@ -1,6 +1,11 @@
 # UC: Set this device's unlock level (the per-device security slider)
 
 - **ID:** uc.account.set-device-security
+- **Surfaces:** apple · android — **native by design** ([ADR 0005 §14–21](../../../decisions/0005-unlock-methods-and-device-trust.md)):
+  the L0–L3 chooser *is* the native flow. Web deliberately collapses to one screen + one toggle
+  ([uc.account.remember-this-device](uc.account.remember-this-device.md)), and the slider needs no backend
+  change — it is a client concern over the existing wraps endpoints. Both native surfaces are parked
+  ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)), so this owes no live surface today.
 - **Primary actor:** Account holder, authenticated **and currently unlocked** on a device (the Master Key
   is in memory)
 - **Goal:** Let the user choose — and later change — **how much friction this device asks for** on future

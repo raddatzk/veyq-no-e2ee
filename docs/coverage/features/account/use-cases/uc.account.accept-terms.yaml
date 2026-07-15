@@ -35,6 +35,3 @@ acceptanceCriteria:
       # construction (both endpoints are membership-gated — no path writes a record without a session) and has
       # no dedicated test; an anonymous-visitor assertion is the honest remaining thin spot, not a false citation.
       backend: { integration: [TenantTermsSliceTest.memberAcceptsThenABumpReStalesAndAStaleAcceptIs409, TenantTermsSliceTest.readOrAcceptByANonMemberIs404] }
-gaps:
-  apple: "The accept gate is Apple's own later CR (web-first, ADR 0043); the generated data layer carries the terms/acceptance after regen."
-  android: "The accept gate is Android's own later CR (web-first, ADR 0043); the generated data layer carries the terms/acceptance after regen."

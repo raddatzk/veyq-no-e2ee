@@ -1,6 +1,10 @@
 # UC: Biometric unlock (L2 — FaceID / fingerprint, no password)
 
 - **ID:** uc.account.biometric-unlock
+- **Surfaces:** apple · android — **native by design.** Web's biometric path is a WebAuthn passkey + PRF, a
+  different mechanism and its own use-case; this one is the platform-keystore route. Both native surfaces are
+  parked ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)), so this use-case currently owes
+  no live surface anything — it re-enters the coverage model at the un-park, with its tests already written.
 - **Primary actor:** Account holder, authenticated **and currently unlocked** on a device with biometric
   hardware (FaceID / TouchID / Android BiometricPrompt)
 - **Goal:** Enrol a device-local **biometric wrap** so that future unlocks on *this* device need only a

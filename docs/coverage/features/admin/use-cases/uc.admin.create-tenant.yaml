@@ -92,6 +92,3 @@ acceptanceCriteria:
     text: The existing-user accept endpoint requires a session (401 when anonymous).
     coverage:
       backend: { integration: [TenantAcceptSliceTest.unauthenticatedAcceptIs401] }
-gaps:
-  apple: not built yet — web-first slice; native parity is a later CR
-  android: not built yet — web-first slice; native parity is a later CR

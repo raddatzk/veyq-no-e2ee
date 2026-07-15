@@ -27,6 +27,3 @@ acceptanceCriteria:
     text: The server only flips a lifecycle timestamp and, at purge, deletes ciphertext rows + blob objects — never a key or a name (erasure the blind server may perform, unlike a removal's rotation).
     coverage:
       backend: { integration: [ScopesSliceTest.purgeErasesExpiredScopeAndContentButKeepsFreshOnes] }
-gaps:
-  apple: "Group lifecycle is web-first — not built natively (own CR later), like the rest of the groups epic."
-  android: "Group lifecycle is web-first — not built natively (own CR later), like the rest of the groups epic."

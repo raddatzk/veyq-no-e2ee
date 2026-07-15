@@ -47,6 +47,3 @@ acceptanceCriteria:
       web:
         unit:
           - src/features/memory/memoryDate.test.ts
-gaps:
-  apple: "Data layer carries `wrappedMeta` after contract regen, but the native date UI (4-mode editor, card range, sort) is not built — web-first (ADR 0043); it is Apple's own later CR."
-  android: "Data layer carries `wrappedMeta` after contract regen, but the native date UI is not built — web-first (ADR 0043); it is Android's own later CR."

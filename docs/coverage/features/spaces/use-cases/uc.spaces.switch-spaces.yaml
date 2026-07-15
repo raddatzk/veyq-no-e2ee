@@ -12,8 +12,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.createPersonalScopeThenListReturnsBoth, ScopesSliceTest.listMyScopesCarriesTheCallersRole] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/ScopesTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/ScopesTest.kt] }
   - id: switch-space-by-fragment
     text: A space's position is encoded in + resolved from the URL #fragment client-side (the blind server resolves no path).
     coverage:

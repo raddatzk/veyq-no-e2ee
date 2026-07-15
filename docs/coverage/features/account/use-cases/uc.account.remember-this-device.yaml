@@ -63,7 +63,3 @@ acceptanceCriteria:
         integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial, AccountWrapsSliceTest.addDeviceKeyWrapRidesNormalKeyMaterial]
       web:
         unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts]
-gaps:
-  apple: N/A — web-only flow; native keeps the uc.account.set-device-security chooser (richer — password-less or
-    biometric). Whether native also collapses to a single toggle is ADR 0005 §21 "to be worked out".
-  android: N/A — web-only flow; native keeps the uc.account.set-device-security chooser.

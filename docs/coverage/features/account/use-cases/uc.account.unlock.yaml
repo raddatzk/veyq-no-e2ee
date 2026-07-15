@@ -6,30 +6,18 @@ acceptanceCriteria:
     text: The correct password + Secret Key derive the Unlock KEK, open the Master Key, and unwrap the identity private key into memory.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
-      apple:
-        unit: [apple/Tests/VeyqKitTests/UnlockTests.swift]
-        e2e: [apple/Tests/VeyqKitTests/LiveRoundTripTests.swift, apple/UITests/RoundTripUITests.swift]
-      android:
-        unit: [android/client/src/test/kotlin/com/veyq/client/UnlockTest.kt]
-        e2e: [android/client/src/test/kotlin/com/veyq/client/LiveRoundTripTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/RoundTripUiTest.kt]
   - id: secret-key-import-from-kit
     text: The Secret Key can be imported from the Emergency Kit (upload the kit file or scan its QR), decoded on-device via parseKit (cr-0007).
     coverage:
       web: { unit: [src/features/account/emergencyKit/emergencyKit.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/KitTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/KitTest.kt] }
   - id: wrong-credentials-generic-failure
     text: A wrong password or wrong Secret Key fails with a generic unlock failure (AEAD tag mismatch) and holds no key material; the server is uninvolved (E1).
     coverage:
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/UnlockTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/UnlockTest.kt] }
   - id: no-password-wrap-generic-failure
     text: An account with no PASSWORD wrap surfaces the same generic failure rather than a distinct error (E2).
     coverage:
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/UnlockTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/UnlockTest.kt] }
   - id: key-material-authed-only
     text: Key material is served only to an authenticated caller — a missing, malformed, expired, or revoked access token is a generic 401 (no anonymous read).
     coverage:
@@ -43,8 +31,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial] }
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/UnlockTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/UnlockTest.kt] }
 # Apple (macOS/iOS/iPadOS) native unlock landed in cr-0015: VeyqKit UnlockTests (key-material → KEK →
 # symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
 # LiveRoundTripTests (real instance) + RoundTripUITests (full UI round-trip). The authed-only / no-cross-

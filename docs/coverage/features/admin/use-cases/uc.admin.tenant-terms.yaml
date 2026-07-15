@@ -22,6 +22,3 @@ acceptanceCriteria:
     text: The terms text is the operator's public policy (served, no content key); terms_version is a plain int. No user content, no E2EE key — the operator-blind boundary is unaffected (ADR 0035).
     coverage:
       backend: { integration: [TenantTermsSliceTest.ownerSetsTermsBumpsVersionAndIdempotentReSaveDoesNot] }
-gaps:
-  apple: "The terms editor is Apple's own later CR (web-first, ADR 0043); the generated data layer carries the terms fields after regen."
-  android: "The terms editor is Android's own later CR (web-first, ADR 0043); the generated data layer carries the terms fields after regen."

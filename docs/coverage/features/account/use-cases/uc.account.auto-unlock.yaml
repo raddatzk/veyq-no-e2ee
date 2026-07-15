@@ -10,13 +10,11 @@ acceptanceCriteria:
   - id: enrol-ungated-key-and-token
     text: Picking L3 stores a random key K + the refresh token ungated and enrols a device-key wrap (method=DEVICE; web's equivalent is the password-less DEVICE_KEY wrap, cr-0054).
     coverage:
-      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts, src/features/account/login/login.test.ts] }
       apple: { unit: [TrustDeviceTests.testPasswordlessEnrolResumeUnlockRoundTrip], e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { unit: [TrustDeviceTest.noLoginEnrolResumeUnlockRoundTrip], e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: opens-straight-in
     text: On relaunch the app reads the ungated token + K and lands on home with no user interaction (no connect, no floor).
     coverage:
-      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { e2e: [RoundTripUITests.testNoLoginAutoRestoreLifecycle, LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }
   - id: same-wrap-as-l2-only-gate-differs
@@ -32,7 +30,6 @@ acceptanceCriteria:
   - id: key-or-token-gone-falls-back
     text: A missing key/wrap or an expired/rotated token degrades to the floor (no silent self-wipe on a single server response).
     coverage:
-      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { unit: [TrustDeviceTests.testResumeSessionWithDeadTokenFallsBack, TrustDeviceTests.testResumeSessionWithNoRecordReturnsFalse] }
       android: { unit: [TrustDeviceTest.resumeSessionWithDeadTokenFallsBack, TrustDeviceTest.resumeSessionWithNoRecordReturnsFalse] }
   - id: reversible-anytime
@@ -43,6 +40,5 @@ acceptanceCriteria:
   - id: operator-blind-unchanged
     text: The relaxation is purely local; the server still holds only ciphertext wraps + an opaque token and cannot distinguish the levels.
     coverage:
-      web: { unit: [src/features/account/rememberMe/deviceKeyWrap.test.ts] }
       apple: { e2e: [LiveRoundTripTests.testPasswordlessRoundTripAgainstLiveInstance] }
       android: { e2e: [NoLoginAutoRestoreUiTest.noLoginAutoRestore] }

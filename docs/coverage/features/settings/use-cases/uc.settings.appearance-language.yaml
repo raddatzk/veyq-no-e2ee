@@ -23,5 +23,6 @@ acceptanceCriteria:
   - id: resolution-fallback
     text: An unknown locale falls back to English; an unknown key resolves to itself; every key has both translations.
     coverage:
+      web: { unit: [src/i18n/setLocale.test.ts] }
       apple: { unit: [apple/Tests/VeyqKitTests/LocalizationTests.swift] }
       android: { unit: [android/app/src/test/kotlin/com/veyq/app/i18n/LocalizationTest.kt] }

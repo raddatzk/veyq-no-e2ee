@@ -51,6 +51,3 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ScopesSliceTest.rotateBumpsEpochAndReGrantsRemaining] }
       web: { unit: [src/features/spaces/scopes.test.ts] }
-gaps:
-  apple: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."
-  android: "Group member management is web-first — not built natively (own CR later), like the rest of the groups epic."

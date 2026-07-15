@@ -40,6 +40,3 @@ acceptanceCriteria:
         integration: [ShareSharedScopeSliceTest.groupMemberCanShareAndAnonymousResolveWorks, ShareSharedScopeSliceTest.listForNodeShowsEveryMembersSharesWithMineFlag]
       web:
         unit: [src/features/memory/share.test.ts]
-gaps:
-  apple: "Sharing is web-first — a later native CR. (A native member can create/list/revoke/reactivate; the anonymous viewer is inherently the no-install web page.)"
-  android: "Sharing is web-first — a later native CR."

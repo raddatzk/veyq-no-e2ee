@@ -39,6 +39,3 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.consentOnAddRecordsSoftRowAndGrantDeliverySkipsIt] }
       web: { unit: [src/features/spaces/inviteName.test.ts] }
-gaps:
-  apple: "Group-add consent is web-first — not built natively (own CR later), like the rest of the groups epic."
-  android: "Group-add consent is web-first — not built natively (own CR later), like the rest of the groups epic."

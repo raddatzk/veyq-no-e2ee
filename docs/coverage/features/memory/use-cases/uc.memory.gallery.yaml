@@ -11,22 +11,16 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
       web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MemoryDetail.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/media/AndroidMediaDeriverTest.kt] }
   - id: lightbox-preview
     text: Opening an item shows its preview (not the multi-MB original) full-view, with prev/next paging the grid order.
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps] }
       web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MediaLightbox.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift, apple/Tests/VeyqKitTests/NativeMediaDeriverTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt, android/app/src/androidTest/kotlin/com/veyq/app/media/AndroidMediaDeriverTest.kt] }
   - id: download-original
     text: An explicit download fetches the pristine, full-resolution original (the only byte-identical copy).
     coverage:
       backend: { integration: [MediaSliceTest.startCompleteListRoundTrip], e2e: [BlobBatchE2ETest.uploadThenDownloadRoundTripsBytes] }
       web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MediaLightbox.test.ts, src/features/memory/download.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
   - id: favorite-toggle
     text: The header toggle pins/unpins the Memory (operator-blind, via en.memory.favorites).
     coverage:
@@ -36,8 +30,6 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [MediaSliceTest.derivativesRoundTripWithOwnWraps, MediaSliceTest.mediaWithoutDerivativesListsEmptyTiers] }
       web: { unit: [src/features/memory/media.test.ts, src/features/memory/components/MemoryDetail.test.ts, src/features/memory/components/MediaLightbox.test.ts] }
-      apple: { unit: [apple/Tests/VeyqKitTests/MediaTests.swift] }
-      android: { unit: [android/client/src/test/kotlin/com/veyq/client/MediaTest.kt] }
   - id: justified-grid-sealed-dimensions
     text: The web grid is laid out justified (aspect-preserving rows that fill the width); each media's geometry (w,h) rides the always-listed metadata tier (wrappedMeta, cr-0068 consolidating cr-0064's wrappedLayout + cr-0066's wrappedCapturedAt) sealed under K_mem at upload and unwrapped on device to drive the layout, so the blind server never sees pixel dimensions. Media without a sealed geometry fall back to a default aspect.
     coverage:

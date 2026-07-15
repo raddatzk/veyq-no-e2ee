@@ -1,6 +1,12 @@
 # UC: Auto unlock (L3 — no login, opens straight in)
 
 - **ID:** uc.account.auto-unlock
+- **Surfaces:** apple · android — **native by design:** L3 is a level of the native chooser
+  ([uc.account.set-device-security](uc.account.set-device-security.md), [ADR 0005 §14–21](../../../decisions/0005-unlock-methods-and-device-trust.md)).
+  Web reaches the same password-less wrap through its own one-toggle flow
+  ([uc.account.remember-this-device](uc.account.remember-this-device.md), cr-0054) and that use-case owns the
+  web evidence — this one must not cite it a second time. Both native surfaces are parked
+  ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)), so this owes no live surface today.
 - **Primary actor:** Account holder, authenticated **and currently unlocked**, who explicitly opts this
   device into the most convenient (and least app-protected) level
 - **Goal:** Make this device open **straight to its content** on launch — **no password, no biometric, no

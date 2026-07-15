@@ -59,6 +59,3 @@ acceptanceCriteria:
           - src/features/memory/components/SpaceMap.test.ts
           - src/features/memory/components/MemoryBrowse.test.ts
           - src/features/memory/components/ViewModeToggle.test.ts
-gaps:
-  apple: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Apple's own later CR (web-first, ADR 0043). The OS geocoder is not a blind option."
-  android: "Not built. Data layer carries `wrappedMeta` after regen; native place/map UI is Android's own later CR (web-first, ADR 0043). The OS geocoder is not a blind option."

@@ -38,5 +38,3 @@ acceptanceCriteria:
     text: Verification is client-only (compare against the sealed pin, no server call) and the pin store is one Master-Key-sealed ciphertext, so the operator never learns who pinned or verified whom, nor the count — the trust graph stays off the server.
 gaps:
   backend: "Built (cr-0098): the sealed pin-store sync (GET/PUT /api/account/identity-pins, optimistic-concurrency 409 stale_version) + the grant-delivery decline seam (POST /api/tasks/{jobId}/decline, per-worker exclusion). No verify/strict-mode server state (client-only ceremony; strict-mode is the follow-up)."
-  apple: "Identity verification is web-first — a later native CR, like the rest of the groups epic."
-  android: "Identity verification is web-first — a later native CR, like the rest of the groups epic."

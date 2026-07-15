@@ -34,6 +34,3 @@ acceptanceCriteria:
     text: The server sees only the membership row, identity public keys, and opaque grant ciphertext — never K_SC, never the group's plaintext name; the add response never exposes email.
     coverage:
       backend: { integration: [ScopesSliceTest.addGroupMemberByUsernameRecordsGrantlessMember] }
-gaps:
-  apple: "Group member-add is web-first — not built natively (own CR later), like the rest of the groups epic."
-  android: "Group member-add is web-first — not built natively (own CR later), like the rest of the groups epic."

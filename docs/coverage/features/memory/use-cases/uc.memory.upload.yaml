@@ -50,6 +50,3 @@ acceptanceCriteria:
           - src/features/memory/optimisticUpload.test.ts
           - src/features/memory/uploadQueue.test.ts
           - src/features/memory/components/MemoryDetail.optimistic.test.ts
-gaps:
-  apple: N/A this CR — the VeyqClient.addMedia data layer exists; the apple upload UI is its own later CR.
-  android: N/A this CR — the VeyqClient.addMedia data layer exists; the android upload UI is its own later CR.

@@ -1,6 +1,8 @@
 # UC: First-run server setup
 
 - **ID:** uc.admin.setup-server
+- **Surfaces:** backend · web — **not a native target by design:** first-run setup happens in the browser,
+  against a host that has no app installed yet.
 - **Primary actor:** Server Owner (the person installing the instance)
 - **Goal:** Bootstrap a fresh instance — create the first account (Server Owner) as an end-to-end
   encrypted account and mark the instance set up.

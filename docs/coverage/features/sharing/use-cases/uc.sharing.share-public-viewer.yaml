@@ -51,6 +51,3 @@ acceptanceCriteria:
         integration: [ShareSliceTest.createThenAnonymousResolveReturnsSealedSubtree, ShareSliceTest.createRequiresAuth]
       web:
         unit: [src/features/memory/share.test.ts]
-gaps:
-  apple: "Sharing is web-first — a later native CR, like the rest of the feature epics. (A native curator can create/list/revoke; the anonymous viewer is inherently the no-install web page.)"
-  android: "Sharing is web-first — a later native CR, like the rest of the feature epics."
