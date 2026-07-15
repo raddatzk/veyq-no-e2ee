@@ -185,7 +185,29 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
     (the rejected E2EE-wrong-concept descendant) instead of `legacy/frontend-noe2ee`; mandates `--app-font-size-*`
     tokens that don't exist in `web/`. ~89 CRs behind.
     Confirm: `grep -rc 'font-size: var(--app-' web/src` → 0 · `grep -n 'legacy/frontend' docs/crosscutting/ui-web-styleguide.md web/CLAUDE.md`
-    Do: rewrite the styleguide against the real `web/src/styles/` (the "upcoming styleguide rewrite" cr-0154 named).
+    **Done 2026-07-14 — not a rewrite; four sections, all of them the *provenance* half.** ~80% of the
+    styleguide is healthy: all 12 `.veyq-*` classes it mandates exist and are used, and the component / button /
+    product-language / a11y rules are current. What was rotten was every claim about **where the design comes
+    from**:
+    - *"Canonical, current: `web/src/style.css`"* — it is an 86-line import barrel. The system is
+      **`web/src/styles/`**, nine sheets, ~175 KB.
+    - *"a minimal subset today (setup slice; **light-mode only**)"* — `styles/dark.css` is 12 KB. The same file
+      demanded "every semantic color must define both light and dark" three lines later.
+    - *"**grows** as UI lands"* / *"port it from legacy when you need it"* — it never grew token by token. It was
+      **vendored whole**, verbatim, from `legacy/frontend-noe2ee/src/styles/`. `style.css`'s own header comment
+      says exactly this; the styleguide describes a strategy that was abandoned before it started.
+    - the source: `legacy/frontend` → **`legacy/frontend-noe2ee`**, also in **`web/CLAUDE.md`**, which is the more
+      harmful of the two — it is loaded by every web session and told the reader to port from the rejected
+      E2EE-wrong-concept descendant.
+
+    **The token claim was narrower than the title.** `--app-*` is alive and heavily used (`--app-muted` 184×,
+    `--app-line` 166×, `--app-text` 129×). Only `--app-font-size-*` is phantom — **0 definitions, 0 uses, and it
+    never existed**. Sizes are raw rem, clustering at 0.78/0.8/0.82/0.85/0.9/0.92/0.95/1rem, while the same
+    paragraph told readers to "avoid one-off `1rem` labels" (there are 14). That section now says there is no
+    scale, states the rule that actually carried the intent (match the surrounding density), and notes that
+    naming a real scale is an ADR plus a ~100-site migration — not a styleguide line. **An unfollowable rule is
+    worse than an absent one:** the reader greps, finds nothing, and either invents tokens or ignores the
+    section. Both happened.
 
 11. **`developer-styleguide.md` still says `http/` "verifies the contract"** *(verified).* cr-0159 removed this
     stance everywhere else; the binding styleguide §3/§11 was missed by the sweep.

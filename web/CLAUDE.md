@@ -48,9 +48,14 @@ here; the server is blind.
 
 ## Conventions
 - **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from
-  `legacy/frontend` (read-only) and rewire them to the contracts client + crypto. If a ported view lacks
-  a field the contract requires, add it **in-style** rather than hardcode a default. Visual rules +
-  tokens/classes: [web UI styleguide](../docs/crosscutting/ui-web-styleguide.md).
+  **`legacy/frontend-noe2ee`** (read-only — the pre-E2EE original, the clean product UX) and rewire them to the
+  contracts client + crypto. **Not `legacy/frontend`:** that is the E2EE-but-wrong-concept descendant, useful
+  only as a reference for *how* an operator-blind server forces a flow client-side (breadcrumbs, name-decrypt,
+  thumbnail-less gallery) — never for its design or scope. Canonical rule: [`docs/ai/README.md`](../docs/ai/README.md).
+  The stylesheets are already here: `src/styles/` is `legacy/frontend-noe2ee/src/styles/` vendored verbatim, so
+  a ported component should render byte-identically. If a ported view lacks a field the contract requires, add
+  it **in-style** rather than hardcode a default. Visual rules + tokens/classes:
+  [web UI styleguide](../docs/crosscutting/ui-web-styleguide.md).
 - **Crypto:** `src/shared/crypto/v1.ts` is the **conformance-pinned** suite — keep it byte-identical to
   the vectors (`../contracts/crypto/vectors/v1.json`); the conformance test must stay green. The Model B
   auth derivation (`deriveAuthSalt` / `deriveAuthKeypair`, Ed25519 from Argon2id — ADR 0003) lives here.

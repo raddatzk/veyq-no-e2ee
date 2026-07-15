@@ -6,11 +6,18 @@ gallery or social network.
 
 ## Source of truth
 
-- **Canonical, current:** `web/src/style.css` — the live `--app-*` tokens and `.veyq-*` classes. It is
-  deliberately a **minimal subset** today (setup slice; light-mode only) and **grows** as UI lands.
-- **The full system to port from:** `legacy/frontend` styles + components (read-only reference). When a
-  token/class you need isn't in `web/src/style.css` yet, **port it from legacy in-style** — same names,
-  same roles — rather than invent a new one. (See the frontend-reuse rule in `docs/ai/README.md`.)
+**`web/src/styles/`** — nine stylesheets (~175 KB: `base` tokens, `ui`, `layout`, `forms`, `memory`, `media`,
+`settings`, **`dark`**), **vendored verbatim** from `legacy/frontend-noe2ee/src/styles/`. Components reuse the
+original class names and markup so they render byte-identically; only the data layer underneath differs.
+`web/src/style.css` is the import barrel plus the handful of additions the pre-E2EE source never had (the
+centered public shell, the Secret-Key unlock field) — read its header comment, it says this too.
+
+**There is nothing left to port.** The design system arrived whole, not token by token. So the rule is not
+"port it from legacy when you need it" — it is **use what is there, and if it is genuinely missing, that is a
+design decision, not a copy job.** The source is `legacy/frontend-noe2ee/` (the pre-E2EE original — the clean
+product UX). `legacy/frontend/` is the **E2EE-but-wrong-concept** descendant: consult it only for *how* an
+operator-blind server forces a flow client-side, **never** for its design. Canonical rule:
+[`docs/ai/README.md`](../ai/README.md).
 
 ## Reuse first
 
@@ -20,8 +27,8 @@ primitive in a feature component rather than copying markup.
 
 ## Color — semantic role tokens
 
-Use `--app-*` role tokens before raw colors. **Every semantic color must define both light and dark**
-(today's `style.css` is a light-only subset — add the dark value when you grow it):
+Use `--app-*` role tokens before raw colors — they are defined in `styles/base.css`, and **every semantic color
+carries a dark value in `styles/dark.css`**. A new one must define both:
 
 - **accent / brand** — brand marks, selected states, focus accents, navigation highlights.
 - **success / positive** — submit, save, confirm, upload, consent, progress, maps, tracks, journal links.
@@ -35,9 +42,19 @@ values), never for application UI roles. Repeated raw colors must become a role 
 
 ## Typography
 
-Use the `--app-font-size-*` role tokens (page-title, section-title, row-title, body, subtitle, meta,
-label, control). Settings/management/navigation screens should feel **dense and scannable** — avoid
-one-off `1rem` labels or default component-library button text there.
+**There is no type scale, and this section used to pretend there was.** It mandated `--app-font-size-*` role
+tokens (page-title, section-title, row-title, body, subtitle, meta, label, control) — **zero of which exist**,
+and none ever did: `grep -r 'font-size: var(--app-' web/src` → 0. The vendored system sets sizes as plain `rem`,
+and the values in use cluster around `0.78 / 0.8 / 0.82 / 0.85 / 0.9 / 0.92 / 0.95 / 1rem`. An unfollowable rule
+is worse than no rule: the reader greps, finds nothing, and either invents a token family or quietly ignores the
+section — and both happened.
+
+The followable rule, which is the one that carried the intent anyway: **match the density of what surrounds
+you.** Settings, management and navigation screens are **dense and scannable** — reach for the smaller end, and
+do not leave a component library's default button text or a one-off `1rem` label sitting in them.
+
+Naming a real scale is a **design decision** — an ADR, and a migration of the ~100 raw values. It is not a
+styleguide line, and writing one did not make it exist.
 
 ## Components
 
@@ -81,8 +98,8 @@ before component-specific media queries.
 ## Checklist before finishing web UI work
 
 - Reused a `.veyq-*` class and `--app-*` token before adding local styles / raw colors.
-- Defined light **and** dark for any new semantic color.
+- Defined light **and** dark (`styles/dark.css`) for any new semantic color.
 - Memory/Chapter language; folders secondary; no Album/Explorer.
 - Rows for management data, cards for content; no nested cards.
 - Dialog actions ordered + in-progress-safe; icon-only actions labelled.
-- Ported missing tokens/classes from legacy **in-style** rather than inventing.
+- Matched the surrounding density rather than introducing a size of your own.

@@ -63,4 +63,6 @@ abverlangt. Dein Server, deine Regeln — veyq kann die privaten Inhalte trotzde
 - **Decisions:** [ADR 0035](../../../decisions/0035-server-terms-of-service.md) (the terms + acceptance model),
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (the owner/membership relation).
 - **Reference impl:** `legacy/backendnoe2ee` `Tenant.termsMarkdownByLocale`/`termsVersion` + `TenantService`, and
-  `legacy/frontend` `termsTemplate.ts` (the pre-E2EE clause template — read-only design reference).
+  `legacy/frontend` `termsTemplate.ts` — the **clause text**, read-only. It lives only in the E2EE descendant
+  (`-noe2ee` never had it), and that is fine here: this is *copy*, not design, so the "port design from
+  `legacy/frontend-noe2ee`" rule does not apply to it.
