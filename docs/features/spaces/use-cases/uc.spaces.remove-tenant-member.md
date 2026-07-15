@@ -1,16 +1,16 @@
 # UC: Remove a member from a tenant (with the group orphan rule)
 
-- ID: uc.spaces.remove-tenant-member
-- Primary actor: **TenantOwner** (`OWNER` on the TENANT scope, i.e. `scopeId == tenantId`). Rotating the groups
+- **ID:** uc.spaces.remove-tenant-member
+- **Primary actor:** **TenantOwner** (`OWNER` on the TENANT scope, i.e. `scopeId == tenantId`). Rotating the groups
   the removed member merely co-shared is completed later by **any remaining group key-holder's device** (operator-
   blind — the server cannot rotate).
-- Goal: remove a member from the tenant — **cut their access to shared + group content immediately**, hand over or
+- **Goal:** remove a member from the tenant — **cut their access to shared + group content immediately**, hand over or
   wind down the groups they leave behind, and give them a **grace window to read their own memories** before those
   are erased. Not: snatch away everything they own the moment they leave.
-- Preconditions: The caller is an **OWNER** of the tenant ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4,
+- **Preconditions:** The caller is an **OWNER** of the tenant ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4,
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md)). The target is a current tenant member and
   **not the last tenant OWNER**.
-- Postconditions (success): The target's **tenant-scope + shared-group** memberships are deleted (instant 403 on
+- **Postconditions (success):** The target's **tenant-scope + shared-group** memberships are deleted (instant 403 on
   shared content). Groups they **solely owned** are **transferred** to the oldest remaining member, else
   **grace-tombstoned**. The target's **own** scopes (their personal scope + any group they were the *only* member
   of) are **grace-tombstoned but still readable by them** until the scheduled purge erases them. The tenant scope

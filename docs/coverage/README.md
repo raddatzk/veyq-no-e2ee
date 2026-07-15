@@ -12,17 +12,16 @@ Each file lists acceptance criteria; every criterion's tests are keyed by **area
 `gaps` with a reason — never left silent.
 
 > **A surface that no CI job runs makes no coverage claim** ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).
-> The surfaces are **`backend` and `web`**. `http/` was hand-fired IDE tooling and has been deleted; `apple/`
-> and `android/` are parked ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)) and no CI builds them,
-> so their tests are not coverage either — however real those tests are. A surface re-enters this model when its
-> CI job is green, not when its code exists.
+> The surfaces are **`backend` and `web`**. `http/` was hand-fired IDE tooling and has been deleted — real
+> requests that proved nothing, because nobody fired them. A surface enters this model when its CI job is
+> green, not when its code exists.
 
 `scripts/validate_coverage.py` enforces the chain (run it after changing a use-case, a coverage file,
 or the tests they point to).
 
 ## Dimensions
 
-**Area** — *where* the test runs (the surface): `backend` · `web` · `apple` · `android`.
+**Area** — *where* the test runs (the surface): `backend` · `web`.
 
 **Level** — *what kind* of test it is. Classify by the **scope of behaviour under test**, not by the
 test harness:
@@ -47,7 +46,7 @@ acceptanceCriteria:
     text: <one sentence>
     coverage:
       <area>:
-        <level>: [<ref>, ...]   # backend/apple/android ref: "ClassName.testMethod"; web ref: a path under web/
+        <level>: [<ref>, ...]   # backend ref: "ClassName.testMethod"; web ref: a path under web/
 gaps:
   <area>: <reason>              # a surface with NO coverage ref for this use-case (never also covered)
 ```
@@ -59,9 +58,8 @@ gaps:
   visible (e.g. "happy path has integration but no e2e yet") — the validator does **not** require any
   particular level, because coverage is risk-based, not box-ticking.
 - **Areas and levels come from the fixed sets above**; unknown names fail validation (catches typos).
-- **References must resolve:** a `backend`/`apple`/`android` `ClassName.method` ref resolves against *that*
-  test class (a file whose stem is `ClassName`, containing `method`); a `web` (or path-form apple/android)
-  ref's file must exist.
+- **References must resolve:** a `backend` `ClassName.method` ref resolves against *that* test class (a file
+  whose stem is `ClassName`, containing `method`); a `web` ref's file must exist.
 - **Gaps are explicit *and* mean uncovered:** a surface with no coverage ref is listed under `gaps` with a
   reason (silent omission is not allowed); a surface that **is** covered may not also be a gap — that overlap
   is a stale gap (a build-note or deferred-slice left behind) and fails validation ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).

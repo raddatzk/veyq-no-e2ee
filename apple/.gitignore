@@ -1,7 +1,0 @@
-.build/
-.swiftpm/
-# The Xcode project is generated from project.yml by xcodegen — never committed.
-*.xcodeproj/
-DerivedData/
-# swift-openapi-generator build-plugin output (generated at build time, not committed).
-Sources/*/GeneratedSources/

@@ -1,22 +1,22 @@
 # UC: Verify a member's identity
 
-- ID: uc.spaces.verify-identity
-- Primary actor: **a scope member** (any key-holder who can see a member directory) verifying **another member**.
-- Goal: confirm out-of-band that a member's identity public key is really theirs — elevate the pin **pinned →
+- **ID:** uc.spaces.verify-identity
+- **Primary actor:** **a scope member** (any key-holder who can see a member directory) verifying **another member**.
+- **Goal:** confirm out-of-band that a member's identity public key is really theirs — elevate the pin **pinned →
   verified** — and **review a changed key** (accept a legitimate rotation, or refuse a substituted one). Closes the
   operator key-substitution gap for those who verify ([ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md)).
-- Preconditions: an **authenticated, unlocked** caller; the target appears in a scope **member directory** the
+- **Preconditions:** an **authenticated, unlocked** caller; the target appears in a scope **member directory** the
   caller can read; the caller's **pin store** ([en.account.identity-pinning](../../account/enablers/en.account.identity-pinning.md))
   is available. Verification is surfaced per scope, but the pin it writes is **account-global** — verify once,
   trusted everywhere.
-- Postconditions (success): the target's pin is **verified** (or a **changed** key is reviewed and either
+- **Postconditions (success):** the target's pin is **verified** (or a **changed** key is reviewed and either
   accepted → re-pinned, or refused → left blocked). Operator-blind throughout: the pin store is sealed under the
   Master Key; the server never learns who verified whom.
 
 This use-case is the **human half** of [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md);
 the pinning mechanism + the change-response is [en.account.identity-pinning](../../account/enablers/en.account.identity-pinning.md).
 The building block is the identity **fingerprint / safety-number** (`fingerprint()` — a digest of the full identity
-public bundle, [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md)).
+public bundle, [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md)).
 
 ## Main flow
 
@@ -108,5 +108,5 @@ nicht zu vertrauen. Du machst es nur einmal pro Person, und es gilt in jedem get
 - Use-cases: [uc.spaces.add-group-member](uc.spaces.add-group-member.md), [uc.spaces.consent-group-add](uc.spaces.consent-group-add.md),
   [uc.spaces.add-member](uc.spaces.add-member.md) (the wrap flows whose E2 key-substitution risk this closes)
 - Decisions: [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md) (the authenticity
-  model), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the fingerprint / safety-number),
+  model), [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the fingerprint / safety-number),
   [ADR 0026](../../../decisions/0026-client-trust-tiers.md) (the trust tier this rides on)

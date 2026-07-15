@@ -21,17 +21,16 @@ least-privilege is crypto-enforced, and the server stays blind.
 
 - [uc.sharing.share-public-viewer](use-cases/uc.sharing.share-public-viewer.md) — **built (web)** (cr-0100: publish
   one of your own Memories as a read-only, anonymous, revocable public link `/s/{shareId}#k=…`; the share key rides
-  the fragment, the server stays blind; v1 = **personal-scope Memories, VIEWER only**; native is later parity)
+  the fragment, the server stays blind; v1 = **personal-scope Memories, VIEWER only**)
 - [uc.sharing.share-contributor](use-cases/uc.sharing.share-contributor.md) — **built (web)** (cr-0101: a
   **CONTRIBUTOR** link where an anonymous visitor can **view + add photos** after naming themselves — the name
   **sealed under `K_mem`** → an anonymous share identity, the buckets hook; direct-append, personal-scope only;
-  [ADR 0030](../../decisions/0030-contributor-public-share.md); native is later parity)
+  [ADR 0030](../../decisions/0030-contributor-public-share.md))
 - [uc.sharing.share-uploader](use-cases/uc.sharing.share-uploader.md) — **built (web)** (cr-0102: an **UPLOADER**
   write-only drop-box — add photos but **cannot see** the Memory or others'; the resolve returns no media (the
   `canView` gate, no server-side gallery filtering), the own-view is **client-local, session-only** from local
   previews (never a download), delete-your-own is **token-gated + ownership-checked**, and the ephemerality is
-  warned in four places; personal-scope only; [ADR 0031](../../decisions/0031-uploader-public-share.md); native is
-  later parity)
+  warned in four places; personal-scope only; [ADR 0031](../../decisions/0031-uploader-public-share.md))
 - [uc.sharing.share-shared-scope](use-cases/uc.sharing.share-shared-scope.md) — **built (web)** (cr-0104: lifts
   the personal-scope-only restriction so **any member** of a **group/tenant** scope may public-share a Memory there,
   across all three roles; **member removal soft-revokes** the removed member's shares, **re-activation transfers
@@ -43,10 +42,10 @@ least-privilege is crypto-enforced, and the server stays blind.
   in place** via a `K_mem`-recoverable share key `sealed_share_key = symWrap(K_mem, K_share)` + an owner-gated
   `updateShare` — the link stays valid. **cr-0116** made the note **per-locale** (`{de,en}`, viewer picks locale),
   added an optional **private share name** (`sealed_share_name`, management-only), and **redesigned the dialogs**
-  toward the legacy shape — list-only manage + separate create, copy-only links, with the **uploader as its own
+  — list-only manage + separate create, copy-only links, with the **uploader as its own
   capability-gated memory action + dialog** (the same `ShareDialog`/`ShareCreateDialog` reused via an `uploader`
   flag — identical by construction, its only difference the absent role switcher). Deferred: the **anonymous
-  acceptance gate** (cr-0117) + native;
+  acceptance gate** (cr-0117);
   [ADR 0036](../../decisions/0036-editable-share-note-recoverable-share-key.md))
 
 - [uc.sharing.share-password](use-cases/uc.sharing.share-password.md) — **built (web, cr-0118)** (an optional
@@ -66,7 +65,7 @@ least-privilege is crypto-enforced, and the server stays blind.
   ([ADR 0034](../../decisions/0034-media-uploader-buckets.md)) — the contributor identity becomes the
   `share:{shareIdentityId}` **`owner_key`**, read with no migration. **cr-0113 (done)** shipped the full bucket
   data layer + backend + the **web** organizer (the always-visible Beiträge tab, sub-bucket create/rename/delete,
-  move + batch, virtual-primary); a **camera filter** and the **native** surfaces stay later slices.
+  move + batch, virtual-primary); a **camera filter** stays a later slice.
 - **MANAGER role + moderation + persistent uploader deletes** — a manager role with view-all + edit/delete;
   **moderation** (review-before-publish) over the direct-append default; and persisting an uploader's id list
   client-side for **post-reload delete** (still no download).

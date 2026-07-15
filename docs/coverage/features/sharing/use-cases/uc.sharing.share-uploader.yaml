@@ -10,8 +10,7 @@ title: Share a Memory as an uploader link (a write-only drop-box)
 # header), and the four-place ephemerality warning. Covered by the backend slice (UPLOADER resolve serves media=[]
 # even with existing media; upload attaches + stamps; delete-own reclaims; foreign-identity 404 / bad-token 403 /
 # VIEWER 403), the http guest-boundary assertions, and the web unit tests (the delete wrapper + the queue
-# removeFile + the session-persistence of a done tile), plus a live browser smoke. apple/android stay gaps —
-# sharing is web-first, native is parity (a later CR). v1 is deliberately narrow: role UPLOADER, direct-append,
+# removeFile + the session-persistence of a done tile), plus a live browser smoke. v1 is deliberately narrow: role UPLOADER, direct-append,
 # personal scope; post-reload delete (persisting the id list), the buckets UI, MANAGER/view-all/delete, password
 # protection and moderation are separate later slices.
 acceptanceCriteria:

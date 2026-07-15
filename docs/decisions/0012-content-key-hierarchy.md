@@ -118,7 +118,7 @@ holds one more opaque wrap and nothing else.
   [Scopes & Tenancy](../crosscutting/scopes-and-tenancy.md) (scope keys, grants, navigation contract),
   [Account & Key Model](../features/account/enablers/en.account.key-model.md).
 - [ADR 0002](0002-personal-scope-per-tenant.md), [ADR 0005](0005-unlock-methods-and-device-trust.md)
-  (one-key-many-wraps), [ADR 0009](0009-native-crypto-per-platform-vectors.md) (vectors are the byte
+  (one-key-many-wraps), [ADR 0017](0017-crypto-primitives-and-post-quantum-strategy.md) (vectors are the byte
   contract).
 - Feature: [Memory](../features/memory/_index.md); the foundation enabler
   [en.memory.tree](../features/memory/enablers/en.memory.tree.md).

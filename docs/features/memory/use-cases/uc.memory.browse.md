@@ -55,9 +55,9 @@
   whole tree shape are assembled client-side** from opaque rows. The server never computes navigation, never
   sees a folder/Memory name, and learns only the tree's shape + blinded slug tokens. (The pre-E2EE original
   UI relied on a server-computed `MemoryNavigationContext`; that is deliberately re-derived client-side here.)
-- **Reuse the existing UI/UX — never invent.** The shell, the folder/Memory grid, and the dialogs are ported
-  from the pre-E2EE design source (`legacy/frontend-noe2ee/`, see its `_PROVENANCE.md`); only the **data
-  layer** is swapped to the contracts client + client-side crypto.
+- **Reuse the existing UI/UX — never invent** ([ui-web-styleguide](../../../crosscutting/ui-web-styleguide.md)
+  § Reuse first). The shell, the folder/Memory grid and the dialogs are existing components; only the **data
+  layer** is client-side crypto over the contracts client.
 - **Unlock-gated.** The shell needs `K_SC`, which needs the vaulted identity — so it is reachable only after
   **unlock**, not merely after login.
 - **No media derivatives yet.** Cards show an icon + name; covers/thumbnails land with the media-display
@@ -90,7 +90,6 @@ späteren Schritt; vorerst ist dies das Zuhause, das deinen verschlüsselten Ber
   [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (`K_SC`, auto-birth),
   [en.memory.media](../enablers/en.memory.media.md) (media — display is a later slice),
   [en.memory.favorites](../enablers/en.memory.favorites.md) (the sidebar Favorites section)
-- Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`→`K_mem`),
-  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native shells later)
+- Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`→`K_mem`)
 - Related use-cases: [login](../../account/use-cases/uc.account.login.md), unlock — done; the **Memory detail
   view** (gallery / journal / chapters) — planned; multi-space switching, search — planned

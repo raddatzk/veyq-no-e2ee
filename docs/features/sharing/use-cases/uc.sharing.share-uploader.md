@@ -1,14 +1,14 @@
 # UC: Share a Memory as an uploader link (a write-only drop-box)
 
-- ID: uc.sharing.share-uploader
-- Primary actor: **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
-- Secondary actor: **an anonymous uploader** — no account, no identity keypair; names themselves once.
-- Goal: publish **one** of your own Memories as a **write-only drop-box** link — anyone with the link can **add
+- **ID:** uc.sharing.share-uploader
+- **Primary actor:** **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
+- **Secondary actor:** **an anonymous uploader** — no account, no identity keypair; names themselves once.
+- **Goal:** publish **one** of your own Memories as a **write-only drop-box** link — anyone with the link can **add
   photos** but **cannot see** the Memory's existing content (nor other contributors'), while the server stays
   operator-blind.
-- Preconditions: an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
+- **Preconditions:** an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
   (v1 restriction); the caller can open it (holds `K_mem`).
-- Postconditions (success): a share record with **role UPLOADER** exists (opaque), and a link
+- **Postconditions (success):** a share record with **role UPLOADER** exists (opaque), and a link
   `/s/{shareId}#k=<K_share>` lets any anonymous visitor **add photos** (after naming themselves) that append to the
   Memory — visible to the curator in *their* gallery. The uploader sees **only the photos they add this session**
   (from local previews, never a download) and can delete them **in that session**; a reload shows nothing.

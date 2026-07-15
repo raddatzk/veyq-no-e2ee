@@ -20,8 +20,8 @@ issues a **session**. The session form was deliberately left open by
   layer must not become a metadata leak either (no cleartext device fingerprints server-side).
 - **Self-hostable, single-instance default.** Stateless horizontal scaling — the one real argument for
   JWTs — carries little weight here.
-- **Multi-surface.** Web wants an httpOnly cookie (XSS can't read it); native and the `http/` surface
-  want an `Authorization: Bearer` header.
+- **The refresh token must not be readable by script.** An httpOnly cookie is what gives that; a token in
+  the response body is one XSS away from exfiltration.
 - **Theft detection.** Instant revocation handles the *detected* compromise; we also want to catch the
   **undetected** one (a cloned token we were never told about).
 
@@ -47,7 +47,7 @@ into **named session families**. No JWTs.
 - **Named families, E2EE, operator-blind.** A login creates a family **without a name** — the server
   assigns only an opaque **family id**. The naming is **client-built and end-to-end encrypted**: once the
   device is **unlocked**, it derives a best-effort display name from its own environment
-  (`navigator.userAgent` → "Safari on macOS"; native → "Kevin's iPhone"), encrypts it **under the account
+  (`navigator.userAgent` → a browser + platform guess), encrypts it **under the account
   key** and stores the ciphertext on the family (`PUT …/sessions/{id}/name`). A later "active sessions"
   view (any unlocked device of the account) lists families and **decrypts** each name; the locked view
   shows only the id + a coarse created-date. Constraints that fall out of this:
@@ -59,18 +59,21 @@ into **named session families**. No JWTs.
   - **Re-encrypt fresh per login**, never resend a cached ciphertext: an identical name blob reused across
     families would let the operator **correlate** a device's re-logins, re-linking otherwise-unlinkable
     families. A fresh nonce each time keeps families unlinkable.
-  - **Best-effort, not a contract.** A browser cannot read the machine/hostname, so web names are coarser
-    ("Safari on macOS") than native ("Kevin's iPhone").
+  - **Best-effort, not a contract.** A browser cannot read the machine/hostname, so the name is coarse — a
+    browser + platform guess, never a device identity. Two of the account's laptops can name themselves
+    identically; that is accepted, not a bug to fix server-side.
   - The operator sees only **ciphertext name blobs**, opaque family ids, coarse timestamps and a device
     *count* — **never** a cleartext device/user-agent string. (A server-generated cleartext codename was
     considered and **rejected** — superseded by this E2EE scheme.)
-- **Transport.** Same opaque value, two transports: httpOnly + Secure + SameSite cookie (web) /
-  `Authorization: Bearer` (native).
+- **Transport.** The refresh token rides an httpOnly + Secure + SameSite **cookie**. The contract still
+  permits it in the request body (`RefreshRequest.refreshToken`) and the server accepts either, but **no
+  client uses the body path** — it is unused surface, kept only because removing it is a contract break
+  nobody has needed yet.
 
 ## Decision — web refresh cookie lifetimes (session vs persistent)
 
 The web cookie transport comes in **two lifetimes**, chosen by the client at login via the optional
-`LoginVerifyRequest.sessionScope` (`SESSION` | `PERSISTENT`); native omits it and keeps the body token.
+`LoginVerifyRequest.sessionScope` (`SESSION` | `PERSISTENT`).
 
 - **`PERSISTENT`** — `Max-Age` = the refresh TTL; survives a browser restart. This is web "remember me".
 - **`SESSION`** — **no `Max-Age`** (a *session cookie*): survives page reloads but is dropped when the browser
@@ -81,8 +84,7 @@ name** — `veyq_refresh` (persistent) vs `veyq_refresh_session` (session). Refr
 cookie (so a rotation never silently upgrades/downgrades the lifetime); logout clears **both**. The real expiry
 backstop remains the **server-side refresh TTL** + reuse detection — not the cookie lifetime, which a browser's
 session-restore ("continue where you left off") may extend across a restart anyway. `remember` stays in the
-contract for backward compatibility (native + legacy) and is honoured (→ `PERSISTENT`) only when `sessionScope`
-is absent. Both lifetimes carry the **same opaque token** — no key material — so the server stays operator-blind.
+contract as the superseded flag and is honoured (→ `PERSISTENT`) only when `sessionScope` is absent. Both lifetimes carry the **same opaque token** — no key material — so the server stays operator-blind.
 The web client (cr-0055) is fully cookie-based (it keeps no body refresh token); see ADR 0005 §22 for how the
 **vault key** is persisted to match each lifetime.
 

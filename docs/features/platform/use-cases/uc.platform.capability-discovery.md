@@ -1,77 +1,75 @@
-# uc.platform.capability-discovery — a client discovers what an instance can do, and refuses to break silently
+# UC: Discover what an instance can do (and refuse to break silently)
 
-- **Feature:** platform
-- **Actor:** any client (web, later native), **before and after login** — the discovery surface is pre-auth.
-- **Decision:** [ADR 0032](../../../decisions/0032-capability-discovery-version-gating.md).
-- **Status:** refined (cr-0103 planned). Web vertical first; native is later parity.
-
-## Goal
-
-A self-hosted instance and its (version-drifting) clients stay **honest** with each other: a client learns the
-instance's **version** and **active capability set** from the pre-auth `GET /api/setup`, **hard-stops** on an
-incompatible `major`, **hides** features the instance doesn't serve, and an operator can **turn a capability off
-instance-wide** — with the server enforcing it, not just the UI hiding it. No silent mid-flow breakage.
+- **ID:** uc.platform.capability-discovery
+- **Primary actor:** any client, **before and after login** — the discovery surface is pre-auth.
+- **Goal:** A self-hosted instance and its version-drifting clients stay **honest** with each other: the client
+  learns the instance's **version** and **active capability set**, hard-stops on an incompatible `major`, hides
+  what the instance doesn't serve, and never breaks silently mid-flow.
+- **Preconditions:** The instance is reachable. No identity, no session — this runs before login, and its answer
+  is identical for every caller (so it leaks nothing about who is asking).
+- **Postconditions (success):** The client holds the instance's `version` + active `capabilities` set for this
+  session and gates its entry points on them. On an incompatible `major` the client is in a blocking state and
+  has **not** attempted login.
 
 ## Main flow
 
-1. On startup (and before login), the client fetches `GET /api/setup` → `{ setupRequired, suites, instanceSalt,
+1. On startup (before login), the client fetches `GET /api/setup` → `{ setupRequired, suites, instanceSalt,
    version: { major, build }, capabilities: [{ id }] }`.
-2. The client compares `server.version.major` to the **`major` it was compiled against**:
-   - equal → continue;
-   - `server > client` → a **blocking** "update your app" screen;
-   - `server < client` → a **blocking** "update this server" screen.
-   A mismatch stops **before** login — never a partial, mysterious failure later.
-3. On a compatible `major`, the client keeps the `capabilities` set and exposes `hasCapability(id)`.
-4. Each feature that is **optional per instance** gates its entry points on its capability: absent → the feature
-   is **hidden** (graceful degradation), never invoked, never crashing.
-5. When an operator has **disabled** a capability, the server both **omits** it from the manifest (so step 4
-   hides it) **and rejects** the corresponding endpoint (`422 capability_disabled`) — so a stale/ignoring client
-   still cannot use it.
+2. The client compares `server.version.major` to the **`major` it was compiled against**. Equal → continue.
+   (Mismatch → A1/A2. `build` never gates.)
+3. The client keeps the `capabilities` set and exposes `hasCapability(id)`.
+4. Each feature that is **optional per instance** gates its entry points on its capability: present → offered,
+   absent → **hidden** (A3), never invoked.
 
-## Seed consumers
+## Alternate / exception flows
 
-The catalog is seeded with four **operator-policy** capabilities; **sharing is the worked end-to-end proof**,
-the other three ride the same machinery (advertised + `hasCapability` soft-gate + a one-line `422` at their
-create/enable path), advertised active as each feature is built:
+- **A1 — server `major` > client:** a **blocking** "update your app" screen, **before** login — never a partial,
+  mysterious failure later.
+- **A2 — server `major` < client:** a **blocking** "update this server" screen, same timing.
+- **A3 — capability absent:** the feature is hidden and never invoked — graceful degradation, never a crash.
+- **E1 — the client ignores A3 (stale or hostile):** the server **rejects** the endpoint with
+  `422 capability_disabled`. The manifest is a UX hint; the server is the authority. An operator who disables a
+  capability gets both halves: it is **omitted** from the manifest *and* enforced at the endpoint.
 
-- **`sharing.public-links` / `sharing.uploader-links`** — the Share dialog gates its role options; with
-  `sharing.uploader-links` disabled the Uploader option is **hidden** and `POST /api/shares { role: UPLOADER }`
-  is **rejected** `422 capability_disabled`; with `sharing.public-links` disabled the Share affordance is hidden
-  entirely and any `createShare` is rejected.
-- **`spaces.groups`** — group-space creation/UI; disabled → the group affordance is hidden and the group-create
-  endpoint rejects `422`. (An operator who wants a personal-only instance.)
-- **`account.device-trust`** — the "remember this device" / passwordless-unlock levels; disabled → the toggle is
-  hidden and enrolling a device wrap rejects `422`. (An operator who mandates a full password every time.)
+## Quality notes
 
-## Acceptance criteria
+- **A capability is not a permission.** It is instance-wide and pre-auth; it says what this *server* offers, not
+  what *you* may do. A feature is offered only when **(capability present) AND (policy permits here)** — e.g.
+  `sharing.public-links` present **and** the node is a personal-scope Memory the caller owns. Conflating the two
+  is the modelling error this use-case exists to prevent ([ADR 0032](../../../decisions/0032-capability-discovery-version-gating.md) §6).
+- **Operator-blind-safe.** The response is identical for every caller and carries no per-user state, so a
+  pre-auth manifest leaks nothing — that is what lets it sit outside the auth boundary.
+- **The catalog is a coarser projection over use-cases, not a 1:1 rename.** Each entry in
+  `contracts/platform/capabilities.json` declares a `serves: [uc.…]` back-ref (catalog-only, never on the wire);
+  `scripts/validate_capabilities.py` enforces that every `serves` resolves to a real use-case, so the catalog
+  cannot drift from the graph. It is **append-only**: an id may be reserved before its first advertisement and is
+  advertised active only once its use-case(s) are built.
+- **Seeded with four operator-policy capabilities**, sharing being the worked end-to-end proof; the others ride
+  the same machinery (advertised + `hasCapability` soft-gate + a one-line `422` at their create/enable path):
+  `sharing.public-links` / `sharing.uploader-links` (the Share dialog's role options), `spaces.groups` (a
+  personal-only instance), `account.device-trust` (an instance mandating a full password every time). The
+  authoritative list is the catalog file, not this page.
 
-- **discover-manifest** — `GET /api/setup` (pre-auth, no identity) returns `version: { major, build }` and
-  `capabilities: [{ id }]` (the instance's **active** set, from the append-only catalog
-  `contracts/platform/capabilities.json`). The response is identical for every caller (operator-blind-safe).
-- **major-hard-gate** — a client whose compiled `major` differs from `server.version.major` shows a **blocking**
-  incompatibility state (direction-specific: update-app vs update-server) **before** login; an equal `major`
-  proceeds. `build` never gates.
-- **capability-soft-gate** — a client hides/omits a feature whose capability id is **absent** from the manifest,
-  and renders normally otherwise. A missing capability degrades gracefully, never throws.
-- **operator-disable-enforced** — an operator disables a capability instance-wide (config); the server then
-  **both** drops it from the manifest **and** rejects the corresponding endpoint with `422 capability_disabled`.
-  The manifest is a UX hint; the server is the authority.
-- **capability-not-permission** — a capability is instance-wide + pre-auth; it is **not** a per-scope/role
-  permission. A feature is offered only when **(capability present) AND (policy permits here)** — e.g.
-  `sharing.public-links` present **and** the node is a personal-scope Memory the caller owns.
-- **sharing-first-consumer** — the Share dialog gates its role options on `sharing.public-links` /
-  `sharing.uploader-links`; disabling `sharing.uploader-links` hides the Uploader option **and** makes
-  `createShare(role = UPLOADER)` return `422 capability_disabled`.
-- **catalog-serves-usecases** — a capability is a **coarser projection** over use-cases, not a 1:1 rename of one
-  (ADR 0032 §6): each catalog entry declares a `serves: [uc.…]` back-ref (catalog-only, not on the wire), and a
-  validator enforces that every `serves` resolves to a **real** use-case — so the catalog can't be a typo or drift
-  from the graph. The catalog is **append-only**; an id may be reserved ahead of its first advertisement, and is
-  **advertised active** only once its use-case(s) are built. (Seed: `sharing.public-links` serves viewer +
-  contributor, `sharing.uploader-links` serves uploader, `spaces.groups` serves the five group use-cases,
-  `account.device-trust` serves the four device-unlock use-cases — 4 capabilities over 12 use-cases.)
+## What this means for you / Was das für dich bedeutet
 
-## Out of scope (deferred — see the feature index)
+**EN —** veyq can be run by anyone, so the server you use and the app you open it with may not be the same age,
+and not every server offers every feature. When they don't fit together, veyq tells you straight away — before
+you sign in — instead of letting you get halfway through something that then fails. And a feature your server
+doesn't offer simply isn't shown, rather than sitting there and breaking when you touch it.
 
-The deprecation lifecycle (`state`, `sunsetAt`, `supersededBy`), per-user "new feature" notices/acks, audience
-filtering, folding `suites` into the unified manifest, client device self-capabilities, and native parity.
-(`directTransport` was **removed** rather than folded in — a byte-path store is now a hard requirement, cr-0105.)
+**DE —** veyq kann jede und jeder selbst betreiben — der Server, den du nutzt, und die App, mit der du ihn
+öffnest, sind also nicht zwangsläufig gleich alt, und nicht jeder Server bietet jede Funktion an. Wenn beides
+nicht zusammenpasst, sagt veyq dir das sofort — noch vor der Anmeldung — statt dich mitten in etwas laufen zu
+lassen, das dann scheitert. Und was dein Server nicht anbietet, wird gar nicht erst angezeigt, anstatt da zu
+sein und beim Antippen kaputtzugehen.
+
+## Related
+
+- Feature: [Platform](../_index.md)
+- Decisions: [ADR 0032](../../../decisions/0032-capability-discovery-version-gating.md) (the discovery +
+  version-gating model, and why a capability is not a permission)
+- Contract: `contracts/platform/capabilities.json` (the append-only catalog — the authoritative capability list)
+- **Deferred** (see the feature index): the deprecation lifecycle (`state`, `sunsetAt`, `supersededBy`), per-user
+  "new feature" notices/acks, audience filtering, folding `suites` into the unified manifest, and client device
+  self-capabilities. (`directTransport` was **removed** rather than folded in — a byte-path store is now a hard
+  requirement, cr-0105.)

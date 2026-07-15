@@ -10,11 +10,11 @@ a removed member's photos disappear — without a manual reload (inbox #48). Two
 "did it change?"** check (fast opens, no work when idle) and **live insert/remove** of others' changes. The
 server is **operator-blind**: it sees opaque `mediaId`s + node membership + coarse timestamps, never content.
 
-The pre-E2EE `legacy/` stack solved this with a **hanging long-poll** carrying a **keyset cursor** `(updatedAt,
-id)` for adds/edits **plus a SHA-256 hash over the sorted `mediaId` set** for deletes (a count would miss a
-delete+add that nets zero; a set-hash catches it). It worked and was real-time, but at a real cost: the server
-recomputed that **O(N) id-scan + hash on every ~750 ms tick, per open gallery**, and held a connection per
-viewer. We want the same **delete-robustness** without the per-tick O(N) cost, and simpler.
+The obvious shape — and the one an earlier version of this product shipped — is a **hanging long-poll** carrying
+a **keyset cursor** `(updatedAt, id)` for adds/edits **plus a SHA-256 hash over the sorted `mediaId` set** for
+deletes (a count would miss a delete+add that nets zero; a set-hash catches it). It works and is real-time, at a
+real cost: the server recomputes that **O(N) id-scan + hash on every ~750 ms tick, per open gallery**, and holds
+a connection per viewer. We want the same **delete-robustness** without the per-tick O(N) cost, and simpler.
 
 Today the fresh stack has none of the pieces: `listNodeMedia` (`GET /api/scopes/{scopeId}/nodes/{nodeId}/media`)
 returns the full `MediaSummary[]` with **no timestamp, no cursor, no conditional**; `veyq_media` has only
@@ -29,7 +29,7 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
    on every gallery-media mutation**: attach (curator + contributor/uploader upload complete), meta edit
    (`updateMediaMeta`, cr-0068), and delete (share delete-own, cr-0102). **Cover changes are excluded** —
    `commitCover`/`clearCover` write no `veyq_media` row and never list, so a cover swap must not force a re-list.
-   Reading it is **O(1)** — this is what replaces legacy's O(N)-per-tick hash. It is opaque operational metadata
+   Reading it is **O(1)** — this is what replaces the O(N)-per-tick hash. It is opaque operational metadata
    (a number), so it is **operator-blind**.
 
 2. **Conditional GET on `listNodeMedia`.** The response carries an **ETag derived from `media_revision`**; a poll
@@ -46,7 +46,7 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
 4. **Delete-reconcile via the current id-set, gated by a second counter.** A keyset delta is add/edit-only — it
    cannot express a removal. So a `200` **may** also carry the node's **current `mediaId` set** (ids only); the
    client **drops any id it no longer sees** — this catches deletes and, because it is the *set* (not a count), a
-   **net-zero delete+add** too (legacy's insight, kept). But the id-set is **O(N)**, so it must not ride *every*
+   **net-zero delete+add** too — the insight worth keeping. But the id-set is **O(N)**, so it must not ride *every*
    change — an active upload would re-send the growing full set each poll. A **second per-node counter,
    `delete_revision`, bumped *only* on a delete** (never on attach/meta-edit — so a delete bumps *both* counters,
    an add/edit only `media_revision`) gates it: the client echoes its last-seen `delete_revision`, and the server
@@ -57,7 +57,7 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
 
 5. **Short-poll transport for v1.** A client with a Memory open polls on an interval, **gated on tab visibility**
    (mirrors `grantDeliveryPolling` / `scopeRotationPolling`: a `visibilitychange` listener ticks immediately on
-   foreground, the interval pauses when hidden — the background-stop legacy lacked). Stops when the Memory
+   foreground, the interval pauses when hidden — a background poll is pure waste). Stops when the Memory
    closes. With the delta, even an active upload is cheap per poll. A few seconds of latency is fine for a photo
    grid; **long-poll / a push channel** (sub-second, shared later with #6 live journal) is a deferred upgrade.
 
@@ -131,9 +131,9 @@ add/edit never carries the O(N) id-set, and nothing does per idle tick.
 - **A member-visible curator delete is a separate surface.** Today the only media-row deletes are the share
   delete-own (cr-0102) and node-delete; there is no authenticated curator "delete my photo" endpoint. The
   delete-reconcile works for the deletes that exist; a curator delete endpoint is net-new (not in this feature).
-- **Rejected — legacy's O(N) set-hash per tick:** correct + delete-robust, but recomputed the whole id-scan +
+- **Rejected — an O(N) set-hash per tick:** correct + delete-robust, but recomputes the whole id-scan +
   SHA-256 every ~750 ms per open gallery; the `media_revision` counter delivers the same robustness at O(1). We
-  keep legacy's *set-not-count* insight (via the on-change id-set), drop its per-tick cost.
+  keep the *set-not-count* insight (via the on-change id-set), drop the per-tick cost.
 - **Rejected — full re-list on any change:** re-downloads + re-decrypts the entire gallery every poll during an
   active upload (the primary live case) — the keyset delta exists precisely to avoid this.
 - **Rejected — a count-only or `max(updated_at)`-only signal:** a count misses a net-zero delete+add; a max misses
@@ -141,4 +141,3 @@ add/edit never carries the O(N) id-set, and nothing does per idle tick.
 - **Rejected (deferred) — WebSocket/SSE push:** lower latency, but more infra and a **held per-viewer connection
   is a stronger presence signal** to the operator than a coarse poll; folded into a later push channel shared with
   #6 (live journal co-edit).
-- **Web first; native parity deferred** ([ADR 0043](0043-web-first-v1-native-parked.md)).

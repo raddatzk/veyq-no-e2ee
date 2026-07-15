@@ -3,37 +3,26 @@
 Self-hostable, end-to-end-encrypted **memory-sharing** app. The server is **operator-blind**:
 it stores and serves only ciphertext. The product center is the **Memory** (nested into **Chapters**).
 
-> Fresh start in progress. `legacy/` holds the previous full implementation and its
-> target-picture docs — **reference only, never edit it.** The fresh state is built up under
-> `docs/` via the workflow in `docs/ai/README.md`.
-
 ## Hard invariants — never violate
 - **Operator-blind E2EE everywhere.** The server sees only ciphertext + opaque metadata (IDs,
   sizes, coarse timestamps, scope/membership, blinded tokens). A user's unshared personal space
   is confidential even from the operator. No path may break this.
 - **Product language: Memory / Chapter.** Folders organize only. Never "Album" / "Explorer".
-- **Self-hostable by default**; central infrastructure always optional.
+- **Self-hostable by default**; central infrastructure always optional. This is **also the security
+  guarantee**, not only a sovereignty one: confidentiality holds against an *actively* malicious operator
+  exactly where the user serves their own client ([ADR 0026](docs/decisions/0026-client-trust-tiers.md)). So
+  anything that erodes self-hostability is a security regression.
 - **API-first:** contracts under `contracts/` are the source of truth; never hand-write DTOs.
-- **All docs in English.** `legacy/` is read-only reference.
+- **All docs in English.**
 
 ## Repository shape
 - `contracts/` — OpenAPI + crypto vectors: the source of truth code is generated from.
-- `backend/` + **one live client surface, `web/`** ([ADR 0043](docs/decisions/0043-web-first-v1-native-parked.md):
-  web-first V1). `apple/` and `android/` hold parked code — no CI builds them, they make no coverage claim, and
-  nothing in `docs/` may present them as live until an explicit un-park. Client surfaces are kept at **parity by
-  shared contracts, not shared code** ([ADR 0010](docs/decisions/0010-native-clients-shared-contracts-not-code.md));
-  `agent/` reserved.
+- `backend/` + `web/` — the two surfaces, and the whole set. A CR's phase order is
+  **contracts → backend → web**.
 - `docs/` — internal engineering state (English) + working flow (`ai/`, `inbox.md`).
 - `wiki/` — **published** end-user GitHub Wiki: plain language, **EN+DE**, focused on what you can do
   and "your data is safe, here's why".
 - `changes/` — the **live** work order + any open review backlog; a CR is deleted once done.
-- `legacy/` — read-only reference, and **the one directory that leaves at v1**: it splits off to its own
-  archive repo when the E2EE product moves to a fresh one. Nothing here depends on it — verified by moving it
-  aside and running the trust chain: all guards green, and **no `docs/` link points into it**. What remains
-  are ~100 **provenance notes** in prose and code comments (*"ported from `legacy/iOS/Veyq/Auth/ConnectView.swift`"*,
-  the inbox's seeded pointers). Those are worth keeping and must **not** be rewritten one by one: after the
-  split they stay literal paths, just rooted in the archive instead of here. **This line is that root** — when
-  the archive exists, name it here, and all ~100 resolve again.
 
 ## How we work
 - Working rules + workflow: **`docs/ai/README.md`** — it owns the pipeline; never restate it here.
@@ -54,8 +43,9 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
   never a MinIO-locked client.)
 - Durable engineering state lives in `docs/`. A change-request is scaffolding: **deleted when done**, after
   what it taught is moved to where it binds — a code trap to a comment at that line, a working lesson to a
-  rule. Never to git: history does not survive the v1 move.
+  rule. Never to git: a reason only a `git log` holds is one the next reader will not find.
 
 ## Prove your work
-Per-platform verification commands are added to each platform's own `CLAUDE.md` as that code
-lands. Until then, the relevant check is named in the active change-request.
+Each surface's own `CLAUDE.md` names its check: [`backend/CLAUDE.md`](backend/CLAUDE.md) (`./gradlew check`),
+[`web/CLAUDE.md`](web/CLAUDE.md) (`npm run check`). The doc trust chain is the `trust-chain` CI job
+(`scripts/validate_*.py`); run it before claiming a doc change is sound.

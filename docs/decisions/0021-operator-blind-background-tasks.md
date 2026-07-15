@@ -14,8 +14,8 @@ but validated first by the trivial one — no time pressure ([docs/ai/README](..
 fast*).
 
 Constraints: **operator-blind** (the coordinator must learn neither content, nor results, nor gratuitously the
-*kind* of work); **self-hostable** (no mandatory extra broker/daemon); **polyglot workers** (Kotlin/TS/Swift/…
-clients plus a headless agent — [ADR 0010](0010-native-clients-shared-contracts-not-code.md)).
+*kind* of work); **self-hostable** (no mandatory extra broker/daemon); **a worker is any client that holds the
+scope key** — today the web client, later a headless agent, so the protocol may not assume one runtime.
 
 ## Decision
 

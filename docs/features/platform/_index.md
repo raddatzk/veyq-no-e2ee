@@ -19,7 +19,7 @@ what this instance can do, what version it speaks, and which optional features t
   **hard-gates** on a `major` mismatch (forced "update app / update server"), **soft-gates** each feature on its
   capability's presence (graceful hide, never a crash), and an operator can **turn a capability off instance-wide**
   — omitted from the manifest **and** rejected at its endpoint. First consumer: the **sharing** roles
-  (`sharing.public-links` / `sharing.uploader-links`). apple/android are a later native-parity CR.
+  (`sharing.public-links` / `sharing.uploader-links`).
   [ADR 0032](../../decisions/0032-capability-discovery-version-gating.md))
 
 ## Precedent already in the fresh state
@@ -39,4 +39,3 @@ advisory on `/api/setup` was **removed** when a byte-path store became a hard re
 - **Unify `suites`** into the single `capabilities` manifest.
 - **Client device self-capabilities** (NPU / WebCodecs / …) — a separate direction (client → self), not
   server-advertised.
-- **Native parity** — the web vertical lands first, apple/android follow.

@@ -20,46 +20,31 @@ sealed **shape** + how it is materialized live in the enabler
 [en.memory.node-meta](../enablers/en.memory.node-meta.md); the reverse-only, veyq-blind **geocoding** decision
 is [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md). This use-case is the **user flow**.
 
-## Main flow
+## Main flow — set a location on a Memory that has media
 
-**Set up with media present (Memory open).** The user triggers **"set location"**; the client forms `derived` as
-the **medoid** of the Memory's media GPS — read from the **always-listed capture tier** (which carries the
-media's GPS alongside its `capturedAt`, so no per-item fetch) — and asks for a **name** — either
-**typed** (`manual`, e.g. "at grandma's") *or*, if the reverse lookup is enabled, **framed on the map** (its
-centre + zoom = `nameAnchor` → the provider returns a name at that resolution, `geocoded`, still editable). On
-save the client seals `{ v, …, location }` under `K_mem` and PATCHes `wrappedMeta`.
-
-**Pre-arm at creation (no media yet).** Just as the date is offered up front, the user can declare a location when
-creating the Memory: a **fallback name** (mandatory) + `nameSource` (`manual` = final, or `geocoded` = placeholder
-to be resolved) with `derivedMode: 'auto'` (forced — nothing to snapshot). Then **on the first geotagged media**,
-`derived` forms as the medoid and — if the user opted into geocoding — `nameAnchor` forms at a default zoom and
-the name resolves, replacing the fallback. No opt-in ⇒ the fallback simply stands (blind).
-
-**After set-up.** Position is **`auto` by default** — it re-medoids `derived` as media are added (it barely
-moves); **moving the pin by hand flips it to `fixed`** (the deliberate correction wins, then stays frozen — like
-a manual date beats `auto`). A `manual` name and a `fixed` position are frozen; a `geocoded` name may refresh when
-its anchor moves.
-
-**The map.** A **toggle in the tenant root** shows all Memories as pins, read from each node's sealed `location`
-via `listNodes` (no media load, no locations endpoint). Clicking a pin opens the Memory.
-
-**Sharing (groups/tenant) — consent is per space, not a free-ride.** Tiles + geocoding are **one opt-in**
-consented **per space** ([ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)): a user pre-opts-in
-in personal settings (then a join is just an info pill) or opts in per space. An owner enabling it **notifies**
-members and does **not** bind them — a **non-consenting** member's device makes no request, so they get **no map**
-and see an already-resolved name only as **text**; they give up the map to keep their privacy (not a free-ride).
-**Unanimity binds:** once all members consent it is binding for new members (a ratchet — to withdraw you leave the
-space, you don't stay as a text-only rider). A resolved name is sealed in the shared `wrappedMeta`, so members
-holding `K_mem` see it without their own device contacting the provider.
-
-**Multilingual names.** A stored `name` is a **single frozen string**. For **shared** content it resolves in the
-**tenant's configured language** (a tenant setting) — consistent across members, not the random locale of whoever
-resolved it first; a personal space uses the user's own locale. Because `nameAnchor` is kept, an opted-in viewer
-can re-resolve in **their** language on demand. Nominatim returns names from OSM `name:<lang>` tags via
-`accept-language` with **graceful fallback to the local name** (no hard error on an unsupported language) — so
-de+en are well covered and further locales degrade, never break.
+1. With the Memory open, the user triggers **"set location"**.
+2. The client forms `derived` as the **medoid** of the Memory's media GPS, read from the **always-listed capture
+   tier** (it carries each medium's GPS alongside its `capturedAt`, so this costs no per-item fetch).
+3. The client asks for a **name**, one of two ways:
+   - **typed** → `manual` (e.g. "at grandma's"); or
+   - **framed on the map**, if the reverse lookup is enabled → its centre + zoom become the `nameAnchor`, the
+     provider returns a name at that resolution → `geocoded`, still editable.
+4. On save the client seals `{ v, …, location }` under `K_mem` and PATCHes `wrappedMeta`. The Memory's detail
+   header shows the named location, and it appears as a pin on the tenant map.
 
 ## Alternate / exception flows
+
+- **A1 — pre-arm at creation (no media yet):** as with the date, the user may declare a location while creating
+  the Memory: a **fallback name** (mandatory) + `nameSource` (`manual` = final, or `geocoded` = a placeholder to
+  be resolved), with `derivedMode: 'auto'` forced (there is nothing to snapshot). Then **on the first geotagged
+  medium** `derived` forms as the medoid, and — only if the user opted into geocoding — `nameAnchor` forms at a
+  default zoom and the name resolves, replacing the fallback. No opt-in ⇒ the fallback simply stands (blind).
+- **A2 — the position keeps itself current, until the user overrides:** position is **`auto` by default** and
+  re-medoids as media are added (it barely moves). **Moving the pin by hand flips it to `fixed`** — the
+  deliberate correction wins and then stays frozen, exactly as a manual date beats `auto`. A `manual` name and a
+  `fixed` position are frozen; a `geocoded` name may refresh when its anchor moves.
+- **A3 — browse the map:** a **toggle in the tenant root** shows every Memory as a pin, read from each node's
+  sealed `location` via `listNodes` — no media load, no locations endpoint. Clicking a pin opens the Memory.
 
 - **E1 — vault locked / Memory not open:** without the node's `K_mem` the `wrappedMeta` can't be unsealed → the
   place is unavailable until unlock + open.
@@ -76,6 +61,20 @@ de+en are well covered and further locales degrade, never break.
 
 ## Quality notes
 
+- **Sharing (groups/tenant) — consent is per space, not a free-ride.** Tiles + geocoding are **one opt-in**
+  consented **per space** ([ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)): a user
+  pre-opts-in in personal settings (then a join is just an info pill) or opts in per space. An owner enabling it
+  **notifies** members and does **not** bind them — a **non-consenting** member's device makes no request, so
+  they get **no map** and see an already-resolved name only as **text**; they give up the map to keep their
+  privacy (not a free-ride). **Unanimity binds:** once all members consent it is binding for new members (a
+  ratchet — to withdraw you leave the space, you don't stay as a text-only rider). A resolved name is sealed in
+  the shared `wrappedMeta`, so members holding `K_mem` see it without their own device contacting the provider.
+- **Multilingual names.** A stored `name` is a **single frozen string**. For **shared** content it resolves in
+  the **tenant's configured language** (a tenant setting) — consistent across members, not the random locale of
+  whoever resolved it first; a personal space uses the user's own locale. Because `nameAnchor` is kept, an
+  opted-in viewer can re-resolve in **their** language on demand. Nominatim returns names from OSM `name:<lang>`
+  tags via `accept-language` with **graceful fallback to the local name** (no hard error on an unsupported
+  language) — so de+en are well covered and further locales degrade, never break.
 - **Operator-blind — the *veyq* operator is the adversary.** The veyq server sees the node shape + coarse
   timestamps + the **opaque `wrappedMeta`** blob; never a place name or a coordinate. The **opt-in
   reverse-geocoding request is a different, consented trust boundary**: it goes **client-direct** to the provider
@@ -92,9 +91,8 @@ de+en are well covered and further locales degrade, never break.
   reads GPS **list-level**, the way date-`auto` reads `capturedAt` — GPS is promoted into the always-listed
   capture tier rather than left in the per-item EXIF blob. The lazy alternative (fetch each media's sealed EXIF
   on demand) was rejected: it would make `derivedMode: 'auto'` re-medoid an N-fetch operation on every upload.
-  Still sealed under `K_mem`, still operator-blind; no backfill — legacy media without the listed tier don't
+  Still sealed under `K_mem`, still operator-blind; no backfill — older media without the listed tier don't
   contribute to the medoid (exactly as they don't to date-`auto`).
-- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -124,7 +122,7 @@ veyq sieht sie nie.
   — this UC applies it at the node level), [ADR 0016](../../../decisions/0016-geocoding-provider-neutrality.md)
   (reverse-only, provider-neutral geocoding; Nominatim reference; veyq-blind),
   [ADR 0018](../../../decisions/0018-map-tiles-provider-neutrality.md) (map tiles: raster via Leaflet,
-  provider-neutral, self-host/opt-in-public, veyq-blind), [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
+  provider-neutral, self-host/opt-in-public, veyq-blind)
 - Crosscutting: [security-model](../../../crosscutting/security-model.md) (operator-blind = the veyq operator;
   third-party services are a separate consented boundary)
 - Future: **on-device coarse names** (a bundled gazetteer, ADR 0016); **derived** place from GPS clusters

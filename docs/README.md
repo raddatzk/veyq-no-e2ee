@@ -60,7 +60,7 @@ docs/
 **Crosscutting (`cc.*` / `crosscutting/`)** — *the cross-feature concern/model.*
 - **Belongs:** a concern / model / convention that serves **many features or applies everywhere** — the
   whole-system security model, scopes & tenancy (spans account + spaces + admin + memory), rate-limit, the
-  ui/dev styleguides, platform parity.
+  ui/dev styleguides, inclusive language.
 - **Does NOT belong:** a decision (→ ADR); a **single feature's** foundation (→ that feature's enabler, even if
   it is crypto).
 

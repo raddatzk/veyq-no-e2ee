@@ -39,17 +39,20 @@ in uc/en + ADRs; the CR is the kept work-order trail beside it (see [`changes/RE
 
 ## Use-case format (Cockburn-lite)
 
+**Machine-checked** by `scripts/validate_feature_format.py` (in CI) — the header bullets, `ID` == filename, the
+required sections, numbered flow steps, and the EN+DE pair. What it cannot check is whether any of it is *true*.
+
 ```
 # UC: <Title>
-- ID: uc.<feature>.<goal>
-- Primary actor: <actor>
-- Secondary actor: <optional>
-- Goal: <one sentence>
-- Preconditions: …
-- Postconditions (success): …
+- **ID:** uc.<feature>.<goal>
+- **Primary actor:** <actor>              (plural + a "(success)"-style qualifier are fine)
+- **Secondary actor:** <optional>
+- **Goal:** <one sentence>
+- **Preconditions:** …
+- **Postconditions (success):** …
 
 ## Main flow
-1. …
+1. …                                      ← numbered steps, always
 
 ## Alternate / exception flows
 - A1: … / E1: …
@@ -57,13 +60,19 @@ in uc/en + ADRs; the CR is the kept work-order trail beside it (see [`changes/RE
 ## Quality notes        (optional — invariants/threats this flow must respect)
 
 ## What this means for you / Was das für dich bedeutet
-Plain-language, bilingual (EN + DE). The end-user wiki is DERIVED from these sections
-(+ the standalone safety pages) — do not maintain a parallel wiki page by hand.
-Omit only for purely internal use-cases with no end-user-visible effect.
+**EN —** plain language.  **DE —** dieselbe Aussage.
+The end-user wiki is DERIVED from these sections (+ the standalone safety pages) — do not
+maintain a parallel wiki page by hand.
 
 ## Related
 Actors, cross-cutting concepts, decisions (ADRs), related use-cases.
 ```
+
+**The flow is numbered, and that is the point of the document.** A use-case answers *how does this run* — step
+by step, in order. Prose paragraphs that describe a mechanism are not a flow: they read as complete and leave
+the next implementer guessing at the sequence. If a paragraph explains a rule rather than a step, it belongs in
+`## Quality notes`; if it explains a structure, it belongs in the enabler. (`uc.memory.place` was four bold
+paragraphs and no steps for months — correct, rich, and unusable as a build order.)
 
 The bilingual section is the **single source** behind `wiki/` (a Python generator assembles the wiki
 from it later — deferred under start-light; author the section now so it's free then).
@@ -72,9 +81,16 @@ from it later — deferred under start-light; author the section now so it's fre
 
 Like the use-case format, but: **`# Enabler: <Title>`**, **`ID: en.<feature>.<name>`**, a **Type: Enabler**
 line, **Provides** (what foundation it gives) + **Serves (use-cases)** + **Depends on** (the enablers/UCs it
-builds on) instead of a single Goal, the same Main-flow / exceptions / quality notes — and **no
-"What this means for you" section** (an enabler has no standalone end-user story; its value surfaces through
-the use-cases it serves). Keep a short note saying so where that section would be.
+builds on) instead of a single Goal — and **no "What this means for you" section** (an enabler has no
+standalone end-user story; its value surfaces through the use-cases it serves). Keep a short note saying so
+where that section would be.
+
+**An enabler owes no `## Main flow` — because enablers come in two kinds.** Nine of the thirteen describe a
+*flow* (`en.memory.media`, `en.memory.tree`, the scope enablers) and carry one. Four describe a **model** — a
+key inventory (`en.account.key-model`), a table layout (`en.memory.buckets`), an envelope shape
+(`en.memory.node-meta`) — where there is no sequence to state and forcing one would mean inventing it. This
+page used to demand "the same Main-flow / exceptions" from both; it was never true. **If an enabler does have
+a flow, it is numbered like any other** — that half is checked.
 
 **Diagrams.** Illustrate flows with inline Mermaid where it clarifies — typically a **sequence
 diagram** for the main flow and a **state machine** for lifecycle/state, as diagrams-as-code (see

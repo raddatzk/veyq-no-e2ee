@@ -3,12 +3,10 @@
 
 Checks that every use-case doc has a coverage file, that each is well-formed (every acceptance
 criterion is covered by at least one test, keyed by area then level; uncovered surfaces are explicit
-gaps), and that **every** referenced test actually exists — across all surfaces — so dead refs fail early:
-    backend            -> "ClassName.method", resolved against *that* class (test file whose stem is
-                          ClassName must exist AND contain method)
-    web                -> a file path (relative to web/)
-    apple / android    -> a file path (contains '/', rel. to repo root) OR "ClassName.method"
-                          (resolved against that class, as backend)
+gaps), and that every referenced test actually exists, so dead refs fail early:
+    backend -> "ClassName.method", resolved against *that* class (test file whose stem is
+               ClassName must exist AND contain method)
+    web     -> a file path (relative to web/)
 
 `http` is NOT a coverage surface (ADR 0040): the `.http` files remain IntelliJ dev tooling but run in
 no CI job, so they make no coverage claim — the same behaviour is proven by the backend slice tests.
@@ -19,7 +17,7 @@ fails even if some other class happens to have a method of that (generic) name.
 
 Coverage shape (per acceptance criterion):
     coverage:
-      <area>:            # backend | web | apple | android
+      <area>:            # backend | web
         <level>:         # unit | integration | e2e
           - <ref>        # see resolution rules above
     gaps:
@@ -41,30 +39,12 @@ FEATURES = ROOT / "docs" / "features"
 COVERAGE = ROOT / "docs" / "coverage" / "features"
 BACKEND_TESTS = ROOT / "backend" / "src" / "test"
 WEB = ROOT / "web"
-APPLE_TEST_DIRS = [ROOT / "apple" / "Tests", ROOT / "apple" / "UITests"]
-ANDROID = ROOT / "android"
 
-KNOWN_AREAS = {"backend", "web", "apple", "android"}   # what a use-case may *declare*
+# The surface set, and the whole of it: a surface counts when a CI job actually runs its tests — the ADR 0040
+# principle, applied by rule rather than by name (the claim follows the build). Every use-case owes every
+# surface here; adding one only ever *permits* refs, so a new surface is one line plus its resolution rule.
+SURFACES = {"backend", "web"}
 KNOWN_LEVELS = {"unit", "integration", "e2e"}
-
-# A surface is **live** when a CI job actually runs its tests — the ADR 0040 principle, applied by rule rather
-# than by name: the claim follows the build. `apple`/`android` hold real code and real tests, but no CI job
-# builds them (ADR 0043 parks them), so they prove nothing and are owed nothing. They re-enter here when their
-# CI job is green — one line, and nothing else has to change (adding a surface only ever *permits* refs).
-LIVE_SURFACES = {"backend", "web"}
-
-# Which surfaces a use-case targets **by design**. Default is parity (ADR 0010) — only deviations declare, via
-# a `- **Surfaces:** a · b — why` line in the use-case doc. This is the declaration; coverage is the proof.
-# Before this existed, `gaps:` did both jobs, and 54 of 63 gaps were hand-copies of one sentence from ADR 0043.
-SURFACES_LINE = re.compile(r"^-\s+\*\*Surfaces:\*\*\s*(.+)$", re.M)
-
-
-def declared_surfaces(uc_doc: pathlib.Path) -> set[str]:
-    m = SURFACES_LINE.search(uc_doc.read_text())
-    if not m:
-        return set(KNOWN_AREAS)                      # no declaration = parity default (ADR 0010)
-    head = re.split(r"\s+—\s+", m.group(1))[0]       # the list, before the em-dash rationale
-    return {s.strip() for s in head.split("·") if s.strip()}
 
 errors: list[str] = []
 
@@ -93,27 +73,10 @@ def _stem_methods(surface: str, files, pattern: str) -> dict[str, set[str]]:
 
 
 KOTLIN_FUN = r"fun\s+`?([A-Za-z0-9_]+)`?\s*\("
-SWIFT_FUNC = r"func\s+([A-Za-z0-9_]+)\s*\("
 
 
 def backend_test_methods() -> dict[str, set[str]]:
     return _stem_methods("backend", BACKEND_TESTS.rglob("*.kt"), KOTLIN_FUN) if BACKEND_TESTS.exists() else {}
-
-
-def apple_test_methods() -> dict[str, set[str]]:
-    swifts = [sw for d in APPLE_TEST_DIRS if d.exists() for sw in d.rglob("*.swift")]
-    return _stem_methods("apple", swifts, SWIFT_FUNC)
-
-
-def android_test_methods() -> dict[str, set[str]]:
-    if not ANDROID.exists():
-        return {}
-    # only real sources: skip other modules' non-test code, and never compiled/generated output
-    # under */build/* (e.g. client/build/generated/openapi/**/src/test/**), which would otherwise
-    # make the map depend on local build state.
-    kts = [kt for kt in ANDROID.rglob("*.kt")
-           if ("/src/test/" in str(kt) or "/src/androidTest/" in str(kt)) and "/build/" not in str(kt)]
-    return _stem_methods("android", kts, KOTLIN_FUN)
 
 
 def rel(p: pathlib.Path) -> str:
@@ -138,17 +101,9 @@ def check_ref(area: str, ref: str, where: str) -> None:
         # web refs are file paths relative to web/
         if not (WEB / ref).exists():
             errors.append(f"{where}: web test file not found: {ref}")
-    elif area in ("apple", "android"):
-        if "/" in ref:  # a file path, relative to repo root
-            if not (ROOT / ref).exists():
-                errors.append(f"{where}: {area} test file not found: {ref}")
-        else:  # "ClassName.method"
-            _check_class_method(area, ref, apple_methods if area == "apple" else android_methods, where)
 
 
 backend_methods = backend_test_methods()
-apple_methods = apple_test_methods()
-android_methods = android_test_methods()
 usecases = sorted(FEATURES.glob("*/use-cases/uc.*.md"))
 
 for uc in usecases:
@@ -179,12 +134,6 @@ for uc in usecases:
         errors.append(f"{where0}: unknown status '{status}' (omit for implemented, or 'planned')")
     planned = status == "planned"
 
-    # What this use-case owes *today*: the surfaces it targets by design, minus the ones no CI runs. A use-case
-    # whose only targets are parked (e.g. the native L0–L3 chooser, ADR 0005 §14-21) owes nothing — it is not a
-    # gap, it is out of scope until the un-park. Refs it already carries for a parked surface stay as they are:
-    # unchecked as coverage, still checked for existence, and ready to count again the day that CI turns green.
-    owed = declared_surfaces(uc) & LIVE_SURFACES
-
     covered_areas: set[str] = set()  # areas that carry a coverage ref anywhere in this use-case
     for ac in data.get("acceptanceCriteria") or []:
         acid = ac.get("id", "?")
@@ -192,10 +141,9 @@ for uc in usecases:
         coverage = ac.get("coverage") or {}
         ref_count = 0
         for area, levels in coverage.items():
-            if area not in KNOWN_AREAS:
+            if area not in SURFACES:
                 errors.append(f"{where}: unknown area '{area}'")
-            if area in LIVE_SURFACES:
-                covered_areas.add(area)  # only a live surface can *cover* — a parked ref proves nothing
+            covered_areas.add(area)
             if not isinstance(levels, dict):
                 errors.append(f"{where}: area '{area}' must map level -> [refs]")
                 continue
@@ -206,23 +154,16 @@ for uc in usecases:
                     errors.append(f"{where}: area '{area}' level '{level}' has no refs")
                     continue
                 for ref in refs:
-                    if area in LIVE_SURFACES:
-                        ref_count += 1
+                    ref_count += 1
                     check_ref(area, ref, where)
-        if ref_count == 0 and not planned and owed:
-            errors.append(f"{where}: no tests on a live surface (needs at least one on {sorted(owed)})")
+        if ref_count == 0 and not planned:
+            errors.append(f"{where}: no tests (needs at least one on {sorted(SURFACES)})")
 
     gaps = data.get("gaps") or {}
-    for area in gaps:
-        if area in KNOWN_AREAS and area not in owed:
-            errors.append(
-                f"{where0}: gap for '{area}', which this use-case does not owe (targets "
-                f"{sorted(declared_surfaces(uc))}, live: {sorted(LIVE_SURFACES)}). A gap is a **debt on a "
-                f"surface you target** — not an N/A note, and never a restatement of ADR 0043")
     if planned and not gaps:
         errors.append(f"{where0}: status 'planned' must declare at least one gap (the surfaces not yet built)")
     for area, reason in gaps.items():
-        if area not in KNOWN_AREAS:
+        if area not in SURFACES:
             errors.append(f"{where0}: gap for unknown area '{area}'")
         if not reason:
             errors.append(f"{where0}: gap for area '{area}' needs a reason")

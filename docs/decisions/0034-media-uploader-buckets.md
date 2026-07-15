@@ -1,35 +1,31 @@
-# ADR 0034 — Media uploader buckets: an `owner_key`-keyed bucket table (operator-blind, adapted from legacy ADR 0023)
+# ADR 0034 — Media uploader buckets: an `owner_key`-keyed bucket table (operator-blind)
 
 - Status: Accepted
 - Date: 2026-07-09
 
 ## Context
 
-The pre-E2EE product (`legacy/frontend-noe2ee` + `legacy/backendnoe2ee`) shipped a **Buckets** concept: a
-per-uploader container *within a single Memory* holding the media that uploader contributed — an **attribution
-axis** ("who contributed this?"), **orthogonal to Chapters** (the owner's curation axis). Each uploader gets one
-automatic **primary bucket** (name = their display name) plus optional user-created, one-level **sub-buckets**;
-the whole thing surfaces as a Memory tab ("Contributions" / "Beiträge"). The bucket owner is a **member** *or* an
-**anonymous share identity**, so the axis groups **internal members and public contributors** alike.
+**Buckets** are a per-uploader container *within a single Memory* holding the media that uploader contributed —
+an **attribution axis** ("who contributed this?"), **orthogonal to Chapters** (the owner's curation axis). Each
+uploader gets one automatic **primary bucket** (name = their display name) plus optional user-created, one-level
+**sub-buckets**; the whole thing surfaces as a Memory tab ("Contributions" / "Beiträge"). The bucket owner is a
+**member** *or* an **anonymous share identity**, so the axis groups **internal members and public contributors**
+alike.
 
-The **data hook already exists in the fresh state**: [ADR 0030](0030-contributor-public-share.md) captured each
-contributed medium's uploader as an opaque `share_identity_id` + a `K_mem`-sealed display name, and **deferred the
-buckets UI** to a later slice. This ADR decides that slice — widened from contributors to **every** uploader.
+The **data hook already exists**: [ADR 0030](0030-contributor-public-share.md) captured each contributed medium's
+uploader as an opaque `share_identity_id` + a `K_mem`-sealed display name, and **deferred the buckets UI** to a
+later slice. This ADR decides that slice — widened from contributors to **every** uploader.
 
-Crucially, **legacy ADR 0023 already re-designed buckets for an operator-blind server** (its pre-E2EE *code* did
-not — it stored cleartext names, enforced no bucket ownership, and hard-deleted media on bucket delete). We
-**orient on ADR 0023, not the legacy code.** The refine (with the user) settled the shape: a **real bucket table**
-keyed by a single opaque **`owner_key`** — not a minimal "derive from a per-media stamp" model — because that is
-symmetric across members and contributors and carries **sub-buckets** without a second data model, and because the
-legacy ADR 0023 design is a proven template. V1 is the **web-only finishing package**: build the **full data
-layer + backend** and the web **"Beiträge" tab** as the full **organizer** — per-uploader grouping **and**
-sub-bucket management (create/rename/delete folders, move media in) — ported from the legacy MemoryAssetBuckets UX
-(the product direction, refined with the user, is the full organizer, not read-only grouping).
+The refine (with the user) settled the shape: a **real bucket table** keyed by a single opaque **`owner_key`** —
+not a minimal "derive from a per-media stamp" model — because that is symmetric across members and contributors
+and carries **sub-buckets** without a second data model. V1 is the **finishing package**: the **full data layer +
+backend** and the **"Beiträge" tab** as the full **organizer** — per-uploader grouping **and** sub-bucket
+management (create/rename/delete folders, move media in). The product direction, refined with the user, is the
+full organizer, not read-only grouping.
 
 ## Decision
 
-Adopt an **`owner_key`-keyed bucket table**, operator-blind, following legacy ADR 0023 and adapted to the
-fresh-state key hierarchy. The data model lives in [en.memory.buckets](../features/memory/enablers/en.memory.buckets.md);
+Adopt an **`owner_key`-keyed bucket table**, operator-blind, built on the key hierarchy. The data model lives in [en.memory.buckets](../features/memory/enablers/en.memory.buckets.md);
 the experience in [uc.memory.buckets](../features/memory/use-cases/uc.memory.buckets.md).
 
 1. **A bucket = a per-uploader container within one Memory** — the **attribution axis**, **orthogonal to
@@ -98,9 +94,9 @@ the experience in [uc.memory.buckets](../features/memory/use-cases/uc.memory.buc
   space **with no share** is wholly confidential — its only `owner_key` is the account owner's.
 - **ADR 0030's forward-compat is spent as intended.** Contributor grouping falls out of `share:{shareIdentityId}`
   with **no migration** on the sharing half; the sealed contributor name becomes the primary's sealed name.
-- **We diverge from the pre-E2EE *code*, tracking ADR 0023.** Cascade-delete → **reparent-to-primary**; no bucket
-  ownership → **own-bucket authz**; cleartext names + server-side uniqueness → **`K_mem`-sealed names + primary-
-  only uniqueness**. These are behavior/blindness changes, not just crypto.
+- **We diverge deliberately from how buckets worked before E2EE.** Cascade-delete → **reparent-to-primary**; no
+  bucket ownership → **own-bucket authz**; cleartext names + server-side uniqueness → **`K_mem`-sealed names +
+  primary-only uniqueness**. These are behavior/blindness changes, not just crypto.
 - **One redundant column, deliberately.** `media.share_identity_id` (cr-0101) overlaps `created_by` for
   contributors; kept to avoid churning the shipped sharing feature in this CR, flagged for cleanup when sharing is
   next touched.
@@ -112,10 +108,9 @@ the experience in [uc.memory.buckets](../features/memory/use-cases/uc.memory.buc
 - **Derived primary buckets, no table** (a per-media `created_by_user_id` grouped at read time — the first-cut
   V1). **Rejected in refine:** it is **asymmetric** (contributors already have a materialized identity row,
   members would be a bare group-by), and it does **not** carry sub-buckets without introducing the table later
-  anyway. A single `owner_key` + one table is the symmetric, sound foundation, and legacy ADR 0023 proves the
-  shape.
+  anyway. A single `owner_key` + one table is the symmetric, sound foundation.
 - **The pre-E2EE two-column `uploader_user_id`/`share_identity_id` XOR.** Rejected — the XOR was enforced only in
-  app code at many call sites; **one opaque `owner_key`** is cleaner and authorization-friendly (ADR 0023).
+  app code at many call sites; **one opaque `owner_key`** is cleaner and authorization-friendly.
 - **Materialize every primary eagerly.** Rejected — **virtual-until-upload** (lazy find-or-create) avoids empty
   rows + create/delete lifecycle churn; a primary appears exactly when its uploader has media.
 - **Cascade-delete a bucket's media** (the pre-E2EE code). Rejected — **reparent-to-primary** never loses media;

@@ -1,15 +1,15 @@
 # UC: Delete a group (soft-delete, grace period, restore)
 
-- ID: uc.spaces.delete-group
-- Primary actor: **GroupOwner** (`OWNER` on the GROUP scope). The eventual hard-purge is run by a **scheduled
+- **ID:** uc.spaces.delete-group
+- **Primary actor:** **GroupOwner** (`OWNER` on the GROUP scope). The eventual hard-purge is run by a **scheduled
   server job** — operator-blind-safe, because it only deletes ciphertext + opaque rows + blob objects (it never
   needs a key or sees a name), unlike the key rotation that removal triggers.
-- Goal: let a GroupOwner **retire a group** without instant, irreversible loss — the group enters a **grace
+- **Goal:** let a GroupOwner **retire a group** without instant, irreversible loss — the group enters a **grace
   period** in which it is clearly marked as deleting, everyone can still look through it, and any owner can undo —
   after which it is **erased** (memories + files) from the server.
-- Preconditions: The caller is an **OWNER** of the group ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4/§6).
+- **Preconditions:** The caller is an **OWNER** of the group ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4/§6).
   The scope is a **GROUP** (personal/tenant scopes have their own lifecycles).
-- Postconditions (success): The group is in **pending-deletion** (a `deletedAt` marker + a `purgeAfter` date); it
+- **Postconditions (success):** The group is in **pending-deletion** (a `deletedAt` marker + a `purgeAfter` date); it
   stays readable but **read-only** for every member and is flagged as deleting. **Restore** (any owner, in-window)
   returns it to fully active. At `purgeAfter`, the scheduled job **hard-erases** the group and all its content —
   nodes, their blob objects in the store, memberships, epoch links, favorites, and the scope row. The server saw

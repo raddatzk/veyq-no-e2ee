@@ -7,15 +7,13 @@
   per unlock method), the **unlock methods + KEK derivation** that open it, and recovery. It is the **root of
   the key chain** the scope + content keys extend downstream.
 - **Serves (use-cases):** [login](../use-cases/uc.account.login.md), [unlock](../use-cases/uc.account.unlock.md),
-  [trust-device](../use-cases/uc.account.trust-device.md), [biometric-unlock](../use-cases/uc.account.biometric-unlock.md),
-  [auto-unlock](../use-cases/uc.account.auto-unlock.md), [set-device-security](../use-cases/uc.account.set-device-security.md),
+  [trust-device](../use-cases/uc.account.trust-device.md),
   [remember-this-device](../use-cases/uc.account.remember-this-device.md); and downstream
   [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) →
   [en.memory.tree](../../memory/enablers/en.memory.tree.md) build their scope/content keys on it.
 - **Depends on:** the crypto strategy ([ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md))
   + the operator-blind auth/unlock split ([ADR 0003](../../../decisions/0003-operator-blind-password-auth.md),
-  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)). The cross-platform passwordless
-  (L2/L3) **orchestration** is [en.account.passwordless-unlock](en.account.passwordless-unlock.md).
+  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)).
 - **Out of scope (by design):** **scope, content & share keys** + the invite/onboarding key transfer live in
   [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md); exact **byte formats** (suite layouts, KEM
   combiner, wrap encodings) in the crypto wire-format spec. Whole-system security concern: the sibling
@@ -98,18 +96,18 @@ signature authenticates and its **PRF** secret derives an unlock KEK.)
 | **Password + Secret Key** | `Argon2id(password ‖ secretKey, salt)` | The **mandatory floor** — always present, cannot be removed. The Secret Key (never sent) is what stops a cracked password from opening content. |
 | **Passkey (PRF)** | the authenticator's PRF output | Passwordless; one credential covers auth (signature) and unlock (PRF). |
 | **Recovery code** | the high-entropy code itself | Single-use; standalone bypass of both password and Secret Key. |
-| **Trusted device (L1, `DEVICE`)** | `Argon2id(password ‖ HMAC(deviceKey, "veyq/v1/device-bind"), salt)` | Two factors — the password **+** a device-bound key — swapping the *cold* Secret Key for a device-local one; this device unlocks with the **password alone** (no Secret Key). Still password-gated: a stolen device alone opens nothing. |
-| **Passwordless device (L2/L3, `DEVICE_KEY`)** | a device-held **random** key `K` (`wrap = symWrap(K, masterKey)`) | **No password** — `K` is released by a live biometric (L2) or ungated (L3). Orchestration + per-platform store: [en.account.passwordless-unlock](en.account.passwordless-unlock.md). |
+| **Trusted device (`DEVICE`)** | `Argon2id(password ‖ HMAC(deviceKey, "veyq/v1/device-bind"), salt)` | Two factors — the password **+** a device-bound key — swapping the *cold* Secret Key for a device-local one; this device unlocks with the **password alone** (no Secret Key). Still password-gated: a stolen device alone opens nothing. |
+| **Passwordless device (`DEVICE_KEY`)** | a device-held **random** key `K` (`wrap = symWrap(K, masterKey)`) | **No password** — the device holds `K` ungated, so a stolen *unlocked* device opens content. Explicit opt-in, never a default: [remember-this-device](../use-cases/uc.account.remember-this-device.md). |
 
 Each KEK is derived **fresh on the device** with a stored salt (so it reproduces identically), used to
 open its wrap, then **discarded**. None is ever stored or sent — which is exactly why the server stays
 blind.
 
-**Device keys are bound, not stored raw.** The L1 `deviceKey` is a **non-extractable** HMAC key (its bytes
-never exist in the clear — usable to compute the bind, never exfiltratable); the L2/L3 `K` is a random
-secure-element key. Device trust is **per device**: each trusted/enrolled device writes **its own** wrap (own
-key + salt), so a phone and a laptop are two independent wraps on the same Master Key — unlike the floor
-methods, `DEVICE`/`DEVICE_KEY`/`PASSKEY` may appear more than once ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)).
+**Device keys are bound, not stored raw.** The `DEVICE` `deviceKey` is a **non-extractable** HMAC key (its
+bytes never exist in the clear — usable to compute the bind, never exfiltratable); the `DEVICE_KEY` `K` is a
+random key held by the device. Device trust is **per device**: each trusted/enrolled device writes **its own**
+wrap (own key + salt), so a phone and a laptop are two independent wraps on the same Master Key — unlike the
+floor methods, `DEVICE`/`DEVICE_KEY`/`PASSKEY` may appear more than once ([ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)).
 
 ## Adding / removing unlock methods
 
@@ -150,3 +148,20 @@ password), and the Master Key, writes one wrap per chosen unlock method, and the
 **Emergency Kit** (Secret Key + recovery code). The server only ever receives ciphertext (`wrapped*`) and
 public keys — **never the password**. The **onboarding key transfer** that grants a new member access to
 an existing space (the temporary invite-wrap) is a scopes & tenancy concern, refined there.
+
+## Related
+
+- Feature: [Account & auth](../_index.md)
+- Decisions: [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (the auth keypair — why the
+  password never reaches the server), [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)
+  (which unlock methods exist and how a device earns one),
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the primitives + the
+  conformance vectors that pin their bytes)
+- Serves: [login](../use-cases/uc.account.login.md), [unlock](../use-cases/uc.account.unlock.md),
+  [trust-device](../use-cases/uc.account.trust-device.md),
+  [remember-this-device](../use-cases/uc.account.remember-this-device.md)
+- Downstream: [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) →
+  [en.memory.tree](../../memory/enablers/en.memory.tree.md) build their scope/content keys on this root
+- Concepts: [security-model](../../../crosscutting/security-model.md) (the whole-system boundary),
+  [scopes & tenancy](../../../crosscutting/scopes-and-tenancy.md) (the scope/content keys this root extends)
+- End-user view: [wiki: Account keys & recovery](../../../../wiki/en/account-keys-and-recovery.md)

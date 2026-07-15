@@ -1,16 +1,16 @@
 # UC: Consent before being added to a group
 
-- ID: uc.spaces.consent-group-add
-- Primary actor: **the invited member** (accepts or declines) — with the **GroupOwner** as the trigger (adds a
+- **ID:** uc.spaces.consent-group-add
+- **Primary actor:** **the invited member** (accepts or declines) — with the **GroupOwner** as the trigger (adds a
   consent-required member) and **any account holder** as the one who set the preference.
-- Goal: let a person **opt in to being asked first** — so a GroupOwner cannot silently drop them into a group.
+- **Goal:** let a person **opt in to being asked first** — so a GroupOwner cannot silently drop them into a group.
   When the toggle is on, an add becomes a **proposal** the person **accepts or declines**; the group key `K_SC`
   is delivered **only after acceptance**.
-- Preconditions: The target is **already a tenant member** with a published identity public key
+- **Preconditions:** The target is **already a tenant member** with a published identity public key
   ([en.spaces.member-identity](../enablers/en.spaces.member-identity.md)). The target has turned **"ask before
   adding me to groups"** on (an **account-global** preference, default **off**). The GroupOwner holds the group
   grant (so their device can derive the group's name-key `K_name` and wrap it to the invitee).
-- Postconditions (success on **Accept**): the proposal becomes a normal **grant-less** membership; grant-delivery
+- **Postconditions (success on Accept):** the proposal becomes a normal **grant-less** membership; grant-delivery
   wraps `K_SC` to the newcomer (the usual *awaiting access* window, [uc.spaces.add-group-member](uc.spaces.add-group-member.md)),
   and the group opens for them. On **Decline**: the soft membership is dropped — **nothing was ever wrapped**, no
   trace kept. Operator-blind throughout: the server saw a membership row, identity public keys, and opaque
@@ -117,10 +117,10 @@ sequenceDiagram
 - **Additive, reversible cheaply.** Accept flips one flag → the existing grant-delivery does the rest; Decline /
   Rescind is a single row delete. No rotation, no re-seal, no second standing key.
 - **Consent's strength tracks the client tier ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** The
-  gate is enforced by the key-holders' clients not wrapping `K_SC` to a soft member — so it is a real, crypto-grade
-  guarantee on a **trusted** client (native / trusted-web: an active operator can't make it wrap), and
-  **honest-operator-only** on operator-served web (a tampered client could wrap regardless) — the same tier as all
-  veyq E2EE, no consent-specific weakness.
+  gate is enforced by the key-holders' clients not wrapping `K_SC` to a soft member — so it is a real,
+  crypto-grade guarantee wherever the operator cannot alter the client (**self-hosted**, or a trusted/attested
+  origin: an active operator can't make it wrap), and **honest-operator-only** on someone else's instance (a
+  tampered client could wrap regardless) — the same tier as all veyq E2EE, no consent-specific weakness.
 
 ## What this means for you / Was das für dich bedeutet
 

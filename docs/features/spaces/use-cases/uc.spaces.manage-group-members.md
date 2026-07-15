@@ -1,13 +1,13 @@
 # UC: Manage a group's members (promote / demote / remove)
 
-- ID: uc.spaces.manage-group-members
-- Primary actor: **GroupOwner** (`OWNER` on the GROUP scope). Removal's key rotation is completed by **any
+- **ID:** uc.spaces.manage-group-members
+- **Primary actor:** **GroupOwner** (`OWNER` on the GROUP scope). Removal's key rotation is completed by **any
   remaining key-holder's device** (operator-blind — the server cannot).
-- Goal: run a group's roster — **promote** a member to co-owner, **demote** a co-owner back to member, and
+- **Goal:** run a group's roster — **promote** a member to co-owner, **demote** a co-owner back to member, and
   **remove** a member — within the ownership rules, so a removed member loses access to **new** content.
-- Preconditions: The caller is an **OWNER** of the group ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4).
+- **Preconditions:** The caller is an **OWNER** of the group ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) §4).
   The target is a current member of the group.
-- Postconditions (success): The target's role/membership reflects the action. On **removal**, the membership is
+- **Postconditions (success):** The target's role/membership reflects the action. On **removal**, the membership is
   deleted (instant 403) **and** the scope rotates its content key forward so the removed member can't read
   post-removal content ([en.spaces.scope-key-rotation](../enablers/en.spaces.scope-key-rotation.md)). The server
   saw only role/membership metadata + opaque epoch links/grants — never a key.

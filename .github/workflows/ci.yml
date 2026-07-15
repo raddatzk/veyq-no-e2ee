@@ -86,11 +86,12 @@ jobs:
       #   validate_changes        — CR number/id unique, satisfies:/adrs: resolve, adrs quoted
       #   validate_doc_links      — every relative link under docs/ resolves
       #   validate_feature_wiring — every uc/en is indexed; enabler Serves ↔ back-reference is symmetric
+      #   validate_feature_format — every uc/en follows the documented format: header bullets, id == filename,
+      #     required sections, a main flow made of numbered steps, and the EN+DE end-user pair on use-cases only
       #   validate_capabilities   — every capability's serves resolves to a real, built use-case (ADR 0032)
       #   validate_contracts_common — shared OpenAPI components (ErrorResponse/bearerAuth/params/enums) don't drift (ADR 0038)
       #   validate_http_failure_projection — ErrorResponse is built only in the shared/http/ writer (ADR 0042)
       #   validate_scope_model_vocabulary — docs name no scope keypair / ADMIN role; entity roles == contract enum (ADR 0007/0024)
-      #   validate_webfirst_authority — web-first is cited to ADR 0043, never to ADR 0010/platform-parity/CLAUDE.md (ADR 0043)
       - name: Validate trust-chain guards
         run: |
           python3 -m venv .venv
@@ -99,16 +100,16 @@ jobs:
           .venv/bin/python scripts/validate_changes.py
           .venv/bin/python scripts/validate_doc_links.py
           .venv/bin/python scripts/validate_feature_wiring.py
+          .venv/bin/python scripts/validate_feature_format.py
           .venv/bin/python scripts/validate_capabilities.py
           .venv/bin/python scripts/validate_contracts_common.py
           .venv/bin/python scripts/validate_http_failure_projection.py
           .venv/bin/python scripts/validate_scope_model_vocabulary.py
-          .venv/bin/python scripts/validate_webfirst_authority.py
 
   web-e2e:
     name: Web E2E (live backend)
-    # Disabled: scripts/run_web_e2e.py was moved to legacy/ in the greenfield reset and not yet ported back.
-    # Drop `if: false` to re-enable once the web e2e orchestrator is restored to scripts/.
+    # Disabled: scripts/run_web_e2e.py does not exist — the orchestrator was lost in the greenfield reset and
+    # has to be REWRITTEN, not restored. Drop `if: false` once it is back. See architecture/README.md §11.
     if: false
     runs-on: ubuntu-latest
     steps:

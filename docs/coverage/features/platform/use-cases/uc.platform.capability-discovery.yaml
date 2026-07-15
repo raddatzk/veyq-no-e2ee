@@ -8,7 +8,7 @@ title: A client discovers an instance's version + capabilities, and refuses to b
 # before login) and soft-gates each optional feature on hasCapability. An operator disables a capability
 # instance-wide (veyq.capabilities.disabled) — omitted from the manifest AND rejected at its create/enable gate
 # (422 capability_disabled). Sharing is the worked end-to-end proof; spaces.groups + account.device-trust ride
-# the same machinery. apple/android are a later native-parity CR. Lean-core scope: no deprecation lifecycle /
+# the same machinery. Lean-core scope: no deprecation lifecycle /
 # notices / audience filter yet.
 acceptanceCriteria:
   - id: discover-manifest

@@ -4,7 +4,7 @@ title: Rename a group
 # Web-complete (cr-0097). ADR 0027's rename mechanism: the owner re-seals the group name under K_name derived from
 # the scope's CURRENT content-key epoch and bumps name_epoch, so the rename is forward-secret (a removed member
 # holding only an earlier epoch can't derive the new K_name). Owner-gated, name-only (no K_SC rotation / re-grant),
-# server rejects a stale nameEpoch (409) and a rename on a pending-deletion group (409). Native (apple/android) is
+# server rejects a stale nameEpoch (409) and a rename on a pending-deletion group (409). (
 # web-first — a later CR, an explicit gap.
 acceptanceCriteria:
   - id: reseal-under-current-epoch

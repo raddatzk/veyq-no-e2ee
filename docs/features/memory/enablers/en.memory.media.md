@@ -130,7 +130,7 @@ sequenceDiagram
 - Feature: [Memory](../_index.md)
 - Decisions: [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) (S3-only, presigned
   direct-to-store, no dedup), [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_blob` under
-  `K_mem`), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (`chunk_frame` vector)
+  `K_mem`), [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (`chunk_frame` vector)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (key hierarchy),
   [Account & Key Model](../../account/enablers/en.account.key-model.md)
 - Related enablers: [en.memory.tree](en.memory.tree.md) (the Memory + `K_mem` this attaches media to),

@@ -1,13 +1,13 @@
 # UC: Manage pending member invites (list, re-issue link, revoke)
 
-- ID: uc.spaces.manage-member-invites
-- Primary actor: Tenant **Owner** (the admission gate — the only one who mints or manages member invites).
-- Goal: give the owner control over the **admission** side after minting — see who has been **invited but not
+- **ID:** uc.spaces.manage-member-invites
+- **Primary actor:** Tenant **Owner** (the admission gate — the only one who mints or manages member invites).
+- **Goal:** give the owner control over the **admission** side after minting — see who has been **invited but not
   yet joined**, **re-issue** the invite link when the old one was lost or ignored, and **revoke** a pending
   invite so its outstanding secret can no longer be accepted.
-- Preconditions: The owner holds the tenant's OWNER membership; the tenant is ACTIVE; at least one MEMBER
+- **Preconditions:** The owner holds the tenant's OWNER membership; the tenant is ACTIVE; at least one MEMBER
   invite has been minted ([uc.spaces.add-member](uc.spaces.add-member.md)).
-- Postconditions (success): The owner sees the current pending member invites; a re-issue produces a fresh
+- **Postconditions (success):** The owner sees the current pending member invites; a re-issue produces a fresh
   single-use secret + copyable link (the prior one superseded); a revoke marks the invite terminal so a
   replay of its secret is rejected. Already-**joined** members are never affected — this manages *invites*,
   not *memberships*. The server saw only invite metadata (email, status, expiry), never a plaintext secret.
@@ -53,11 +53,12 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
 
 ## What this means for you / Was das für dich bedeutet
 
-You can see who you have invited but who has not joined yet, send someone their link again if they lost it, and
-cancel an invite you sent by mistake — all without touching anyone who is already in your space. / Du siehst,
-wen du eingeladen hast, der aber noch nicht beigetreten ist, kannst jemandem den Link erneut schicken, wenn er
-verloren ging, und eine versehentliche Einladung zurückziehen — ohne jemanden anzutasten, der schon in deinem
-Bereich ist.
+**EN —** You can see who you have invited but who has not joined yet, send someone their link again if they lost
+it, and cancel an invite you sent by mistake — all without touching anyone who is already in your space.
+
+**DE —** Du siehst, wen du eingeladen hast, der aber noch nicht beigetreten ist, kannst jemandem den Link erneut
+schicken, wenn er verloren ging, und eine versehentliche Einladung zurückziehen — ohne jemanden anzutasten, der
+schon in deinem Bereich ist.
 
 ## Related
 

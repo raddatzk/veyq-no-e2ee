@@ -69,13 +69,13 @@
   },
   "auth": {
     "auth_salt": {
-      "note": "deriveAuthSalt (ADR 0003): HKDF-SHA256(ikm=utf8(email.trim().toLowerCase()), salt=instance_salt, info=\"veyq/v1/auth-salt\", 16). email_utf8 is the raw pre-normalization input the impl normalizes. Asserted on web+apple+android; the operator-blind backend only VERIFIES signatures, so it does not derive this.",
+      "note": "deriveAuthSalt (ADR 0003): HKDF-SHA256(ikm=utf8(email.trim().toLowerCase()), salt=instance_salt, info=\"veyq/v1/auth-salt\", 16). email_utf8 is the raw pre-normalization input the impl normalizes. Asserted on web; the operator-blind backend only VERIFIES signatures, so it does not derive this.",
       "instance_salt": "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0",
       "email_utf8": "user@example.com",
       "auth_salt": "3adf4158b2c29361edb0b00ae3666b17"
     },
     "auth_keypair": {
-      "note": "deriveAuthKeypair (ADR 0003): seed=Argon2id(utf8(password), auth_salt, PRODUCTION params m=32768); private_key=seed, public_key=Ed25519.getPublicKey(seed). Pins the password->Ed25519 auth identity byte-identically across web+apple+android (was only a non-vector sign/verify round-trip). auth_salt is auth.auth_salt.auth_salt.",
+      "note": "deriveAuthKeypair (ADR 0003): seed=Argon2id(utf8(password), auth_salt, PRODUCTION params m=32768); private_key=seed, public_key=Ed25519.getPublicKey(seed). Pins the password->Ed25519 auth identity byte-for-byte, so a refactor cannot silently move it (it was only a non-vector sign/verify round-trip before). auth_salt is auth.auth_salt.auth_salt.",
       "params": {
         "t": 3,
         "m": 32768,

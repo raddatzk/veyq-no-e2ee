@@ -20,8 +20,13 @@ The three goals that outrank every other quality, in order:
 
 1. **The operator cannot read your content — including the operator you are.** A user's unshared personal space
    is confidential even from whoever runs the server. This is not a feature; it is the product.
-2. **Anyone can run it.** Self-hosting is the default deployment, not a degraded mode.
-3. **The same product on every surface it ships to**, without shipping the same code twice.
+2. **Anyone can run it.** Self-hosting is the default deployment, not a degraded mode — and, since only a client
+   the operator cannot alter holds goal 1 against an *active* operator, it is also how goal 1 is *kept*
+   ([ADR 0026](../decisions/0026-client-trust-tiers.md)).
+3. **The memories outlive the crypto that protects them.** These are decade-lived keepsakes, which makes
+   harvest-now-decrypt-later a present threat and crypto-agility non-negotiable: post-quantum key wrapping from
+   the start, a versioned suite id on every artifact, and upgrades that never re-encrypt what already exists
+   ([ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md)).
 
 Stakeholders: the **person** whose memories these are; the **operator** who runs an instance (often the same
 person, and explicitly *not* trusted with content); a **developer or reviewer** judging whether the encryption
@@ -47,7 +52,7 @@ Non-negotiable, and every view below is downstream of them. Stated canonically i
 title: veyq containers (the operator-blind server is the trust boundary)
 ---
 flowchart TB
-  C["Clients<br>web (Vue) — the one live surface<br>apple (SwiftUI) · android (Compose) — parked (ADR 0043)"]
+  C["Client<br>web (Vue)"]
   B["Backend<br>Quarkus / Kotlin — operator-blind<br>feature-sliced (resource→handler→store)"]
   NB["sees ciphertext + structure — never a key,<br>name, day, coordinate, or pixel"]
   DB[("MariaDB<br>ciphertext + opaque metadata")]
@@ -81,8 +86,8 @@ operator ([ADR 0016](../decisions/0016-geocoding-provider-neutrality.md); the bo
 | Operator cannot read content | **All content crypto is client-side.** The backend performs no content crypto and never sees the password: login is challenge-response against a derived public key, so there is no credential to steal. | [ADR 0003](../decisions/0003-operator-blind-password-auth.md), [security-model](../crosscutting/security-model.md) |
 | …and cannot read it *later*, in bulk | **Envelope encryption with random per-level keys, many-wrapped** (§6) — every level is an independent sharing grain, so sharing never means re-encrypting content. | [ADR 0012](../decisions/0012-content-key-hierarchy.md) |
 | …and cannot see bytes at all | **Blobs go direct-to-store via presigned URLs.** The backend signs; it never touches a blob byte. | [ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md) |
-| Same product, many surfaces | **Parity by shared contracts, not shared code** — one generated client per language + crypto conformance vectors. | [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md), [ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md) |
-| Anyone can run it | **One node, no required central service**, a vendor-neutral S3 store, Host-based tenant routing. | [ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md), [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md) |
+| Anyone can run it — and that *is* the security answer | **One node, no required central service**, a vendor-neutral S3 store, Host-based tenant routing. Self-hosting is what makes confidentiality hold against an *active* operator; on someone else's instance veyq is passive-safe and says so. | [ADR 0013](../decisions/0013-blob-storage-presigned-direct-to-store.md), [ADR 0006](../decisions/0006-cold-tenant-scope-birth.md), [ADR 0026](../decisions/0026-client-trust-tiers.md) |
+| The memories outlive their crypto | **Post-quantum key wrapping from the start** (hybrid X25519 + ML-KEM-768 — safe if *either* holds) + a **versioned suite id** on every artifact, so a suite can be upgraded without ever re-encrypting what exists. Conformance vectors pin a suite's bytes, so a refactor cannot silently move them. | [ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) |
 
 ## 5. Building Block View
 
@@ -96,9 +101,7 @@ operator ([ADR 0016](../decisions/0016-geocoding-provider-neutrality.md); the bo
   fine-grained content authorization is a small domain guard in the handler — a different layer.
   → [ADR 0008](../decisions/0008-centralized-http-auth.md),
   [cc.security.authorization](../crosscutting/cc.security.authorization.md)
-- **`web/`** — Vue 3 + PrimeVue, and **the one live client surface** ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)).
-  All content crypto runs here. `apple/` and `android/` hold parked code that no CI builds and that claims no
-  coverage; they re-enter when their CI job is green.
+- **`web/`** — Vue 3 + PrimeVue, and **the client surface**. All content crypto runs here.
 - **`contracts/`** — OpenAPI + crypto vectors. The source of truth both sides are generated from; never a
   hand-written DTO.
 
@@ -139,8 +142,8 @@ Where each level is owned: **unlock + Master Key + identity** →
 [en.memory.media](../features/memory/enablers/en.memory.media.md)
 ([ADR 0012](../decisions/0012-content-key-hierarchy.md)) · **wrappedMeta** →
 [en.memory.node-meta](../features/memory/enablers/en.memory.node-meta.md) · the primitives that realize it →
-[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (vectors:
-[ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md)).
+[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (which also pins their bytes as
+conformance vectors).
 
 **Every other runtime flow is drawn where it belongs** — each use-case doc carries its own sequence diagram
 (login, unlock, add media, share, add member, rotate a scope key…). This page does not copy them:
@@ -154,7 +157,7 @@ Where each level is owned: **unlock + Master Key + identity** →
 title: Self-hosted node (central infrastructure always optional)
 ---
 flowchart TB
-  C["Clients<br>web live · apple / android parked (ADR 0043)"]
+  C["Client<br>web (Vue)"]
   subgraph N["One self-hosted node"]
     B["Backend (Quarkus/Kotlin)"]
     DB[("MariaDB")]
@@ -196,11 +199,10 @@ flowchart TB
   [ADR 0003](../decisions/0003-operator-blind-password-auth.md) →
   [ADR 0004](../decisions/0004-session-tokens.md) → [ADR 0008](../decisions/0008-centralized-http-auth.md);
   the split itself is [en.account.key-model](../features/account/enablers/en.account.key-model.md).
-- **Passwordless-unlock orchestration** — a prompt-free data layer + a native app-layer secure-element gate,
-  identical on every platform. →
-  [en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)
-  ([ADR 0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md),
-  [ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md))
+- **Passwordless unlock** — a device-held key wrap that opens the master key without a password, enrolled per
+  device and revocable. →
+  [uc.account.remember-this-device](../features/account/use-cases/uc.account.remember-this-device.md)
+  ([ADR 0005](../decisions/0005-unlock-methods-and-device-trust.md))
 - **Scope / tenancy model** — personal / group / tenant scopes; membership = (user, scope, role, grant); a
   tenant scope is born cold; groups are private even from the tenant owner. →
   [scopes & tenancy](../crosscutting/scopes-and-tenancy.md)
@@ -221,18 +223,19 @@ flowchart TB
 
 ## 9. Architecture Decisions
 
-The decisions that shape the views above, by theme. **This is a reader's path in, not the full set** — all
-**42** live in [decisions/](../decisions/), which is the only complete list.
+The decisions that shape the views above, by theme. **This is a reader's path in, not the full set** —
+[decisions/](../decisions/) is the only complete list, and stating its size here would only be one more number
+to keep true.
 
 | Theme | ADRs |
 |---|---|
 | **Backend structure** | [0001](../decisions/0001-backend-http-adapter-vs-application-slicing.md) adapters/slicing · [0008](../decisions/0008-centralized-http-auth.md) central auth/authz · [0042](../decisions/0042-http-failure-projection.md) single-source failure projection |
-| **Auth & session** | [0003](../decisions/0003-operator-blind-password-auth.md) password keypair · [0004](../decisions/0004-session-tokens.md) session tokens · [0011](../decisions/0011-uniform-passwordless-unlock-orchestration.md) passwordless orchestration |
-| **Keys & crypto** | [0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) primitives + PQ strategy · [0012](../decisions/0012-content-key-hierarchy.md) content-key hierarchy · [0005](../decisions/0005-unlock-methods-and-device-trust.md) unlock methods & device trust · [0009](../decisions/0009-native-crypto-per-platform-vectors.md) per-platform vectors |
+| **Auth & session** | [0003](../decisions/0003-operator-blind-password-auth.md) password keypair · [0004](../decisions/0004-session-tokens.md) session tokens |
+| **Keys & crypto** | [0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) primitives + PQ strategy + conformance vectors · [0012](../decisions/0012-content-key-hierarchy.md) content-key hierarchy · [0005](../decisions/0005-unlock-methods-and-device-trust.md) unlock methods & device trust |
 | **Scopes & tenancy** | [0002](../decisions/0002-personal-scope-per-tenant.md) personal scope per tenant · [0006](../decisions/0006-cold-tenant-scope-birth.md) cold tenant birth · [0007](../decisions/0007-membership-role-grant-relation.md) membership relation · [0014](../decisions/0014-group-scopes-and-governance.md) group scopes & governance · [0024](../decisions/0024-scope-key-rotation.md) key rotation |
 | **Storage & URLs** | [0013](../decisions/0013-blob-storage-presigned-direct-to-store.md) S3 direct-to-store · [0015](../decisions/0015-operator-blind-readable-urls.md) blind readable URLs |
-| **Client parity** | [0010](../decisions/0010-native-clients-shared-contracts-not-code.md) shared contracts, not shared code · [0016](../decisions/0016-geocoding-provider-neutrality.md) geocoding provider-neutrality |
-| **Scope of V1** | [0043](../decisions/0043-web-first-v1-native-parked.md) web-first V1; apple/android parked until an explicit un-park |
+| **Provider neutrality** | [0016](../decisions/0016-geocoding-provider-neutrality.md) geocoding · [0018](../decisions/0018-map-tiles-provider-neutrality.md) map tiles |
+| **Client integrity** | [0026](../decisions/0026-client-trust-tiers.md) trust tiers — self-hosting is the guarantee |
 | **Coverage & process** | [0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md) what counts as a covered surface |
 
 ## 10. Quality Requirements
@@ -244,7 +247,6 @@ has no key to misuse.
 |---|---|---|
 | **Confidentiality from the operator** | absolute. Not "hard to abuse" — *impossible without a client key*. A full DB + object-store dump yields ciphertext, public keys and wrapped blobs, and derives nothing. | §4's strategies; argued end-to-end in [security-model](../crosscutting/security-model.md) |
 | **Self-hostability** | one `docker compose up` + a JVM; no account with anyone, no phone-home, no required central service | [infra/README](../../infra/README.md) |
-| **Surface parity** | the same product behaviour on every *live* surface, without shared client code | contracts + crypto vectors ([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md)) — and see §11: the mechanism that caught behavioural drift is currently gone |
 | **Forward secrecy on removal** | a removed member cannot read content created after their removal | [ADR 0024](../decisions/0024-scope-key-rotation.md) |
 
 **Deliberately unstated:** there is no latency, throughput or availability target, and inventing one here would
@@ -258,14 +260,11 @@ being scattered across an ADR's prose, a coverage field, and an audit file.
 
 | Risk / debt | Why it matters | State |
 |---|---|---|
-| **"No shared code" has no drift net.** [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) relied on the `http/` acceptance suites to catch behavioural drift in re-implemented orchestration (login/unlock/accept — *not* vector-pinned like crypto). [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md) demoted that suite and it has since been deleted. | Only *one* live surface exists, so there is nothing to drift *from* — the risk is dormant, not solved. It wakes the moment a second orchestration exists. | **A replacement is due at the native un-park**, before any second surface — the same moment [ADR 0041](../decisions/0041-shared-crypto-core-deferred.md) triggers. Do not un-park without settling it. |
 | **Two use-cases are built but unproven.** `uc.admin.setup-server` on web, `uc.spaces.verify-identity` on backend — code shipped, no test linked. | A coverage claim is only worth the build behind it. These are the only two real gaps in the model. | Tracked as `gaps:` in [coverage/](../coverage/) — the honest kind: a debt on a surface we target. |
-| **No CI runs any end-to-end test.** `web`'s `*.e2e.test.ts` are gated on `VEYQ_E2E` and skipped by every run; the `web-e2e` job is `if: false` because its orchestrator (`scripts/run_web_e2e.py`) was moved to `legacy/` in the greenfield reset and never ported back. | These are the tests that catch what unit tests structurally cannot — real crypto against a real backend and a real store. One of them caught a security-relevant key-zeroing bug that every unit test passed. Today they run only when a human remembers. | Open, and the highest-value item here. Port the orchestrator back and drop the `if: false`; the four coverage refs that were riding on it come back the day it is green. |
+| **No CI runs any end-to-end test.** `web`'s `*.e2e.test.ts` are gated on `VEYQ_E2E` and skipped by every run; the `web-e2e` job is `if: false` because its orchestrator (`scripts/run_web_e2e.py`) is gone. | These are the tests that catch what unit tests structurally cannot — real crypto against a real backend and a real store. One of them caught a security-relevant key-zeroing bug that every unit test passed. Today they run only when a human remembers. | Open, and the highest-value item here. **The orchestrator cannot be restored — it must be rewritten**, then drop the `if: false`. |
 | **`uc.spaces.verify-identity` contradicts itself** — `status: planned` while carrying real web coverage. | A file that lies about its own state teaches the next reader the wrong shape. | Open. Not guard-worthy: one file filled in wrong. |
-| **Parked native code is not built by any CI.** ~12.9k lines of Swift/Kotlin, last touched 2026-07-12, that nothing compiles. | It rots invisibly against contract changes, and the rot is only discovered at the un-park. | Accepted deliberately ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)): the cost of the rot is paid once, at un-park, and is lower than keeping two half-clients green. |
 | **Bucket primary-uniqueness is claimed but not enforced.** [ADR 0034](../decisions/0034-media-uploader-buckets.md) §4 wants one primary per `(node_id, owner_key)`; `V35` carries only a plain index, and `ensurePrimaryBucket` is a read-then-write. Two concurrent resolves of a missing primary each create one — measured, reproducible on demand. | An uploader would appear twice in the "Beiträge" tab with their media split across the two rows. No confidentiality impact (opaque `owner_key`s, names stay sealed) and **zero observed cost** — reachability is low: the web upload queue is sequential, and the read path only materializes for pre-cr0113 media. | Open, low priority. The portable fix is the marker-column + plain `UNIQUE` that `veyq_node` already uses for slugs (`ux_node_parent_slug`, V10) — **due when buckets are next touched**, and it needs a dedup of already-doubled primaries before the index will build. |
 | **`.github/workflows/wiki-sync.yml` is dead.** It triggers on `docs/wiki/**`, rsyncs `docs/wiki/`, and runs `scripts/render-wiki-diagrams.mjs` — none of which exist. | It can never fire; it is a workflow-shaped ghost that reads as live. | Open — delete or repair. |
-| **Git history is not durable.** At the v1 move to a fresh repo (`legacy/` splitting to its own archive), history drops. | Every "let git hold it" habit silently becomes "let it go". | Decided against as a default: what must survive lives in the tree ([ai/README](../ai/README.md) § rule 5). Whether the move itself preserves history is still open — `git filter-repo` could. |
 
 ## 12. Glossary
 
@@ -289,7 +288,7 @@ The words this project uses precisely. Where a term has a tempting synonym, the 
 | **Operator-blind** | the server stores and serves only ciphertext + opaque metadata, and *cannot* do otherwise — it holds no content key. The operator is modelled as the adversary. |
 | **Server Owner** | the person who installed the instance. A server role over ciphertext — **not** a reader of content. |
 | **Tenant Owner** | governs one tenant (members, groups, terms). In the common self-hosted case, the same person as the Server Owner — and still not a reader. |
-| **Live surface** | a client surface whose tests a CI job actually runs. Today: `backend` and `web`. A surface with code but no CI job claims no coverage ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)). |
+| **Surface** | a place veyq's behaviour is built and proven: `backend` and `web`, and that is the whole set. Coverage follows the **build**, never the intention — a test no CI run executes proves nothing, however real it is ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)). |
 
 ## Where else to look
 

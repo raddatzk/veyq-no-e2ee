@@ -47,8 +47,7 @@ unless the store is **same-origin**. `traefik` path-routes the bucket so it is: 
 **without stripping the prefix** and **preserving the Host header** (SigV4 signs host+path+query, so a
 stripPrefix or host rewrite would break the signature). Entry is `http://localhost:18080`; sign presigned URLs
 for that public endpoint via `veyq.blob-store.public-endpoint=http://localhost:18080` (CORS-free, ADR 0013 §4).
-Native apps PUT/GET directly and are never subject to CORS. (The backend + web are added behind Traefik in a
-fuller deployment; this profile routes only the bucket path.)
+(The backend + web are added behind Traefik in a fuller deployment; this profile routes only the bucket path.)
 
 ## Seeding a reproducible dev instance (cr-0046)
 

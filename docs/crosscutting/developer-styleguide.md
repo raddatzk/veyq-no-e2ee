@@ -26,8 +26,8 @@
   The **application layer is use-case-sliced** — `features/<area>/<use-case>/…Handler` (a use-case may
   have several handlers); this is where cohesion and the trust chain live. The **HTTP adapter layer is
   resource-shaped** — one `…Resource` per generated `…Api` interface (OpenAPI tag), *not* per use-case,
-  because one endpoint can serve several use-cases. Use-case slicing is what mirrors across stacks
-  (web/apple/android); the adapter shape is necessarily per-stack.
+  because one endpoint can serve several use-cases. Use-case slicing is what carries the trust chain; the
+  adapter shape is necessarily per-stack.
 - **Cross-cutting code lives in `shared/`** — `backend/src/main/kotlin/com/veyq/app/shared/`. **The directory is
   the list**; it cannot be out of date about itself, whereas the roll-call that used to stand here named six
   slices of which two existed and omitted nine. `shared/` must not depend on a feature.
@@ -119,8 +119,8 @@ restating the code. Avoid `// loop over the items` and comments that drift from 
 ## 9. Crypto & data (binding)
 
 - **One suite, byte-identical everywhere.** Any change to crypto suite `v1` (or a new suite) requires a
-  **conformance vector in `contracts/crypto/vectors/`** and a **passing conformance test on all stacks**
-  (backend where applicable, web, iOS, Android). Use domain-separated labels (`veyq/v1/<purpose>`),
+  **conformance vector in `contracts/crypto/vectors/`** and a **passing conformance test** (web, and the
+  backend where it verifies). Use domain-separated labels (`veyq/v1/<purpose>`),
   length-prefixed encoding, and bind context into the AAD. Never roll your own primitive; never skip the
   vector. (The contents of suite `v1` are decided in the first crypto change-request — see
   [Security Model → Cryptographic stance](security-model.md).)
@@ -135,28 +135,14 @@ restating the code. Avoid `// loop over the items` and comments that drift from 
 - The **coverage validators** (Python; added with the first feature slice, per start-light) check the
   trust chain: every behavior maps to its use-case coverage.
 
-## 11. Cross-platform parity
-
-Keep the client surfaces' behaviour in parity ([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md):
-by shared *contracts*, never shared code). When a surface intentionally differs, that is a **product decision,
-and it is declared once** — on the use-case, as `- **Surfaces:**`, with the reason. Never mark it twice: what
-each surface actually has is [`coverage/`](../coverage/README.md), and a build backs that answer.
-
-Crypto parity is enforced mechanically by the conformance vectors (§9) — that is the only parity axis a machine
-can hold. **Behavioural** parity across re-implemented orchestration has **no automatic check today**; it is
-survivable only while exactly one surface is live, and a replacement is due at the native un-park
-([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) § Consequences,
-[architecture §11](../architecture/README.md)).
-
-
-## 12. Git & PR
+## 11. Git & PR
 
 - **Domain-scoped Conventional Commits** — `type(scope): summary`, scopes
-  `backend|web|apple|android|http|contracts|infra|ci|docs|repo` (migrations are `backend`; multi-domain
+  `backend|web|contracts|infra|ci|docs|repo` (migrations are `backend`; multi-domain
   changes list each). Commit/push only when the user asks.
 - Keep build-generated files out of commits.
 
-## 13. Architectural patterns
+## 12. Architectural patterns
 
 Architectural patterns that are **binding across the codebase** are recorded here (and as an ADR when
 they are stable decisions) — using the same litmus test as above. Local, self-evident pattern usage is

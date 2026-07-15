@@ -87,7 +87,6 @@ delete *whose* — is deferred to a later groups/moderation refine.)
 - **Start light.** Soft-delete + retention **is** the security model's mechanism; a single **per-Memory trash tab**,
   no per-item "delete forever" UI, no cross-scope trash. The store isn't freed until the purge — an honest
   trade-off of recoverability, communicated by the retention window.
-- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -116,8 +115,7 @@ löscht später verschlüsselte Dateien, die er nicht lesen kann.
   any-member audited trash vs. irreversible system purge) + the server-visible trash-state metadata
 - Decisions: [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md) (blob store + purge),
   [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_mem` seals content),
-  [ADR 0033](../../../decisions/0033-live-media-updates-revision-polling.md) (the revision reconcile),
-  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
+  [ADR 0033](../../../decisions/0033-live-media-updates-revision-polling.md) (the revision reconcile)
 - Reference impl: the anonymous share *delete-own* (cr-0102) — the blob-reclaim + `bumpMediaRevision(deleted=true)`
   path the purge parallels. Built: **cr-0110** (contracts → backend → web + the scheduled purge job) + **cr-0111**
   (the member-expedited `purgeMedia` + the Trash-tab redesign — the same `MediaGrid`, batch-select + a 3-dot

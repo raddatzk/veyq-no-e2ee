@@ -4,7 +4,7 @@
 - **Type:** **Enabler** — structural foundation, no standalone end-user goal
   ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
 - **Status:** **refined** — ready to cut a CR. All four design points are settled (role-tagged blobs with
-  **per-blob keys**, **no backfill**, **first-frame video poster**, **legacy sizes**); see *Decisions*.
+  **per-blob keys**, **no backfill**, **first-frame video poster**, the tier sizes); see *Decisions*.
 - **Provides:** a **three-tier** view of each media item — a small **thumbnail** (the grid), a medium
   **preview** (the lightbox), and the **original** (download only) — each its own encrypted blob, generated
   **on the client** so the operator never sees a derivable pixel. Lets the gallery render fast and
@@ -29,21 +29,19 @@
 | **preview** | **lightbox** | JPEG, longest edge **2048 px**, quality **0.85** | opening an item |
 | **original** | **download** | **pristine**, as uploaded (full res + metadata) | explicit download only |
 
-- **Sizes are pinned from the legacy E2EE client** (`legacy/apple/App/Veyq/Gallery/MemoryDetailView.swift:318-319`
-  — `thumbnail = downscale(maxDim 400, q 0.8)`, `preview = downscale(maxDim 2048, q 0.85)`), so the look
-  matches the original product. Tunable, but these are the defaults. (WebP would be smaller — an optional swap,
-  not the default.) **Exception (cr-0070):** the **thumbnail** cap was raised **400 → 512 px** so a ~200 px grid
-  tile on a 2×/3× display isn't upscaled into mush; preview stays legacy-pinned.
+- **The sizes are product defaults, each with a reason.** **Thumbnail 512 px** (cr-0070, raised from 400): a
+  ~200 px grid tile on a 2×/3× display must not be upscaled into mush. **Preview 2048 px**: covers a lightbox
+  on a high-DPI screen without shipping the original. Tunable — but change them deliberately: a re-derive of
+  existing media is expensive and there is **no backfill**. (WebP would be smaller — an optional swap, not the
+  default.)
 - **Use a high-quality downscale filter.** The thumbnail is a large single-step reduction (e.g. 4032 → 512 ≈ 8×);
-  the platform's *cheap* default resampler (web canvas `imageSmoothingQuality: 'low'`) aliases fine detail into
-  a smear. Each surface must select its high-quality scaler (web: **progressive-halving** canvas downscale — ≤2×
-  steps at `imageSmoothingQuality='high'`, since a single big `drawImage` is one bilinear pass and stays soft;
-  apple: ImageIO `CGImageSourceCreateThumbnailAtIndex` — a resampling downscaler; android:
-  `createScaledBitmap(filter = true)` after a power-of-two `inSampleSize` pre-reduction). The legacy web client
-  sidestepped this entirely by deriving **server-side** (libvips) — not an option here (operator-blind).
+  the *cheap* default resampler (canvas `imageSmoothingQuality: 'low'`) aliases fine detail into a smear. Web
+  uses a **progressive-halving** canvas downscale — ≤2× steps at `imageSmoothingQuality='high'`, since a single
+  big `drawImage` is one bilinear pass and stays soft. **Deriving server-side (libvips) would sidestep all of
+  this and is not an option** — the server never sees a pixel (operator-blind). That constraint is why this
+  enabler exists at all.
 - **Video:** decode the **first frame** to a JPEG **poster**, used for **both** the thumbnail and the preview
-  (a still — no motion preview this pass); the original video is fetched only on download. Mirrors the legacy
-  single-JPEG-poster (`legacy/infra/.env.template:210`).
+  (a still — no motion preview this pass); the original video is fetched only on download.
 - Each tier is sealed **exactly like any media blob** — chunked AEAD under its **own fresh random `K_blob`**
   wrapped under the Memory's `K_mem` ([en.memory.media](en.memory.media.md)). **No new crypto primitive** — a
   derivative is another blob with a role tag.
@@ -61,8 +59,7 @@ On upload (the add-media flow), the client derives **preview + thumbnail** from 
 video: first-frame poster), seals **each as its own blob** under a fresh random `K_blob`, and uploads all
 three in **one batch** (the control plane is already batch-shaped, [en.memory.media](en.memory.media.md)). The
 **media** record then references the blobs **by role** — `original` plus `derivatives: [{ kind, blob }]`,
-`kind ∈ THUMBNAIL | PREVIEW` — exactly the legacy E2EE model
-(`legacy/apple/App/Veyq/Home/HomeStore.swift:373`: `derivatives.first { $0.kind == "THUMBNAIL" }?.blob ?? original`).
+`kind ∈ THUMBNAIL | PREVIEW`. A consumer picks by role and falls back to the original when the role is absent.
 A type that is neither image nor video (no derivable frame) attaches the **original only**; the gallery falls
 back to an icon + name. **Upload always generates the derivatives** — there is no produce-later path.
 
@@ -82,22 +79,21 @@ back to an icon + name. **Upload always generates the derivatives** — there is
    may **assume** they exist (the only fallback is the rare non-image/non-video type).
 3. **Video = first-frame poster** (JPEG), used for both thumbnail and preview; the video original only on
    download. Motion/short-clip preview is a later pass.
-4. **Tier sizes:** thumbnail JPEG longest-edge 512 / q0.80 (raised from the legacy 400 for hi-DPI, cr-0070),
-   preview JPEG longest-edge 2048 / q0.85 — legacy-pinned (see *The three tiers*).
+4. **Tier sizes:** thumbnail JPEG longest-edge 512 / q0.80 (raised from 400 for hi-DPI, cr-0070), preview
+   JPEG longest-edge 2048 / q0.85 (see *The three tiers* for why each).
 
 ## Quality notes
 
 - **Operator-blind end to end.** Derivatives are generated and sealed on the client; the store/server hold
   only ciphertext + role tags + wraps. A smaller derivative leaks no more than the original already does
   (coarse size).
-- **Parity is by property, not bytes, for the pixel stage.** The *sealing* of every derivative stays
-  vector-gated and **byte-identical** across surfaces (`chunk_frame`, [en.memory.media](en.memory.media.md)).
-  The *pixel* stage before it — decode → downscale → JPEG re-encode — is **platform-native** (web Canvas,
-  apple ImageIO, android Bitmap) and **diverges at the byte level by construction**: a derivative need only be
-  a valid JPEG that hits the target longest-edge. Cross-surface parity for derivative *generation* is therefore
-  verified by **property** (decodable, longest edge ≤ target, dimensions/quality in range), **not** by a byte
-  vector. (This is the one deliberate exception to vector-gated parity, and it is confined to the lossy
-  re-encode — the crypto layer is unaffected.)
+- **The pixel stage is verified by property, not by bytes.** The *sealing* of every derivative stays
+  vector-gated and byte-exact (`chunk_frame`, [en.memory.media](en.memory.media.md)). The *pixel* stage before
+  it — decode → downscale → JPEG re-encode — runs on the browser's own codecs and **is not byte-reproducible**:
+  a codec or engine update legitimately shifts the output. So it is asserted by **property** (decodable,
+  longest edge ≤ target, dimensions/quality in range), never pinned to a vector. A byte assertion here would
+  fail on a Chrome update and teach everyone to ignore it. This is the one deliberate exception to
+  vector-gated verification, confined to the lossy re-encode — the crypto layer is unaffected.
 - **Reuses the media transport verbatim.** No new endpoint *shape* beyond the role tagging — same
   start → direct PUT → complete+attach → direct GET → open ([en.memory.media](en.memory.media.md)),
   batch-shaped (now three blobs per item).

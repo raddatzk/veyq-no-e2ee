@@ -7,8 +7,7 @@ title: Share a Memory as a contributor link (anyone with the link can add photos
 # (presign mirror + complete, gated by role CONTRIBUTOR + enabled + a contributor token), and direct-append
 # attribution. Covered by the backend slice (create CONTRIBUTOR → identity-create → share-scoped upload attaches
 # + stamps the identity → surfaces in the resolve; VIEWER/bad-token/revoke rejected), the http guest-boundary
-# assertions, and the web unit round-trip of the operator-blind name seal. apple/android stay gaps — sharing is
-# web-first, native is parity (a later CR). v1 is deliberately narrow: role CONTRIBUTOR only (view + append),
+# assertions, and the web unit round-trip of the operator-blind name seal. v1 is deliberately narrow: role CONTRIBUTOR only (view + append),
 # direct-append, personal scope; the buckets UI, the UPLOADER drop-box, MANAGER/edit/delete, password protection
 # and moderation are separate later slices.
 acceptanceCriteria:

@@ -10,10 +10,9 @@ choice of **which cryptographic primitives** to use and **what posture to take t
 durable, foundational decision that outlives any single feature — and it had been stated only inside the
 [Security Model](../crosscutting/security-model.md), a descriptive concern doc, not recorded as a decision.
 
-This ADR records the **strategy**. It is distinct from [ADR 0009](0009-native-crypto-per-platform-vectors.md),
-which governs the **per-platform *implementation*** of an already-chosen suite via shared test vectors — the
-vectors *realize* this strategy; they do not choose it. The **concrete byte contents** of a suite (e.g. `v1`)
-are settled in the first crypto change-request + pinned as vectors, not here.
+This ADR records the **strategy**. The **concrete byte contents** of a suite (e.g. `v1`) are settled in the
+first crypto change-request and pinned as conformance vectors (rule 4 below) — the vectors *realize* this
+strategy; they do not choose it.
 
 ## Decision
 
@@ -29,6 +28,11 @@ are settled in the first crypto change-request + pinned as vectors, not here.
    id**. New artifacts use the current suite; old artifacts stay readable under their stored suite id — this is
    what makes adopting, and later upgrading, post-quantum crypto safe without breaking the model or forcing a
    re-encryption migration.
+4. **The conformance vectors are a suite's byte definition, and they come first.**
+   `contracts/crypto/vectors/v1.json` is the single source of truth for what a suite *is* on the wire.
+   `web/src/shared/crypto/v1.ts` is pinned to it by `web/src/shared/crypto/v1.conformance.test.ts`, and the
+   operator-blind backend verifies signatures against the same file. Pinning a new primitive means **adding a
+   vector first, then making the implementation green** — never the reverse.
 
 ## Consequences
 
@@ -38,17 +42,18 @@ are settled in the first crypto change-request + pinned as vectors, not here.
   documented asymmetry that avoids paying the PQ-signature size/perf cost before it buys anything.
 - **The versioned suite id decouples the format from the algorithm** — upgrades are additive, old artifacts
   never break, and no flag-day re-encryption is needed.
+- **The vectors are what makes rule 3 enforceable.** A versioned suite id only keeps old artifacts readable if
+  the bytes behind a version cannot quietly move. The vector file is that pin: a refactor that shifts them
+  fails a red test instead of silently orphaning stored ciphertext. It is also the seam between the two things
+  that must agree on those bytes — the client that signs and the backend that verifies.
 - **Rejected — home-grown crypto:** unreviewed constructions are a foot-gun; rejected outright.
 - **Rejected — classical-only / defer PQ entirely:** rejected for *encryption*, because decade-lived memories
   make HNDL a real present threat; accepted (for now) only for *signatures*, per the asymmetry above.
-- **Realized by [ADR 0009](0009-native-crypto-per-platform-vectors.md)** (vectors = the cross-platform byte
-  contract) and applied by [ADR 0012](0012-content-key-hierarchy.md) (the key hierarchy this crypto protects);
-  the low-urgency-PQ signature case is the auth keypair of
-  [ADR 0003](0003-operator-blind-password-auth.md).
+- **Applied by [ADR 0012](0012-content-key-hierarchy.md)** (the key hierarchy this crypto protects); the
+  low-urgency-PQ signature case is the auth keypair of [ADR 0003](0003-operator-blind-password-auth.md).
 
 ## Related
 
 - [Security Model](../crosscutting/security-model.md) (the concern doc; now points here for the stance),
   [Account & Key Model](../features/account/enablers/en.account.key-model.md).
-- [ADR 0009](0009-native-crypto-per-platform-vectors.md), [ADR 0003](0003-operator-blind-password-auth.md),
-  [ADR 0012](0012-content-key-hierarchy.md).
+- [ADR 0003](0003-operator-blind-password-auth.md), [ADR 0012](0012-content-key-hierarchy.md).

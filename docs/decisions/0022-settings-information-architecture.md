@@ -9,8 +9,8 @@ Settings are accreting in scattered places. Device-local preferences (theme, lan
 menu; the Server Owner's tenant administration is its own page (`/server/settings`, cr-0050); tenant member
 management is another page (`/tenant/settings`, cr-0077). As **groups** arrive (ADR 0014) each group will add
 its own member + governance settings, and the fragmentation compounds — a per-scope button here, a profile
-submenu item there. We need one coherent information architecture that scales, is discoverable, works on
-mobile, and keeps the same shape across surfaces ([ADR 0010](0010-native-clients-shared-contracts-not-code.md)).
+submenu item there. We need one coherent information architecture that scales, is discoverable, and works on
+a narrow viewport as well as a wide one.
 
 The recurring design mistake to avoid is a **category error**: putting "this group's members" under the profile
 menu (which is about *me*), or scattering "settings for the space I'm in" across ad-hoc buttons.
@@ -26,11 +26,9 @@ sidebar↔detail split, with sections filtered by the scopes in the caller's cur
    *overlay* look is an optional later cosmetic over the same routes — no structural difference.) The gear is
    **context-aware**: with no explicit section it resolves to the caller's **active scope as a concrete entity** —
    in a group → **that group's** detail page; in the Tenant scope → the Tenant's members; else *Persönlich*.
-2. **`NavigationSplitView` pattern, responsive.** Wide viewports render a persistent section **sidebar +
+2. **A sidebar ↔ detail split, responsive.** Wide viewports render a persistent section **sidebar +
    detail pane**; narrow viewports collapse to a **list → drill-in** navigation stack (`/settings/<section>`).
-   Same routes, one breakpoint. Native parity is literal: Apple `NavigationSplitView`, Android
-   `ListDetailPaneScaffold` ([ADR 0010](0010-native-clients-shared-contracts-not-code.md)); the web hub is the
-   blueprint. A section that is itself a **collection** to fan out (e.g. *multiple groups*: Groups → a group →
+   Same routes, one breakpoint. A section that is itself a **collection** to fan out (e.g. *multiple groups*: Groups → a group →
    its detail) is a **collapsible category in the rail** — expanding it lists its entities, selecting one opens
    that entity's detail in the same detail pane (`/settings/group-<id>`) — **not** a third column: the split
    stays two panes (rail ↔ detail), scaling to many entities by scroll/collapse. Narrow keeps the list →
@@ -65,10 +63,8 @@ sidebar↔detail split, with sections filtered by the scopes in the caller's cur
   entry point, no new muscle memory. The existing `/server/settings` (tenant admin) and `/tenant/settings`
   (member management, cr-0077) collapse into hub sections. Nothing is deployed yet, so they are **replaced, not
   redirected**.
-- **Mobile-correct by construction.** The split view collapses to the native list→detail stack; there is no
+- **Narrow-viewport-correct by construction.** The split view collapses to a list→detail stack; there is no
   separate mobile design to maintain.
-- **Cross-surface parity.** Apple/Android inherit the same IA via their native split-view scaffolds — the same
-  section tree, the same role gating.
 - **Operator-blindness is untouched.** Device-local preferences stay device-local (they never reach the
   server); the member/tenant sections show only already-stored operational metadata (pubkeys, roles,
   grant-present, tenant name/domain) — never a key. The hub is only *where* these are shown.

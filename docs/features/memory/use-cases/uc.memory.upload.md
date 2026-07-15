@@ -37,8 +37,8 @@
   hard error marks it **failed** and cancels the rest of that batch's queued files (the user retries explicitly).
 - **E2 — cancel:** cancelling a queued file drops it; cancelling an in-flight file aborts its PUTs and stops
   before `complete` (no media is attached). The abandoned upload session is reclaimed by the store-side GC.
-- **E3 — Safari Photos import.** Files chosen from the macOS/iOS Photos gallery arrive with an **empty MIME
-  type** and Safari **populates `input.files` late / across repeated picks**. The picker therefore (a) accepts a
+- **E3 — Safari's Photos picker.** Files chosen from the Photos gallery arrive with an **empty MIME type**, and
+  Safari **populates `input.files` late / across repeated picks**. The picker therefore (a) accepts a
   file by **extension** when its `type` is empty, (b) **re-reads** the input over a short retry window and
   **merges** (never replaces) by a `name:size:lastModified:type` signature, and (c) infers a `mediaType` from
   the extension so derivation can still run (HEIC/MOV). Underivable bytes upload **original-only** (the gallery

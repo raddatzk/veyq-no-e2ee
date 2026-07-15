@@ -143,10 +143,10 @@ stateDiagram-v2
   device falls back to the PASSWORD floor and **re-trusts** on next use. This is inherent to a *device +
   password* wrap (a stolen device alone must not unlock) and is ADR-0005-consistent; the future
   **change-password** use-case must state it and re-offer "trust this device" afterwards.
-- **Reuse only the affordance, not the legacy data layer.** The legacy "remember login" stored the Secret
-  Key and the raw Master Key in browser storage — exactly the [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md)
-  rejected pattern; this use-case reuses only the *idea* of a "trust this device" control, with a new
-  ADR-0005 data layer.
+- **Reuse the affordance, never the naive data layer.** The obvious way to build "remember login" is to put
+  the Secret Key or the raw Master Key in browser storage — which is exactly the pattern
+  [ADR 0005](../../../decisions/0005-unlock-methods-and-device-trust.md) rejects, and it is what an earlier
+  version of this product did. This use-case takes only the *idea* of a "trust this device" control.
 
 ## Out of scope (separate increments)
 

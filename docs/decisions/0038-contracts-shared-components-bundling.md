@@ -17,38 +17,35 @@ Today this duplication is a **documented, deliberate** invariant — the specs a
 each generator target consumes exactly one self-contained file, and colliding component names across specs are
 why they can't share a generator module.
 
-The audit asks to extract a shared `_common.openapi.yaml` and `$ref` it. The blocker is **per-toolchain
-external-`$ref` support**, established empirically:
+The audit asks to extract a shared `_common.openapi.yaml` and `$ref` it. **Both consumers resolve cross-file
+`$ref` natively**, established empirically:
 
 | Consumer | Resolves cross-file `$ref`? | Note |
 |---|---|---|
 | web (openapi-generator typescript-fetch) | **yes** | swagger-parser resolves relative refs in place |
 | backend (openapi-generator 7.21, Quarkus) | **yes** | reads specs in place |
-| android (openapi-generator kotlin) | **no, as wired** | `sanitizeSpecs` copies specs into a *flat isolated* build dir |
-| apple (swift-openapi-generator 1.5) | **no, ever** | generator throws on any external ref — source-verified¹ |
-| http (`.http` files) | n/a | no code generation |
 
-¹ `swift-openapi-generator/.../TypeAssigner.swift`: *"External JSON references are not supported"*;
-`OperationDescription.swift:63`: *"Swift OpenAPI Generator currently doesn't support external references."*
+**This decision originally rested on a blocker that no longer exists.** It was taken when a generator that
+could not resolve external references at all was a consumer: extraction would have needed a bundler plus a
+committed, generated spec in the tree, and *that* cost — not the merit of `$ref` — is what defeated it. With
+only web and backend left, extraction needs no bundler, no committed artifact, and no reversal of a toolchain
+requirement. The "self-contained spec" invariant is now a **convention we keep, not a constraint we are
+under**, and this ADR's conclusion stands on its second argument alone:
 
-So a naive `$ref` extraction **breaks apple and android**. apple is unfixable at the generator level (and SPM's
-build-tool plugin gives no hook to run a bundler before it), so apple would have to consume a **pre-bundled,
-self-contained spec**; and since `swift test` must pass standalone (no manual pre-step), that bundled spec would
-have to be **committed** — a generated artifact in the tree. A bundler is the only way to physically DRY the YAML,
-and it costs a reversal of a documented invariant plus committed generated specs.
-
-The duplication it would remove, however, is ~50 lines of **stable** boilerplate: the `ErrorResponse` schema is
+The duplication `$ref` would remove is ~50 lines of **stable** boilerplate: the `ErrorResponse` schema is
 already byte-identical across all 9 specs (only the per-domain `code.example` varies), `bearerAuth` differs only
 in `description`, and the shared enums are duplicated-not-drifted. The actual risk is **future** drift, not present
-disorder. That risk is fully addressed by a check — which needs none of the machinery.
+disorder. That risk is fully addressed by a check — which needs none of the machinery. That argument is real,
+but it is a *judgement about size*, not an impossibility — so the honest status is **weaker than it reads**, and
+the revisit trigger below is now the live one.
 
 ## Decision
 
 **Keep the specs self-contained; add a drift guard instead of a bundler.** Do not extract `_common.openapi.yaml`,
 do not introduce external `$ref`, do not touch any generator toolchain.
 
-1. **The invariant stays.** Each `contracts/api/*.openapi.yaml` remains a single self-contained document, exactly
-   as the toolchains require and the docs promise. Zero risk to web/backend/apple/android generation.
+1. **The invariant stays** — now as a convention, not a toolchain requirement (see Context). Each
+   `contracts/api/*.openapi.yaml` remains a single self-contained document. Zero risk to generation.
 2. **A trust-chain guard (`scripts/validate_contracts_common.py`) enforces consistency** where the components are
    copied: `ErrorResponse` identical across specs (ignoring the per-domain `code.example`), `bearerAuth`
    `type`+`scheme` identical (ignoring `description`), the `ScopeId`/`TenantId` path-params structurally identical,
@@ -67,8 +64,9 @@ do not introduce external `$ref`, do not touch any generator toolchain.
 - **On-disk duplication remains.** A reviewer still sees `ErrorResponse` in nine files; editing it means editing
   nine (the guard then fails until they agree). Accepted: the components change ~never, and the guard makes a
   half-done edit loud instead of silent.
-- **Rejected — the bundler (this ADR's original proposal).** `_common.openapi.yaml` + external `$ref` + a Python
-  bundler + committed apple bundles would give a true single source file, but at the cost of reversing a
-  documented invariant and checking generated YAML into the tree, to DRY boilerplate that does not actually drift
-  today. If the shared surface grows large or genuinely starts drifting under the guard, revisit this — the guard
-  makes that signal visible.
+- **Rejected — extraction to `_common.openapi.yaml` + external `$ref`** (this ADR's original proposal). It would
+  give a true single source file. It was rejected when it also required a bundler and committed generated specs;
+  **it no longer does** — both consumers resolve refs in place, so the cost is now just the extraction itself.
+  What remains against it is only proportion: ~50 lines of boilerplate that does not drift, already guarded.
+  **Revisit when the shared surface grows, when the guard actually catches a drift, or when `contracts/` is next
+  reworked** — the ground under this rejection moved, and it should not be re-affirmed by inertia.

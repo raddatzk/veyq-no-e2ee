@@ -1,18 +1,18 @@
 # UC: Add a member to a group
 
-- ID: uc.spaces.add-group-member
-- Primary actor: **GroupOwner** (`OWNER` on a GROUP scope — a per-scope role, any tenant member can hold it;
+- **ID:** uc.spaces.add-group-member
+- **Primary actor:** **GroupOwner** (`OWNER` on a GROUP scope — a per-scope role, any tenant member can hold it;
   admits the member — the only human action); **any group key-holder's device** completes the key delivery
   automatically.
-- Goal: give an **existing tenant member** access to a group — the GroupOwner picks them **by username**, and the
+- **Goal:** give an **existing tenant member** access to a group — the GroupOwner picks them **by username**, and the
   group then hands over the key by itself: any group member's device wraps the group scope key `K_SC` to the
   newcomer's identity, operator-blind.
-- Preconditions: The caller is the group's **OWNER** (holds the group grant, so their device can wrap `K_SC`).
+- **Preconditions:** The caller is the group's **OWNER** (holds the group grant, so their device can wrap `K_SC`).
   The target is **already a member of the active tenant** with a published identity public key
   ([en.spaces.member-identity](../enablers/en.spaces.member-identity.md), [ADR 0023](../../../decisions/0023-per-tenant-member-identity.md))
   — there is **no onboarding** to do. At least one group key-holder comes online after the membership is
   recorded, to deliver the key.
-- Postconditions (success): The target is a **member of the group** and, once **any** group key-holder's device
+- **Postconditions (success):** The target is a **member of the group** and, once **any** group key-holder's device
   has wrapped `K_SC` to them, holds a **group grant** — so the group opens for them like any space they hold.
   The server saw only the new membership row, identity public keys, and opaque grant ciphertext — never `K_SC`,
   and never the group's (sealed) name.

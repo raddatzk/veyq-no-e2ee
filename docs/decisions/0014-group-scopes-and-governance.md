@@ -9,7 +9,7 @@ The [spaces feature](../features/spaces/_index.md) always planned **groups** ("c
 foundation is in place: scope identity (opaque `scopeId` + `kind` TENANT/GROUP/PERSONAL,
 [ADR 0002](0002-personal-scope-per-tenant.md) + [en.spaces.personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md)),
 membership = role + grant ([ADR 0007](0007-membership-role-grant-relation.md)), the hybrid-KEM grant
-([ADR 0009](0009-native-crypto-per-platform-vectors.md)), and the content-key hierarchy
+([ADR 0017](0017-crypto-primitives-and-post-quantum-strategy.md)), and the content-key hierarchy
 ([ADR 0012](0012-content-key-hierarchy.md), where a scope's `K_SC` is already "one key, many wraps"). A group
 is therefore **mostly a multi-member scope** — little new crypto. What is *not* yet settled, and what this ADR
 nails, is the **governance**: who may do what, how members are added operator-blind, the group lifecycle, and
@@ -45,7 +45,7 @@ and which is confidential even from the tenant owner.**
    **named + multi-member-capable**: generate a random `K_SC`, **seal the group name under `K_SC`**, and
    `asymWrap` `K_SC` to their **own** identity public key (the self-grant). `POST` the ciphertext name + grant;
    the server mints the `GROUP` scope + the creator's `role=OWNER` membership. No new crypto — the KEM grant of
-   [ADR 0009](0009-native-crypto-per-platform-vectors.md), the content keys of [ADR 0012](0012-content-key-hierarchy.md).
+   [ADR 0017](0017-crypto-primitives-and-post-quantum-strategy.md), the content keys of [ADR 0012](0012-content-key-hierarchy.md).
 
 2. **Key distribution = one grant per member.** A member holds the group iff a membership row carries `K_SC`
    `asymWrap`'d to *their* identity public key. Adding a member is exactly: produce that grant and `POST` it.

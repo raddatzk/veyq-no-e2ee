@@ -30,7 +30,7 @@ storage splits by principal.
 
 ## Decision
 
-Adopt the legacy tenant-terms model, operator-blind, with a **two-tier acceptance gate**.
+Adopt a tenant-terms model, operator-blind, with a **two-tier acceptance gate**.
 
 1. **Operator-set per-locale terms + a version.** Each tenant carries **`terms_markdown_by_locale`** (DE+EN
    markdown) + **`terms_version`** (int, bumped on any edit). The **operator** (tenant owner) assembles/edits the
@@ -54,9 +54,8 @@ Adopt the legacy tenant-terms model, operator-blind, with a **two-tier acceptanc
    operational metadata (like membership/role); the anonymous acceptance is client-only. **No user content, no new
    blindness cost** — recorded in the [security model](../crosscutting/security-model.md).
 
-5. **v1 = member-facing, web-only.** The operator sets/edits terms (admin UI, versioned) + the member
-   accept/re-accept gate (server-side). The anonymous-share notice (client-side) and native surfaces are later
-   slices.
+5. **v1 = member-facing.** The operator sets/edits terms (admin UI, versioned) + the member accept/re-accept
+   gate (server-side). The anonymous-share notice (client-side) is a later slice.
 
 ## Consequences
 

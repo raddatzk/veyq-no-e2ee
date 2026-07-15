@@ -12,19 +12,19 @@
 
 The acceptance-coverage trust chain (`feature → use-case → criteria → tests` — see
 [docs/coverage/README.md](../coverage/README.md)) records, per acceptance criterion, a `coverage` map keyed by
-**area** (`backend · http · web · apple · android`) then **level** (`unit · integration · e2e`), plus a
+**area** (`backend · web`) then **level** (`unit · integration · e2e`), plus a
 per-use-case `gaps` map (`area: reason`) for surfaces "intentionally not (yet) covered". `scripts/validate_coverage.py`
 enforces that every criterion has ≥1 test and every ref resolves.
 
 P1b flagged three things. The class-vs-flat resolution is done (cr-0158). The remaining two were split to #81
 (an area appearing in both `coverage` and `gaps` — 16 files) and #82 (`level: e2e` conflating CI-run tests,
-IDE-only `.http`, env-gated live smokes, and native UITests with no CI job). Refining them **together** surfaced
+IDE-only `.http`, and env-gated live smokes). Refining them **together** surfaced
 a single root cause: **`gaps` had drifted into an overloaded free-form per-area status field**, doing three
 different jobs at once —
 
-1. a **real gap** — the surface is not built (`apple`/`android` "Not built");
+1. a **real gap** — the surface is not built;
 2. a **deferred sub-slice** — the core is covered, a later feature is pending (`uc.memory.date` "the aggregated
-   cross-chapter timeline is a later CR"; `uc.memory.place` "native map parity; blind gazetteer");
+   cross-chapter timeline is a later CR"; `uc.memory.place` "blind gazetteer");
 3. a **build-note for a manual/live smoke** — the CI tests exist, the end-to-end check was a human clicking once
    (`uc.memory.gallery` "the live browser smoke … driven manually per the CR done-gate").
 
@@ -36,7 +36,7 @@ Two facts from the corpus + the real CI config decide the shape:
 | Fact | Measured |
 |---|---|
 | CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` (lint+typecheck+**unit**+build), the trust-chain validators |
-| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), `apple`/`android` (no job — #80), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, skipped by every run; the `web-e2e` job that would set it is `if: false` |
+| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, skipped by every run; the `web-e2e` job that would set it is `if: false` |
 | `http` as **sole** coverage area | **1 of 256** criteria (`uc.account.login/boundary-validation`) — the other 66 pair it with a backend SliceTest that proves the same behaviour in CI |
 
 So **"CI-proven" is not a function of area alone**: an env-gated smoke inside an otherwise-CI area is not
@@ -44,7 +44,7 @@ proven, whatever colour its column is. **The unit is the test, not the surface.*
 
 > **Correction (2026-07-14).** This table originally read *"web `npm run check` + `run_web_e2e.py` (unit+e2e)"*
 > and the sentence above it began *"web e2e runs"*. Both were false when written: `run_web_e2e.py` had already
-> been moved to `legacy/` in the greenfield reset, and its job carries `if: false` to this day. The measurement
+> been lost in the greenfield reset, and its job carries `if: false` to this day. The measurement
 > that **carries this ADR's core decision** was itself unmeasured — a table headed "Measured" that nobody ran.
 > The decision survives (its argument is about `http`, which the table gets right), but four web `e2e` coverage
 > refs had been riding on the false half and are now removed; each criterion they touched keeps a CI-run ref.
@@ -70,18 +70,16 @@ proven, whatever colour its column is. **The unit is the test, not the surface.*
    This ADR originally kept the `.http` files "in the repo as what they were built for — IntelliJ requests a
    developer fires by hand". **They have since been deleted** (2026-07-14): once they counted for nothing, the
    only thing keeping 2,448 lines alive was the hope someone would fire them by hand, and nobody did.
-   **The consequence this ADR did not chase down:** [ADR 0010](0010-native-clients-shared-contracts-not-code.md)
-   named those same suites as *"what makes 'no shared code' safe"* — demoting `http` therefore dismantled a net
-   another ADR still promised, and this one never said so. ADR 0010 now states the honest position (one live
-   surface ⇒ no drift to catch; a replacement net is due at the native un-park). **The reusable lesson:
-   demoting a mechanism means finding every decision that leaned on it** — a grep for the mechanism's name,
-   not just for the docs that describe it.
+   **The consequence this ADR did not chase down:** another ADR named those same suites as the net that made
+   re-implemented orchestration safe across clients — so demoting `http` quietly dismantled a guarantee a
+   different decision was still promising, and this one never said so. **The reusable lesson: demoting a
+   mechanism means finding every decision that leaned on it** — a grep for the mechanism's name, not just for
+   the docs that describe it.
 
-3. **No CI-gating marker (#82 needs none).** After (2), the only criteria not CI-proven are native-UITest-only
-   ones — and that is precisely the **#80** native-CI gap, honestly visible as a native gap, not a coverage-model
-   hole. When #80 adds the native unit/integration CI job, they become CI-proven with no data change. A
-   `ci-surfaces.yaml` manifest / a per-ref `ci: false` flag / a filename convention would all be machinery to
-   police ~1 http + ~4 native criteria — not worth it.
+3. **No CI-gating marker (#82 needs none).** After (2), a `ci-surfaces.yaml` manifest / a per-ref `ci: false`
+   flag / a filename convention would all be machinery to police a handful of criteria — not worth it. The
+   rule carries itself: a ref only counts when a CI run executes it, and that is checked by the build, not by
+   a field.
 
 ## Consequences
 
@@ -93,18 +91,18 @@ proven, whatever colour its column is. **The unit is the test, not the surface.*
   reflects that they were one problem (an overloaded `gaps`) seen from two angles.
 - **Cost, paid honestly:** this reverses a *documented* stance (`http` as a verification surface); ~67 criteria
   drop their now-redundant `http` refs; one backend boundary test is added; `docs/ai/README.md` +
-  `docs/coverage/README.md` are rewritten; the phase order becomes `contracts → backend → web → apple → android`.
+  `docs/coverage/README.md` are rewritten; the phase order becomes `contracts → backend → web`.
 - **The `.http` files are not deleted.** They keep their value as dev tooling and living request examples with
   response-handler assertions; they simply make no coverage *claim*. The door stays open: if they ever must be
   CI-proven, the path is an `ijhttp` CI job — rejected now because the backend SliceTests already prove the same
   behaviour in CI, so it would be infrastructure for coverage we already have.
 - **Rejected alternatives:**
   - *A CI-gating marker* (`ci-surfaces.yaml` / per-ref `ci: false` / filename convention) — machinery for a
-    problem that removing `http` shrinks to the #80 native gap.
+    problem that removing `http` shrinks to a handful of criteria.
   - *Per-criterion `gaps`* — makes covered+gap an exact contradiction, but most gaps are genuinely use-case-wide
-    ("apple not built at all" applies to every criterion), so per-criterion gaps are artificial and a heavy
+    ("the surface is not built at all" applies to every criterion), so per-criterion gaps are artificial and a heavy
     migration.
-  - *Finer area keys* (`android-ui` vs `android-data`) — violates the documented "**stop at area × level**" rule
+  - *Finer area keys* (`web-ui` vs `web-data`) — violates the documented "**stop at area × level**" rule
     and invents a taxonomy only to dodge the overlap check.
   - *Forbid all overlap naively* (the finding's first proposal) — breaks legitimate partial coverage; it is the
     reason this needed a model decision rather than a one-line validator tweak.

@@ -65,7 +65,7 @@ Uploaders span **members** (`owner_key = user:{userId}`, display name = the per-
   sub-buckets from day one, and the organizer UI (create/rename/delete a sub-bucket, move media in) is built on the
   shipped endpoints.
 - **Reuse, not a new surface.** The organizer reuses the gallery **`MediaGrid` + lightbox**; the picker (a
-  hierarchy Select), the dialogs, and the tile checkbox/menu are the ported legacy UX — frontends never invent UI.
+  hierarchy Select), the dialogs, and the tile checkbox/menu are existing components — never invent UI.
 - **Ownership is server-enforced.** Create / rename / delete a sub-bucket + move media are gated to
   **`owner_key == caller`** (you organize only your **own** buckets; a contributor's is read-only to you);
   **delete media** + **edit capture time** stay any key-holder.
@@ -97,5 +97,3 @@ keinen Namen.
   (the DE „Beiträge" voice).
 - **Decisions:** [ADR 0034](../../../decisions/0034-media-uploader-buckets.md) (the bucket model),
   [ADR 0030](../../../decisions/0030-contributor-public-share.md) (the contributor identity it builds on).
-- **Reference impl:** `legacy/frontend-noe2ee` `MemoryAssetBuckets.vue` + `legacy/backendnoe2ee` `MediaService` —
-  the pre-E2EE Buckets UX + service (read-only design reference; not a dependency).

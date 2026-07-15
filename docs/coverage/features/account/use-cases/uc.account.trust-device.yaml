@@ -8,7 +8,7 @@ acceptanceCriteria:
       backend: { integration: [AccountWrapsSliceTest.addDeviceWrapAppearsInKeyMaterialAndReturnsId] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
   - id: device-unlock-password-only
-    text: A trusted device opens the Master Key with only the password (its DEVICE wrap), no Secret Key — and on apple the unlock folds into login.
+    text: A trusted device opens the Master Key with only the password (its DEVICE wrap), no Secret Key.
     coverage:
       web: { unit: [src/features/account/unlock/unlock.device.test.ts] }
   - id: device-kek-conformance

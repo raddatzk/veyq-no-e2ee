@@ -6,7 +6,7 @@ title: Tenant terms — the operator sets their server's legal terms (versioned)
 # normalizes + bumps-on-change, TenantTermsHandler/TenantsResource) → web (the owner terms editor in the settings
 # hub `tenant` category, TenantTermsPanel, the 11-clause DE+EN template + free per-locale markdown). Terms are the
 # operator's PUBLIC operational content (served) — no E2EE. Backend slice tests run over the full HTTP stack; a
-# signed ijhttp lifecycle proves it against a live instance. Native (apple/android) is web-first (later CRs). The
+# signed ijhttp lifecycle proves it against a live instance. The
 # browser smoke passed too (owner sets terms → version 1 badge, live against the dev instance).
 acceptanceCriteria:
   - id: operator-sets-per-locale-terms

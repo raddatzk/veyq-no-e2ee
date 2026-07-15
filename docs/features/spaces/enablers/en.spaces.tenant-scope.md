@@ -97,7 +97,7 @@ sequenceDiagram
   grant(s)**, and membership — never the tenant scope key. Open is client-side; there is no birth to be
   client- or server-side here at all.
 - **No new crypto.** The grant is the same hybrid KEM (`asymWrap`, X25519 + ML-KEM-768,
-  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md)) used for the tenant grant at
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md)) used for the tenant grant at
   activation and for the personal/group grants — this enabler only **opens** it.
 - **Shared, not private.** Unlike the personal scope's "no other key-holder" promise, the tenant scope is the
   **commons**: every granted member reads it. Confidentiality is still cryptographic (only a grant opens the
@@ -123,7 +123,7 @@ sequenceDiagram
   (identity opens grants), [Security Model](../../../crosscutting/security-model.md) (operator-blind)
 - Decisions: [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md) (the tenant scope is born cold —
   why there is no client birth here), [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (scopes
-  are tenant-bound), [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM
+  are tenant-bound), [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the hybrid-KEM
   grant), [ADR 0019](../../../decisions/0019-token-less-tenant-home.md) (tenant is the token-less default home)
 - Sibling enablers: [en.spaces.personal-scope](en.spaces.personal-scope.md) (the open machinery this reuses +
   the auto-birth this deliberately omits), [en.spaces.group-scope](en.spaces.group-scope.md) (the other shared

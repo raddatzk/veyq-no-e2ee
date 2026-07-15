@@ -5,7 +5,7 @@ title: Chapters — nested Memories inside a Memory (web)
 # K_mem key model (ADR 0012, amended): every content node (MEMORY = CHAPTER) carries its own random K_mem,
 # wrapped under its parent's content key — so a chapter is a sharing unit without a re-encryption migration.
 # Sharing itself is out (#19). Backend already enforces the nesting; the data-path criteria carry backend +
-# web refs, the UI is web unit-tested, end-to-end is the cr-0060 smoke. Native chapter UI is its own later CR.
+# web refs, the UI is web unit-tested, end-to-end is the cr-0060 smoke.
 acceptanceCriteria:
   - id: chapter-own-recursive-kmem
     text: A chapter carries its OWN random K_mem, wrapped under its parent Memory's K_mem (recursive K_mem, not the parent's key, not a derived key) — the server stores only the opaque wrap + node shape and never inspects it.

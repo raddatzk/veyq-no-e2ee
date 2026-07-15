@@ -95,8 +95,8 @@ Considered and rejected:
   operational metadata, never a coordinate or a per-member consent detail.
 - **A blind, leak-free path remains open.** Manual names need no request; a future **on-device coarse gazetteer**
   (a bundled `lat/lng → country/region/city` dataset) can sit behind the same seam as a fully-blind provider —
-  deferred for its per-locale data cost, not excluded. The OS geocoders (`CLGeocoder`, Android `Geocoder`) call
-  their vendors, so they are **not** the blind option.
+  deferred for its per-locale data cost, not excluded. Note that a platform's *built-in* geocoder is never the
+  blind option — it calls its own vendor.
 - **Limitation (honest).** With a third-party provider enabled, the geocoder learns a bare coordinate + client
   IP — a *consented, non-veyq* boundary, documented in [security-model](../crosscutting/security-model.md).
 

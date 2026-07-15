@@ -8,7 +8,7 @@
 The server is operator-blind, so it should never see the user's **raw password** — a high-value,
 often-reused secret. Two tempting designs fall short:
 
-- **Model A (legacy):** the client sends the password; the server runs Argon2id and stores/compares a
+- **Model A (the conventional one):** the client sends the password; the server runs Argon2id and stores/compares a
   verifier. Simple, but the operator sees the raw password (reusable elsewhere) at every login/reset.
 - **Model B-naive:** the client sends `V = Argon2id(password, salt)` and the server stores `H(V)`. But
   then `V` is a **transmitted, replayable bearer credential**, and the stored value is a credential

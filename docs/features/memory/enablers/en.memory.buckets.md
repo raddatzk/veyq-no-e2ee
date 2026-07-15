@@ -23,7 +23,7 @@
   materialized** (lazy). The server holds **opaque `owner_key`s + the bucket structure + sealed names** — **no
   cleartext name, no content**.
 
-## The bucket model (ADR 0034, adapted from legacy ADR 0023)
+## The bucket model (ADR 0034)
 
 - **`owner_key`** — **one opaque string** identifying the uploader: `user:{userId}` for a **member**,
   `share:{shareIdentityId}` for a **contributor** (reusing the existing cr-0101 identity as the grouping key). It
@@ -86,7 +86,4 @@
 - **Depends on:** [en.memory.media](en.memory.media.md), [en.memory.tree](en.memory.tree.md),
   [ADR 0030](../../../decisions/0030-contributor-public-share.md) (the guest identity).
 - **Decisions:** [ADR 0034](../../../decisions/0034-media-uploader-buckets.md) (the bucket model + the
-  reparent/authz deltas vs the pre-E2EE code).
-- **Reference impl:** `legacy/backendnoe2ee` `MediaService` + `veyq_memory_media_bucket` and
-  `legacy/docs/adr/0023-contribution-media-buckets.md` (the pre-E2EE model + its operator-blind re-design;
-  read-only reference, not a dependency).
+  reparent/authz rules).

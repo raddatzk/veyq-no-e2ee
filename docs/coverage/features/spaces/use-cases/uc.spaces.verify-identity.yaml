@@ -4,7 +4,7 @@ title: Verify a member's identity
 status: planned
 # Refined (ADR 0028 + en.account.identity-pinning define the model: TOFU-pin on first use, a change is a UI notice
 # / a worker block+decline, out-of-band safety-number verification elevates pinned->verified, opt-in strict mode).
-# PARTIALLY BUILT on web (native later). cr-0098: the sealed pin-store sync, the grant-delivery decline seam, and
+# PARTIALLY BUILT on web. cr-0098: the sealed pin-store sync, the grant-delivery decline seam, and
 # the TOFU wrap-gates at the three foreign-wrap sites -> tofu-pin-on-first-use, change-surfaced-not-trusted,
 # operator-blind-pinning FILLED. cr-0099: changed-key-review (side-by-side expected-vs-current -> accept/refuse) is
 # FILLED, and the pin-store verify PRIMITIVES ship (safetyNumber, markVerified, trustState/trustStates — unit-tested).

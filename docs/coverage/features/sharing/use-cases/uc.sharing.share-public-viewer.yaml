@@ -6,8 +6,7 @@ title: Share a Memory as a public viewer link (web)
 # resolve + gated presigned blob reads, soft (L1) revoke/expiry, and the operator-served-viewer trust-tier
 # honesty carried by a footer link. The six criteria are covered by the backend slice (create -> anonymous
 # resolve -> gated blob -> revoke/expiry -> subtree isolation), the http guest-boundary assertions, and the web
-# unit round-trip of the operator-blind decrypt path. apple/android stay gaps — sharing is web-first, native is
-# parity (a later CR), so it is not a criterion of this use-case. v1 scope is deliberately narrow: personal-scope
+# unit round-trip of the operator-blind decrypt path. v1 scope is deliberately narrow: personal-scope
 # Memories, VIEWER role only; contributor/uploader, password protection, group/tenant sharing, persisted-shares
 # and notices are separate later slices.
 acceptanceCriteria:

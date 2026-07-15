@@ -11,7 +11,7 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
 - **Decisions:** [ADR 0002](../../decisions/0002-personal-scope-per-tenant.md) (personal scope is
   tenant-bound, one per member per tenant), [ADR 0007](../../decisions/0007-membership-role-grant-relation.md)
   (membership = role + grant), [ADR 0006](../../decisions/0006-cold-tenant-scope-birth.md) (cold scope
-  birth), [ADR 0009](../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant),
+  birth), [ADR 0017](../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the hybrid-KEM grant),
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) (group scopes + governance — private even
   from the tenant owner), [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md) (readable URLs in
   the `#fragment`), [ADR 0019](../../decisions/0019-token-less-tenant-home.md) (token-less tenant home),
@@ -69,11 +69,11 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   grant-delivery **skips** + a wrapped **derived name-key** (`group-name-key` context) so the invitee reads the
   **canonical** name — so `K_SC` is gated **before** the wrap and the owner can't show a divergent name; accept
   delivers, decline drops silently; [ADR 0014](../../decisions/0014-group-scopes-and-governance.md) §5,
-  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Native parity is a later CR)
+  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md))
 - [Rename a group](use-cases/uc.spaces.rename-group.md) — **web done (cr-0097)** (owner re-seals the name under
   `K_name` from the **current** epoch and bumps `nameEpoch`, so a rename is **forward-secret** — a removed member
   can't read the new name; name-only, no `K_SC` rotation; server rejects a stale `nameEpoch`;
-  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md). Native parity is a later CR)
+  [ADR 0027](../../decisions/0027-group-invite-name-shared-key.md))
 - [Manage a group's members](use-cases/uc.spaces.manage-group-members.md) — **web done (cr-0088, cr-0089)** (the
   GroupOwner runs the roster: **promote/demote** co-owners (multiple owners + a last-owner guard) and **remove** a
   member — removal rotates the content key forward ([en.spaces.scope-key-rotation](enablers/en.spaces.scope-key-rotation.md))
@@ -86,7 +86,7 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   is never silently trusted: the grant-delivery worker **declines**, the UI surfaces a notice + accept → re-pin,
   rotation excludes the member; [ADR 0028](../../decisions/0028-identity-authenticity-tofu-verification.md),
   [en.account.identity-pinning](../account/enablers/en.account.identity-pinning.md). The out-of-band **QR
-  safety-number** ceremony, the *verified* badge, and strict-mode are the follow-up CR; native later)
+  safety-number** ceremony, the *verified* badge, and strict-mode are the follow-up CR)
 - Person / profile view — planned (`~username`, [ADR 0015](../../decisions/0015-operator-blind-readable-urls.md)):
   open a member and see the Memories **you can see** that tag them; client-side (never a server query), depends
   on a future per-Memory **participants** tag (sealed `userId`s)

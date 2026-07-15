@@ -91,7 +91,6 @@ module (extraction-ready, not extracted).
 ## Related
 
 - Decision: [ADR 0021](../decisions/0021-operator-blind-background-tasks.md) (this mechanism),
-  [ADR 0020](../decisions/0020-grant-distribution-invite-wrap.md) (grant distribution — the first consumer),
-  [ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) (polyglot workers)
+  [ADR 0020](../decisions/0020-grant-distribution-invite-wrap.md) (grant distribution — the first consumer)
 - Concepts: [Security Model](security-model.md) (operator-blind, the accepted gaps),
   [Scopes & Tenancy](scopes-and-tenancy.md) (the scope key a worker must hold)

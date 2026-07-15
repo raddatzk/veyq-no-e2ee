@@ -1,15 +1,15 @@
 # UC: Rename a group
 
-- ID: uc.spaces.rename-group
-- Primary actor: **GroupOwner** (`OWNER` on the GROUP scope) — the group's **name authority**
+- **ID:** uc.spaces.rename-group
+- **Primary actor:** **GroupOwner** (`OWNER` on the GROUP scope) — the group's **name authority**
   ([ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md)).
-- Goal: let a GroupOwner **change a group's display name** for everyone, operator-blind, and **forward-secret** —
+- **Goal:** let a GroupOwner **change a group's display name** for everyone, operator-blind, and **forward-secret** —
   a member removed before the rename cannot read the new name.
-- Preconditions: an **authenticated, unlocked** `OWNER` of the group who holds a grant at the scope's **current
+- **Preconditions:** an **authenticated, unlocked** `OWNER` of the group who holds a grant at the scope's **current
   content-key epoch** (the write key). The scope is a **GROUP** (personal/tenant scopes carry no per-scope name)
   and is **active** (not pending-deletion — a rename is a name-write, blocked during the grace period like any
   content write, [uc.spaces.delete-group](uc.spaces.delete-group.md) A4).
-- Postconditions (success): the scope's `encryptedName` is **re-sealed** under `K_name` derived from the **current**
+- **Postconditions (success):** the scope's `encryptedName` is **re-sealed** under `K_name` derived from the **current**
   epoch key, and `nameEpoch` is set to that epoch. Every current member sees the new name on their next
   `listMyScopes` (they peel to `nameEpoch` and derive `K_name`); a member removed at an earlier epoch **cannot**
   derive the new `K_name`, so they never read the post-removal name. The server saw new opaque ciphertext + a

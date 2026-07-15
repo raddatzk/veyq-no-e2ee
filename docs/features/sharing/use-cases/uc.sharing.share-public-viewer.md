@@ -1,13 +1,13 @@
 # UC: Share a Memory as a public viewer link
 
-- ID: uc.sharing.share-public-viewer
-- Primary actor: **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
-- Secondary actor: **an anonymous viewer** — no account, no identity keypair.
-- Goal: publish **one** of your own Memories as a **read-only, anonymous, revocable** link that anyone with the
+- **ID:** uc.sharing.share-public-viewer
+- **Primary actor:** **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
+- **Secondary actor:** **an anonymous viewer** — no account, no identity keypair.
+- **Goal:** publish **one** of your own Memories as a **read-only, anonymous, revocable** link that anyone with the
   link can open — while the server stays operator-blind and the rest of your content stays private.
-- Preconditions: an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
+- **Preconditions:** an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
   (v1 restriction); the caller can open it (holds `K_mem`).
-- Postconditions (success): a share record exists server-side (opaque), and a link `/s/{shareId}#k=<K_share>` opens
+- **Postconditions (success):** a share record exists server-side (opaque), and a link `/s/{shareId}#k=<K_share>` opens
   the Memory subtree read-only for any anonymous visitor — until the curator revokes it or it expires. Operator-blind
   throughout: the server never sees `K_share`, `K_mem`, any name, the viewer, or which media the viewer opens.
 

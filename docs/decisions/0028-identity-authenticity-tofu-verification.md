@@ -11,7 +11,7 @@ controls** (MITM) at the moment of a wrap and read what is sealed to it. veyq ha
 the wrapper trusts the returned key, no pin, no gate ([ADR 0020](0020-grant-distribution-invite-wrap.md),
 [ADR 0014](0014-group-scopes-and-governance.md) §5 — deferred to this slice). The **fingerprint / safety
 number** primitive already exists (`fingerprint()` — a Signal-style digest of the full identity public bundle
-`lp(kemX) || lp(kemM) || lp(sign)`, vector-pinned + conformance-tested on web and native) but is **dormant**:
+`lp(kemX) || lp(kemM) || lp(sign)`, vector-pinned + conformance-tested) but is **dormant**:
 never called in production, no UI, no pin store.
 
 Three surfaces wrap to a **foreign** identity key today, all Plain: (1) rotation re-grants, (2) the **automated
@@ -83,7 +83,7 @@ split by whether a human is present. Key Transparency stays the (out-of-scope) e
   pinned or verified whom. It gains only a small **grant-delivery decline** status (a worker refusing a job) —
   operational metadata, no trust graph.
 - **Tier-consistent ([ADR 0026](0026-client-trust-tiers.md)).** Enforcement is crypto-grade on a trusted client
-  (native / trusted-web) and honest-operator on operator-served web (a tampered client could ignore its own pin) —
+  (self-hosted / trusted-web) and honest-operator on someone else's instance (a tampered client could ignore its own pin) —
   the same tier as all veyq E2EE, no authenticity-specific weakness.
 - **Alternatives rejected:** (a) *hard-block every change by default* — locks out a legitimate rotation and adds
   friction; the human path is advisory instead (strict mode keeps the hard gate opt-in). (b) *verify-before-first-wrap

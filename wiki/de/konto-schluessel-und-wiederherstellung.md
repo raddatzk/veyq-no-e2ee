@@ -18,9 +18,8 @@ Es gibt **einen Master-Schlüssel**, und er ist **separat durch jede eingerichte
 
 ```
 Master-Schlüssel ─┬─ geöffnet durch Passwort + Secret Key   (immer eingerichtet)
-                  ├─ geöffnet durch deinen Passkey (Face ID / Fingerabdruck)
                   ├─ geöffnet durch deinen Wiederherstellungscode
-                  └─ geöffnet durch dieses vertraute Gerät
+                  └─ geöffnet durch dieses Gerät, wenn du ihm vertraust
 ```
 
 Jede einzelne öffnet **denselben** Master-Schlüssel, der **alle** deine Inhalte entsperrt. Eine Methode
@@ -29,16 +28,15 @@ nie neu verschlüsselt.**
 
 ## Anmelden
 
-- **Dein eigenes Gerät** — entsperrt mit Face ID / Fingerabdruck; nichts zu tippen.
-- **Ein synchronisierter Passkey** — auf einem neuen Gerät entsperrt dich ein Passkey aus iCloud/Google.
-- **Ein anderes Gerät bestätigt es** — dein altes Handy gibt das neue frei, wie das Verknüpfen eines
-  Messengers.
-- **Kaltstart** — nichts zur Hand? Melde dich mit **Passwort + dem Secret Key** aus deinem Notfall-Kit
-  an.
+- **Das erste Mal auf einem Gerät** — dein **Passwort + der Secret Key** aus deinem Notfall-Kit. Den
+  Secret Key tippst du hier einmal, danach auf diesem Gerät nicht wieder.
+- **Ein Gerät, dem du vertraust** — ab dann reicht dein Passwort. Setzt du stattdessen das Häkchen bei
+  **„angemeldet bleiben"**, öffnet das Gerät direkt deine Erinnerungen, ganz ohne Tippen.
+- **Ein fremder Rechner** — nutze ein privates/Inkognito-Fenster; es bleibt nichts zurück.
 
-Der Secret Key wird nur in diesem letzten Fall gebraucht. Warum überhaupt? Dein Passwort wird zum
-Anmelden an den Server gesendet — käme der Master-Schlüssel *allein* aus dem Passwort, könnte der Server
-ihn öffnen. Der Secret Key (nie gesendet) schließt diese Lücke.
+Der Secret Key wird nur dieses erste Mal gebraucht. Warum überhaupt? Dein Passwort wird zum Anmelden an
+den Server gesendet — käme der Master-Schlüssel *allein* aus dem Passwort, könnte der Server ihn öffnen.
+Der Secret Key (nie gesendet) schließt diese Lücke.
 
 ## Was der Server tatsächlich speichert
 

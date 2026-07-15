@@ -23,7 +23,7 @@ use-case adds is the **`auto`** behaviour — the other three modes just carry t
   capture time — an edited photo whose EXIF was dropped would carry its *edit* date and wrongly stretch the
   range — so the capture-time tier records `capturedAtSource: 'exif' | 'file'`, and **`auto` includes a media
   only when its `capturedAt` is EXIF-sourced *or* the user set a `capturedAtOverride`** (an intentional
-  correction). File-fallback media (and legacy source-less media) are excluded; a Memory with only such media
+  correction). File-fallback media (and older source-less media) are excluded; a Memory with only such media
   has an empty `auto` range (set it manually). (The media grid still *sorts* by the effective `capturedAt`
   regardless of source — cr-0066 unchanged.)
 
@@ -73,10 +73,9 @@ use-case adds is the **`auto`** behaviour — the other three modes just carry t
   a concurrent-member add can briefly narrow a card's range and let the **open-time self-heal** correct it — no
   data loss, no operator-blindness impact. Materialize the range only **after an upload finishes**, never
   mid-upload. (If strict consistency is ever needed, the `media_rev` CAS is the blind-safe upgrade.)
-- **Reuse the existing UI/UX — never invent.** The date picker + ISO formatting are ported from the design
-  source (`legacy/frontend-noe2ee` `IsoDateField` / `memoryDateRange`); the 4-mode switch realizes the approved
+- **Reuse the existing UI/UX — never invent.** The date picker + ISO formatting are existing components
+  (`IsoDateField` / `memoryDateRange`); the 4-mode switch realizes the approved
   mockup (the pre-E2EE design carried only a flat start/end range).
-- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -98,5 +97,5 @@ Daten und erfährt nie den Tag, an dem du dort warst.
   [uc.memory.gallery](uc.memory.gallery.md) (the capture-time tier that `auto` derives from),
   [uc.memory.chapters](uc.memory.chapters.md) (a chapter is a node too — it carries `wrappedMeta` the same way)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (K_mem seals "capture time, location"
-  — this UC applies it at the node level), [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
+  — this UC applies it at the node level)
 - Future: the **aggregated** chronological date/gallery across a Memory + its chapters

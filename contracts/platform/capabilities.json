@@ -18,7 +18,7 @@
       "description": "Shared group spaces — creating a group scope and managing its membership. Disabled => the group affordance is hidden client-side and the group-create endpoint is rejected server-side with 422 capability_disabled (a personal-only instance)."
     },
     "account.device-trust": {
-      "serves": ["uc.account.trust-device", "uc.account.remember-this-device", "uc.account.auto-unlock", "uc.account.set-device-security"],
+      "serves": ["uc.account.trust-device", "uc.account.remember-this-device"],
       "source": "operator-policy",
       "description": "Device trust and passwordless remember-me unlock levels. Disabled => the \"remember this device\" toggle is hidden client-side and enrolling a device wrap is rejected server-side with 422 capability_disabled (an instance mandating a full password every time)."
     }

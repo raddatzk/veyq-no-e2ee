@@ -23,9 +23,8 @@ Forces:
 - **The client must never hold the store's credentials.** S3 access/secret keys would grant unrestricted,
   non-expiring access to the whole bucket.
 
-The previous (scrapped) build solved this in `legacy/docs/adr/0021` (S3-only + presigned direct-to-store,
-later batched). This ADR re-takes that decision for the fresh start, **trimmed to what the first media slice
-needs** and aligned with the [no-dedup decision](#5-no-content-dedup) below.
+This ADR decides it **trimmed to what the first media slice needs** and aligned with the
+[no-dedup decision](#5-no-content-dedup) below.
 
 ## Decision
 
@@ -83,8 +82,8 @@ client**, which may differ from the backend's internal endpoint. Presigned URLs 
 `veyq.blob-store.public-endpoint` (empty ⇒ sign against the internal endpoint, i.e. external S3 or any
 publicly-reachable store); `S3BlobStore` keeps a second client purely for signing (local HMAC, never connects).
 
-**CORS is web-only** — native apps `PUT`/`GET` directly and are never subject to it. It is configured **on the
-store** (veyq cannot inject headers into a direct fetch): none needed for a bundled store behind a Traefik
+**CORS is a browser rule, and it is configured on the store** — veyq cannot inject headers into a direct
+fetch: none needed for a bundled store behind a Traefik
 **path route** (same origin); otherwise a bucket/account CORS policy allowing `PUT`+`GET` from the web origin,
 exposing `ETag`. For the bundled store behind Traefik, route the bucket path **without** stripping the prefix and with the
 Host header preserved (SigV4 signs host+path+query). Because a byte path is a **hard requirement** (§1), there is
@@ -106,8 +105,8 @@ media path. Rationale (decided as a sparring trade-off):
   in the *detection*; client-side detection only moves who notices first.
 - That equality-metadata leak runs against the **operator-blind** core promise, and on a **self-hostable** app
   the operator pays for their own storage — so the savings are weakly motivated.
-- Therefore `K_blob` stays random, the `dedup_token` vector in `v1.json` stays **unused** (and is **not**
-  ported to native), and ADR 0012's "random `K_blob`" stays literally correct. If storage pressure ever
+- Therefore `K_blob` stays random, the `dedup_token` vector in `v1.json` stays **unused**, and ADR 0012's
+  "random `K_blob`" stays literally correct. If storage pressure ever
   justifies it, **scope-wide convergent dedup** (`K_blob = HKDF(K_SC, content)`, accepting the equality leak)
   is a deliberate later slice — not a default.
 
@@ -142,9 +141,6 @@ media path. Rationale (decided as a sparring trade-off):
 ## Related
 
 - [ADR 0012](0012-content-key-hierarchy.md) (`K_blob` per blob, random, under `K_mem`),
-  [ADR 0009](0009-native-crypto-per-platform-vectors.md) (`chunk_frame` is vector-pinned).
+  [ADR 0017](0017-crypto-primitives-and-post-quantum-strategy.md) (`chunk_frame` is vector-pinned).
 - Enabler: [en.memory.media](../features/memory/enablers/en.memory.media.md) (the blob/media data layer this
   transport carries). Feature: [Memory](../features/memory/_index.md).
-- Reference (read-only, scrapped build): `legacy/docs/adr/0021-s3-storage-and-presigned-direct-to-store.md`
-  (the fuller version — we **adopt** its batch transport, **decline** its content dedup, and **defer** its
-  resumable uploads).

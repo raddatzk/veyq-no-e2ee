@@ -5,8 +5,8 @@ title: Manage pending member invites (list, re-issue link, revoke)
 # additive (ADR 0020), so tracking/re-issuing/revoking the member INVITES it mints lives here, mirroring the
 # owner-invite management the Server Owner already has (uc.admin.create-tenant: resend/reassign/revoke, cr-0009).
 # Owner-gated throughout; operator-blind (invite metadata only, the secret only re-returned on re-issue, cr-0080).
-# Removing a joined member + key rotation are explicitly NOT here (a later slice, ADR 0020/0014). Web-first
-# (ADR 0010); native is each surface's own later CR. The owner-gated happy-path (list/reissue/revoke) needs a
+# Removing a joined member + key rotation are explicitly NOT here (a later slice, ADR 0020/0014).
+# The owner-gated happy-path (list/reissue/revoke) needs a
 # signed member/owner session not reproducible from a bare .http, so it is proven at the integration layer
 # (MemberInviteManagementSliceTest); the .http covers the anonymous-401 boundary/authz.
 acceptanceCriteria:

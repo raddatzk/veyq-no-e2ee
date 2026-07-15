@@ -19,10 +19,10 @@ blind upload the curator performs ([en.memory.media](../features/memory/enablers
 the role, the mandatory contributor **display name** (and how it stays operator-blind), the **anonymous identity**
 that owns a contributor's uploads, the **share-scoped upload endpoints**, and where contributed media lands.
 
-The **display name is mandatory** (a product decision, matching the pre-E2EE design source
-`legacy/frontend-noe2ee`): a contributor names themselves on a pre-screen before contributing. The name is not
-decoration — it is the **forward-compatible hook for buckets** (a later slice): the pre-E2EE product groups each
-contributor's uploads into a named per-contributor **bucket**, seeded from that display name. v1 does not build
+The **display name is mandatory** — a product decision. A contributor names themselves on a pre-screen before
+contributing. The name is not decoration: it is the **forward-compatible hook for buckets** (a later slice),
+which group each contributor's uploads into a named per-contributor **bucket**, seeded from that display name.
+Without it, attribution has nothing to key on and buckets would need a migration to add later. v1 does not build
 the buckets UI, but it **captures the name into a sealed anonymous identity now** so buckets fall out of it later
 without a migration.
 

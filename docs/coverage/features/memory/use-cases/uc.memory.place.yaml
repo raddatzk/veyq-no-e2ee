@@ -6,7 +6,7 @@ title: Curate a Memory's place — one sealed, named location
 # set via the same partial updateNode, returned on listNodes. Deliberate set-up (never silent), a mandatory name,
 # position = the MEDOID of the media GPS, reverse-only opt-in geocoding (client-direct, Nominatim reference, ADR
 # 0016), and a per-folder-subtree "Karte" view plotting every located Memory/Chapter from listNodes without loading
-# media (cr-0071). Native place/map UI is each platform's own later CR (web-first, ADR 0043); the group consent
+# media (cr-0071). The group consent
 # state-machine + a blind gazetteer remain prose gaps (own CRs), not unref'd criteria.
 acceptanceCriteria:
   - id: sealed-location-on-node
@@ -27,7 +27,7 @@ acceptanceCriteria:
           - src/features/memory/components/NodeMutationDialog.test.ts
           - src/features/memory/components/MemoryDetail.test.ts
   - id: medoid-position
-    text: The position `derived` is the MEDOID of the Memory's media GPS — the actual photo minimizing the summed Haversine distance to the others (robust to an outlier), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` defaults to auto on set-with-media (re-medoids as media are added) and flips to fixed when the user moves the MAP by hand (the centre crosshair becomes the position — "Karte verschieben"); fixed is a frozen snapshot. GPS is read from the always-listed capture tier (promoted alongside `capturedAt`, like cr-0066), so the medoid and every auto re-medoid are list-level — no per-item EXIF fetch; no backfill, so legacy media without the tier do not contribute.
+    text: The position `derived` is the MEDOID of the Memory's media GPS — the actual photo minimizing the summed Haversine distance to the others (robust to an outlier), never the arithmetic mean — so it never lands in the sea and barely moves as media are added. `derivedMode` defaults to auto on set-with-media (re-medoids as media are added) and flips to fixed when the user moves the MAP by hand (the centre crosshair becomes the position — "Karte verschieben"); fixed is a frozen snapshot. GPS is read from the always-listed capture tier (promoted alongside `capturedAt`, like cr-0066), so the medoid and every auto re-medoid are list-level — no per-item EXIF fetch; no backfill, so older media without the tier do not contribute.
     coverage:
       web:
         unit:
@@ -50,7 +50,7 @@ acceptanceCriteria:
           - src/shared/state/useMapConfig.test.ts
           - src/features/memory/components/MemoryLocationEditor.test.ts
   - id: tenant-map-via-listnodes
-    text: A "Karte" browse view mode shows every located Memory/Chapter in the current folder's subtree (the whole space at the scope root) as a clickable pin, read from each node's sealed `location` via listNodes (unsealed client-side under its own K_mem, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name; a pending auto place (no `derived`) is not pinned; a pin click opens that Memory. Each pin shows the node's explicit `cover` (uc.memory.cover, cr-0072) cropped by the shared display formula — no cover ⇒ the placeholder (retiring the cr-0071 nearest-media stopgap). Map tiles are a separate opt-in/self-host seam (ADR 0018), reused from the editor. (cr-0071; per-folder-subtree, more contextual than always space-wide. Native map parity is a separate later CR.)
+    text: A "Karte" browse view mode shows every located Memory/Chapter in the current folder's subtree (the whole space at the scope root) as a clickable pin, read from each node's sealed `location` via listNodes (unsealed client-side under its own K_mem, no media load, no locations endpoint — a location endpoint would leak coordinates to the operator). On the map ⟺ a coordinate; a location ⟺ a name; a pending auto place (no `derived`) is not pinned; a pin click opens that Memory. Each pin shows the node's explicit `cover` (uc.memory.cover, cr-0072) cropped by the shared display formula — no cover ⇒ the placeholder (retiring the cr-0071 nearest-media stopgap). Map tiles are a separate opt-in/self-host seam (ADR 0018), reused from the editor. (cr-0071; per-folder-subtree, more contextual than always space-wide.)
     coverage:
       web:
         unit:

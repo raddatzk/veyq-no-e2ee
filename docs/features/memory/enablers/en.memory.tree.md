@@ -113,7 +113,7 @@ sequenceDiagram
   [Scopes & Tenancy](../../../crosscutting/scopes-and-tenancy.md) (navigation contract; content in a scope),
   [Account & Key Model](../../account/enablers/en.account.key-model.md)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC`/`K_mem`/`K_blob`),
-  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned content crypto)
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (vector-pinned content crypto)
 - Related: [en.spaces.personal-scope](../../spaces/enablers/en.spaces.personal-scope.md) (the enabler this
   builds on — where the first tree lives), and the planned add-media / journal / share-a-Memory use-cases
   ([Memory feature](../_index.md)) this serves

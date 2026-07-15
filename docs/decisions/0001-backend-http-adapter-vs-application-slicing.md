@@ -7,7 +7,7 @@
 
 veyq is feature/use-case-sliced for cohesion and for the documentation trust chain (use-case →
 acceptance → tests). The initial convention paired a thin `…Resource` with a `…Handler` **per
-use-case** and claimed an identical slicing across all stacks.
+use-case**, and assumed that shape carried everywhere.
 
 That conflates two axes that are genuinely different on the backend:
 

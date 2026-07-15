@@ -31,15 +31,3 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [AccountKeyMaterialSliceTest.validTokenReturnsCallersMaterial] }
       web: { unit: [src/features/account/unlock/unlock.test.ts] }
-# Apple (macOS/iOS/iPadOS) native unlock landed in cr-0015: VeyqKit UnlockTests (key-material → KEK →
-# symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
-# LiveRoundTripTests (real instance) + RoundTripUITests (full UI round-trip). The authed-only / no-cross-
-# account boundaries stay backend concerns. Apple secret-key-import-from-kit landed in cr-0017
-# (two-step floor + Emergency-Kit upload/scan): VeyqKit KitTests cover the parseKit path; the file/scan UI
-# wiring + AVFoundation camera are manual-smoke (the round-trip uses the prefill seam, not the import).
-# Android (phone/tablet, Jetpack Compose) native unlock landed in cr-0016: :client UnlockTest (key-material
-# → KEK → symUnwrap master+identity round-trip, wrong-Secret-Key, no-PASSWORD-wrap, 401→refresh→retry) +
-# LiveRoundTripTest (real instance) + :app RoundTripUiTest (full Compose UI round-trip on the emulator).
-# Android secret-key-import-from-kit landed in cr-0018 (two-step floor + Emergency-Kit upload/scan): :client
-# KitTest covers the parseKit path; the SAF file picker + CameraX/ML Kit camera UI are manual-smoke (the
-# round-trip uses typed input, not the import).

@@ -27,7 +27,7 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   into a CR — if you feel the urge, the state doc is what should be updated instead.
 - **Phases only above real size.** A small CR is single-phase. Each phase ends with the repo in a
   working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
-  contracts → backend → web → apple → android.
+  contracts → backend → web.
 - **Genuinely independent work = separate CRs, not phases.**
 - **A checkable claim carries the command that produced it — run it, don't estimate.** A CR's inventory/plan
   states code-confirmable facts — a symbol, a count, a path, "all N of X do Y" — as the **output of a command

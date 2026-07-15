@@ -6,8 +6,8 @@ title: Live media updates — others' adds/removes surface into the open gallery
 # past the client's (updatedAt,id) cursor, so an active upload streams new items, never a full re-list) + the
 # current mediaId set for delete-reconcile, gated by a second delete_revision counter (present only when a delete
 # advanced it). Short-poll, tab-visibility-gated, only while a Memory is open. Operator-blind (opaque counters +
-# opaque ids + coarse timestamps). Backend + web verticals built + tested; apple/android are native-deferred (the
-# gallery UI itself is a later native CR); the two-member browser auto-insert/drop is the manual live smoke.
+# opaque ids + coarse timestamps). Backend + web verticals built + tested. (The
+# gallery UI itself is a later CR); the two-member browser auto-insert/drop is the manual live smoke.
 acceptanceCriteria:
   - id: cheap-unchanged-check
     text: listNodeMedia is a conditional GET keyed on the node's media_revision (an opaque counter, bumped on every gallery-media mutation but NOT on a cover change); a poll/re-open whose revision matches gets a 304 with no body and no media query server-side — so an unchanged gallery costs an O(1) counter compare, not a full list.

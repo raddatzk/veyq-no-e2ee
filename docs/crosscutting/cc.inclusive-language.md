@@ -1,10 +1,9 @@
 # Cross-cutting: German inclusive language (neutral-first)
 
 - **ID:** cc.inclusive-language
-- **Applies to:** every **German user-facing** string — the `de` catalog in `web/src/i18n/index.ts`, the published
-  DE wiki (`wiki/de/*.md`), and any future DE strings on native surfaces (`android` `strings.xml`, Apple once it
-  externalizes strings). **English strings and code/identifiers are unaffected** — this is a language convention
-  for the German product voice only.
+- **Applies to:** every **German user-facing** string — the `de` catalog in `web/src/i18n/index.ts` and the
+  published DE wiki (`wiki/de/*.md`). **English strings and code/identifiers are unaffected** — this is a
+  language convention for the German product voice only.
 
 ## The rule — neutral-first
 

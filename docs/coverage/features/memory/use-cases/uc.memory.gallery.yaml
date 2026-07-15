@@ -3,8 +3,7 @@ feature: memory
 title: Open a Memory & browse its gallery
 # The web gallery UI is built (cr-0049): MemoryDetail (grid + header) + MediaLightbox (preview, prev/next,
 # download) over the ready three-tier data layer (en.memory.derivatives). The data-path criteria carry refs on
-# every surface (the cr-0045/0047/0048 data layer) plus the web render tests; the apple/android gallery UI
-# render stays a gap (web-first, ADR 0043 — their galleries are their own later CRs).
+# every surface (the cr-0045/0047/0048 data layer) plus the web render tests.
 acceptanceCriteria:
   - id: thumbnail-grid
     text: Opening a Memory lists its media and renders a thumbnail grid (each thumbnail fetched as ciphertext and decrypted on device under K_mem). The grid is the Gallery tab of a tabbed detail view (Gallery / Chapters, cr-0061).

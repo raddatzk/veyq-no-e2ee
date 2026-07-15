@@ -1,19 +1,20 @@
 # Enabler: Identity pinning — trust-on-first-use + a sealed pin store
 
-- ID: en.account.identity-pinning
-- Context: every client that wraps a scope key / invite to **another** member's identity public key (the grant
-  authorities, the grant-delivery worker, the invite name-key). The substrate for
-  [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md).
-- Goal: give a client an **operator-blind, cross-device memory of each contact's identity key**, so a
-  **substituted** key (an active operator's MITM) is caught on change (TOFU), and out-of-band verification can
-  elevate a contact to *verified*.
-- Preconditions: an **unlocked** account — the Master Key is available to seal/open the pin store
-  ([en.account.key-model](en.account.key-model.md)).
-- Postconditions: after wrapping to a contact for the first time, the client holds a **pin** of that contact's
-  identity public key (state *pinned*); a later wrap to a **changed** key is surfaced (UI) or refused (worker),
-  never silently trusted. The server saw only an opaque ciphertext — never a `userId`, a pinned key, or the count.
+- **ID:** en.account.identity-pinning
+- **Type:** **Enabler** — the substrate under
+  [ADR 0028](../../../decisions/0028-identity-authenticity-tofu-verification.md); no standalone end-user goal
+  ([features/README → use-case vs enabler vs ADR vs change-request](../../README.md#use-case-vs-enabler-vs-adr-vs-change-request)).
+- **Provides:** an **operator-blind, cross-device memory of each contact's identity key**, so a **substituted**
+  key (an active operator's MITM) is caught on change (TOFU), and out-of-band verification can elevate a contact
+  to *verified*. Used by every client that wraps a scope key or invite to **another** member's identity public
+  key — the grant authorities, the grant-delivery worker, the invite name-key.
 - **Serves (use-cases):** [uc.spaces.verify-identity](../../spaces/use-cases/uc.spaces.verify-identity.md) (the
   human ceremony this sealed pin store + its TOFU change-response backs).
+- **Depends on:** [en.account.key-model](en.account.key-model.md) — the Master Key that seals the pin store, so
+  the account must be **unlocked** for any of this to run.
+- **Postconditions:** after wrapping to a contact for the first time, the client holds a **pin** of that contact's
+  identity public key (state *pinned*); a later wrap to a **changed** key is surfaced (UI) or refused (worker),
+  never silently trusted. The server saw only an opaque ciphertext — never a `userId`, a pinned key, or the count.
 
 ## What it is — the sealed pin store
 
@@ -100,11 +101,6 @@ trust state is shared across the account, not re-TOFU'd per device.
   blind server must not adjudicate a crypto claim (ADR 0028 § Consequences).
 - **Tier-consistent ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** Crypto-grade on a trusted
   client, honest-operator on operator-served web — a tampered client could ignore its own pin.
-- **Native parity.** The seal context (`identity-pins`) is a conformance-vector-pinnable string, so native heads
-  adopt the same store when they reach group sharing — sharing contracts, not code
-  ([ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)).
-  They reach it when native un-parks, which is web-first's schedule
-  ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
 
 > **No end-user section.** As an enabler this has no standalone "what this means for you" story — its value reaches
 > the user through the verification use-case + the member-add flows it protects (their bilingual sections carry the

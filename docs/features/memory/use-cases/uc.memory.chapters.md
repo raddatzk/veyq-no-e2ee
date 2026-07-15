@@ -42,9 +42,9 @@ in [ADR 0012](../../../decisions/0012-content-key-hierarchy.md).
   key model keeps least-privilege **crypto-enforced**, not server-gated.
 - **No new key type.** A chapter reuses the Memory key model (`K_mem`, `content-key` wrap context) one level
   deeper — the contract change is only *allowing* `wrappedContentKey` on a `CHAPTER`, not a new field.
-- **Reuse the existing UI/UX — never invent.** Chapter creation + the nested gallery are ported from the
-  pre-E2EE design source (`legacy/frontend-noe2ee/`, `uc.memory.create-tree`); only the data layer is ours.
-- **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
+- **Reuse the existing UI/UX — never invent** ([ui-web-styleguide](../../../crosscutting/ui-web-styleguide.md)
+  § Reuse first). Chapter creation + the nested gallery are the existing shell and grid; only the data layer
+  is new.
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -68,6 +68,5 @@ Gerät verschlüsselt alles, der Server sieht nur verschlüsselte Daten.
 - Enablers: [en.memory.tree](../enablers/en.memory.tree.md) (`K_mem`, node CRUD),
   [en.memory.media](../enablers/en.memory.media.md) (`K_blob` under the parent's `K_mem`)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (content-key hierarchy — this UC
-  applies its **recursive `K_mem`** decision for chapters),
-  [ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md) (web first; native parity)
+  applies its **recursive `K_mem`** decision for chapters)
 - Future: chapter **sharing** (#19) — the key layout here is the groundwork

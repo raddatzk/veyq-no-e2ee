@@ -1,5 +1,0 @@
--- No-op compatibility migration.
---
--- V1 is a consolidated greenfield baseline and already creates veyq_user.username with
--- uq_veyq_user_username. Keeping this version as an empty migration preserves Flyway's
--- version sequence without trying to rename the retired permalink column on fresh schemas.

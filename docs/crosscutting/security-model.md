@@ -139,9 +139,9 @@ flowchart TB
 Standard, well-reviewed primitives only (no home-grown crypto); **post-quantum from the start** for encryption
 (a hybrid KEM, secure if either component holds) because decade-lived memories make harvest-now-decrypt-later
 real, while signatures stay classical for now; and **crypto-agility** via a versioned suite id on every
-artifact, so upgrades never break old data. The strategy + its rejected alternatives are
-[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md); the concrete per-platform byte
-contract is [ADR 0009](../decisions/0009-native-crypto-per-platform-vectors.md).
+artifact, so upgrades never break old data. The strategy, its rejected alternatives, and the conformance
+vectors that pin a suite's bytes are all
+[ADR 0017](../decisions/0017-crypto-primitives-and-post-quantum-strategy.md).
 
 ## Names & blinded tokens
 
@@ -233,22 +233,24 @@ Confidentiality (Layer 2 below) is enforced by the **client**, so it holds again
 operator **only on a client whose code the operator cannot silently alter**. This splits by client, and we state
 it plainly ([ADR 0026](../decisions/0026-client-trust-tiers.md)):
 
-- **Native (store-signed):** the operator cannot alter it → confidentiality holds against an active operator;
-  residual = the *detectable* key-substitution above. **The high-assurance primary** (committed target: native on
-  every platform).
+- **Self-hosted:** operator = user → moot. No adversary serves you your own code. This is veyq's **default
+  posture**, and therefore its high-assurance answer — the question dissolves rather than being mitigated.
 - **Operator-served web:** the operator serves the code each load → an active operator can serve tampered code
-  that captures keys/plaintext. **Protects against a *passive* operator only** (honest serving + at-rest). The
-  **convenience tier**, honestly labelled and surfaced in-client — never claimed operator-proof.
+  that captures keys/plaintext. **Protects against a *passive* operator only** (honest serving + at-rest),
+  honestly labelled and surfaced in-client — never claimed operator-proof.
 - **Trusted central / attested web** (code from an origin the operator does *not* control, reproducibly built —
-  SaaS-era): restores the native-level guarantee in the browser, for the no-install flows (a public-share/upload
+  SaaS-era): restores the full guarantee in the browser, for the no-install flows (a public-share/upload
   viewer). An **operator-owned** domain is *always* operator-served — it owns its DNS, so it controls delivery.
-- **Self-hosted, single user:** operator = user → moot.
 
 Constant on every tier: the server can **never** read already-stored content (no keys); it **always** sees
 operational metadata, can deny/alter access, and can *attempt* key-substitution on new exchanges (detectable,
-above). **The honest boundary: passive operator → protected everywhere; active operator → protected on
-native / trusted-web, passive-only on operator-served web.** Stating this precisely is a trust asset, as it is
-for Signal (native-only) and Proton (open-source + native).
+above). **The honest boundary: passive operator → protected everywhere; active operator → protected when you
+host it yourself, passive-only on someone else's instance.** Stating this precisely is a trust asset, as it is
+for Signal and Proton.
+
+**A stronger unlock method does not move this boundary** ([ADR 0026](../decisions/0026-client-trust-tiers.md)
+records why): the operator ships the code that consumes whatever the unlock produces. Unlock convenience and
+client integrity are orthogonal.
 
 ## Recovery — no escrow
 

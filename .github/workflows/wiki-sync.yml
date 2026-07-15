@@ -25,9 +25,11 @@ concurrency:
 jobs:
   sync:
     name: Sync docs/wiki to the GitHub Wiki
-    # Disabled: scripts/render-wiki-diagrams.mjs was moved to legacy/ in the greenfield reset and not yet
-    # ported back. Also stale: the published wiki now lives in wiki/ (not docs/wiki/), so the trigger paths
-    # and source dir below need revisiting when this is restored. Drop `if: false` to re-enable.
+    # Disabled, and every part of it is stale: it triggers on docs/wiki/** and rsyncs docs/wiki/, but the
+    # published wiki lives in wiki/; and scripts/render-wiki-diagrams.mjs no longer exists. That renderer
+    # existed for PlantUML — diagrams are Mermaid now, which GitHub renders natively, so a repaired job would
+    # not need it at all. Fixing this means rewriting the paths and dropping the render step, not restoring
+    # anything. Until someone does: delete or repair (architecture/README.md §11).
     if: false
     runs-on: ubuntu-latest
     steps:

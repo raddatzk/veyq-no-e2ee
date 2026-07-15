@@ -114,7 +114,7 @@ CONTRIBUTOR album, and an UPLOADER drop-box alike; the password field lives in t
   threat the share model already concedes (operator-served web viewer). A future upgrade path, not the first slice.
 - **(B, chosen) Access-control gate.** Matches the realistic threat (link-leak, honest operator), reuses the
   contributor-token pattern, and is small + fully in-place. Its honest limit (malicious operator) is documented.
-- **(C) Server stores the raw password / a fast hash.** The legacy shape. Rejected: the operator would see (or
+- **(C) Server stores the raw password / a fast hash.** The conventional shape. Rejected: the operator would see (or
   trivially crack) the password. The `Argon2id(pw)` token + `SHA-256` verifier keeps the raw password client-side.
 
 ## Related

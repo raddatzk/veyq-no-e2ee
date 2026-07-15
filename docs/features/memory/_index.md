@@ -11,7 +11,7 @@ tokens; it never sees a name or a content key.
   scope), [Account & Key Model](../account/enablers/en.account.key-model.md).
 - **Decisions:** [ADR 0012](../../decisions/0012-content-key-hierarchy.md) (per-Memory content key `K_mem`,
   random + many-wrapped — the unit of sharing; `K_SC` for navigation; `K_blob` per blob),
-  [ADR 0009](../../decisions/0009-native-crypto-per-platform-vectors.md) (the vector-pinned content crypto).
+  [ADR 0017](../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the vector-pinned content crypto).
 - **Product language (hard rule):** Memory / Chapter. Folders **organize only**. Never "Album" / "Explorer".
 
 ## Key model (ADR 0012, in one line)
@@ -34,7 +34,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - ★ [en.memory.derivatives](enablers/en.memory.derivatives.md) — **refined** (per-item **thumbnail / preview /
   original** tiers — grid = thumbnail, lightbox = preview, download = original; client-generated encrypted
   blobs, **per-blob `K_blob`**, role-tagged on the media record (`original` + `derivatives[{kind, blob}]`), no
-  backfill, first-frame video poster, legacy sizes. **Built before the gallery** — where
+  backfill, first-frame video poster. **Built before the gallery** — where
   [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md)'s deferred thumbnails/previews land)
 - ★ [en.memory.node-meta](enablers/en.memory.node-meta.md) — **partly built** (the sealed, client-versioned
   `wrappedMeta` blob on a content node — one opaque envelope for a Memory's node-level metadata, sealed under
@@ -43,13 +43,13 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - ★ [en.memory.buckets](enablers/en.memory.buckets.md) — **refined** (the bucket data layer: a per-uploader
   container within a Memory, a real `owner_key`-keyed `veyq_bucket` table — `user:{id}` / `share:{id}` — with a
   lazy virtual primary + one-level sub-buckets, names sealed under `K_mem`, media linked via a nullable `bucket_id`
-  + denormalized `created_by`; reparent-on-delete + own-bucket authz, oriented on legacy ADR 0023;
+  + denormalized `created_by`; reparent-on-delete + own-bucket authz;
   [ADR 0034](../../decisions/0034-media-uploader-buckets.md))
 
 ## Use-cases (on the tree + media enablers)
 
 - Browse & organize the Memory tree — the shell + folder/Memory browse + create/rename/delete
-  ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done** on web, the one live surface)
+  ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done**)
 - [uc.memory.upload](use-cases/uc.memory.upload.md) — **refined** (add media to a Memory: the web upload flow +
   global uploads tray on [en.memory.media](enablers/en.memory.media.md) — `K_blob` + chunked AEAD,
   direct-to-store; the upload also generates the [derivatives](enablers/en.memory.derivatives.md))
@@ -67,20 +67,18 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   (`{ mediaId, crop }` on the same `wrappedMeta`), shown on the browse card, the detail header, and the map pin
 - [uc.memory.live-updates](use-cases/uc.memory.live-updates.md) — **built (web)** (cr-0107, ADR 0033): an open
   gallery reflects others' media adds/removes live; a per-node `media_revision` counter → conditional-GET `304` +
-  keyset delta + id-set delete-reconcile (gated by a `delete_revision` counter), short-polled + visibility-gated;
-  apple/android native-deferred
+  keyset delta + id-set delete-reconcile (gated by a `delete_revision` counter), short-polled + visibility-gated)
 - [uc.memory.delete-media](use-cases/uc.memory.delete-media.md) — **built (web)** (remove a photo into a recoverable
   per-Memory trash: soft-delete → Trash tab → 30-day retention → scheduled hard-purge; **any member** may
   trash/restore, audited `deleted_by`; lightbox-only delete + Delete-key culling; reuses the cr-0107
   `delete_revision` reconcile + the cr-0102 blob-reclaim; **cr-0110 + cr-0111** (member-expedited purge + Trash-tab
-  redesign on the shared grid + the upload/delete reconcile fixes) — apple/android deferred)
+  redesign on the shared grid + the upload/delete reconcile fixes))
 - [uc.memory.buckets](use-cases/uc.memory.buckets.md) — **refined** ([ADR 0034](../../decisions/0034-media-uploader-buckets.md),
   on [en.memory.buckets](enablers/en.memory.buckets.md)): group a Memory's media by **who contributed it** — the
   attribution axis, orthogonal to Chapters; a real **`owner_key`-keyed bucket table** (lazy virtual primary +
-  one-level sub-buckets, `K_mem`-sealed names, reparent-on-delete, own-bucket authz — oriented on legacy ADR 0023).
+  one-level sub-buckets, `K_mem`-sealed names, reparent-on-delete, own-bucket authz).
   **cr-0113** (planned) ships the full data layer + backend + the primary-grouping **"Beiträge"** tab (reusing the
-  gallery grid); the **sub-bucket management UI** is the next slice, camera-filter/batch later; apple/android
-  web-first
+  gallery grid); the **sub-bucket management UI** is the next slice, camera-filter/batch later
 - Memory journal — markdown sealed under `K_mem`
 - Tracks (GPX) — sealed under `K_mem` (the sealed *location* is now [uc.memory.place](use-cases/uc.memory.place.md))
 - Share a Memory — wrap its `K_mem` to a per-share key (least-privilege, ADR 0012) → the

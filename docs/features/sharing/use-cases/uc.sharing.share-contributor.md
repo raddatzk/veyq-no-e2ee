@@ -1,13 +1,13 @@
 # UC: Share a Memory as a contributor link (anyone with the link can add photos)
 
-- ID: uc.sharing.share-contributor
-- Primary actor: **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
-- Secondary actor: **an anonymous contributor** — no account, no identity keypair; names themselves once.
-- Goal: publish **one** of your own Memories as a **contributor link** — anyone with the link can **view it and
+- **ID:** uc.sharing.share-contributor
+- **Primary actor:** **a curator** — the owner of a **personal-scope** Memory (holds its `K_mem`).
+- **Secondary actor:** **an anonymous contributor** — no account, no identity keypair; names themselves once.
+- **Goal:** publish **one** of your own Memories as a **contributor link** — anyone with the link can **view it and
   add photos** — while the server stays operator-blind and the rest of your content stays private.
-- Preconditions: an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
+- **Preconditions:** an **authenticated, unlocked** curator; the target Memory is in the caller's **personal scope**
   (v1 restriction); the caller can open it (holds `K_mem`).
-- Postconditions (success): a share record with **role CONTRIBUTOR** exists (opaque), and a link
+- **Postconditions (success):** a share record with **role CONTRIBUTOR** exists (opaque), and a link
   `/s/{shareId}#k=<K_share>` lets any anonymous visitor open the Memory **and contribute photos** — after naming
   themselves — until the curator revokes it or it expires. Contributed photos appear in the Memory immediately
   (direct-append) and are attributed to the contributor's **sealed** name. Operator-blind throughout: the server

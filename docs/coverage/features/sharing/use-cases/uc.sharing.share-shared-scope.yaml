@@ -7,7 +7,7 @@ title: Public-share a Memory in a shared scope (group / tenant)
 # (enabled=false) every share the removed member created in that scope; any remaining member may re-activate a
 # deactivated share, which transfers its owner_account. K_mem is stable across rotation (ADR 0024), so the share
 # follows new content and cannot be rotated away — the server-side deactivation IS the honest-server revocation
-# (the only forward layer for a tenant, which is ACL-revoke). apple/android stay gaps — sharing is web-first.
+# (the only forward layer for a tenant, which is ACL-revoke).
 acceptanceCriteria:
   - id: member-authored-any-scope
     text: A member of a group/tenant scope may createShare a MEMORY in that scope (personal still works); the create-gate is "MEMORY in a scope the caller is a member of" AND the role's sharing.* capability — not owner-only, not personal-only. A non-member cannot (no reveal).

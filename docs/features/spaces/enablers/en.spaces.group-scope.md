@@ -106,7 +106,7 @@ sequenceDiagram
   tenant owner holds no grant, they see only that a group exists + who is in it, never its name or content
   ([ADR 0014](../../../decisions/0014-group-scopes-and-governance.md)).
 - **No new crypto primitive.** The self-grant is the same hybrid KEM (`asymWrap`, X25519 + ML-KEM-768,
-  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md)) as the tenant/personal grant; the
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md)) as the tenant/personal grant; the
   name uses the same node-name seal ([ADR 0012](../../../decisions/0012-content-key-hierarchy.md)), just keyed by
   the derived `K_name` rather than `K_SC` directly ([ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md)).
 - **Owner ≠ admin.** The creator is the group's `OWNER`; that is a per-scope role, independent of any tenant
@@ -124,6 +124,6 @@ sequenceDiagram
 - Decisions: [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (group governance),
   [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (scopes are tenant-bound),
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (membership = role + grant),
-  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant),
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the hybrid-KEM grant),
   [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC` name-sealing)
 - Sibling: [en.spaces.personal-scope](en.spaces.personal-scope.md) (the machinery this reuses)

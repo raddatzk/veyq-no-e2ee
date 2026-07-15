@@ -1,16 +1,16 @@
 # UC: Public-share a Memory in a shared scope (group / tenant)
 
-- ID: uc.sharing.share-shared-scope
-- Primary actor: **any member** of a group or tenant scope (holds the scope grant → the Memory's `K_mem`).
-- Secondary actor: **an anonymous visitor** (viewer / contributor / uploader — the existing roles), and the
+- **ID:** uc.sharing.share-shared-scope
+- **Primary actor:** **any member** of a group or tenant scope (holds the scope grant → the Memory's `K_mem`).
+- **Secondary actor:** **an anonymous visitor** (viewer / contributor / uploader — the existing roles), and the
   **remaining members** of the scope (who inherit the governance below).
-- Goal: lift the v1 **personal-scope-only** restriction so a member can public-share a **group or tenant** Memory
+- **Goal:** lift the v1 **personal-scope-only** restriction so a member can public-share a **group or tenant** Memory
   with the same operator-blind link mechanism — while keeping shared-scope content honestly revocable when a member
   leaves.
-- Preconditions: an **authenticated, unlocked** caller who is a **member of the target Memory's scope** (personal,
+- **Preconditions:** an **authenticated, unlocked** caller who is a **member of the target Memory's scope** (personal,
   group, or tenant) and can open it (holds `K_mem`); the instance advertises the role's capability
   (`sharing.public-links` / `sharing.uploader-links`, [ADR 0032](../../../decisions/0032-capability-discovery-version-gating.md)).
-- Postconditions (success): a share record exists (opaque, owned by its creator), and the link opens the Memory
+- **Postconditions (success):** a share record exists (opaque, owned by its creator), and the link opens the Memory
   subtree per its role — until revoked, expired, **or auto-deactivated by the creator's removal from the scope**.
 
 This extends the sharing slices ([ADR 0029](../../../decisions/0029-public-viewer-share.md) §6, this revision) from

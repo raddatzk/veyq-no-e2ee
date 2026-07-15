@@ -17,9 +17,8 @@ There is **one master key**, and it's locked **separately by each method you set
 
 ```
 master key ─┬─ opened by your password + secret key   (always set up)
-            ├─ opened by your passkey (Face ID / fingerprint)
             ├─ opened by your recovery code
-            └─ opened by this trusted device
+            └─ opened by this device, once you trust it
 ```
 
 Any one of them opens the **same** master key, which unlocks **all** your content. Adding or removing a
@@ -27,14 +26,14 @@ method just adds or removes one lock — **your memories are never re-encrypted.
 
 ## Logging in
 
-- **Your own device** — unlocks with Face ID / fingerprint; nothing to type.
-- **A synced passkey** — on a new device, a passkey from iCloud/Google unlocks you.
-- **Another device approves it** — your old phone okays the new one, like linking a messenger.
-- **Cold start** — nothing on hand? Sign in with your **password + the secret key** from your Emergency
-  Kit.
+- **First time on a device** — your **password + the secret key** from your Emergency Kit. You type the
+  secret key once here, and then not again on this device.
+- **A device you trust** — from then on, just your password. Tick **"remember me"** instead and the device
+  opens straight to your memories with nothing to type at all.
+- **Someone else's computer** — use a private/incognito window; nothing is kept.
 
-The secret key is only needed in that last case. Why have it? Your password is sent to the server to log
-in — if the master key came from the password *alone*, the server could open it. The secret key (never
+The secret key is only needed that first time. Why have it at all? Your password is sent to the server to
+log in — if the master key came from the password *alone*, the server could open it. The secret key (never
 sent) closes that gap.
 
 ## What the server actually stores

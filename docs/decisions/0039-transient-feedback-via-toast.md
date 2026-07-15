@@ -15,14 +15,14 @@ The web client's user feedback is entirely **inline** today:
   transient bar with an "Undo" button and a `setTimeout` auto-dismiss; the timer/ref/cleanup skeleton is
   duplicated between them.
 
-The project rule (`CLAUDE.md`, `docs/ai/README.md`) is **reuse the legacy design, never invent new UI**; the web
-design source is `legacy/frontend-noe2ee/`. That source has **no toast, snackbar, or undo** — its feedback
-paradigm is inline `<Message>` only. The undo bars are therefore **already a veyq invention** layered on top of
-legacy, not a ported pattern.
+The project rule is **reuse the existing UI, never invent** ([ui-web-styleguide](../crosscutting/ui-web-styleguide.md)
+§ Reuse first) — the nearest built screen answers the question. A floating Toast has no built precedent here, so
+it is in tension with that rule and must be a deliberate, recorded decision rather than a silent "reuse".
 
-Audit finding #74 (P3d) flagged "add `useToast`/`useUndo` (no toast infra today — use PrimeVue Toast)". Adopting
-a floating Toast is genuinely **new UI with no legacy precedent**, so it is in tension with the reuse rule and
-must be a deliberate, recorded decision rather than a silent "reuse".
+What makes this the case where reuse is *not* the answer: there is no single existing pattern to reuse. The two
+undo bars are the same skeleton built twice, and the success `notice` refs are a third shape. "Match your
+neighbour" only works when the neighbour is right; here it would mean copying a duplication a third time.
+Audit finding #74 (P3d) flagged exactly this ("add `useToast`/`useUndo` — no toast infra today").
 
 ## Decision
 
@@ -37,10 +37,10 @@ transient feedback through it:
   timeout + pending-restore managed by a generic **`useUndo<T>`** composable (the timer/ref/auto-dismiss/
   `onBeforeUnmount` skeleton the two bars duplicated); the item-specific restore stays at each call site.
 
-This **deliberately overrides "reuse UI, never invent" for transient feedback only.** The justification: the
-inline undo bars were already a veyq invention (not legacy), so there is no legacy paradigm being displaced for
-undo; consolidating all ephemeral feedback into one consistent, accessible channel (PrimeVue Toast ships the
-`role`/aria + focus semantics) is cleaner than maintaining two hand-rolled bars plus scattered `notice` refs.
+This **deliberately overrides "reuse UI, never invent" for transient feedback only.** The justification: there
+was no one pattern to reuse — two hand-rolled undo bars duplicating a timer skeleton, plus scattered `notice`
+refs — so consolidating all ephemeral feedback into one consistent, accessible channel (PrimeVue Toast ships
+the `role`/aria + focus semantics) beats copying either shape a third time.
 Form-level *validation errors* and persistent *load-error* states stay inline — this decision covers success +
 undo (ephemeral) feedback, not error states pinned to a form.
 

@@ -46,9 +46,3 @@ acceptanceCriteria:
     text: GET /api/setup carries a stable instance salt (consumed at registration and login).
     coverage:
       backend: { integration: [LoginSliceTest.setupStatusCarriesStableInstanceSalt] }
-# Apple (macOS/iOS/iPadOS) native login landed in cr-0015: VeyqKit LoginTests (stubbed challenge→sign→
-# verify, refresh rotation, withRefresh) + LiveRoundTripTests (real instance) + RoundTripUITests (full UI
-# round-trip). wrong-credentials/nonce/reuse-detection stay backend-covered (server-side concerns).
-# Android (phone/tablet, Jetpack Compose) native login landed in cr-0016: :client LoginTest (MockWebServer
-# challenge→sign→verify, refresh rotation, withRefresh) + LiveRoundTripTest (real instance, OkHttp) +
-# :app RoundTripUiTest (full Compose UI round-trip on the API-37 emulator).

@@ -1,15 +1,15 @@
 # UC: Add a member to the shared Tenant space
 
-- ID: uc.spaces.add-member
-- Primary actor: Tenant **Owner** (invites — the only human action); **any tenant key-holder's device**
+- **ID:** uc.spaces.add-member
+- **Primary actor:** Tenant **Owner** (invites — the only human action); **any tenant key-holder's device**
   completes the key delivery automatically.
-- Goal: give another person access to the shared **Tenant** space — the owner invites them, and the tenant then
+- **Goal:** give another person access to the shared **Tenant** space — the owner invites them, and the tenant then
   hands over the key by itself: any member's device wraps the tenant scope key to the newcomer's identity,
   operator-blind.
-- Preconditions: The owner holds the TENANT grant (born cold at activation, [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md))
+- **Preconditions:** The owner holds the TENANT grant (born cold at activation, [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md))
   to mint the invite; at least one key-holder (every member holds `K_SC`) comes online after the newcomer joins,
   to deliver the key; a way to deliver the invite secret out-of-band (email, as the owner invite already does).
-- Postconditions (success): The invited person is a **member** of the tenant and, once **any** key-holder's
+- **Postconditions (success):** The invited person is a **member** of the tenant and, once **any** key-holder's
   device has wrapped the key to them, holds a **TENANT grant** — so they open the shared space instead of the
   Personal fallback. The server saw only the invite metadata, identity public keys, and opaque grant
   ciphertext — never the scope key.

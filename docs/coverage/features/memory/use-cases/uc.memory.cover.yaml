@@ -6,7 +6,7 @@ title: Memory cover — a chosen, cropped cover shown everywhere
 # under K_mem, set via the same partial updateNode, returned on listNodes. Deliberate pick (no auto-cover), one
 # normalized crop shown identically on the browse card, the detail header, and the map pin. cr-0072 built the
 # existing-media source (web, no backend); cr-0073 added the new-upload source — a standalone cover blob
-# (contract + backend + web) committed with no `veyq_media` row. Native cover parity is a later per-surface CR.
+# (contract + backend + web) committed with no `veyq_media` row.
 acceptanceCriteria:
   - id: sealed-cover-on-node
     text: A MEMORY/CHAPTER node's `wrappedMeta.cover` carries ONE cover — a source (an existing media `mediaId`, or a standalone uploaded blob ref) + a `crop {x,y,width,height}` normalized to 0..1 of the source image — sealed under K_mem in the same client-versioned blob as the date + location (no contract change for the media source), set via the partial updateNode and returned on listNodes. The operator-blind server never sees which image or the crop.

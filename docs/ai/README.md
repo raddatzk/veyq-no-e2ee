@@ -8,15 +8,19 @@ invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
 **Two audiences, and the project's owner is neither:**
 
 - **The agent implementing** — needs the current state, stated **once**, precisely. Duplication is the tax it
-  pays on every task: one rule (web-first) sits on 89 lines across 163 docs, and a guard was built to keep all
-  89 citing the right ADR — instead of deleting 88 and linking.
+  pays on every task, and it does not stay honest: `uc.platform.capability-discovery` kept its own copy of the
+  seven acceptance criteria that already lived in its coverage file, and by the time anyone compared them the
+  two had **already disagreed** about what sharing gates on. Two copies are not twice the truth; they are one
+  truth and one lie, and nothing says which.
 - **Someone outside judging the project** — reads it on GitHub, for twenty minutes, and never installs an IDE
   plugin. A format only IntelliJ renders is a diagram nobody sees.
 
 **The owner reviews in conversation, before the work — not by reading `docs/`.** So: describe what a refinement
-or a CR is *actually about*, in two sentences, and let them stop it. That exchange is the review loop. It is the
-only check that can ask **"do we need this at all?"** — no validator can, and its absence is how 33,000 lines of
-prose accumulated against 28,000 lines of product, with 1 feature in the last 40 commits.
+or a CR is *actually about*, in two sentences, and let them stop it. That exchange is the review loop, and it is
+the only check that can ask **"do we need this at all?"** — no validator can. The prose-to-product ratio is
+currently healthy (~12k lines of docs against ~50k of source), and it is worth knowing what that cost: it was
+last corrected by **deleting** ~2.6k lines in one pass, not by writing carefully. Prose grows by default; only
+that question shrinks it.
 
 Five rules follow:
 
@@ -30,10 +34,12 @@ Five rules follow:
    break quietly.
 4. **A claim nothing backs is a lie with a reason attached.** Coverage no CI runs, a diagram no reader can
    render, a work-order nobody reads. Cut it, don't annotate it.
-5. **Git is not durable here.** At the v1 move to a fresh repo (`legacy/` splits off to its own archive), the
-   history drops — an explicit choice, and a `git filter-repo`/`subtree split` move could keep it. Until that
-   is decided, **"let git hold it" buys nothing past v1**: what must survive lives in the **working tree**, or
-   is knowingly let go.
+5. **Don't offload meaning to git.** The rule was written against a planned v1 move to a fresh repo, which
+   would have dropped the history; that move's whole purpose was shedding the previous implementation, and
+   that is now simply done, in place. **Whether this repo is the final one is an open question** — until it
+   is answered, treat history as expendable: what must survive lives in the **working tree**, or is knowingly
+   let go. It stands on its own merit anyway — a reason that only a `git log` holds is a reason the next
+   reader will not find.
 
 ## State vs. flow
 
@@ -47,8 +53,7 @@ Five rules follow:
 
 ## The pipeline
 
-1. **Inbox** (`docs/inbox.md`) — a single status table of topics. Low friction. Seeded with
-   pointers into `legacy/` so the target-picture work isn't lost.
+1. **Inbox** (`docs/inbox.md`) — a single status table of topics. Low friction.
 2. **Refine** — pull a topic and refine it *with the user* into durable state. Always check the new
    fits the old: reconcile into existing crosscutting concerns and features/use-cases; never create
    orphan concepts. Durable decisions → an ADR in `docs/decisions/`. This is a sparring
@@ -153,7 +158,7 @@ A refined CR nails **decisions, not keystrokes**:
   those + the plain-language safety pages. Never maintain a parallel page tree by hand. (The Python
   generator is deferred; the section is authored from day one so it's free later.)
 
-## Parity & verification surfaces
+## What counts as verified
 
 **The coverage surfaces are `backend` and `web` — that is the whole set.** CR phases follow the dependency
 order **contracts → backend → web**.
@@ -161,18 +166,17 @@ order **contracts → backend → web**.
 The rule underneath, from [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md): **a test that
 no CI run executes makes no coverage claim.** It is not about which directories exist, or even which surfaces —
 it is about what a green build actually proves. Note the granularity, which cost a second pass to get right: the
-unit is the **test**, not the surface. `web` is live, and four of its refs still pointed at
-`*.e2e.test.ts` files gated behind `describe.skipIf(!process.env.VEYQ_E2E)` — real tests, genuinely valuable,
-that every CI run **skips**. A live surface is no alibi. Three cases have failed this rule:
+unit is the **test**, not the surface. `web` is built and tested on every run, and four of its refs still
+pointed at `*.e2e.test.ts` files gated behind `describe.skipIf(!process.env.VEYQ_E2E)` — real tests, genuinely
+valuable, that every CI run **skips**. A surface being built is no alibi for a test that isn't. Two cases have
+failed this rule:
 
 - **`http/`** was IntelliJ requests fired by hand. ADR 0040 stopped counting it; it has since been **deleted**.
-- **`apple/` and `android/`** hold parked code ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)).
-  No CI job builds or tests them, so **by the same rule their tests are not coverage** — however real the code
-  is. They re-enter the surface set at an explicit un-park, together with the net ADR 0010 owes then.
 - **`web`'s `*.e2e.test.ts`** need a live backend, so they are gated on `VEYQ_E2E` and skipped by every CI run;
-  the `web-e2e` job that would set it is `if: false`, because its orchestrator was moved to `legacy/` and never
-  ported back. They are a hand-run smoke — the same shape as `http/`, inside a live surface. Their four refs are
-  gone; every criterion they touched keeps CI-run coverage. Re-enabling that job is real, tracked debt
+  the `web-e2e` job that would set it is `if: false`, because its orchestrator no longer exists. They are a
+  hand-run smoke — the same shape as `http/`, only inside a surface that is otherwise built. Their four refs
+  are gone; every criterion
+  they touched keeps CI-run coverage. Rebuilding that job is real, tracked debt
   ([architecture §11](../architecture/README.md)) — and the day it is green, the refs come back.
 
 **Nothing enters the coverage model before a CI run executes it.** The claim follows the build, never the
@@ -205,26 +209,15 @@ intention — and "the test exists" is an intention.
   as it is **now**; when a decision changes, **edit the doc**. Never accrete `Amended: <date>` lines or
   `## … addendum <date>` sections — a dated change-log is not state. Canonical rule:
   [`../README.md`](../README.md) (§ current-state) + [`../decisions/README.md`](../decisions/README.md).
-  **But do not offload the *reason* to git** (§ What the docs are for, rule 5 — history drops at the v1 move).
+  **But do not offload the *reason* to git** (§ What the docs are for, rule 5).
   The test is not "old vs. new", it is **"does this still bind a future decision?"**: if a change leaves a live
   obligation, that obligation *is* current state and stays in the doc — as the obligation, not as a diary entry.
-  ADR 0010 is the worked example: it does not say *"we removed the `http/` clause on 2026-07-14"*; it says the
-  drift net is gone, that one live surface is why that is survivable, and that **a replacement is due at the
-  native un-park**. The date is noise; the debt is state. Where nothing binds, let it go.
-- **`legacy/` is read-only reference.** Never edit it. The inbox may point to it as source material,
-  but durable state must not depend on or link to it.
-- **Frontends reuse the existing UI/UX — never invent new UI.** Port the design/UX and change only the
-  underlying data layer (contracts-generated clients + client-side crypto). **Web design source =
-  `legacy/frontend-noe2ee/`** (the pre-E2EE original, `0075f77c` — the clean product UX; see its
-  `_PROVENANCE.md`). `legacy/frontend/` is the **E2EE-but-wrong-concept** descendant — consult it **only** as a
-  reference for *how an operator-blind server forces a flow client-side* (breadcrumbs, name-decrypt,
-  thumbnail-less gallery), never for its scope/key concept. **Native reuses its own legacy UI the same way:**
-  Apple ports the **first iOS UI** (`legacy/ios/`) **component-for-component** — copy the SwiftUI views, swap
-  only the data layer to the E2EE client (exactly the web approach); Android is built **fresh in parallel** to
-  Apple (no legacy Compose UI to copy) matching the same screens. **Both native heads are responsive universal
-  apps:** Apple adapts across **iPhone / iPad / macOS** (size classes — compact ↔ regular, multi-column on
-  regular), Android across **phone / tablet** (WindowSizeClass). Design for the **size class**, not a fixed
-  width — the sidebar/detail split collapses to a stack on compact and expands to columns on regular.
+  [ADR 0026](../decisions/0026-client-trust-tiers.md) is the worked example: it does not narrate which tiers it
+  once listed; it says a stronger unlock method is **not** a client-integrity answer, and why — the wrong turn
+  someone will otherwise take again. The date is noise; the trap is state. Where nothing binds, let it go.
+- **Reuse the existing UI — never invent new UI.** The built product is the design source: `web/` is whole, so
+  the nearest built screen answers almost every question. The rule and its details live once, in
+  [`../crosscutting/ui-web-styleguide.md`](../crosscutting/ui-web-styleguide.md) § Reuse first — not here.
 - **Start light.** Heavier machinery — validators, hooks, the wiki generator, the full `contracts/`
   tree, `.claude/` commands + subagents — is added when there is code/feature surface that justifies
   it, not up front.
@@ -237,8 +230,7 @@ these within a session and *propose* — I don't add tooling silently. Concrete 
 
 | Tool | Trigger |
 |---|---|
-| graphify on `legacy/` | I run 2–3 broad Explore sweeps over legacy in one refine session |
-| graphify on veyq | code exists across ≥3 surfaces and tracing one use-case through them gets lossy |
+| graphify on veyq | tracing one use-case from contract through backend to web gets lossy across 2–3 Explore sweeps in one session |
 | trust-chain validators | the first use-case + first test exist (something to link) |
 | an invariant guard | a CR removes a duplication or establishes "X only in Y" — promote its one-shot proof grep to a permanent check |
 | a hook | a validator/formatter exists and we've run it manually a few times |

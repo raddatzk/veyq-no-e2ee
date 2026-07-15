@@ -76,8 +76,8 @@ name under `K_name` from birth (epoch 0) and the backend needs **no** dual-shape
 
 ## Resolved / still open
 
-- **Resolved (cr-0096).** The HKDF `salt`/`info` and the AAD contexts are pinned as conformance vectors (native
-  byte-identical, [ADR 0009](0009-native-crypto-per-platform-vectors.md)): `K_name = HKDF-SHA256(E_e, salt="",
+- **Resolved (cr-0096).** The HKDF `salt`/`info` and the AAD contexts are pinned as conformance vectors
+  ([ADR 0017](0017-crypto-primitives-and-post-quantum-strategy.md)): `K_name = HKDF-SHA256(E_e, salt="",
   info=utf8("veyq/v1/group-name-key"), 32)`; the name seals with the existing **`node-name`** `symEncrypt` context
   (a group name is a name — domain separation lives in the key derivation) and `K_name` wraps under the distinct
   **`group-name-key`** `asymWrap` context (`group_name_key` / `sym_group_name` / `asym_group_name_key` vectors).

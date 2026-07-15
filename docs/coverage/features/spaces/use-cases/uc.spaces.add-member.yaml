@@ -6,8 +6,7 @@ title: Add a member to the shared Tenant space
 # member's identity pubkey (asymWrap to a FOREIGN identity; context `scope-grant`). ADMISSION (who may invite)
 # is owner-only; DELIVERY (the wrap) is any online key-holder's device, first-online-wins (no second human
 # action). Two-phase, "awaiting access" until any key-holder is next online. Authenticity is Plain in v1 (the
-# fingerprint/TOFU seam left open). Native invite/directory UI is each native surface's own later CR (web-first,
-# ADR 0010). The full grant-delivery happy-path needs the ML-KEM scope-grant flow not reproducible from a bare
+# fingerprint/TOFU seam left open). The full grant-delivery happy-path needs the ML-KEM scope-grant flow not reproducible from a bare
 # .http, so it is proven at the integration layer (TasksSliceTest / MemberAddSliceTest), same as content.http.
 acceptanceCriteria:
   - id: member-invite-and-onboard

@@ -7,28 +7,12 @@ gallery or social network.
 ## Source of truth
 
 **`web/src/styles/`** — nine stylesheets (~175 KB: `base` tokens, `ui`, `layout`, `forms`, `memory`, `media`,
-`settings`, **`dark`**), taken from `legacy/frontend-noe2ee/src/styles/` and then brought under the rules on
-this page. `web/src/style.css` is the import barrel plus the few additions the pre-E2EE source never had (the
-centered public shell, the Secret-Key unlock field).
+`settings`, **`dark`**); `web/src/style.css` is the import barrel. Individual edits carry a comment with their
+reason where the reason isn't obvious.
 
-**Not a verbatim copy — and deliberately not.** Only `media.css` is byte-identical; `base.css` and `ui.css` are
-additive; the other five carry real edits, each commented with its reason. They are this page's own rules applied
-to the inherited code, which is the useful thing to know about them:
-
-- **raw colours became role tokens** — `rgba(15,23,42,.12)` → `var(--app-shadow-sm)`, i.e. *"repeated raw colors
-  must become a role token before merge"* enforced backwards. Values shifted where the scale said so.
-- **hardcoded light values became theme-aware** — `background: rgba(255,255,255,.92)` →
-  `color-mix(in srgb, var(--app-surface) 92%, transparent)`. The original was white *by construction*; under
-  `dark.css` it would have stayed white. This is the section's rule ("every semantic color defines both") fixing
-  its own source.
-- **E2EE-era components were appended** where the pre-E2EE product had no equivalent (`.veyq-form-field`,
-  `.media-tile-check`, the changed-identity badge).
-
-**There is nothing left to port.** The system arrived whole, not token by token — so the rule is not "port it
-from legacy when you need it"; it is **use what is there, and if something is genuinely missing, that is a design
-decision, not a copy job.** Which reference tree the design comes from, and which one to never copy, is a
-project-wide rule and lives once, in [`docs/ai/README.md`](../ai/README.md) § Working rules. It is not restated
-here, and it is not needed here: for `web` there is nothing left to fetch.
+**The design system is complete — there is nothing to fetch from anywhere.** If something seems missing, that
+is a **design decision to make**, not a copy job. What the code already does is the answer; this page only says
+how to extend it.
 
 ## Reuse first — this is the load-bearing rule
 

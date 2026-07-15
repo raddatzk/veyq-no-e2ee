@@ -51,8 +51,9 @@
   **keyset delta**, not a full re-list. Neither re-serializes the whole gallery — the failure mode a naïve
   poll-then-full-list would hit.
 - **Delete-robust by an id-set, not a count.** When a delete happens the server returns the current `mediaId` set;
-  the client diffs it to drop removals and catch net-zero delete+add — the legacy set-not-count insight, without
-  its per-tick O(N) hash and without riding pure adds/edits (a second `delete_revision` counter gates it —
+  the client diffs it to drop removals and catch net-zero delete+add — a **count** cannot see a delete+add that
+  nets to zero, which is the whole reason this is a set. It costs no per-tick O(N) hash and does not ride pure
+  adds/edits (a second `delete_revision` counter gates it —
   [ADR 0033](../../../decisions/0033-live-media-updates-revision-polling.md)).
 - **Tightens the `auto`-date self-heal.** New media surfacing into an open grid lets the cr-0067 `auto`-date
   reconcile ([uc.memory.date](uc.memory.date.md) E5) see others' additions sooner — the same `media_revision` the
@@ -61,7 +62,7 @@
   (cr-0074); the poll loop mirrors `grantDeliveryPolling` / `scopeRotationPolling` (interval + visibility gate).
 - **Deferred (out of scope):** long-poll / push for sub-second latency (shared later with the live journal, #6);
   a **subtree** (Memory + chapters) aggregated revision (the gallery is own-node); a keyset delta is add/edit-only
-  by design, deletes ride the id-set. **Web first, then native parity** ([ADR 0043](../../../decisions/0043-web-first-v1-native-parked.md)).
+  by design, deletes ride the id-set.
 
 ## What this means for you / Was das für dich bedeutet
 
@@ -82,6 +83,5 @@ Erinnerung auf deinem Gerät verschlüsselt; der Server bewegt nur verschlüssel
   (its `auto` self-heal that the same `media_revision` tightens)
 - Decisions: [ADR 0033](../../../decisions/0033-live-media-updates-revision-polling.md) (the revision counter +
   conditional GET + keyset delta + delete-reconcile, short-poll v1), [ADR 0013](../../../decisions/0013-blob-storage-presigned-direct-to-store.md)
-  (the media transport the tiles fetch through), [ADR 0010](../../../decisions/0010-native-clients-shared-contracts-not-code.md)
-  (web first; native parity)
+  (the media transport the tiles fetch through)
 - Future: long-poll / push (sub-second, shared with live journal co-edit #6); Memory+chapters aggregated live grid

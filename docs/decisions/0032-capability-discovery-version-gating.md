@@ -6,7 +6,7 @@
 ## Context
 
 veyq is **self-hostable by default**: an operator runs their own backend, and users reach it with clients
-(web served by that backend, plus native apps) whose **versions drift** from the server's. Two problems follow
+(the web client served by that backend) whose **versions drift** from the server's. Two problems follow
 that a REST API alone doesn't solve:
 
 1. **Compatibility.** A client built against a newer/older server can call an endpoint that no longer exists, or
@@ -150,7 +150,7 @@ Two rules follow, so the catalog stays honest instead of being invented in paral
 - **Deferred (each a later slice, none blocking this):** the **deprecation lifecycle** (`state`, `sunsetAt`,
   `supersededBy`, the ~4-month sunset + non-dismissable warning); **per-user "new feature" notices/acks**;
   **audience filtering** (`ALL_USERS` vs `SERVER_OWNER`); **client device self-capabilities** (NPU/WebCodecs,
-  a separate direction); migrating `suites` into the unified manifest; **native parity**.
+  a separate direction); migrating `suites` into the unified manifest.
 - **Not a permission system.** This ADR deliberately does not touch per-scope/role authorization — it only adds
   the instance-wide discovery + version layer above it. Conflating the two is the main modeling risk, called out
   in §3.

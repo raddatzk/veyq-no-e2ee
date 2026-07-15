@@ -31,7 +31,7 @@ personal scope is a new `kind=PERSONAL` scope in the same tenant. (Realises the
 
 The server **cannot** create the scope — it has no key, and must stay blind. So the **client** mints it:
 generate a random scope key, seal it to the member's **own** identity public key
-(`asymWrap(ownIdentityPub, scopeKey, "scope-grant")` — the hybrid KEM, native-capable), and hand the server
+(`asymWrap(ownIdentityPub, scopeKey, "scope-grant")` — the hybrid KEM), and hand the server
 only the **ciphertext grant**.
 The server mints the scope row + the self-membership. The client **auto-births** it after unlock if
 `GET /api/scopes` shows no personal scope in the active tenant — so it appears "at join"
@@ -109,6 +109,6 @@ sequenceDiagram
   [Security Model](../../../crosscutting/security-model.md) (operator-blind)
 - Decisions: [ADR 0002](../../../decisions/0002-personal-scope-per-tenant.md) (personal scope is tenant-bound),
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (membership = role + grant),
-  [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant)
+  [ADR 0017](../../../decisions/0017-crypto-primitives-and-post-quantum-strategy.md) (the hybrid-KEM grant)
 - Related use-cases: [unlock](../../account/use-cases/uc.account.unlock.md) (yields the identity that opens the
   grant), [create-tenant](../../admin/use-cases/uc.admin.create-tenant.md) (the TENANT scope this sits beside)

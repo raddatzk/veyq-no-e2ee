@@ -78,5 +78,4 @@ The full grammar (extends, and revises the default of, [ADR 0015](0015-operator-
   and the `~me`/`@` tokens all stand; this ADR pins the previously-unspecified token-less default and is
   cross-referenced from 0015.
 
-> Realised web-first: the `location.ts` default flip + Personal ↔ Tenant switching; contracts + backend
-> unchanged. Native heads follow in their own CRs.
+> Realised: the `location.ts` default flip + Personal ↔ Tenant switching; contracts + backend unchanged.
