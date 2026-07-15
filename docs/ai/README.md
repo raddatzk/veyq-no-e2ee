@@ -3,6 +3,38 @@
 How we build veyq. Concise on purpose; this is the entry for every working session. The hard
 invariants in [CLAUDE.md](../../CLAUDE.md) override everything here.
 
+## What the docs are for — and who reads them
+
+**Two audiences, and the project's owner is neither:**
+
+- **The agent implementing** — needs the current state, stated **once**, precisely. Duplication is the tax it
+  pays on every task: one rule (web-first) sits on 89 lines across 163 docs, and a guard was built to keep all
+  89 citing the right ADR — instead of deleting 88 and linking.
+- **Someone outside judging the project** — reads it on GitHub, for twenty minutes, and never installs an IDE
+  plugin. A format only IntelliJ renders is a diagram nobody sees.
+
+**The owner reviews in conversation, before the work — not by reading `docs/`.** So: describe what a refinement
+or a CR is *actually about*, in two sentences, and let them stop it. That exchange is the review loop. It is the
+only check that can ask **"do we need this at all?"** — no validator can, and its absence is how 33,000 lines of
+prose accumulated against 28,000 lines of product, with 1 feature in the last 40 commits.
+
+Five rules follow:
+
+1. **Deleting beats reformatting.** Success is lines *removed*. Bullets vs. prose is roughly token-neutral;
+   duplication is not. Never restructure what you could delete.
+2. **Point at one canonical source; never restate it.** A restated list drifts from the one that runs — the CI
+   job is the guard registry, the ADR owns its rule, the use-case owns its behaviour.
+3. **No guard unless a human would notice the defect.** Ask what it *cost* before building one: three diagrams
+   failed to render for 13 days at an observed cost of **zero**. Thirteen unnoticed days are evidence nobody
+   looks — not evidence of urgency. The alternative to a guard is usually a format or structure that cannot
+   break quietly.
+4. **A claim nothing backs is a lie with a reason attached.** Coverage no CI runs, a diagram no reader can
+   render, a work-order nobody reads. Cut it, don't annotate it.
+5. **Git is not durable here.** At the v1 move to a fresh repo (`legacy/` splits off to its own archive), the
+   history drops — an explicit choice, and a `git filter-repo`/`subtree split` move could keep it. Until that
+   is decided, **"let git hold it" buys nothing past v1**: what must survive lives in the **working tree**, or
+   is knowingly let go.
+
 ## State vs. flow
 
 - **State** = what veyq *is* (durable truth):
@@ -146,9 +178,15 @@ never the intention.
   rest of the label is swallowed **silently**, with no error at all).
 - **Scripts and utilities in Python.** Bash only for thin CI/hook glue.
 - **Durable state is edited in place — no addendums.** State every doc (ADRs, use-cases, enablers, crosscutting)
-  as it is **now**; when a decision changes, **edit the doc** and let **git** hold the history. Never accrete
-  `Amended: <date>` lines or `## … addendum <date>` sections — a change-log belongs in git, not the doc. Canonical
-  rule: [`../README.md`](../README.md) (§ current-state) + [`../decisions/README.md`](../decisions/README.md).
+  as it is **now**; when a decision changes, **edit the doc**. Never accrete `Amended: <date>` lines or
+  `## … addendum <date>` sections — a dated change-log is not state. Canonical rule:
+  [`../README.md`](../README.md) (§ current-state) + [`../decisions/README.md`](../decisions/README.md).
+  **But do not offload the *reason* to git** (§ What the docs are for, rule 5 — history drops at the v1 move).
+  The test is not "old vs. new", it is **"does this still bind a future decision?"**: if a change leaves a live
+  obligation, that obligation *is* current state and stays in the doc — as the obligation, not as a diary entry.
+  ADR 0010 is the worked example: it does not say *"we removed the `http/` clause on 2026-07-14"*; it says the
+  drift net is gone, that one live surface is why that is survivable, and that **a replacement is due at the
+  native un-park**. The date is noise; the debt is state. Where nothing binds, let it go.
 - **`legacy/` is read-only reference.** Never edit it. The inbox may point to it as source material,
   but durable state must not depend on or link to it.
 - **Frontends reuse the existing UI/UX — never invent new UI.** Port the design/UX and change only the
