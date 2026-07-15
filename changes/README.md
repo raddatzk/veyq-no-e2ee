@@ -1,10 +1,25 @@
 # Change requests
 
-A change-request (CR) is the **self-contained work order** for an implementation. It is derived
-from refined state. **CRs are kept as a record** (not deleted when done) — they form a readable log
-of what each piece of work delivered. The durable *engineering* truth still lives in the updated
-`docs/` state + (for decisions) ADRs + git history; CRs are the work-order trail alongside it, not a
-substitute for state docs.
+A change-request (CR) is the **self-contained work order** for an implementation, derived from refined state.
+**A CR is deleted when it is done.** It is scaffolding: consumed the moment the work lands.
+
+This reverses a 2026-06-25 convention change that kept them "as a readable log". By 2026-07-14 that log was
+**168 files / 18,016 lines** — larger than all of `docs/`, larger than the backend — and it had no reader:
+the owner does not read `docs/` at all, nobody judges a project by reading 168 work orders, and an agent reads
+the *current* CR plus recent retrospectives. A log nobody reads is not a record, it is a cost (§ What the docs
+are for, in [`../docs/ai/README.md`](../docs/ai/README.md)).
+
+Nothing durable dies with it, because nothing durable was ever *only* there:
+- **What was built** → the updated `docs/` state; **what was decided** → an ADR. If a CR holds a decision that
+  is in neither, that is the bug — fix it there, then delete the CR.
+- **What was learned** moves to where it bites, not into an archive. A code trap becomes a comment on the line
+  that trips over it (cr-0089's post-rotation zeroed-key trap lives in `web/src/app/activeSpace.ts`, three
+  lines from the code that caused it); a working lesson becomes a rule in this file. Both already happened —
+  the retrospectives were the ore, not the metal.
+- **Do not offload it to git.** The old pre-2026-06-25 rule said "the durable trace lives in git history",
+  which is exactly the assumption that breaks at the v1 repo move. Harvest *before* deleting, into the tree.
+
+So: no `changes/cr-*` archive. `changes/` holds this file and any live review/finding backlog.
 
 - One file per CR: `cr-NNNN-slug.md`.
 - **Self-contained as a work order:** it *links* to the durable truth (use-cases, contracts,
@@ -63,7 +78,7 @@ substitute for state docs.
 ---
 id: cr-0001
 title: <short title>
-status: planned          # planned → in-progress → done (the file is kept as a record)
+status: planned          # planned → in-progress → done (then harvest what binds, and delete the file)
 satisfies: []            # use-case ids this fulfills (trust-chain link)
 adrs: []                 # related ADR ids
 invariants: []           # hard rules this work could threaten

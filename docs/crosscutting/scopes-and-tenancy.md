@@ -8,9 +8,8 @@
 
 This is the **target model**; first-build scope is tracked via the inbox and change-requests. The general
 **scope identity** (opaque `scopeId` + `kind`) and the per-tenant **personal scope** (client-birthed,
-operator-blind) are realised by the enabler [en.spaces.personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md)
-([cr-0026](../../changes/cr-0026-personal-scope.md)); the tenant root scope by
-[cr-0010](../../changes/cr-0010-tenant-activation.md).
+operator-blind) are realised by the enabler [en.spaces.personal-scope](../features/spaces/enablers/en.spaces.personal-scope.md);
+the tenant root scope is born at tenant activation.
 
 ## Scope — the unit content is keyed on
 

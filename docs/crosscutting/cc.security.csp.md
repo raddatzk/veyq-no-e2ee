@@ -4,9 +4,8 @@
 - **Type:** **Cross-cutting concern** — a horizontal browser-enforced security mechanism for the `web/` surface;
   it has no standalone end-user goal (not a use-case) and is not a feature substrate (not an enabler). Recorded
   here so its policy + rationale + verification are traceable from the threat model.
-- **Status:** baseline shipped as a `<meta>` policy + dev-server header
-  ([cr-0133](../../changes/cr-0133-web-csp.md)); the header-only directives (`frame-ancestors`, HSTS) are
-  **deferred** to the future production web-serving component (see *Deferred* below).
+- **Status:** baseline shipped as a `<meta>` policy + dev-server header; the header-only directives
+  (`frame-ancestors`, HSTS) are **deferred** to the future production web-serving component (see *Deferred* below).
 
 ## Protects against
 

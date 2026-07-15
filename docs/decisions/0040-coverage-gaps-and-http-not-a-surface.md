@@ -3,8 +3,8 @@
 - Status: Accepted
 - Date: 2026-07-13
 
-> Realises the rest of audit finding **#62 (P1b)** after [cr-0158](../../changes/cr-0158-coverage-validator-class-resolution.md)
-> did the class-scoped-resolution core. Merges the two split sub-findings — inbox **#81** (coverage/`gaps`
+> Realises the rest of audit finding **#62 (P1b)**; the class-scoped-resolution core already landed.
+> Merges the two split sub-findings — inbox **#81** (coverage/`gaps`
 > overlap) and **#82** (CI-vs-live levels) — because the refine found they share one root cause. To be
 > implemented by a change-request (P1b follow-up); this ADR is the decision it builds on.
 

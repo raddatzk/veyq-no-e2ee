@@ -64,7 +64,7 @@
   removal, which must run on a key-holder's device. `deletedAt`/`purgeAfter` are operational metadata the operator
   already sees the shape of (membership + timestamps).
 - **Grace = 30 days (`P30D`), reused from the tenant-invite retention precedent** — one retention-constant family
-  ([cr-0011](../../../../changes/cr-0011-session-token-purge.md) purge pattern). Irreplaceable shared memories deserve
+  (purge pattern). Irreplaceable shared memories deserve
   a generous, recoverable window, and pending-deletion only holds **ciphertext**, so the cost of waiting is nil.
 - **Multiple owners: any owner deletes, any owner restores.** Delete is a destructive-but-reversible-in-window act;
   the grace window is the mutual safety net, so a single owner's mistake (or pique) is undoable by any co-owner. The

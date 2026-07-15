@@ -12,7 +12,7 @@ duplications result (audit finding **P3b**, [inbox #72](../inbox.md)):
 
 1. **Envelope construction is copy-pasted in 4 idioms across 17 sites.** The generated wire contract
    `ErrorResponse{code}` (required `code`, optional `message`; identical in all 9 specs, guarded by
-   [cr-0144](../../changes/cr-0144-contracts-common-drift-guard.md)/[ADR 0038](0038-contracts-shared-components-bundling.md))
+   [ADR 0038](0038-contracts-shared-components-bundling.md))
    is built via: an overloaded `private fun error(status, code)` (5 resources), named per-code helpers
    (`forbidden`/`notFound`/`conflict`, 2 resources), fully-inline `Response.status(…).entity(ErrorResponse(code=…))`
    (8 resources + `tasks`), and the 2 central providers `shared/auth/AuthExceptionMappers` +
@@ -55,8 +55,7 @@ intact**:
 
 **Operator-blind guard ordering (the drift target).** A non-member probing a `scopeId` must not distinguish
 "exists, you're forbidden" (403) from "no such scope" (404), or the response **discloses scope existence** across
-the membership boundary — a confidentiality leak (cf. the cross-scope IDOR class,
-[cr-0126](../../changes/cr-0126-fix-node-delete-idor.md)).
+the membership boundary — a confidentiality leak (cf. the cross-scope IDOR class).
 
 What leaks is the **order of the guards**, not a variant's status tag. Existence is disclosed when an operation
 probes *existence* (or scope **kind**) **before** the membership guard, so the two branches answer differently.
@@ -75,10 +74,8 @@ be applied to paths a non-member reaches legitimately by **possessing an unguess
 share-guest ops and tenant `preview`/`register`/`accept`. Those callers already know the resource exists, so
 their 403s are correct.
 
-The projection refactor ([cr-0161](../../changes/cr-0161-http-failure-projection.md)) was deliberately
-**behaviour-preserving** and only made the drift *visible*; the ordering fix is
-[cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md), which also carries the enforcement
-guard below.
+The projection refactor was deliberately **behaviour-preserving** and only made the drift *visible*;
+the ordering fix also carries the enforcement guard below.
 
 **`not_scope_member` was a misnomer**, retired by cr-0162. The sites named it gated on `holdsGrant`, not on
 membership, so a member whose consent/grant was still pending (ADR 0020) was told they were "not a member". With
@@ -112,6 +109,3 @@ the boundary guard first, the residual 403 means precisely "member, but not a ke
 - **Rejected — envelope-only dedup.** Extract just the `error()` helper to `shared/http/`, leave each resource's
   variant → status `when`. Smallest change, but leaves the projection re-derived per resource and does nothing
   about the drift. Rejected as half the value.
-- Implemented by **[cr-0161](../../changes/cr-0161-http-failure-projection.md)** (the projection);
-  **[cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md)** carries the guard-ordering
-  rule + its enforcement test.

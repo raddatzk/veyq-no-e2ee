@@ -21,8 +21,7 @@
   flow here is native-only by design (see *Web* below).
 
 > **No end-user section** (enabler) — its value surfaces through the unlock use-cases it serves. This is the
-> **target model**; what landed per surface is the [parity matrix](../../../crosscutting/platform-parity.md) +
-> [cr-0024](../../../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).
+> **target model**; what landed per surface is the [parity matrix](../../../crosscutting/platform-parity.md).
 
 ## The one rule: two layers, and where the prompt lives
 
@@ -54,8 +53,7 @@ knowable without a prompt, and only the *secret* costs a gesture:
 `K` *is* the KEK for the passwordless wrap: `device-key wrap = symWrap(K, masterKey, "master-key")`, stored
 server-side as a `method=DEVICE` wrap (no contract change; the server cannot tell L2 from L3 — both are the
 same ciphertext). The refresh token is **sealed under `K`**: `sealedRefreshToken = symWrap(K, token,
-"session-token")` ([cr-0023](../../../../changes/cr-0023-gate-l2-session-token.md)) — so the store and the data
-layer only ever see **ciphertext**, never a usable token at rest.
+"session-token")` — so the store and the data layer only ever see **ciphertext**, never a usable token at rest.
 
 ## The unified sequences
 
@@ -152,7 +150,7 @@ The *rule* still holds trivially: web's data layer is already prompt-free. A fut
   the password — so an extracted key opens **this device's vault only**, never a way to authenticate
   elsewhere (bounded blast radius; [biometric-unlock](../use-cases/uc.account.biometric-unlock.md)).
 - **Token sealed under `K`.** The persisted refresh token is useless without the (gated) `K` — closing
-  security finding M2 ([cr-0023](../../../../changes/cr-0023-gate-l2-session-token.md)).
+  security finding M2.
 
 ## What is identical vs. native (reviewer's summary)
 
@@ -179,4 +177,3 @@ The *rule* still holds trivially: web's data layer is already prompt-free. A fut
   [set-device-security (chooser)](../use-cases/uc.account.set-device-security.md),
   [trust-device (L1)](../use-cases/uc.account.trust-device.md),
   [unlock (L0 floor)](../use-cases/uc.account.unlock.md).
-- Work order: [cr-0024](../../../../changes/cr-0024-unify-passwordless-unlock-mechanism.md).

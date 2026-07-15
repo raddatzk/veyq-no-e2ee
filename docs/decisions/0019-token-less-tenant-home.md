@@ -7,14 +7,13 @@
 
 [ADR 0015](0015-operator-blind-readable-urls.md) put the in-shell content path in the URL `#fragment` and
 established two leading tokens — `~me` (personal) and `@<group>` (group) — resolved client-side. It did **not**
-pin what a **token-less** fragment means: the first web slice ([cr-0031](../../changes/cr-0031-memory-shell-polish.md))
-simply defaulted an empty/bare fragment to **Personal** (`~me`), because Personal was the only scope the shell
+pin what a **token-less** fragment means: the first web slice simply defaulted an empty/bare fragment to
+**Personal** (`~me`), because Personal was the only scope the shell
 could open at the time — the shared `TENANT` scope, though born at activation
-([ADR 0006](0006-cold-tenant-scope-birth.md), [cr-0010](../../changes/cr-0010-tenant-activation.md)), had no
-client entry.
+([ADR 0006](0006-cold-tenant-scope-birth.md)), had no client entry.
 
-We are now making the `TENANT` scope enterable ([en.spaces.tenant-scope](../features/spaces/enablers/en.spaces.tenant-scope.md),
-[cr-0075](../../changes/cr-0075-web-enter-tenant-scope.md)). That forces the question ADR 0015 left open: with
+We are now making the `TENANT` scope enterable ([en.spaces.tenant-scope](../features/spaces/enablers/en.spaces.tenant-scope.md)).
+That forces the question ADR 0015 left open: with
 **three** openable kinds, which one owns the **token-less** default — the clean `family.example.com/` with no
 bare `#`? veyq's product center is **memory-sharing**; a tenant *is* a domain, and its shared root scope is the
 commons that domain exists to serve. Two candidates:
@@ -79,5 +78,5 @@ The full grammar (extends, and revises the default of, [ADR 0015](0015-operator-
   and the `~me`/`@` tokens all stand; this ADR pins the previously-unspecified token-less default and is
   cross-referenced from 0015.
 
-> Realised web-first under [cr-0075](../../changes/cr-0075-web-enter-tenant-scope.md) (the `location.ts` default
-> flip + Personal ↔ Tenant switching); contracts + backend unchanged. Native heads follow in their own CRs.
+> Realised web-first: the `location.ts` default flip + Personal ↔ Tenant switching; contracts + backend
+> unchanged. Native heads follow in their own CRs.

@@ -5,7 +5,7 @@
 
 ## Context
 
-[ADR 0002](0002-personal-scope-per-tenant.md) + [cr-0026](../../changes/cr-0026-personal-scope.md) settled
+[ADR 0002](0002-personal-scope-per-tenant.md) settled
 the **scope** layer (opaque `scopeId` + kind; a member holds a scope via a grant = the scope key sealed to
 their identity). What lives *inside* a scope — folders, Memories, chapters, media, journal — needs its own
 key model. The [Security Model](../crosscutting/security-model.md) **sketched** per-subtree content keys and
@@ -121,4 +121,4 @@ holds one more opaque wrap and nothing else.
   (one-key-many-wraps), [ADR 0009](0009-native-crypto-per-platform-vectors.md) (vectors are the byte
   contract).
 - Feature: [Memory](../features/memory/_index.md); the foundation enabler
-  [en.memory.tree](../features/memory/enablers/en.memory.tree.md). Implementation: [cr-0027](../../changes/cr-0027-memory-tree.md).
+  [en.memory.tree](../features/memory/enablers/en.memory.tree.md).

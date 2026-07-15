@@ -93,8 +93,7 @@ and which is confidential even from the tenant owner.**
      **Accept** flips the membership eligible → a key-holder wraps `K_SC` (the usual "awaiting access" window);
      **Decline** drops the soft membership (nothing was ever wrapped).
    - **Threat:** a malicious operator could return a public key it controls (MITM) and read the group.
-     **Defense:** the **safety-number / fingerprint** of that identity
-     ([cr-0025](../../changes/cr-0025-native-hybrid-kem.md)). The verification stance is settled in
+     **Defense:** the **safety-number / fingerprint** of that identity. The verification stance is settled in
      [ADR 0028](0028-identity-authenticity-tofu-verification.md): **TOFU-pin on first use**, a **change** is a UI
      notice (accept → re-pin) or a **hard block for the human-less grant-delivery worker**, and out-of-band
      **safety-number verification** (QR compare) elevates *pinned* → *verified*; a **hard gate** before the first
@@ -104,7 +103,7 @@ and which is confidential even from the tenant owner.**
    - **Owner delete = soft + grace.** Any GroupOwner deletes; the group enters **pending-deletion** (`deletedAt`
      marker + a `purgeAfter` date) and is hard-purged by a scheduled job after a **30-day grace period** (`P30D`,
      reusing the tenant-invite retention precedent). Mirrors the scheduled-purge pattern (`TenantInvitePurge` /
-     `SessionPurge`, [cr-0011](../../changes/cr-0011-session-token-purge.md)). **During grace the group stays
+     `SessionPurge`). **During grace the group stays
      viewable + downloadable but read-only, clearly marked as deleting** (members can see their pictures one last
      time); grants/memberships are untouched, so **any owner can restore** in-window (trivial: clear the marker).
      The **hard-purge erases content + blob objects** from the store (reusing the blob-aware node-subtree delete),

@@ -54,8 +54,9 @@ Five rules follow:
    orphan concepts. Durable decisions → an ADR in `docs/decisions/`. This is a sparring
    conversation, not transcription. **Scope each refinement** — don't refine all of crypto at once.
 3. **Change-request** (`changes/cr-NNNN-slug.md`) — a self-contained, phased work order derived from
-   the refined state. See [`changes/README.md`](../../changes/README.md). CRs are **kept** as a record
-   of each piece of work; the durable engineering truth still lives in the updated state + ADRs.
+   the refined state. See [`changes/README.md`](../../changes/README.md). A CR is **scaffolding, deleted when
+   done** — the durable truth lives in the updated state + ADRs, and what the work *taught* is moved to where
+   it binds before the file goes (rule 5: not into git).
 
 > **Refined state comes before the CR — always.** A change-request is only written once the durable state it
 > builds on already exists as written docs: its **use-case(s) (`uc.*`)**, **enabler(s) (`en.*`)**, **crosscutting

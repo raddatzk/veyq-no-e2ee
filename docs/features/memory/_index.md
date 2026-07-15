@@ -23,15 +23,14 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 
 - ★ [en.memory.tree](enablers/en.memory.tree.md) — **refined** (the encrypted node tree: FOLDER/MEMORY/CHAPTER,
   encrypted names, blinded slugs, per-Memory `K_mem` birth/open — the substrate the use-cases below build on;
-  [ADR 0012](../../decisions/0012-content-key-hierarchy.md), [cr-0027](../../../changes/cr-0027-memory-tree.md))
+  [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
 - ★ [en.memory.media](enablers/en.memory.media.md) — **refined** (the encrypted media data layer: a blob sealed
   as chunked AEAD under a random `K_blob` wrapped under `K_mem`, transferred direct-to-store via presigned URLs,
   attached to a node; **no content dedup** — operator-blind trade-off;
   [ADR 0013](../../decisions/0013-blob-storage-presigned-direct-to-store.md),
   [ADR 0012](../../decisions/0012-content-key-hierarchy.md))
 - ★ [en.memory.favorites](enablers/en.memory.favorites.md) — **built** (pin a Memory: the per-(user, scope)
-  pinned-id set sealed under `K_SC` as one opaque blob — operator-blind, no plaintext favorite flag;
-  [cr-0031](../../../changes/cr-0031-memory-shell-polish.md))
+  pinned-id set sealed under `K_SC` as one opaque blob — operator-blind, no plaintext favorite flag)
 - ★ [en.memory.derivatives](enablers/en.memory.derivatives.md) — **refined** (per-item **thumbnail / preview /
   original** tiers — grid = thumbnail, lightbox = preview, download = original; client-generated encrypted
   blobs, **per-blob `K_blob`**, role-tagged on the media record (`original` + `derivatives[{kind, blob}]`), no
@@ -45,7 +44,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
   container within a Memory, a real `owner_key`-keyed `veyq_bucket` table — `user:{id}` / `share:{id}` — with a
   lazy virtual primary + one-level sub-buckets, names sealed under `K_mem`, media linked via a nullable `bucket_id`
   + denormalized `created_by`; reparent-on-delete + own-bucket authz, oriented on legacy ADR 0023;
-  [ADR 0034](../../decisions/0034-media-uploader-buckets.md), [cr-0113](../../../changes/cr-0113-media-uploader-buckets-beitraege-tab.md) planned)
+  [ADR 0034](../../decisions/0034-media-uploader-buckets.md))
 
 ## Use-cases (on the tree + media enablers)
 

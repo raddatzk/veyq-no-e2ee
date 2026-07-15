@@ -8,8 +8,7 @@
   operator-blind.
 - Preconditions: The owner holds the TENANT grant (born cold at activation, [ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md))
   to mint the invite; at least one key-holder (every member holds `K_SC`) comes online after the newcomer joins,
-  to deliver the key; a way to deliver the invite secret out-of-band (email, as the owner invite already does,
-  [cr-0009](../../../../changes/cr-0009-create-tenant-structural.md)).
+  to deliver the key; a way to deliver the invite secret out-of-band (email, as the owner invite already does).
 - Postconditions (success): The invited person is a **member** of the tenant and, once **any** key-holder's
   device has wrapped the key to them, holds a **TENANT grant** — so they open the shared space instead of the
   Personal fallback. The server saw only the invite metadata, identity public keys, and opaque grant
@@ -22,10 +21,10 @@ This use-case is the first consumer of the grant-distribution primitive
 
 1. The owner opens **"add member,"** enters the person's **email** and `role = MEMBER`. The server mints a
    **single-use member invite** (the secret hashed, never stored plaintext) and delivers it out-of-band —
-   reusing the tenant-invite machinery that today mints only the owner ([cr-0009](../../../../changes/cr-0009-create-tenant-structural.md) / cr-0010).
-   Delivery is by email **if a mailer is configured**, or by the owner **copying the invite link** the mint
+   reusing the tenant-invite machinery that today mints only the owner. Delivery is by email **if a mailer is
+   configured**, or by the owner **copying the invite link** the mint
    returns (the bootstrap secret in the URL fragment) — so member-add works with no SMTP, self-hostable by
-   default ([cr-0080](../../../../changes/cr-0080-invite-link-handoff.md)).
+   default.
 2. The invitee opens the invite, previews the tenant (name, domain), and **registers**: their identity is
    **born cold on-device** and its public bundle published, they set their password + master-key wraps, and
    accept. They are now a tenant **member with no grant** — so they land in the **Personal fallback**
@@ -66,10 +65,10 @@ sequenceDiagram
 ## Alternate / exception flows
 
 - **A1 — the invitee already has an account on this instance:** they **accept** rather than cold-register
-  (the [cr-0010](../../../../changes/cr-0010-tenant-activation.md) accept branch); they still become a
-  grantless member until a key-holder wraps (step 3). *(v1 tenant onboarding targets a new person by email; the
-  existing-member, by-username variant is [uc.spaces.add-group-member](uc.spaces.add-group-member.md) — the group
-  case under [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md).)*
+  (the accept branch); they still become a grantless member until a key-holder wraps (step 3). *(v1 tenant
+  onboarding targets a new person by email; the existing-member, by-username variant is
+  [uc.spaces.add-group-member](uc.spaces.add-group-member.md) — the group case under
+  [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md).)*
 - **A2 — no key-holder is online when the member joins:** the member stays in the Personal fallback, surfaced as
   *awaiting access* — **not** an error. Only a key-holder can wrap the key; the blind server cannot. Access
   completes as soon as **any** member (the owner or another) is next online (step 3) — not specifically the owner.

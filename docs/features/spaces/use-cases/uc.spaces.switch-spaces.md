@@ -89,7 +89,3 @@ liegt.
   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (groups, sealed names),
   [ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md) (fragment routing),
   [ADR 0019](../../../decisions/0019-token-less-tenant-home.md) (tenant is the token-less default home)
-- Work orders: cr-0031 (the switcher + fragment routing), cr-0032 (groups appear in the switcher),
-  [cr-0075](../../../../changes/cr-0075-web-enter-tenant-scope.md) (enter the tenant space + Personal ↔ Tenant
-  switching, web), [cr-0108](../../../../changes/cr-0108-web-merge-tenant-switcher-root.md) (merge the switcher
-  into the active-tenant row + chevron overview, web)

@@ -15,9 +15,8 @@
   a **generic scope consumer** (it lives in *any* scope — personal, tenant, or group), not something built on the
   tenant scope specifically, so it is not a `Serves` target here.
 - **Depends on:** [en.spaces.personal-scope](en.spaces.personal-scope.md) (the generalised **scope identity**
-  `scopeId + kind` and the client-side **open-by-unwrap**), `uc.account.unlock` (the identity that opens the
-  grant), and [cr-0010](../../../../changes/cr-0010-tenant-activation.md) (the `TENANT` scope + the owner's
-  grant already exist — this enabler consumes them, it does not create them).
+  `scopeId + kind` and the client-side **open-by-unwrap**), and `uc.account.unlock` (the identity that opens
+  the grant).
 - **Preconditions:** An **authenticated, unlocked** member of the active tenant (the identity **private**
   bundle is in the vault, so the client can open a grant); the tenant resolved from the request `Host`; a
   `kind=TENANT` scope for which the caller **holds a grant** is returned by `GET /api/scopes`.
@@ -32,8 +31,8 @@ with the vaulted identity → the scope key in memory) with **one deliberate sub
 
 1. **No birth — open only.** A personal scope **auto-births** after unlock if absent
    ([en.spaces.personal-scope](en.spaces.personal-scope.md)). The tenant scope must **never** be minted by the
-   client: it is **born cold by the invited owner at activation** ([ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md),
-   [cr-0010](../../../../changes/cr-0010-tenant-activation.md)). So this enabler has **no `POST /api/scopes`
+   client: it is **born cold by the invited owner at activation**
+   ([ADR 0006](../../../decisions/0006-cold-tenant-scope-birth.md)). So this enabler has **no `POST /api/scopes`
    path**; if no openable tenant scope is present, it does **not** create one — it yields "not available" and
    the shell falls back to Personal (below). This subtraction is the crux: minting a tenant scope client-side
    would fork the single shared root.
@@ -129,6 +128,3 @@ sequenceDiagram
 - Sibling enablers: [en.spaces.personal-scope](en.spaces.personal-scope.md) (the open machinery this reuses +
   the auto-birth this deliberately omits), [en.spaces.group-scope](en.spaces.group-scope.md) (the other shared
   kind — named, warm-born)
-- Work order: [cr-0075](../../../../changes/cr-0075-web-enter-tenant-scope.md) (web: open + enter the tenant
-  scope, switch Personal ↔ Tenant), building on [cr-0010](../../../../changes/cr-0010-tenant-activation.md)
-  (the scope's cold birth)

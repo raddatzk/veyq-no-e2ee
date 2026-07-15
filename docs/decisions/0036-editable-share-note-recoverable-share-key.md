@@ -57,8 +57,7 @@ parts.
    can't be honestly flipped on already-distributed links). `role` is omitted for a plain note/name edit.
 
 **Roles + scope.** All three roles (VIEWER / CONTRIBUTOR / UPLOADER) carry a note. **v1 = personal-scope shares**
-(the current share cut); the note rides [cr-0104](../../changes/cr-0104-shared-scope-public-shares.md)'s
-group/tenant lift with no extra work.
+(the current share cut); the note rides the group/tenant lift with no extra work.
 
 ## Operator-blindness
 

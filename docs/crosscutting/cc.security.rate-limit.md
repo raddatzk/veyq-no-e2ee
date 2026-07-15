@@ -6,7 +6,7 @@
   here so its **mechanism + its verification are traceable** from the threat model, rather than living as an
   orphan test next to the code (the gap a 2026-06 coverage audit found).
 - **Status:** two independent bounds shipped — the **per-IP auth bound** (cr-0044/cr-0130) and the **per-share
-  password-attempt bound** ([cr-0165](../../changes/cr-0165-share-password-attempt-bound.md)). Verification is
+  password-attempt bound**. Verification is
   **partial by design**: the auth challenge/verify/refresh endpoints carry runtime `429` assertions + window-reset
   + per-IP isolation; the three **method-level** account-creation endpoints (cr-0130) are pinned by a **static**
   annotation-presence check, **not** a runtime `429` test; the share bound has runtime assertions (cr-0165).
@@ -98,6 +98,3 @@ exhausted budget does not block another (the per-share axis); and a guest **writ
   mechanism + verification)
 - Code: `backend/.../shared/ratelimit/{RateLimited,AuthRateLimitFilter}.kt`,
   `backend/.../features/sharing/SharePasswordAttemptLimiter.kt`
-- Change-requests: [cr-0044](../../changes/cr-0044-rate-limit-tests-and-auth-gaps.md) (auth verification),
-  [cr-0130](../../changes/cr-0130-auth-rate-limit-account-creation.md) (account-creation endpoints + static check),
-  [cr-0165](../../changes/cr-0165-share-password-attempt-bound.md) (per-share password-attempt bound)

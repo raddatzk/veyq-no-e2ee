@@ -5,7 +5,7 @@
 
 > Realises audit finding **#76 (P3f)**. **Keeps** the "specs are self-contained (no external `$ref`)" invariant
 > (`backend/gradle/openapi.gradle.kts`, `contracts/api/account.openapi.yaml`) and adds a guard instead of a
-> bundler — see *Decision*. Implemented by [cr-0144](../../changes/cr-0144-contracts-common-drift-guard.md).
+> bundler — see *Decision*.
 
 ## Context
 

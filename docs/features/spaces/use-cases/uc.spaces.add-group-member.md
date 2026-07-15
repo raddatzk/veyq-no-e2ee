@@ -39,7 +39,7 @@ Governance (who may add, the name stays sealed, no tenant-owner power) is [ADR 0
    member in the group's **member directory** (with their identity public key) and **eagerly wraps** `K_SC` to
    them. The **first** key-holder to do so wins; the rest see the grant already present and no-op. Delivery is a
    `grant-delivery` job on the operator-blind background-task mechanism ([ADR 0021](../../../decisions/0021-operator-blind-background-tasks.md)),
-   exactly as for the tenant scope ([cr-0076](../../../../changes/cr-0076-background-task-mechanism.md) / [cr-0079](../../../../changes/cr-0079-web-grant-delivery-polling.md)).
+   exactly as for the tenant scope.
 4. The wrap is `asymWrap(hybridPublic(member), K_SC, "scope-grant")` — the same hybrid KEM as a self-grant, only
    the recipient differs — run **on the key-holder's device** and posted as the member's grant; the server stores
    opaque ciphertext.

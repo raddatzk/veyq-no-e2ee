@@ -3,9 +3,9 @@
 - Status: Accepted
 - Date: 2026-07-06
 
-> Supersedes the one-off name-seal mechanism in [ADR 0014](0014-group-scopes-and-governance.md) §5 /
-> [cr-0094](../../changes/cr-0094-consent-group-add.md). The behaviour change is carried by the CR that implements
-> this ADR; until then the code still does the one-off seal.
+> Supersedes the one-off name-seal mechanism in [ADR 0014](0014-group-scopes-and-governance.md) §5. The
+> behaviour change is carried by the CR that implements this ADR; until then the code still does the one-off
+> seal.
 
 ## Context
 

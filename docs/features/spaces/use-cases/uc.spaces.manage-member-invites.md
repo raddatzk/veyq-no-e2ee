@@ -16,7 +16,7 @@ This is the management companion to [uc.spaces.add-member](uc.spaces.add-member.
 **additive** ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)), so tracking/re-issuing/
 revoking the *invites* it produces lives here. It mirrors the owner-invite management the Server Owner already
 has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.admin.create-tenant.md): resend
-/ reassign / revoke, [cr-0009](../../../../changes/cr-0009-create-tenant-structural.md)).
+/ reassign / revoke).
 
 ## Main flow
 
@@ -26,8 +26,7 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
    management actions.
 2. **Re-issue.** For a pending invite whose link the invitee lost or ignored, the owner re-issues it: the server
    **supersedes** the current invite and mints a **fresh single-use secret** (the old one dies), and returns the
-   new copyable link ([cr-0080](../../../../changes/cr-0080-invite-link-handoff.md)) for the owner to hand off
-   again. Same email, new secret, new expiry.
+   new copyable link for the owner to hand off again. Same email, new secret, new expiry.
 3. **Revoke.** The owner revokes a pending invite: it is soft-transitioned to a terminal state, so a later
    replay of that secret at `accept` is rejected as no-longer-valid. The reserved email is freed to re-invite.
 
@@ -42,7 +41,7 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
 
 - **Operator-blind.** Listing returns only invite **metadata** (email, status, expiry) the server already
   stores; the secret is never stored plaintext (only its hash) and a re-issue returns the new secret only to
-  the owner-gated caller over TLS ([cr-0080](../../../../changes/cr-0080-invite-link-handoff.md)).
+  the owner-gated caller over TLS.
 - **Admission stays owner-only.** Every action here is gated on the tenant OWNER membership — the same gate that
   mints a member invite.
 - **Invites, not memberships.** This never removes a joined member or rotates a scope key — those are a separate,
@@ -50,8 +49,7 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) defer removal + rotation). Revoking a
   *pending* invite is additive-safe: it touches no grant and no member.
 - **Reuse.** The soft invite-lifecycle (ACTIVE → SUPERSEDED / EXPIRED, matched by hash, replay-rejected) already
-  exists for owner invites ([cr-0009](../../../../changes/cr-0009-create-tenant-structural.md)); this applies it to
-  MEMBER-role invites.
+  exists for owner invites; this applies it to MEMBER-role invites.
 
 ## What this means for you / Was das für dich bedeutet
 

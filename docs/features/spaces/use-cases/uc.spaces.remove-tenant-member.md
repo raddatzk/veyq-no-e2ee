@@ -96,8 +96,6 @@ werden sie gelöscht. Du bekommst nie Zugriff auf die private Gruppe von jemande
   [ADR 0025](../../../decisions/0025-forward-secrecy-policy-per-scope.md) (tenant = ACL-revoke, no rotation; groups
   rotate), [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (roles + last-owner),
   [ADR 0008](../../../decisions/0008-centralized-http-auth.md) (owner-gating)
-- Reuses: [cr-0090](../../../../changes/cr-0090-group-lifecycle-delete.md) (soft-delete + grace + `ScopePurge`, applied
-  to the target's own scopes)
 - Sibling use-cases: [uc.spaces.delete-group](uc.spaces.delete-group.md) (the lifecycle reused),
   [uc.spaces.manage-group-members](uc.spaces.manage-group-members.md) (group removal + rotation),
   [uc.spaces.add-member](uc.spaces.add-member.md) (the tenant roster's other half)

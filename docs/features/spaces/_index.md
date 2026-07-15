@@ -19,47 +19,37 @@ the **ciphertext grant** (the scope key sealed to a member's identity); it never
   another member), [ADR 0023](../../decisions/0023-per-tenant-member-identity.md) (per-tenant member identity —
   username + sealed real names).
 - **Note:** a **scope** is the unit content is keyed on (opaque `scopeId` + `kind`); a **grant** is how a
-  member holds its key. The tenant's root scope is born at tenant activation
-  ([cr-0010](../../../changes/cr-0010-tenant-activation.md)); this feature adds the **personal** scope and the
-  general scope-identity model.
+  member holds its key. The tenant's root scope is born at tenant activation; this feature adds the
+  **personal** scope and the general scope-identity model.
 
 ## Enablers
 
 - ★ [en.spaces.tenant-scope](enablers/en.spaces.tenant-scope.md) — **refined** (the shared root TENANT scope
   **opened + entered** on the device — no birth, it already exists from activation; the token-less default home;
-  [ADR 0019](../../decisions/0019-token-less-tenant-home.md), building in
-  [cr-0075](../../../changes/cr-0075-web-enter-tenant-scope.md))
+  [ADR 0019](../../decisions/0019-token-less-tenant-home.md))
 - ★ [en.spaces.personal-scope](enablers/en.spaces.personal-scope.md) — **built** (the per-tenant PERSONAL
-  scope born + opened, client-driven & operator-blind; the keyed container the content flows fill;
-  [cr-0026](../../../changes/cr-0026-personal-scope.md))
+  scope born + opened, client-driven & operator-blind; the keyed container the content flows fill)
 - ★ [en.spaces.group-scope](enablers/en.spaces.group-scope.md) — **refined** (a shared, **named** GROUP scope
   born by its owner + opened — confidential even from the tenant owner;
   [ADR 0014](../../decisions/0014-group-scopes-and-governance.md), building in cr-0032)
 - [en.spaces.member-identity](enablers/en.spaces.member-identity.md) — **built** (per-tenant `username`
   unique-in-tenant + `firstName`/`lastName` **sealed** under `K_tenant`; email the only global key, owner-only in
-  the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md);
-  [cr-0083](../../../changes/cr-0083-member-identity.md))
+  the directory; [ADR 0023](../../decisions/0023-per-tenant-member-identity.md))
 - [en.spaces.scope-key-rotation](enablers/en.spaces.scope-key-rotation.md) — **built** (rotate a scope's content
   key **forward into a new epoch**, granting it only to the remaining members, so a removed member reads
   pre-removal content but never post-removal — no re-encryption; the substrate member-removal builds on;
-  [ADR 0024](../../decisions/0024-scope-key-rotation.md); [cr-0089](../../../changes/cr-0089-scope-key-rotation-web.md),
-  [cr-0092](../../../changes/cr-0092-async-group-rotation-backstop.md),
-  [cr-0093](../../../changes/cr-0093-grant-delivery-epoch-aware.md))
+  [ADR 0024](../../decisions/0024-scope-key-rotation.md))
 
 ## Use-cases
 
 - ★ [List & switch spaces](use-cases/uc.spaces.switch-spaces.md) — **built (web)** (tenant switcher +
-  per-space `#fragment` switching; [cr-0031](../../../changes/cr-0031-memory-shell-polish.md),
-  [cr-0075](../../../changes/cr-0075-web-enter-tenant-scope.md) enter-tenant + Personal↔Tenant)
+  per-space `#fragment` switching; enter-tenant + Personal↔Tenant)
 - ★ [Add a member to the shared tenant space](use-cases/uc.spaces.add-member.md) — **built (web)** (invite a
   person, then wrap `K_SC` to their identity — the grant-distribution primitive;
-  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md);
-  [cr-0076](../../../changes/cr-0076-background-task-mechanism.md) delivery +
-  [cr-0077](../../../changes/cr-0077-member-add-onboarding.md) onboarding +
-  [cr-0080](../../../changes/cr-0080-invite-link-handoff.md) copyable invite link)
+  [ADR 0020](../../decisions/0020-grant-distribution-invite-wrap.md); delivery + onboarding + copyable invite
+  link)
 - [Manage pending member invites](use-cases/uc.spaces.manage-member-invites.md) — **built** (the owner lists /
-  re-issues / revokes the member invites add-member mints; owner-gated, additive-safe;
-  [cr-0082](../../../changes/cr-0082-member-invite-management.md))
+  re-issues / revokes the member invites add-member mints; owner-gated, additive-safe)
 - [Remove a member from a tenant](use-cases/uc.spaces.remove-tenant-member.md) — **web done (cr-0091)** (TenantOwner
   cuts a member's access to shared + group content immediately, applies the **group orphan rule** (hand over or
   wind down the groups they leave), and gives them a grace window to read their own memories before erase;

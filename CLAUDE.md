@@ -26,7 +26,8 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 - `docs/` — internal engineering state (English) + working flow (`ai/`, `inbox.md`).
 - `wiki/` — **published** end-user GitHub Wiki: plain language, **EN+DE**, focused on what you can do
   and "your data is safe, here's why".
-- `changes/` — change-requests, kept as a work-order record. `legacy/` — read-only reference.
+- `changes/` — the **live** work order + any open review backlog; a CR is deleted once done.
+  `legacy/` — read-only reference.
 
 ## How we work
 - Working rules + workflow: **`docs/ai/README.md`** (inbox → refine → change-request).
@@ -45,8 +46,9 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
   (E.g. MinIO's OSS server was archived in 2026 and its successor AIStor is commercial — so the bundled store
   stays a generic **S3-compatible OSS** one, and the backend signs via the vendor-neutral **AWS S3 SDK**,
   never a MinIO-locked client.)
-- Durable engineering state lives in `docs/`; change-requests in `changes/` are **kept** as a record of
-  each piece of work (no longer deleted when done).
+- Durable engineering state lives in `docs/`. A change-request is scaffolding: **deleted when done**, after
+  what it taught is moved to where it binds — a code trap to a comment at that line, a working lesson to a
+  rule. Never to git: history does not survive the v1 move.
 
 ## Prove your work
 Per-platform verification commands are added to each platform's own `CLAUDE.md` as that code

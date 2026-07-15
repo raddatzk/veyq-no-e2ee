@@ -47,7 +47,7 @@ in.** Concretely:
 3. **The secure store is split in two:** an **ungated meta** part `{level, wrapId, sealed refresh token}`
    readable **without a prompt**, and a **gated secret** `{K}` released **only** by the native gesture in
    the app layer. The level is always knowable without a prompt (so the app can decide what UI to show).
-4. **The persisted refresh token is sealed under `K`** ([cr-0023](../../changes/cr-0023-gate-l2-session-token.md)):
+4. **The persisted refresh token is sealed under `K`**:
    the data/store layers only ever see **ciphertext**, and `K` is held in memory for the unlocked session so
    mid-session rotation re-seals it **prompt-free**.
 5. **"Exactly one prompt at launch" is therefore an app-layer property** — one gesture → one `K` → one
@@ -63,7 +63,7 @@ This **generalises the Android model to all platforms**. It is the right directi
 - **One concept doc** describes the mechanism for all surfaces
   ([en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md)); per-platform docs only
   map native APIs. This is the externally-reviewable artifact the decision exists to enable.
-- **Apple is refactored to match** ([cr-0024](../../changes/cr-0024-unify-passwordless-unlock-mechanism.md)):
+- **Apple is refactored to match**:
   the `K`-release moves out of the data layer into the app layer (`AppModel`); `resumeSession` /
   `unlockWithDeviceKey` / `autoRestore` take `K` as a parameter; the gated Keychain read leaves the data
   layer's responsibility (the ungated meta read stays). Apple's just-added `loadCount` single-gated-load unit
@@ -88,8 +88,6 @@ This **generalises the Android model to all platforms**. It is the right directi
 - [ADR 0005](0005-unlock-methods-and-device-trust.md) — the unlock levels this orchestrates.
 - [ADR 0010](0010-native-clients-shared-contracts-not-code.md) — no shared code; the constraint that forced
   the Android split and that this decision now makes uniform.
-- [cr-0023](../../changes/cr-0023-gate-l2-session-token.md) — sealing the persisted token under `K` (the
-  property that lets the data layer stay prompt-free and ciphertext-only).
 - Concept: [en.account.passwordless-unlock](../features/account/enablers/en.account.passwordless-unlock.md).
 - Use-cases: [biometric-unlock (L2)](../features/account/use-cases/uc.account.biometric-unlock.md),
   [auto-unlock (L3)](../features/account/use-cases/uc.account.auto-unlock.md),

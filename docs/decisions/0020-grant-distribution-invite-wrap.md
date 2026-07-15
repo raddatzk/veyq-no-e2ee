@@ -16,7 +16,7 @@ That is exactly what makes a shared space shareable-in-name-only. [en.spaces.ten
 and [en.spaces.group-scope](../features/spaces/enablers/en.spaces.group-scope.md) both **open** whatever grant
 the caller already holds and both explicitly defer *adding other members* as "the member-add slice"; until it
 lands the tenant is **owner-reachable only** and every other member sees the Personal fallback
-([cr-0075](../../changes/cr-0075-web-enter-tenant-scope.md), [ADR 0019](0019-token-less-tenant-home.md)). The
+([ADR 0019](0019-token-less-tenant-home.md)). The
 membership model already anticipates this: role gates management, the **grant** gates content, and a role
 without a grant is a deliberate "hollow" membership ([ADR 0007](0007-membership-role-grant-relation.md)).
 
@@ -53,7 +53,7 @@ key, wraps, or unwraps.** Concretely:
 3. **A two-phase handshake, but only one human action** — the newcomer has no identity until they join, and
    only a key-holder (not the server) can wrap, so there are two *moments*; there need not be two *decisions*:
    - **(a) Onboard.** An OWNER mints a **member invite** (email + `role = MEMBER`), reusing the tenant-invite
-     machinery ([cr-0009](../../changes/cr-0009-create-tenant-structural.md) / cr-0010) that today mints only
+     machinery that today mints only
      the owner. The invitee **cold-registers** — their identity is born on-device and its public bundle is
      published — becoming a tenant **member with no grant**. They land in the **Personal fallback** (cr-0075)
      until step (b).

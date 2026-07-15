@@ -8,7 +8,7 @@
 [ADR 0024](0024-scope-key-rotation.md) gives the rotation **mechanism** (a backward-linked content-key epoch chain;
 remove-a-member = mint `E_{n+1}`, re-grant the remaining members, delete the removed membership) and notes it is
 "scope-generic, group-first" — but deliberately leaves the **policy** open: *which* scopes rotate on removal, and
-*when*. Its first and only consumer so far is group member-removal ([cr-0089](../../changes/cr-0089-scope-key-rotation-web.md)).
+*when*. Its first and only consumer so far is group member-removal.
 This ADR settles the policy, because the tenant scope forces the question.
 
 **The tenant scope is veyq's primary shared-content home** (groups are secondary), and a tenant can hold **hundreds
@@ -43,7 +43,7 @@ vault") is an explicit, rare action. This is the established practice for per-us
 
 **Forward-secrecy on removal is a policy that depends on the scope type.**
 
-1. **Group — always rotate on removal** ([ADR 0024](0024-scope-key-rotation.md), [cr-0089](../../changes/cr-0089-scope-key-rotation-web.md)).
+1. **Group — always rotate on removal** ([ADR 0024](0024-scope-key-rotation.md)).
    Small `N`, intentional and often sensitive sharing; the `O(N)` burst is small and rotation delivers full
    post-removal forward-confidentiality even against a malicious operator. **Unchanged.**
 

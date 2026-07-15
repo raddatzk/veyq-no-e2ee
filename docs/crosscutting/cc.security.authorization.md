@@ -87,8 +87,8 @@ have given — and unlike a table they cannot go stale.
    > — [ADR 0042](../decisions/0042-http-failure-projection.md)
 
    The **order is the security property**. Probing existence — or scope *kind* — before the boundary lets a
-   non-member distinguish "exists, forbidden" (403) from "no such scope" (404) and enumerate scope ids
-   ([cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md)). Membership-gated absence is
+   non-member distinguish "exists, forbidden" (403) from "no such scope" (404) and enumerate scope ids.
+   Membership-gated absence is
    therefore **404**, uniform for strangers and bogus ids; the residual **403** means precisely "member, but not a
    key-holder" (`not_key_holder`).
 
@@ -98,8 +98,8 @@ have given — and unlike a table they cannot go stale.
    > — [ADR 0007](../decisions/0007-membership-role-grant-relation.md)
 
    Every scope birth mints its creator an `OWNER` row, so a `tenantId`-only owner check silently degrades to
-   `isMember` — it answers **true for every tenant member**. That was a real privilege escalation
-   ([cr-0163](../../changes/cr-0163-tenant-owner-gate-scope-condition.md)). Tenant authority keys on the tenant
+   `isMember` — it answers **true for every tenant member**. That was a real privilege escalation. Tenant
+   authority keys on the tenant
    **root scope**: `isTenantOwner(u, t) = isScopeOwner(u, t)`.
 
 4. **Role gates management; grant gates content** ([ADR 0007](../decisions/0007-membership-role-grant-relation.md)).
@@ -123,9 +123,8 @@ have given — and unlike a table they cannot go stale.
   **hand-kept** matrix drifts — the sibling concern records the precedent
   ([cc.security.rate-limit](cc.security.rate-limit.md): cr-0044 deleted a phantom row). A **generated** matrix
   would not drift and would also be worthless as a guard: derived from the code, it can never *disagree* with the
-  code, so it can never fail. On the day [cr-0163](../../changes/cr-0163-tenant-owner-gate-scope-condition.md)
-  shipped, a generated matrix would have printed `isTenantOwner` and been green — the defect was *inside* the
-  predicate.
+  code, so it can never fail. On the day the rule-3 privilege-escalation fix shipped, a generated matrix would
+  have printed `isTenantOwner` and been green — the defect was *inside* the predicate.
 - **Layer 2 is not greppable, and must not be guarded by a grep.** No resource holds a guard call; every guard is
   at least one hop down in a handler, and for a few operations (share `revoke`/`update`, the task lifecycle) it is
   fused into a store **query predicate** (`takeIf { it.ownerAccount == … }`), where no call-site scan can see it.
@@ -178,7 +177,3 @@ product judgement, recorded in the ADRs — not something a test asserts.
 - Code: `backend/.../shared/membership/MembershipStore.kt` (guards #3–#5),
   `backend/.../shared/identity/ServerRoles.kt` (#2), `backend/.../shared/auth/` (the authentication front door),
   `backend/.../features/sharing/SharingHandler.kt` (#6/#7)
-- Change-requests: [cr-0160](../../changes/cr-0160-backend-membership-to-shared.md) (the guards collapsed onto one
-  shared primitive), [cr-0162](../../changes/cr-0162-membership-boundary-first-guard-ordering.md) (the ordering
-  rule + its test), [cr-0163](../../changes/cr-0163-tenant-owner-gate-scope-condition.md) (the `scopeId` keying
-  rule), [cr-0164](../../changes/cr-0164-share-password-write-path-gate.md) (the guest-write password gate)
