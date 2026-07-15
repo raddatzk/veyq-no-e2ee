@@ -21,7 +21,7 @@
   flow here is native-only by design (see *Web* below).
 
 > **No end-user section** (enabler) — its value surfaces through the unlock use-cases it serves. This is the
-> **target model**; what landed per surface is the [parity matrix](../../../crosscutting/platform-parity.md).
+> **target model**; what landed per surface is [`docs/coverage/`](../../../coverage/README.md).
 
 ## The one rule: two layers, and where the prompt lives
 
@@ -170,8 +170,7 @@ The *rule* still holds trivially: web's data layer is already prompt-free. A fut
   [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (vector-pinned crypto),
   [ADR 0003](../../../decisions/0003-operator-blind-password-auth.md) (auth vs. unlock — why passwordless needs a
   persisted session).
-- Concepts: [Account & Key Model](en.account.key-model.md), [Security Model](../../../crosscutting/security-model.md),
-  [Cross-platform parity matrix](../../../crosscutting/platform-parity.md).
+- Concepts: [Account & Key Model](en.account.key-model.md), [Security Model](../../../crosscutting/security-model.md).
 - Use-cases: [biometric-unlock (L2)](../use-cases/uc.account.biometric-unlock.md),
   [auto-unlock (L3)](../use-cases/uc.account.auto-unlock.md),
   [set-device-security (chooser)](../use-cases/uc.account.set-device-security.md),

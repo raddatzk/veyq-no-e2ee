@@ -62,4 +62,3 @@ sealing the **set** is what hides which of them are favorited.
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (operator-blind metadata boundary)
 - Decisions: [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC` sealing),
   [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (group favorites under the identity key)
-- Work order: cr-0031

@@ -49,7 +49,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 ## Use-cases (on the tree + media enablers)
 
 - Browse & organize the Memory tree — the shell + folder/Memory browse + create/rename/delete
-  ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done**, web/apple/android shells)
+  ([uc.memory.browse](use-cases/uc.memory.browse.md) — **done** on web, the one live surface)
 - [uc.memory.upload](use-cases/uc.memory.upload.md) — **refined** (add media to a Memory: the web upload flow +
   global uploads tray on [en.memory.media](enablers/en.memory.media.md) — `K_blob` + chunked AEAD,
   direct-to-store; the upload also generates the [derivatives](enablers/en.memory.derivatives.md))

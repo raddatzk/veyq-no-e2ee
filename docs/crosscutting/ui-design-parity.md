@@ -5,9 +5,8 @@ veyq runs on many surfaces — web, Apple (macOS/iOS/iPadOS), Android, later Win
 the durable statement of *what* is shared visually and *how* each surface realises it. It governs every
 native UI CR (Apple cr-0015, Android cr-0016, the desktop heads next).
 
-> Behavioural parity (which use-case exists per surface) is tracked in
-> [`platform-parity.md`](platform-parity.md) and the [`coverage/`](../coverage/) chain. This doc is the
-> orthogonal **visual / interaction** axis.
+> Behavioural parity (which use-case exists per surface, and what a build proves) is the
+> [`coverage/`](../coverage/) chain. This doc is the orthogonal **visual / interaction** axis.
 
 ## Principle
 

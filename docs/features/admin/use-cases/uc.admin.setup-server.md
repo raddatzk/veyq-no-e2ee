@@ -1,8 +1,10 @@
 # UC: First-run server setup
 
 - **ID:** uc.admin.setup-server
-- **Surfaces:** backend · web — **not a native target by design:** first-run setup happens in the browser,
-  against a host that has no app installed yet.
+- **Surfaces:** backend · web — **not a native target by design.** Bootstrap happens in the browser, while the
+  operator is at the machine they are installing the server on; that beats a native app for a one-time act.
+  **A native client only ever connects to an already-bootstrapped instance — it never bootstraps one**, so
+  there is nothing here for it to implement, now or after the un-park.
 - **Primary actor:** Server Owner (the person installing the instance)
 - **Goal:** Bootstrap a fresh instance — create the first account (Server Owner) as an end-to-end
   encrypted account and mark the instance set up.

@@ -7,17 +7,20 @@ What it had instead was three claimed authorities, none of which could carry it 
 
   * **ADR 0010** (38 lines) — never says web-first; its per-CR clause said the *opposite* ("every feature CR
     carries phases for **every** surface … plus a **parity ledger**").
-  * **`platform-parity.md`** (5 lines) — a *state* doc, and its restatement had drifted **weaker** than the rule
-    in force (it promised native catch-up CRs; there are none while parked).
+  * **`platform-parity.md`** — a *state* doc whose restatement had drifted **weaker** than the rule in force
+    (it promised native catch-up CRs; there are none while parked). **Deleted 2026-07-14**, so it is no longer
+    guarded here: a rule forbidding a citation of a file that cannot be cited guards nothing. The doc died of
+    the same disease that put it on this list — it re-asserted, by hand and unbacked, what `docs/coverage/`
+    proves from a build.
   * **`CLAUDE.md`** (1 line — ADR 0041, which derived its entire trigger from it) — does not state the rule.
 
 That is worse than a gap: a reader who *followed the citation* was confirmed in the wrong belief about their own
 project. cr-0167 repointed all 44 at ADR 0043; this guard is why they cannot silently drift back.
 
-**The invariant is lexical**, like cr-0166's: *a line that asserts web-first must not cite ADR 0010,
-`platform-parity.md` or `CLAUDE.md` as its authority.* The one allowlist entry is **ADR 0043 itself**, and it is
-principled — the ADR that *owns* a rule may name the documents it takes it from, and 0043's whole Context is the
-inventory of these three false authorities.
+**The invariant is lexical**, like cr-0166's: *a line that asserts web-first must not cite ADR 0010 or
+`CLAUDE.md` as its authority.* The one allowlist entry is **ADR 0043 itself**, and it is principled — the ADR
+that *owns* a rule may name the documents it takes it from, and 0043's whole Context is the inventory of those
+false authorities.
 
 Two things this guard learned the hard way, both worth keeping:
 
@@ -65,11 +68,6 @@ AUTHORITIES = [
      re.compile(r"0010-native-clients-shared-contracts-not-code\.md"),
      "ADR 0010 governs *how* the surfaces relate (shared contracts, never shared code) and never says "
      "web-first; its per-CR clause defers the schedule to ADR 0043"),
-    ("platform-parity.md",
-     re.compile(r"\bplatform-parity\b"),
-     re.compile(r"platform-parity\.md"),
-     "platform-parity.md is a *state* doc — it records which surface has what, and cites ADR 0043 for why the "
-     "native columns are empty; a decision restated in state drifts (docs/ai/README.md)"),
     ("CLAUDE.md",
      re.compile(r"\bCLAUDE\.md\b"),
      re.compile(r"CLAUDE\.md"),
@@ -127,8 +125,8 @@ def main() -> int:
 
     asserting = sum(
         1 for p in paths for line in p.read_text().splitlines() if WEBFIRST.search(prose(line)))
-    print(f"web-first authority OK: {asserting} assertion(s) across {len(paths)} docs, none citing ADR 0010, "
-          f"platform-parity.md or CLAUDE.md — the rule's only authority is ADR 0043")
+    print(f"web-first authority OK: {asserting} assertion(s) across {len(paths)} docs, none citing ADR 0010 "
+          f"or CLAUDE.md — the rule's only authority is ADR 0043")
     return 0
 
 

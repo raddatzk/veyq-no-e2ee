@@ -20,7 +20,7 @@ instead is three claimed authorities, none of which can carry it:
   trigger ("adopt the shared crypto core at the native un-park moment") from "web-first V1, native deferred
   (CLAUDE.md; project priority)". `CLAUDE.md` does not state it; it says the four surfaces are "kept at
   **parity**".
-- **[`platform-parity.md`](../crosscutting/platform-parity.md)** — the only doc that states anything like the
+- **`platform-parity.md`** (deleted 2026-07-14, see Consequences) — the only doc that stated anything like the
   rule ("the **web** vertical leads; apple/android parity is a **deferred program** — caught up later as
   dedicated native CRs"). Two problems: it is a **state** doc, and a decision restated in state is precisely
   what the workflow forbids (state records *what veyq is*, decisions live in ADRs); and its rule is **weaker
@@ -61,13 +61,19 @@ decision — deliberately *not* on an automatic trigger.**
 
 - **`docs/` cites this ADR for web-first, not ADR 0010.** Every citation-bearing assertion is repointed here
   (cr-0167); `CLAUDE.md`'s "kept at parity" is corrected to name the commitment *and* the schedule.
-- **[`platform-parity.md`](../crosscutting/platform-parity.md) stops stating the rule and starts citing it.**
-  Its "native parity is a deferred catch-up" section is replaced by a pointer here — the state doc records
-  *which surface has what*, this ADR records *why the native columns are empty*. Its weaker promise ("caught up
-  later as dedicated native CRs") goes with it: there are no native CRs while parked.
-- **Coverage stays honest.** apple/android remain explicit `gaps:` entries with a reason in
-  `docs/coverage/` — unchanged mechanically ([ADR 0040](0040-coverage-gaps-and-http-not-a-surface.md)); this
-  ADR only gives those reasons a citation that resolves.
+- **`platform-parity.md` is deleted** (2026-07-14). This ADR first made it stop *stating* the rule and start
+  citing it; the file then had nothing left to do. It was a hand-kept use-case × surface matrix covering **7 of
+  39** use-cases, whose `✅` column re-asserted what `docs/coverage/` proves from CI, whose `N/A` column is now
+  each use-case's own `- **Surfaces:**` declaration, and whose `http` column named a directory that no longer
+  exists. With one live surface a parity matrix has one meaningful column. Its three genuine "intentional N/A"
+  rationales were moved into the use-cases that own them before it went. *Which surface has what* is
+  [`docs/coverage/`](../coverage/README.md), which a build backs; a second, hand-copied answer could only drift.
+- **Coverage stays honest — and got honest about this ADR.** apple/android were, at first, explicit `gaps:`
+  entries with a reason. That was wrong twice over: **54 of 63 gaps had become hand-copies of this ADR's one
+  sentence**, and a surface no CI job runs cannot be a "gap" — it makes no claim to fall short of
+  ([ADR 0040](0040-coverage-gaps-and-http-not-a-surface.md)'s principle, applied by rule). A use-case now
+  declares its target surfaces and owes only the **live** ones; a parked target owes nothing, and says so once,
+  here. The gaps went 63 → 2, and both survivors are real debts.
 - **ADR 0010's parity ledger stands down while parked.** A ledger whose rows are permanently "pending" for two
   of four surfaces measures nothing; it returns with the surfaces.
 - **The park is load-bearing for ADR 0041 and must not drift silently.** If native un-parks without 0041 being

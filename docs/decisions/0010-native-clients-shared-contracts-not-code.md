@@ -58,9 +58,9 @@ in the CR.
 
 **The parity ledger** — a per-CR table of what has landed per surface — **stands down while surfaces are
 parked**: rows permanently pending for two of four surfaces measure nothing. It returns when they do. Until
-then the standing record of what is built where is
-[`platform-parity.md`](../crosscutting/platform-parity.md) plus the per-use-case `gaps:` in
-[`docs/coverage/`](../coverage/README.md).
+then the standing record of what is built where is [`docs/coverage/`](../coverage/README.md) — and only it:
+the hand-kept matrix that used to sit alongside was deleted, because a second answer that no build backs can
+only drift from the one that does.
 
 **Dev-environment reality (macOS).** This workstation can build + verify web, Apple (`swift test`/Xcode) and
 Android (Gradle/JVM), plus the **non-UI** layers of Windows and Linux (C#/.NET is cross-platform; Rust builds

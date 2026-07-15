@@ -5,8 +5,8 @@ other. Not an end-user feature in itself — it is the negotiation + discovery l
 what this instance can do, what version it speaks, and which optional features the operator left on.
 
 - **Cross-cutting:** [Security Model](../../crosscutting/security-model.md) (the manifest is pre-auth,
-  identity-free, and the same for everyone — operator-blind-safe), [Platform Parity](../../crosscutting/platform-parity.md)
-  (every client surface reads the same manifest).
+  identity-free, and the same for everyone — operator-blind-safe). Every client surface reads the same
+  manifest; what each surface actually has is [`docs/coverage/`](../../coverage/README.md).
 - **Decisions:** [ADR 0032](../../decisions/0032-capability-discovery-version-gating.md) (capability discovery +
   the `major` version gate — the lean core: `/api/setup` advertises `version` + a `capabilities` manifest, clients
   hard-gate on `major` and soft-gate features on capability presence, operators disable a capability instance-wide

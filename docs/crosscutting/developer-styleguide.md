@@ -136,10 +136,16 @@ restating the code. Avoid `// loop over the items` and comments that drift from 
 
 ## 11. Cross-platform parity
 
-Keep **http / web / apple / android** (plus backend) behavior in parity; when a platform intentionally
-differs, **mark it explicitly** in code and in the [parity matrix](platform-parity.md) (use-case ×
-surface, with reasons for intentional N/A). Crypto parity is enforced mechanically by the conformance
-vectors (§9).
+Keep the client surfaces' behaviour in parity ([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md):
+by shared *contracts*, never shared code). When a surface intentionally differs, that is a **product decision,
+and it is declared once** — on the use-case, as `- **Surfaces:**`, with the reason. Never mark it twice: what
+each surface actually has is [`coverage/`](../coverage/README.md), and a build backs that answer.
+
+Crypto parity is enforced mechanically by the conformance vectors (§9) — that is the only parity axis a machine
+can hold. **Behavioural** parity across re-implemented orchestration has **no automatic check today**; it is
+survivable only while exactly one surface is live, and a replacement is due at the native un-park
+([ADR 0010](../decisions/0010-native-clients-shared-contracts-not-code.md) § Consequences,
+[architecture §11](../architecture/README.md)).
 
 
 ## 12. Git & PR

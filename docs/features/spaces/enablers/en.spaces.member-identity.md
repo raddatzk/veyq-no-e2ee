@@ -88,4 +88,3 @@ member's own group rows) and splits it by sensitivity:
   [ADR 0007](../../../decisions/0007-membership-role-grant-relation.md) (membership = role + grant; email
   visibility), [ADR 0014](../../../decisions/0014-group-scopes-and-governance.md) (the group member-add search
   this feeds), [ADR 0015](../../../decisions/0015-operator-blind-readable-urls.md) (`~username` routing)
-- Work order: cr-0083

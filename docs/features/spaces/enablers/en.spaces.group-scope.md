@@ -127,4 +127,3 @@ sequenceDiagram
   [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vectors.md) (the hybrid-KEM grant),
   [ADR 0012](../../../decisions/0012-content-key-hierarchy.md) (`K_SC` name-sealing)
 - Sibling: [en.spaces.personal-scope](en.spaces.personal-scope.md) (the machinery this reuses)
-- Work order: cr-0032
