@@ -31,11 +31,16 @@ UX; see its `_PROVENANCE.md`). `legacy/frontend/` is the **E2EE-but-wrong-concep
 for *how* an operator-blind server forces a flow client-side, **never** for its design. Canonical rule:
 [`docs/ai/README.md`](../ai/README.md).
 
-## Reuse first
+## Reuse first — this is the load-bearing rule
 
-Before adding any local style: use an existing `.veyq-*` shared class and `--app-*` token. Add a local
-class only when no shared class can express the behaviour without leaking styles elsewhere. Wrap a shared
-primitive in a feature component rather than copying markup.
+**The existing implementation is the styleguide.** `web/` is a whole product now, so the nearest built screen
+answers almost every question this page could: use an existing `.veyq-*` shared class and `--app-*` token before
+writing anything local. Add a local class only when no shared class can express the behaviour without leaking
+styles elsewhere. Wrap a shared primitive in a feature component rather than copying markup.
+
+**This gets stronger as web grows, and that is the design.** A rule that enumerates values goes stale the moment
+the code moves; a rule that says *"match your neighbour"* cannot. It is also the one rule here that is
+demonstrably obeyed — `.veyq-dialog-action-row`: 15 uses, zero per-component copies.
 
 ## Color — semantic role tokens
 
@@ -54,19 +59,28 @@ values), never for application UI roles. Repeated raw colors must become a role 
 
 ## Typography
 
-**There is no type scale, and this section used to pretend there was.** It mandated `--app-font-size-*` role
-tokens (page-title, section-title, row-title, body, subtitle, meta, label, control) — **zero of which exist**,
-and none ever did: `grep -r 'font-size: var(--app-' web/src` → 0. The vendored system sets sizes as plain `rem`,
-and the values in use cluster around `0.78 / 0.8 / 0.82 / 0.85 / 0.9 / 0.92 / 0.95 / 1rem`. An unfollowable rule
-is worse than no rule: the reader greps, finds nothing, and either invents a token family or quietly ignores the
-section — and both happened.
+**Reuse the class; it already carries the size.** If a shared class fits, you never write `font-size` at all —
+that is the whole answer, and §*Reuse first* is where it lives. When you genuinely must write CSS, **match the
+neighbour**: the same row, the same panel, the same screen. Settings, management and navigation screens are
+**dense and scannable** — reach for the smaller end, and do not leave a component library's default button text
+or a one-off `1rem` label sitting in them.
 
-The followable rule, which is the one that carried the intent anyway: **match the density of what surrounds
-you.** Settings, management and navigation screens are **dense and scannable** — reach for the smaller end, and
-do not leave a component library's default button text or a one-off `1rem` label sitting in them.
-
-Naming a real scale is a **design decision** — an ADR, and a migration of the ~100 raw values. It is not a
-styleguide line, and writing one did not make it exist.
+> **There is no `--app-font-size-*` token family, and this section used to mandate one.** Zero existed; none ever
+> did (`grep -r 'font-size: var(--app-' web/src` → 0). That was not an oversight to correct — **it was the rule
+> that was wrong**, and this is worth stating so nobody "completes" the token system later:
+>
+> **Tokens exist here where theming forces them, not where tidiness suggests them.** Colour is 91% tokenised,
+> background 75%, shadow 58% — those are exactly the axes `dark.css` cannot work without. The axes with no
+> structural need were never tokenised and nobody missed them: **spacing is 578 declarations across 115 distinct
+> raw values, 0% tokenised** — 2.4× worse than type, and no rule ever asked for `--app-space-*`. Type was the
+> lone outlier demanding a token layer for a non-theming axis, and 89 CRs went by without anyone feeling its
+> absence. That is the evidence, not an excuse.
+>
+> Imposing one now would mean choosing a scale the data does not contain (the most common value per role wins
+> only 19–42% of its own uses), then editing **243 sites** and shifting the product's look — with no visual
+> regression test anywhere, on a surface whose e2e tests no CI run executes. The cost is real and the defect is
+> invisible. If a scale is ever genuinely wanted, it is an **ADR** with that migration priced in — not a line
+> here, and writing the line did not make it exist.
 
 ## Components
 
