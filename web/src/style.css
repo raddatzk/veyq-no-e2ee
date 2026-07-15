@@ -1,7 +1,16 @@
-/* The design system is the pre-E2EE source's stylesheets, vendored VERBATIM (web/src/styles/, copied from
-   legacy/frontend-noe2ee/src/styles/). Components reuse the original class names + markup so they render
-   byte-identically; only the data layer underneath differs. Below: the few E2EE-specific additions the
-   pre-E2EE source never had (the centered public-shell wrapper + the Secret-Key unlock field). */
+/* The design system is the pre-E2EE source's stylesheets (web/src/styles/, taken from
+   legacy/frontend-noe2ee/src/styles/). Components reuse the original class names + markup, so a ported view
+   should look like the original; only the data layer underneath differs.
+
+   This comment used to say "vendored VERBATIM ... render byte-identically". It is neither, and should not be:
+   only media.css is byte-identical, base/ui are additive, and the other five carry deliberate edits — raw
+   colours lifted to --app-* role tokens, and hardcoded light values (background: rgba(255,255,255,.92))
+   replaced by theme-aware ones, without which dark.css could not work. Those are the ui-web-styleguide's own
+   rules applied backwards to the inherited code; each edit carries its reason in place. Diff a sheet against
+   legacy/frontend-noe2ee/src/styles/ before assuming a difference is drift.
+
+   Below: the few E2EE-specific additions the pre-E2EE source never had (the centered public-shell wrapper +
+   the Secret-Key unlock field). */
 @import './styles/base.css';
 @import './styles/ui.css';
 @import './styles/layout.css';
