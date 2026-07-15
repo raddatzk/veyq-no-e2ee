@@ -11,8 +11,7 @@ their identity). What lives *inside* a scope — folders, Memories, chapters, me
 key model. The [Security Model](../crosscutting/security-model.md) **sketched** per-subtree content keys and
 "a share = one subtree content key wrapped to a per-share key" (its hierarchy diagram now names this ADR's
 per-Memory `K_mem`); the crypto vectors pin a `contentKey`-based `slug_token` / `chunk_frame` /
-`dedup_token` / `journal_open`. The open question (inbox #46) is the **exact
-granularity and wrapping** — and specifically: *how do you share a single Memory without exposing the rest
+`dedup_token` / `journal_open`. The open question was the **exact granularity and wrapping** — and specifically: *how do you share a single Memory without exposing the rest
 of the scope?* This ADR nails it. (Considered and rejected during refinement: **one content key per scope** —
 sharing one Memory would hand out the whole-scope key, leaving the confidentiality of the *other* Memories to
 **server gating, not crypto**; and **a full per-subtree key tree** — maximal flexibility but a deep key
@@ -69,7 +68,7 @@ holds `K_SC`, `K_mem`, `K_blob`, or any name.
 
 ## Consequences
 
-- **Per-Memory sharing works without exposing the scope** (the #46 answer): a share is one extra wrap of the
+- **Per-Memory sharing works without exposing the scope** — the question this ADR was opened to settle: a share is one extra wrap of the
   Memory's `K_mem`; `K_SC` stays in the owner-circle.
 - **Cheap navigation, scoped content.** One `K_SC` decrypts the whole tree's names/structure; a Memory's
   content needs its `K_mem`. A guest of a shared Memory sees that Memory's name + content and nothing else.
