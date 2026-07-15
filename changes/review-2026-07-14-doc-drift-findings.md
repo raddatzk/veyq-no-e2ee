@@ -212,8 +212,16 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
 11. **`developer-styleguide.md` still says `http/` "verifies the contract"** *(verified).* cr-0159 removed this
     stance everywhere else; the binding styleguide §3/§11 was missed by the sweep.
     Confirm: `grep -n 'verifies the contract\|contract-level coverage' docs/crosscutting/developer-styleguide.md`
-    Do: align with ADR 0040 (http is a dev aid, not a coverage surface). Also `:31` lists
-    `shared/{security,content,keymgmt,storage}` — 4 of 6 don't exist (`ls backend/.../shared/`).
+    **Done 2026-07-14 — both halves, and the second was worse than reported.**
+    - *"verifies the contract"* — gone with the surface: `http/` is deleted. §11 was rewritten past the strike;
+      it had told developers to mark an intentional difference **twice** (in code *and* in a matrix) and now says
+      declare it once, on the use-case. It also now admits that **behavioural parity has no automatic check** —
+      only crypto parity does, via the conformance vectors.
+    - *`:31`'s `shared/` roll-call* — the finding said "4 of 6 don't exist". True, and the rest is worse: of the
+      six named, **two** exist (`crypto`, `identity`), and **nine** real slices were missing (`auth`,
+      `blobstore`, `config`, `http`, `instance`, `membership`, `persistence`, `ratelimit`, `validation`). A list
+      2/11 accurate. Fixed the way #8 was — **stop enumerating**: the directory is the list, and a directory
+      cannot be out of date about itself.
 
 12. **Bucket authz doc drift** *(agent).* `en.memory.buckets.md` describes owner-gated; cr-0123 relaxed to
     member-gated. A reader infers a stronger guarantee than the code gives.

@@ -28,10 +28,11 @@
   resource-shaped** — one `…Resource` per generated `…Api` interface (OpenAPI tag), *not* per use-case,
   because one endpoint can serve several use-cases. Use-case slicing is what mirrors across stacks
   (web/apple/android); the adapter shape is necessarily per-stack.
-- **Cross-cutting code lives in `shared/`** — e.g. backend `shared/{security,crypto,content,keymgmt,storage,identity}`.
-  `shared/` must not depend on a feature.
-- **Dependencies stay directed.** If `memory` builds on `content`, `content` must not reach back into
-  `memory`; share neutral rules through small interfaces.
+- **Cross-cutting code lives in `shared/`** — `backend/src/main/kotlin/com/veyq/app/shared/`. **The directory is
+  the list**; it cannot be out of date about itself, whereas the roll-call that used to stand here named six
+  slices of which two existed and omitted nine. `shared/` must not depend on a feature.
+- **Dependencies stay directed.** If a feature builds on a `shared/` slice, that slice must not reach back into
+  the feature; share neutral rules through small interfaces.
 
 ## 2. Backend layering
 
