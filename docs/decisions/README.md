@@ -3,8 +3,15 @@
 Short, numbered records of **stable** architectural or product decisions — the durable trace of *why*
 something is the way it is. One file per decision: `NNNN-kebab-title.md`, numbered from `0001`.
 
-- **Status:** `Proposed` · `Accepted` · `Superseded by NNNN`. Supersede rather than delete.
+- **Status:** `Proposed` · `Accepted` · `Superseded by NNNN`. Supersede when the decision *changes*; **delete
+  when its subject is gone** — five went with the native surfaces (`7a1c4e9f`) and there was nothing to
+  supersede them *to*. A deletion is not done until its citations are swept with it: ADRs are cited from
+  `contracts/` and from code, **not only from `docs/`**, and no validator checks that. The native drop was
+  thorough in `docs/` and left 27 references to the deleted ADR 0009 behind in a spec and the web crypto layer.
 - Keep them concise: context, the decision, consequences — not a tutorial.
+- **An ADR records a decision that had a real alternative.** If it could not have gone another way, it is a
+  description, not a decision — put it where it binds instead of filing one. Apply the test before adding a
+  record, not in a review afterwards.
 - Refinements that produce a durable decision create an ADR; change-requests link the ADRs they touch.
 - **Current state, edited in place.** State the decision *as it is now*; when it changes, **edit the ADR** and
   let **git** hold the history — **no** `Amended: <date>` lines or `## Decision — addendum <date>` sections
