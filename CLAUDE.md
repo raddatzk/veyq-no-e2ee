@@ -27,7 +27,13 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 - `wiki/` — **published** end-user GitHub Wiki: plain language, **EN+DE**, focused on what you can do
   and "your data is safe, here's why".
 - `changes/` — the **live** work order + any open review backlog; a CR is deleted once done.
-  `legacy/` — read-only reference.
+- `legacy/` — read-only reference, and **the one directory that leaves at v1**: it splits off to its own
+  archive repo when the E2EE product moves to a fresh one. Nothing here depends on it — verified by moving it
+  aside and running the trust chain: all guards green, and **no `docs/` link points into it**. What remains
+  are ~100 **provenance notes** in prose and code comments (*"ported from `legacy/iOS/Veyq/Auth/ConnectView.swift`"*,
+  the inbox's seeded pointers). Those are worth keeping and must **not** be rewritten one by one: after the
+  split they stay literal paths, just rooted in the archive instead of here. **This line is that root** — when
+  the archive exists, name it here, and all ~100 resolve again.
 
 ## How we work
 - Working rules + workflow: **`docs/ai/README.md`** (inbox → refine → change-request).
