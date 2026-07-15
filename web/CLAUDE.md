@@ -47,15 +47,14 @@ here; the server is blind.
   `127.0.0.1:5173`.
 
 ## Conventions
-- **Reuse legacy UI, swap only the data layer — never invent new UI.** Port screens/components from
-  **`legacy/frontend-noe2ee`** (read-only — the pre-E2EE original, the clean product UX) and rewire them to the
-  contracts client + crypto. **Not `legacy/frontend`:** that is the E2EE-but-wrong-concept descendant, useful
-  only as a reference for *how* an operator-blind server forces a flow client-side (breadcrumbs, name-decrypt,
-  thumbnail-less gallery) — never for its design or scope. Canonical rule: [`docs/ai/README.md`](../docs/ai/README.md).
-  The stylesheets are already here: `src/styles/` is `legacy/frontend-noe2ee/src/styles/` vendored verbatim, so
-  a ported component should render byte-identically. If a ported view lacks a field the contract requires, add
-  it **in-style** rather than hardcode a default. Visual rules + tokens/classes:
-  [web UI styleguide](../docs/crosscutting/ui-web-styleguide.md).
+- **Reuse the existing UI, swap only the data layer — never invent new UI.** **Which reference tree, and which
+  one to never copy, is the project-wide rule: [`docs/ai/README.md`](../docs/ai/README.md) § Working rules.**
+  Read it before porting a screen — pointing at the wrong tree is the mistake it exists to prevent, and the one
+  this file used to make.
+  The stylesheets are already here — `src/styles/` came from that tree and was then brought under the
+  [web UI styleguide](../docs/crosscutting/ui-web-styleguide.md) (raw colours → `--app-*`, dark-mode-aware
+  values), so a ported component should *look* like the original but is not a byte-for-byte copy. If a ported
+  view lacks a field the contract requires, add it **in-style** rather than hardcode a default.
 - **Crypto:** `src/shared/crypto/v1.ts` is the **conformance-pinned** suite — keep it byte-identical to
   the vectors (`../contracts/crypto/vectors/v1.json`); the conformance test must stay green. The Model B
   auth derivation (`deriveAuthSalt` / `deriveAuthKeypair`, Ed25519 from Argon2id — ADR 0003) lives here.
