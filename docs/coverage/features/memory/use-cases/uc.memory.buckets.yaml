@@ -18,7 +18,7 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/media.buckets.test.ts]
   - id: derived-primary-buckets
-    text: A Memory's buckets are materialized lazily via find-or-create on (node_id, owner_key) — exactly one primary per uploader, virtual until that uploader has at least one medium. Primary uniqueness is enforced procedurally under the transaction (no DB partial index in the H2 ∩ MariaDB subset).
+    text: A Memory's buckets are materialized lazily via find-or-create on (node_id, owner_key) — one primary per uploader, virtual until that uploader has at least one medium. (Uniqueness holds for sequential resolves, which is what these tests pin; it is not enforced by a constraint — see ADR 0034 §4 + architecture §11.)
     coverage:
       backend:
         integration: [MediaBucketsSliceTest.uploadStampsOwnerKeyAndMaterializesPrimary, MediaBucketsSliceTest.createSubBucketMoveThenDeleteReparents]

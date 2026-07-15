@@ -39,7 +39,8 @@ the experience in [uc.memory.buckets](../features/memory/use-cases/uc.memory.buc
 
 2. **A real `veyq_bucket` table, not a derived group-by.** A row per materialized bucket:
    `id, node_id, owner_key, parent_bucket_id? (null = primary), sealed_name? + suite_id, is_primary`, with
-   `UNIQUE (node_id, owner_key) WHERE is_primary`. `veyq_media` gains **`bucket_id`** (nullable FK,
+   **one primary per `(node_id, owner_key)`** — an invariant the schema does **not** currently carry (below).
+   `veyq_media` gains **`bucket_id`** (nullable FK,
    `ON DELETE SET NULL`, `null` = the owner's primary) and **`created_by`** (the `owner_key`, copied onto the
    medium on attach — denormalized so grouping/move-authz never joins the bucket). Full field list:
    [en.memory.buckets](../features/memory/enablers/en.memory.buckets.md).
@@ -56,8 +57,18 @@ the experience in [uc.memory.buckets](../features/memory/use-cases/uc.memory.buc
    find-or-create on `(node, owner_key)` on the first upload / first sub-bucket); uploaders with no media have no
    row. Its **derived** name (member = username, contributor = the identity's sealed name) is itself **sealed
    under `K_mem`** so the view is uniform + operator-blind, and it is **not renameable**. Sub-bucket names are
-   **`K_mem`-sealed** user text; because they are ciphertext there is **no server-side name uniqueness** — only
-   the content-blind **primary uniqueness `(node, owner_key)`** holds.
+   **`K_mem`-sealed** user text; because they are ciphertext there is **no server-side name uniqueness** — the
+   only uniqueness this model wants is the content-blind **one primary per `(node, owner_key)`**.
+
+   **That uniqueness is not enforced today, and the find-or-create is best-effort.** Two requests that resolve
+   the same missing primary concurrently each create one. The intended `UNIQUE (node_id, owner_key) WHERE
+   is_primary` is a **partial** index, which the H2 ∩ MariaDB common subset does not have — but the portable
+   form does: a marker column carrying `owner_key` **only** when `is_primary` (else `NULL`, and NULLs do not
+   collide), plus a plain `UNIQUE (node_id, marker)`. That is the same shape `veyq_node` already uses for slug
+   uniqueness (`ux_node_parent_slug`, V10), where the store's `slugTaken` pre-check exists for the friendly
+   error and the **index** is the guarantee. Buckets have the pre-check and not the index — **due when buckets
+   are next touched**, with a dedup of any primaries that already doubled
+   ([architecture §11](../architecture/README.md)).
 
 5. **One-level nesting.** Sub-buckets sit **one level** under a primary (the parent must be a primary), **owner
    inherited** from the parent. No arbitrary depth, **no reparenting**.
