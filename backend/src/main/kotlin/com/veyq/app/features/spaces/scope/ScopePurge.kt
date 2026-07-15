@@ -23,6 +23,10 @@ import java.time.Instant
  * the scope) and then every row that references the scope. Operator-blind-safe: erasure only, no key/plaintext
  * (unlike a removal's key rotation). Mirrors the soft-then-hard purge pattern (`TenantInvitePurge`/`SessionPurge`,
  * cr-0011).
+ *
+ * Deliberately **not** routed through `MediaStore.purgeMediaRows` (the shared FK-ordered per-media purge,
+ * cr-0135): that helper erases one media's rows, while this erases set-based by scope and objects-first. It is
+ * the wrong shape here, not a fourth copy of it.
  */
 @ApplicationScoped
 class ScopePurge(

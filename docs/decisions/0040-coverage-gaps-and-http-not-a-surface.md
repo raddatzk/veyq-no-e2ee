@@ -92,10 +92,6 @@ proven, whatever colour its column is. **The unit is the test, not the surface.*
 - **Cost, paid honestly:** this reverses a *documented* stance (`http` as a verification surface); ~67 criteria
   drop their now-redundant `http` refs; one backend boundary test is added; `docs/ai/README.md` +
   `docs/coverage/README.md` are rewritten; the phase order becomes `contracts → backend → web`.
-- **The `.http` files are not deleted.** They keep their value as dev tooling and living request examples with
-  response-handler assertions; they simply make no coverage *claim*. The door stays open: if they ever must be
-  CI-proven, the path is an `ijhttp` CI job — rejected now because the backend SliceTests already prove the same
-  behaviour in CI, so it would be infrastructure for coverage we already have.
 - **Rejected alternatives:**
   - *A CI-gating marker* (`ci-surfaces.yaml` / per-ref `ci: false` / filename convention) — machinery for a
     problem that removing `http` shrinks to a handful of criteria.

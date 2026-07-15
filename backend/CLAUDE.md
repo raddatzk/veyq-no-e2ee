@@ -4,7 +4,6 @@ Operator-blind API service. Loaded in addition to the root `CLAUDE.md` when work
 
 ## Prove your work
 - `./gradlew check` (compile + slice tests) — runs on **in-memory H2** (`%test`, hermetic + fast).
-  Runnable acceptance lives in `../http/` (ijhttp).
 - **Run the app (`quarkusDev`) on a persistent MariaDB** (`%dev`): `docker compose -f infra/docker-compose.yml
   up -d` starts it; data survives restarts (Flyway migrates once, then "up to date"). `docker compose -f
   infra/docker-compose.yml down -v` wipes it for a fresh instance. The H2 fallback is only the test default now.
