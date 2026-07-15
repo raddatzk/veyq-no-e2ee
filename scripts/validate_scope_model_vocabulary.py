@@ -37,7 +37,7 @@ Four invariants:
 
    **Line-scope is a proxy for clause-scope** (as in `validate_webfirst_authority.py`, for its own case). The
    line this was written for carried both a phantom and a legitimate state at once —
-   `owner = ACTIVE tenant-owner; tenant = ACTIVE` (`uc.admin.create-tenant.md`, a PlantUML step) — so a line
+   `owner = ACTIVE tenant-owner; tenant = ACTIVE` (`uc.admin.create-tenant.md`, a diagram step) — so a line
    cannot be judged as a whole. Two costs, both real and accepted: a phantom phrased without any of these words
    is invisible here, and a line that legitimately puts a lifecycle `ACTIVE` next to a membership word reds
    falsely. **The fix for a false positive is to split the claim, not to weaken the check.**

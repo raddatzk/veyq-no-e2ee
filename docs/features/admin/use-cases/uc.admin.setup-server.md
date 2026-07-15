@@ -24,24 +24,23 @@
    the server never sees the password and stores no credential/verifier — login is challenge-response);
    the server stores ciphertext + the public key only and **marks setup complete** (single-owner lock).
 
-```plantuml
-@startuml
-title First-run server setup — sequence
-skinparam shadowing false
-actor "Server Owner" as O
-participant "Client\n(owner device)" as C
-participant "Server\n(blind)" as S
-
-C -> S : GET setup status
-S --> C : setupRequired = true
-O -> C : auth method, email
-C -> C : generate cold —\nidentity keypair, Master Key + wraps,\nEmergency Kit (Secret Key + recovery code)
-C -> O : show Emergency Kit
-O -> C : confirm saved
-C -> S : POST setup/owner\n{ email, identityPublicKey, wrapped blobs,\nauthPublicKey, suiteId }
-S -> S : store ciphertext only;\nmark setup complete (single-owner lock)
-S --> C : Server Owner created
-@enduml
+```mermaid
+---
+title: First-run server setup — sequence
+---
+sequenceDiagram
+  actor O as Server Owner
+  participant C as Client<br>(owner device)
+  participant S as Server<br>(blind)
+  C->>S: GET setup status
+  S-->>C: setupRequired = true
+  O->>C: auth method, email
+  C->>C: generate cold —<br>identity keypair, Master Key + wraps,<br>Emergency Kit (Secret Key + recovery code)
+  C->>O: show Emergency Kit
+  O->>C: confirm saved
+  C->>S: POST setup/owner<br>{ email, identityPublicKey, wrapped blobs,<br>authPublicKey, suiteId }
+  S->>S: store ciphertext only#59;<br>mark setup complete (single-owner lock)
+  S-->>C: Server Owner created
 ```
 
 ## Alternate / exception flows
@@ -52,17 +51,17 @@ S --> C : Server Owner created
 
 ## Setup state
 
-```plantuml
-@startuml
-title Instance setup — state
-skinparam shadowing false
-[*] --> SetupRequired
-SetupRequired --> KeysGenerated : owner submits config\n(client generates keys cold)
-KeysGenerated --> SetupComplete : Emergency Kit confirmed\n+ owner stored
-KeysGenerated --> SetupRequired : kit not confirmed (E1)
-SetupComplete --> SetupComplete : further setup rejected (A1)
-SetupComplete --> [*]
-@enduml
+```mermaid
+---
+title: Instance setup — state
+---
+stateDiagram-v2
+  [*] --> SetupRequired
+  SetupRequired --> KeysGenerated : owner submits config<br>(client generates keys cold)
+  KeysGenerated --> SetupComplete : Emergency Kit confirmed<br>+ owner stored
+  KeysGenerated --> SetupRequired : kit not confirmed (E1)
+  SetupComplete --> SetupComplete : further setup rejected (A1)
+  SetupComplete --> [*]
 ```
 
 ## Quality notes

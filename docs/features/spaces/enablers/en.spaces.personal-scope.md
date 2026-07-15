@@ -50,27 +50,26 @@ The server mints the scope row + the self-membership. The client **auto-births**
    `asymUnwrap` it with the vaulted identity (hybrid secret + public derived from the identity private
    bundle) → the **scope key**, held in memory (the `ScopeVault`).
 
-```plantuml
-@startuml
-title Personal scope — birth + open (client-driven, operator-blind)
-skinparam shadowing false
-actor "Member\n(unlocked)" as U
-participant "Client" as C
-participant "Server\n(blind)" as S
-
-C -> S : GET /api/scopes
-S --> C : [] (no personal scope yet)
-C -> C : scopeKey = random(32)
-C -> C : grant = asymWrap(ownIdentityPub, scopeKey, "scope-grant")
-C -> S : POST /api/scopes { wrappedGrant: grant }
-S -> S : mint scope(kind=PERSONAL, tenant=Host) + self-membership(role=OWNER)
-S --> C : { scopeId, kind:PERSONAL }
-== open (now or next launch) ==
-C -> S : GET /api/scopes
-S --> C : [{ id, kind:PERSONAL, tenantId, wrappedGrant }]
-C -> C : scopeKey = asymUnwrap(identity, wrappedGrant, "scope-grant")  (in memory)
-note right of C : server only ever saw ciphertext + the scope row
-@enduml
+```mermaid
+---
+title: Personal scope — birth + open (client-driven, operator-blind)
+---
+sequenceDiagram
+  actor U as Member<br>(unlocked)
+  participant C as Client
+  participant S as Server<br>(blind)
+  C->>S: GET /api/scopes
+  S-->>C: [] (no personal scope yet)
+  C->>C: scopeKey = random(32)
+  C->>C: grant = asymWrap(ownIdentityPub, scopeKey, "scope-grant")
+  C->>S: POST /api/scopes { wrappedGrant: grant }
+  S->>S: mint scope(kind=PERSONAL, tenant=Host) + self-membership(role=OWNER)
+  S-->>C: { scopeId, kind:PERSONAL }
+  Note over U,S: open (now or next launch)
+  C->>S: GET /api/scopes
+  S-->>C: [{ id, kind:PERSONAL, tenantId, wrappedGrant }]
+  C->>C: scopeKey = asymUnwrap(identity, wrappedGrant, "scope-grant")  (in memory)
+  Note right of C: server only ever saw ciphertext + the scope row
 ```
 
 ## Alternate / exception flows

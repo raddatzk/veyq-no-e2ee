@@ -41,27 +41,26 @@ This use-case is the first consumer of the grant-distribution primitive
 5. The member, on their **next entry**, opens their grant with their own identity private and reaches the
    shared **Tenant** space; the tree + favorites load for it ([uc.spaces.switch-spaces](uc.spaces.switch-spaces.md)).
 
-```plantuml
-@startuml
-title Add a member — invite (owner), auto-deliver (any key-holder), open (operator-blind; server never holds K_SC)
-skinparam shadowing false
-actor "Owner\n(invites)" as O
-actor "Any member\n(key-holder, online)" as M
-participant "Server\n(blind)" as S
-actor "Invitee" as I
-participant "Client\n(invitee)" as CI
-
-O -> S : mint member invite (email, role=MEMBER; secret hashed)
-S --> I : invite delivered out-of-band
-I -> CI : open invite → register
-CI -> S : cold-birth identity (publish pubkey) + accept → MEMBER, no grant
-note right of CI : lands in the Personal fallback\nuntil any key-holder wraps
-M -> S : (next online) directory shows the pending member + identity pubkey
-M -> M : grant = asymWrap(pubkey(member), K_SC, "scope-grant")  — first-online-wins
-M -> S : POST grant for member (opaque ciphertext)
-I -> CI : next entry → asymUnwrap own grant → K_SC → shared space
-note right of S : server saw invite metadata,\npubkeys, opaque grants — never K_SC
-@enduml
+```mermaid
+---
+title: Add a member — invite (owner), auto-deliver (any key-holder), open (operator-blind; server never holds K_SC)
+---
+sequenceDiagram
+  actor O as Owner<br>(invites)
+  actor M as Any member<br>(key-holder, online)
+  participant S as Server<br>(blind)
+  actor I as Invitee
+  participant CI as Client<br>(invitee)
+  O->>S: mint member invite (email, role=MEMBER#59; secret hashed)
+  S-->>I: invite delivered out-of-band
+  I->>CI: open invite → register
+  CI->>S: cold-birth identity (publish pubkey) + accept → MEMBER, no grant
+  Note right of CI: lands in the Personal fallback<br>until any key-holder wraps
+  M->>S: (next online) directory shows the pending member + identity pubkey
+  M->>M: grant = asymWrap(pubkey(member), K_SC, "scope-grant")  — first-online-wins
+  M->>S: POST grant for member (opaque ciphertext)
+  I->>CI: next entry → asymUnwrap own grant → K_SC → shared space
+  Note right of S: server saw invite metadata,<br>pubkeys, opaque grants — never K_SC
 ```
 
 ## Alternate / exception flows

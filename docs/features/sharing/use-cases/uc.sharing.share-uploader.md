@@ -38,29 +38,27 @@ client-local** own-view. **v1: role UPLOADER, personal scope, direct-append.**
    On **reload / new tab** the own-view is empty (session-only) — surfaced by a dedicated empty-state, not a blank
    gallery.
 
-```plantuml
-@startuml
-title Uploader share — write-only drop-box (server serves the uploader NO gallery)
-skinparam shadowing false
-actor "Curator\n(unlocked)" as C
-participant "Server\n(blind)" as S
-participant "Object store" as O
-actor "Anonymous\nuploader" as V
-
-C -> S : POST share { nodeId, UPLOADER, wrap, sealedName }
-S --> C : shareId
-C -> V : hand off link /s/{shareId}#k=…
-
-V -> S : GET /api/shares/{shareId}   (no auth)
-S --> V : { role: UPLOADER, wrap, sealedName, media: [] }   ← no gallery
-V -> V : K_mem = unwrap(wrap, K_share); seal name; keep uploads' ids + LOCAL previews in session
-V -> S : POST /identities → identityId + contributorToken
-V -> S : POST /blob-uploads (token) → presigned PUTs
-V -> O : PUT ciphertext chunks (direct)   [never a download]
-V -> S : POST /media (token) → attach to nodeId, stamp identityId
-V -> S : DELETE /media/{mediaId} (token)   [own only; in-session]
-note right of S : never serves the uploader a gallery (resolve media=[]);\nholds only opaque ids + ciphertext + the sealed name.\nThe own-view is client-local; upload+delete are token-authorized.
-@enduml
+```mermaid
+---
+title: Uploader share — write-only drop-box (server serves the uploader NO gallery)
+---
+sequenceDiagram
+  actor C as Curator<br>(unlocked)
+  participant S as Server<br>(blind)
+  participant O as Object store
+  actor V as Anonymous<br>uploader
+  C->>S: POST share { nodeId, UPLOADER, wrap, sealedName }
+  S-->>C: shareId
+  C->>V: hand off link /s/{shareId}#35;k=…
+  V->>S: GET /api/shares/{shareId}   (no auth)
+  S-->>V: { role: UPLOADER, wrap, sealedName, media: [] }   ← no gallery
+  V->>V: K_mem = unwrap(wrap, K_share)#59; seal name#59; keep uploads' ids + LOCAL previews in session
+  V->>S: POST /identities → identityId + contributorToken
+  V->>S: POST /blob-uploads (token) → presigned PUTs
+  V->>O: PUT ciphertext chunks (direct)   [never a download]
+  V->>S: POST /media (token) → attach to nodeId, stamp identityId
+  V->>S: DELETE /media/{mediaId} (token)   [own only#59; in-session]
+  Note right of S: never serves the uploader a gallery (resolve media=[])#59;<br>holds only opaque ids + ciphertext + the sealed name.<br>The own-view is client-local#59; upload+delete are token-authorized.
 ```
 
 ## Alternate / exception flows

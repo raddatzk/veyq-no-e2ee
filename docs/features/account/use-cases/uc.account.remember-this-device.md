@@ -39,37 +39,35 @@ The screen shows only the fields this device still needs:
 3. **Returning on a remembered device** (password-less wrap + cookie present): the boot restore opens the vault
    with no prompt (the [uc.account.auto-unlock](uc.account.auto-unlock.md) path).
 
-```plantuml
-@startuml
-title Sign in & remember this device (web)
-skinparam shadowing false
-actor User as U
-participant "Web client" as C
-participant "Server (blind)" as S
-
-== first sign-in on a device ==
-U -> C : email + password + Secret Key (+ remember?)
-C -> S : login (challenge → sign → verify[remember])
-S --> C : session (+ httpOnly cookie if remember)
-C -> C : unlock (password + Secret Key → Master Key)
-alt remember = off
-  C -> C : enrol DEVICE wrap (device key + password)
-  C -> S : add wrap (ciphertext)
-else remember = on
-  C -> C : enrol password-less device-key wrap (symWrap(K, masterKey))
-  C -> S : add wrap (ciphertext)
-end
-C --> U : in the shell (Secret Key now forgotten)
-
-== next launch ==
-alt remembered (password-less)
-  C -> S : silent refresh (cookie) ; fetch wrap
-  C -> C : open vault with device key — no prompt
-else trusted (password)
-  U -> C : email + password
-  C -> C : unlock via DEVICE wrap — no Secret Key
-end
-@enduml
+```mermaid
+---
+title: Sign in & remember this device (web)
+---
+sequenceDiagram
+  actor U as User
+  participant C as Web client
+  participant S as Server (blind)
+  Note over U,S: first sign-in on a device
+  U->>C: email + password + Secret Key (+ remember?)
+  C->>S: login (challenge → sign → verify[remember])
+  S-->>C: session (+ httpOnly cookie if remember)
+  C->>C: unlock (password + Secret Key → Master Key)
+  alt remember = off
+  C->>C: enrol DEVICE wrap (device key + password)
+  C->>S: add wrap (ciphertext)
+  else remember = on
+  C->>C: enrol password-less device-key wrap (symWrap(K, masterKey))
+  C->>S: add wrap (ciphertext)
+  end
+  C-->>U: in the shell (Secret Key now forgotten)
+  Note over U,S: next launch
+  alt remembered (password-less)
+  C->>S: silent refresh (cookie) #59; fetch wrap
+  C->>C: open vault with device key — no prompt
+  else trusted (password)
+  U->>C: email + password
+  C->>C: unlock via DEVICE wrap — no Secret Key
+  end
 ```
 
 ## Alternate / exception flows

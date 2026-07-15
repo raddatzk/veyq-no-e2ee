@@ -58,26 +58,25 @@ you verified in one space is verified everywhere.
    key opens a side-by-side review; **accept** re-pins as `pinned` (`acceptKeyChange`), **refuse** leaves it blocked.
    So `verified` is currently reachable only via the data layer, awaiting the strict-mode entry point.
 
-```plantuml
-@startuml
-title Identity pinning — TOFU check before a foreign wrap (operator-blind)
-skinparam shadowing false
-participant "Client\n(unlocked)" as C
-participant "Pin store\n(sealed under MK)" as P
-participant "Server\n(blind)" as S
-
-C -> S : GET directory → identityPublicKey(userId)
-C -> P : open (unseal MK) → lookup userId
-alt no pin
-  C -> P : pin { key, state=pinned, firstSeenAt } ; re-seal
-  C -> C : proceed with asymWrap (TOFU)
-else key == pin
-  C -> C : proceed with asymWrap
-else key != pin
-  C -> C : UI → notice (accept ⇒ repin) ; worker ⇒ block + decline job + flag
-end
-note right of S : sees ONE opaque ciphertext blob\n(no userId, no key, no count)
-@enduml
+```mermaid
+---
+title: Identity pinning — TOFU check before a foreign wrap (operator-blind)
+---
+sequenceDiagram
+  participant C as Client<br>(unlocked)
+  participant P as Pin store<br>(sealed under MK)
+  participant S as Server<br>(blind)
+  C->>S: GET directory → identityPublicKey(userId)
+  C->>P: open (unseal MK) → lookup userId
+  alt no pin
+  C->>P: pin { key, state=pinned, firstSeenAt } #59; re-seal
+  C->>C: proceed with asymWrap (TOFU)
+  else key == pin
+  C->>C: proceed with asymWrap
+  else key != pin
+  C->>C: UI → notice (accept ⇒ repin) #59; worker ⇒ block + decline job + flag
+  end
+  Note right of S: sees ONE opaque ciphertext blob<br>(no userId, no key, no count)
 ```
 
 ## Sync & merge

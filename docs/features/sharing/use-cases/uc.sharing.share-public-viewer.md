@@ -33,29 +33,27 @@ slices. The crypto is the per-Memory second-wrap of [ADR 0012](../../../decision
 5. **Manage / revoke.** The curator can list their shares and **revoke** one (`enabled = false`) or set an expiry;
    the next visitor request then `404`s.
 
-```plantuml
-@startuml
-title Public viewer share — operator-blind (server never sees K_share/K_mem)
-skinparam shadowing false
-actor "Curator\n(unlocked)" as C
-participant "Server\n(blind)" as S
-participant "Object store" as O
-actor "Anonymous\nviewer" as V
-
-C -> C : K_share = random; wrap = symWrap(K_share, K_mem); sealName under K_share
-C -> S : POST share { nodeId, VIEWER, wrap, sealedName }
-S --> C : shareId
-note over C : link = /s/{shareId}#k=base64url(K_share)   (fragment, never sent)
-C -> V : hand off link out-of-band
-
-V -> S : GET /api/shares/{shareId}   (no auth)
-S --> V : record + sealed subtree (all under K_mem)
-V -> V : K_mem = unwrap(wrap, K_share from fragment) → decrypt locally
-V -> S : GET share blob (gated: attached under nodeId?)
-S --> V : presigned store URL
-V -> O : GET bytes (direct) → decrypt locally
-note right of S : sees shareId, wrap, role, sealedName, nodeId —\nnever K_share, K_mem, names, viewer, or which media
-@enduml
+```mermaid
+---
+title: Public viewer share — operator-blind (server never sees K_share/K_mem)
+---
+sequenceDiagram
+  actor C as Curator<br>(unlocked)
+  participant S as Server<br>(blind)
+  participant O as Object store
+  actor V as Anonymous<br>viewer
+  C->>C: K_share = random#59; wrap = symWrap(K_share, K_mem)#59; sealName under K_share
+  C->>S: POST share { nodeId, VIEWER, wrap, sealedName }
+  S-->>C: shareId
+  Note over C: link = /s/{shareId}#35;k=base64url(K_share)   (fragment, never sent)
+  C->>V: hand off link out-of-band
+  V->>S: GET /api/shares/{shareId}   (no auth)
+  S-->>V: record + sealed subtree (all under K_mem)
+  V->>V: K_mem = unwrap(wrap, K_share from fragment) → decrypt locally
+  V->>S: GET share blob (gated: attached under nodeId?)
+  S-->>V: presigned store URL
+  V->>O: GET bytes (direct) → decrypt locally
+  Note right of S: sees shareId, wrap, role, sealedName, nodeId —<br>never K_share, K_mem, names, viewer, or which media
 ```
 
 ## Alternate / exception flows

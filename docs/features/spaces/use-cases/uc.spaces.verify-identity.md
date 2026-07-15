@@ -34,26 +34,25 @@ public bundle, [ADR 0009](../../../decisions/0009-native-crypto-per-platform-vec
    (directory) safety-numbers side by side. The caller verifies out-of-band, then either **accept** (re-pin the new
    key, optionally straight to *verified*) or **refuse** (leave it blocked — the wrap/delivery stays gated).
 
-```plantuml
-@startuml
-title Verify a member's identity — out-of-band safety-number compare (operator-blind)
-skinparam shadowing false
-actor "Caller\n(member)" as A
-participant "Caller's client\n(pin store)" as CA
-actor "Target\n(member)" as B
-participant "Target's device" as CB
-
-A -> CA : open member → show MY safety-number(target) + scan
-B -> CB : show QR of MY identity fingerprint
-A -> CA : scan target's QR
-CA -> CA : compare scanned vs pinned key
-alt matches
-  CA -> CA : offer "mark verified" → state = verified
-else differs
-  CA -> CA : warn "different key" → do not trust
-end
-note right of CA : no server call — pin store is client-side, sealed under the Master Key
-@enduml
+```mermaid
+---
+title: Verify a member's identity — out-of-band safety-number compare (operator-blind)
+---
+sequenceDiagram
+  actor A as Caller<br>(member)
+  participant CA as Caller's client<br>(pin store)
+  actor B as Target<br>(member)
+  participant CB as Target's device
+  A->>CA: open member → show MY safety-number(target) + scan
+  B->>CB: show QR of MY identity fingerprint
+  A->>CA: scan target's QR
+  CA->>CA: compare scanned vs pinned key
+  alt matches
+  CA->>CA: offer "mark verified" → state = verified
+  else differs
+  CA->>CA: warn "different key" → do not trust
+  end
+  Note right of CA: no server call — pin store is client-side, sealed under the Master Key
 ```
 
 ## Alternate / exception flows

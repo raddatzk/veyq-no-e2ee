@@ -53,23 +53,22 @@ which is **known-correct** (it just opened the floor wrap) and not yet cleared.
 6. **Trusted:** the server holds the DEVICE ciphertext; this device holds its non-extractable key + the salt
    and id it needs to find and remove that wrap later.
 
-```plantuml
-@startuml
-title Trust this device (enrol DEVICE wrap) — sequence
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(unlocked)" as C
-participant "IndexedDB" as DB
-participant "Server\n(blind)" as S
-
-U -> C : "Trust this device" (+ password)
-C -> DB : generate + store non-extractable deviceKey
-C -> C : df = HMAC(deviceKey, info)\nKEK = Argon2id(password + df, salt)\nDEVICE wrap = symWrap(KEK, masterKey)
-C -> S : add DEVICE wrap (ciphertext + kdfParams)
-S --> C : stored
-C -> C : discard KEK
-C --> U : this device is trusted (password-only next time)
-@enduml
+```mermaid
+---
+title: Trust this device (enrol DEVICE wrap) — sequence
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(unlocked)
+  participant DB as IndexedDB
+  participant S as Server<br>(blind)
+  U->>C: "Trust this device" (+ password)
+  C->>DB: generate + store non-extractable deviceKey
+  C->>C: df = HMAC(deviceKey, info)<br>KEK = Argon2id(password + df, salt)<br>DEVICE wrap = symWrap(KEK, masterKey)
+  C->>S: add DEVICE wrap (ciphertext + kdfParams)
+  S-->>C: stored
+  C->>C: discard KEK
+  C-->>U: this device is trusted (password-only next time)
 ```
 
 ## Routine unlock on a trusted device (the DEVICE path of uc.account.unlock)
@@ -110,15 +109,15 @@ control can never strip the 2SKD floor or a recovery path.
 
 ## Trust state
 
-```plantuml
-@startuml
-title Device trust — state
-skinparam shadowing false
-[*] --> Untrusted
-Untrusted --> Trusted : enrol (unlocked) → store deviceKey + DEVICE wrap
-Trusted --> Untrusted : untrust (delete wrap + deviceKey)\nor device key lost (falls back to PASSWORD)
-Trusted --> [*]
-@enduml
+```mermaid
+---
+title: Device trust — state
+---
+stateDiagram-v2
+  [*] --> Untrusted
+  Untrusted --> Trusted : enrol (unlocked) → store deviceKey + DEVICE wrap
+  Trusted --> Untrusted : untrust (delete wrap + deviceKey)<br>or device key lost (falls back to PASSWORD)
+  Trusted --> [*]
 ```
 
 ## Quality notes

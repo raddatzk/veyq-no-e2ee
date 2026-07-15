@@ -37,22 +37,21 @@ every member already does. It is a **name-only** change: it does **not** rotate 
    epoch chain to `E_nameEpoch`, derives `K_name`, and decrypts `encryptedName` → the new name (the read path
    [uc.spaces.consent-group-add](uc.spaces.consent-group-add.md) / the switcher already use).
 
-```plantuml
-@startuml
-title Rename a group — re-seal under the CURRENT epoch (forward-secret, operator-blind)
-skinparam shadowing false
-actor "GroupOwner\n(holds E_current)" as O
-participant "Server\n(blind)" as S
-actor "Removed member\n(holds ≤ E_{n-1})" as R
-
-O -> O : e = currentEpoch ; K_name_e = HKDF(E_e, "group-name-key")
-O -> O : encryptedName = seal(newName, K_name_e)
-O -> S : POST /api/scopes/{id}/name { encryptedName, nameEpoch: e }
-S -> S : owner-gate + active + nameEpoch == currentEpoch ? else 409
-S -> S : scope.encrypted_name = encryptedName ; scope.name_epoch = e
-S --> O : 204
-note right of R : holds no E_e ⇒ cannot derive K_name_e\n⇒ never reads the post-removal name
-@enduml
+```mermaid
+---
+title: Rename a group — re-seal under the CURRENT epoch (forward-secret, operator-blind)
+---
+sequenceDiagram
+  actor O as GroupOwner<br>(holds E_current)
+  participant S as Server<br>(blind)
+  actor R as Removed member<br>(holds ≤ E_{n-1})
+  O->>O: e = currentEpoch #59; K_name_e = HKDF(E_e, "group-name-key")
+  O->>O: encryptedName = seal(newName, K_name_e)
+  O->>S: POST /api/scopes/{id}/name { encryptedName, nameEpoch: e }
+  S->>S: owner-gate + active + nameEpoch == currentEpoch ? else 409
+  S->>S: scope.encrypted_name = encryptedName #59; scope.name_epoch = e
+  S-->>O: 204
+  Note right of R: holds no E_e ⇒ cannot derive K_name_e<br>⇒ never reads the post-removal name
 ```
 
 ## Alternate / exception flows

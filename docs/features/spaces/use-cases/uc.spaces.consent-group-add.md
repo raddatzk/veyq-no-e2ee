@@ -53,30 +53,29 @@ group's **canonical** name (not an owner-typed claim), and the **accept/decline*
    acceptance the person is a real member and leaves via the normal remove path
    ([uc.spaces.manage-group-members](uc.spaces.manage-group-members.md)).
 
-```plantuml
-@startuml
-title Consent to a group add — gate K_SC BEFORE the wrap (server never holds K_SC or the name)
-skinparam shadowing false
-actor "GroupOwner\n(key-holder)" as O
-participant "Server\n(blind)" as S
-actor "Invitee\n(consent = on)" as I
-participant "Client\n(invitee)" as CI
-actor "Any key-holder\n(online)" as M
-
-O -> S : resolve username → { userId, identityPublicKey }
-O -> S : add → server sees consent=on → record SOFT membership (pendingConsent)
-note right of S : grant-delivery SKIPS soft memberships\n→ no wrap of K_SC yet
-O -> O : derive K_name = HKDF(E_e); wrap it: asymWrap(inviteePub, K_name, "group-name-key")
-O -> S : POST proposal's sealedNameKey (opaque ciphertext)
-I -> CI : open invitations → unwrap K_name → open CANONICAL encryptedName → see real name + who added
-alt Accept
-  I -> S : accept → clear pendingConsent (now a normal grant-less member)
-  M -> M : (next online) grant = asymWrap(inviteePub, K_SC, "scope-grant") — first-online-wins
-  M -> S : POST grant (opaque) → awaiting access → Active
-else Decline
-  I -> S : decline → delete soft membership (nothing was ever wrapped)
-end
-@enduml
+```mermaid
+---
+title: Consent to a group add — gate K_SC BEFORE the wrap (server never holds K_SC or the name)
+---
+sequenceDiagram
+  actor O as GroupOwner<br>(key-holder)
+  participant S as Server<br>(blind)
+  actor I as Invitee<br>(consent = on)
+  participant CI as Client<br>(invitee)
+  actor M as Any key-holder<br>(online)
+  O->>S: resolve username → { userId, identityPublicKey }
+  O->>S: add → server sees consent=on → record SOFT membership (pendingConsent)
+  Note right of S: grant-delivery SKIPS soft memberships<br>→ no wrap of K_SC yet
+  O->>O: derive K_name = HKDF(E_e)#59; wrap it: asymWrap(inviteePub, K_name, "group-name-key")
+  O->>S: POST proposal's sealedNameKey (opaque ciphertext)
+  I->>CI: open invitations → unwrap K_name → open CANONICAL encryptedName → see real name + who added
+  alt Accept
+  I->>S: accept → clear pendingConsent (now a normal grant-less member)
+  M->>M: (next online) grant = asymWrap(inviteePub, K_SC, "scope-grant") — first-online-wins
+  M->>S: POST grant (opaque) → awaiting access → Active
+  else Decline
+  I->>S: decline → delete soft membership (nothing was ever wrapped)
+  end
 ```
 
 ## Alternate / exception flows

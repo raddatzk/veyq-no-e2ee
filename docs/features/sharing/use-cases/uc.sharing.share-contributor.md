@@ -41,31 +41,29 @@ exactly as a viewer does, then seals new media under it. **v1 is deliberately na
 5. **Appears immediately.** The contributed photo is now part of the shared Memory (direct-append); every viewer
    (and the curator) sees it. The curator can delete it or **revoke** the link.
 
-```plantuml
-@startuml
-title Contributor share — operator-blind (server never sees K_share/K_mem/the name)
-skinparam shadowing false
-actor "Curator\n(unlocked)" as C
-participant "Server\n(blind)" as S
-participant "Object store" as O
-actor "Anonymous\ncontributor" as V
-
-C -> C : K_share = random; wrap = symWrap(K_share, K_mem); sealName under K_share
-C -> S : POST share { nodeId, CONTRIBUTOR, wrap, sealedName }
-S --> C : shareId
-C -> V : hand off link /s/{shareId}#k=…   (fragment, never sent)
-
-V -> S : GET /api/shares/{shareId}   (no auth)
-S --> V : record (role CONTRIBUTOR) + sealed subtree
-V -> V : K_mem = unwrap(wrap, K_share); seal display name under K_mem
-V -> S : POST /identities { sealedDisplayName }
-S --> V : identityId + contributorToken
-V -> V : seal photo under fresh K_blob (wrapped under K_mem) + derivatives + meta
-V -> S : POST /blob-uploads (token) → presigned PUTs
-V -> O : PUT ciphertext chunks (direct)
-V -> S : POST /media (token) → attach to nodeId, stamp identityId
-note right of S : sees shareId, wrap, role, sealedName, nodeId,\nthe sealed contributor name + identityId,\nciphertext blobs — never a name, K_share, K_mem, or the person
-@enduml
+```mermaid
+---
+title: Contributor share — operator-blind (server never sees K_share/K_mem/the name)
+---
+sequenceDiagram
+  actor C as Curator<br>(unlocked)
+  participant S as Server<br>(blind)
+  participant O as Object store
+  actor V as Anonymous<br>contributor
+  C->>C: K_share = random#59; wrap = symWrap(K_share, K_mem)#59; sealName under K_share
+  C->>S: POST share { nodeId, CONTRIBUTOR, wrap, sealedName }
+  S-->>C: shareId
+  C->>V: hand off link /s/{shareId}#35;k=…   (fragment, never sent)
+  V->>S: GET /api/shares/{shareId}   (no auth)
+  S-->>V: record (role CONTRIBUTOR) + sealed subtree
+  V->>V: K_mem = unwrap(wrap, K_share)#59; seal display name under K_mem
+  V->>S: POST /identities { sealedDisplayName }
+  S-->>V: identityId + contributorToken
+  V->>V: seal photo under fresh K_blob (wrapped under K_mem) + derivatives + meta
+  V->>S: POST /blob-uploads (token) → presigned PUTs
+  V->>O: PUT ciphertext chunks (direct)
+  V->>S: POST /media (token) → attach to nodeId, stamp identityId
+  Note right of S: sees shareId, wrap, role, sealedName, nodeId,<br>the sealed contributor name + identityId,<br>ciphertext blobs — never a name, K_share, K_mem, or the person
 ```
 
 ## Alternate / exception flows

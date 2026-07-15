@@ -65,24 +65,23 @@ with a clear warning, and gated on a device passcode being set.
 5. **At L3:** next launch, the client reads the ungated token (resume session) and the ungated `K`
    (`symUnwrap` the Master Key) and lands on the content — **no prompt**.
 
-```plantuml
-@startuml
-title Auto unlock — enrol (L3)
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(unlocked)" as C
-participant "Keystore items\n(ungated)" as K
-participant "Server\n(blind)" as S
-
-U -> C : pick "No login" + confirm warning
-C -> C : check OS passcode is set
-C -> K : store random key K (ungated)
-C -> C : device-key wrap = symWrap(K, masterKey)
-C -> S : add device-key wrap (ciphertext)
-S --> C : stored (id)
-C -> K : store refresh token (ungated)
-C --> U : this device opens straight in
-@enduml
+```mermaid
+---
+title: Auto unlock — enrol (L3)
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(unlocked)
+  participant K as Keystore items<br>(ungated)
+  participant S as Server<br>(blind)
+  U->>C: pick "No login" + confirm warning
+  C->>C: check OS passcode is set
+  C->>K: store random key K (ungated)
+  C->>C: device-key wrap = symWrap(K, masterKey)
+  C->>S: add device-key wrap (ciphertext)
+  S-->>C: stored (id)
+  C->>K: store refresh token (ungated)
+  C-->>U: this device opens straight in
 ```
 
 ## Routine "unlock" at L3

@@ -96,39 +96,32 @@ Content is protected by layered envelopes so grants are cheap and shares are lea
 byte-level detail lives in the crypto wire-format spec; account-level detail (unlock methods, recovery)
 in the account/key model. The shape:
 
-```plantuml
-@startuml
-title Envelope encryption — key hierarchy
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: Envelope encryption — key hierarchy
+---
+flowchart TB
+  unlock["Unlock methods<br>(one wrap each — see account/key model)"]
+  muk["Master Key"]
+  idk["Identity private key<br>(you)"]
+  idk2["Identity private key<br>(another member)"]
+  ksc["Scope content key K_SC<br>(current epoch)"]
+  kmem["Per-Memory content keys K_mem"]
+  content["Content<br>(memories, media, journal, sensitive metadata)"]
+  share["Public share<br>(per-share key)"]
+  NB["The scope's current content-epoch key is sealed once<br>per member — to each member's identity public key<br>(one wrap = the whole scope). Every member, you<br>included, opens it with their own identity private key."]
 
-rectangle "Unlock methods\n(one wrap each — see account/key model)" as unlock
-rectangle "Master Key" as muk
-rectangle "Identity private key\n(you)" as idk
-rectangle "Identity private key\n(another member)" as idk2
-rectangle "Scope content key K_SC\n(current epoch)" as ksc
-rectangle "Per-Memory content keys K_mem" as kmem
-rectangle "Content\n(memories, media, journal, sensitive metadata)" as content
-rectangle "Public share\n(per-share key)" as share
+  unlock -->|"each wraps (one blob per method)"| muk
+  muk -->|"unlocks"| idk
+  idk -->|"opens a grant"| ksc
+  idk2 -->|"opens a grant"| ksc
+  ksc -->|"unwraps"| kmem
+  kmem -->|"encrypts"| content
+  kmem -->|"one Memory's K_mem wrapped to a<br>per-share key (token-unlocked)"| share
+  ksc -.- NB
 
-unlock --> muk : each wraps (one blob per method)
-muk  --> idk : unlocks
-idk  --> ksc : opens a grant
-idk2 --> ksc : opens a grant
-ksc  --> kmem : unwraps
-kmem --> content : encrypts
-kmem --> share : one Memory's K_mem wrapped to a\nper-share key (token-unlocked)
-
-note right of ksc
-  The scope's current content-epoch key is sealed once
-  per member — to each member's identity public key
-  (one wrap = the whole scope). Every member, you
-  included, opens it with their own identity private key.
-end note
-@enduml
+  classDef note fill:#fffdf0,stroke:#c9b458,stroke-dasharray:4 3,color:#5c5326
+  class NB note
 ```
 
 - **Cheap grants, scoped shares.** Adding a member = one seal of the scope's current content-epoch key to

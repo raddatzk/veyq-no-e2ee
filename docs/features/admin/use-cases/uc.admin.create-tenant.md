@@ -43,27 +43,25 @@ keys); the invited owner's act is where the tenant's cryptographic root is **bor
    the tenant-owner role**, flips the tenant to **`ACTIVE`**, and marks the invite **`CONSUMED`**
    (soft-invalidated, **not** deleted — see the invite-lifecycle note).
 
-```plantuml
-@startuml
-title Create a tenant & invite its owner — sequence
-skinparam shadowing false
-actor "Server Owner" as SO
-participant "Server\n(blind)" as S
-actor "Invited Owner" as IO
-
-== Act 1 — structural, no keys ==
-SO -> S : POST tenants\n{ tenantName, domain, ownerEmail }
-S -> S : validate domain free;\ncreate tenant = PENDING;\nmint single-use invite token
-S ->> IO : invite email ( link #fragment = bootstrap secret )
-S --> SO : tenant created (PENDING)
-
-== Act 2 — cold scope birth ==
-IO -> IO : open link; log in OR register cold\n(identity keypair, Master Key, Emergency Kit)
-IO -> IO : generate TENANT scope cold —\nscope key K_SC; seal grant to OWN identity key
-IO -> S : POST accept\n{ scopeId, grant, bootstrap-secret proof }
-S -> S : verify secret; store grant;\nowner = tenant-owner;\ntenant = ACTIVE; invite = CONSUMED
-S --> IO : tenant active
-@enduml
+```mermaid
+---
+title: Create a tenant & invite its owner — sequence
+---
+sequenceDiagram
+  actor SO as Server Owner
+  participant S as Server<br>(blind)
+  actor IO as Invited Owner
+  Note over SO,IO: Act 1 — structural, no keys
+  SO->>S: POST tenants<br>{ tenantName, domain, ownerEmail }
+  S->>S: validate domain free#59;<br>create tenant = PENDING#59;<br>mint single-use invite token
+  S-)IO: invite email ( link #35;fragment = bootstrap secret )
+  S-->>SO: tenant created (PENDING)
+  Note over SO,IO: Act 2 — cold scope birth
+  IO->>IO: open link#59; log in OR register cold<br>(identity keypair, Master Key, Emergency Kit)
+  IO->>IO: generate TENANT scope cold —<br>scope key K_SC#59; seal grant to OWN identity key
+  IO->>S: POST accept<br>{ scopeId, grant, bootstrap-secret proof }
+  S->>S: verify secret#59; store grant#59;<br>owner = tenant-owner#59;<br>tenant = ACTIVE#59; invite = CONSUMED
+  S-->>IO: tenant active
 ```
 
 ## Alternate / exception flows
@@ -90,16 +88,16 @@ operator-boundary quality note.
 
 ## Tenant lifecycle — state
 
-```plantuml
-@startuml
-title Tenant lifecycle
-skinparam shadowing false
-[*] --> Pending : Server Owner creates\n(name, domain, owner email)
-Pending --> Active : invited owner accepts\n+ cold-births scope key + first grant
-Pending --> Pending : invite re-issued (A2)
-Pending --> [*] : revoked, never accepted (E1)
-Active --> [*]
-@enduml
+```mermaid
+---
+title: Tenant lifecycle
+---
+stateDiagram-v2
+  [*] --> Pending : Server Owner creates<br>(name, domain, owner email)
+  Pending --> Active : invited owner accepts<br>+ cold-births scope key + first grant
+  Pending --> Pending : invite re-issued (A2)
+  Pending --> [*] : revoked, never accepted (E1)
+  Active --> [*]
 ```
 
 ## Quality notes

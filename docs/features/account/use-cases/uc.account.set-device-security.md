@@ -56,33 +56,32 @@ after — a later "settings" prompt would have to re-ask).
    for L2, ungated for L3).
 4. Until the user picks, the device **stays at L0** — the choice is never made silently.
 
-```plantuml
-@startuml
-title Set device unlock level — sequence
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(unlocked)" as C
-participant "Platform keystore" as K
-participant "Server\n(blind)" as S
-
-U -> C : unlock at L0 (password + Secret Key)
-C -> U : choose unlock level (no default)
-U -> C : pick L1 / L2 / L3
-alt L1 — only password
-  C -> K : store device-bound factor
-  C -> S : add DEVICE wrap (ciphertext)
-else L2 — biometric
-  C -> K : create biometric-gated key + store gated refresh token
-  C -> S : add device-key wrap (ciphertext)
-else L3 — no login
-  C -> K : store device key + refresh token (ungated)
-  C -> S : add device-key wrap (ciphertext)
-else L0 — keep floor
-  C -> C : store nothing
-end
-S --> C : stored
-C --> U : this device is at level <chosen>
-@enduml
+```mermaid
+---
+title: Set device unlock level — sequence
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(unlocked)
+  participant K as Platform keystore
+  participant S as Server<br>(blind)
+  U->>C: unlock at L0 (password + Secret Key)
+  C->>U: choose unlock level (no default)
+  U->>C: pick L1 / L2 / L3
+  alt L1 — only password
+  C->>K: store device-bound factor
+  C->>S: add DEVICE wrap (ciphertext)
+  else L2 — biometric
+  C->>K: create biometric-gated key + store gated refresh token
+  C->>S: add device-key wrap (ciphertext)
+  else L3 — no login
+  C->>K: store device key + refresh token (ungated)
+  C->>S: add device-key wrap (ciphertext)
+  else L0 — keep floor
+  C->>C: store nothing
+  end
+  S-->>C: stored
+  C-->>U: this device is at level <chosen>
 ```
 
 ## Change the level later
@@ -101,21 +100,21 @@ Changing level on **this** device never touches **other** devices' wraps (each d
 
 ## State
 
-```plantuml
-@startuml
-title Device unlock level — state
-skinparam shadowing false
-[*] --> L0 : fresh device (floor only)
-L0 --> L1 : choose "only password"
-L0 --> L2 : choose "biometric"
-L0 --> L3 : choose "no login"
-L1 --> L2 : raise
-L2 --> L3 : raise
-L3 --> L0 : lower (untrust)
-L2 --> L0 : lower
-L1 --> L0 : lower
-L0 --> [*]
-@enduml
+```mermaid
+---
+title: Device unlock level — state
+---
+stateDiagram-v2
+  [*] --> L0 : fresh device (floor only)
+  L0 --> L1 : choose "only password"
+  L0 --> L2 : choose "biometric"
+  L0 --> L3 : choose "no login"
+  L1 --> L2 : raise
+  L2 --> L3 : raise
+  L3 --> L0 : lower (untrust)
+  L2 --> L0 : lower
+  L1 --> L0 : lower
+  L0 --> [*]
 ```
 
 ## Alternate / exception flows

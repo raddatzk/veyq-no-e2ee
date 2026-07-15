@@ -127,9 +127,16 @@ backend as a manual smoke, but it is not a phase gate).
 - **Language.** Converse with the user in the language they use; **document and implement in English**
   (docs, code, identifiers, commits). The published `wiki/` is the intentional bilingual EN+DE exception. German
   user-facing text follows [neutral-first inclusive language](../crosscutting/cc.inclusive-language.md).
-- **Diagrams as inline PlantUML.** Where a diagram genuinely clarifies, embed it as a ` ```plantuml `
-  fenced block directly in the markdown (IntelliJ renders it in the preview). Diagrams-as-code only —
-  no binary image files. Skip diagrams that are mere decoration.
+- **Diagrams as inline Mermaid.** Where a diagram genuinely clarifies, embed it as a ` ```mermaid `
+  fenced block directly in the markdown. Diagrams-as-code only — no binary image files. Skip diagrams that
+  are mere decoration. **Mermaid, not PlantUML, because GitHub renders it** — and `docs/` is read by people
+  judging the project there, who cannot install an IDE plugin. A format only IntelliJ renders is a diagram
+  nobody sees: all three diagrams in `architecture/README.md` were syntactically broken from their first
+  commit and nobody noticed for 13 days. Mermaid covers every kind veyq draws (sequence, state, component,
+  flow); its `%%{init}%%` styling is not worth using — the defaults theme themselves, and the one PlantUML
+  construct used everywhere (`skinparam`) is what broke. Two characters must be escaped in label text:
+  **`;` → `#59;`** (it separates statements → parse error) and **`#` → `#35;`** (it opens an entity → the
+  rest of the label is swallowed **silently**, with no error at all).
 - **Scripts and utilities in Python.** Bash only for thin CI/hook glue.
 - **Durable state is edited in place — no addendums.** State every doc (ADRs, use-cases, enablers, crosscutting)
   as it is **now**; when a decision changes, **edit the doc** and let **git** hold the history. Never accrete

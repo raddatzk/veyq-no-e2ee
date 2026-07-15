@@ -64,40 +64,46 @@ on a change the client pulls a keyset delta + reconciles deletes against the ret
 How the server computes one `listNodeMedia` poll response — the **O(1) revision compare short-circuits the idle
 case** (no media query at all), and only a genuine change runs the two queries (keyset delta + current id-set):
 
-```plantuml
-@startuml
-title Server: computing one listNodeMedia poll response
-skinparam shadowing false
-start
-:read node.media_revision + delete_revision   (O(1), one row);
-note right
-  media_revision : bumped by every gallery-media mutation
-     — attach, setMeta, delete (a cover change bumps neither).
-  delete_revision : bumped ONLY by a delete.
-end note
-:etag := tag(media_revision);
-if (client's If-None-Match == etag?) then (equal — nothing changed)
-  :respond 304 Not Modified;
-  note right: no body, no media rows read — the idle fast path
-  stop
-else (differs — a mutation bumped media_revision)
-  :delta := media rows WHERE updated_at > client cursor\n(keyset scan, id as tie-break);
-  if (client delete_revision < node delete_revision?) then (a delete happened)
-    :idSet := every mediaId of this node   (ids only);
-    :respond 200  ->  delta + idSet + both revisions;
-    note right
-      delta → client upserts adds + in-place edits
-      idSet → client drops any id it no longer sees (deletes)
-    end note
-  else (adds / edits only)
-    :respond 200  ->  delta + both revisions   (no id-set);
-    note right
-      pure adds/edits — the O(N) id-set is skipped
-    end note
-  endif
-  stop
-endif
-@enduml
+```mermaid
+---
+title: "Server: computing one listNodeMedia poll response"
+---
+flowchart TB
+  START(["start"])
+  READ["read node.media_revision + delete_revision<br>(O(1), one row)"]
+  ETAG["etag := tag(media_revision)"]
+  Q1{"client's If-None-Match == etag?"}
+  R304["respond 304 Not Modified"]
+  DELTA["delta := media rows WHERE updated_at > client cursor<br>(keyset scan, id as tie-break)"]
+  Q2{"client delete_revision < node delete_revision?"}
+  IDSET["idSet := every mediaId of this node<br>(ids only)"]
+  R200A["respond 200 → delta + idSet + both revisions"]
+  R200B["respond 200 → delta + both revisions<br>(no id-set)"]
+  STOP(["stop"])
+  N1["media_revision : bumped by every gallery-media mutation<br>— attach, setMeta, delete (a cover change bumps neither).<br>delete_revision : bumped ONLY by a delete."]
+  N2["no body, no media rows read — the idle fast path"]
+  N3["delta → client upserts adds + in-place edits<br>idSet → client drops any id it no longer sees (deletes)"]
+  N4["pure adds/edits — the O(N) id-set is skipped"]
+
+  START --> READ
+  READ --> ETAG
+  ETAG --> Q1
+  Q1 -->|"equal — nothing changed"| R304
+  Q1 -->|"differs — a mutation bumped media_revision"| DELTA
+  R304 --> STOP
+  DELTA --> Q2
+  Q2 -->|"a delete happened"| IDSET
+  IDSET --> R200A
+  Q2 -->|"adds / edits only"| R200B
+  R200A --> STOP
+  R200B --> STOP
+  READ -.- N1
+  R304 -.- N2
+  R200A -.- N3
+  R200B -.- N4
+
+  classDef note fill:#fffdf0,stroke:#c9b458,stroke-dasharray:4 3,color:#5c5326
+  class N1,N2,N3,N4 note
 ```
 
 `media_revision` is a monotonic count of *mutations* (not of media), so any change moves it — that is what turns

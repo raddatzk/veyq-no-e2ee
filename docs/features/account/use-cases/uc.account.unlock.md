@@ -29,26 +29,25 @@
 6. **Unlocked:** the Master Key + identity private key are in memory; the KEK is discarded. Content and
    scope grants are now openable.
 
-```plantuml
-@startuml
-title Unlock the Master Key (password + Secret Key) — sequence
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(device)" as C
-participant "Server\n(blind)" as S
-
-U -> C : password (+ Secret Key from Emergency Kit)
-C -> S : GET PASSWORD MasterKeyWrap (authenticated)
-S --> C : wrappedKey + KDF params (ciphertext only)
-C -> C : KEK = Argon2id(password + Secret Key, params)
-C -> C : AEAD-unwrap Master Key with KEK
-alt KEK opens the wrap
-  C -> C : unwrap identity private key with Master Key\ndiscard KEK
-  C --> U : unlocked — content decryptable
-else wrong password / Secret Key (AEAD tag fails)
-  C --> U : generic unlock failure (server uninvolved)
-end
-@enduml
+```mermaid
+---
+title: Unlock the Master Key (password + Secret Key) — sequence
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(device)
+  participant S as Server<br>(blind)
+  U->>C: password (+ Secret Key from Emergency Kit)
+  C->>S: GET PASSWORD MasterKeyWrap (authenticated)
+  S-->>C: wrappedKey + KDF params (ciphertext only)
+  C->>C: KEK = Argon2id(password + Secret Key, params)
+  C->>C: AEAD-unwrap Master Key with KEK
+  alt KEK opens the wrap
+  C->>C: unwrap identity private key with Master Key<br>discard KEK
+  C-->>U: unlocked — content decryptable
+  else wrong password / Secret Key (AEAD tag fails)
+  C-->>U: generic unlock failure (server uninvolved)
+  end
 ```
 
 ## Alternate / exception flows
@@ -63,17 +62,17 @@ end
 
 ## Unlock state
 
-```plantuml
-@startuml
-title Unlock — state
-skinparam shadowing false
-[*] --> Locked
-Locked --> Unlocking : password + Secret Key\n+ fetch PASSWORD wrap
-Unlocking --> Unlocked : KEK opens wrap;\nidentity key unwrapped
-Unlocking --> Locked : wrong password / Secret Key (AEAD fail)
-Unlocked --> Locked : app restart / sign-out / timeout\n(Master Key is in-memory only)
-Unlocked --> [*]
-@enduml
+```mermaid
+---
+title: Unlock — state
+---
+stateDiagram-v2
+  [*] --> Locked
+  Locked --> Unlocking : password + Secret Key<br>+ fetch PASSWORD wrap
+  Unlocking --> Unlocked : KEK opens wrap;<br>identity key unwrapped
+  Unlocking --> Locked : wrong password / Secret Key (AEAD fail)
+  Unlocked --> Locked : app restart / sign-out / timeout<br>(Master Key is in-memory only)
+  Unlocked --> [*]
 ```
 
 ## Quality notes

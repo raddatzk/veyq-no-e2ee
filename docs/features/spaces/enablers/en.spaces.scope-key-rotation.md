@@ -39,23 +39,22 @@ guarantees, and the rotating-vs-stable (dedup) split: [ADR 0024](../../../decisi
 3. New content (names, `slug_token`s, `K_mem`-wraps) seals under `E_{n+1}`; each new node carries epoch index `n+1`.
 4. The removed member holds ≤ `E_n` → decrypts pre-removal content, never `E_{n+1}` content.
 
-```plantuml
-@startuml
-title Scope-key rotation on removal (client-driven, operator-blind)
-skinparam shadowing false
-actor "Owner\n(remaining key-holder)" as O
-participant "Server\n(blind)" as S
-actor "Removed\nmember" as X
-
-O -> O : E_{n+1} = random(32)
-O -> S : chain-link = symWrap(E_{n+1}, E_n)   ; delete removed membership
-O -> S : re-grant asymWrap(remainingPub, E_{n+1})  (rest via grant-delivery, first-online-wins)
-note right of S : opaque epoch link + grants + per-node epoch index — never a key
-== new content ==
-O -> S : new node sealed under E_{n+1}, tagged epoch n+1
-X -> S : (colluding) fetch new node
-note right of X : holds only ≤ E_n → cannot derive E_{n+1} → cannot read it
-@enduml
+```mermaid
+---
+title: Scope-key rotation on removal (client-driven, operator-blind)
+---
+sequenceDiagram
+  actor O as Owner<br>(remaining key-holder)
+  participant S as Server<br>(blind)
+  actor X as Removed<br>member
+  O->>O: E_{n+1} = random(32)
+  O->>S: chain-link = symWrap(E_{n+1}, E_n)   #59; delete removed membership
+  O->>S: re-grant asymWrap(remainingPub, E_{n+1})  (rest via grant-delivery, first-online-wins)
+  Note right of S: opaque epoch link + grants + per-node epoch index — never a key
+  Note over O,X: new content
+  O->>S: new node sealed under E_{n+1}, tagged epoch n+1
+  X->>S: (colluding) fetch new node
+  Note right of X: holds only ≤ E_n → cannot derive E_{n+1} → cannot read it
 ```
 
 ## Alternate / exception flows

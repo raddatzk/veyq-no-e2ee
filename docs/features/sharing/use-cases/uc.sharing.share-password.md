@@ -40,21 +40,21 @@ serve the ciphertext to a colluder holding the fragment) — the same posture th
    salt/verifier/sealed copy) or **remove** it (`password_required: false`, fields cleared) — the same link keeps
    working throughout.
 
-```plantuml
-@startuml
-title Password-protected share — the gate is access-control, content stays E2EE via the fragment
-skinparam shadowing false
-actor "Guest" as V
-participant "Server\n(blind)" as S
-V -> S : GET /api/shares/{id}   (no token)
-S --> V : LOCKED { passwordRequired, pw_salt }   (no wrap/name/note/media)
-V -> V : pwToken = Argon2id(pw, pw_salt)
-V -> S : GET /api/shares/{id}   X-Share-Password: pwToken
-S -> S : SHA-256(pwToken) == pw_verifier ?
-S --> V : FULL share (wrap, sealedName, sealedNote, media…)  — or 403 if wrong
-V -> V : K_mem = unwrap(wrap, K_share from #fragment); decrypt
-note right of S : stores password_required + pw_salt + pw_verifier + sealed_password (ciphertext).\nNever the raw password, never content.
-@enduml
+```mermaid
+---
+title: Password-protected share — the gate is access-control, content stays E2EE via the fragment
+---
+sequenceDiagram
+  actor V as Guest
+  participant S as Server<br>(blind)
+  V->>S: GET /api/shares/{id}   (no token)
+  S-->>V: LOCKED { passwordRequired, pw_salt }   (no wrap/name/note/media)
+  V->>V: pwToken = Argon2id(pw, pw_salt)
+  V->>S: GET /api/shares/{id}   X-Share-Password: pwToken
+  S->>S: SHA-256(pwToken) == pw_verifier ?
+  S-->>V: FULL share (wrap, sealedName, sealedNote, media…)  — or 403 if wrong
+  V->>V: K_mem = unwrap(wrap, K_share from #35;fragment)#59; decrypt
+  Note right of S: stores password_required + pw_salt + pw_verifier + sealed_password (ciphertext).<br>Never the raw password, never content.
 ```
 
 ## Alternate / exception flows

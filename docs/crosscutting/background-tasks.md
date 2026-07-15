@@ -27,22 +27,21 @@ reference; the decisions + rationale live in [ADR 0021](../decisions/0021-operat
 
 ## Lifecycle
 
-```plantuml
-@startuml
-title Background job — pull, claim (lease), execute on-device, seal result
-skinparam shadowing false
-participant "Originator\n(client/agent — or the server\nfor structural jobs)" as O
-participant "Server\n(blind coordinator)" as S
-participant "Worker\n(client or agent, key-holder)" as W
-
-O -> S : create job { scopeId, capabilityTag, resourceRef, sealed body }
-W -> S : pull { my capability tags }  (scope ∈ my memberships ∧ tag ∈ mine)
-S --> W : claimable jobs
-W -> S : claim (atomic: status=leased, leaseExpiry=now+TTL)  — first wins
-W -> W : unseal body (K_SC) → do the work on-device\n(long jobs heartbeat to extend the lease)
-W -> S : sealed write via the normal path (grant / derivative / node) + mark done\n(or post sealedResult)
-note right of S : crash before done → lease expires → lazy reclaim by another worker\n(at-least-once; jobId-keyed idempotent completion; attempts>max → dead-letter)
-@enduml
+```mermaid
+---
+title: Background job — pull, claim (lease), execute on-device, seal result
+---
+sequenceDiagram
+  participant O as Originator<br>(client/agent — or the server<br>for structural jobs)
+  participant S as Server<br>(blind coordinator)
+  participant W as Worker<br>(client or agent, key-holder)
+  O->>S: create job { scopeId, capabilityTag, resourceRef, sealed body }
+  W->>S: pull { my capability tags }  (scope ∈ my memberships ∧ tag ∈ mine)
+  S-->>W: claimable jobs
+  W->>S: claim (atomic: status=leased, leaseExpiry=now+TTL)  — first wins
+  W->>W: unseal body (K_SC) → do the work on-device<br>(long jobs heartbeat to extend the lease)
+  W->>S: sealed write via the normal path (grant / derivative / node) + mark done<br>(or post sealedResult)
+  Note right of S: crash before done → lease expires → lazy reclaim by another worker<br>(at-least-once#59; jobId-keyed idempotent completion#59; attempts>max → dead-letter)
 ```
 
 - **Claim / lease.** Atomic (`WHERE status='pending'`, MariaDB `SKIP LOCKED`). Cheap idempotent jobs need no

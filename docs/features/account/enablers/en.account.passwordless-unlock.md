@@ -64,32 +64,31 @@ layer only ever see **ciphertext**, never a usable token at rest.
 This is the flow the "exactly one prompt at launch" property lives in. Note the prompt is **entirely** in the
 app layer; the data layer's `autoRestore(email, K)` never prompts.
 
-```plantuml
-@startuml
-title Launch auto-restore (L2) — one gesture, prompt-free data layer
-skinparam shadowing false
-actor User as U
-participant "App layer\n(AppModel)" as A
-participant "Secure store\n(native)" as K
-participant "Data layer\n(VeyqClient)" as C
-participant "Server\n(blind)" as S
-
-A -> K : read level (ungated) -> L2
-A -> K : release K  (the ONE biometric gesture)
-K -> U : Face ID / fingerprint
-U --> K : ok
-K --> A : K
-A -> C : autoRestore(email, K)
-note over C: from here: crypto + network only, no prompt
-C -> C : unseal refresh token with K
-C -> S : refresh (rotate to live session)
-S --> C : new tokens  -> re-seal token under K (prompt-free)
-C -> S : fetch key material
-S --> C : ciphertext wraps
-C -> C : masterKey = symUnwrap(K, deviceWrap) ; open vault
-C --> A : restored = true
-A -> A : show Home
-@enduml
+```mermaid
+---
+title: Launch auto-restore (L2) — one gesture, prompt-free data layer
+---
+sequenceDiagram
+  actor U as User
+  participant A as App layer<br>(AppModel)
+  participant K as Secure store<br>(native)
+  participant C as Data layer<br>(VeyqClient)
+  participant S as Server<br>(blind)
+  A->>K: read level (ungated) -> L2
+  A->>K: release K  (the ONE biometric gesture)
+  K->>U: Face ID / fingerprint
+  U-->>K: ok
+  K-->>A: K
+  A->>C: autoRestore(email, K)
+  Note over C: from here: crypto + network only, no prompt
+  C->>C: unseal refresh token with K
+  C->>S: refresh (rotate to live session)
+  S-->>C: new tokens  -> re-seal token under K (prompt-free)
+  C->>S: fetch key material
+  S-->>C: ciphertext wraps
+  C->>C: masterKey = symUnwrap(K, deviceWrap) #59; open vault
+  C-->>A: restored = true
+  A->>A: show Home
 ```
 
 For **L3** the diagram is identical except the "release `K`" step is **ungated** (no gesture). For a dead /

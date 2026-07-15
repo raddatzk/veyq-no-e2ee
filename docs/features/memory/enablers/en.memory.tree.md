@@ -53,23 +53,22 @@ a Memory's *content* needs its `K_mem` ([ADR 0012](../../../decisions/0012-conte
 4. The client renders the tree by **decrypting names with `K_SC`**; opening a Memory's content (later slices)
    unwraps its `K_mem` with `K_SC`.
 
-```plantuml
-@startuml
-title Create a Memory (operator-blind)
-skinparam shadowing false
-actor "Member\n(unlocked, holds K_SC)" as U
-participant "Client" as C
-participant "Server\n(blind)" as S
-
-U -> C : new Memory "Italien 2026"
-C -> C : K_mem = random(32)
-C -> C : wrappedContentKey = symWrap(K_SC, K_mem)
-C -> C : encryptedName = seal(K_SC, name) ; slugToken = HMAC(K_SC, parentId‖slug)
-C -> S : POST node { kind:MEMORY, parentId, encryptedName, slugToken, wrappedContentKey }
-S -> S : enforce UNIQUE(parentId, slugToken) + structural rules
-S --> C : { nodeId }
-note right of S : stores ciphertext + opaque tokens only — no name, no K_mem
-@enduml
+```mermaid
+---
+title: Create a Memory (operator-blind)
+---
+sequenceDiagram
+  actor U as Member<br>(unlocked, holds K_SC)
+  participant C as Client
+  participant S as Server<br>(blind)
+  U->>C: new Memory "Italien 2026"
+  C->>C: K_mem = random(32)
+  C->>C: wrappedContentKey = symWrap(K_SC, K_mem)
+  C->>C: encryptedName = seal(K_SC, name) #59; slugToken = HMAC(K_SC, parentId‖slug)
+  C->>S: POST node { kind:MEMORY, parentId, encryptedName, slugToken, wrappedContentKey }
+  S->>S: enforce UNIQUE(parentId, slugToken) + structural rules
+  S-->>C: { nodeId }
+  Note right of S: stores ciphertext + opaque tokens only — no name, no K_mem
 ```
 
 ## Organize — rename / move / reorder

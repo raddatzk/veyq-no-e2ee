@@ -59,22 +59,21 @@ generalising "open a scope by kind" so `kind=TENANT` is opened the same way `kin
 4. The shell makes the tenant the **active space**: it resets the tree + favorites for the new scope and
    browses the tenant's Memory tree ([uc.spaces.switch-spaces](../use-cases/uc.spaces.switch-spaces.md)).
 
-```plantuml
-@startuml
-title Tenant scope — open + enter (no birth; the scope already exists)
-skinparam shadowing false
-actor "Member\n(unlocked)" as U
-participant "Client" as C
-participant "Server\n(blind)" as S
-
-C -> S : GET /api/scopes
-S --> C : [{ id, kind:TENANT, tenantId, wrappedGrant }, { kind:PERSONAL, .. }]
-note right of C : the TENANT scope + its grant were\nborn cold at activation (cr-0010) —\nthe client never mints one
-C -> C : scopeKey = asymUnwrap(identity, wrappedGrant, "scope-grant")  (in memory)
-U -> C : enter the shared space (token-less home, or the sidebar entry)
-C -> C : reset tree + favorites, browse the tenant Memory tree
-note right of C : server only ever saw ciphertext + the scope row
-@enduml
+```mermaid
+---
+title: Tenant scope — open + enter (no birth; the scope already exists)
+---
+sequenceDiagram
+  actor U as Member<br>(unlocked)
+  participant C as Client
+  participant S as Server<br>(blind)
+  C->>S: GET /api/scopes
+  S-->>C: [{ id, kind:TENANT, tenantId, wrappedGrant }, { kind:PERSONAL, .. }]
+  Note right of C: the TENANT scope + its grant were<br>born cold at activation (cr-0010) —<br>the client never mints one
+  C->>C: scopeKey = asymUnwrap(identity, wrappedGrant, "scope-grant")  (in memory)
+  U->>C: enter the shared space (token-less home, or the sidebar entry)
+  C->>C: reset tree + favorites, browse the tenant Memory tree
+  Note right of C: server only ever saw ciphertext + the scope row
 ```
 
 ## Alternate / exception flows

@@ -59,26 +59,25 @@ hand. No password is needed for enrolment itself (the Master Key is already open
 6. **At L2:** the server holds the device-key ciphertext; this device holds a biometric-gated secure-element
    key + the gated session token + the wrap id.
 
-```plantuml
-@startuml
-title Biometric unlock — enrol (L2)
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(unlocked)" as C
-participant "Secure element\n(Enclave/Keystore)" as SE
-participant "Keystore items" as K
-participant "Server\n(blind)" as S
-
-U -> C : pick "Biometric"
-C -> SE : create non-extractable key (biometry-gated)
-SE -> U : authorize (FaceID / fingerprint)
-C -> SE : derive KEK
-C -> C : device-key wrap = symWrap(KEK, masterKey)
-C -> S : add device-key wrap (ciphertext)
-S --> C : stored (id)
-C -> K : store refresh token (biometry-gated)
-C --> U : this device unlocks with FaceID
-@enduml
+```mermaid
+---
+title: Biometric unlock — enrol (L2)
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(unlocked)
+  participant SE as Secure element<br>(Enclave/Keystore)
+  participant K as Keystore items
+  participant S as Server<br>(blind)
+  U->>C: pick "Biometric"
+  C->>SE: create non-extractable key (biometry-gated)
+  SE->>U: authorize (FaceID / fingerprint)
+  C->>SE: derive KEK
+  C->>C: device-key wrap = symWrap(KEK, masterKey)
+  C->>S: add device-key wrap (ciphertext)
+  S-->>C: stored (id)
+  C->>K: store refresh token (biometry-gated)
+  C-->>U: this device unlocks with FaceID
 ```
 
 ## Routine unlock at L2

@@ -25,28 +25,27 @@
 5. The server **verifies** the signature against the stored `authPublicKey`. On success it issues a
    **session** (and the account's server role); on failure it returns a **generic auth failure**.
 
-```plantuml
-@startuml
-title Account login (password) — sequence
-skinparam shadowing false
-actor "Account holder" as U
-participant "Client\n(device)" as C
-participant "Server\n(blind)" as S
-
-U -> C : email, password
-C -> C : authSalt = HKDF(instanceSalt, email)\nseed = Argon2id(password, authSalt)\nderive Ed25519 (authPriv, authPub)
-C -> S : POST login/challenge { email }
-S -> S : issue single-use, time-bounded nonce\n(same response if account absent)
-S --> C : nonce
-C -> C : sign nonce with authPriv
-C -> S : POST login/verify { email, signature }
-S -> S : verify signature against stored authPublicKey
-alt valid
-  S --> C : session + server role
-else invalid / unknown / stale
-  S --> C : generic auth failure
-end
-@enduml
+```mermaid
+---
+title: Account login (password) — sequence
+---
+sequenceDiagram
+  actor U as Account holder
+  participant C as Client<br>(device)
+  participant S as Server<br>(blind)
+  U->>C: email, password
+  C->>C: authSalt = HKDF(instanceSalt, email)<br>seed = Argon2id(password, authSalt)<br>derive Ed25519 (authPriv, authPub)
+  C->>S: POST login/challenge { email }
+  S->>S: issue single-use, time-bounded nonce<br>(same response if account absent)
+  S-->>C: nonce
+  C->>C: sign nonce with authPriv
+  C->>S: POST login/verify { email, signature }
+  S->>S: verify signature against stored authPublicKey
+  alt valid
+  S-->>C: session + server role
+  else invalid / unknown / stale
+  S-->>C: generic auth failure
+  end
 ```
 
 ## Alternate / exception flows
@@ -62,16 +61,16 @@ end
 
 ## Login state
 
-```plantuml
-@startuml
-title Login — state
-skinparam shadowing false
-[*] --> Anonymous
-Anonymous --> ChallengeIssued : request challenge\n(always — non-enumerable)
-ChallengeIssued --> Authenticated : valid signature over fresh nonce
-ChallengeIssued --> Anonymous : invalid signature / expired / replayed nonce
-Authenticated --> [*]
-@enduml
+```mermaid
+---
+title: Login — state
+---
+stateDiagram-v2
+  [*] --> Anonymous
+  Anonymous --> ChallengeIssued : request challenge<br>(always — non-enumerable)
+  ChallengeIssued --> Authenticated : valid signature over fresh nonce
+  ChallengeIssued --> Anonymous : invalid signature / expired / replayed nonce
+  Authenticated --> [*]
 ```
 
 ## Quality notes

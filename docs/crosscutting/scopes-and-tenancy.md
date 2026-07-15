@@ -46,35 +46,28 @@ correct domain (see the scope kinds above and [ADR 0002](../decisions/0002-perso
 
 ## How access works — keys, grants, shares
 
-```plantuml
-@startuml
-title Scope access — keys, grants, shares
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: Scope access — keys, grants, shares
+---
+flowchart TB
+  ma["Member A<br>identity key"]
+  mb["Member B<br>identity key"]
+  ksc["Scope content key K_SC<br>(current epoch)"]
+  kmem["Per-Memory content keys K_mem"]
+  content["Content<br>(nodes, media, journal, metadata)"]
+  share["Public share<br>(per-share key)"]
+  NB["A grant = the scope's current content-epoch key<br>sealed to a member's identity public key (one wrap<br>= the whole scope). Each member opens it with their<br>own identity private key."]
 
-rectangle "Member A\nidentity key" as ma
-rectangle "Member B\nidentity key" as mb
-rectangle "Scope content key K_SC\n(current epoch)" as ksc
-rectangle "Per-Memory content keys K_mem" as kmem
-rectangle "Content\n(nodes, media, journal, metadata)" as content
-rectangle "Public share\n(per-share key)" as share
+  ma -->|"opens (holds a grant)"| ksc
+  mb -->|"opens (holds a grant)"| ksc
+  ksc -->|"unwraps"| kmem
+  kmem -->|"encrypts"| content
+  kmem -->|"one Memory's K_mem wrapped<br>to a per-share key (token-unlocked)"| share
+  ksc -.- NB
 
-ma   --> ksc : opens (holds a grant)
-mb   --> ksc : opens (holds a grant)
-ksc  --> kmem : unwraps
-kmem --> content : encrypts
-kmem --> share : one Memory's K_mem wrapped\nto a per-share key (token-unlocked)
-
-note right of ksc
-  A grant = the scope's current content-epoch key
-  sealed to a member's identity public key (one wrap
-  = the whole scope). Each member opens it with their
-  own identity private key.
-end note
-@enduml
+  classDef note fill:#fffdf0,stroke:#c9b458,stroke-dasharray:4 3,color:#5c5326
+  class NB note
 ```
 
 - **Grant = the unit of access.** A member receives the **scope's current content-epoch key sealed to
@@ -151,28 +144,27 @@ Access is **always an explicit, informed act by the granting owner** (the only w
 lowered). The mental model: **one passenger, two envelopes** — the *passenger* is the scope key `K_SC`;
 a throwaway *invite-wrapping keypair* is the envelope in between.
 
-```plantuml
-@startuml
-title Invite-wrap — one passenger (the scope key K_SC), two envelopes
-skinparam shadowing false
-actor "Owner\n(holds scope key)" as O
-participant "Server\n(blind)" as S
-actor "Invitee\n(no keypair yet)" as I
-
-O -> O : open scope key K_SC (the passenger)
-O -> O : generate throwaway invite-wrapping keypair
-O -> O : seal passenger to invite-wrapping public key
-O -> S : POST invite { inviteWrappingPublicKey, wrappedScopeKey }
-note right of S : stores both, opens neither\n(envelope key absent)
-S --> O : { inviteId, bootstrapSecret }
-O ->> I : link  ( #fragment = invite-wrapping private key, never sent )
-I -> S : fetch material + bootstrapSecret (possession proof)
-S --> I : { inviteWrappingPublicKey, wrappedScopeKey }
-I -> I : open envelope with fragment key -> passenger
-I -> I : generate own identity; re-seal passenger to own identity key
-I -> S : register/accept { wrappedGrant (persistent grant) }
-note right of S : throwaway material deleted -> window closes
-@enduml
+```mermaid
+---
+title: Invite-wrap — one passenger (the scope key K_SC), two envelopes
+---
+sequenceDiagram
+  actor O as Owner<br>(holds scope key)
+  participant S as Server<br>(blind)
+  actor I as Invitee<br>(no keypair yet)
+  O->>O: open scope key K_SC (the passenger)
+  O->>O: generate throwaway invite-wrapping keypair
+  O->>O: seal passenger to invite-wrapping public key
+  O->>S: POST invite { inviteWrappingPublicKey, wrappedScopeKey }
+  Note right of S: stores both, opens neither<br>(envelope key absent)
+  S-->>O: { inviteId, bootstrapSecret }
+  O-)I: link  ( #35;fragment = invite-wrapping private key, never sent )
+  I->>S: fetch material + bootstrapSecret (possession proof)
+  S-->>I: { inviteWrappingPublicKey, wrappedScopeKey }
+  I->>I: open envelope with fragment key -> passenger
+  I->>I: generate own identity#59; re-seal passenger to own identity key
+  I->>S: register/accept { wrappedGrant (persistent grant) }
+  Note right of S: throwaway material deleted -> window closes
 ```
 
 `bootstrapSecret` only **gates the material fetch** (it is not a key). The server is blind at both ends —

@@ -47,26 +47,25 @@ Governance (who may add, the name stays sealed, no tenant-owner power) is [ADR 0
    group's sealed name for the switcher, and browses the group like any space
    ([uc.spaces.switch-spaces](uc.spaces.switch-spaces.md), [en.spaces.group-scope](../enablers/en.spaces.group-scope.md)).
 
-```plantuml
-@startuml
-title Add a group member — admit by username (owner), auto-deliver (any key-holder), open (blind; server never holds K_SC)
-skinparam shadowing false
-actor "GroupOwner\n(admits)" as O
-participant "Server\n(blind)" as S
-actor "Any group member\n(key-holder, online)" as M
-actor "Target\n(existing tenant member)" as T
-participant "Client\n(target)" as CT
-
-O -> S : resolve username → identity pubkey (scoped to the tenant)
-S --> O : { userId, identityPublicKey }
-O -> S : add member → record grant-less GROUP membership (role=MEMBER)
-note right of S : admission only — no key,\nno onboarding (already a tenant member)
-M -> S : (next online) group directory shows the pending member + pubkey
-M -> M : grant = asymWrap(pubkey(member), K_SC, "scope-grant")  — first-online-wins
-M -> S : POST grant for member (opaque ciphertext)
-T -> CT : next entry → asymUnwrap own grant → K_SC → open name → browse group
-note right of S : server saw the membership row,\npubkeys, opaque grant — never K_SC / the name
-@enduml
+```mermaid
+---
+title: Add a group member — admit by username (owner), auto-deliver (any key-holder), open (blind; server never holds K_SC)
+---
+sequenceDiagram
+  actor O as GroupOwner<br>(admits)
+  participant S as Server<br>(blind)
+  actor M as Any group member<br>(key-holder, online)
+  actor T as Target<br>(existing tenant member)
+  participant CT as Client<br>(target)
+  O->>S: resolve username → identity pubkey (scoped to the tenant)
+  S-->>O: { userId, identityPublicKey }
+  O->>S: add member → record grant-less GROUP membership (role=MEMBER)
+  Note right of S: admission only — no key,<br>no onboarding (already a tenant member)
+  M->>S: (next online) group directory shows the pending member + pubkey
+  M->>M: grant = asymWrap(pubkey(member), K_SC, "scope-grant")  — first-online-wins
+  M->>S: POST grant for member (opaque ciphertext)
+  T->>CT: next entry → asymUnwrap own grant → K_SC → open name → browse group
+  Note right of S: server saw the membership row,<br>pubkeys, opaque grant — never K_SC / the name
 ```
 
 ## Alternate / exception flows

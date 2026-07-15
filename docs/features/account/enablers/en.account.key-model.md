@@ -32,30 +32,25 @@ method** the user sets up. Any one method opens the **same** Master Key, which u
 private key**, which in turn opens every scope grant the user holds. Adding or removing a method
 adds/removes **one wrap** — content is never re-encrypted.
 
-```plantuml
-@startuml
-title One Master Key, one wrap per unlock method
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: One Master Key, one wrap per unlock method
+---
+flowchart TB
+  pw["Password + Secret Key<br>(mandatory floor)"]
+  pk["Passkey (PRF)"]
+  rec["Recovery code<br>(single-use)"]
+  dev["Trusted device"]
+  muk["Master Key<br>(32-byte account root)"]
+  idk["Identity private key"]
+  grants["Scope grants<br>(opened downstream — see scopes model)"]
 
-rectangle "Password + Secret Key\n(mandatory floor)" as pw
-rectangle "Passkey (PRF)" as pk
-rectangle "Recovery code\n(single-use)" as rec
-rectangle "Trusted device" as dev
-rectangle "Master Key\n(32-byte account root)" as muk
-rectangle "Identity private key" as idk
-rectangle "Scope grants\n(opened downstream — see scopes model)" as grants
-
-pw  --> muk : wraps (one blob)
-pk  --> muk : wraps (one blob)
-rec --> muk : wraps (one blob)
-dev --> muk : wraps (one blob)
-muk --> idk : unlocks
-idk --> grants : unwraps
-@enduml
+  pw -->|"wraps (one blob)"| muk
+  pk -->|"wraps (one blob)"| muk
+  rec -->|"wraps (one blob)"| muk
+  dev -->|"wraps (one blob)"| muk
+  muk -->|"unlocks"| idk
+  idk -->|"unwraps"| grants
 ```
 
 ## Account key inventory

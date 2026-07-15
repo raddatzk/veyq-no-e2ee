@@ -10,28 +10,27 @@ Kept current as work lands; it is a map, not a satisfiable record (no CR `satisf
 
 ## Containers — who talks to whom
 
-```plantuml
-@startuml
-title veyq containers (the operator-blind server is the trust boundary)
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: veyq containers (the operator-blind server is the trust boundary)
+---
+flowchart TB
+  C["Clients<br>web (Vue) — the one live surface<br>apple (SwiftUI) · android (Compose) — parked (ADR 0043)"]
+  B["Backend<br>Quarkus / Kotlin — operator-blind<br>feature-sliced (resource→handler→store)"]
+  NB["sees ciphertext + structure — never a key,<br>name, day, coordinate, or pixel"]
+  DB[("MariaDB<br>ciphertext + opaque metadata")]
+  S[("Object store<br>S3-compatible (Garage in dev)")]
+  T(["Third-party services<br>(geocoder, map tiles)"])
 
-rectangle "Clients\nweb (Vue) · apple (SwiftUI) · android (Compose)\nhttp/ (ijhttp contract tests)" as C
-rectangle "Backend\nQuarkus / Kotlin — **operator-blind**\nfeature-sliced (resource→handler→store)" as B
-database "MariaDB\n(ciphertext + opaque metadata)" as DB
-cloud "Object store\nS3-compatible (Garage in dev)" as S
-rectangle "Third-party services\n(geocoder, map tiles)" as T
+  C -->|"contracts API — ciphertext + opaque metadata + blinded tokens"| B
+  C -->|"presigned direct-to-store — ciphertext blob chunks (never via the backend)"| S
+  C -.->|"consented, client-direct — a bare coordinate, opt-in (never via the backend)"| T
+  B -->|"opaque rows (ids, kinds, sizes, coarse timestamps, wraps, blinded tokens)"| DB
+  B -->|"presign only — issues short-TTL URLs; never sees a blob byte"| S
+  B -.- NB
 
-C --> B : contracts API — ciphertext + opaque metadata + blinded tokens
-C --> S : **presigned direct-to-store** — ciphertext blob chunks (never via the backend)
-C ..> T : **consented, client-direct** — a bare coordinate, opt-in (never via the backend)
-B --> DB : opaque rows (ids, kinds, sizes, coarse timestamps, wraps, blinded tokens)
-B --> S : **presign only** — issues short-TTL URLs; never sees a blob byte
-note bottom of B : sees ciphertext + structure — never a key, name, day, coordinate, or pixel
-@enduml
+  classDef note fill:#fffdf0,stroke:#c9b458,stroke-dasharray:4 3,color:#5c5326
+  class NB note
 ```
 
 - **All content crypto is client-side.** The backend performs no content crypto and never sees the password
@@ -53,33 +52,28 @@ note bottom of B : sees ciphertext + structure — never a key, name, day, coord
 The one chain each doc shows only a slice of — from an unlock gesture down to a sealed field. Random keys,
 many-wrapped, so every level is an independent sharing grain.
 
-```plantuml
-@startuml
-title Key-hierarchy spine — unlock → content (each key random, many-wrapped)
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: Key-hierarchy spine — unlock → content (each key random, many-wrapped)
+---
+flowchart TB
+  U["Unlock methods<br>(password+Secret Key floor, passkey PRF,<br>recovery code, device key L1/L2/L3)"]
+  MK["Master Key<br>(one per account, one wrap per method)"]
+  ID["Identity private key<br>(hybrid KEM + signing)"]
+  KSC["K_SC — scope content key<br>(one per scope; names + slug tokens)"]
+  KMEM["K_mem — per-Memory key<br>(recursive: a chapter has its own)"]
+  KBLOB["K_blob — per-media key"]
+  WM["wrappedMeta<br>(date / place sealed on the node)"]
+  SH["Share wrap<br>(per-share key / recipient identity)"]
 
-rectangle "Unlock methods\n(password+Secret Key floor, passkey PRF,\nrecovery code, device key L1/L2/L3)" as U
-rectangle "Master Key\n(one per account, one wrap per method)" as MK
-rectangle "Identity private key\n(hybrid KEM + signing)" as ID
-rectangle "K_SC — scope content key\n(one per scope; names + slug tokens)" as KSC
-rectangle "K_mem — per-Memory key\n(recursive: a chapter has its own)" as KMEM
-rectangle "K_blob — per-media key" as KBLOB
-rectangle "wrappedMeta\n(date / place sealed on the node)" as WM
-rectangle "Share wrap\n(per-share key / recipient identity)" as SH
-
-U --> MK : each opens (KEK from its source)
-MK --> ID : unwraps
-ID --> KSC : unwraps via the scope **grant** (K_SC wrapped to identity)
-KSC --> KMEM : wraps (top-level Memory)
-KMEM --> KMEM : wraps (chapter — recursive)
-KMEM --> KBLOB : wraps (media)
-KMEM --> WM : seals (node-meta context)
-KMEM --> SH : one Memory/chapter key wrapped to a share
-@enduml
+  U -->|"each opens (KEK from its source)"| MK
+  MK -->|"unwraps"| ID
+  ID -->|"unwraps via the scope grant (K_SC wrapped to identity)"| KSC
+  KSC -->|"wraps (top-level Memory)"| KMEM
+  KMEM -->|"wraps (chapter — recursive)"| KMEM
+  KMEM -->|"wraps (media)"| KBLOB
+  KMEM -->|"seals (node-meta context)"| WM
+  KMEM -->|"one Memory/chapter key wrapped to a share"| SH
 ```
 
 Where each level lives: **unlock + Master Key + identity** →
@@ -132,29 +126,27 @@ Where each level lives: **unlock + Master Key + identity** →
 
 ## Deployment — self-hostable by default
 
-```plantuml
-@startuml
-title Self-hosted node (central infrastructure always optional)
-skinparam shadowing false
-skinparam rectangle {
-  BackgroundColor #FAFAFA
-  BorderColor #888888
-}
+```mermaid
+---
+title: Self-hosted node (central infrastructure always optional)
+---
+flowchart TB
+  C["Clients<br>web live · apple / android parked (ADR 0043)"]
+  subgraph N["One self-hosted node"]
+    B["Backend (Quarkus/Kotlin)"]
+    DB[("MariaDB")]
+    S[("S3-compatible store<br>(e.g. Garage)")]
+    NB["Flyway owns the schema; blob bytes<br>never transit the backend (ADR 0013)"]
+  end
+  CI(["Central infra<br>(optional — discovery, relays)"])
 
-rectangle "One self-hosted node" as N {
-  rectangle "Backend (Quarkus/Kotlin)" as B
-  database "MariaDB" as DB
-  cloud "S3-compatible store\n(e.g. Garage)" as S
-}
-rectangle "Clients\n(web / apple / android)" as C
-cloud "Central infra\n(optional — discovery, relays)" as CI
+  C -->|"per-tenant by Host (domain → tenant)"| B
+  B --> DB
+  B -->|"presign"| S
+  B -.->|"optional only"| CI
 
-C --> B : per-tenant by **Host** (domain → tenant)
-B --> DB
-B --> S : presign
-B ..> CI : optional only
-note bottom of N : Flyway owns the schema; blob bytes never transit the backend (ADR 0013)
-@enduml
+  classDef note fill:#fffdf0,stroke:#c9b458,stroke-dasharray:4 3,color:#5c5326
+  class NB note
 ```
 
 - **Self-hostable by default; central infrastructure always optional** (a hard invariant,

@@ -64,28 +64,27 @@
 6. **Read back:** to display, the client asks for **presigned `GET` URLs**, fetches the raw frames directly,
    unwraps `K_blob` (via `K_mem`), and `openFrame`s each (the AAD position check verifies order/count).
 
-```plantuml
-@startuml
-title Add a media blob (direct-to-store, operator-blind)
-skinparam shadowing false
-actor "Member\n(Memory open, holds K_mem)" as U
-participant "Client" as C
-participant "Server\n(blind, control plane)" as S
-database "Object store\n(blind)" as O
-
-U -> C : add photo
-C -> C : K_blob = random(32)
-C -> C : frames = [ sealFrame(K_blob, i, n, chunk_i, nonce_i) ]
-C -> C : wrappedBlobKey = symWrap(K_mem, K_blob)
-C -> S : start blob { chunkCount:n, byteSize, wrappedBlobKey }
-S --> C : { uploadId, presignedPut[0..n-1] }
-C -> O : PUT raw frame bytes  (direct, parallel)
-C -> S : complete + attach { uploadId, nodeId }
-S -> O : stat each object (size/presence)
-S -> S : write manifest, enforce budget, create media record
-S --> C : { blobId, mediaId }
-note right of S : stores ciphertext chunks + manifest + K_blob wrap only —\nno plaintext byte, no content key
-@enduml
+```mermaid
+---
+title: Add a media blob (direct-to-store, operator-blind)
+---
+sequenceDiagram
+  actor U as Member<br>(Memory open, holds K_mem)
+  participant C as Client
+  participant S as Server<br>(blind, control plane)
+  participant O as Object store<br>(blind)
+  U->>C: add photo
+  C->>C: K_blob = random(32)
+  C->>C: frames = [ sealFrame(K_blob, i, n, chunk_i, nonce_i) ]
+  C->>C: wrappedBlobKey = symWrap(K_mem, K_blob)
+  C->>S: start blob { chunkCount:n, byteSize, wrappedBlobKey }
+  S-->>C: { uploadId, presignedPut[0..n-1] }
+  C->>O: PUT raw frame bytes  (direct, parallel)
+  C->>S: complete + attach { uploadId, nodeId }
+  S->>O: stat each object (size/presence)
+  S->>S: write manifest, enforce budget, create media record
+  S-->>C: { blobId, mediaId }
+  Note right of S: stores ciphertext chunks + manifest + K_blob wrap only —<br>no plaintext byte, no content key
 ```
 
 ## Alternate / exception flows

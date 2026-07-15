@@ -76,6 +76,8 @@ builds on) instead of a single Goal, the same Main-flow / exceptions / quality n
 "What this means for you" section** (an enabler has no standalone end-user story; its value surfaces through
 the use-cases it serves). Keep a short note saying so where that section would be.
 
-**Diagrams.** Illustrate flows with inline PlantUML where it clarifies — typically a **sequence
+**Diagrams.** Illustrate flows with inline Mermaid where it clarifies — typically a **sequence
 diagram** for the main flow and a **state machine** for lifecycle/state, as diagrams-as-code (see
-[`docs/ai`](../ai/README.md)). Validate with `plantuml -checkonly` before considering a doc done.
+[`docs/ai`](../ai/README.md) for the format rule and the two characters that must be escaped). A broken
+block shows as a render error on GitHub, so the doc itself is the check — open it there before calling a
+doc done.

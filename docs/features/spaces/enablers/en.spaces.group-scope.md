@@ -64,27 +64,26 @@ A group reuses the personal scope's machinery — client-driven birth, the hybri
    with the vaulted identity → `K_SC`; decrypt `encryptedName` → the group's name (for the switcher); browse its
    tree like any scope.
 
-```plantuml
-@startuml
-title Group scope — create + open (client-driven, operator-blind)
-skinparam shadowing false
-actor "Member\n(unlocked)" as U
-participant "Client" as C
-participant "Server\n(blind)" as S
-
-U -> C : new group "Familie"
-C -> C : K_SC = random(32)  (= E_0)
-C -> C : K_name0 = HKDF(E_0, "group-name-key") ; encryptedName = seal("Familie", K_name0)
-C -> C : grant = asymWrap(ownIdentityPub, K_SC, "scope-grant")
-C -> S : POST /api/scopes/groups { encryptedName, wrappedGrant: grant }
-S -> S : mint scope(kind=GROUP, tenant=Host) + self-membership(role=OWNER)
-S --> C : { scopeId, kind:GROUP }
-== open (now or next launch) ==
-C -> S : GET /api/scopes
-S --> C : [.., { id, kind:GROUP, tenantId, wrappedGrant, encryptedName, nameEpoch }]
-C -> C : K_SC = asymUnwrap(identity, wrappedGrant) ; name = open(encryptedName, HKDF(E_nameEpoch, "group-name-key"))
-note right of C : server only ever saw ciphertext name + the scope row
-@enduml
+```mermaid
+---
+title: Group scope — create + open (client-driven, operator-blind)
+---
+sequenceDiagram
+  actor U as Member<br>(unlocked)
+  participant C as Client
+  participant S as Server<br>(blind)
+  U->>C: new group "Familie"
+  C->>C: K_SC = random(32)  (= E_0)
+  C->>C: K_name0 = HKDF(E_0, "group-name-key") #59; encryptedName = seal("Familie", K_name0)
+  C->>C: grant = asymWrap(ownIdentityPub, K_SC, "scope-grant")
+  C->>S: POST /api/scopes/groups { encryptedName, wrappedGrant: grant }
+  S->>S: mint scope(kind=GROUP, tenant=Host) + self-membership(role=OWNER)
+  S-->>C: { scopeId, kind:GROUP }
+  Note over U,S: open (now or next launch)
+  C->>S: GET /api/scopes
+  S-->>C: [.., { id, kind:GROUP, tenantId, wrappedGrant, encryptedName, nameEpoch }]
+  C->>C: K_SC = asymUnwrap(identity, wrappedGrant) #59; name = open(encryptedName, HKDF(E_nameEpoch, "group-name-key"))
+  Note right of C: server only ever saw ciphertext name + the scope row
 ```
 
 ## Alternate / exception flows
