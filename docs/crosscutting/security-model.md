@@ -80,6 +80,10 @@ These operational fields are exactly what lets the server **sort, paginate, rout
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"
 mode is possible at the cost of those capabilities. The server never sees content — only structure.
 
+This split is written in *kinds*; the contracts are written in *field names*. [ADR 0044](../decisions/0044-field-visibility-declared-at-the-field.md)
+is what connects them: every field in `contracts/api/` declares which of these kinds it is, or the build fails.
+This section stays the reason; the ADR carries the mechanism and does not restate it.
+
 ## Central axis: shared vs. unshared
 
 The deciding property for risk is **whether content is shared**, not which scope it lives in. A
