@@ -43,9 +43,10 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   coverage file that gaps every target surface.)
 - **The trust-chain guards stay green.** *Every* deterministic check in `scripts/` gates a CR — all of them, not
   a remembered subset: `for f in scripts/validate_*.py; do python3 "$f"; done`. The glob is the point: it cannot
-  go stale. What each guard asserts is enumerated canonically by the `trust-chain` job in
-  [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml); this line points there rather than restating it,
-  because a list restated in prose drifts out of step with the one that runs — this file's own *"point at a
+  go stale. CI runs that same glob, unfiltered, in
+  [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml). What each guard asserts — and
+  the defect that bought it — is that validator's own module docstring: **`scripts/` is the list**, and no file
+  restates it, because a restated list drifts out of step with the one that runs. This file's own *"point at a
   canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
 - **Promote one-shot proofs to permanent guards.** When a CR's correctness rests on a structural invariant it
   proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that

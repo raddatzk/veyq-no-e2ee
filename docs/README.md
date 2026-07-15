@@ -111,9 +111,10 @@ docs/
 - **Architecture** sits above all and **indexes** them — a map kept current as work lands, not a satisfiable
   record.
 - The wiring is machine-checked by **every** guard in `scripts/` (`scripts/validate_*.py`), not by a subset
-  worth naming here: the `trust-chain` job in [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)
-  enumerates them canonically — one line per guard, saying what it asserts. That job is the list; this bullet
-  points at it, because a list restated in prose drifts out of step with the one that actually runs.
+  worth naming here. Each validator's module docstring says what it asserts and names the defect that bought it,
+  so **`scripts/` is the list** — this bullet points at it rather than restating it, because a list restated in
+  prose drifts out of step with the one that actually runs. CI runs the glob, unfiltered on every push and PR,
+  in [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml).
 
 ## Formats (the per-kind templates)
 
