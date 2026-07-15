@@ -12,8 +12,9 @@ title: Remove a member from a tenant (with the group orphan rule)
 # completes on-device via the cr-0089 rotation crypto (web scopeRotationWorker + its polling). The three-actor
 # forward-secrecy flow (owner-A cuts a member of group G that A doesn't hold → key-holder-B online rotates G
 # forward epoch 0→1 → ex-member gone, survivor re-granted) is verified LIVE against a real backend + MariaDB with
-# real crypto by scopeRotation.e2e.test.ts (VEYQ_E2E), plus the SCOPE_ROTATION unauth/non-key-holder boundary by
-# ijhttp (http/tasks/tasks.http, requests 12-13).
+# real crypto by scopeRotation.e2e.test.ts (VEYQ_E2E). The SCOPE_ROTATION unauth/non-key-holder boundary used to
+# be noted here as covered by ijhttp; http/ was hand-fired IDE tooling that no CI ran and has been deleted
+# (ADR 0040) — that boundary is a backend concern and is proven by the backend slice tests.
 acceptanceCriteria:
   - id: remove-shared-access
     text: A TenantOwner removes a member → their tenant-scope + co-shared group memberships are deleted (instant 403 on shared content); the tenant content key is NOT rotated (ADR 0025). Owner-gated (403 not_tenant_owner), 404 for a non-member.
@@ -50,6 +51,3 @@ acceptanceCriteria:
     text: The server only deletes/soft-deletes opaque rows + flips a lifecycle timestamp — never a key or a name; the tenant key is not rotated.
     coverage:
       backend: { integration: [MemberRemoveSliceTest.ownerRemovesMemberCutsSharedButKeepsOwnScopeReadable, MemberRemoveSliceTest.scopePurgeErasesTheGraceTombstonedOwnScope] }
-gaps:
-  apple: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."
-  android: "Tenant member management is web-first — not built natively (own CR later), like the rest of the groups epic."

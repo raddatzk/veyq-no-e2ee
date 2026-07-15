@@ -63,8 +63,6 @@
 - **The OpenAPI spec under `contracts/api/` is the contract.** The build generates JAX-RS interfaces +
   Kotlin/TS models; resources implement the interfaces directly. Never hand-write a DTO that duplicates a
   generated model. The API is internal and may change with its consumers.
-- The `http/` surface (runnable `.http` files with assertions) is a peer client and verifies the contract
-  — keep it in parity (§11).
 
 ## 4. Input validation & sanitization
 
@@ -143,12 +141,6 @@ differs, **mark it explicitly** in code and in the [parity matrix](platform-pari
 surface, with reasons for intentional N/A). Crypto parity is enforced mechanically by the conformance
 vectors (§9).
 
-- **`http/` covers signed happy-paths, not just boundaries.** The ijhttp client signs the login nonce
-  in-client via a vendored Ed25519 facade (`http/_lib/ed25519.js`, pre-request handler), so the
-  authenticated journeys (signed login → token → authed calls) are real contract-level coverage in
-  `*-authed.http` files, not deferred to slice tests. Split by precondition: boundary files stay
-  zero-precondition (any instance); `*-authed.http` self-seed an owner and need a **fresh** instance
-  (documented in each header). See `http/_lib/README.md` (cr-0013).
 
 ## 12. Git & PR
 

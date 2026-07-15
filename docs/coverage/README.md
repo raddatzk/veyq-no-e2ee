@@ -11,10 +11,11 @@ Each file lists acceptance criteria; every criterion's tests are keyed by **area
 **level** (which kind of test). Surfaces with **no** coverage ref for the use-case are declared under
 `gaps` with a reason — never left silent.
 
-> **`http` is not a coverage surface** ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).
-> The `http/**/*.http` files remain IntelliJ dev tooling — handy for firing requests by hand — but run in
-> no CI job, so they make no coverage claim; the same behaviour is proven by the backend slice tests. Do
-> not reference an `.http` file here.
+> **A surface that no CI job runs makes no coverage claim** ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)).
+> The surfaces are **`backend` and `web`**. `http/` was hand-fired IDE tooling and has been deleted; `apple/`
+> and `android/` are parked ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)) and no CI builds them,
+> so their tests are not coverage either — however real those tests are. A surface re-enters this model when its
+> CI job is green, not when its code exists.
 
 `scripts/validate_coverage.py` enforces the chain (run it after changing a use-case, a coverage file,
 or the tests they point to).

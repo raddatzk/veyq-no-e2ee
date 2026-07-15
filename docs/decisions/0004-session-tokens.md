@@ -65,7 +65,7 @@ into **named session families**. No JWTs.
     *count* — **never** a cleartext device/user-agent string. (A server-generated cleartext codename was
     considered and **rejected** — superseded by this E2EE scheme.)
 - **Transport.** Same opaque value, two transports: httpOnly + Secure + SameSite cookie (web) /
-  `Authorization: Bearer` (native, `http/`).
+  `Authorization: Bearer` (native).
 
 ## Decision — web refresh cookie lifetimes (session vs persistent)
 

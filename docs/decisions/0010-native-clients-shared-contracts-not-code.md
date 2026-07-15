@@ -18,7 +18,7 @@ implemented in its platform-idiomatic stack, independently. This generalises [AD
 
 - the **OpenAPI specs** (`contracts/`) → a generated client per language (never hand-written DTOs),
 - the **crypto conformance vectors** (`contracts/crypto/vectors/`, ADR 0009),
-- the **`http/` acceptance suites + use-cases** as the cross-platform *behavioural* contract.
+- the **use-cases** (`docs/features/*/use-cases/`) as the cross-platform *behavioural* contract.
 
 ### Platform / language matrix
 
@@ -75,8 +75,15 @@ all five stacks stays buildable + vector-gated here.
   frozen (a new suite is `v2`, additive), and **vector-gated** — cheap and low-risk per language (Android
   proved this). Don't let crypto drive the platform count; let product reach + UI/logic maintenance drive it.
 - **Behavioural-drift risk** in the re-implemented orchestration (login / unlock / accept flows — *not*
-  vector-pinned like crypto) is caught by the shared **`http/` acceptance + use-cases**, not by shared code.
-  This is what makes "no shared code" safe — keep `http/` the cross-platform behavioural contract.
+  vector-pinned like crypto) is **currently uncaught, and that is survivable only because there is exactly one
+  live surface.** This clause used to name the `http/` acceptance suites as the net that made "no shared code"
+  safe. [ADR 0040](0040-coverage-gaps-and-http-not-a-surface.md) demoted `http/` to hand-fired IDE tooling that
+  runs in no CI job and counts for nothing, and it never came back here — so the net was gone while this ADR
+  still promised it. `http/` has since been deleted outright. **The honest state:** under
+  [ADR 0043](0043-web-first-v1-native-parked.md) only `web` is live, so there is no second implementation to
+  drift *from*; cross-surface behavioural drift is not a live risk. **It becomes one again at the native
+  un-park — and a replacement net must be decided *then*, before a second orchestration exists**, which is the
+  same moment [ADR 0041](0041-shared-crypto-core-deferred.md) triggers. Do not un-park without settling this.
 - **Each new stack adds:** a generated OpenAPI client + a v1 crypto port (vector-gated) + native UI + an
   agent head — independent of the other stacks.
 - **Rejected:** a shared .NET core for Windows+Linux, and a shared Rust/FFI crypto core

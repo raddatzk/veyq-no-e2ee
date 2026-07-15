@@ -18,10 +18,11 @@ it stores and serves only ciphertext. The product center is the **Memory** (nest
 
 ## Repository shape
 - `contracts/` — OpenAPI + crypto vectors: the source of truth code is generated from.
-- `backend/` + four client surfaces `http/ web/ apple/ android/`, kept at **parity by shared contracts, not
-  shared code** ([ADR 0010](docs/decisions/0010-native-clients-shared-contracts-not-code.md)) and built
-  **web-first — `apple/` and `android/` are parked** until an explicit un-park
-  ([ADR 0043](docs/decisions/0043-web-first-v1-native-parked.md)); `agent/` reserved.
+- `backend/` + **one live client surface, `web/`** ([ADR 0043](docs/decisions/0043-web-first-v1-native-parked.md):
+  web-first V1). `apple/` and `android/` hold parked code — no CI builds them, they make no coverage claim, and
+  nothing in `docs/` may present them as live until an explicit un-park. Client surfaces are kept at **parity by
+  shared contracts, not shared code** ([ADR 0010](docs/decisions/0010-native-clients-shared-contracts-not-code.md));
+  `agent/` reserved.
 - `docs/` — internal engineering state (English) + working flow (`ai/`, `inbox.md`).
 - `wiki/` — **published** end-user GitHub Wiki: plain language, **EN+DE**, focused on what you can do
   and "your data is safe, here's why".

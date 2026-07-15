@@ -54,13 +54,21 @@ in an otherwise-CI area does not) — but the part of that which actually bites 
    belongs to the CR record, not the coverage file) and **deferred sub-slices** (future scope, not untested
    current scope — they belong in the inbox / a future CR).
 
-2. **`http` stops being a coverage surface.** The `.http` files stay in the repo as what they were built for —
-   IntelliJ requests a developer fires by hand — but they no longer count in the trust chain. `http` is removed
-   from the area set and stripped from the coverage files; the one http-only criterion
-   (`uc.account.login/boundary-validation`) gains a backend boundary test (malformed email / non-base64
-   signature / missing token → 400) so it stays CI-covered. `docs/ai/README.md`'s "`http/` is a real
-   contract-level verification surface" stance and the `contracts → backend → http → web → …` phase order are
-   rewritten to drop `http` from the verified surfaces.
+2. **`http` is not a coverage surface, and `http/` no longer exists.** It was removed from the area set and
+   stripped from the coverage files; the one http-only criterion (`uc.account.login/boundary-validation`) gained
+   a backend boundary test (malformed email / non-base64 signature / missing token → 400) so it stays
+   CI-covered. `docs/ai/README.md`'s "`http/` is a real contract-level verification surface" stance and the
+   `contracts → backend → http → web → …` phase order were rewritten to drop `http`.
+
+   This ADR originally kept the `.http` files "in the repo as what they were built for — IntelliJ requests a
+   developer fires by hand". **They have since been deleted** (2026-07-14): once they counted for nothing, the
+   only thing keeping 2,448 lines alive was the hope someone would fire them by hand, and nobody did.
+   **The consequence this ADR did not chase down:** [ADR 0010](0010-native-clients-shared-contracts-not-code.md)
+   named those same suites as *"what makes 'no shared code' safe"* — demoting `http` therefore dismantled a net
+   another ADR still promised, and this one never said so. ADR 0010 now states the honest position (one live
+   surface ⇒ no drift to catch; a replacement net is due at the native un-park). **The reusable lesson:
+   demoting a mechanism means finding every decision that leaned on it** — a grep for the mechanism's name,
+   not just for the docs that describe it.
 
 3. **No CI-gating marker (#82 needs none).** After (2), the only criteria not CI-proven are native-UITest-only
    ones — and that is precisely the **#80** native-CI gap, honestly visible as a native gap, not a coverage-model

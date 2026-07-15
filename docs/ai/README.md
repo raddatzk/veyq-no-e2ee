@@ -107,13 +107,20 @@ A refined CR nails **decisions, not keystrokes**:
 
 ## Parity & verification surfaces
 
-A feature/use-case is "covered" across **three client surfaces**: `web · apple · android` (plus
-`backend`). `http/` holds IntelliJ `.http` files with response-handler assertions — a **dev aid** for
-firing requests by hand, **not** a coverage surface: they run in no CI job, so the coverage trust chain
-does not count them ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md)); the same
-behaviour is proven by the backend slice tests. CR phases follow the dependency order:
-**contracts → backend → web → apple → android** (a `.http` file may still be written alongside the
-backend as a manual smoke, but it is not a phase gate).
+**The coverage surfaces are `backend` and `web` — that is the whole set.** CR phases follow the dependency
+order **contracts → backend → web**.
+
+The rule underneath, from [ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md): **a surface
+that no CI job runs makes no coverage claim.** It is not about which directories exist — it is about what a
+green build actually proves. Two surfaces have failed that test:
+
+- **`http/`** was IntelliJ requests fired by hand. ADR 0040 stopped counting it; it has since been **deleted**.
+- **`apple/` and `android/`** hold parked code ([ADR 0043](../decisions/0043-web-first-v1-native-parked.md)).
+  No CI job builds or tests them, so **by the same rule their tests are not coverage** — however real the code
+  is. They re-enter the surface set at an explicit un-park, together with the net ADR 0010 owes then.
+
+**Do not add a surface back to the coverage model before its CI job is green.** The claim follows the build,
+never the intention.
 
 ## Working rules
 
