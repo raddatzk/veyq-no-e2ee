@@ -31,7 +31,10 @@ FEATURES = ROOT / "docs" / "features"
 DECISIONS = ROOT / "docs" / "decisions"
 CROSSCUTTING = ROOT / "docs" / "crosscutting"
 
-KNOWN_STATUS = {"planned", "in-progress", "done"}
+# `superseded` = the work landed and was then undone, or its premise fell away (cr-0169: the guard it built was
+# deleted the same day, obsoleted by a format change). Without it the only honest options are to lie (`done`)
+# or to erase the record — and the record of a wrong turn is the part worth keeping.
+KNOWN_STATUS = {"planned", "in-progress", "done", "superseded"}
 
 errors: list[str] = []
 

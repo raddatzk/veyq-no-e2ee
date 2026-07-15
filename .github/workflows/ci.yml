@@ -78,7 +78,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      # The deterministic guards from scripts/ (PyYAML is the only dep). A red guard fails the build:
+      # The deterministic guards from scripts/ (PyYAML is the only dep). This comment block + the run: below
+      # are the canonical registry of the guards — the prose in changes/README.md and docs/README.md points
+      # here rather than restating the list, because a restated list drifts (both said "three" and "four"
+      # long after there were nine). A red guard fails the build:
       #   validate_coverage       — every use-case acceptance criterion resolves to a test ref on each surface
       #   validate_changes        — CR number/id unique, satisfies:/adrs: resolve, adrs quoted
       #   validate_doc_links      — every relative link under docs/ resolves

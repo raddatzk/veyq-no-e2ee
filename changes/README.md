@@ -26,10 +26,12 @@ substitute for state docs.
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
   while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
   coverage file that gaps every target surface.)
-- **The trust-chain guards stay green.** Three deterministic checks gate a CR, all run from `scripts/`:
-  `validate_coverage.py` (use-case → test refs resolve on every surface), `validate_changes.py` (CR
-  number/id unique, `satisfies:`/`adrs:` resolve, adrs quoted), `validate_doc_links.py` (every relative
-  link under `docs/` resolves). A red guard means the CR isn't done.
+- **The trust-chain guards stay green.** *Every* deterministic check in `scripts/` gates a CR — all of them, not
+  a remembered subset: `for f in scripts/validate_*.py; do python3 "$f"; done`. The glob is the point: it cannot
+  go stale. What each guard asserts is enumerated canonically by the `trust-chain` job in
+  [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml); this line points there rather than restating it,
+  because a list restated in prose drifts out of step with the one that runs — this file's own *"point at a
+  canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
 - **Promote one-shot proofs to permanent guards.** When a CR's correctness rests on a structural invariant it
   proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that
   check is added as a **permanent guard** (a `scripts/` validator step or CI grep) so the invariant can't

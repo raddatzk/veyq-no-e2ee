@@ -129,12 +129,31 @@ exactly where a validator checks it (contracts, coverage refs, links) and drifts
      `:149`) still present apple/android as live surfaces, against
      [ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md).
 
-   **Neither is fixed** — both are content decisions that belong to this finding's "Do" (and #11's), not to a
-   syntax repair. **And note what this says about diagrams-as-code:** `docs/ai/README.md` mandates inline
-   PlantUML, no validator covers it, `plantuml` is absent from `ci.yml`, and a docs-only PR triggers **no CI at
-   all** (cr-0168 decision 7, undecided) — so a diagram can carry false claims indefinitely with nothing able to
-   red. A `validate_plantuml.py` is the obvious guard and is **blocked on that CI decision**; refine it fresh, not
-   as a drive-by (it would be green by construction today).
+   **Both content items are now fixed** (2026-07-14), not by a guard but by the diagram migration below: the
+   `http/` rectangle states what [ADR 0040](../docs/decisions/0040-coverage-gaps-and-http-not-a-surface.md)
+   decided ("IDE tooling, not a coverage surface" — `ijhttp contract tests` is now gone **repo-wide**), and both
+   client rectangles state the [ADR 0043](../docs/decisions/0043-web-first-v1-native-parked.md) schedule (web
+   live, apple/android parked). This finding's confirm-command `grep -c 'parked\|web-first\|0043'` went **0 → 2**.
+
+   **The real lesson is about the guard this finding asked for, and it is the opposite of what it assumed.**
+   [cr-0169](cr-0169-guard-diagrams-as-code.md) built `validate_plantuml.py` — 130 lines, plus a JRE and a
+   pinned 29 MB jar as a CI dependency — to parse diagrams that **nobody could see**: GitHub renders no
+   PlantUML, so `docs/`'s only visual asset was invisible to the only audience that reads it. The guard was
+   **deleted the same day**, obsoleted by switching all 41 diagrams to **Mermaid**, which GitHub renders and
+   whose breakage therefore shows as a visible render error. The format choice did what the guard was built to
+   do, and removed machinery instead of adding it.
+
+   Three assumptions this finding made, all wrong, all reusable errors:
+   - **"Blocked on that CI decision"** — no. Validators run **by hand at every CR's verify step**
+     ([`README.md`](README.md) § trust-chain guards). The CI question (cr-0168 decision 7) hits **all** docs
+     guards equally and gates none.
+   - **"Green by construction"** — true of *every* guard the day it lands, and no argument against one. cr-0166
+     and cr-0167 each fixed the drift first, then guarded it; a guard red at commit means known-broken state
+     shipped. The question is "can it go red later", not "is it green now".
+   - **"A `validate_plantuml.py` is the obvious guard"** — the assumption underneath was that the rot needed
+     *enforcing*, when it needed *rendering*. **Ask what the defect cost before building the guard:** three
+     diagrams failed to render for 13 days and the observed cost was zero, because no reader ever reached them.
+     The 13 days were evidence that nobody looks — not evidence of urgency.
 
 9. **`platform-parity.md` matrix covers 7 of 39 UCs; `en.memory.tree` marked not-built** *(agent).* The one
    artifact meant to show "which UC on which surface" is 82% empty and partly stale (tree is live).

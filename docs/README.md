@@ -110,10 +110,10 @@ docs/
   `uc`/`en`/`cc` that builds it).
 - **Architecture** sits above all and **indexes** them — a map kept current as work lands, not a satisfiable
   record.
-- The wiring is machine-checked: `scripts/validate_changes.py` (`satisfies ∈ {uc,en,cc}`; `adrs` resolve),
-  `scripts/validate_coverage.py` (every use-case has coverage **or** declared gaps), `scripts/validate_doc_links.py`
-  (every relative link resolves), and `scripts/validate_feature_wiring.py` (every `uc`/`en` is linked from its
-  feature `_index.md`; an enabler's `Serves` and the served doc's back-reference are **symmetric**).
+- The wiring is machine-checked by **every** guard in `scripts/` (`scripts/validate_*.py`), not by a subset
+  worth naming here: the `trust-chain` job in [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+  enumerates them canonically — one line per guard, saying what it asserts. That job is the list; this bullet
+  points at it, because a list restated in prose drifts out of step with the one that actually runs.
 
 ## Formats (the per-kind templates)
 
