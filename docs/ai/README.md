@@ -135,11 +135,22 @@ A refined CR nails **decisions, not keystrokes**:
   at risk? what is the Definition of done? Do **not** script line-level edits ("change line 46 of X"): prose can't
   compile or be tested, line numbers drift, and a `grep`/build finds the exact sites for free at implement time.
   Name the *inventory* (which files/surfaces, as a table) + the *decisions*; implementation discovers the exact
-  *where* (which line, which site), but any **count** in the inventory is a cited command's output, not an estimate
-  (see [`changes/README.md`](../../changes/README.md)). **The inventory greps the *test* trees too, not just
-  source** — a symbol move/rename's blast radius includes every test that references it: cr-0160's guessed "~8
-  cross-slice imports" was really +2 same-package users **and 22 test files**, a gap a `grep -rc` at refine would
-  have closed instead of the build.
+  *where* (which line, which site). **The inventory hands over the command that finds the sites, not a tally of
+  them** — the number answers *"is this worth doing?"* here, in this conversation, and then has no reader; the
+  command is what stays true while the code drifts. Format + the traps:
+  [`changes/README.md`](../../changes/README.md) owns that rule. **The inventory greps the *test* trees too, not
+  just source** — a symbol move/rename's blast radius includes every test that references it: cr-0160's guessed
+  "~8 cross-slice imports" was really +2 same-package users **and 22 test files**, a gap a `grep -rc` at refine
+  would have closed instead of the build.
+- **Run the locator here — from two angles, and read the output as a list.** Handing one over unrun is the
+  estimate wearing a command's clothes. And the first command you reach for is a paraphrase of what you already
+  believe, so it fails silently wherever that belief is wrong: cr-0171's refine measured "246 scalars" with a
+  probe that knew one of OpenAPI's three nullable spellings, and asking the same question on a different key
+  (`$ref` in the property, not `type: array` on it) answers **60** where the probe says 49 — the gap is the
+  finding, and it names the 11. The bullet above is the standing example of a second angle, remembered because
+  cr-0160 paid for it; the general rule and when it is worth the cost live in
+  [`changes/README.md`](../../changes/README.md). This is also where an abstraction gets sanity-checked against
+  reality before the CR freezes it — the list is the spike's cheapest form.
 - **Spike when the shape is unclear.** The right abstraction often only emerges from N real usages (that is why
   `shared/membership/MembershipStore` came out clean — 5 usages, not a guess). If refinement can't settle the
   shape from reasoning, run a time-boxed subagent spike over the surface and fold the inventory back in — don't

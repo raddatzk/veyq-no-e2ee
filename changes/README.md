@@ -29,13 +29,49 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
   contracts → backend → web.
 - **Genuinely independent work = separate CRs, not phases.**
-- **A checkable claim carries the command that produced it — run it, don't estimate.** A CR's inventory/plan
-  states code-confirmable facts — a symbol, a count, a path, "all N of X do Y" — as the **output of a command
-  written into the CR** (`grep -rc … → 4`), never a guess. This is a *format* requirement, not a "be careful"
-  plea (which broke nine times, e.g. cr-0162's phantom `tasks.createJob`) — a cited command is re-runnable, and
-  in this repo's history every bare estimate was an under-count. Two traps: a null result counts only once you've
-  confirmed the search hit the right place, and match the **marker**, not a hand-rolled regex (`grep -c '@Test'`,
-  not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's phantom `/api/token`).
+- **The CR carries the locator, not the number — run it, don't estimate, don't freeze.** A CR's inventory states
+  code-confirmable facts (a symbol, a path, "all of X do Y") as a **command written into the CR that finds the
+  sites**, never a guess and never a frozen tally. This is a *format* requirement, not a "be careful" plea (which
+  broke nine times, e.g. cr-0162's phantom `tasks.createJob`): in this repo's history every bare estimate was an
+  under-count. Three reasons the number itself does not belong in the file:
+  - **A count rots; a locator re-runs.** The code drifts between refine and implement, and a stale `→ 4` reads
+    as current. The command is the only part that stays true, so it is the part that ships.
+  - **The number's one real job happens before the CR exists.** *"Is this worth doing at all?"* is decided in the
+    refine conversation, looking at the output. Once that call is made the tally has no further reader — the
+    implementer needs the **sites**, and the CR already says implementation discovers the exact *where*.
+  - **Where the CR builds a guard, the guard is the completeness proof** — infinitely stronger than a tally in
+    prose. cr-0171 could not under-deliver on 235 fields: the validator stays red while one is missing. Prefer
+    that over a number every time (see *promote one-shot proofs*, below).
+  **Find the sites from two angles keyed on different things — the easiest command encodes what you already
+  believe.** The locator you reach for first is a paraphrase of your own model of the code, so it fails exactly
+  where that model is wrong: silently, and with a plausible number. Ask a second time on a **different key** — a
+  different marker, a different tree, the opposite direction — and compare. **The disagreement is the finding**,
+  and it names the sites rather than merely raising doubt. cr-0171's refine asked the container's *declaration*
+  (`type == "array"` → 49) where the reliable key is its *target* (`$ref` anywhere in the property → 60); the
+  11-property gap was the entire miscount, and it listed every offender. This is the only rule here that works
+  **without foreknowledge** — *match the marker, not a paraphrase* (below) assumes you already know which is
+  which, and not knowing is the whole miss. Two conditions:
+  - **Agreement is worth exactly what the independence is worth.** Two angles that share a blind spot agree, and
+    the agreement then reads as confirmation — worse than a single angle, because it manufactures confidence.
+    `grep -c` against `grep -rc` is one angle twice: cost paid, nothing bought.
+  - **Spend it where the number decides something** — a go/no-go call, or a predicate that *is* the CR's own rule
+    ("what counts as a container" was ADR 0044's decision, measured by a probe that quietly re-implemented it).
+    Not on every grep: this repo dies of ceremony faster than of arithmetic.
+
+  **Emit the list, not the tally.** A number cannot look wrong; a list can. Printing the items behind cr-0171's
+  "246 scalars" puts `derivatives: ['array','null'] items={$ref}` in front of you and the fault is unmissable.
+  Cheaper than a second angle and it catches a wrong *predicate* — but not a wrong *scope*: a list of the sites
+  you searched can never reveal the tree you didn't (cr-0160's "~8 imports" were 2 **and 22 test files**). The
+  two defenses cover different failures; neither replaces the other.
+
+  A cited command is re-runnable, which is the point; it is not automatically right, and **a locator is only as
+  true as its predicate** — over a structured format, enumerate the format's spellings, not the one in front of
+  you, and trace the predicate to the *rule's own words* rather than to a paraphrase of them. Three further
+  traps: a null result counts only once you've confirmed the search hit the right place; a **truncated** result
+  is not a null result (cr-0171 piped an inline-YAML probe through `head -10`, read the empty tail as "there are
+  none", and broke three specs on the assumption); and match the **marker**, not a hand-rolled regex
+  (`grep -c '@Test'`, not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's
+  phantom `/api/token`).
 - **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
   use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
