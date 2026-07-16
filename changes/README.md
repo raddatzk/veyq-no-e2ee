@@ -72,6 +72,17 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   none", and broke three specs on the assumption); and match the **marker**, not a hand-rolled regex
   (`grep -c '@Test'`, not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's
   phantom `/api/token`).
+
+  **Upstream of every trap above — which all assume a command ran — is the claim that never reached for one.** A
+  statement of *where* or *how* something is built is a locatable claim even when it reads as settled fact, and
+  the statements that read *most* as fact are the ones this repo's invariants invert. The world's default is
+  `crypto → a JVM backend module, gated by a JVM mutation tool`; operator-blindness puts content crypto in the
+  **client**, so #99's refine wrote "PIT against the Gradle/Quarkus setup" with `backend/CLAUDE.md`'s *"no content
+  crypto"* loaded every turn and the repo map already naming `web/src/shared/crypto`. This is not a locator being
+  subtly wrong — it is no locator at all, because the claim did not feel like a claim. So: where a world-default
+  (`crypto → backend`, `auth → server`, `storage → a path you name`) meets one of the hard invariants, the
+  one-line `grep` goes **before** the sentence, not after the correction. The tell is the feeling of already
+  knowing — that is exactly where the imported prior is, and exactly where this repo most often inverts it.
 - **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
   use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
   entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
