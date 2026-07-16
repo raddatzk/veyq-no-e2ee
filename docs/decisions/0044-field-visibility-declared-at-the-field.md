@@ -68,6 +68,11 @@ The point is the **default**. Today silence means "nobody classified this". Afte
   is the whole mechanism: it does not detect bad fields, it makes the decision unavoidable and visible.
 - **Backfill: 246 scalar occurrences.** Mechanical, and it is the cost. It is paid once; a marker on a field is
   cheaper than a list in the middle, which is what the rejected alternatives all are.
+- **This checks the contract, not the traffic — and that is the sharpest limit, not the list below.** A field
+  carrying `contentEncoding: base64` is *permitted* to be opaque; nothing here observes whether the client put
+  ciphertext in it. A client that writes plaintext into a field marked opaque satisfies this ADR completely. The
+  marker closes the **design** hole — a field that should never have existed in plaintext — and only that. What
+  the server actually receives is a different sensor, with the wire as its oracle, and it does not exist yet.
 - **The claim is narrow, and the validator's docstring must say so.** This is a **body-surface** sensor. It does
   not see: 11 path params, 4 query params, `X-Contributor-Token` / `X-Share-Password` (capability secrets that
   cross the wire outside any schema), presigned-URL query strings, 67 DB column names with no contract, error
