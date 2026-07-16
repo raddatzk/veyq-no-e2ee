@@ -525,6 +525,7 @@ components:
       required: [nodeId, role, wrap, sealedName]
       properties:
         nodeId:
+          x-veyq-visibility: id
           type: string
           format: uuid
           description: The Memory to share — must be a MEMORY in a scope the caller is a member of (personal, group, or tenant).
@@ -546,6 +547,7 @@ components:
           example: c2VhbGVkLW5hbWUtdW5kZXItay1zaGFyZQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 4096) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         expiresAt:
+          x-veyq-visibility: time
           type: [string, "null"]
           format: date-time
           description: Optional expiry; a share past this instant resolves `404` (same shape as an unknown id). Null = no expiry.
@@ -581,6 +583,7 @@ components:
           example: cmVjb3ZlcmFibGUtc2hhcmUta2V5LXVuZGVyLWttZW0=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         passwordRequired:
+          x-veyq-visibility: flag
           type: boolean
           default: false
           description: OPTIONAL — protect the share with a password (cr-0118, ADR 0037). When true, `pwSalt` + `pwVerifier` (+ optionally `sealedPassword`) must accompany it.
@@ -641,6 +644,7 @@ components:
         role:
           $ref: "#/components/schemas/ShareRole"
         passwordRequired:
+          x-veyq-visibility: flag
           type: [boolean, "null"]
           description: Tri-state (cr-0118, ADR 0037) — true sets/changes the password (with pwSalt/pwVerifier/sealedPassword), false removes it, null/omitted leaves it untouched.
           example: null
@@ -671,6 +675,7 @@ components:
       required: [shareId]
       properties:
         shareId:
+          x-veyq-visibility: id
           type: string
           description: The opaque 256-bit share id (base64url). The full link `/s/{shareId}#k=<K_share>` is assembled client-side.
           minLength: 43
@@ -682,11 +687,13 @@ components:
       required: [shareId, nodeId, role, sealedName, enabled, mine, createdAt]
       properties:
         shareId:
+          x-veyq-visibility: id
           type: string
           minLength: 43
           maxLength: 43
           example: 3q2-7v8Xk1p0aZ9bQ4rT6yW-uJ5nD2fL8sB1cE0gH3i
         nodeId:
+          x-veyq-visibility: id
           type: string
           format: uuid
           description: The shared Memory node (lets the curator UI group shares by Memory).
@@ -720,6 +727,7 @@ components:
           maxLength: 256
           example: null
         passwordRequired:
+          x-veyq-visibility: flag
           type: boolean
           default: false
           description: True when the share is password-protected (cr-0118) — the manage UI shows a lock badge.
@@ -733,10 +741,12 @@ components:
           maxLength: 512
           example: null
         enabled:
+          x-veyq-visibility: flag
           type: boolean
           description: False once revoked — the guest resolve + blob GET then `404`.
           example: true
         mine:
+          x-veyq-visibility: flag
           type: boolean
           description: >
             True when the authenticated caller owns this share (so may revoke it). On a shared-scope Memory the
@@ -744,11 +754,13 @@ components:
             a member, which transfers ownership.
           example: true
         expiresAt:
+          x-veyq-visibility: time
           type: [string, "null"]
           format: date-time
           description: The share's expiry instant, or null when it never expires.
           example: null
         createdAt:
+          x-veyq-visibility: time
           type: string
           format: date-time
           example: 2026-07-07T12:00:00Z
@@ -765,6 +777,7 @@ components:
         role:
           $ref: "#/components/schemas/ShareRole"
         passwordRequired:
+          x-veyq-visibility: flag
           type: boolean
           default: false
           description: True when this share needs a password token; a locked response carries only this + `pwSalt` (cr-0118).
@@ -818,8 +831,9 @@ components:
         which a public viewer never holds — the root's name comes from `sealedName`).
       required: [id, kind]
       properties:
-        id: { type: string, format: uuid, example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d }
+        id: { type: string, format: uuid, example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d, x-veyq-visibility: id }
         parentId:
+          x-veyq-visibility: id
           type: [string, "null"]
           format: uuid
           description: The parent node id within the subtree, or null at the shared root.
@@ -827,6 +841,7 @@ components:
         kind:
           $ref: "#/components/schemas/NodeKind"
         orderIndex:
+          x-veyq-visibility: structure
           type: integer
           format: int32
           example: 0
@@ -849,21 +864,25 @@ components:
       required: [nodeId, mediaId, blobId, chunkCount, byteSize, wrappedBlobKey]
       properties:
         nodeId:
+          x-veyq-visibility: id
           type: string
           format: uuid
           description: The subtree node this media is attached to (selects its `K_mem`).
           example: 4a6e8b2c-1f2d-3e4a-5b6c-7c3f0e2a9b1d
-        mediaId: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e }
-        blobId: { type: string, format: uuid, example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a }
+        mediaId: { type: string, format: uuid, example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e, x-veyq-visibility: id }
+        blobId: { type: string, format: uuid, example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a, x-veyq-visibility: id }
         chunkCount:
+          x-veyq-visibility: measure
           type: integer
           format: int32
           example: 2
         byteSize:
+          x-veyq-visibility: measure
           type: integer
           format: int64
           example: 131072
         manifest:
+          x-veyq-visibility: measure
           type: [array, "null"]
           description: Per-chunk ciphertext byte sizes in chunk order (ciphertext sizes only).
           items: { type: integer, format: int64, example: 65536 }
@@ -884,6 +903,7 @@ components:
           maxLength: 512
           example: bWV0YS1jaXBoZXJ0ZXh0
         identityId:
+          x-veyq-visibility: id
           type: [string, "null"]
           format: uuid
           description: The **contributor identity** that added this media (cr-0101); null for media the curator uploaded. Maps into `identities[]` for attribution/grouping.
@@ -895,19 +915,23 @@ components:
       required: [kind, blobId, chunkCount, byteSize, wrappedBlobKey]
       properties:
         kind:
+          x-veyq-visibility: enum
           type: string
           enum: [THUMBNAIL, PREVIEW]
           example: THUMBNAIL
-        blobId: { type: string, format: uuid, example: 8b2c1f2d-3e4a-5b6c-7c3f-0e2a9b1d4a6e }
+        blobId: { type: string, format: uuid, example: 8b2c1f2d-3e4a-5b6c-7c3f-0e2a9b1d4a6e, x-veyq-visibility: id }
         chunkCount:
+          x-veyq-visibility: measure
           type: integer
           format: int32
           example: 1
         byteSize:
+          x-veyq-visibility: measure
           type: integer
           format: int64
           example: 65536
         manifest:
+          x-veyq-visibility: measure
           type: [array, "null"]
           items: { type: integer, format: int64, example: 65536 }
         wrappedBlobKey:
@@ -930,11 +954,13 @@ components:
       required: [index, url]
       properties:
         index:
+          x-veyq-visibility: structure
           type: integer
           format: int32
           description: Chunk index (0-based, in chunk order).
           example: 0
         url:
+          x-veyq-visibility: token
           type: string
           description: A short-TTL, single-object, single-method presigned URL (GET for viewer downloads, PUT for contributor uploads) against the object store.
           maxLength: 4096
@@ -946,7 +972,7 @@ components:
       description: An anonymous contributor identity — an opaque id + the `K_mem`-sealed display name (attribution/grouping hook).
       required: [identityId, sealedDisplayName]
       properties:
-        identityId: { type: string, format: uuid, example: 6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c }
+        identityId: { type: string, format: uuid, example: 6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c, x-veyq-visibility: id }
         sealedDisplayName:
           type: string
           description: The contributor's display name AEAD-sealed under `K_mem` (AAD `share-identity-name`; opaque base64).
@@ -970,8 +996,9 @@ components:
       type: object
       required: [identityId, contributorToken]
       properties:
-        identityId: { type: string, format: uuid, example: 6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c }
+        identityId: { type: string, format: uuid, example: 6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c, x-veyq-visibility: id }
         contributorToken:
+          x-veyq-visibility: token
           type: string
           description: An unguessable capability token (held on device) that authorizes this identity's uploads on the share.
           maxLength: 512
@@ -982,6 +1009,7 @@ components:
       required: [contributorToken, items]
       properties:
         contributorToken:
+          x-veyq-visibility: token
           type: string
           description: The capability token from `createShareIdentity` — authorizes the upload on the share.
           maxLength: 512
@@ -998,6 +1026,7 @@ components:
       required: [chunkCount, byteSize, wrappedBlobKey]
       properties:
         chunkCount:
+          x-veyq-visibility: measure
           type: integer
           format: int32
           description: Number of ciphertext chunks the blob is sealed into (≥ 1).
@@ -1005,6 +1034,7 @@ components:
           maximum: 100000
           example: 2
         byteSize:
+          x-veyq-visibility: measure
           type: integer
           format: int64
           description: Total ciphertext byte size declared up front (verified against the stored objects on complete).
@@ -1031,6 +1061,7 @@ components:
       description: One per request item, in order. Success carries `uploadId` + `presignedPuts`; failure carries `error`.
       properties:
         uploadId:
+          x-veyq-visibility: id
           type: [string, "null"]
           format: uuid
           example: 1f2d3e4a-5b6c-7c3f-0e2a-9b1d4a6e8b2c
@@ -1039,6 +1070,7 @@ components:
           description: One presigned PUT URL per chunk, in chunk order.
           items: { $ref: "#/components/schemas/PresignedUrl" }
         error:
+          x-veyq-visibility: public
           type: [string, "null"]
           description: Per-item error code (`budget_exceeded`, `store_unavailable`); null on success.
           maxLength: 64
@@ -1049,6 +1081,7 @@ components:
       required: [contributorToken, items]
       properties:
         contributorToken:
+          x-veyq-visibility: token
           type: string
           description: The capability token from `createShareIdentity`.
           maxLength: 512
@@ -1066,6 +1099,7 @@ components:
       required: [originalUploadId]
       properties:
         originalUploadId:
+          x-veyq-visibility: id
           type: string
           format: uuid
           description: The upload session for the original (pristine) blob, opened by `startShareBlobUploads`.
@@ -1093,10 +1127,12 @@ components:
       required: [kind, uploadId]
       properties:
         kind:
+          x-veyq-visibility: enum
           type: string
           enum: [THUMBNAIL, PREVIEW]
           example: THUMBNAIL
         uploadId:
+          x-veyq-visibility: id
           type: string
           format: uuid
           example: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
@@ -1114,14 +1150,17 @@ components:
       description: One per request item, in order. Success carries the original `blobId` + `mediaId`; failure carries `error`.
       properties:
         blobId:
+          x-veyq-visibility: id
           type: [string, "null"]
           format: uuid
           example: 9b1d4a6e-8b2c-1f2d-3e4a-5b6c7c3f0e2a
         mediaId:
+          x-veyq-visibility: id
           type: [string, "null"]
           format: uuid
           example: 2a9b1d4a-6e8b-2c1f-2d3e-4a5b6c7c3f0e
         error:
+          x-veyq-visibility: public
           type: [string, "null"]
           description: Per-item error code (`upload_not_found`, `budget_exceeded`); null on success.
           maxLength: 64
@@ -1132,11 +1171,13 @@ components:
       required: [code]
       properties:
         code:
+          x-veyq-visibility: public
           type: string
           description: Stable, client-localizable error code.
           maxLength: 64
           example: invalid_request
         message:
+          x-veyq-visibility: public
           type: [string, "null"]
           description: Optional developer-facing detail; never contains secrets or content.
           maxLength: 512

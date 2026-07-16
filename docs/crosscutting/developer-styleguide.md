@@ -83,8 +83,11 @@
   invariant, and small/named/fail-closed (e.g. crypto-suite allow-list, scope-grant checks, upload
   quota/path-traversal guards). Anything needing DB state does not belong in a field annotation.
 - **Operator-blind boundary:** the server may validate only **structure and server-visible fields** (IDs,
-  sizes, MIME, `suiteId`, lengths, counts). It **cannot** validate or sanitize **content** — content is
-  ciphertext. Never introduce a server path that must read content to validate it.
+  sizes, `suiteId`, lengths, counts). It **cannot** validate or sanitize **content** — content is
+  ciphertext. Never introduce a server path that must read content to validate it. Which fields those are is
+  not a matter of memory: every field in `contracts/api/` declares its visibility class
+  ([ADR 0044](../decisions/0044-field-visibility-declared-at-the-field.md)), and an unclassified one fails the
+  build.
 - **Sanitization is a client duty, safe-by-construction.** Decrypted content rendered as HTML — above all
   journal Markdown — must never reach `v-html`/`innerHTML` unsanitized. Use an escape-first renderer
   (HTML-escape, then a fixed safe subset; links forced to `https?://` + `rel="noopener noreferrer"`) or

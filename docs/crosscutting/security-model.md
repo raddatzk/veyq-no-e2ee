@@ -67,7 +67,7 @@ request the **user** turned on, straight to the chosen provider.
   shares; scope and membership (who belongs to which tenant/group); a member's **per-tenant username,
   identity public key, and group-add-consent flag** — visible to, and effectively **enumerable by**, any
   fellow tenant member (anyone can create a group to run the member-resolve, [ADR 0014](../decisions/0014-group-scopes-and-governance.md) §5);
-  coarse timestamps for ordering; sizes; MIME type; job-queue and op-log offsets; presence facts; a media
+  coarse timestamps for ordering; sizes; job-queue and op-log offsets; presence facts; a media
   item's **trash state** (a trashed flag + who trashed it + when, until the scheduled purge); a media item's
   **uploader attribution + bucket structure** (an opaque `owner_key` per medium — `user:{id}` / `share:{id}` —
   plus its `bucket_id` and the bucket rows' shape: node, parentage, `is_primary`, per-bucket counts; the

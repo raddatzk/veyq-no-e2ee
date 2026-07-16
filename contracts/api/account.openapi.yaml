@@ -315,6 +315,7 @@ components:
       required: [method, wrappedKey]
       properties:
         id:
+          x-veyq-visibility: id
           type: string
           description: >
             Opaque id of this wrap. Present in responses (lets a client pin its own DEVICE wrap and untrust
@@ -322,6 +323,7 @@ components:
           maxLength: 64
           example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
         method:
+          x-veyq-visibility: enum
           type: string
           description: >
             Which unlock method opens this wrap. DEVICE mixes the password into the KEK
@@ -353,6 +355,7 @@ components:
       required: [method, wrappedKey, kdfParams]
       properties:
         method:
+          x-veyq-visibility: enum
           type: string
           description: >
             The unlock method this wrap opens. Restricted to the device-local methods on this endpoint:
@@ -382,6 +385,7 @@ components:
       required: [id]
       properties:
         id:
+          x-veyq-visibility: id
           type: string
           description: Opaque id of the stored wrap.
           maxLength: 64
@@ -393,6 +397,7 @@ components:
       required: [suiteId, wraps, wrappedIdentityPrivateKey]
       properties:
         suiteId:
+          x-veyq-visibility: enum
           type: string
           description: Crypto suite the wrapped material was produced under (selects the client crypto suite).
           enum: [v1]
@@ -415,6 +420,10 @@ components:
       required: [username, requireGroupAddConsent]
       properties:
         username:
+          x-veyq-visibility: pii
+          x-veyq-rationale: >-
+            The per-tenant handle members are known by (ADR 0023) — the directory's stable, human-readable label,
+            visible to every fellow tenant member.
           type: string
           description: The caller's per-tenant handle (plaintext, unique within the tenant).
           maxLength: 32
@@ -428,6 +437,7 @@ components:
           maxLength: 8192
           example: c2VhbGVkLW5hbWU=
         requireGroupAddConsent:
+          x-veyq-visibility: flag
           type: boolean
           description: >
             The caller's **account-global** "ask before adding me to groups" preference (uc.spaces.consent-group-add,
@@ -444,6 +454,10 @@ components:
         the account-global `requireGroupAddConsent` preference. Omit a field to leave it unchanged.
       properties:
         username:
+          x-veyq-visibility: pii
+          x-veyq-rationale: >-
+            The handle the caller chooses in the tenant they are joining (ADR 0023) — held in plaintext to enforce
+            uniqueness within the tenant and to serve the directory.
           type: string
           description: >
             The new per-tenant handle (plaintext; trimmed + lowercased server-side; unique in the tenant →
@@ -462,6 +476,7 @@ components:
           example: c2VhbGVkLW5hbWU=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8192) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         requireGroupAddConsent:
+          x-veyq-visibility: flag
           type: [boolean, "null"]
           description: >
             The account-global "ask before adding me to groups" preference (uc.spaces.consent-group-add). `true`
@@ -486,6 +501,7 @@ components:
           maxLength: 1048576
           example: c2VhbGVkLXBpbi1zdG9yZQ==
         version:
+          x-veyq-visibility: structure
           type: integer
           format: int64
           description: >
@@ -511,6 +527,7 @@ components:
           example: c2VhbGVkLXBpbi1zdG9yZQ==
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 1048576) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         version:
+          x-veyq-visibility: structure
           type: integer
           format: int64
           description: >
@@ -525,11 +542,13 @@ components:
       required: [code]
       properties:
         code:
+          x-veyq-visibility: public
           type: string
           description: Stable, client-localizable error code.
           maxLength: 64
           example: authentication_failed
         message:
+          x-veyq-visibility: public
           type: [string, "null"]
           description: Optional developer-facing detail; never contains secrets or content.
           maxLength: 512

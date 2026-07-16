@@ -4,10 +4,16 @@ The web client. Loaded in addition to the root `CLAUDE.md` when working here. Al
 here; the server is blind.
 
 ## Prove your work
-- `npm run check` (typecheck + test + build).
+- `npm run check` (lint + typecheck + test + build).
 - API client is **generated** and **not tracked** (gitignored, mirrors the backend) — `npm run generate:api`
   from `../contracts/api/*.openapi.yaml` produces it (and runs automatically on install via `prepare`). Never
-  hand-write the client. Regenerate after a contract change.
+  hand-write the client.
+- **`npm run check` does NOT regenerate the client — so on its own it proves nothing about a contract change.**
+  It runs lint/typecheck/test/build over whatever `src/api/generated/` already holds, which is the *previous*
+  spec. Change `contracts/api/` and a green `check` is a green run against stale code: run **`npm run
+  generate:api` first**, then `check`. (Unlike the backend, where `./gradlew check` generates as part of the
+  build — the asymmetry is the trap.) cr-0171 nearly shipped "the markers are inert to both generators" on a
+  check that had never seen them.
 - **Dev credentials come from a seeder — never hardcode or guess them. Two paths, and they are NOT
   interchangeable:**
   - **`npm run bootstrap:user` (the primary local principal).** Inputs live in **`<repo-root>/.run/.env`**

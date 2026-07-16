@@ -154,6 +154,10 @@ components:
       required: [email]
       properties:
         email:
+          x-veyq-visibility: pii
+          x-veyq-rationale: >-
+            The account's login identifier and the source of its deterministic auth salt (ADR 0003) — authentication can
+            neither resolve the account nor derive its salt without this plaintext.
           type: string
           format: email
           description: The account's login email — identifier and source of the deterministic auth salt (ADR 0003).
@@ -183,6 +187,10 @@ components:
       required: [email, signature]
       properties:
         email:
+          x-veyq-visibility: pii
+          x-veyq-rationale: >-
+            The account's login identifier and the source of its deterministic auth salt (ADR 0003) — authentication can
+            neither resolve the account nor derive its salt without this plaintext.
           type: string
           format: email
           description: The account's login email (same value used for the challenge).
@@ -197,6 +205,7 @@ components:
           example: c2lnbmF0dXJlLW92ZXItbm9uY2U=
           x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 256) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         remember:
+          x-veyq-visibility: flag
           type: boolean
           default: false
           description: >
@@ -205,6 +214,7 @@ components:
             returns the refresh token as a persistent **httpOnly + Secure + SameSite cookie** instead of in the
             body, and `refreshToken` is omitted. No current client sends this.
         sessionScope:
+          x-veyq-visibility: enum
           type: string
           description: >
             Cookie lifetime (ADR 0004 / ADR 0005 §22, cr-0055). **PERSISTENT** → a persistent httpOnly refresh
@@ -220,6 +230,7 @@ components:
       type: object
       properties:
         refreshToken:
+          x-veyq-visibility: token
           type: string
           description: >
             The opaque refresh token to rotate. **Optional**: the client sends the token in the httpOnly
@@ -234,6 +245,7 @@ components:
       required: [id]
       properties:
         id:
+          x-veyq-visibility: id
           type: string
           format: uuid
           description: Opaque id of the session family (one login / device). The E2EE name is attached later (uc.account.sessions).
@@ -244,11 +256,13 @@ components:
       required: [accessToken]
       properties:
         accessToken:
+          x-veyq-visibility: token
           type: string
           description: Opaque bearer access token (short-lived); sent as an Authorization bearer header.
           maxLength: 512
           example: YWNjZXNzLXRva2Vu
         refreshToken:
+          x-veyq-visibility: token
           type: string
           description: >
             Opaque refresh token (long-lived); send only to /api/token/refresh. **Omitted** when the rotation
@@ -261,11 +275,13 @@ components:
       required: [accessToken, family]
       properties:
         accessToken:
+          x-veyq-visibility: token
           type: string
           description: Opaque bearer access token (short-lived); sent as an Authorization bearer header.
           maxLength: 512
           example: YWNjZXNzLXRva2Vu
         refreshToken:
+          x-veyq-visibility: token
           type: string
           description: >
             Opaque refresh token (long-lived); send only to /api/token/refresh. **Omitted** when `remember` was
@@ -279,11 +295,13 @@ components:
       required: [code]
       properties:
         code:
+          x-veyq-visibility: public
           type: string
           description: Stable, client-localizable error code.
           maxLength: 64
           example: authentication_failed
         message:
+          x-veyq-visibility: public
           type: [string, "null"]
           description: Optional developer-facing detail; never contains secrets or content.
           maxLength: 512
