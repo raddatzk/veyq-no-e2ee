@@ -64,6 +64,9 @@ here; the server is blind.
 - **Crypto:** `src/shared/crypto/v1.ts` is the **conformance-pinned** suite — keep it byte-identical to
   the vectors (`../contracts/crypto/vectors/v1.json`); the conformance test must stay green. The Model B
   auth derivation (`deriveAuthSalt` / `deriveAuthKeypair`, Ed25519 from Argon2id — ADR 0003) lives here.
+  **`npm run mutation`** is the assertion-strength gate over `v1.ts` (StrykerJS, [ADR 0045](../docs/decisions/0045-mutation-testing-trust-chain-unit-layer.md))
+  — a heavier PR-only crypto job, **not** part of `npm run check`; scope + config in `stryker.mutate.json` +
+  `stryker.config.mjs`, gated in CI by [`mutation.yml`](../.github/workflows/mutation.yml).
 - **Wire encoding:** opaque fields are **standard base64** (`b64std`), not base64url — the contract pins
   `[A-Za-z0-9+/]*={0,2}`, so base64url is rejected with 400 at the boundary.
 - **Operator-blind:** seal/derive everything client-side; never send the password, plaintext or raw keys.

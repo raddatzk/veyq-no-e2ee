@@ -70,6 +70,19 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(d.salt)).toBe(k.salt)
   })
 
+  it('kdfParams length guard (the blob comes from the blind server — reject it cleanly)', () => {
+    const k = vectors.kdf_params
+    const encoded = unhex(k.encoded) // 16-byte header || 16-byte salt
+    // Pin the MESSAGE, not merely that it throws: without the guard a truncated blob still throws — the
+    // opaque DataView RangeError that decodeKdfParams exists to pre-empt. A bare .toThrow() passes either
+    // way, so relaxing this assertion silently retires the guard it is here to prove.
+    expect(() => v1.decodeKdfParams(encoded.slice(0, 15))).toThrow(/malformed_kdf_params/)
+    // 16 bytes is exactly the four u32be reads, so the header alone is well-formed: params, empty salt.
+    const d = v1.decodeKdfParams(encoded.slice(0, 16))
+    expect(d.params).toEqual(k.params)
+    expect(d.salt.length).toBe(0)
+  })
+
   it('KEM-v1 decap (hybrid X25519 + ML-KEM-768)', () => {
     const d = vectors.kem_v1.decap_kat
     const ss = v1.kemDecap(
