@@ -34,11 +34,17 @@ No mutation tooling exists (web = vitest; backend = Gradle/Quarkus/Kotlin). This
 `validate_coverage.py` cannot. Adopted per surface, on the unit layer, not repo-wide, not on the integration
 layer.**
 
-1. **Two tools, both vendor-neutral OSS.** Web: **StrykerJS** (vitest runner). Backend: **PIT** (`info.solidsoft.pitest`
-   + the `pitest-kotlin` mutators). There is no maintained OSS alternative to either on their respective
-   runtimes; the boot cost is a property of the *tests*, not the engine, so no tool switch would change it.
-   **arcmutate** is git-native and works for both Maven and Gradle, but is commercial → excluded by
-   self-hostability (a closed dependency breaks *self-hostable by default*).
+1. **Two tools, both vendor-neutral OSS.** Web: **StrykerJS** (vitest runner). Backend: **PIT**
+   (`info.solidsoft.pitest`) **alone — no Kotlin mutator plugin.** The OSS `pitest/pitest-kotlin` (the filter for
+   Kotlin's null-check-intrinsic noise) was **archived read-only in 2023**, never left `0.1-SNAPSHOT`, and names the
+   commercial **arcmutate** its successor — barred twice: unmaintained *and* successor-closed (CLAUDE.md's
+   no-unmaintained-deps + *self-hostable by default*). It is not needed anyway, and that is **measured, not hoped**:
+   base PIT over the **non-null** policy types of §2's unit tier emits **zero** intrinsic-null-check mutants (on
+   rotate/consent: 3 on DEFAULTS, 5 on STRONGER, all killed, none NON_VIABLE). The noise the plugin filters is a
+   property of null-heavy *wiring* — which the pure tier excludes by construction — so the discipline §2 adopts for
+   boot-freeness **also** disposes of the dead plugin. **arcmutate**, now the only living Kotlin mutator (git-native
+   for Maven and Gradle), stays excluded as commercial and **unneeded**. The boot cost is a property of the *tests*,
+   not the engine, so no tool switch changes it.
 
 2. **Mutation measures decisions on the unit layer — never wiring on the integration layer.** An
    integration-level mutant is killed as often for a wiring reason (a boot-path 500) as for a pinned assertion;
@@ -110,9 +116,10 @@ when CI runs it*; this one adds *a test that runs proves only as much as its ass
     minutes (Argon2id KDF mutants dominate), PR diff ~1–3 min.
   - **Backend is the real work** — a **scoped security-core refactor** (disentangle the fusion points, write the
     pure-policy unit tests), *not* "wire up PIT". The mutatable logic is tiny once boot-free, so PIT itself is
-    cheap; the effort is the substrate. The first backend CR task is a **spike** on rotate/consent — does the
-    decision extract cleanly over a repository, do the slices stay green, does unit-PIT yield high-value mutants —
-    validating the extraction *pattern* before it runs across the surface.
+    cheap; the effort is the substrate. The extraction *pattern* is **spike-validated on rotate/consent**: the
+    `pendingConsent`-skip lifts cleanly into a pure `RotationPolicy` over a dumb store, the slices stay green as its
+    safety net, and unit-PIT scores 100% — so `break = 100 − margin` (per the web pilot; the margin is headroom for
+    a future equivalent mutant, of which this tier has none), never 100.
 - **Rejected alternatives:**
   - **Integration-level mutation** (PIT over `@QuarkusTest`) — covers the surface with no refactor, but pays
     boot-per-mutant, is PIT+Quarkus-fragile, and its signal conflates wiring with assertion strength: the wrong
