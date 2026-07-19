@@ -1,7 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.features.sharing.SharingStore
-import com.veyq.app.features.spaces.scope.ScopeEntity
 import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
 import com.veyq.app.shared.config.VeyqConfig
@@ -213,39 +212,43 @@ class TenantHandler(
     fun removeMember(callerId: String, tenantId: String, targetId: String): RemoveTenantMemberOutcome {
         if (!store.hasMembership(callerId, tenantId)) return RemoveTenantMemberOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return RemoveTenantMemberOutcome.NotOwner
-        val memberships = scopes.membershipsInTenant(targetId, tenantId)
-        val tenantMembership = memberships.firstOrNull { it.scopeId == tenantId }
-            ?: return RemoveTenantMemberOutcome.MemberNotFound
-        if (tenantMembership.role == MembershipEntity.OWNER && store.tenantOwnerCount(tenantId) <= 1) {
-            return RemoveTenantMemberOutcome.LastOwner
-        }
-        val now = Instant.now()
-        for (m in memberships) {
-            when {
-                // The target's own scopes: grace-tombstone, keep the membership (read-only grace, then purge).
-                m.kind == ScopeEntity.PERSONAL -> scopes.softDelete(m.scopeId, now)
-                m.kind == ScopeEntity.GROUP && m.memberCount <= 1 -> scopes.softDelete(m.scopeId, now)
-                // Shared content: instant layer-1 cut. First hand over a group they solely owned (orphan rule).
-                else -> {
-                    if (m.kind == ScopeEntity.GROUP && m.role == MembershipEntity.OWNER &&
-                        scopes.ownerCount(m.scopeId) <= 1
-                    ) {
-                        scopes.oldestOtherMember(m.scopeId, targetId)
-                            ?.let { scopes.setRole(it, m.scopeId, MembershipEntity.OWNER) }
-                    }
-                    scopes.removeMembership(targetId, m.scopeId)
-                    // cr-0104: soft-revoke the shares this member created in the shared scope they're removed from
-                    // — their public links 404 now (their own personal/solo-group shares stay through the grace).
-                    shares.deactivateSharesByOwnerInScope(targetId, m.scopeId)
-                    // Layer-2 forward secrecy for a co-shared GROUP: the removing owner isn't necessarily a
-                    // key-holder here, so queue an async rotation for the next online remaining key-holder to
-                    // complete on-device (cr-0092, Fork 1b). Idempotent + coalescing. The TENANT scope is NOT
-                    // rotated — ACL-revoke only (ADR 0025), so it falls through with no job.
-                    if (m.kind == ScopeEntity.GROUP) tasks.originateScopeRotation(m.scopeId, maxAttempts)
-                }
+        // Impure shell: load the directory (ownerCount pre-resolved per row), ask the pure policy, execute its steps.
+        // Every branch and boundary of the decision lives in RemovalPolicy, where it is mutation-verified (ADR 0045 §2).
+        val rows = scopes.membershipsInTenant(targetId, tenantId)
+            .map { RemovalScope(it.scopeId, it.kind, it.role, it.memberCount, it.ownerCount) }
+        return when (val plan = RemovalPolicy.plan(rows, tenantId)) {
+            RemovalPlan.MemberNotFound -> RemoveTenantMemberOutcome.MemberNotFound
+            RemovalPlan.LastOwner -> RemoveTenantMemberOutcome.LastOwner
+            is RemovalPlan.Cascade -> {
+                val now = Instant.now()
+                plan.steps.forEach { execute(it, targetId, now) }
+                RemoveTenantMemberOutcome.Ok
             }
         }
-        return RemoveTenantMemberOutcome.Ok
+    }
+
+    /** Run one policy-decided cascade step against the stores. Decides nothing — the `when` only dispatches. */
+    private fun execute(step: CascadeStep, targetId: String, now: Instant) {
+        when (step.action) {
+            // The target's own scope: grace-tombstone, keep the membership (read-only grace, then purge).
+            CascadeAction.SOFT_DELETE -> scopes.softDelete(step.scopeId, now)
+            // Orphan rule: hand the solely-owned group to the oldest remaining member before cutting the target.
+            CascadeAction.TRANSFER_THEN_REMOVE -> {
+                scopes.oldestOtherMember(step.scopeId, targetId)
+                    ?.let { scopes.setRole(it, step.scopeId, MembershipEntity.OWNER) }
+                cutSharedAccess(step, targetId)
+            }
+            CascadeAction.REMOVE -> cutSharedAccess(step, targetId)
+        }
+    }
+
+    /** The shared-access cut (layer-1): drop the membership, soft-revoke the shares the target created here
+     *  (cr-0104), and queue the async forward rotation for a co-shared GROUP (cr-0092, Fork 1b) — the removing
+     *  owner need not be a key-holder. The TENANT scope carries `rotateAfter = false` (ACL-revoke only, ADR 0025). */
+    private fun cutSharedAccess(step: CascadeStep, targetId: String) {
+        scopes.removeMembership(targetId, step.scopeId)
+        shares.deactivateSharesByOwnerInScope(targetId, step.scopeId)
+        if (step.rotateAfter) tasks.originateScopeRotation(step.scopeId, maxAttempts)
     }
 
     private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {

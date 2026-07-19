@@ -260,16 +260,28 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
 
     // --- tenant-member removal cascade (cr-0091) ---
 
-    /** One of a user's memberships within a tenant, tagged with its scope kind + the total member count on that
-     *  scope — a row of the `removeTenantMember` worklist (cr-0091). */
-    data class TenantMembershipRow(val scopeId: String, val kind: String, val role: String, val memberCount: Long)
+    /** One of a user's memberships within a tenant, tagged with its scope kind + the total member and owner counts
+     *  on that scope — a row of the `removeTenantMember` worklist (cr-0091). The `ownerCount` is pre-resolved here so
+     *  the removal decision's sole-owner / last-owner `<= 1` boundaries live in the pure [RemovalPolicy], not an SQL
+     *  predicate — unit-tested and mutation-verified without a boot (ADR 0045 §2). */
+    data class TenantMembershipRow(
+        val scopeId: String,
+        val kind: String,
+        val role: String,
+        val memberCount: Long,
+        val ownerCount: Long,
+    )
 
-    /** Every scope the user is a member of in this tenant, each tagged with the scope kind + its member count —
-     *  the input to the per-kind removal cascade (delete shared, orphan-transfer, soft-delete own, cr-0091). */
+    /** Every scope the user is a member of in this tenant, each tagged with the scope kind + its member and owner
+     *  counts — the input to the per-kind removal cascade (delete shared, orphan-transfer, soft-delete own, cr-0091). */
     fun membershipsInTenant(userId: String, tenantId: String): List<TenantMembershipRow> =
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             ScopeEntity.findById(m.scopeId)?.let { s ->
-                TenantMembershipRow(m.scopeId, s.kind, m.role, MembershipEntity.count("scopeId", m.scopeId))
+                TenantMembershipRow(
+                    m.scopeId, s.kind, m.role,
+                    MembershipEntity.count("scopeId", m.scopeId),
+                    membership.ownerCount(m.scopeId),
+                )
             }
         }
 
