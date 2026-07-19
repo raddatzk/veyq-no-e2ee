@@ -207,32 +207,34 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
         ScopeEpochEntity.find("scopeId", scopeId).list().sortedBy { it.epoch }.map { it.epoch to it.wrappedPrev }
 
     /** Commit a rotation (ADR 0024): bump the current epoch, store the chain-link, apply the re-grants (each to the
-     *  new epoch). Client-minted; the server stores only ciphertext. Returns the new epoch. */
+     *  new epoch). Client-minted; the server stores only ciphertext. Returns the new epoch.
+     *
+     *  Dumb by design (ADR 0045 §2): the decision — the next epoch, and that a `pendingConsent` proposal is never
+     *  (re-)granted so `K_SC` stays gated before the wrap (cr-0094/cr-0095) — lives in the pure [RotationPolicy], where
+     *  it is unit-tested and mutation-verified. This method only loads the directory, asks the policy, and writes what
+     *  it returns; the `pendingConsent` skip is no longer an SQL predicate here. */
     @Transactional
     fun rotate(scopeId: String, wrappedPrev: String, grants: List<Pair<String, String>>): Int {
         val scope = ScopeEntity.findById(scopeId)!!
-        val newEpoch = scope.currentEpoch + 1
-        scope.currentEpoch = newEpoch
+        val members = MembershipEntity.find("scopeId", scopeId).list().map { RotationMember(it.userId, it.pendingConsent) }
+        val plan = RotationPolicy.plan(scope.currentEpoch, members, grants)
+        scope.currentEpoch = plan.newEpoch
         scope.persist()
         ScopeEpochEntity().apply {
             id = UUID.randomUUID().toString()
             this.scopeId = scopeId
-            epoch = newEpoch
+            epoch = plan.newEpoch
             this.wrappedPrev = wrappedPrev
             createdAt = Instant.now()
         }.persist()
-        grants.forEach { (uid, g) ->
-            // Never (re-)grant a soft `pendingConsent` proposal (cr-0094/cr-0095): `K_SC` stays gated **before** the
-            // wrap on the rotation path too, exactly as grant-delivery's `complete()` enforces (§ pendingConsent = false).
-            // Without this, an ordinary member-removal rotation that re-grants the whole directory (which, for an owner,
-            // includes the owner-visible pending proposals) would silently deliver `K_SC` to someone who never accepted.
-            MembershipEntity.find("userId = ?1 and scopeId = ?2 and pendingConsent = false", uid, scopeId).firstResult()?.let {
+        plan.grants.forEach { (uid, g) ->
+            MembershipEntity.find("userId = ?1 and scopeId = ?2", uid, scopeId).firstResult()?.let {
                 it.wrappedGrant = g
-                it.grantedEpoch = newEpoch
+                it.grantedEpoch = plan.newEpoch
                 it.persist()
             }
         }
-        return newEpoch
+        return plan.newEpoch
     }
 
     // --- group lifecycle: soft-delete + grace + purge (cr-0090) ---
