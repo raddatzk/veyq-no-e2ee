@@ -75,8 +75,18 @@ pitest {
     junit5PluginVersion.set("1.2.3")
     targetClasses.set(pitScope["targetClasses"] as List<String>)
     targetTests.set(pitScope["targetTests"] as List<String>)
-    // Report-only for the spike: we are MEASURING the achievable score, not gating on it yet. A break threshold
-    // (calibrated = high − margin, per the web pilot — NOT 100) is the CR's job once the number is measured.
+    // The gate: the build goes red below this mutation score. The pure tier measures 100% (zero survivors, zero
+    // equivalents); the margin is NOT slack for a known gap — it is deliberate headroom for a FUTURE equivalent
+    // mutant (one PIT cannot detect as equivalent, so it surfaces as SURVIVED), which at 100 would red the gate
+    // with no fix available. Mirrors web's break=95 (ADR 0045 §4). At the current mutant count it tolerates
+    // exactly one such survivor; a second collapses the score below 95.
+    mutationThreshold.set(95)
+    // Incremental analysis: PIT re-tests only mutants whose code OR covering tests changed since the cached
+    // history, so a weakened assertion (a test edit, no source change) is still caught. The history file is the
+    // CI cache (mutation-backend.yml), mirroring Stryker's incremental report (ADR 0045 §4). Same path in/out:
+    // PIT reads the prior run, then writes the updated history for the next; a missing input on a cold run is fine.
+    historyInputLocation.set(file("build/pitest/history.bin"))
+    historyOutputLocation.set(file("build/pitest/history.bin"))
     outputFormats.set(listOf("HTML", "XML"))
     timestampedReports.set(false) // stable report path: build/reports/pitest/{index.html,mutations.xml}
     failWhenNoMutations.set(true)  // an empty scope must fail loudly — the meta-check's build-time sibling

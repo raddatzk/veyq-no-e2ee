@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Diff-aware meta-check for the crypto mutation gate (ADR 0045 §4).
 
-The PR gate runs Stryker diff-scoped (`--since`), so a PR that changes no mutatable crypto file
-correctly mutates nothing and reports 100%. That same "100%, 0 mutants" is ALSO what a BROKEN run
-produces — a wrong `--since` base, a mis-scoped glob, a renamed file the manifest missed. A green gate
-that measured nothing is a claim nothing backs (ai/README.md rule 4). This asserts the one fact that
-tells the two apart: **when the PR's diff intersects the mutate scope, the Stryker report must carry
-> 0 mutants.**
+The gate runs Stryker over the full curated scope every run, incremental-cache-accelerated — NOT
+git-diff-scoped (`--since`): StrykerJS OSS has no diff scoping (that is the commercial arcmutate, ADR
+0045 §1). So a green "100%, 0 mutants" is never a correctly-empty run; it is a BROKEN one — a mis-scoped
+glob, a renamed file the manifest missed — that measured nothing. A green gate that measured nothing is a
+claim nothing backs (ai/README.md rule 4). This asserts the one fact that catches it: **when the PR's
+diff intersects the mutate scope, the Stryker report must carry > 0 mutants.**
 
 Not a `validate_*.py`: the trust-chain job runs those on every push with no build, but this one needs
 the Stryker report, which only the mutation CI job produces — so it is invoked from that job, not the
@@ -75,7 +75,7 @@ def main() -> int:
     total = report_mutant_count()
     if total == 0:
         print(f"::error::meta-check: PR changed {touched} but Stryker reported 0 mutants — a green run that "
-              f"measured nothing (ADR 0045 §4). Check the --since base and the mutate scope.")
+              f"measured nothing (ADR 0045 §4). Check the mutate scope and the manifest glob.")
         return 1
 
     print(f"meta-check: PR changed {touched}; Stryker reported {total} mutants (> 0). OK.")
