@@ -58,20 +58,22 @@ class AuthRateLimitFilter : ContainerRequestFilter {
     override fun filter(ctx: ContainerRequestContext) {
         val ip = request.remoteAddress()?.hostAddress() ?: "unknown"
         val nowSec = System.currentTimeMillis() / 1000
-        val windowStart = nowSec - (nowSec % windowSeconds)
+        // The fixed-window arithmetic (window start, elapsed, over-limit, retry-after) is the pure RateLimitWindow,
+        // where it is mutation-verified (ADR 0045 §2); this filter only drives the clock + concurrent-map plumbing.
+        val windowStart = RateLimitWindow.windowStart(nowSec, windowSeconds)
 
         // Bound the map so a flood of distinct (possibly spoofed) source IPs can't grow it without limit:
         // when it gets large, drop every entry whose window has already elapsed.
         if (buckets.size > MAX_TRACKED_IPS) {
-            buckets.entries.removeIf { nowSec - it.value.windowStart >= windowSeconds }
+            buckets.entries.removeIf { RateLimitWindow.hasElapsed(nowSec, it.value.windowStart, windowSeconds) }
         }
 
         val window = buckets.compute(ip) { _, existing ->
             if (existing != null && existing.windowStart == windowStart) existing else Window(windowStart)
         }!!
 
-        if (window.count.incrementAndGet() > maxRequests) {
-            val retryAfter = windowSeconds - (nowSec % windowSeconds)
+        if (RateLimitWindow.isOverLimit(window.count.incrementAndGet(), maxRequests)) {
+            val retryAfter = RateLimitWindow.retryAfter(nowSec, windowSeconds)
             // The body is the shared ErrorResponse envelope (via httpError); this filter only adds Retry-After.
             ctx.abortWith(
                 Response.fromResponse(httpError(Failures.rateLimited))
