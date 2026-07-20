@@ -14,7 +14,8 @@ import { openName } from '../memory/tree'
 /** The AAD/KDF context binding the wrap of the derived name-key `K_name` (ADR 0009/0027). Distinct from `scope-grant`. */
 export const GROUP_NAME_KEY = 'group-name-key'
 
-/** HKDF `info` for deriving the group name-key from an epoch key (vector-pinned, native byte-identical). */
+/** HKDF `info` for deriving the group name-key from an epoch key. There is no conformance vector for
+ *  `group-name-key`; the derivation is pinned by the forward KAT in `inviteName.test.ts` instead. */
 const NAME_KEY_INFO = v1.utf8('veyq/v1/group-name-key')
 
 /**
