@@ -7,7 +7,8 @@
 // (the token-less default home — `/`, `#urlaube`), `~me` is the personal scope, and the `@group` form is
 // reserved for the (later) groups slice — parsed, but only tenant/personal resolve today. `slugify` emits only
 // `[a-z0-9-]`, so a folder slug can never start with `~`/`@` and thus never collides with a scope token.
-import { slugify, type TreeNode } from './tree'
+import { type TreeNode } from './tree'
+import { slugify } from '../../shared/naming'
 
 /** A personal/profile scope token is `~<username>` (ADR 0023) — your own opens your personal scope, a foreign
  *  one is the later profile view. `~me` remains a valid fallback token (it also starts with `~`). */

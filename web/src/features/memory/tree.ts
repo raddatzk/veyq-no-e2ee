@@ -18,6 +18,7 @@ import { NodeKind, type NodeSummary } from '../../api/generated/content'
 import { writeKey, keyAt, type EpochKeys } from '../spaces/epochs'
 import { sealNodeMeta } from './nodeMeta'
 import type { MemoryLocation } from './memoryLocation'
+import { slugify } from '../../shared/naming'
 
 const NAME_CTX = 'node-name'
 const KMEM_CTX = 'content-key'
@@ -36,35 +37,6 @@ export type TreeNode = {
   wrappedContentKey: string | null
   /** Curated metadata (date now, place later) sealed under this node's `K_mem` (cr-0067); null when unset. */
   wrappedMeta: string | null
-}
-
-const GERMAN_FOLDING: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
-
-/**
- * URL-safe slug: deterministic, `[a-z0-9-]` only — the same name always yields the same slug (so the same
- * blinded `slugToken`) AND it's safe as a `#fragment` path segment (cr-0031). German folding + diacritic
- * stripping keep Latin names readable ("Müller" → "mueller", "Café" → "cafe"); a name that reduces to nothing
- * (e.g. emoji/CJK-only) falls back to a deterministic short token so siblings stay distinct and addressable.
- */
-export function slugify(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .replace(/[äöüß]/g, (c) => GERMAN_FOLDING[c])
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '') // drop combining diacritical marks (é → e)
-    .replace(/[^a-z0-9]+/g, '-') // any run of non-alphanumerics → a single dash
-    .replace(/^-+|-+$/g, '') // trim leading/trailing dashes
-  return slug || `n${fnv1a(name)}`
-}
-
-/** Tiny deterministic 32-bit hash (FNV-1a) → base36, for the empty-slug fallback only. */
-function fnv1a(value: string): string {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0).toString(36)
 }
 
 /** Seal a name under a scope content key `K_SC` (the `node-name` construction, ADR 0012). Reused verbatim for a

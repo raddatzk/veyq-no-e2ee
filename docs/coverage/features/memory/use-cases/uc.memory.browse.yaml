@@ -39,7 +39,7 @@ acceptanceCriteria:
     text: A name whose blinded slug already exists under the parent is rejected (UNIQUE(parentId, slugToken), 409) — deterministic slug.
     coverage:
       backend: { integration: [NodesSliceTest.slugCollisionPerParentIs409] }
-      web: { unit: [src/features/memory/slugify.test.ts] }
+      web: { unit: [src/shared/naming.test.ts] }
   - id: illegal-structure-rejected
     text: A CHAPTER cannot live at a folder level (it belongs inside a Memory); the server rejects it (422).
     coverage:
