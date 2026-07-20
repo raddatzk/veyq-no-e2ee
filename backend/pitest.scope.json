@@ -3,11 +3,15 @@
   "targetClasses": [
     "com.veyq.app.features.spaces.scope.RotationPolicy*",
     "com.veyq.app.features.admin.tenant.RemovalPolicy*",
-    "com.veyq.app.shared.ratelimit.RateLimitWindow*"
+    "com.veyq.app.shared.ratelimit.RateLimitWindow*",
+    "com.veyq.app.features.sharing.ShareAccessPolicy*",
+    "com.veyq.app.features.spaces.scope.MembershipPolicy*"
   ],
   "targetTests": [
     "com.veyq.app.features.spaces.scope.RotationPolicyTest",
     "com.veyq.app.features.admin.tenant.RemovalPolicyTest",
-    "com.veyq.app.shared.ratelimit.RateLimitWindowTest"
+    "com.veyq.app.shared.ratelimit.RateLimitWindowTest",
+    "com.veyq.app.features.sharing.ShareAccessPolicyTest",
+    "com.veyq.app.features.spaces.scope.MembershipPolicyTest"
   ]
 }

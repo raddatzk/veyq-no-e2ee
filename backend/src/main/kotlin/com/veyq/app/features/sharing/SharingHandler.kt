@@ -221,7 +221,7 @@ class SharingHandler(
             PwCheck.TOO_MANY -> return ResolveShareOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
-        if (canView(share.role)) {
+        if (ShareAccessPolicy.canView(share.role)) {
             return ResolveShareOutcome.Found(share, store.subtree(share.scopeId, share.nodeId), store.listIdentities(shareId))
         }
         // UPLOADER: the minimal capability — no nodes, no media, no identities. The client seals its uploads under
@@ -241,7 +241,7 @@ class SharingHandler(
             PwCheck.TOO_MANY -> return CreateIdentityOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
-        if (!canUpload(share.role)) return CreateIdentityOutcome.NotContributable
+        if (!ShareAccessPolicy.canUpload(share.role)) return CreateIdentityOutcome.NotContributable
         val (identityId, token) = store.createIdentity(shareId, sealedDisplayName)
         return CreateIdentityOutcome.Created(identityId, token)
     }
@@ -255,7 +255,7 @@ class SharingHandler(
             PwCheck.TOO_MANY -> return ShareUploadOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
-        if (!canUpload(share.role)) return ShareUploadOutcome.NotContributable
+        if (!ShareAccessPolicy.canUpload(share.role)) return ShareUploadOutcome.NotContributable
         if (store.findIdentity(shareId, contributorToken) == null) return ShareUploadOutcome.NotContributable
         if (!rateLimiter.allow(shareId)) return ShareUploadOutcome.RateLimited
         return ShareUploadOutcome.Results(mediaHandler.startForScope(share.scopeId, declares))
@@ -270,7 +270,7 @@ class SharingHandler(
             PwCheck.TOO_MANY -> return ShareCompleteOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
-        if (!canUpload(share.role)) return ShareCompleteOutcome.NotContributable
+        if (!ShareAccessPolicy.canUpload(share.role)) return ShareCompleteOutcome.NotContributable
         val identity = store.findIdentity(shareId, contributorToken) ?: return ShareCompleteOutcome.NotContributable
         val completeItems = items.map {
             CompleteItem(
@@ -298,7 +298,7 @@ class SharingHandler(
             PwCheck.TOO_MANY -> return ShareDeleteOutcome.RateLimited // cr-0165
             PwCheck.OK -> {}
         }
-        if (!canUpload(share.role)) return ShareDeleteOutcome.NotContributable
+        if (!ShareAccessPolicy.canUpload(share.role)) return ShareDeleteOutcome.NotContributable
         val identity = store.findIdentity(shareId, contributorToken) ?: return ShareDeleteOutcome.NotContributable
         val reclaimKeys = store.deleteContributedMedia(share.scopeId, mediaId, identity.id)
             ?: return ShareDeleteOutcome.NotFound
@@ -316,7 +316,7 @@ class SharingHandler(
         }
         // A write-only role has NO download capability (ADR 0031) — an UPLOADER share serves no blob, even for an
         // in-subtree id. This makes "cannot see" a real server gate, not just id-secrecy (the resolve returns none).
-        if (!canView(share.role)) return ShareBlobOutcome.NotFound
+        if (!ShareAccessPolicy.canView(share.role)) return ShareBlobOutcome.NotFound
         val blob = store.authorizedBlob(share.scopeId, share.nodeId, blobId) ?: return ShareBlobOutcome.NotFound
         if (!blobStore.canPresign) return ShareBlobOutcome.StoreUnavailable
         val gets = (0 until blob.chunkCount).map { i -> PresignRef(i, blobStore.presignGet(chunkKey(blob.storageKey, i))!!) }
@@ -327,12 +327,6 @@ class SharingHandler(
      *  VIEWER/CONTRIBUTOR → the public-links toggle. Kept coarser than the role (2 capabilities, 3 roles). */
     private fun capabilityFor(role: String): String =
         if (role == ShareEntity.UPLOADER) CapabilityIds.SHARING_UPLOADER_LINKS else CapabilityIds.SHARING_PUBLIC_LINKS
-
-    /** Roles whose guest resolve serves the sealed gallery (VIEWER/CONTRIBUTOR). UPLOADER is write-only → false. */
-    private fun canView(role: String) = role == ShareEntity.VIEWER || role == ShareEntity.CONTRIBUTOR
-
-    /** Roles that accept anonymous contributions (identity + upload + delete-own): CONTRIBUTOR/UPLOADER. */
-    private fun canUpload(role: String) = role == ShareEntity.CONTRIBUTOR || role == ShareEntity.UPLOADER
 
     private enum class PwCheck { OK, MISSING, WRONG, TOO_MANY }
 

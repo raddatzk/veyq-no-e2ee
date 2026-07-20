@@ -60,9 +60,15 @@ layer.**
    This requires **disentangling the fusion points** where decision logic leaked *down* into store methods that
    also write — `ScopesStore.rotate` (skip `pendingConsent`, re-grant to the remaining members) is the archetype;
    `TenantHandler`'s cascade already orchestrates *above* the stores and is closer to the target. Scoped to the
-   **rich** decisions (rotate/consent, last-owner `≤1` cascade, epoch, gate ordering, rate-limit arithmetic) —
-   never the trivial one-line gates (`isScopeOwner` is a boolean; lifting it buys nothing). Feature-by-feature,
-   backed by the green slices as the refactor's safety net.
+   **rich** decisions (rotate/consent, last-owner `≤1` cascade, epoch, gate ordering, rate-limit arithmetic,
+   **and the share-access gates `canView`/`canUpload` — the who-may-see-what capability matrix**). The
+   discriminator is **redundancy and blast-radius, not line count**: `isScopeOwner` is a one-line `role == OWNER`
+   whose mutant is caught loudly and redundantly across many tests — lifting it buys nothing. `canView`/`canUpload`
+   are *also* one-liners, but each is a three-role capability matrix whose single flipped `||`-arm silently admits
+   a write-only UPLOADER into the sealed gallery — a **confidentiality-invariant** breach pinned today by exactly
+   one slice, and slices are deliberately un-mutated (this §). A one-liner whose decay silently breaks a hard
+   invariant under a single un-mutated oracle is **in**; one whose decay is loud and redundantly caught is **out**.
+   Feature-by-feature, backed by the green slices as the refactor's safety net.
 
    **Query correctness stays out of mutation's reach on purpose.** A wrong `WHERE` clause returns wrong rows and
    is a security failure, but a mutant in a query string is invisible to a mocked unit test — so it stays covered
@@ -75,10 +81,14 @@ layer.**
    actually lands. Widening past the pilot is a deliberate later step, not a forbidden one.
 
    **And the widening is a curated logic tier, never a directory sweep — the frontend layers exactly as §2's
-   backend does.** Its pure `.ts` modules (the crypto ring, the memory data layer, the task workers,
-   `epoch`/`tree`/`buckets`/`date`/`location` computation) are the mutate glob; its `.vue` components, `views/`,
-   `components/` and side-effect stores are the rendering-and-wiring layer — the frontend's equivalent of §2's
-   repository + slice — and are **excluded**. A mutant there dies for a render/wiring reason or survives as an
+   backend does.** Its **file-pure** `.ts` modules — pure at *file* granularity, because Stryker mutates whole
+   files — are the mutate glob (the crypto ring, `epoch`/`naming`/`buckets` computation, the cold master-key
+   birth and the node-meta seal). It is **not the memory/tasks layer wholesale**: most of that layer is wiring —
+   `memoryLocation`/`memoryDate` import `contentApi`, the task workers import the network client — so a module
+   joins only when it imports no I/O. A network-importing worker that *happens* to score 100% under full mocks is
+   excluded on the same principle: its green is brittle placement, not earned assertion strength — the boundary is
+   purity, not score. Its `.vue` components, `views/`, `components/` and side-effect stores are the
+   rendering-and-wiring layer — the frontend's equivalent of §2's repository + slice — and are **excluded**. A mutant there dies for a render/wiring reason or survives as an
    equivalent, producing the noisy score this section exists to avoid; a `.vue` score reads high for brittle DOM
    snapshots and low for equivalents, so it measures neither trust nor its absence. `src/** minus *.vue` is **not**
    the boundary — it re-admits the wiring. The same forcing function as the backend holds: logic worth mutating is

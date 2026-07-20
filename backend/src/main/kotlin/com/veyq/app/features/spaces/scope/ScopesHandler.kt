@@ -1,6 +1,5 @@
 package com.veyq.app.features.spaces.scope
 
-import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
 import com.veyq.app.features.sharing.SharingStore
@@ -275,7 +274,7 @@ class ScopesHandler(
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return SetRoleOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return SetRoleOutcome.NotOwner
         val current = store.memberRole(targetId, scopeId) ?: return SetRoleOutcome.MemberNotFound
-        if (current == MembershipEntity.OWNER && role == MembershipEntity.MEMBER && store.ownerCount(scopeId) <= 1) {
+        if (MembershipPolicy.isLastOwnerDemote(current, role, store.ownerCount(scopeId))) {
             return SetRoleOutcome.LastOwner
         }
         store.setRole(targetId, scopeId, role)
@@ -294,7 +293,7 @@ class ScopesHandler(
         if (store.scopeKind(scopeId) != ScopeEntity.GROUP) return RemoveMemberOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return RemoveMemberOutcome.NotOwner
         val current = store.memberRole(targetId, scopeId) ?: return RemoveMemberOutcome.MemberNotFound
-        if (current == MembershipEntity.OWNER && store.ownerCount(scopeId) <= 1) return RemoveMemberOutcome.LastOwner
+        if (MembershipPolicy.isLastOwnerRemoval(current, store.ownerCount(scopeId))) return RemoveMemberOutcome.LastOwner
         store.removeMembership(targetId, scopeId)
         // cr-0104: soft-revoke the public shares this member created in the group — their links 404 now. (Layer-1;
         // the caller's follow-up rotation is the layer-2 forward-secrecy for the group's content, ADR 0024.)
