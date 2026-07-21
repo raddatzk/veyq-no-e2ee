@@ -62,24 +62,30 @@ remembered.
 ## What green proves — and where it stops
 
 **Green means: nothing points into the void. It does not mean: what it points at carries weight.**
-`measured` (per-file read of all ten `validate_*.py` + both `mutation_meta_check*.py`):
-every guard asserts a reference **resolves / exists / is present / count > 0** — never the substance of what
-it references. The per-guard limit is each validator's own docstring (e.g. `validate_field_visibility.py`:
-"a marker permits, it does not verify"); this skill only names the pattern across all of them.
+`measured` (per-file read of every doc↔code `validate_*.py` + both `mutation_meta_check*.py`):
+each asserts a reference **resolves / exists / is present / count > 0** — never the substance of what it
+references (the meta-guard `validate_guard_gaps.py` is the exception that proves the rule: it asserts these
+very limits still hold — below). The per-guard limit is each validator's own docstring (e.g.
+`validate_field_visibility.py`: "a marker permits, it does not verify"); this skill only names the pattern.
 
-Concrete, `measured` (judged from the guard code — re-confirming the prior sessions'
-bite-tests by reading, not re-injecting):
+Concrete: the specific gaps are **executable, not prose** — `scripts/validate_guard_gaps.py` (in the
+trust-chain glob) injects each into a throwaway copy of the tree and asserts the guard still passes (or, for
+the one working-check it pins, still rejects); its docstring is the enumeration. That guard is the canonical,
+always-current list, so this skill does not restate it: a restated list is a *remembered* claim that drifts
+the moment a validator is tightened — the very failure this section is about, one level up. The coupling is
+deliberate — closing a gap flips a documented pass/fail and turns that guard red, forcing the closure to be
+recorded here, not landed silently.
 
-- a **web** coverage ref at a *non-test* file passes — `validate_coverage.py` only checks the path exists;
-- a **backend** ref at an *empty `fun` body* passes — only the symbol name is resolved, never the body;
-- a CR marked `status: done` with no implementation passes — `validate_changes.py` checks the enum + that
-  refs resolve, nothing more;
-- a `#fragment` anchor is stripped, never verified (`validate_doc_links.py:35`);
-- a coverage file's `status: done` is *rejected*, but a **lying `status: planned`** on an implemented
-  use-case passes (`validate_coverage.py:132-134,:159`) — the asymmetry is real, don't rely on it;
-- `mutation_meta_check.py` (crypto) asserts a **total** mutant count > 0 (`:53-55`); the **backend** one is
-  **per-glob** (`mutation_meta_check_backend.py:54-63`). The remembered "total-count" claim held for the
-  crypto check only — corrected here.
+Two documented gaps sit **outside** that guard, on purpose (cr-0180):
+
+- the mutation **total-vs-per-glob** asymmetry: `mutation_meta_check.py` (crypto) asserts a **total** mutant
+  count > 0 (`:53-55`); the **backend** one is **per-glob** (`mutation_meta_check_backend.py:54-63`). (The
+  remembered "total-count" claim held for the crypto check only — corrected here.) Pinning it would need a
+  synthetic report fixture + a git tree (the web check gates on `git diff`), so it belongs to a
+  mutation-job-local test, not the buildless glob — and it is self-documented in both meta-check docstrings,
+  beside the code.
+- **history-blindness** (a burned CR number, a deleted cited ADR) is a **principled edge** (§4 below), not a
+  fixable gap; its remedy is a monotonic next-number helper (inbox #107), not a forgery-assertion.
 
 ### The four edges are principled limits, not gaps to fill
 

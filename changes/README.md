@@ -106,7 +106,11 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   injection, break the code, run the one test, then `command cp -f /tmp/snap <file>` (the `command` prefix skips
   any interactive `cp -i` alias). **Never `git checkout -- <file>` to restore** — it resets to HEAD and silently
   discards *uncommitted* work in that file; `git checkout` is safe only when the baseline is committed. Confirm
-  the restore (grep the fix marker) before moving on.
+  the restore (grep the fix marker) before moving on. For an **automated, repeated** guard that re-injects on
+  every run, work on a throwaway *copy* of the tree, not the live one: `scripts/validate_guard_gaps.py`
+  copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
+  (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
+  Snapshot-restore is the interactive one-shot; a copy is its automated form.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
