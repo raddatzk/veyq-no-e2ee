@@ -1,5 +1,6 @@
 package com.veyq.app.features.sharing
 
+import com.veyq.app.features.admin.tenant.TenantTermsHandler
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.media.CompleteItem
 import com.veyq.app.features.media.CompleteItemResult
@@ -9,6 +10,7 @@ import com.veyq.app.features.media.UploadDeclare
 import com.veyq.app.features.media.UploadItemResult
 import com.veyq.app.features.platform.capabilities.CapabilityIds
 import com.veyq.app.features.platform.capabilities.CapabilityRegistry
+import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.shared.blobstore.BlobStore
 import com.veyq.app.shared.blobstore.BlobStore.Companion.chunkKey
 import com.veyq.app.shared.http.FailureStatus.FORBIDDEN
@@ -134,6 +136,13 @@ sealed interface ReactivateShareOutcome {
     object NotFound : ReactivateShareOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
 }
 
+sealed interface ShareTermsOutcome {
+    /** The owning tenant's public terms — `termsVersion` 0 (with null `de`/`en`) when the operator published none. */
+    data class Found(val tenantId: String, val termsVersion: Int, val de: String?, val en: String?) : ShareTermsOutcome
+    /** Unknown/disabled/expired share — the same non-enumerable 404 as [ResolveShareOutcome.NotFound]. */
+    object NotFound : ShareTermsOutcome, HttpFailure by httpFailure("share_not_found", NOT_FOUND)
+}
+
 /**
  * Use-case logic for public viewer shares (cr-0100, ADR 0029). Two authorization surfaces:
  *  - **Curator** (create/list/revoke/reactivate): authenticated + gated to a **MEMORY in a scope the caller is
@@ -151,6 +160,8 @@ class SharingHandler(
     private val rateLimiter: ShareRateLimiter,
     private val passwordAttemptLimiter: SharePasswordAttemptLimiter,
     private val capabilities: CapabilityRegistry,
+    private val scopes: ScopesStore,
+    private val tenantTerms: TenantTermsHandler,
 ) {
 
     fun create(
@@ -228,6 +239,29 @@ class SharingHandler(
         // `K_mem` (from the share `wrap`) and shows the title (from `sealedName`); it needs nothing from the subtree.
         // Returning even the root node would hand the uploader that node's `K_mem`-decryptable `wrappedMeta`.
         return ResolveShareOutcome.Found(share, SubtreeData(emptyList(), emptyList()), emptyList())
+    }
+
+    /**
+     * The owning tenant's public terms for an **accountless** visitor to accept **client-side** (uc.sharing.share-accept,
+     * ADR 0035 §3 — the accountless half of the two-tier gate). Reuses [activeShare] so an unknown/disabled/expired
+     * share is the **same non-enumerable 404** as [resolve]: the caller passes only the `shareId` they already hold,
+     * and the opaque `tenantId` is only *returned* (the client's localStorage key) — **no `tenantId` existence oracle**.
+     * The terms are public operational content, so this is independent of the share password. **No acceptance is
+     * recorded** — the server keeps nothing about the accountless visitor.
+     *
+     * Honest about its scope: what this serves is an **operational gate, not enforcement**. The client stores
+     * acceptance in localStorage, which an accountless visitor can bypass (devtools / a fresh profile / resolving the
+     * share directly). It records + surfaces consent; it does not *prevent* access. The legally-meaningful protection
+     * is the terms' own content (CSAM/illegal-content + review-and-removal) and the decryptable-on-report path, not
+     * this prompt. A tenant with no published terms yields `termsVersion` 0, and the client then never gates.
+     */
+    fun shareTerms(shareId: String): ShareTermsOutcome {
+        val share = activeShare(shareId) ?: return ShareTermsOutcome.NotFound
+        // The share→tenant hop: share.scopeId → the scope's tenant (a PERSONAL scope still resolves its tenant;
+        // ADR 0029 §6). Defensive null (a share always has a scope+tenant by FK) → the same non-enumerable 404.
+        val tenantId = scopes.scopeTenantId(share.scopeId) ?: return ShareTermsOutcome.NotFound
+        val terms = tenantTerms.guestTerms(tenantId)
+        return ShareTermsOutcome.Found(tenantId, terms?.version ?: 0, terms?.terms?.de, terms?.terms?.en)
     }
 
     // --- contributor / uploader (cr-0101, cr-0102) -----------------------------

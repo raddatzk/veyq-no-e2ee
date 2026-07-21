@@ -28,7 +28,7 @@ import {
   type AddMediaOptions,
   type MediaDeriver,
 } from './media'
-import { ShareRole, type PublicShare, type ShareMedia, type ShareNode } from '../../api/generated/sharing'
+import { ShareRole, type PublicShare, type ShareMedia, type ShareNode, type ShareTerms } from '../../api/generated/sharing'
 import type { MediaDerivativeKind } from '../../api/generated/media'
 
 // The AAD context binding `symWrap(K_share, K_mem)` — a dedicated domain tag for the share second-wrap, distinct
@@ -396,6 +396,55 @@ export class SharePasswordRequiredError extends Error {
 }
 /** cr-0118: the presented password token was wrong (403) — the caller re-prompts. */
 export class SharePasswordIncorrectError extends Error {}
+
+// --- accountless terms gate (uc.sharing.share-accept, ADR 0035 §3) ----------
+// The accountless half of the two-tier terms gate. The terms are the operator's PUBLIC policy (never E2EE); a
+// visitor accepts them before viewing/contributing, and acceptance is stored **client-side only** (localStorage
+// keyed per tenant) so the server records NOTHING about the accountless visitor. This is an **operational gate,
+// not enforcement**: a localStorage flag is bypassable by an accountless visitor (devtools / a fresh profile /
+// resolving the share directly), so it records + surfaces consent — it does not *prevent* access. The
+// legally-meaningful protection is the terms' content + the decryptable-on-report path, not this prompt.
+const TERMS_ACCEPTED_KEY_PREFIX = 'veyq:terms-accepted:'
+
+/**
+ * The owning tenant's public terms for a share (a guest read keyed on the non-enumerable `shareId`, so unknown/
+ * disabled/expired is the same non-enumerable 404 as `resolveShare` — no `tenantId` existence oracle). Returns
+ * `{ tenantId, termsVersion, terms }`; `termsVersion` 0 means the operator published no terms (the client never
+ * gates). No auth, no password — terms are public.
+ */
+export async function fetchShareTerms(shareId: string): Promise<ShareTerms> {
+  return publicSharesApi().getShareTerms({ shareId })
+}
+
+/** Pick the viewer's-locale terms markdown out of a [ShareTerms] (exact → base → en → first), '' when none. */
+export function pickShareTerms(terms: ShareTerms, locale: string): string {
+  const map: LocaleMap = {}
+  if (terms.terms?.de) map.de = terms.terms.de
+  if (terms.terms?.en) map.en = terms.terms.en
+  return pickLocaleText(map, locale)
+}
+
+/** The locally-recorded accepted terms version for a tenant (0 if never accepted or the store is unreadable). */
+export function acceptedTermsVersion(tenantId: string): number {
+  try {
+    const raw = localStorage.getItem(`${TERMS_ACCEPTED_KEY_PREFIX}${tenantId}`)
+    const n = raw ? Number.parseInt(raw, 10) : 0
+    return Number.isFinite(n) ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+/** Record acceptance of [version] for [tenantId] — client-only (localStorage), keyed per tenant so accepting on
+ *  one share of a tenant clears the gate on **every** share of that tenant. A storage failure is swallowed: the
+ *  gate is operational, not enforcement, so it must never throw and block a visitor from viewing. */
+export function recordTermsAccepted(tenantId: string, version: number): void {
+  try {
+    localStorage.setItem(`${TERMS_ACCEPTED_KEY_PREFIX}${tenantId}`, String(version))
+  } catch {
+    /* private-mode / quota — an unrecordable acceptance still clears the in-memory gate for this session */
+  }
+}
 
 function shareMediaToItem(m: ShareMedia): MediaItem {
   return {

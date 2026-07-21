@@ -197,6 +197,15 @@ server-blind tokens make this work without the server ever seeing content:
   serve ciphertext to a colluder holding the fragment — the same posture as the passive-operator-safe web viewer
   ([ADR 0026](../decisions/0026-client-trust-tiers.md)). A crypto-gate (fold `Argon2id` into the key) is a
   documented future upgrade.
+- **The accountless-visitor terms acceptance is client-only** ([ADR 0035](../decisions/0035-server-terms-of-service.md)
+  §3, [uc.sharing.share-accept](../features/sharing/use-cases/uc.sharing.share-accept.md)): before viewing, an
+  account-less share visitor accepts the operator's tenant terms, but the acceptance lives in **localStorage** (per
+  tenant + version) — the server records **nothing** about the visitor, so opening a share stays anonymous. The
+  terms are **public operational content** (no blindness cost), served from the *share* via a guest
+  `GET /api/shares/{shareId}/terms` keyed on the non-enumerable `shareId` (no `tenantId` existence oracle). It is an
+  **operational gate, not enforcement** — bypassable by an accountless visitor and no legal-non-repudiation record;
+  the operator's real remedy for a public share is the **decryptable-on-report** review-and-removal path above, not
+  this prompt.
 
 ## Key-directory trust — TOFU pinning + out-of-band verification ([ADR 0028](../decisions/0028-identity-authenticity-tofu-verification.md))
 

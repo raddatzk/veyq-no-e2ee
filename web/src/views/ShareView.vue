@@ -21,6 +21,10 @@ import {
   deleteSharePhoto,
   pickLocaleText,
   derivePasswordToken,
+  fetchShareTerms,
+  pickShareTerms,
+  acceptedTermsVersion,
+  recordTermsAccepted,
   SharePasswordRequiredError,
   SharePasswordIncorrectError,
   type ShareItem,
@@ -62,6 +66,46 @@ const memoryName = ref('')
 // (the safe escape-first subset — no raw HTML/script survives, so v-html is safe).
 const note = ref('')
 const renderedNote = computed(() => (note.value ? renderMarkdown(note.value) : ''))
+
+// --- accountless terms gate (uc.sharing.share-accept, ADR 0035 §3) ----------
+// Before viewing/contributing, the visitor accepts the operator's tenant terms. Acceptance is stored CLIENT-SIDE
+// only (localStorage, keyed per tenant) — the server records nothing about the accountless visitor. This is an
+// OPERATIONAL GATE, NOT ENFORCEMENT: a localStorage flag is bypassable, so it records + surfaces consent, it does
+// not police access (the terms' content + the decryptable-on-report path are the operator's real remedy). It also
+// FAILS OPEN: a transient terms-fetch error is treated as "no terms" (version 0) so a network blip never locks a
+// visitor out. The terms come from the share (GET /api/shares/{shareId}/terms) — a public share is Host-independent,
+// so the tenant can't come from the Host, and the member terms endpoint is auth+membership-gated.
+const termsTenantId = ref('')
+const termsVersion = ref(0) // 0 = no gate (also the fail-open value on a fetch error)
+const acceptedVersion = ref(0) // the locally-recorded accepted version; bumped in-memory on accept so the gate clears
+const termsMarkdown = ref('')
+const renderedTerms = computed(() => (termsMarkdown.value ? renderMarkdown(termsMarkdown.value) : ''))
+// The gate fires once the share is resolved (post-password), the tenant has published terms, and the locally-stored
+// accepted version is below current. Sits BETWEEN the password shell and the display-name pre-screen in the template.
+const needsTerms = computed(() => status.value === 'ready' && termsVersion.value > 0 && acceptedVersion.value < termsVersion.value)
+
+/** Fetch the owning tenant's terms + read the locally-stored accepted version. FAILS OPEN (uc.sharing.share-accept):
+ *  a transient error is treated as "no terms" (version 0) so the visitor is never locked out by a network blip. */
+async function loadTerms() {
+  try {
+    const terms = await fetchShareTerms(shareId)
+    termsTenantId.value = terms.tenantId
+    termsVersion.value = terms.termsVersion
+    termsMarkdown.value = pickShareTerms(terms, locale.value)
+    acceptedVersion.value = acceptedTermsVersion(terms.tenantId)
+  } catch {
+    termsVersion.value = 0
+    acceptedVersion.value = 0
+  }
+}
+
+/** Record acceptance client-side (localStorage, per tenant) + clear the gate in-memory. No server call — the
+ *  accountless visitor's acceptance is client-only, so the server keeps no record (anonymity preserved). */
+function acceptTerms() {
+  recordTermsAccepted(termsTenantId.value, termsVersion.value)
+  acceptedVersion.value = termsVersion.value
+}
+
 const items = ref<ShareItem[]>([])
 // mediaId → ShareItem, so the injected lightbox loaders resolve each item's own K_mem (chapters differ).
 const shareById = computed(() => new Map(items.value.map((si) => [si.item.mediaId, si])))
@@ -234,6 +278,9 @@ async function load() {
     rootMemoryKey.value = resolved.rootMemoryKey
     // incremental merge (no empty-flash): the pipeline drops thumbs of removed media + donates a just-uploaded
     // photo's optimistic preview (hands off with no gray gap), then decrypts each derivable item's real thumbnail.
+    // Decide the terms gate BEFORE flipping to 'ready' so an ungated content flash can't slip in between resolve
+    // and the gate (loadTerms fails open, so it never throws here). The gate then sits ahead of the content.
+    await loadTerms()
     pipeline.reconcile(resolved.items)
     items.value = resolved.items
     status.value = 'ready'
@@ -310,6 +357,21 @@ onBeforeUnmount(() => pipeline.revokeAll())
         </button>
         <p v-if="pwError" class="share-error">{{ t('share.passwordWrong') }}</p>
       </form>
+    </div>
+
+    <!-- The accountless terms gate (uc.sharing.share-accept, ADR 0035 §3): the operator's terms + an Accept button,
+         BETWEEN the password shell and the display-name pre-screen (password → terms → name → content). Acceptance
+         is client-only (localStorage) — an operational gate, not enforcement: it records + surfaces consent, it does
+         not police access. renderMarkdown escapes first (safe subset), so v-html is safe. -->
+    <div v-else-if="needsTerms" class="share-view-state share-name-gate">
+      <div class="veyq-surface share-name-card share-terms-card">
+        <span class="pi pi-file-check share-terms-icon" />
+        <h1>{{ t('share.termsTitle') }}</h1>
+        <p class="share-name-intro">{{ t('share.termsIntro') }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div class="share-terms-body markdown-body" v-html="renderedTerms"></div>
+        <button class="share-name-submit" type="button" @click="acceptTerms">{{ t('share.termsAccept') }}</button>
+      </div>
     </div>
 
     <!-- CONTRIBUTOR / UPLOADER share: a mandatory display-name pre-screen before contributing (ADR 0030 / 0031) -->
@@ -622,6 +684,50 @@ onBeforeUnmount(() => pipeline.revokeAll())
 }
 .share-name-card .share-note {
   margin: 0.1rem 0 0.3rem;
+}
+/* The terms gate reuses the centered card; its body is the safe-markdown terms, scrollable when long so the
+   Accept button stays reachable. Wider than the name card since terms are prose. */
+.share-terms-card {
+  width: min(38rem, 100%);
+}
+.share-terms-icon {
+  font-size: 1.5rem;
+  color: var(--app-accent);
+}
+.share-terms-body {
+  max-height: min(50vh, 26rem);
+  overflow-y: auto;
+  margin: 0.2rem 0 0.4rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.share-terms-body :deep(h1) {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+.share-terms-body :deep(h2) {
+  font-size: 1rem;
+  margin: 0.9rem 0 0.35rem;
+}
+.share-terms-body :deep(h3) {
+  font-size: 0.92rem;
+  margin: 0.8rem 0 0.3rem;
+}
+.share-terms-body :deep(p) {
+  margin: 0 0 0.55rem;
+}
+.share-terms-body :deep(ul),
+.share-terms-body :deep(ol) {
+  margin: 0 0 0.55rem;
+  padding-left: 1.3rem;
+}
+.share-terms-body :deep(a) {
+  color: var(--app-accent);
 }
 .share-note :deep(h1) {
   font-size: 1.15rem;

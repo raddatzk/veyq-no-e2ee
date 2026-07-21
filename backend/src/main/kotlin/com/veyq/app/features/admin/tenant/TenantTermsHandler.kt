@@ -12,6 +12,10 @@ import java.util.TreeMap
 /** The decoded per-locale terms markdown (cr-0114). Either locale may be null; both null = no terms. */
 data class TermsContent(val de: String?, val en: String?)
 
+/** A tenant's current **public** terms for an accountless reader (uc.sharing.share-accept): the version + the
+ *  decoded per-locale markdown. No caller, no acceptedVersion — an accountless visitor has no account. */
+data class GuestTerms(val version: Int, val terms: TermsContent?)
+
 /** Result of reading a tenant's terms + the caller's accepted version (cr-0114). */
 sealed interface TermsReadOutcome {
     data class Ok(val version: Int, val acceptedVersion: Int, val terms: TermsContent?) : TermsReadOutcome
@@ -52,6 +56,18 @@ class TenantTermsHandler(
         if (!store.hasMembership(callerId, tenantId)) return TermsReadOutcome.NotFound
         val row = store.termsFor(tenantId, callerId) ?: return TermsReadOutcome.NotFound
         return TermsReadOutcome.Ok(row.version, row.acceptedVersion, decode(row.markdownByLocale))
+    }
+
+    /**
+     * The tenant's current **public** terms for an **accountless** reader (uc.sharing.share-accept) — version +
+     * decoded per-locale markdown, with **no** membership check, **no** userId, and **no** acceptance recorded.
+     * The accountless half of the two-tier gate is client-side (ADR 0035 §3): the server keeps no record of an
+     * accountless visitor, so this read is deliberately caller-free (contrast [read], member-gated). Null only
+     * when the tenant id itself does not resolve; a tenant with no published terms reads back version 0 / null.
+     */
+    fun guestTerms(tenantId: String): GuestTerms? {
+        val row = store.guestTermsFor(tenantId) ?: return null
+        return GuestTerms(row.version, decode(row.markdownByLocale))
     }
 
     /**

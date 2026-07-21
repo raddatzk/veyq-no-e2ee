@@ -5,6 +5,7 @@ import com.veyq.app.features.media.UploadDeclare
 import com.veyq.app.generated.api.SharingApi
 import com.veyq.app.generated.model.CreateShareIdentityRequest
 import com.veyq.app.generated.model.CreateShareRequest
+import com.veyq.app.generated.model.LocalizedMarkdown
 import com.veyq.app.generated.model.PresignedUrl
 import com.veyq.app.generated.model.PublicShare
 import com.veyq.app.generated.model.ShareBlobDownload
@@ -22,6 +23,7 @@ import com.veyq.app.generated.model.ShareMediaResultItem
 import com.veyq.app.generated.model.ShareNode
 import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.ShareSummary
+import com.veyq.app.generated.model.ShareTerms
 import com.veyq.app.generated.model.UpdateShareRequest
 import com.veyq.app.generated.model.NodeKind
 import com.veyq.app.shared.http.HttpFailure
@@ -150,6 +152,24 @@ class SharingResource(
         when (val o = handler.resolveBlob(shareId, blobId.toString(), xSharePassword)) {
             is ShareBlobOutcome.Found -> Response.ok(
                 ShareBlobDownload(presignedGets = o.gets.map { PresignedUrl(index = it.index, url = it.url) }),
+            ).build()
+            is HttpFailure -> httpError(o)
+        }
+
+    // The accountless terms gate (uc.sharing.share-accept, ADR 0035 §3; @PermitAll — no auth, keyed on the
+    // non-enumerable shareId, no X-Share-Password: terms are public). Returns the owning tenant's public terms so
+    // the client can gate acceptance in localStorage. NOTE: this endpoint records NOTHING about the visitor — the
+    // accountless acceptance is an operational client-side gate, not enforcement (see SharingHandler.shareTerms).
+    @PermitAll
+    override fun getShareTerms(shareId: String): Response =
+        when (val o = handler.shareTerms(shareId)) {
+            is ShareTermsOutcome.Found -> Response.ok(
+                ShareTerms(
+                    tenantId = UUID.fromString(o.tenantId),
+                    termsVersion = o.termsVersion,
+                    // null when the operator has published no terms (termsVersion 0) — the client never gates.
+                    terms = if (o.de == null && o.en == null) null else LocalizedMarkdown(de = o.de, en = o.en),
+                ),
             ).build()
             is HttpFailure -> httpError(o)
         }

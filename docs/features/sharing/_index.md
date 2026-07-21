@@ -44,8 +44,8 @@ least-privilege is crypto-enforced, and the server stays blind.
   added an optional **private share name** (`sealed_share_name`, management-only), and **redesigned the dialogs**
   — list-only manage + separate create, copy-only links, with the **uploader as its own
   capability-gated memory action + dialog** (the same `ShareDialog`/`ShareCreateDialog` reused via an `uploader`
-  flag — identical by construction, its only difference the absent role switcher). Deferred: the **anonymous
-  acceptance gate** (cr-0117);
+  flag — identical by construction, its only difference the absent role switcher). The anonymous acceptance gate is
+  its own use-case now ([uc.sharing.share-accept](use-cases/uc.sharing.share-accept.md)), not the curator note;
   [ADR 0036](../../decisions/0036-editable-share-note-recoverable-share-key.md))
 
 - [uc.sharing.share-password](use-cases/uc.sharing.share-password.md) — **built (web, cr-0118)** (an optional
@@ -56,6 +56,15 @@ least-privilege is crypto-enforced, and the server stays blind.
   curator can **reveal**; a locked resolve serves only the password challenge. **Set / change / remove in place**,
   same link; all roles. Honest limit: defends a leaked link against an **honest** operator, not a malicious one —
   stated plainly; [ADR 0037](../../decisions/0037-password-protected-shares.md))
+
+- [uc.sharing.share-accept](use-cases/uc.sharing.share-accept.md) — **refined (cr-anonymous-accept-gate)** (the
+  accountless-visitor half of the two-tier terms gate, [ADR 0035](../../decisions/0035-server-terms-of-service.md)
+  §3: before viewing/contributing, an account-less share visitor **accepts the operator's tenant terms**, stored
+  **client-side** (localStorage, per tenant + version) — the server records nothing, anonymity preserved. The terms
+  reach the accountless client from the **share** (not the member endpoint, not the Host — a share is
+  Host-independent): a guest **`GET /api/shares/{shareId}/terms`** keyed on the non-enumerable `shareId`, so **no
+  `tenantId` existence oracle**. On the share page the gate sits **password → terms → name → content**, and it
+  **fails open** on a fetch error — an operational gate, not enforcement, honest about being bypassable)
 
 ## Deferred (later slices, each with its own dependency)
 
@@ -70,10 +79,12 @@ least-privilege is crypto-enforced, and the server stays blind.
   **moderation** (review-before-publish) over the direct-append default; and persisting an uploader's id list
   client-side for **post-reload delete** (still no download).
 - **Password-protected shares** — fold `Argon2id(passphrase)` into the wrap key for link-leak defense.
-- **Persisted shares / person-resolution** — cross-scope surfaces. **Tenant terms** are now refined
+- **Persisted shares / person-resolution** — cross-scope surfaces. **Tenant terms** are built
   ([ADR 0035](../../decisions/0035-server-terms-of-service.md); the operator sets versioned per-locale terms in
   [uc.admin.tenant-terms](../admin/use-cases/uc.admin.tenant-terms.md), members accept server-side in
-  [uc.account.accept-terms](../account/use-cases/uc.account.accept-terms.md)); what stays deferred **here** is the
-  **anonymous share-page notice** — an accountless visitor's *client-side* (localStorage) acceptance on the public
-  share page, a slice on top of those terms.
+  [uc.account.accept-terms](../account/use-cases/uc.account.accept-terms.md)), and the accountless-visitor
+  acceptance is now its own refined use-case
+  ([uc.sharing.share-accept](use-cases/uc.sharing.share-accept.md), above). What stays deferred on terms is only the
+  **pre-auth login-page** terms surface (a Host-served public read — a different mechanism from the share-keyed
+  guest read).
 - **A foreign-operator-proof no-install viewer** — needs the future trusted-web client (SaaS-era).

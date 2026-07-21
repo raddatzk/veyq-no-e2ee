@@ -44,18 +44,38 @@ Adopt a tenant-terms model, operator-blind, with a **two-tier acceptance gate**.
    recorded server-side as **operational metadata** — the member's **`accepted_terms_version`** (+ when). A
    **hard gate**: no entry until accepted.
 
-3. **Anonymous share acceptance — client-side (later slice).** An anonymous public-share visitor sees the tenant
-   terms + version and must accept (**hard gate + re-accept** on a version change), but acceptance is stored
-   **client-side** (localStorage, per share/version) — the server records **nothing** about an anonymous visitor,
-   preserving anonymity. This reuses the same tenant terms (the T&S decryptable-on-report corollary), and is
-   deferred.
+3. **Anonymous share acceptance — client-side** (uc.sharing.share-accept). An accountless public-share visitor
+   sees the tenant terms + version and must accept (**hard gate + re-accept** on a version change), but acceptance
+   is stored **client-side** (localStorage, keyed **per tenant + version** — accepting on one share of a tenant
+   clears the gate on every share of that tenant, since it is the *operator's* terms, not the link's) — the server
+   records **nothing** about the accountless visitor, preserving anonymity. This reuses the same tenant terms (the
+   T&S decryptable-on-report corollary).
+
+   **Delivery — the terms reach the accountless client from the *share*, not the member endpoint or the Host.** The
+   member read (`getTenantTerms`) is `bearerAuth`, membership-gated, keyed by `tenantId` — none of which an
+   accountless visitor has. A public share is also **Host-independent** (`shareId` is a global key resolvable on
+   any Host), so the tenant cannot be inferred from the request Host. The terms therefore come from a dedicated
+   **guest** endpoint keyed on the already non-enumerable `shareId`: **`GET /api/shares/{shareId}/terms`** (no
+   auth) → `{ tenantId, termsVersion, terms }`, reusing the share's `activeShare()` gate so unknown/disabled/
+   expired is the same non-enumerable 404 as `resolveShare`. **There is no `tenantId` existence oracle** — the
+   caller passes only the `shareId` they already hold; the opaque `tenantId` is only *returned* (as the localStorage
+   key). This is **not** the pre-auth *login-page* terms surface (§Consequences) — that path is Host-served and
+   stays a separate, still-deferred slice.
+
+   **Ordering + fail-open.** On the share page the gate sits **after** the password shell (ADR 0037) and **before**
+   the display-name pre-screen (ADR 0030/0031): **password → terms → name → content**. It **fails open** — a
+   transient terms-fetch error leaves the visitor viewing (a gate is operational, not enforcement; locking someone
+   out on a network blip is worse than none), mirroring the member path's fail-open terms refresh.
 
 4. **Operator-blind boundary.** The terms text is public; a member's `accepted_terms_version` is coarse
    operational metadata (like membership/role); the anonymous acceptance is client-only. **No user content, no new
    blindness cost** — recorded in the [security model](../crosscutting/security-model.md).
 
-5. **v1 = member-facing.** The operator sets/edits terms (admin UI, versioned) + the member accept/re-accept
-   gate (server-side). The anonymous-share notice (client-side) is a later slice.
+5. **Two acceptance tiers, one login surface still deferred.** The operator sets/edits terms (admin UI, versioned).
+   The **member** accept/re-accept gate is server-side (v1, cr-0114); the **accountless-share** accept/re-accept
+   gate is client-side (§3, uc.sharing.share-accept). What stays deferred is only the **pre-auth login-page** terms
+   surface (a Host-served public read — see §Consequences), a distinct mechanism from the share-keyed guest read
+   above.
 
 ## Consequences
 

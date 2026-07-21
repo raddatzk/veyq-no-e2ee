@@ -3,6 +3,7 @@ package com.veyq.app.features.sharing
 import com.veyq.app.features.account.login.SessionService
 import com.veyq.app.shared.membership.MembershipEntity
 import com.veyq.app.features.admin.tenant.TenantEntity
+import com.veyq.app.features.admin.tenant.TenantTermsAcceptanceEntity
 import com.veyq.app.features.content.NodeEntity
 import com.veyq.app.features.media.BlobEntity
 import com.veyq.app.features.media.MediaEntity
@@ -17,6 +18,7 @@ import org.hamcrest.CoreMatchers.equalTo
 import org.hamcrest.CoreMatchers.hasItem
 import org.hamcrest.CoreMatchers.not
 import org.hamcrest.CoreMatchers.notNullValue
+import org.hamcrest.CoreMatchers.nullValue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
@@ -204,7 +206,82 @@ class ShareSliceTest {
             .then().statusCode(401).body("code", equalTo("authentication_failed"))
     }
 
+    // --- accountless terms gate (uc.sharing.share-accept, ADR 0035 §3) ---
+
+    @Test
+    fun shareTermsServesOwningTenantTermsAndRecordsNoAcceptance() {
+        val (userId, scopeId) = seedMemberScope(ScopeEntity.PERSONAL)
+        val tenantId = seedTerms(scopeId, de = "## Nutzungsbedingungen", en = "## Terms of use")
+        val memory = seedNode(scopeId, NodeEntity.MEMORY, parent = scopeId)
+        val shareId = createShare(userId, memory)
+
+        // (a) an accountless GET (no bearer) gets the owning tenant's terms — the opaque tenantId is only RETURNED
+        // (the client's localStorage key), never passed in, so there is no tenantId existence oracle.
+        given().`when`().get("/api/shares/$shareId/terms")
+            .then().statusCode(200)
+            .body("tenantId", equalTo(tenantId))
+            .body("termsVersion", equalTo(1))
+            .body("terms.de", equalTo("## Nutzungsbedingungen"))
+            .body("terms.en", equalTo("## Terms of use"))
+
+        // (c) the server records NOTHING about the accountless visitor — no acceptance row exists for the tenant.
+        val acceptances = QuarkusTransaction.requiringNew().call {
+            TenantTermsAcceptanceEntity.count("tenantId", tenantId)
+        }
+        assert(acceptances == 0L) { "expected no acceptance record for an accountless terms read, found $acceptances" }
+    }
+
+    @Test
+    fun shareTermsVersionZeroWhenTenantPublishedNoTerms() {
+        // A tenant with no published terms → version 0 / null terms; the client then never gates.
+        val (userId, scopeId) = seedMemberScope(ScopeEntity.PERSONAL)
+        val memory = seedNode(scopeId, NodeEntity.MEMORY, parent = scopeId)
+        val shareId = createShare(userId, memory)
+
+        given().`when`().get("/api/shares/$shareId/terms")
+            .then().statusCode(200)
+            .body("termsVersion", equalTo(0))
+            .body("terms", nullValue())
+    }
+
+    @Test
+    fun shareTermsIsTheSameNonEnumerable404AsResolve() {
+        // (b) unknown / disabled (revoked) / expired are ALL the same non-enumerable 404 — no existence oracle.
+        // unknown — a well-formed but unknown 43-char base64url id
+        given().`when`().get("/api/shares/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/terms")
+            .then().statusCode(404).body("code", equalTo("share_not_found"))
+
+        // disabled (revoked)
+        val (userId, scopeId) = seedMemberScope(ScopeEntity.PERSONAL)
+        seedTerms(scopeId, de = "## Regeln", en = "## Rules")
+        val memory = seedNode(scopeId, NodeEntity.MEMORY, parent = scopeId)
+        val shareId = createShare(userId, memory)
+        given().`when`().get("/api/shares/$shareId/terms").then().statusCode(200) // live first
+        given().header("Authorization", token(userId)).`when`().post("/api/shares/$shareId/revoke").then().statusCode(204)
+        given().`when`().get("/api/shares/$shareId/terms")
+            .then().statusCode(404).body("code", equalTo("share_not_found"))
+
+        // expired
+        val past = Instant.now().minusSeconds(3600).toString()
+        val expiredId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"nodeId":"$memory","role":"VIEWER","wrap":"$wrap","sealedName":"$sealedName","expiresAt":"$past"}""")
+            .`when`().post("/api/shares").then().statusCode(201).extract().path<String>("shareId")
+        given().`when`().get("/api/shares/$expiredId/terms")
+            .then().statusCode(404).body("code", equalTo("share_not_found"))
+    }
+
     // --- helpers ---
+
+    /** Publish terms (version 1) on the tenant that owns [scopeId], the direct-entity seed. Returns the tenantId
+     *  (the value the /terms endpoint must return). `termsMarkdownByLocale` is the serialized locale→markdown map. */
+    private fun seedTerms(scopeId: String, de: String, en: String): String =
+        QuarkusTransaction.requiringNew().call {
+            val tenant = TenantEntity.findById(ScopeEntity.findById(scopeId)!!.tenantId)!!
+            tenant.termsMarkdownByLocale = """{"de":"$de","en":"$en"}"""
+            tenant.termsVersion = 1
+            tenant.persist()
+            tenant.id
+        }
 
     private fun createShare(userId: String, nodeId: String): String =
         given().header("Authorization", token(userId)).contentType(ContentType.JSON)

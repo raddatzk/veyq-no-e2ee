@@ -31,6 +31,11 @@ data class PendingInviteRow(val inviteId: String, val email: String, val status:
  *  serialized locale→markdown map (null = none set); the handler decodes it into the per-locale DTO. */
 data class TenantTermsRow(val version: Int, val acceptedVersion: Int, val markdownByLocale: String?)
 
+/** A tenant's current terms with **no** caller — version + the raw serialized markdown, no acceptance lookup
+ *  (the accountless share terms read, uc.sharing.share-accept). Distinct from [TenantTermsRow] which carries a
+ *  caller's acceptedVersion; an accountless visitor has no account, so there is nothing to report. */
+data class TenantGuestTermsRow(val version: Int, val markdownByLocale: String?)
+
 /**
  * Persistence for tenant creation + invite lifecycle (cr-0009). The invite is its own row history; only the
  * SHA-256 token hash is stored (never the token), and transitions are soft (ACTIVE → SUPERSEDED/CONSUMED/
@@ -224,6 +229,14 @@ class TenantStore(private val membership: MembershipStore) {
         val accepted = TenantTermsAcceptanceEntity
             .find("userId = ?1 and tenantId = ?2", userId, tenantId).firstResult()?.acceptedVersion ?: 0
         return TenantTermsRow(tenant.termsVersion, accepted, tenant.termsMarkdownByLocale)
+    }
+
+    /** The tenant's current terms **without** a caller — version + serialized markdown, and **no** acceptance
+     *  lookup (uc.sharing.share-accept: the accountless visitor's acceptance is client-only, so the server keeps
+     *  no record and needs no userId). Null if no such tenant. */
+    fun guestTermsFor(tenantId: String): TenantGuestTermsRow? {
+        val tenant = TenantEntity.findById(tenantId) ?: return null
+        return TenantGuestTermsRow(tenant.termsVersion, tenant.termsMarkdownByLocale)
     }
 
     /** Store the (already normalized) serialized terms and bump the version **only if the markdown changed** — an
