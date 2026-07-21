@@ -106,6 +106,12 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   the defect that bought it — is that validator's own module docstring: **`scripts/` is the list**, and no file
   restates it, because a restated list drifts out of step with the one that runs. This file's own *"point at a
   canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
+- **Before reshaping a symbol, grep `scripts/` for *every* guard that anchors on it — not just the one the task
+  names.** A guard's anchor is part of that symbol's contract, and the task naming one guard is exactly what hides
+  the sibling the reshape breaks. #103 nearly re-homed the role enum into a shared `ScopeRole` `$ref` because only
+  the *drift* guard (`validate_contracts_common.py`) was named; `validate_scope_model_vocabulary.py` silently
+  anchors on `SetMemberRoleRequest.role.enum`, and a `$ref` would have broken it. Enumerate the guards on the
+  symbol first, then choose the shape — the shape that keeps every anchor green is a constraint, not an afterthought.
 - **Promote one-shot proofs to permanent guards.** When a CR's correctness rests on a structural invariant it
   proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that
   check is added as a **permanent guard** (a `scripts/` validator step or CI grep) so the invariant can't
@@ -122,6 +128,10 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
   (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
   Snapshot-restore is the interactive one-shot; a copy is its automated form.
+- **`git status` before the first edit of a contracts-phase CR — a dirty shared spec is stop-and-confirm, not
+  proceed.** Two CRs touching one `*.openapi.yaml` mix unrelated deltas into a single commit: #103's mechanical
+  enum narrowing landed on top of uncommitted `cr-space-icon` WIP in `scopes.openapi.yaml`, and only a pre-edit
+  `git status` caught it. Split the go — land one, then the other as its own commit — and the history stays legible.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
