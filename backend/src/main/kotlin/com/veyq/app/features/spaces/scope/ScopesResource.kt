@@ -16,6 +16,7 @@ import com.veyq.app.generated.model.ScopeMember
 import com.veyq.app.generated.model.ScopeRotated
 import com.veyq.app.generated.model.ScopeSummary
 import com.veyq.app.generated.model.SetMemberRoleRequest
+import com.veyq.app.generated.model.SetScopeIconRequest
 import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.http.HttpFailure
 import com.veyq.app.shared.http.httpError
@@ -78,6 +79,7 @@ class ScopesResource(
                         tenantId = UUID.fromString(it.tenantId), role = it.role,
                         currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
                         wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName, nameEpoch = it.nameEpoch,
+                        sealedIcon = it.sealedIcon, iconEpoch = it.iconEpoch,
                         deletedAt = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d, ZoneOffset.UTC) },
                         purgeAfter = it.deletedAt?.let { d -> OffsetDateTime.ofInstant(d.plus(deleteRetention), ZoneOffset.UTC) },
                     )
@@ -169,6 +171,20 @@ class ScopesResource(
             is HttpFailure -> httpError(o)
         }
 
+    override fun setScopeIcon(scopeId: UUID, setScopeIconRequest: SetScopeIconRequest): Response =
+        when (val o = handler.setScopeIcon(
+            identity.principal.name, scopeId.toString(), setScopeIconRequest.sealedIcon, setScopeIconRequest.iconEpoch,
+        )) {
+            SetScopeIconOutcome.Ok -> Response.noContent().build()
+            is HttpFailure -> httpError(o)
+        }
+
+    override fun clearScopeIcon(scopeId: UUID): Response =
+        when (val o = handler.clearScopeIcon(identity.principal.name, scopeId.toString())) {
+            ClearScopeIconOutcome.Ok -> Response.noContent().build()
+            is HttpFailure -> httpError(o)
+        }
+
     override fun restoreGroup(scopeId: UUID): Response =
         when (val o = handler.restoreGroup(identity.principal.name, scopeId.toString())) {
             RestoreGroupOutcome.Ok -> Response.noContent().build()
@@ -184,7 +200,10 @@ class ScopesResource(
     override fun listMyTenants(): Response =
         Response.ok(
             handler.myTenants(identity.principal.name).map {
-                MyTenant(tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role)
+                MyTenant(
+                    tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role,
+                    wrappedGrant = it.wrappedGrant, sealedIcon = it.sealedIcon, iconEpoch = it.iconEpoch,
+                )
             },
         ).build()
 

@@ -165,6 +165,14 @@
     "length": 32,
     "okm": "bfce920b85838f30f49707451ff99d27162a30b41a465effb90dc4f1ae0a8bb9"
   },
+  "space_icon_key": {
+    "note": "uc.spaces.set-space-icon (ADR 0027): the space icon-key K_icon derived from the icon's content-epoch key E_e — K_icon = HKDF-SHA256(ikm=E_e, salt=\"\" (empty), info=utf8(\"veyq/v1/space-icon-key\"), 32). The icon plaintext is padded to a constant length, then sealed under K_icon (symWrap, 'space-icon' AAD context), so every sealedIcon is byte-identical in length — the operator cannot tell a logo from a photo. The info string is DISTINCT from group_name_key (domain separation: an icon-key wrap can never be reinterpreted as a name-key or a scope-grant). HKDF one-wayness means K_icon leaks the icon and nothing else — not E_e, not the content key. epoch_key is the 32-byte E_e (0x44*32 here, shared with group_name_key so only the info differs); okm is K_icon.",
+    "epoch_key": "4444444444444444444444444444444444444444444444444444444444444444",
+    "salt": "",
+    "info": "766579712f76312f73706163652d69636f6e2d6b6579",
+    "length": 32,
+    "okm": "e777171e34f9fefe9f55525e7abde8ea6fafc96d2b1563f3956b9b684520bae5"
+  },
   "slug_token": {
     "note": "AD-26 blinded slug token: slugKey = HKDF(contentKey, \"veyq/v1/slug-token:\" + parentSlot); token = HMAC-SHA256(slugKey, NFC(slug)). parentSlot = parent node id, or scope id at the root. (slug stored DECOMPOSED/NFD on purpose, so a platform that skips NFC normalization computes a different token and fails this vector.)",
     "contentKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",

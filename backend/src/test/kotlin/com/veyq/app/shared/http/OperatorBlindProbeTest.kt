@@ -100,6 +100,8 @@ class OperatorBlindProbeTest {
         Probe("scopes.deleteGroup", "DELETE", "/api/scopes/{scopeId}"),
         Probe("scopes.restoreGroup", "POST", "/api/scopes/{scopeId}/restore"),
         Probe("scopes.renameGroup", "POST", "/api/scopes/{scopeId}/name", """{"encryptedName":"$b64","nameEpoch":0}"""),
+        Probe("scopes.setScopeIcon", "POST", "/api/scopes/{scopeId}/icon", """{"sealedIcon":"$b64","iconEpoch":0}"""),
+        Probe("scopes.clearScopeIcon", "DELETE", "/api/scopes/{scopeId}/icon"),
         // Invitation ops: gated on the caller's *own* membership, so a non-member gets `invitation_not_found` for
         // real and invented ids alike; decline is unconditionally idempotent (204 either way — no oracle).
         Probe("scopes.acceptInvitation", "POST", "/api/scopes/{scopeId}/invitations/accept"),

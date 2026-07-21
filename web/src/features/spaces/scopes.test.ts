@@ -19,13 +19,14 @@ vi.mock('../account/identityPins', () => ({
   },
 }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup } from './scopes'
-import { ScopeKind } from '../../api/generated/scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup, openMyTenantIcon, SCOPE_GRANT } from './scopes'
+import { ScopeKind, type MyTenant } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { checkAndPin } from '../account/identityPins'
 import { identityPrivate } from '../../app/vault'
 import { openName, sealName } from '../memory/tree'
 import { deriveGroupNameKey } from './inviteName'
+import { deriveSpaceIconKey, sealIcon } from './spaceIcon'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 
@@ -337,5 +338,40 @@ describe('listMyTenants', () => {
       listMyTenants: vi.fn().mockResolvedValue(tenants),
     } as unknown as ReturnType<typeof scopesApi>)
     expect(await listMyTenants()).toEqual(tenants)
+  })
+})
+
+describe('openMyTenantIcon (the cross-tenant switcher read)', () => {
+  // Seal an icon under K_icon derived from a tenant scope key, wrap that key as the caller's OWN grant, and hand
+  // both to openMyTenantIcon as a MyTenant row — it must open our grant transiently and return the encoded bytes.
+  // This is the per-tenant grant-open the switcher runs once per tenant (en.spaces.tenant-scope), exercised without
+  // a live backend; the end-to-end (a SECOND tenant rendering the first's icon) is the live smoke.
+  function tenantWithIcon(encoded: Uint8Array): MyTenant {
+    const scopeKey = v1.randomBytes(32)
+    const iconKey = deriveSpaceIconKey(scopeKey)
+    const sealedIcon = sealIcon(iconKey, encoded)
+    const wrappedGrant = b64std(v1.asymWrap(v1.hybridPublic(ID.priv), scopeKey, SCOPE_GRANT, { nonce: v1.randomBytes(12) }))
+    return { tenantId: 't1', name: 'Fam', domain: 'd', role: 'OWNER', iconEpoch: 0, wrappedGrant, sealedIcon }
+  }
+
+  it('opens the caller’s own grant and returns the encoded icon bytes', async () => {
+    const encoded = new Uint8Array([1, 2, 3, 4, 5, 250, 0, 99])
+    const bytes = await openMyTenantIcon(tenantWithIcon(encoded))
+    expect(bytes).not.toBeNull()
+    expect([...bytes!]).toEqual([...encoded])
+  })
+
+  it('returns null (→ the initial) when the tenant has no icon or the caller holds no grant', async () => {
+    expect(await openMyTenantIcon({ tenantId: 't1', name: 'Fam', domain: 'd', role: 'MEMBER', iconEpoch: 0 })).toBeNull()
+    expect(await openMyTenantIcon({ tenantId: 't1', name: 'Fam', domain: 'd', role: 'MEMBER', iconEpoch: 0, sealedIcon: 'c2VhbGVk', wrappedGrant: null })).toBeNull()
+  })
+
+  it('returns null (never throws) when the grant opens but the icon was sealed under a different key', async () => {
+    // A foreign/mismatched sealedIcon under our real grant must fall back to the initial, not crash the switcher.
+    const scopeKey = v1.randomBytes(32)
+    const wrappedGrant = b64std(v1.asymWrap(v1.hybridPublic(ID.priv), scopeKey, SCOPE_GRANT, { nonce: v1.randomBytes(12) }))
+    const foreign = sealIcon(deriveSpaceIconKey(v1.randomBytes(32)), new Uint8Array([9, 9, 9]))
+    const tenant: MyTenant = { tenantId: 't1', name: 'Fam', domain: 'd', role: 'OWNER', iconEpoch: 0, wrappedGrant, sealedIcon: foreign }
+    expect(await openMyTenantIcon(tenant)).toBeNull()
   })
 })

@@ -13,6 +13,7 @@ import { deriveEpochKeys, keyAt, writeKey, zeroEpochKeys, EPOCH_LINK, type Epoch
 import { SCOPE_GRANT, wrapScopeKeyToMember } from './grant'
 import { checkAndPin, IdentityChangedError } from '../account/identityPins'
 import { deriveGroupNameKey, wrapNameKeyToInvitee } from './inviteName'
+import { deriveSpaceIconKey, sealIcon, openIcon } from './spaceIcon'
 import { ScopeKind, type ScopeSummary, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 
 /** The AAD/KDF context binding a scope-key wrap (ADR 0017/0020), re-exported for back-compat — its home is now
@@ -320,6 +321,69 @@ export async function renameGroup(scopeId: string, newName: string): Promise<voi
 /** Whether a failed call is a `409 stale_epoch` (a concurrent rotation advanced the epoch under a rename). */
 function isStaleEpoch(e: unknown): Promise<boolean> {
   return isCodedError(e, 409, 'stale_epoch')
+}
+
+/**
+ * Set or replace a space's icon (uc.spaces.set-space-icon) — operator-blind: bake+encode is the caller's, here we
+ * seal the encoded bytes under `K_icon` derived from the caller's **write key** (the highest epoch they hold) and
+ * POST `{ sealedIcon, iconEpoch }`. The server accepts it only when `iconEpoch == currentEpoch`; a stale caller
+ * (a concurrent rotation) gets `409 stale_epoch`, so we refetch + retry **once** — the same shape as
+ * {@link renameGroup}. The padding to a constant length is intrinsic to {@link sealIcon}, so every stored icon is
+ * byte-identical in size. Requires an unlocked vault + OWNER on the scope (enforced server-side).
+ */
+export async function setSpaceIcon(scopeId: string, encoded: Uint8Array): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const opened = await openScopeById(scopeId)
+    if (!opened) throw new Error('cannot open space to set its icon')
+    const iconEpoch = opened.epochs.current // seal under the highest epoch we hold; the server gates it == current
+    const iconKey = deriveSpaceIconKey(writeKey(opened.epochs))
+    try {
+      const sealedIcon = sealIcon(iconKey, encoded)
+      await withRefresh(() => scopesApi().setScopeIcon({ scopeId, setScopeIconRequest: { sealedIcon, iconEpoch } }))
+      return
+    } catch (e) {
+      if (attempt === 0 && (await isStaleEpoch(e))) continue // a concurrent rotation — refetch the epoch + retry once
+      throw e
+    } finally {
+      iconKey.fill(0)
+      zeroEpochKeys(opened.epochs)
+    }
+  }
+}
+
+/** Remove a space's icon (uc.spaces.set-space-icon A5) — every member falls back to the initial. No epoch (a
+ *  removal carries no ciphertext to be stale); idempotent. Owner-gated server-side. */
+export async function clearSpaceIcon(scopeId: string): Promise<void> {
+  await withRefresh(() => scopesApi().clearScopeIcon({ scopeId }))
+}
+
+/**
+ * Open a tenant's icon for the switcher (uc.spaces.set-space-icon, en.spaces.tenant-scope) — unwrap the caller's
+ * **own** grant on that tenant transiently, derive `K_icon`, and open + unpad the `sealedIcon` → the encoded image
+ * bytes, or **null** (no icon set, grant-less while awaiting-access, or it won't open → the caller renders the
+ * initial). Zeroes the scope key + `K_icon` + the identity copy in `finally` (the {@link listMyGroups} posture).
+ *
+ * A tenant does not routinely re-key, so `iconEpoch == the grant's epoch == 0` (ADR 0025) and `K_icon` derives
+ * directly from the grant key — the cross-tenant switcher read carries **no** epoch chain to peel, by design. If a
+ * tenant ever re-keys and `iconEpoch < currentEpoch`, {@link openIcon} returns null → the initial (never a throw).
+ */
+export async function openMyTenantIcon(tenant: MyTenant): Promise<Uint8Array | null> {
+  if (!tenant.sealedIcon || !tenant.wrappedGrant) return null
+  const priv = identityPrivate()
+  if (!priv) return null
+  let scopeKey: Uint8Array | null = null
+  let iconKey: Uint8Array | null = null
+  try {
+    scopeKey = v1.asymUnwrap(v1.hybridSecret(priv), v1.hybridPublic(priv), fromB64std(tenant.wrappedGrant), SCOPE_GRANT)
+    iconKey = deriveSpaceIconKey(scopeKey)
+    return openIcon(iconKey, tenant.sealedIcon)
+  } catch {
+    return null
+  } finally {
+    scopeKey?.fill(0)
+    iconKey?.fill(0)
+    zero(priv)
+  }
 }
 
 /**

@@ -46,6 +46,8 @@ class ScopesSliceTest {
     private val rotPrev = "cm90LXByZXY=" // "rot-prev" (symWrap(E1, E0))
     private val newGrant = "bmV3LWVwb2NoLWdyYW50" // "new-epoch-grant"
     private val renamedName = "cmVuYW1lZC1uYW1l" // "renamed-name" — re-sealed under K_name of the current epoch (cr-0097)
+    private val sealedIcon = "c2VhbGVkLWljb24=" // "sealed-icon" — opaque here; the constant-length invariant is a web unit test
+    private val replacedIcon = "cmVwbGFjZWQ=" // "replaced"
 
     /** Add a seeded tenant member (by username) to a group via the API — returns nothing, the member is grant-less. */
     private fun addToGroup(owner: String, domain: String, groupId: String, username: String) {
@@ -274,6 +276,130 @@ class ScopesSliceTest {
             .body("""{"encryptedName":"$renamedName","nameEpoch":0}""")
             .`when`().post("/api/scopes/$groupId/name")
             .then().statusCode(409).body("code", equalTo("scope_pending_deletion"))
+    }
+
+    // --- space icon (uc.spaces.set-space-icon) ---
+
+    @Test
+    fun setScopeIconUpdatesSealedIconAndIconEpochThenClearResets() {
+        val (owner, domain) = seedMember()
+        val tenantId = tenantIdOf(domain)
+
+        // Born with no icon.
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$tenantId' }.sealedIcon", nullValue())
+            .body("find { it.id == '$tenantId' }.iconEpoch", equalTo(0))
+
+        // The tenant owner sets the icon at the current epoch (0) → 204.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$tenantId/icon").then().statusCode(204)
+
+        // It shows on the tenant's own scope row.
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$tenantId' }.sealedIcon", equalTo(sealedIcon))
+            .body("find { it.id == '$tenantId' }.iconEpoch", equalTo(0))
+
+        // And on the widened my-tenants read (the switcher's cross-tenant path), with the caller's own grant.
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().get("/api/scopes/my-tenants").then().statusCode(200)
+            .body("[0].sealedIcon", equalTo(sealedIcon))
+            .body("[0].iconEpoch", equalTo(0))
+            .body("[0].wrappedGrant", notNullValue())
+
+        // Replace it (still epoch 0) → 204.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$replacedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$tenantId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$tenantId' }.sealedIcon", equalTo(replacedIcon))
+
+        // Remove it → 204; every member falls back to the initial (sealedIcon null again).
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$tenantId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$tenantId' }.sealedIcon", nullValue())
+            .body("find { it.id == '$tenantId' }.iconEpoch", equalTo(0))
+    }
+
+    @Test
+    fun setScopeIconNonOwnerIs403EvenWithAPersonalScopeOwnerRow() {
+        // The owner gate keys on the tenant ROOT scope (isScopeOwner(caller, scopeId == tenantId), ADR 0007). A
+        // plain member also OWNS their personal scope, whose membership carries the SAME tenantId — a gate keyed on
+        // tenantId would read that OWNER row and wrongly admit them (cr-0163's escalation shape). Seed exactly that
+        // and assert 403: reverting the gate to a tenantId key reds this test. (The role bug itself is #93, already
+        // fixed + tested; this pins the *icon* gate against the same trap.)
+        val (_, domain) = seedMember()
+        val tenantId = tenantIdOf(domain)
+        val member = seedUser()
+        QuarkusTransaction.requiringNew().run {
+            val personalId = UUID.randomUUID().toString()
+            ScopeEntity().apply {
+                id = personalId; this.tenantId = tenantId; kind = ScopeEntity.PERSONAL; createdAt = Instant.now()
+            }.persist()
+            MembershipEntity().apply {
+                id = UUID.randomUUID().toString(); this.userId = member; this.tenantId = tenantId
+                scopeId = personalId; role = MembershipEntity.OWNER
+                wrappedGrant = "cGVyc29uYWwtZ3JhbnQ=" // "personal-grant"
+                createdAt = Instant.now()
+            }.persist()
+            MembershipEntity().apply {
+                id = UUID.randomUUID().toString(); this.userId = member; this.tenantId = tenantId
+                scopeId = tenantId; role = MembershipEntity.MEMBER
+                wrappedGrant = "bWVtYmVyLWdyYW50" // "member-grant"
+                createdAt = Instant.now()
+            }.persist()
+        }
+        given().header("Authorization", "Bearer ${token(member)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$tenantId/icon")
+            .then().statusCode(403).body("code", equalTo("not_scope_owner"))
+    }
+
+    @Test
+    fun setScopeIconStaleEpochIs409AndLeavesTheIconUnset() {
+        val (owner, domain) = seedMember()
+        val tenantId = tenantIdOf(domain)
+        // currentEpoch is 0; a set claiming epoch 1 is stale → 409 stale_epoch.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":1}""")
+            .`when`().post("/api/scopes/$tenantId/icon")
+            .then().statusCode(409).body("code", equalTo("stale_epoch"))
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$tenantId' }.sealedIcon", nullValue())
+    }
+
+    @Test
+    fun clearScopeIconIsIdempotentAndOwnerGated() {
+        val (owner, domain) = seedMember()
+        val tenantId = tenantIdOf(domain)
+        // Idempotent: clearing an already-iconless scope → 204.
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$tenantId/icon").then().statusCode(204)
+        // A plain tenant member cannot clear → 403.
+        val member = seedTenantMember(tenantId, "member")
+        given().header("Authorization", "Bearer ${token(member)}")
+            .`when`().delete("/api/scopes/$tenantId/icon").then().statusCode(403).body("code", equalTo("not_scope_owner"))
+        // A non-member gets the uniform 404 (membership first, ADR 0042).
+        val outsider = seedUser()
+        given().header("Authorization", "Bearer ${token(outsider)}")
+            .`when`().delete("/api/scopes/$tenantId/icon").then().statusCode(404)
+    }
+
+    @Test
+    fun setScopeIconOnANonTenantScopeIs404InV1() {
+        // v1 is TENANT-only (the group slice lifts the kind guard). A GROUP owner setting an icon → 404, the same
+        // uniform not-found a non-member gets — the kind guard never leaks that the scope exists.
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(404)
     }
 
     @Test

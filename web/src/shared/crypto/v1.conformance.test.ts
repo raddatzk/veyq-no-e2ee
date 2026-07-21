@@ -133,6 +133,13 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.hkdfSha256(unhex(g.epoch_key), unhex(g.salt), unhex(g.info), g.length))).toBe(g.okm)
   })
 
+  it('space icon-key derivation from the icon epoch key (uc.spaces.set-space-icon, ADR 0027)', () => {
+    const s = vectors.space_icon_key
+    // K_icon = HKDF-SHA256(E_e, salt="", info=utf8("veyq/v1/space-icon-key"), 32). Distinct info from
+    // group_name_key (same epoch_key here) → a different okm: an icon-key wrap can never be a name-key.
+    expect(hex(v1.hkdfSha256(unhex(s.epoch_key), unhex(s.salt), unhex(s.info), s.length))).toBe(s.okm)
+  })
+
   it('symmetric wrap of the group name under K_name (node-name context, cr-0096)', () => {
     const w = vectors.wrap.sym_group_name
     // The canonical encryptedName: the group name sealed under its derived name-key (reusing the node-name seal).

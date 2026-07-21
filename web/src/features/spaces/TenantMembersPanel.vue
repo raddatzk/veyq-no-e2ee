@@ -10,6 +10,8 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import InviteMemberDialog from './InviteMemberDialog.vue'
+import SpaceIconDialog from './SpaceIconDialog.vue'
+import TenantAvatar from '../../components/app/TenantAvatar.vue'
 import {
   listMemberInvites,
   listScopeMembers,
@@ -19,13 +21,15 @@ import {
   type PendingMemberInvite,
   type ScopeMember,
 } from './members'
-import { listMyTenants } from './scopes'
+import { listMyTenants, setSpaceIcon, clearSpaceIcon, openMyTenantIcon } from './scopes'
+import { bumpSpaceIcon } from './spaceIconSignal'
 import { activeSpace, activeScopeKey } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
 import { unsealName, type MemberName } from '../account/profile/profile'
-import { isUnauthorized } from '../../shared/httpError'
+import { isUnauthorized, isCodedError } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
+import { useObjectUrl } from '../../shared/state/useObjectUrls'
 import { useToast } from '../../shared/state/useToast'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
@@ -37,6 +41,15 @@ const names = ref<Record<string, MemberName | null>>({})
 const pendingInvites = ref<PendingMemberInvite[]>([])
 const actionError = ref('')
 const inviteOpen = ref(false)
+
+// The tenant identity header (uc.spaces.set-space-icon): the tenant's name + its avatar (the decrypted icon, or the
+// initial), and — for the owner — set/replace/remove. The name is server-visible plaintext; the icon is sealed and
+// opened on-device against the caller's own grant. Mirrors GroupMembersPanel's owner-gated `group-name-header`.
+const tenantName = ref('')
+const tenantIcon = useObjectUrl() // an owned object URL for the decrypted icon (revoked on replace/unmount)
+const iconDialogOpen = ref(false)
+const iconBusy = ref(false)
+const iconError = ref('')
 
 // After a re-issue, show the fresh invite link to copy (cr-0080) — the owner hands it off again, no mailer.
 const reissueUrl = ref('')
@@ -56,6 +69,12 @@ const { members, isOwner, trust, reviewTarget, reviewOpen, loading, loadError, r
     names.value = kTenant ? Object.fromEntries(rows.map((m) => [m.userId, unsealName(kTenant, m.sealedName)])) : {}
     const mine = (await listMyTenants()).find((tn) => tn.tenantId === activeSpace.tenantId)
     const owner = mine?.role === 'OWNER'
+    // The identity header: the tenant name (plaintext) + its icon opened on-device against our own grant (null when
+    // unset / grant-less / unopenable → the initial shows). Every member reads it, not just the owner.
+    tenantName.value = mine?.name ?? ''
+    const iconBytes = mine ? await openMyTenantIcon(mine) : null
+    if (iconBytes) tenantIcon.set(new Blob([iconBytes as BlobPart], { type: 'image/webp' }))
+    else tenantIcon.clear()
     // Only the owner may read the pending-invite list (the backend 403s any non-owner).
     pendingInvites.value = owner ? await listMemberInvites(activeSpace.tenantId) : []
     return { rows, isOwner: owner }
@@ -70,6 +89,43 @@ function fullName(userId: string): string {
 async function onInvited() {
   toast.success(t('members.inviteSent'))
   await reload()
+}
+
+// Set/replace the tenant icon: the dialog baked + encoded the bytes; here we seal + POST (retry-once-on-stale is in
+// setSpaceIcon), then refresh the header and signal the always-mounted sidebar to re-decrypt (bumpSpaceIcon).
+async function onIconSave(bytes: Uint8Array) {
+  if (!activeSpace.scopeId) return
+  iconBusy.value = true
+  iconError.value = ''
+  try {
+    await setSpaceIcon(activeSpace.scopeId, bytes)
+    iconDialogOpen.value = false
+    bumpSpaceIcon()
+    await reload()
+    toast.success(t('spaceIcon.saved'))
+  } catch (e) {
+    on401(e)
+    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, 409, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
+  } finally {
+    iconBusy.value = false
+  }
+}
+
+async function removeIcon() {
+  if (!activeSpace.scopeId || !window.confirm(t('spaceIcon.removeConfirm'))) return
+  iconBusy.value = true
+  iconError.value = ''
+  try {
+    await clearSpaceIcon(activeSpace.scopeId)
+    bumpSpaceIcon()
+    await reload()
+    toast.success(t('spaceIcon.removed'))
+  } catch (e) {
+    on401(e)
+    if (!isUnauthorized(e)) iconError.value = t('spaceIcon.failed')
+  } finally {
+    iconBusy.value = false
+  }
 }
 
 async function reissue(invite: PendingMemberInvite) {
@@ -126,6 +182,35 @@ async function revoke(invite: PendingMemberInvite) {
 <template>
   <section class="veyq-surface settings-panel">
     <section class="settings-form">
+      <!-- The tenant identity (uc.spaces.set-space-icon): its avatar + name; owner-only set/replace/remove icon.
+           Mirrors GroupMembersPanel's owner-gated `group-name-header`, one scope-kind up (a tenant has no rename —
+           its name is server-visible metadata, so only the icon is editable here). -->
+      <div class="tenant-identity-header">
+        <TenantAvatar :name="tenantName" :icon="tenantIcon.url.value ?? undefined" />
+        <h1 class="tenant-identity-name">{{ tenantName }}</h1>
+        <div v-if="isOwner" class="tenant-identity-actions">
+          <Button
+            :label="tenantIcon.url.value ? t('spaceIcon.change') : t('spaceIcon.add')"
+            icon="pi pi-image"
+            text
+            size="small"
+            :disabled="iconBusy"
+            @click="iconDialogOpen = true"
+          />
+          <Button
+            v-if="tenantIcon.url.value"
+            :label="t('spaceIcon.remove')"
+            icon="pi pi-trash"
+            text
+            severity="danger"
+            size="small"
+            :disabled="iconBusy"
+            @click="removeIcon"
+          />
+        </div>
+      </div>
+      <Message v-if="iconError" severity="error" :closable="false">{{ iconError }}</Message>
+
       <div class="settings-section-header">
         <div>
           <h2>{{ t('members.title') }}</h2>
@@ -277,6 +362,10 @@ async function revoke(invite: PendingMemberInvite) {
       @invited="onInvited"
     />
 
+    <!-- The owner's icon editor (uc.spaces.set-space-icon): pick + frame 1:1; on save the crop is baked + encoded
+         on-device and this panel seals + POSTs it. -->
+    <SpaceIconDialog v-if="iconDialogOpen" :busy="iconBusy" @save="onIconSave" @close="iconDialogOpen = false" />
+
     <!-- Review a changed identity key (cr-0099) — the only verify surface until scope-wide strict-mode (cr-0100). -->
     <ChangedKeyReviewDialog v-if="reviewTarget" v-model:visible="reviewOpen" :member="reviewTarget" @accepted="refreshTrust" />
   </section>
@@ -288,6 +377,29 @@ async function revoke(invite: PendingMemberInvite) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* The tenant identity header — the avatar + name on one row, owner actions trailing (mirrors group-name-header).
+   A bottom rule (the --app-line divider the settings sections use between stacked blocks) sets it apart from the
+   Members section below, rather than letting the two crowd together. */
+.tenant-identity-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 1.2rem;
+  margin-bottom: 1.2rem;
+  border-bottom: 1px solid var(--app-line);
+}
+.tenant-identity-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.tenant-identity-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
 </style>

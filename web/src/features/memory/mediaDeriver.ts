@@ -27,8 +27,13 @@ export type AddMediaSource = { bytes: Uint8Array; mediaType: string; lastModifie
  * bytes (en.memory.derivatives → *Quality notes*).
  */
 export interface MediaDeriver {
-  /** Downscale an image Blob to a JPEG with longest edge ≤ `maxEdge` at `quality`. */
-  deriveImage(source: Blob, opts: { maxEdge: number; quality: number }): Promise<Uint8Array>
+  /**
+   * Downscale an image Blob to `maxEdge` at `quality`. Encodes JPEG by default; pass `mimeType: 'image/webp'`
+   * for an alpha-preserving encode (a space icon, uc.spaces.set-space-icon). `background` fills the canvas before
+   * drawing (a hex/CSS colour) so a transparent source does not flatten onto the canvas default (transparent
+   * black → black once JPEG-flattened); omit it to keep alpha (only meaningful with an alpha-capable `mimeType`).
+   */
+  deriveImage(source: Blob, opts: { maxEdge: number; quality: number; mimeType?: string; background?: string }): Promise<Uint8Array>
   /** Decode a video's first frame to a JPEG poster (used for both the thumbnail and the preview tier). */
   deriveVideoPoster(source: Blob): Promise<Uint8Array>
   /** Probe the source's intrinsic pixel `{w,h}` for the justified grid (cr-0059). Optional + best-effort. */
@@ -49,10 +54,10 @@ export function scaleToMaxEdge(width: number, height: number, maxEdge: number): 
 /** The real browser deriver — Canvas decode/downscale + `<video>` first-frame poster. DOM-only (used live). */
 export function createBrowserDeriver(): MediaDeriver {
   return {
-    async deriveImage(source, { maxEdge, quality }) {
+    async deriveImage(source, { maxEdge, quality, mimeType = 'image/jpeg', background }) {
       const bitmap = await createImageBitmap(source)
       try {
-        return drawToJpeg(bitmap, bitmap.width, bitmap.height, maxEdge, quality)
+        return drawEncoded(bitmap, bitmap.width, bitmap.height, maxEdge, quality, mimeType, background)
       } finally {
         bitmap.close()
       }
@@ -70,7 +75,7 @@ export function createBrowserDeriver(): MediaDeriver {
           await onceEvent(video, 'seeked')
         }
         // the poster is encoded at the preview tier and reused for the (smaller) thumbnail tier as-is
-        return drawToJpeg(video, video.videoWidth, video.videoHeight, TIER_SPECS.PREVIEW.maxEdge, TIER_SPECS.PREVIEW.quality)
+        return drawEncoded(video, video.videoWidth, video.videoHeight, TIER_SPECS.PREVIEW.maxEdge, TIER_SPECS.PREVIEW.quality)
       } finally {
         URL.revokeObjectURL(url)
       }
@@ -102,13 +107,17 @@ export function createBrowserDeriver(): MediaDeriver {
   }
 }
 
-async function drawToJpeg(src: CanvasImageSource, w: number, h: number, maxEdge: number, quality: number): Promise<Uint8Array> {
+async function drawEncoded(
+  src: CanvasImageSource, w: number, h: number, maxEdge: number, quality: number,
+  mimeType = 'image/jpeg', background?: string,
+): Promise<Uint8Array> {
   const { width, height } = scaleToMaxEdge(w, h, maxEdge)
   // Progressive-halving downscale. A single large drawImage (e.g. 4032→512 ≈ 8×) stays soft even at
   // imageSmoothingQuality:'high' — the browser applies ONE bilinear pass, not an iterative filter, so it drops
   // high-frequency detail. Halving in ≤2× steps (each with high smoothing) preserves that detail, approximating
   // the multi-tap resample the legacy server did with libvips (frontend-noe2ee derived server-side; operator-blind
   // forces it on-device here). scaleToMaxEdge never upscales, so a small source just skips the loop.
+  // The intermediate steps keep alpha (no fill); the background is applied only on the FINAL canvas that is encoded.
   let curSrc: CanvasImageSource = src
   let curW = w
   let curH = h
@@ -119,19 +128,25 @@ async function drawToJpeg(src: CanvasImageSource, w: number, h: number, maxEdge:
     curW = nextW
     curH = nextH
   }
-  const canvas = drawStep(curSrc, width, height)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+  const canvas = drawStep(curSrc, width, height, background)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mimeType, quality))
   if (!blob) throw new Error('encode_failed')
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-/** One high-quality `drawImage` onto a fresh canvas at `width`×`height` (each downscale step of drawToJpeg). */
-function drawStep(src: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+/** One high-quality `drawImage` onto a fresh canvas at `width`×`height` (each downscale step of drawEncoded).
+ *  `background` (a CSS colour) fills the canvas before drawing, so a transparent source lands on it rather than
+ *  the transparent-black default; omit it to preserve alpha (only meaningful with an alpha-capable encode). */
+function drawStep(src: CanvasImageSource, width: number, height: number, background?: string): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas_unavailable')
+  if (background) {
+    ctx.fillStyle = background
+    ctx.fillRect(0, 0, width, height)
+  }
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(src, 0, 0, width, height)

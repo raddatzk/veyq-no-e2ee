@@ -14,7 +14,9 @@ import type { MenuItem } from 'primevue/menuitem'
 import TenantAvatar from './TenantAvatar.vue'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
-import { listMyTenants, listMyGroups, type GroupSpace } from '../../features/spaces/scopes'
+import { listMyTenants, listMyGroups, openMyTenantIcon, type GroupSpace } from '../../features/spaces/scopes'
+import { spaceIconVersion } from '../../features/spaces/spaceIconSignal'
+import { useObjectUrls } from '../../shared/state/useObjectUrls'
 import { activeSpace } from '../../app/activeSpace'
 import CreateGroupDialog from '../../features/spaces/CreateGroupDialog.vue'
 import { useCapabilities } from '../../shared/state/useCapabilities'
@@ -41,6 +43,12 @@ const route = useRoute()
 const router = useRouter()
 const { resolvedTheme } = useThemeState()
 const tenants = ref<MyTenant[]>([])
+// Each tenant's decrypted icon as an owned object URL keyed by tenantId (uc.spaces.set-space-icon,
+// en.spaces.tenant-scope) — opened on-device against the caller's own per-tenant grant. Absent → the initial.
+const tenantIcons = useObjectUrls()
+function tenantIcon(tenantId: string): string | undefined {
+  return tenantIcons.get(tenantId) ?? undefined
+}
 
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
 
@@ -85,6 +93,25 @@ async function loadGroups() {
     /* the switcher tolerates an empty groups section */
   }
 }
+
+// Fetch the switcher's tenants + decrypt each one's icon on-device (open our own grant → K_icon → the image bytes).
+// A tenant with no icon / no grant / an unopenable icon just drops from the map → the initial shows. Re-run when a
+// space icon changes anywhere (bumpSpaceIcon) so the owner's edit reaches this always-mounted rail without a reload.
+async function loadTenants() {
+  try {
+    tenants.value = await listMyTenants()
+  } catch {
+    return // the sidebar tolerates an empty switcher
+  }
+  await Promise.all(
+    tenants.value.map(async (tn) => {
+      const bytes = await openMyTenantIcon(tn)
+      if (bytes) tenantIcons.set(tn.tenantId, new Blob([bytes as BlobPart], { type: 'image/webp' }))
+      else tenantIcons.drop(tn.tenantId)
+    }),
+  )
+}
+watch(spaceIconVersion, () => void loadTenants())
 
 // Create-group dialog. On success: refresh the list + switch into the new group (`#@<id>`).
 const createGroupOpen = ref(false)
@@ -185,11 +212,7 @@ const favoriteMemories = computed(() =>
 )
 
 onMounted(async () => {
-  try {
-    tenants.value = await listMyTenants()
-  } catch {
-    /* the sidebar tolerates an empty switcher */
-  }
+  await loadTenants()
   try {
     myUsername.value = (await getMyProfile()).username
   } catch {
@@ -252,7 +275,7 @@ function closeMobileMenu() {
               :title="activeTenant.name"
               @click="navigate"
             >
-              <TenantAvatar :name="activeTenant.name" active />
+              <TenantAvatar :name="activeTenant.name" :icon="tenantIcon(activeTenant.tenantId)" active />
               <span class="sidebar-tenant-text">
                 <strong>{{ activeTenant.name }}</strong>
                 <!-- Awaiting access: a grant-less member is on this tenant but has no key yet (cr-0077). The
@@ -290,7 +313,7 @@ function closeMobileMenu() {
               :title="tenant.name"
               @click="switchTenant(tenant); tenantOverview?.hide()"
             >
-              <TenantAvatar :name="tenant.name" :active="isActive(tenant)" />
+              <TenantAvatar :name="tenant.name" :icon="tenantIcon(tenant.tenantId)" :active="isActive(tenant)" />
               <span class="sidebar-tenant-text">
                 <strong>{{ tenant.name }}</strong>
                 <small>{{ tenant.domain }}</small>
@@ -445,7 +468,7 @@ function closeMobileMenu() {
                 :class="{ 'mobile-nav-item-active': tenantActive }"
                 @click="closeMobileMenu"
               >
-                <TenantAvatar :name="tenant.name" active />
+                <TenantAvatar :name="tenant.name" :icon="tenantIcon(tenant.tenantId)" active />
                 <span>
                   <strong>{{ tenant.name }}</strong>
                   <small v-if="activeSpace.tenantUnavailable" class="sidebar-tenant-awaiting">{{ t('members.awaitingAccess') }}</small>
@@ -458,7 +481,7 @@ function closeMobileMenu() {
                 type="button"
                 @click="switchTenant(tenant); closeMobileMenu()"
               >
-                <TenantAvatar :name="tenant.name" />
+                <TenantAvatar :name="tenant.name" :icon="tenantIcon(tenant.tenantId)" />
                 <span><strong>{{ tenant.name }}</strong><small>{{ tenant.domain }}</small></span>
               </button>
             </template>

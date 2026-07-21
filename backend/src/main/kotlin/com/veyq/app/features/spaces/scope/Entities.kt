@@ -39,6 +39,18 @@ class ScopeEntity : PanacheEntityBase {
     @Column(name = "name_epoch", nullable = false)
     var nameEpoch: Int = 0
 
+    /** The scope's icon (uc.spaces.set-space-icon): a padded, constant-length image sealed under its **derived
+     *  icon-key `K_icon`** (`HKDF(E_iconEpoch, "veyq/v1/space-icon-key")`, opaque base64) — null for no icon. The
+     *  first sealed content on a TENANT row; the server never opens it (no key), it only relays the ciphertext. */
+    @Column(name = "sealed_icon")
+    var sealedIcon: String? = null
+
+    /** The content-key epoch `sealedIcon` was sealed under (uc.spaces.set-space-icon, ADR 0027's per-field epoch) —
+     *  0 until an icon is set, bumped only by an icon-set (a plain rotation leaves it). Members peel the chain to
+     *  this epoch's key and derive `K_icon`. On a TENANT it is 0 in practice (no routine re-key, ADR 0025). */
+    @Column(name = "icon_epoch", nullable = false)
+    var iconEpoch: Int = 0
+
     /** The scope's **current content-key epoch** (ADR 0024, cr-0088) — 0 until the first rotation. New content
      *  seals under this epoch; a removal bumps it. */
     @Column(name = "current_epoch", nullable = false)

@@ -105,6 +105,24 @@ sealed interface RenameGroupOutcome {
     object StaleEpoch : RenameGroupOutcome, HttpFailure by httpFailure("stale_epoch", CONFLICT)
 }
 
+/** Outcome of setting/replacing a scope icon (uc.spaces.set-space-icon). Owner-gated, TENANT-only (v1),
+ *  active-only, current-epoch-only — the [RenameGroupOutcome] shape one scope-kind up. */
+sealed interface SetScopeIconOutcome {
+    object Ok : SetScopeIconOutcome
+    object ScopeNotFound : SetScopeIconOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : SetScopeIconOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+    object PendingDeletion : SetScopeIconOutcome, HttpFailure by httpFailure("scope_pending_deletion", CONFLICT)
+    object StaleEpoch : SetScopeIconOutcome, HttpFailure by httpFailure("stale_epoch", CONFLICT)
+}
+
+/** Outcome of clearing a scope icon (uc.spaces.set-space-icon A5). Owner-gated, TENANT-only (v1); no epoch —
+ *  a removal carries no ciphertext that could be stale — and idempotent. */
+sealed interface ClearScopeIconOutcome {
+    object Ok : ClearScopeIconOutcome
+    object ScopeNotFound : ClearScopeIconOutcome, HttpFailure by Failures.scopeNotFound
+    object NotOwner : ClearScopeIconOutcome, HttpFailure by httpFailure("not_scope_owner", FORBIDDEN)
+}
+
 /** Outcome of soft-deleting a group (cr-0090). */
 sealed interface DeleteGroupOutcome {
     object Ok : DeleteGroupOutcome
@@ -183,6 +201,39 @@ class ScopesHandler(
         if (store.currentEpoch(scopeId) != nameEpoch) return RenameGroupOutcome.StaleEpoch
         store.renameGroup(scopeId, encryptedName, nameEpoch)
         return RenameGroupOutcome.Ok
+    }
+
+    /**
+     * Set or replace a space icon (uc.spaces.set-space-icon). Owner-gated on the scope **root** row — for a
+     * `kind=TENANT` row `isScopeOwner(caller, scopeId==tenantId)` **is** the tenant-owner check (ADR 0007 — no new
+     * query, and no opening to the `tenantId`-only gate cr-0163 fixed). TENANT-only in the v1 slice (the group
+     * slice lifts the kind guard); rejected while pending-deletion. The client sealed the padded, constant-length
+     * icon under `K_icon` of the **current** epoch and sends that epoch back; the server enforces `iconEpoch ==
+     * currentEpoch` (`StaleEpoch` on a concurrent rotation) so a replace stays forward-secret, then overwrites the
+     * row's ciphertext icon + icon-epoch. Guard order is [renameGroup]'s exactly (membership → kind → owner →
+     * active → epoch, ADR 0042). Operator-blind: the server never sees a key or the image.
+     */
+    fun setScopeIcon(callerId: String, scopeId: String, sealedIcon: String, iconEpoch: Int): SetScopeIconOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return SetScopeIconOutcome.ScopeNotFound
+        if (store.scopeKind(scopeId) != ScopeEntity.TENANT) return SetScopeIconOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return SetScopeIconOutcome.NotOwner
+        if (store.deletedAt(scopeId) != null) return SetScopeIconOutcome.PendingDeletion
+        if (store.currentEpoch(scopeId) != iconEpoch) return SetScopeIconOutcome.StaleEpoch
+        store.setIcon(scopeId, sealedIcon, iconEpoch)
+        return SetScopeIconOutcome.Ok
+    }
+
+    /**
+     * Remove a space icon (uc.spaces.set-space-icon A5) — reset the row's icon + epoch; every member falls back to
+     * the initial. Same owner gate as the set, but **no epoch check** (a removal carries no ciphertext that could
+     * be sealed under a stale epoch) and idempotent. Membership-gated first (ADR 0042), then TENANT-kind, then owner.
+     */
+    fun clearScopeIcon(callerId: String, scopeId: String): ClearScopeIconOutcome {
+        if (!store.isScopeMember(callerId, scopeId)) return ClearScopeIconOutcome.ScopeNotFound
+        if (store.scopeKind(scopeId) != ScopeEntity.TENANT) return ClearScopeIconOutcome.ScopeNotFound
+        if (!store.isScopeOwner(callerId, scopeId)) return ClearScopeIconOutcome.NotOwner
+        store.clearIcon(scopeId)
+        return ClearScopeIconOutcome.Ok
     }
 
     /**

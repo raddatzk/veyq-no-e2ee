@@ -13,7 +13,12 @@ vi.mock('./members', () => ({
   revokeMemberInvite: vi.fn(),
   memberError: vi.fn().mockResolvedValue({ status: 0, code: null }),
 }))
-vi.mock('./scopes', () => ({ listMyTenants: vi.fn() }))
+vi.mock('./scopes', () => ({
+  listMyTenants: vi.fn(),
+  setSpaceIcon: vi.fn(),
+  clearSpaceIcon: vi.fn(),
+  openMyTenantIcon: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('../../shared/inviteLink', () => ({
   buildInviteLink: (secret: string) => `https://x.test/tenant/accept#${secret}`,
   copyText: vi.fn().mockResolvedValue(true),

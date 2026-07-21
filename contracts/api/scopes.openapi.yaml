@@ -596,6 +596,62 @@ paths:
         "404": { description: "No such GROUP scope — or the caller is not a member of it (indistinguishable, ADR 0042).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
         "409": { description: "The submitted `nameEpoch` is stale (a concurrent rotation moved the epoch — `stale_epoch`, refetch + retry), or the group is pending-deletion (`scope_pending_deletion`).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: stale_epoch } } } }
 
+  /api/scopes/{scopeId}/icon:
+    post:
+      tags: [scopes]
+      operationId: setScopeIcon
+      summary: Set or replace a space icon — seal it under the current epoch (operator-blind, constant length).
+      description: >
+        Sets or replaces a space's icon (uc.spaces.set-space-icon). The client bakes the crop, re-encodes to a
+        fixed square, **pads the plaintext to a constant length**, and seals it under `K_icon` derived from the
+        scope's **current** content-key epoch (`K_icon = HKDF(E_currentEpoch, "veyq/v1/space-icon-key")`), then
+        posts the opaque `sealedIcon` + the `iconEpoch` it sealed under. The server overwrites the scope's
+        `sealed_icon` + `icon_epoch` — **only** when `iconEpoch == currentEpoch` (else `409 stale_epoch`: a
+        concurrent rotation advanced the epoch under the caller, refetch + retry) and the scope is active (else
+        `409 scope_pending_deletion`). Sealing under the current epoch makes a replaced icon forward-secret. The
+        scope must be a **TENANT** — the v1 slice; the identical endpoint serves a **GROUP** in a later slice, so
+        until then any non-TENANT scope (a PERSONAL, or a GROUP) answers `404`. Membership-gated first (a
+        non-member gets `404 scope_not_found`, ADR 0042), then owner-gated (`403 not_scope_owner`; ADR 0007 — the
+        owner gate keys on the root scope). Because every `sealedIcon` is padded to an identical length, the
+        server cannot tell a logo from a photo. Operator-blind — the server never sees a key or the image
+        (ADR 0008).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the TENANT or GROUP scope to set the icon of., schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetScopeIconRequest" }
+            example: { sealedIcon: c2VhbGVkLWljb24=, iconEpoch: 0 }
+      responses:
+        "204": { description: The icon was set (the row's sealed_icon + icon_epoch were overwritten). }
+        "400": { description: Malformed request (blank/wrong-length/invalid sealedIcon)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } } } }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is a member of the scope but not its OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: "No such scope (or already hard-purged) — or the caller is not a member of it (indistinguishable, ADR 0042) — or it is not a TENANT scope (a PERSONAL, or a GROUP until the group slice, carries no icon here).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+        "409": { description: "The submitted `iconEpoch` is stale (a concurrent rotation moved the epoch — `stale_epoch`, refetch + retry), or the scope is pending-deletion (`scope_pending_deletion`).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: stale_epoch } } } }
+    delete:
+      tags: [scopes]
+      operationId: clearScopeIcon
+      summary: Remove a space icon — every member falls back to the initial.
+      description: >
+        Clears a space's icon (uc.spaces.set-space-icon A5): the row's `sealed_icon` + `icon_epoch` are reset and
+        every member falls back to the initial. **No epoch check** — a removal carries no ciphertext that could be
+        sealed under a stale epoch, so it is idempotent (clearing an already-iconless scope is still a `204`).
+        Membership-gated first (a non-member gets `404 scope_not_found`, ADR 0042), then owner-gated
+        (`403 not_scope_owner`). Operator-blind.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: scopeId, in: path, required: true, description: Opaque id of the TENANT or GROUP scope to clear the icon of., schema: { type: string, format: uuid, example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c } }
+      responses:
+        "204": { description: The icon was removed (or was already absent — idempotent). }
+        "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
+        "403": { description: The caller is a member of the scope but not its OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
+        "404": { description: "No such scope — or the caller is not a member of it (indistinguishable, ADR 0042).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+
   /api/scopes/my-tenants:
     get:
       tags: [scopes]
@@ -603,10 +659,14 @@ paths:
       summary: List the tenants the caller belongs to (the space switcher).
       description: >
         Returns every tenant the authenticated caller is a member of — its opaque id, display `name`, the
-        `domain` it is reached at, and the caller's `role`. Independent of the request Host (it lists *all* the
-        caller's tenants, so the client can render a switcher and link to each tenant's domain). Tenant name +
-        domain are server-visible operational metadata (tenant identity = the domain, ADR 0002), not content;
-        no key material is involved.
+        `domain` it is reached at, the caller's `role`, and — so the switcher can render each tenant's avatar
+        without a per-tenant call — the caller's own opaque `wrappedGrant` for that tenant plus its `sealedIcon`
+        / `iconEpoch` (uc.spaces.set-space-icon; the widened cross-tenant read path is owned by
+        en.spaces.tenant-scope). Independent of the request Host (it lists *all* the caller's tenants, so the
+        client can render a switcher and link to each tenant's domain). Tenant name + domain are server-visible
+        operational metadata (tenant identity = the domain, ADR 0002). The `wrappedGrant` and `sealedIcon` are
+        **opaque ciphertext** the server never interprets — it derives no key and never sees the icon
+        (operator-blind, ADR 0008).
       security:
         - bearerAuth: []
       responses:
@@ -622,6 +682,9 @@ paths:
                   name: Familie Raddatz
                   domain: memories.raddatz.me
                   role: OWNER
+                  wrappedGrant: AQ==
+                  sealedIcon: c2VhbGVkLWljb24=
+                  iconEpoch: 0
         "401":
           description: Generic authentication failure.
           content:
@@ -790,6 +853,35 @@ components:
           minimum: 0
           example: 0
 
+    SetScopeIconRequest:
+      type: object
+      required: [sealedIcon, iconEpoch]
+      properties:
+        sealedIcon:
+          type: string
+          description: >
+            The space icon — the client bakes the crop, re-encodes to a fixed square, **pads the plaintext to a
+            constant length**, then seals it under `K_icon` derived from the scope's **current** content-key epoch
+            (uc.spaces.set-space-icon): `K_icon = HKDF(E_currentEpoch, "veyq/v1/space-icon-key")`, then
+            `symWrap(K_icon, paddedIcon, "space-icon")` (`0x02 || nonce(12) || aead`, base64). Opaque base64 the
+            server stores verbatim and never interprets. Its length is a **constant** — the exact base64 length of
+            the sealed padded plaintext (a 16 KiB pad → 21884 chars) — so every stored icon is byte-identical in
+            length (a logo is indistinguishable from a photo) and the value is provably inside the `TEXT` column
+            (65 535). Sealing under the current epoch makes a replace forward-secret.
+          contentEncoding: base64
+          maxLength: 21884
+          example: c2VhbGVkLWljb24=
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.NotBlank @field:jakarta.validation.constraints.Size(max = 21884) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
+        iconEpoch:
+          x-veyq-visibility: structure
+          type: integer
+          description: >
+            The content-key epoch the client sealed `sealedIcon` under — must equal the scope's **current** epoch
+            (the server rejects a stale value with `409 stale_epoch`). The server writes it to the scope's
+            `icon_epoch` so members peel to it and derive `K_icon` (uc.spaces.set-space-icon).
+          minimum: 0
+          example: 0
+
     AddGroupMemberRequest:
       type: object
       required: [username]
@@ -903,7 +995,7 @@ components:
 
     MyTenant:
       type: object
-      required: [tenantId, name, domain, role]
+      required: [tenantId, name, domain, role, iconEpoch]
       properties:
         tenantId:
           x-veyq-visibility: id
@@ -929,6 +1021,34 @@ components:
           description: The caller's role in this tenant.
           maxLength: 16
           example: OWNER
+        wrappedGrant:
+          type: [string, "null"]
+          description: >
+            The caller's **own** grant for this tenant — the tenant scope key sealed to their identity public key
+            (opaque base64), so the switcher can open the tenant's `sealedIcon` without a per-tenant scopes call
+            (en.spaces.tenant-scope). The client `asymUnwrap`s it locally; the server never interprets it. `null`
+            while the caller is grant-less — the transient awaiting-access window, during which the icon renders
+            as the initial.
+          contentEncoding: base64
+          maxLength: 8192
+          example: AQ==
+        sealedIcon:
+          type: [string, "null"]
+          description: >
+            The tenant's icon (uc.spaces.set-space-icon): padded to a constant length and sealed under `K_icon =
+            HKDF(E_iconEpoch, "veyq/v1/space-icon-key")` — opaque base64 the client opens + unpads on-device to
+            render the tenant's avatar in the switcher. `null` when the tenant has no icon (render the initial).
+          contentEncoding: base64
+          maxLength: 21884
+          example: c2VhbGVkLWljb24=
+        iconEpoch:
+          x-veyq-visibility: structure
+          type: integer
+          description: >
+            The content-key epoch `sealedIcon` was sealed under — the client peels the tenant's epoch-chain to it
+            and derives `K_icon`. 0 when no icon is set.
+          minimum: 0
+          example: 0
 
     ScopeCreated:
       type: object
@@ -1100,7 +1220,7 @@ components:
 
     ScopeSummary:
       type: object
-      required: [id, kind, tenantId, role, currentEpoch, grantedEpoch, nameEpoch, wrappedGrant]
+      required: [id, kind, tenantId, role, currentEpoch, grantedEpoch, nameEpoch, iconEpoch, wrappedGrant]
       properties:
         id:
           x-veyq-visibility: id
@@ -1142,6 +1262,25 @@ components:
             For a `GROUP` scope: the content-key epoch the `encryptedName` was sealed under (cr-0096/ADR 0027) — 0
             at birth, bumped only by a rename (a plain rotation leaves the name on its epoch). The client peels the
             epoch-chain to that epoch's key and derives `K_name` from it. 0 for `TENANT` / `PERSONAL` scopes.
+          minimum: 0
+          example: 0
+        sealedIcon:
+          type: [string, "null"]
+          description: >
+            The scope's icon (uc.spaces.set-space-icon): the padded, constant-length image sealed under `K_icon =
+            HKDF(E_e, "veyq/v1/space-icon-key")` for the icon's epoch (`iconEpoch`, peeled from the chain) — opaque
+            base64 the client opens + unpads on-device. `null` when the scope has no icon (the client renders the
+            initial). `PERSONAL` scopes never carry one.
+          contentEncoding: base64
+          maxLength: 21884
+          example: c2VhbGVkLWljb24=
+        iconEpoch:
+          x-veyq-visibility: structure
+          type: integer
+          description: >
+            The content-key epoch `sealedIcon` was sealed under (uc.spaces.set-space-icon) — 0 until an icon is set,
+            bumped only by an icon-set (a plain rotation leaves it). The client peels the epoch-chain to that
+            epoch's key and derives `K_icon`. 0 when no icon is set.
           minimum: 0
           example: 0
         currentEpoch:

@@ -24,12 +24,27 @@ data class ScopeRow(
     val encryptedName: String?,
     /** The epoch the group name was sealed under (cr-0096/ADR 0027) — the client derives `K_name` from its key. */
     val nameEpoch: Int,
+    /** The scope's icon sealed under `K_icon` (uc.spaces.set-space-icon), or null; the client opens + unpads it. */
+    val sealedIcon: String?,
+    /** The epoch `sealedIcon` was sealed under — the client peels the chain to it and derives `K_icon`. */
+    val iconEpoch: Int,
     /** When a GROUP is in pending-deletion (cr-0090); null = active. The client marks + (for owners) restores it. */
     val deletedAt: Instant?,
 )
 
-/** A tenant the caller belongs to — the row behind a `MyTenant` (the space switcher). */
-data class TenantRow(val tenantId: String, val name: String, val domain: String, val role: String)
+/** A tenant the caller belongs to — the row behind a `MyTenant` (the space switcher). Carries the caller's own
+ *  root-scope `wrappedGrant` + the tenant's `sealedIcon`/`iconEpoch` (uc.spaces.set-space-icon) so the switcher
+ *  renders each tenant's avatar without a per-tenant scopes call (en.spaces.tenant-scope). `wrappedGrant` is null
+ *  while the caller is grant-less (the transient awaiting-access window). */
+data class TenantRow(
+    val tenantId: String,
+    val name: String,
+    val domain: String,
+    val role: String,
+    val wrappedGrant: String?,
+    val sealedIcon: String?,
+    val iconEpoch: Int,
+)
 
 /** A member of a scope — the row behind a `ScopeMember` (the member directory, cr-0077). `hasGrant=false` is a
  *  pending member awaiting delivery. `identityPublicKey` is a key-holder's `asymWrap` target — never a key.
@@ -145,6 +160,30 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
         }
     }
 
+    /** Set/replace a scope's icon (uc.spaces.set-space-icon): overwrite `sealed_icon` (re-sealed under `K_icon` of
+     *  the current epoch) + `icon_epoch`. The caller (handler) has already gated owner + active + `iconEpoch ==
+     *  currentEpoch`; this just persists the two opaque values (blind overwrite, the [renameGroup] shape). */
+    @Transactional
+    fun setIcon(scopeId: String, sealedIcon: String, iconEpoch: Int) {
+        ScopeEntity.findById(scopeId)?.let {
+            it.sealedIcon = sealedIcon
+            it.iconEpoch = iconEpoch
+            it.persist()
+        }
+    }
+
+    /** Clear a scope's icon (uc.spaces.set-space-icon A5): reset `sealed_icon` + `icon_epoch` so every member falls
+     *  back to the initial. **No epoch** — a removal carries no ciphertext that could be stale; idempotent (clearing
+     *  an already-iconless scope is a no-op). Owner-gated by the caller (handler). */
+    @Transactional
+    fun clearIcon(scopeId: String) {
+        ScopeEntity.findById(scopeId)?.let {
+            it.sealedIcon = null
+            it.iconEpoch = 0
+            it.persist()
+        }
+    }
+
     /** The caller's scopes in this tenant, each with their own grant ciphertext (to open client-side). A
      *  grant-less ("pending") membership is skipped — the member can't open that scope yet, so it never
      *  surfaces as an openable scope (they see the Personal fallback until delivery lands, cr-0076). */
@@ -152,7 +191,7 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
         MembershipEntity.find("userId = ?1 and tenantId = ?2", userId, tenantId).list().mapNotNull { m ->
             m.wrappedGrant?.let { grant ->
                 ScopeEntity.findById(m.scopeId)?.let {
-                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName, it.nameEpoch, it.deletedAt)
+                    ScopeRow(it.id, it.kind, it.tenantId, m.role, it.currentEpoch, m.grantedEpoch, grant, it.encryptedName, it.nameEpoch, it.sealedIcon, it.iconEpoch, it.deletedAt)
                 }
             }
         }
@@ -406,8 +445,15 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
                 // return the OWNER row every scope birth mints its creator (the member's own personal scope
                 // carries this tenantId), reporting OWNER for a plain member. Belonging is by tenantId across all
                 // the user's scopes, so fall back to MEMBER rather than drop a tenant with no root row. #93.
-                val role = memberships.firstOrNull { it.scopeId == tenantId }?.role ?: MembershipEntity.MEMBER
-                TenantEntity.findById(tenantId)?.let { t -> TenantRow(t.id, t.name, t.domain, role) }
+                // The same root membership carries the caller's own `wrappedGrant`, and the root scope (id ==
+                // tenantId, cr-0010) carries the tenant's `sealedIcon`/`iconEpoch` — the switcher opens the icon
+                // against that grant without a per-tenant scopes call (uc.spaces.set-space-icon, en.spaces.tenant-scope).
+                val root = memberships.firstOrNull { it.scopeId == tenantId }
+                val role = root?.role ?: MembershipEntity.MEMBER
+                val rootScope = ScopeEntity.findById(tenantId)
+                TenantEntity.findById(tenantId)?.let { t ->
+                    TenantRow(t.id, t.name, t.domain, role, root?.wrappedGrant, rootScope?.sealedIcon, rootScope?.iconEpoch ?: 0)
+                }
             }
             .sortedBy { it.name }
 }
