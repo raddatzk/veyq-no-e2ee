@@ -1019,7 +1019,7 @@ components:
           x-veyq-visibility: structure
           type: string
           description: The caller's role in this tenant.
-          maxLength: 16
+          enum: [OWNER, MEMBER]
           example: OWNER
         wrappedGrant:
           type: [string, "null"]
@@ -1108,7 +1108,7 @@ components:
           x-veyq-visibility: structure
           type: string
           description: The member's role in the scope (OWNER / MEMBER).
-          maxLength: 16
+          enum: [OWNER, MEMBER]
           example: MEMBER
         identityPublicKey:
           type: string
@@ -1237,7 +1237,7 @@ components:
             The **caller's own** role in this scope (`OWNER` / `MEMBER`) — so the client can list the scopes it
             manages (e.g. groups it owns) without a per-scope directory call. Operational metadata the server
             already stores on the caller's membership (ADR 0007); exposing one's own role reveals no key.
-          maxLength: 16
+          enum: [OWNER, MEMBER]
           example: OWNER
         tenantId:
           x-veyq-visibility: id

@@ -20,7 +20,7 @@ vi.mock('../account/identityPins', () => ({
 }))
 
 import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup, openMyTenantIcon, SCOPE_GRANT } from './scopes'
-import { ScopeKind, type MyTenant } from '../../api/generated/scopes'
+import { ScopeKind, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { checkAndPin } from '../account/identityPins'
 import { identityPrivate } from '../../app/vault'
@@ -220,7 +220,7 @@ describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)',
     // Two surviving members with real identities (the removed one is simply absent from this list).
     const memberA = v1.generateIdentity()
     const memberB = v1.generateIdentity()
-    const remaining = [
+    const remaining: ScopeMember[] = [
       { userId: 'a', username: 'a', role: 'OWNER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberA.pub)), hasGrant: true },
       { userId: 'b', username: 'b', role: 'MEMBER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberB.pub)), hasGrant: true },
     ]
@@ -260,7 +260,7 @@ describe('rotateGroupForRemoval (cr-0089 — the client-side forward rotation)',
 
     const memberA = v1.generateIdentity()
     const memberB = v1.generateIdentity()
-    const remaining = [
+    const remaining: ScopeMember[] = [
       { userId: 'a', username: 'a', role: 'OWNER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberA.pub)), hasGrant: true },
       { userId: 'b', username: 'b', role: 'MEMBER', identityPublicKey: b64std(v1.serializeIdentityPublic(memberB.pub)), hasGrant: true },
     ]

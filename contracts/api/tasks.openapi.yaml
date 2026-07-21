@@ -553,7 +553,7 @@ components:
           x-veyq-visibility: public
           type: string
           description: The job's status after the report — `pending` (requeued) or `failed` (dead-lettered).
-          maxLength: 16
+          enum: [pending, failed]
           example: pending
         attempts:
           x-veyq-visibility: measure

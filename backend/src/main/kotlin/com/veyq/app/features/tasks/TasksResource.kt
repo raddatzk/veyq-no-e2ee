@@ -72,13 +72,13 @@ class TasksResource(
 
     override fun failTask(jobId: UUID, failRequest: FailRequest?): Response =
         when (val r = handler.fail(me, jobId.toString())) {
-            is FailResult.Recorded -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
+            is FailResult.Recorded -> Response.ok(JobStatus(status = JobStatus.Status.valueOf(r.status.lowercase()), attempts = r.attempts)).build()
             is HttpFailure -> httpError(r)
         }
 
     override fun declineTask(jobId: UUID, declineRequest: DeclineRequest?): Response =
         when (val r = handler.decline(me, jobId.toString(), declineRequest?.reason)) {
-            is DeclineResult.Released -> Response.ok(JobStatus(status = r.status.lowercase(), attempts = r.attempts)).build()
+            is DeclineResult.Released -> Response.ok(JobStatus(status = JobStatus.Status.valueOf(r.status.lowercase()), attempts = r.attempts)).build()
             is HttpFailure -> httpError(r)
         }
 

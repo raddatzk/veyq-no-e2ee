@@ -76,7 +76,7 @@ class ScopesResource(
                 Response.ok(outcome.rows.map {
                     ScopeSummary(
                         id = UUID.fromString(it.id), kind = ScopeKind.decode(it.kind),
-                        tenantId = UUID.fromString(it.tenantId), role = it.role,
+                        tenantId = UUID.fromString(it.tenantId), role = ScopeSummary.Role.valueOf(it.role),
                         currentEpoch = it.currentEpoch, grantedEpoch = it.grantedEpoch,
                         wrappedGrant = it.wrappedGrant, encryptedName = it.encryptedName, nameEpoch = it.nameEpoch,
                         sealedIcon = it.sealedIcon, iconEpoch = it.iconEpoch,
@@ -201,7 +201,7 @@ class ScopesResource(
         Response.ok(
             handler.myTenants(identity.principal.name).map {
                 MyTenant(
-                    tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = it.role,
+                    tenantId = UUID.fromString(it.tenantId), name = it.name, domain = it.domain, role = MyTenant.Role.valueOf(it.role),
                     wrappedGrant = it.wrappedGrant, sealedIcon = it.sealedIcon, iconEpoch = it.iconEpoch,
                 )
             },
@@ -210,7 +210,7 @@ class ScopesResource(
     /** Map a directory row to the wire DTO — carries `pendingConsent` (cr-0094); the handler already gated its visibility. */
     private fun scopeMember(row: ScopeMemberRow) = ScopeMember(
         userId = UUID.fromString(row.userId), username = row.username, sealedName = row.sealedName,
-        email = row.email, role = row.role, identityPublicKey = row.identityPublicKey,
+        email = row.email, role = ScopeMember.Role.valueOf(row.role), identityPublicKey = row.identityPublicKey,
         hasGrant = row.hasGrant, pendingConsent = row.pendingConsent,
     )
 
