@@ -25,6 +25,7 @@ on:
       - "web/package.json"
       - "web/package-lock.json"
       - "scripts/mutation_meta_check.py"
+      - "scripts/mutation_meta_check_selftest.py"
       - ".github/workflows/mutation.yml"
   # Also on main. A PR gates before the merge, so this is a backstop, not the primary gate: it catches what the
   # PR job structurally cannot — a direct push, an admin/force merge, or a green PR that lands on a main which
@@ -39,6 +40,7 @@ on:
       - "web/package.json"
       - "web/package-lock.json"
       - "scripts/mutation_meta_check.py"
+      - "scripts/mutation_meta_check_selftest.py"
       - ".github/workflows/mutation.yml"
   workflow_dispatch:
 
@@ -90,6 +92,11 @@ jobs:
         # Full scope (one small file), incremental-accelerated. stryker.config.mjs breaks the build below the
         # calibrated break threshold — that is the gate.
         run: npm run mutation
+
+      - name: Meta-check selftest (the total-vs-per-glob asymmetry is as documented)
+        # Pins the two meta-checks' asymmetry (inbox #109) with fabricated fixtures — no real report needed, so
+        # it runs regardless of what this PR changed. If the check logic rots, this reds before the real check.
+        run: python3 scripts/mutation_meta_check_selftest.py
 
       - name: Diff-aware meta-check (mutants > 0 when the mutate scope changed)
         # ADR 0045 §4: a run that mutates nothing yet reports 100% is a claim nothing backs. When the diff

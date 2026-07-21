@@ -30,6 +30,7 @@ on:
       - "backend/pitest.scope.json"
       - "backend/build.gradle.kts"
       - "scripts/mutation_meta_check_backend.py"
+      - "scripts/mutation_meta_check_selftest.py"
       - ".github/workflows/mutation-backend.yml"
   # Also on main. A PR gates before the merge, so this is a backstop, not the primary gate: it catches what the PR
   # job structurally cannot — a direct push, an admin/force merge, or a green PR that lands on a main which has
@@ -47,6 +48,7 @@ on:
       - "backend/pitest.scope.json"
       - "backend/build.gradle.kts"
       - "scripts/mutation_meta_check_backend.py"
+      - "scripts/mutation_meta_check_selftest.py"
       - ".github/workflows/mutation-backend.yml"
   workflow_dispatch:
 
@@ -90,6 +92,11 @@ jobs:
         working-directory: backend
         # build.gradle.kts breaks the build below the calibrated mutationThreshold (95) — that is the gate.
         run: ./gradlew --no-daemon pitest
+
+      - name: Meta-check selftest (the total-vs-per-glob asymmetry is as documented)
+        # Pins the two meta-checks' asymmetry (inbox #109) with fabricated fixtures — no real report needed. If
+        # the check logic rots, this reds before the real check below.
+        run: python3 scripts/mutation_meta_check_selftest.py
 
       - name: Per-glob meta-check (every scope glob mutated something)
         # ADR 0045 §4: a scope glob that matches nothing yet leaves the build green (its siblings carry the run,
