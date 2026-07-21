@@ -38,10 +38,14 @@ independent becomes its own CR rather than a phase here (`changes/README.md` § 
 
 ## Phases
 
-- [x] **1 — `trust-chain` skill.** `.claude/skills/trust-chain/SKILL.md`: the claim-provenance rule + a verified
-      guard-gap map (green = reference resolves, not that it carries weight) + pointers to the canonical sources.
-      All content *measured* (this CR's Verification section is the command log) or a pointer — nothing recalled.
-      Done when: SKILL.md exists on verified content, carries no restated block from a canonical doc, and
+- [x] **1 — `trust-chain` skill + its resolvability guard.** `.claude/skills/trust-chain/SKILL.md`: the
+      claim-provenance rule + a verified guard-gap map (green = reference resolves, not that it carries weight) +
+      pointers to the canonical sources. All content *measured* (this CR's Verification section is the command
+      log) or a pointer — nothing recalled. **Plus `scripts/validate_skill_links.py`** — a new guard that closes
+      the gap this phase itself opened (skill docs live outside `validate_doc_links.py`'s `docs/**` scope), so a
+      skill's pointer can no longer rot silently; it self-registers via the trust-chain glob. Done when: SKILL.md
+      exists on verified content, carries no restated block from a canonical doc, the new guard **bites**
+      (bite-tested: dead link injected → red, restored → green), and
       `for f in scripts/validate_*.py; do python3 "$f"; done` is green.
 
 Later phases — **intent only, re-refined before each is built; not a frozen queue** (`changes/README.md`):
@@ -65,10 +69,12 @@ Later phases — **intent only, re-refined before each is built; not a frozen qu
 
 `.claude/skills/trust-chain/SKILL.md` exists; every factual claim in it is a pointer or marked *measured* with
 its command; it restates no canonical doc (spot-checked: no copied paragraph from `changes/README.md` /
-`ai/README.md`); and `for f in scripts/validate_*.py; do python3 "$f"; done` is green. The trust-chain guards
-have no hook for a prose skill file, so the completeness proof here is the **Verification** log below (the
-measured basis for every claim), not a validator — stated honestly per ADR 0045's own limit that green proves
-resolvability, not substance.
+`ai/README.md`); `scripts/validate_skill_links.py` is added, bite-tested, and green; and
+`for f in scripts/validate_*.py; do python3 "$f"; done` is green. The new guard gives the skill layer a
+**resolvability** hook (its pointers must resolve) — but by ADR 0045's own limit that is all a guard can give:
+green proves the pointers lead somewhere, never that the skill's *content* is right. So the completeness proof
+for the prose itself is still the **Verification** log below (the measured basis for every claim), not the
+validator.
 
 ## Verification (the measured basis for Phase 1's claims)
 
@@ -94,6 +100,11 @@ Ledger of the commands whose output the skill's claims rest on — so a fresh re
   rejected but a lying `status: planned` passes (`validate_coverage.py:132-134,:159`).
 - **Correction to the remembered map:** "five coupling points" was an undercount — there are **ten**
   `validate_*.py` validators + two meta-checks (`ls scripts/validate_*.py scripts/mutation_meta_check*.py`).
+  Phase 1 adds `validate_skill_links.py`, so the glob now runs **eleven**.
+- **New guard bites (bite-tested, not recalled):** `cp SKILL.md /tmp/snap; append a dead link;
+  python3 scripts/validate_skill_links.py` → RED (`dead link → …/9999-does-not-exist.md`); `command cp -f
+  /tmp/snap SKILL.md; grep 9999 → gone; re-run` → GREEN. Snapshot-restore per `changes/README.md`, never
+  `git checkout`.
 
 ## Retrospective
 
