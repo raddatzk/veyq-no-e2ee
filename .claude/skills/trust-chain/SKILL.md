@@ -48,18 +48,18 @@ exactly where the imported prior sits, and where this repo most often inverts it
 [ADR 0046](../../../docs/decisions/0046-operative-lore-in-skills-and-agents.md) § 4.
 
 **This skill obeys its own rule.** Every factual claim below is a pointer to its canonical home, or is
-marked `measured` against [cr-0179](../../../changes/cr-0179-skills-and-agents.md) § Verification — the
-command ledger those measurements come from. Nothing here is recalled.
+marked `measured` and carries the `file:line` it was read from — re-runnable, not recalled. Nothing here is
+remembered.
 
 ## What green proves — and where it stops
 
 **Green means: nothing points into the void. It does not mean: what it points at carries weight.**
-`measured` (per-file read of all ten `validate_*.py` + both `mutation_meta_check*.py`, cr-0179 § Verification):
+`measured` (per-file read of all ten `validate_*.py` + both `mutation_meta_check*.py`):
 every guard asserts a reference **resolves / exists / is present / count > 0** — never the substance of what
 it references. The per-guard limit is each validator's own docstring (e.g. `validate_field_visibility.py`:
 "a marker permits, it does not verify"); this skill only names the pattern across all of them.
 
-Concrete, `measured` (judged from the guard code, cr-0179 § Verification — re-confirming the prior sessions'
+Concrete, `measured` (judged from the guard code — re-confirming the prior sessions'
 bite-tests by reading, not re-injecting):
 
 - a **web** coverage ref at a *non-test* file passes — `validate_coverage.py` only checks the path exists;
@@ -93,7 +93,7 @@ each has a canonical home — point there, don't try to build past it:
 
 ## The map (assembled from nowhere single)
 
-`measured`, cr-0179 § Verification:
+`measured`:
 
 - **Three CI runs, three triggers.** `trust-chain.yml` — unfiltered, buildless, runs the whole guard glob
   (`:14-21`, no paths filter). `ci.yml` — `paths-ignore` includes `docs/**` (`:9-13`, `:19-23`), so a

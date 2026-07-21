@@ -78,16 +78,62 @@ exactly where claims are made, which is not every turn.
 - **Rejected — subagents only, no skills.** A subagent's value is isolation; a procedure the main thread must
   follow *inline* (mark this claim measured, before you write it) cannot be handed to a fresh context. Skill and
   subagent are complements, not substitutes.
-- **Worked example of rule 3 — `cr-execute` was checked and *not* built.** A proposed CR-run skill was measured
-  against its own no-restate test: every element it would carry — phase order contracts→backend→web, each phase
-  self-verifying, coverage-is-part, promote-one-shot-proofs, bite-proof, the closing spoken retro — already has a
-  precise canonical home in [`changes/README.md`](../../changes/README.md) + [`ai/README.md`](../ai/README.md) +
-  the surface `CLAUDE.md`s, and its claim-provenance role is already covered by `trust-chain`'s trigger. It would
-  have been ~100% restatement, failing rule 3, so it was not built. The measured verdict — with the per-element
-  citations — is the deliverable, and it is worth more than the skill would have been:
-  [cr-0179](../../changes/cr-0179-skills-and-agents.md) P2. This is the no-restate invariant holding against the
-  skills layer itself, which is the point.
+- **The no-restate test culls the skills layer to what earns its place.** Of three proposed skills, **one** was
+  built (`trust-chain`) and **two** (`cr-execute`, `mutation-gate`) were measured to be ~100% restatement of docs
+  that already exist, and not built. The per-element verdicts are recorded below (§ Which proposed skills survived
+  measurement) — that finding is worth more than the skills would have been, and is the no-restate invariant
+  holding against the skills layer itself, which is the point.
 
-Deferred to [cr-0179](../../changes/cr-0179-skills-and-agents.md): whether claim-provenance also earns a one-line
-CLAUDE.md anchor — so it loads even outside a triggered skill — is left open until the skills exist and we can see
-whether the trigger coverage has real gaps. Deciding it now would be guessing.
+One question stays parked (tracked in inbox #108): whether claim-provenance also earns a one-line CLAUDE.md anchor
+— so it loads even outside a triggered skill — is left open until we can observe whether the trigger coverage has
+real gaps. Deciding it now would be guessing.
+
+## Which proposed skills survived measurement
+
+The rollout proposed three skills. Each was measured against rule 3 — *for every element it would carry, does a
+canonical home already exist?* Two failed and were **not built**; the tables are why, kept here because a deleted
+work-order (the CR that found this) cannot hold them and the finding outlives it. `pain-before-tool` was applied
+as strictly: only a **recorded** failure counts, never an imaginable one.
+
+**`trust-chain` — BUILT.** It consolidated a map scattered across four places *and* introduced content with no
+prior home: the claim-provenance convention (§ 4) and the guard-gap synthesis ("green = a reference resolves, not
+that it carries weight"). Genuinely new — it passes rule 3.
+
+**`cr-execute` — CHECKED, NOT BUILT.** Every element already has a canonical home; its claim-provenance role is
+covered by `trust-chain`'s trigger (which names *"a report, a CR, a handoff"*):
+
+| element it would carry | canonical home (measured) |
+|---|---|
+| phase order contracts→backend→web | `changes/README.md` § phases + [`ai/README.md`](../ai/README.md) § what counts as verified |
+| each phase self-verifies ("Done when") | `changes/README.md` § phases |
+| surface check cmd (+ `generate:api` *before* `check`) | [`backend/CLAUDE.md`](../../backend/CLAUDE.md), [`web/CLAUDE.md`](../../web/CLAUDE.md) |
+| coverage is part, not a follow-up | `changes/README.md` § coverage is part of the work |
+| trust-chain guards green via the glob | `changes/README.md` § trust-chain guards |
+| promote a one-shot proof → permanent guard | `changes/README.md` § promote one-shot proofs |
+| bite-proof snapshot-restore | `changes/README.md` § bite-proof a guard |
+| close with a spoken retro | `changes/README.md` § retrospective + [`ai/README.md`](../ai/README.md) § closing process retro |
+| mark claims measured | the `trust-chain` skill + [`ai/README.md`](../ai/README.md) § the pipeline (measured, not recalled) |
+| workflow entry | [`ai/README.md`](../ai/README.md) (the entry for every working session) |
+
+**`mutation-gate` — CHECKED, NOT BUILT.** Covered even more completely — [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md)
+is 164 lines of complete decision + consequences, and the two meta-check docstrings self-document their asymmetry.
+No failure is on record *after* ADR 0045 that a skill would have prevented (the two known mutation missteps were
+caught inside the refine that wrote 0045, and its corrections are in the doc):
+
+| element it would carry | canonical home (measured) |
+|---|---|
+| concept: mutation = assertion-strength last link | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) Context + Decision |
+| per-surface finding (web KAT-pinned, backend no content crypto) | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Context table |
+| tool choice (Stryker/PIT, no kotlin-plugin, no arcmutate) + why | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Decision 1 |
+| backend three-layer split, what is mutated | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Decision 2 |
+| what is in scope + the discriminator | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Decision 2–3 + `web/stryker.mutate.json`, `backend/pitest.scope.json` |
+| CI shape: PR, path-gated, report-before-gate | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Decision 4 + `mutation.yml`, `mutation-backend.yml` |
+| the total-vs-per-glob meta-check asymmetry | `scripts/mutation_meta_check.py` + `scripts/mutation_meta_check_backend.py` docstrings |
+| KAT-beats-mutation finding; blind spots | [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md) § Context + Consequences |
+| operational: `npm run mutation` PR-only; in-place footgun | [`web/CLAUDE.md`](../../web/CLAUDE.md) |
+
+The residual non-restate value of either — a trigger at the work's start and one ordered checklist — rests on an
+**unmeasured** failure (a session skipping the canonical entry), so it stays deferred until such a failure is
+observed. The genuine remaining gap the measurement points at is **agent roles**: `ai/README.md` argues the
+refine/implement *split* but nowhere defines the roles *as roles* (allowed tools, write boundaries, isolation
+purpose). That is new content with no home — and its own work-order, not this one's.

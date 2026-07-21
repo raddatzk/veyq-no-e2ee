@@ -2,9 +2,10 @@
 """Validate that every relative link in a `.claude/` skill or agent-role doc resolves to a real file.
 
 The gap this closes was opened by the change that shipped it. [`validate_doc_links.py`](validate_doc_links.py)
-walks only the `docs/` tree ("Scans every `*.md` under `docs/`"), so the moment cr-0179 put pointer-heavy
-`SKILL.md` files under `.claude/skills/`, their links landed **outside every guard's reach** — a skill pointing
-at a moved or renamed canonical doc would rot silently. That is exactly the failure the skills layer must not
+walks only the `docs/` tree ("Scans every `*.md` under `docs/`"), so the moment the skills layer (ADR 0046) put
+pointer-heavy `SKILL.md` files under `.claude/skills/`, their links landed **outside every guard's reach** — a
+skill pointing at a moved or renamed canonical doc would rot silently. That is exactly the failure the skills
+layer must not
 reintroduce: [ADR 0046](../docs/decisions/0046-operative-lore-in-skills-and-agents.md) rule 3 makes a skill an
 asset *only* while it points at the canonical source instead of restating it, and a dead pointer is a restated
 copy's quiet cousin — it stops leading anywhere without saying so.
