@@ -69,8 +69,10 @@ vault") is an explicit, rare action. This is the established practice for per-us
   revocation, and the same one 1Password accepts. If this becomes unacceptable for some tenants, the **only**
   escalation that keeps auto-rotate-on-every-removal affordable at large `N` is a **key tree** (MLS/TreeKEM,
   `O(log N)` re-wraps) — a large, deferred architecture change, taken up only if tenants prove large **and** churny.
-- **Future work, not built now.** Tenant member-removal and the explicit "re-key a space" action are unbuilt; this
-  ADR fixes the policy so they are built right when they land. The group path is already live.
+- **Built to this policy (cr-0091).** Tenant member-removal is the ACL-revoke cascade (`rotateAfter = false`,
+  `TenantHandler`) — O(1), no rotation, as decided here. The rare explicit **re-key** rides the generic
+  `rotateScope` endpoint (live for groups); a dedicated tenant re-key flow is not separately wired. The group
+  path is already live.
 - **Edits in place:** [ADR 0024](0024-scope-key-rotation.md)'s "scope-generic, group-first" consequence and the
   [security-model](../crosscutting/security-model.md) revocation section point here for the per-scope policy.
 - **Rejected — apply the group policy uniformly (always-rotate the tenant):** puts an `O(N)` burst on *every*
