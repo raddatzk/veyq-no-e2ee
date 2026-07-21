@@ -78,22 +78,24 @@ exactly where claims are made, which is not every turn.
 - **Rejected — subagents only, no skills.** A subagent's value is isolation; a procedure the main thread must
   follow *inline* (mark this claim measured, before you write it) cannot be handed to a fresh context. Skill and
   subagent are complements, not substitutes.
-- **The no-restate test culls the skills layer to what earns its place.** Of three proposed skills, **one** was
-  built (`trust-chain`) and **two** (`cr-execute`, `mutation-gate`) were measured to be ~100% restatement of docs
-  that already exist, and not built. The per-element verdicts are recorded below (§ Which proposed skills survived
-  measurement) — that finding is worth more than the skills would have been, and is the no-restate invariant
-  holding against the skills layer itself, which is the point.
+- **The no-restate test culls the layer to what earns its place.** Of **three proposed skills and four agent
+  roles**, the measurement kept **one skill** (`trust-chain`) + **one guard** (`validate_skill_links.py`) and a
+  one-paragraph reader convention; it rejected `cr-execute` and `mutation-gate` as ~100% restatement, and all four
+  roles (the decisive reason: a subagent cannot enforce a top-level-session split — below). The per-item verdicts
+  are recorded below (§ Which proposed skills and roles survived measurement) — that finding is worth more than the
+  artefacts would have been, and is the no-restate invariant holding against the skills layer itself, which is the
+  point.
 
 One question stays parked (tracked in inbox #108): whether claim-provenance also earns a one-line CLAUDE.md anchor
 — so it loads even outside a triggered skill — is left open until we can observe whether the trigger coverage has
 real gaps. Deciding it now would be guessing.
 
-## Which proposed skills survived measurement
+## Which proposed skills and roles survived measurement
 
-The rollout proposed three skills. Each was measured against rule 3 — *for every element it would carry, does a
-canonical home already exist?* Two failed and were **not built**; the tables are why, kept here because a deleted
-work-order (the CR that found this) cannot hold them and the finding outlives it. `pain-before-tool` was applied
-as strictly: only a **recorded** failure counts, never an imaginable one.
+The rollout proposed three skills and four agent roles. Each was measured against rule 3 — *for every element it
+would carry, does a canonical home already exist?* — and `pain-before-tool` was applied strictly: only a
+**recorded** failure counts, never an imaginable one. Most did not survive; the tables and the roles finding are
+kept here because a deleted work-order (the CR that found this) cannot hold them and the finding outlives it.
 
 **`trust-chain` — BUILT.** It consolidated a map scattered across four places *and* introduced content with no
 prior home: the claim-provenance convention (§ 4) and the guard-gap synthesis ("green = a reference resolves, not
@@ -134,6 +136,46 @@ caught inside the refine that wrote 0045, and its corrections are in the doc):
 
 The residual non-restate value of either — a trigger at the work's start and one ordered checklist — rests on an
 **unmeasured** failure (a session skipping the canonical entry), so it stays deferred until such a failure is
-observed. The genuine remaining gap the measurement points at is **agent roles**: `ai/README.md` argues the
-refine/implement *split* but nowhere defines the roles *as roles* (allowed tools, write boundaries, isolation
-purpose). That is new content with no home — and its own work-order, not this one's.
+observed.
+
+### The four agent roles — measured, and mostly culled
+
+The rollout also proposed four agent roles (`refine`, `implement`, `verify`, `measure`) as `.claude/agents/`
+files. The measurement collapsed them, and the reason is the single most reusable finding of this whole exercise:
+
+> **A subagent is a *child* of a session; the clean-room refine/implement split is a *top-level session*
+> property. A write-boundary on a `refine` subagent stops that subagent from writing — but not its parent
+> session from implementing. So the boundary the role exists to enforce would be a *false guarantee*: the split
+> is enforced by separate fresh top-level sessions + owner review ([`ai/README.md`](../ai/README.md) §
+> session-topology), which no agent file can replace.**
+
+That reframes the whole idea. `refine`/`implement` are **session-shaped, not subagent-shaped** — to make a
+*top-level* session read-only you set session config (permissions / `permissionMode`), not a `.claude/agents/`
+file, which only ever governs a *delegated* child. The one genuinely subagent-shaped, read-only piece is the
+delegated reader (`measure`), and that is already the built-in `Explore` agent (all tools except Edit/Write/
+NotebookEdit); its only veyq-specific delta — *return findings measured, with the command* — is a one-paragraph
+convention in the `trust-chain` skill, not a new role file. `verify` has **no recorded failure** (its class of
+miss — a coverage claim believed then measured false — is a provenance failure, already closed by § 4 + the
+`trust-chain` guard-gap map) and overlaps existing review tooling. Net: **zero role files built.**
+
+**Measured harness capabilities behind the finding** (Claude Code subagent + permissions docs, checked
+2026-07-21 — re-verify, as harness behaviour drifts):
+
+- Subagent frontmatter `tools:` is a comma-separated **allowlist** (omitted ⇒ inherits all); `disallowedTools:`
+  is a **denylist**, applied first. So "no writes at all" *is* expressible with the tool list alone, zero extra
+  mechanism (`tools: Read, Grep, Glob, Bash`, the built-in `Explore` form) — this part of the idea works.
+- **Permissions are session-global, not per-agent.** No frontmatter field scopes a write path to one role;
+  `permissionMode` is a mode, not a boundary. A global `Edit(changes/**)` rule would bind the *main thread* too.
+- **`Write(path)` is a footgun** — accepted but never matched (warns at startup); the working form is
+  `Edit(path/**)`, which covers all file-editing tools.
+- The *only* per-agent path scope is a per-agent frontmatter **hook** running a checked-in script that inspects
+  `tool_input.file_path` and denies — extra machinery (a bash hook + script) for a boundary the subagent couldn't
+  make load-bearing anyway.
+
+**Rejected — `refine`/`implement`/`verify` as `.claude/agents/` role files** (recorded so this is not
+re-derived): a write-boundary on a child subagent cannot enforce a top-level-session invariant, `verify` has no
+recorded pain and duplicates review tooling, and the read-only-`refine`-returns-text option — though the *only*
+zero-mechanism form — mis-sizes the handoff: `refine`'s real job reshapes durable state (an ADR + use-case edits
++ the CR), and handing multi-file *edits* back as text for a caller to apply is a faithful-copy cost that lands on
+the common case. Kept: the `measure`-as-`Explore` convention in `trust-chain`. The session-topology + owner review
+already carried the split; that is the result, not a failure to build.

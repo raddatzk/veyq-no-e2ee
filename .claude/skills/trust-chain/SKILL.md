@@ -47,6 +47,14 @@ of already knowing ([`changes/README.md`](../../../changes/README.md) § upstrea
 exactly where the imported prior sits, and where this repo most often inverts it. Rationale in
 [ADR 0046](../../../docs/decisions/0046-operative-lore-in-skills-and-agents.md) § 4.
 
+**Delegate the measuring, but keep it measured.** When a claim needs reading across many files (a surface
+sweep, "where does X live", "is Y consistent"), delegate the read to a **read-only `Explore` subagent** so
+the main context stays lean — and require it to **return each finding measured: the command it ran and that
+command's output**, not a prose conclusion. A subagent that hands back "coverage looks complete" has
+laundered a `measured` claim into a `remembered` one across the delegation boundary; you inherit its
+confidence without its evidence. Ask for the ledger, not the verdict — then the delegation costs context
+without costing provenance.
+
 **This skill obeys its own rule.** Every factual claim below is a pointer to its canonical home, or is
 marked `measured` and carries the `file:line` it was read from — re-runnable, not recalled. Nothing here is
 remembered.
