@@ -4,8 +4,8 @@ description: >-
   Use before asserting any doc, coverage, contract, or CR change is sound; when adding or modifying a
   scripts/ guard; or when a green trust-chain is about to be used as evidence for a claim. Carries the
   claim-provenance convention (mark every claim measured vs. remembered) and the map of what a green
-  trust-chain does — and does not — prove. Entry point into veyq's doc↔code validation; the deep-dives
-  (mutation-gate) and the CR-run procedure (cr-execute) sit under it.
+  trust-chain does — and does not — prove. Entry point into veyq's doc↔code validation; per-guard detail
+  lives in each scripts/validate_*.py docstring, the mutation-testing deep-dive in ADR 0045.
 ---
 
 # trust-chain
