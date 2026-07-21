@@ -53,11 +53,11 @@ class JobEntity : PanacheEntityBase {
     var maxAttempts: Int = 0
 
     /** Sealed task body (`type` + params) under a K_SC-derived key, context `job`; null for structural jobs. */
-    @Column(name = "sealed_body", columnDefinition = "TEXT")
+    @Column(name = "sealed_body", columnDefinition = "MEDIUMTEXT")
     var sealedBody: String? = null
 
     /** An optional sealed job result (for grant-delivery, the wrappedGrant written onto the target membership). */
-    @Column(name = "sealed_result", columnDefinition = "TEXT")
+    @Column(name = "sealed_result", columnDefinition = "MEDIUMTEXT")
     var sealedResult: String? = null
 
     @Column(name = "created_at", nullable = false)

@@ -20,8 +20,8 @@ The coupling is the point: if someone tightens a validator to close a gap, the d
 happens the fix is *not* to relax this guard blindly: confirm the gap really closed, then move the skill's map
 and this table together.
 
-Scope — six file-based cases: three the guard must **reject** (a closed hole, pinned so it can't silently
-re-open) and three still-**open** gaps (the limit is documented, not yet closed). Two further documented gaps
+Scope — eight file-based cases: four the guard must **reject** (a closed hole, pinned so it can't silently
+re-open) and four still-**open** gaps (the limit is documented, not yet closed). Two further documented gaps
 stay out on purpose (below).
 
 Rejected — regression-pins for closed holes (a forgery the guard must now catch):
@@ -30,6 +30,9 @@ Rejected — regression-pins for closed holes (a forgery the guard must now catc
   2  a backend ref at an *empty `fun` body* — closed: the resolved method's body is now read; an empty `{}`
      block is rejected, while a `= expr` expression body still counts (validate_coverage `_kotlin_funs`)
   4a a coverage `status: done` — rejected: the enum permits only unset/`planned`, so a loosened enum bites
+  7  a base64 field's `maxLength` pushed above 65 532 (more than a `TEXT` column holds) on a non-allowlisted
+     field — rejected: `validate_maxlength_storage` ties every base64 cap to its storage, so the #94 class
+     (a cap larger than its column) can't silently re-enter
 Open gaps — a forgery the guard still passes (a documented limit, not a defect to fix blindly):
   4b a lying `status: planned` on an implemented use-case passes. **Left open on purpose** — the obvious rule
      "planned ⇒ no coverage refs" is *false*: `uc.spaces.verify-identity` is legitimately `planned` yet carries
@@ -39,6 +42,12 @@ Open gaps — a forgery the guard still passes (a documented limit, not a defect
      reason 4b stays open — recorded here, beside the case, so nobody re-derives the false rule from scratch.
   5  a CR marked `status: done` with no implementation passes (validate_changes: enum + refs, nothing more)
   6  a link to a non-existent `#fragment` anchor in an existing file passes (validate_doc_links strips it)
+  8  a *free-text* (non-base64) `maxLength` blown past what its column holds passes — `validate_maxlength_storage`
+     reasons only about base64 caps (char == byte), never free-text byte-width (`chars × up-to-4` under utf8mb4)
+     nor columns that serialize several capped fields (`terms_markdown_by_locale`). **Left open on purpose** —
+     catching it needs the field→column map the guard deliberately does not carry (a manifest that rots); the
+     one real free-text-on-`TEXT` column was instead *widened to MEDIUMTEXT* in #94, closing that instance by
+     construction. The gap is the class, not that column.
 Deferred (see cr-0180 / inbox): the mutation **total-vs-per-glob** asymmetry (needs a report fixture + git, so
 it belongs to a mutation-job-local test, not this buildless glob). (The other historical deferral here —
 CR-number reuse against history, old inbox #107 — is *gone*, not deferred: CRs are named by slug, not an
@@ -73,6 +82,10 @@ COV_SHARE_NOTE = "docs/coverage/features/sharing/use-cases/uc.sharing.share-note
 WEB_TEST_REF = "src/shared/state/useThemeState.test.ts"
 BACKEND_TEST_CLASS = "ShareNoteSliceTest"
 BACKEND_TEST_REF = f"{BACKEND_TEST_CLASS}.createWithNoteThenAnonymousResolveReturnsIt"
+# A distinctive base64 cap (the space icon, 21 884) — forging it oversize is the #94 closed-hole probe; a
+# free-text cap (the operator terms, 20 000) — forging it huge is the free-text open-gap probe.
+B64_CAP_ANCHOR = ("contracts/api/scopes.openapi.yaml", "maxLength: 21884", "maxLength: 65536")
+FREETEXT_CAP_ANCHOR = ("contracts/api/_common.openapi.yaml", "maxLength: 20000", "maxLength: 999996")
 
 
 def _sub(text: str, old: str, new: str) -> str:
@@ -148,6 +161,20 @@ def forge_doc_dead_fragment(root: pathlib.Path) -> str:
     return "doc link to a non-existent #fragment anchor (fragment stripped, never verified)"
 
 
+def forge_b64_cap_over_text(root: pathlib.Path) -> str:
+    rel, old, new = B64_CAP_ANCHOR
+    f = root / rel
+    f.write_text(_sub(f.read_text(), old, new))
+    return f"base64 cap {old} → {new} on a non-allowlisted field (must be REJECTED — the #94 class)"
+
+
+def forge_freetext_cap_over_column(root: pathlib.Path) -> str:
+    rel, old, new = FREETEXT_CAP_ANCHOR
+    f = root / rel
+    f.write_text(_sub(f.read_text(), old, new))
+    return f"free-text cap {old} → {new} (guard reasons only about base64 — the open gap)"
+
+
 # id, target guard, forgery, expect_pass (True = guard passes the forgery = gap still open; False = must reject)
 CASES = [
     ("1",  "validate_coverage.py",  forge_web_ref_nontest,      False),
@@ -156,6 +183,8 @@ CASES = [
     ("4b", "validate_coverage.py",  forge_lying_planned,        True),
     ("5",  "validate_changes.py",   forge_cr_done_no_impl,      True),
     ("6",  "validate_doc_links.py", forge_doc_dead_fragment,    True),
+    ("7",  "validate_maxlength_storage.py", forge_b64_cap_over_text,          False),
+    ("8",  "validate_maxlength_storage.py", forge_freetext_cap_over_column,   True),
 ]
 
 

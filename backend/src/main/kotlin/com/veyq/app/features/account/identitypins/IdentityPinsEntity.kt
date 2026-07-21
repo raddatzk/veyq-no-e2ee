@@ -22,7 +22,7 @@ class IdentityPinsEntity : PanacheEntityBase {
     @Column(name = "account_id", length = 36)
     lateinit var accountId: String
 
-    @Column(name = "sealed_blob", columnDefinition = "TEXT")
+    @Column(name = "sealed_blob", columnDefinition = "MEDIUMTEXT")
     var sealedBlob: String? = null
 
     @Column(name = "version", nullable = false)
