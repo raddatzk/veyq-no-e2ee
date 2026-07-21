@@ -63,10 +63,14 @@ remembered.
 
 **Green means: nothing points into the void. It does not mean: what it points at carries weight.**
 `measured` (per-file read of every doc↔code `validate_*.py` + both `mutation_meta_check*.py`):
-each asserts a reference **resolves / exists / is present / count > 0** — never the substance of what it
-references (the meta-guard `validate_guard_gaps.py` is the exception that proves the rule: it asserts these
-very limits still hold — below). The per-guard limit is each validator's own docstring (e.g.
-`validate_field_visibility.py`: "a marker permits, it does not verify"); this skill only names the pattern.
+each asserts a reference **resolves / exists / is present / count > 0** — and, where a degenerate miss is
+cheaply decidable, that the target is the right *kind* of thing (a web coverage ref is a `*.test`/`*.spec`
+file, a backend ref has a non-empty body); it never asserts that what it points at **carries weight** — a
+`*.test` file whose body asserts nothing still passes (oracle correctness is edge #1 below). The meta-guard
+`validate_guard_gaps.py` is the exception that proves the rule: it asserts these very limits still hold, and
+pins each closed hole so it can't silently re-open — below. The per-guard limit is each validator's own
+docstring (e.g. `validate_field_visibility.py`: "a marker permits, it does not verify"); this skill only
+names the pattern.
 
 Concrete: the specific gaps are **executable, not prose** — `scripts/validate_guard_gaps.py` (in the
 trust-chain glob) injects each into a throwaway copy of the tree and asserts the guard still passes (or, for

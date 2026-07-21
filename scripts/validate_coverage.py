@@ -4,9 +4,10 @@
 Checks that every use-case doc has a coverage file, that each is well-formed (every acceptance
 criterion is covered by at least one test, keyed by area then level; uncovered surfaces are explicit
 gaps), and that every referenced test actually exists, so dead refs fail early:
-    backend -> "ClassName.method", resolved against *that* class (test file whose stem is
-               ClassName must exist AND contain method)
-    web     -> a file path (relative to web/)
+    backend -> "ClassName.method", resolved against *that* class (test file whose stem is ClassName
+               must exist, declare method, AND that method must have a non-empty body — an empty `{}`
+               block is rejected; a Kotlin expression body `= expr` counts, it delegates to real code)
+    web     -> a file path (relative to web/) that both exists AND is a test file (*.test|*.spec)
 
 `http` is NOT a coverage surface (ADR 0040): the `.http` files remain IntelliJ dev tooling but run in
 no CI job, so they make no coverage claim — the same behaviour is proven by the backend slice tests.
@@ -14,6 +15,13 @@ no CI job, so they make no coverage claim — the same behaviour is proven by th
 Class-scoped resolution: a "ClassName.method" ref is checked against the test file whose stem is
 ClassName, not a flat set of every method name on the surface — so a ref pointing at the wrong class
 fails even if some other class happens to have a method of that (generic) name.
+
+Reference *substance*, not just resolution: a ref that resolves can still point at nothing that runs —
+a web ref at a non-test file (a real `package.json` once passed), a backend ref at an empty `fun` body.
+Both degenerate cases are rejected here. This does NOT prove the test's assertion is *correct* — a body
+that runs but asserts nothing (oracle correctness) stays ADR 0045's job (mutation score), never this
+guard's. The line is deliberate: "is it a test file / does it have a body" is decidable and cheap;
+"does the body assert the right thing" is not, and pretending otherwise would oversell the green.
 
 Coverage shape (per acceptance criterion):
     coverage:
@@ -49,8 +57,59 @@ KNOWN_LEVELS = {"unit", "integration", "e2e"}
 errors: list[str] = []
 
 
-def _stem_methods(surface: str, files, pattern: str) -> dict[str, set[str]]:
-    """Map each test file's stem -> the {method names} declared in it.
+KOTLIN_FUN = r"fun\s+`?([A-Za-z0-9_]+)`?\s*\("
+
+
+def _kotlin_funs(src: str):
+    """Yield (method-name, has_substance) for each `fun` declared in src.
+
+    has_substance is False only for a **block body** that is empty or comment-only (`fun x() {}`).
+    A Kotlin **expression body** (`fun x() = assertWriteGate(...)`) always counts — it delegates to
+    real code, so treating it as "empty" would false-positive every delegating test (the edge that
+    made naive `{}`-only detection wrong). Body-less abstract/expected decls yield False but are never
+    ref targets, so it does not matter.
+
+    Regex-with-brace-matching, not a Kotlin parser: the param list is skipped by balanced-paren scan
+    (so a default value's own `()` doesn't end it early); the body delimiter is the first `{` or `=`
+    after the params, bounded by the enclosing `}` so a body-less decl can't borrow the next fun's body.
+    """
+    for m in re.finditer(KOTLIN_FUN, src):
+        name = m.group(1)
+        i = m.end() - 1  # at the '(' of the param list
+        depth = 0
+        while i < len(src):  # skip a balanced param list (default values may nest parens)
+            if src[i] == "(":
+                depth += 1
+            elif src[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        j = i + 1  # first char past ')'
+        while j < len(src) and src[j] not in "{=}":  # hop over a `: ReturnType` to the body delimiter
+            j += 1
+        if j >= len(src) or src[j] == "}":  # no body (abstract/expected) — not a ref target
+            yield name, False
+        elif src[j] == "=":  # expression body — delegates to real code, always substance
+            yield name, True
+        else:  # '{' block body — substance iff non-whitespace, non-comment content remains
+            depth = 0
+            k = j
+            while k < len(src):
+                if src[k] == "{":
+                    depth += 1
+                elif src[k] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                k += 1
+            body = re.sub(r"//[^\n]*", "", src[j + 1:k])
+            body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+            yield name, body.strip() != ""
+
+
+def _stem_methods(surface: str, files) -> dict[str, dict[str, bool]]:
+    """Map each test file's stem -> {method name -> has_substance} for the funs it declares.
 
     Class-scoped ref resolution keys on the file stem, so it assumes stems are unique within a
     surface; two files sharing a stem would silently merge their methods and re-open the very
@@ -60,10 +119,12 @@ def _stem_methods(surface: str, files, pattern: str) -> dict[str, set[str]]:
     Per-file helper/stub/companion classes lump under the file stem; harmless because they are
     never ref targets, and stem-keying ignores them for free.
     """
-    by_stem: dict[str, set[str]] = {}
+    by_stem: dict[str, dict[str, bool]] = {}
     sources: dict[str, list[str]] = {}
     for f in files:
-        by_stem.setdefault(f.stem, set()).update(re.findall(pattern, f.read_text()))
+        funs = by_stem.setdefault(f.stem, {})
+        for name, has_substance in _kotlin_funs(f.read_text()):
+            funs[name] = funs.get(name, False) or has_substance  # an overload with any real body counts
         sources.setdefault(f.stem, []).append(rel(f))
     for stem, paths in sources.items():
         if len(paths) > 1:
@@ -72,18 +133,18 @@ def _stem_methods(surface: str, files, pattern: str) -> dict[str, set[str]]:
     return by_stem
 
 
-KOTLIN_FUN = r"fun\s+`?([A-Za-z0-9_]+)`?\s*\("
-
-
-def backend_test_methods() -> dict[str, set[str]]:
-    return _stem_methods("backend", BACKEND_TESTS.rglob("*.kt"), KOTLIN_FUN) if BACKEND_TESTS.exists() else {}
+def backend_test_methods() -> dict[str, dict[str, bool]]:
+    return _stem_methods("backend", BACKEND_TESTS.rglob("*.kt")) if BACKEND_TESTS.exists() else {}
 
 
 def rel(p: pathlib.Path) -> str:
     return str(p.relative_to(ROOT))
 
 
-def _check_class_method(area: str, ref: str, stem_map: dict[str, set[str]], where: str) -> None:
+WEB_TEST_RE = re.compile(r"\.(test|spec)\.(ts|tsx|js|jsx)$")
+
+
+def _check_class_method(area: str, ref: str, stem_map: dict[str, dict[str, bool]], where: str) -> None:
     """Resolve a "ClassName.method" ref against that class's own methods (not a flat surface set)."""
     cls, sep, method = ref.rpartition(".")
     if not sep:  # no '.', no '/' -> malformed for these surfaces
@@ -92,15 +153,19 @@ def _check_class_method(area: str, ref: str, stem_map: dict[str, set[str]], wher
         errors.append(f"{where}: {area} test class not found: {cls}")
     elif method not in stem_map[cls]:
         errors.append(f"{where}: {area} test method not found: {ref}")
+    elif not stem_map[cls][method]:  # symbol resolves but its body is empty/comment-only
+        errors.append(f"{where}: {area} test method has an empty body (proves nothing): {ref}")
 
 
 def check_ref(area: str, ref: str, where: str) -> None:
     if area == "backend":
         _check_class_method(area, ref, backend_methods, where)
     elif area == "web":
-        # web refs are file paths relative to web/
+        # web refs are file paths relative to web/, and must be test files (not any real file)
         if not (WEB / ref).exists():
             errors.append(f"{where}: web test file not found: {ref}")
+        elif not WEB_TEST_RE.search(ref):
+            errors.append(f"{where}: web ref is not a test file (expected *.test|*.spec .ts/.tsx/.js/.jsx): {ref}")
 
 
 backend_methods = backend_test_methods()

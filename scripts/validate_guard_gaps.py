@@ -20,11 +20,23 @@ The coupling is the point: if someone tightens a validator to close a gap, the d
 happens the fix is *not* to relax this guard blindly: confirm the gap really closed, then move the skill's map
 and this table together.
 
-Scope — six file-based gaps (the skill's bullets it now owns); two documented gaps stay out on purpose:
-  1  a web coverage ref at a *non-test* file passes (validate_coverage: web = path-exists only)
-  2  a backend ref at an *empty `fun` body* passes (validate_coverage: symbol name resolved, body never read)
-  4a a coverage `status: done` is *rejected* (the one working-check pinned here, so a loosened enum bites)
-  4b a lying `status: planned` on an implemented use-case passes (the asymmetry with 4a is real)
+Scope — six file-based cases: three the guard must **reject** (a closed hole, pinned so it can't silently
+re-open) and three still-**open** gaps (the limit is documented, not yet closed). Two further documented gaps
+stay out on purpose (below).
+
+Rejected — regression-pins for closed holes (a forgery the guard must now catch):
+  1  a web coverage ref at a *non-test* file — closed: a web ref must exist AND match *.test|*.spec, so a real
+     `package.json` no longer resolves (validate_coverage `WEB_TEST_RE`)
+  2  a backend ref at an *empty `fun` body* — closed: the resolved method's body is now read; an empty `{}`
+     block is rejected, while a `= expr` expression body still counts (validate_coverage `_kotlin_funs`)
+  4a a coverage `status: done` — rejected: the enum permits only unset/`planned`, so a loosened enum bites
+Open gaps — a forgery the guard still passes (a documented limit, not a defect to fix blindly):
+  4b a lying `status: planned` on an implemented use-case passes. **Left open on purpose** — the obvious rule
+     "planned ⇒ no coverage refs" is *false*: `uc.spaces.verify-identity` is legitimately `planned` yet carries
+     a real ref (`identityPins.test.ts`), a partially-built use-case. The narrow decidable rule ("every criterion
+     covered ⇒ planned is a contradiction") shuts only the *full* evasion, never the partial ("cover 5 of 6, mark
+     planned, skip the 6th"), so it is much mechanism for one theoretical lie. This counter-example is the whole
+     reason 4b stays open — recorded here, beside the case, so nobody re-derives the false rule from scratch.
   5  a CR marked `status: done` with no implementation passes (validate_changes: enum + refs, nothing more)
   6  a link to a non-existent `#fragment` anchor in an existing file passes (validate_doc_links strips it)
 Deferred (see cr-0180 / inbox): the mutation **total-vs-per-glob** asymmetry (needs a report fixture + git, so
@@ -93,14 +105,14 @@ def forge_backend_empty_fun(root: pathlib.Path) -> str:
     tf.write_text(src[:cut] + "\n    fun guardGapEmptyProof() {}\n" + src[cut:])
     cov = root / COV_SHARE_NOTE
     cov.write_text(_sub(cov.read_text(), BACKEND_TEST_REF, f"{BACKEND_TEST_CLASS}.guardGapEmptyProof"))
-    return "backend ref → empty fun body (symbol resolves, body never inspected)"
+    return "backend ref → empty fun body (symbol resolves; the body is now inspected)"
 
 
 def forge_coverage_status_done(root: pathlib.Path) -> str:
     f = root / COV_APPEARANCE
     f.write_text(_sub(f.read_text(), "useCase: uc.settings.appearance-language",
                       "useCase: uc.settings.appearance-language\nstatus: done"))
-    return "coverage status: done (must be REJECTED — the one working-check pinned here)"
+    return "coverage status: done (must be REJECTED — a loosened status enum would bite)"
 
 
 def forge_lying_planned(root: pathlib.Path) -> str:
@@ -135,10 +147,10 @@ def forge_doc_dead_fragment(root: pathlib.Path) -> str:
     return "doc link to a non-existent #fragment anchor (fragment stripped, never verified)"
 
 
-# id, skill-bullet, target guard, forgery, expect_pass (True = documented to stay green under the forgery)
+# id, target guard, forgery, expect_pass (True = guard passes the forgery = gap still open; False = must reject)
 CASES = [
-    ("1",  "validate_coverage.py",  forge_web_ref_nontest,      True),
-    ("2",  "validate_coverage.py",  forge_backend_empty_fun,    True),
+    ("1",  "validate_coverage.py",  forge_web_ref_nontest,      False),
+    ("2",  "validate_coverage.py",  forge_backend_empty_fun,    False),
     ("4a", "validate_coverage.py",  forge_coverage_status_done, False),
     ("4b", "validate_coverage.py",  forge_lying_planned,        True),
     ("5",  "validate_changes.py",   forge_cr_done_no_impl,      True),
@@ -190,7 +202,7 @@ def main() -> int:
         for e in errors:
             print("  -", e)
         return 1
-    print(f"guard gaps OK: {len(CASES)} documented gap(s) still hold as the trust-chain skill claims")
+    print(f"guard gaps OK: {len(CASES)} pinned case(s) hold (closed holes stay rejected, open gaps stay open)")
     return 0
 
 
