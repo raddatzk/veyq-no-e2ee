@@ -21,7 +21,18 @@ Nothing durable dies with it, because nothing durable was ever *only* there:
 
 So: no `changes/cr-*` archive. `changes/` holds this file and any live review/finding backlog.
 
-- One file per CR: `cr-NNNN-slug.md`.
+- **One file per CR: `cr-<slug>.md`** — a descriptive slug, **no number**. The number was dropped once it
+  proved a pure liability rather than a convenience. Its only live job — telling two *parallel* CRs apart — the
+  slug already does (two open CRs are about different things). Its damage was entirely in its *durability*: a
+  number is stamped into immutable git history and code comments, so when a done CR is deleted and its number
+  reused, `git log --grep cr-0174` returns two unrelated changes and every comment citing it is ambiguous (this
+  bit in practice — the ADR-0009 sweep first collided with a since-deleted mutation-gate cr-0174). A slug is
+  unique **by meaning** among live CRs and, if one ever recurred years later, collides *visibly* — not as the
+  silent numeric ambiguity that cost. So there is nothing to allocate, no max-ever to track, and no history to
+  scan; `scripts/validate_changes.py` checks only that the filename is a lowercase slug and `id` matches it. The
+  `cr-` prefix stays as a pure namespace marker — it is what separates a CR from this file and any `review-*.md`
+  backlog. (This retired inbox #107, whose remedy was going to be a monotonic next-number helper; dropping the
+  number is the simpler dissolution — the counter never has to exist.)
 - **Self-contained as a work order:** it *links* to the durable truth (use-cases, contracts,
   crosscutting concerns, ADRs) and *contains* the delta + plan + acceptance. Never copy state docs
   into a CR — if you feel the urge, the state doc is what should be updated instead.
@@ -128,7 +139,7 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
 
 ```markdown
 ---
-id: cr-0001
+id: cr-<slug>            # equals the filename stem, e.g. cr-space-icon — a descriptive slug, no number
 title: <short title>
 status: planned          # planned → in-progress → done (then harvest what binds, and delete the file)
 satisfies: []            # use-case ids this fulfills (trust-chain link)

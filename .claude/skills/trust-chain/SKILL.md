@@ -88,8 +88,10 @@ Two documented gaps sit **outside** that guard, on purpose (cr-0180):
   synthetic report fixture + a git tree (the web check gates on `git diff`), so it belongs to a
   mutation-job-local test, not the buildless glob — and it is self-documented in both meta-check docstrings,
   beside the code.
-- **history-blindness** (a burned CR number, a deleted cited ADR) is a **principled edge** (§4 below), not a
-  fixable gap; its remedy is a monotonic next-number helper (inbox #107), not a forgery-assertion.
+- **history-blindness** (e.g. a deleted cited ADR that now resolves to nothing) is a **principled edge** (§4
+  below), not a fixable gap — a guard never sees history, so a forgery-assertion can't reach it. (The old
+  "burned CR number" instance of this is gone entirely: CRs are named by slug, not an allocated number — nothing
+  to reuse, so nothing to guard. Retired inbox #107; see `changes/README.md` § naming.)
 
 ### The four edges are principled limits, not gaps to fill
 

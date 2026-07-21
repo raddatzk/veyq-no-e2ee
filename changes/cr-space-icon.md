@@ -1,5 +1,5 @@
 ---
-id: cr-0170
+id: cr-space-icon
 title: Space icon — a sealed, constant-length avatar for the tenant scope
 status: planned
 satisfies: [uc.spaces.set-space-icon]

@@ -40,8 +40,9 @@ Open gaps — a forgery the guard still passes (a documented limit, not a defect
   5  a CR marked `status: done` with no implementation passes (validate_changes: enum + refs, nothing more)
   6  a link to a non-existent `#fragment` anchor in an existing file passes (validate_doc_links strips it)
 Deferred (see cr-0180 / inbox): the mutation **total-vs-per-glob** asymmetry (needs a report fixture + git, so
-it belongs to a mutation-job-local test, not this buildless glob), and CR-number reuse **against history** (a
-principled edge — a guard never sees history — whose remedy is a monotonic next-number helper, inbox #107).
+it belongs to a mutation-job-local test, not this buildless glob). (The other historical deferral here —
+CR-number reuse against history, old inbox #107 — is *gone*, not deferred: CRs are named by slug, not an
+allocated number, so there is no number to reuse and nothing to guard. See `changes/README.md` § naming.)
 
 A `validate_*.py`, so the trust-chain glob runs it on every push with no build. Runnable locally:
 
@@ -125,10 +126,10 @@ def forge_lying_planned(root: pathlib.Path) -> str:
 
 
 def forge_cr_done_no_impl(root: pathlib.Path) -> str:
-    # A CR number the guard will accept as unique in the copy; content is a valid-but-empty 'done' CR.
-    (root / "changes/cr-0999-guard-gap-phantom.md").write_text(textwrap.dedent("""\
+    # A valid slug-named CR the guard will accept (id == filename stem); content is a valid-but-empty 'done' CR.
+    (root / "changes/cr-guard-gap-phantom.md").write_text(textwrap.dedent("""\
         ---
-        id: cr-0999
+        id: cr-guard-gap-phantom
         title: phantom done CR (guard-gap probe)
         status: done
         satisfies: []
