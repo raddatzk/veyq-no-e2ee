@@ -6,7 +6,8 @@ buildscript {
 }
 
 // Spec-first generation: Kotlin models + JAX-RS (Quarkus) interfaces from contracts/api/*.openapi.yaml.
-// Specs are self-contained (no external $refs), so no bundling or shared schema mapping is needed.
+// Specs $ref shared components from _common.openapi.yaml (ADR 0038); openapi-generator resolves the external
+// ref in place, so no bundling or committed artifact is needed (excluded from the spec glob below).
 // Slice Resources implement the generated `*Api` interfaces (one tag per API resource — ADR 0001).
 
 val generatedApiDir = layout.buildDirectory.dir("generated/openapi-api")
@@ -16,7 +17,12 @@ val apiPackageName = "com.veyq.app.generated.api"
 val modelPackageName = "com.veyq.app.generated.model"
 val invokerPackageName = "com.veyq.app.generated"
 
-val specFiles = fileTree("../contracts/api") { include("*.openapi.yaml") }.files.sorted()
+// `_common.openapi.yaml` is a shared-component $ref target (ADR 0038), not a spec — exclude it so the
+// per-spec generator loop never treats it as its own API/model set.
+val specFiles = fileTree("../contracts/api") {
+    include("*.openapi.yaml")
+    exclude("_common.openapi.yaml")
+}.files.sorted()
 
 fun runGenerator(
     generator: String,

@@ -291,18 +291,4 @@ components:
         family: { $ref: "#/components/schemas/SessionFamily" }
 
     ErrorResponse:
-      type: object
-      required: [code]
-      properties:
-        code:
-          x-veyq-visibility: public
-          type: string
-          description: Stable, client-localizable error code.
-          maxLength: 64
-          example: authentication_failed
-        message:
-          x-veyq-visibility: public
-          type: [string, "null"]
-          description: Optional developer-facing detail; never contains secrets or content.
-          maxLength: 512
-          example: null
+      $ref: '_common.openapi.yaml#/components/schemas/ErrorResponse'
