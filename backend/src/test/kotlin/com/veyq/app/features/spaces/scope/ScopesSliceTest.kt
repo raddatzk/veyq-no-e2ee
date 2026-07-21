@@ -486,6 +486,51 @@ class ScopesSliceTest {
     }
 
     @Test
+    fun myTenantsRoleKeysOnRootScopeNotAPersonalOwnerRow() {
+        // A plain member also OWNS their personal scope, whose membership carries the SAME tenantId. Grouping by
+        // tenantId then taking `.first().role` could surface that OWNER row → a MEMBER shown as OWNER (cr-0163's
+        // shape, in the switcher). The role must key on the tenant ROOT scope (scopeId == tenantId). #93.
+        val (_, domain) = seedMember()
+        val tenantId = domain.removePrefix("t-").removeSuffix(".example.com")
+        val member = seedUser()
+        QuarkusTransaction.requiringNew().run {
+            // Personal-scope OWNER row FIRST — under H2's insertion scan order this is what a buggy `.first()`
+            // returns, so the assertion below bites the pre-fix code deterministically.
+            val personalId = UUID.randomUUID().toString()
+            ScopeEntity().apply {
+                id = personalId
+                this.tenantId = tenantId
+                kind = ScopeEntity.PERSONAL
+                createdAt = Instant.now()
+            }.persist()
+            MembershipEntity().apply {
+                id = UUID.randomUUID().toString()
+                this.userId = member
+                this.tenantId = tenantId
+                scopeId = personalId
+                role = MembershipEntity.OWNER
+                wrappedGrant = "cGVyc29uYWwtZ3JhbnQ=" // "personal-grant"
+                createdAt = Instant.now()
+            }.persist()
+            // Then the tenant ROOT MEMBER row (scopeId == tenantId) — the one the role must come from.
+            MembershipEntity().apply {
+                id = UUID.randomUUID().toString()
+                this.userId = member
+                this.tenantId = tenantId
+                scopeId = tenantId
+                role = MembershipEntity.MEMBER
+                wrappedGrant = "bWVtYmVyLWdyYW50" // "member-grant"
+                createdAt = Instant.now()
+            }.persist()
+        }
+        given().header("Authorization", "Bearer ${token(member)}")
+            .`when`().get("/api/scopes/my-tenants")
+            .then().statusCode(200)
+            .body("size()", equalTo(1))
+            .body("[0].role", equalTo("MEMBER"))
+    }
+
+    @Test
     fun deleteGroupSoftThenRestoreWithReadOnlyGrace() {
         val (owner, domain) = seedMember()
         val groupId = createGroupAs(owner, domain)

@@ -401,7 +401,13 @@ class ScopesStore(private val profiles: TenantProfileStore, private val membersh
         MembershipEntity.find("userId", userId).list()
             .groupBy { it.tenantId }
             .mapNotNull { (tenantId, memberships) ->
-                TenantEntity.findById(tenantId)?.let { t -> TenantRow(t.id, t.name, t.domain, memberships.first().role) }
+                // The tenant role keys on the ROOT scope (scopeId == tenantId), mirroring isTenantOwner
+                // (MembershipStore, cr-0163/ADR 0007) — NOT `.first().role`, which over an unordered find could
+                // return the OWNER row every scope birth mints its creator (the member's own personal scope
+                // carries this tenantId), reporting OWNER for a plain member. Belonging is by tenantId across all
+                // the user's scopes, so fall back to MEMBER rather than drop a tenant with no root row. #93.
+                val role = memberships.firstOrNull { it.scopeId == tenantId }?.role ?: MembershipEntity.MEMBER
+                TenantEntity.findById(tenantId)?.let { t -> TenantRow(t.id, t.name, t.domain, role) }
             }
             .sortedBy { it.name }
 }
