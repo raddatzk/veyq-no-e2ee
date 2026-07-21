@@ -22,7 +22,8 @@ Three delivery mechanisms exist, and their difference is **load semantics**:
 - **CLAUDE.md** — always loaded. Permanent context steering.
 - **Skill** (`.claude/skills/`) — loaded on a trigger. A procedure with an explicit *"when"*.
 - **Subagent** (`.claude/agents/`) — its own context. Isolation is the point: either the work would flood the
-  main context, or unbiasedness (a clean-room implementer, an adversarial verifier) is the whole purpose.
+  main context (a delegated surface-reader that returns only conclusions), or unbiasedness is the goal. Which
+  veyq work actually earns a subagent file is itself measured below — the answer turned out to be almost none.
 
 What forced the decision now was a **measured pattern**, not a wish for structure: nearly every expensive recent
 error was a *remembered* claim that a cheap measurement would have refuted — a coverage claim believed and later
@@ -53,7 +54,8 @@ exactly where claims are made, which is not every turn.
    ([`changes/README.md`](../../changes/README.md) § bite-proof a guard) applied to prose instead of tests. It is
    carried by [`trust-chain`](../../.claude/skills/trust-chain/SKILL.md), whose trigger already names *a report, a
    CR, a handoff* — so the claim moments of CR execution are covered there, not in a separate skill (see the
-   `cr-execute` finding under Consequences). It binds where claims are made, not on every turn.
+   `cr-execute` finding in § Which proposed skills and roles survived measurement). It binds where claims are
+   made, not on every turn.
 
 5. **[`ai/README.md`](../ai/README.md) stays canonical for the workflow** — the prose narrative and the pipeline,
    read by both the refining agent and the human judging the project. Skills are its **agent-triggered operational
