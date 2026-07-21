@@ -1,18 +1,18 @@
 name: Wiki Sync
 
-# Publishes the human architecture docs (docs/wiki/**) to the GitHub Wiki.
-# The repo is the single source of truth — edit docs/wiki, not the wiki.
-# docs/ai/** is repo-only and is intentionally NOT published.
+# Publishes the end-user wiki (wiki/**, EN+DE) to the GitHub Wiki.
+# The repo is the single source of truth — edit wiki/, not the GitHub Wiki.
+# docs/ (engineering state) is repo-only and intentionally NOT published.
 #
-# Prerequisite: the wiki must be enabled and initialized once (create any page in
-# the GitHub Wiki UI) so that <repo>.wiki.git exists and can be pushed to.
+# Prerequisite: the GitHub Wiki must be enabled and initialized once (create any page in
+# the Wiki UI) so that <repo>.wiki.git exists and can be pushed to.
 
 on:
   push:
     branches:
       - main
     paths:
-      - "docs/wiki/**"
+      - "wiki/**"
   workflow_dispatch:
 
 permissions:
@@ -24,38 +24,26 @@ concurrency:
 
 jobs:
   sync:
-    name: Sync docs/wiki to the GitHub Wiki
-    # Disabled, and every part of it is stale: it triggers on docs/wiki/** and rsyncs docs/wiki/, but the
-    # published wiki lives in wiki/; and scripts/render-wiki-diagrams.mjs no longer exists. That renderer
-    # existed for PlantUML — diagrams are Mermaid now, which GitHub renders natively, so a repaired job would
-    # not need it at all. Fixing this means rewriting the paths and dropping the render step, not restoring
-    # anything. Until someone does: delete or repair (architecture/README.md §11).
-    if: false
+    name: Sync wiki/ to the GitHub Wiki
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Install PlantUML
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y plantuml graphviz
-
-      - name: Clone the wiki
+      - name: Clone the GitHub Wiki
+        # Into a distinct dir: the repo already has wiki/ (the source), so the clone target must not collide.
         run: |
           git clone \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" \
-            wiki
+            wiki-remote
 
-      - name: Mirror docs/wiki into the wiki (docs/ai is repo-only and not here)
-        run: |
-          rsync -a --delete --exclude='.git' docs/wiki/ wiki/
-
-      - name: Render inline PlantUML diagrams into the wiki copy
-        run: node scripts/render-wiki-diagrams.mjs wiki
+      - name: Mirror wiki/ into the GitHub Wiki (docs/ is repo-only and not published)
+        # Mermaid diagrams render natively on the GitHub Wiki, so there is no diagram-render step (the old
+        # PlantUML renderer, scripts/render-wiki-diagrams.mjs, is gone and not needed).
+        run: rsync -a --delete --exclude='.git' wiki/ wiki-remote/
 
       - name: Commit and push
-        working-directory: wiki
+        working-directory: wiki-remote
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,6 +51,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No wiki changes."
           else
-            git commit -m "docs: sync wiki from docs/wiki @ ${{ github.sha }}"
+            git commit -m "docs: sync wiki from wiki/ @ ${{ github.sha }}"
             git push
           fi
