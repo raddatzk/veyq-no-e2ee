@@ -9,7 +9,7 @@ info:
     `Host` (ADR 0002); every scope lives within exactly one tenant.
 
     **Operator-blind.** The server stores only the opaque scope row (id / kind / tenant), the **ciphertext
-    grant** (the scope key sealed to a member's identity public key — `asymWrap`, the hybrid KEM, ADR 0009),
+    grant** (the scope key sealed to a member's identity public key — `asymWrap`, the hybrid KEM, ADR 0017),
     and the membership. It never holds a scope key, so it **cannot** create a scope: birth is **client-driven**
     — the client generates the scope key, seals it to its own identity, and hands the server only the grant
     ciphertext. The server mints the scope id + the self-membership.

@@ -15,7 +15,7 @@ import { withRefresh } from './login/login'
 import { isCodedError } from '../../shared/httpError'
 import { masterKey, identityPrivate } from '../../app/vault'
 
-/** The AAD context binding the pin-store seal (ADR 0009, vector-pinned `sym_identity_pins`). */
+/** The AAD context binding the pin-store seal (ADR 0017, vector-pinned `sym_identity_pins`). */
 export const IDENTITY_PINS = 'identity-pins'
 
 /** A pin's trust state. `pinned` = trust-on-first-use; `verified` = an out-of-band safety-number compare
@@ -182,7 +182,7 @@ export async function getPin(userId: string): Promise<Pin | null> {
 
 /**
  * The out-of-band **safety number** ("6×5 digits") for a serialized identity public bundle — what two members
- * read aloud / scan to compare. Pure and vault-free: `fingerprint(deserializeIdentityPublic(...))` (ADR 0009,
+ * read aloud / scan to compare. Pure and vault-free: `fingerprint(deserializeIdentityPublic(...))` (ADR 0017,
  * vector-pinned). The input is the same base64 identity bundle the directory returns and the pin store holds.
  */
 export function safetyNumber(identityPublicKeyB64: string): string {

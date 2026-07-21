@@ -15,7 +15,7 @@ import { checkAndPin, IdentityChangedError } from '../account/identityPins'
 import { deriveGroupNameKey, wrapNameKeyToInvitee } from './inviteName'
 import { ScopeKind, type ScopeSummary, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 
-/** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020), re-exported for back-compat — its home is now
+/** The AAD/KDF context binding a scope-key wrap (ADR 0017/0020), re-exported for back-compat — its home is now
  *  {@link ./grant}, shared with the grant-delivery worker (cr-0076) + rotation re-grants (cr-0089). */
 export { SCOPE_GRANT } from './grant'
 

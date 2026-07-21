@@ -6,7 +6,7 @@
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 
-/** The AAD/KDF context binding a scope-key wrap (ADR 0009/0020). A grant opened by the holder uses the same context. */
+/** The AAD/KDF context binding a scope-key wrap (ADR 0017/0020). A grant opened by the holder uses the same context. */
 export const SCOPE_GRANT = 'scope-grant'
 
 /**

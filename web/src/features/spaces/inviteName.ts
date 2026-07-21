@@ -11,7 +11,7 @@ import { b64std, fromB64std } from '../../shared/base64'
 import { identityPrivate } from '../../app/vault'
 import { openName } from '../memory/tree'
 
-/** The AAD/KDF context binding the wrap of the derived name-key `K_name` (ADR 0009/0027). Distinct from `scope-grant`. */
+/** The AAD/KDF context binding the wrap of the derived name-key `K_name` (ADR 0017/0027). Distinct from `scope-grant`. */
 export const GROUP_NAME_KEY = 'group-name-key'
 
 /** HKDF `info` for deriving the group name-key from an epoch key. There is no conformance vector for
