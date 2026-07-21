@@ -73,7 +73,7 @@ Five rules follow:
    whole retention window because the trash CR and the sharing CRs both read `veyq_media` and never met —
    the doc↔code delta there was **empty**, and the defect was real. Doc drift and cross-feature gaps are
    different problems; this step finds only the first.
-4. **Change-request** (`changes/cr-NNNN-slug.md`) — a self-contained, phased work order derived from
+4. **Change-request** (`changes/cr-<slug>.md`) — a self-contained, phased work order derived from
    the refined state. See [`changes/README.md`](../../changes/README.md). A CR is **scaffolding, deleted when
    done** — the durable truth lives in the updated state + ADRs, and what the work *taught* is moved to where
    it binds before the file goes (rule 5: not into git).
