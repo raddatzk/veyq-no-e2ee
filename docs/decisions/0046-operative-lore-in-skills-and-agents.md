@@ -51,8 +51,9 @@ exactly where claims are made, which is not every turn.
 4. **Claim-provenance is a standing convention.** Every claim in a report, CR, or handoff is marked **measured**
    or **remembered**; a *measured* claim names the command that proves it. This is the bite-proof idea
    ([`changes/README.md`](../../changes/README.md) § bite-proof a guard) applied to prose instead of tests. It is
-   carried by the skills that gate claim-heavy work — [`trust-chain`](../../.claude/skills/trust-chain/SKILL.md)
-   now, `cr-execute` later — because it binds where claims are made, not on every turn.
+   carried by [`trust-chain`](../../.claude/skills/trust-chain/SKILL.md), whose trigger already names *a report, a
+   CR, a handoff* — so the claim moments of CR execution are covered there, not in a separate skill (see the
+   `cr-execute` finding under Consequences). It binds where claims are made, not on every turn.
 
 5. **[`ai/README.md`](../ai/README.md) stays canonical for the workflow** — the prose narrative and the pipeline,
    read by both the refining agent and the human judging the project. Skills are its **agent-triggered operational
@@ -77,6 +78,15 @@ exactly where claims are made, which is not every turn.
 - **Rejected — subagents only, no skills.** A subagent's value is isolation; a procedure the main thread must
   follow *inline* (mark this claim measured, before you write it) cannot be handed to a fresh context. Skill and
   subagent are complements, not substitutes.
+- **Worked example of rule 3 — `cr-execute` was checked and *not* built.** A proposed CR-run skill was measured
+  against its own no-restate test: every element it would carry — phase order contracts→backend→web, each phase
+  self-verifying, coverage-is-part, promote-one-shot-proofs, bite-proof, the closing spoken retro — already has a
+  precise canonical home in [`changes/README.md`](../../changes/README.md) + [`ai/README.md`](../ai/README.md) +
+  the surface `CLAUDE.md`s, and its claim-provenance role is already covered by `trust-chain`'s trigger. It would
+  have been ~100% restatement, failing rule 3, so it was not built. The measured verdict — with the per-element
+  citations — is the deliverable, and it is worth more than the skill would have been:
+  [cr-0179](../../changes/cr-0179-skills-and-agents.md) P2. This is the no-restate invariant holding against the
+  skills layer itself, which is the point.
 
 Deferred to [cr-0179](../../changes/cr-0179-skills-and-agents.md): whether claim-provenance also earns a one-line
 CLAUDE.md anchor — so it loads even outside a triggered skill — is left open until the skills exist and we can see

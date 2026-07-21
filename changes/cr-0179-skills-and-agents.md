@@ -50,10 +50,28 @@ independent becomes its own CR rather than a phase here (`changes/README.md` § 
 
 Later phases — **intent only, re-refined before each is built; not a frozen queue** (`changes/README.md`):
 
-- [ ] **2 — `cr-execute` skill.** The CR-run procedure (phase order contracts→backend→web, coverage-is-part,
-      promote-one-shot-proofs, the closing retro) as a triggered entry — pointing at `changes/README.md` +
-      `ai/README.md`, restating nothing. Carries claim-provenance too (ADR 0046 §4). *May instead stay a
-      pointer-only skill if refinement finds `changes/README.md` already suffices.*
+- [–] **2 — `cr-execute`: CHECKED, NOT NEEDED (refined 2026-07-21).** Measured against its own no-restate test —
+      every element it would carry already has a canonical home, so it would have been ~100% restatement and fails
+      ADR 0046 rule 3. The verdict is the deliverable; not built. The claim-provenance role ADR 0046 §4 once
+      assigned it is already covered by `trust-chain`'s trigger (which names *"a report, a CR, a handoff"*).
+      Per-element citations (`grep`-measured):
+
+      | element it would carry | canonical home |
+      |---|---|
+      | phase order contracts→backend→web | `changes/README.md:29-30` + `ai/README.md:175` |
+      | each phase self-verifies ("Done when") | `changes/README.md:28-29` |
+      | surface check cmd (+ `generate:api` *before* `check`) | `backend/CLAUDE.md:6`, `web/CLAUDE.md:7,11-16` |
+      | coverage is part, not follow-up | `changes/README.md:86` |
+      | trust-chain guards green via the glob | `changes/README.md:91` |
+      | promote one-shot proof → permanent guard | `changes/README.md:98` |
+      | bite-proof snapshot-restore | `changes/README.md:104` |
+      | close with a spoken retro | `changes/README.md:110` + `ai/README.md:113` |
+      | mark claims measured | the `trust-chain` skill + `ai/README.md:61` |
+      | workflow entry | `ai/README.md:3` |
+
+      Residual non-restate value — a trigger at CR-execution-start, and one ordered checklist — rests on an
+      **unmeasured** failure (an implement session skipping the entry); *pain-before-tool* unmet. Revisit as a
+      thin pointer-skill only if that failure is ever observed.
 - [ ] **3 — `mutation-gate` skill** (deep-dive under `trust-chain`): the assertion-strength last link
       (ADR 0045) — when PIT/Stryker run, the total-vs-per-glob meta-check asymmetry, the KAT-beats-mutation
       finding. Points at ADR 0045; restates nothing.
