@@ -6,10 +6,11 @@ something is the way it is. One file per decision: `NNNN-kebab-title.md`, number
 - **Status:** `Proposed` · `Accepted` · `Superseded by NNNN`. Supersede when the decision *changes*; **delete
   when its subject is gone** — five went with the native surfaces (`7a1c4e9f`) and there was nothing to
   supersede them *to*. A deletion is not done until its citations are swept with it: ADRs are cited from
-  `contracts/` and from code, **not only from `docs/`**, and no validator checks that. The native drop was
-  thorough in `docs/` but left 27 references to the deleted ADR 0009 behind in a spec and the web crypto layer
-  — swept only later, in cr-0178, by repointing them to the surviving ADR 0017. The gap that let them linger
-  (no validator watches whether a cited ADR still resolves) is still open; see inbox #95.
+  `contracts/` and from code, **not only from `docs/`** — checked by `scripts/validate_adr_citations.py`. The
+  native drop was thorough in `docs/` but left 27 references to the deleted ADR 0009 behind in a spec and the
+  web crypto layer — swept only later, in cr-0178, by repointing them to the surviving ADR 0017. The gap that
+  let them linger (no validator watched whether a cited ADR still resolves) is **now closed** by that guard,
+  scoped to the load-bearing surfaces (inbox #95).
 - Keep them concise: context, the decision, consequences — not a tutorial.
 - **An ADR records a decision that had a real alternative.** If it could not have gone another way, it is a
   description, not a decision — put it where it binds instead of filing one. Apply the test before adding a
