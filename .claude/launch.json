@@ -2,12 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "veyq-legacy-smoke",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/frontend && VITE_PORT=8088 VITE_PROXY_TARGET=http://localhost:8080 npm run dev"],
-      "port": 8088
-    },
-    {
       "name": "veyq-web",
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && npm run dev -- --port 8089"],
@@ -24,20 +18,6 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && VITE_PORT=5173 npm run dev"],
       "port": 5173,
-      "autoPort": false
-    },
-    {
-      "name": "veyq-web-cr54",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && npm run dev -- --port 8091"],
-      "port": 8091,
-      "autoPort": false
-    },
-    {
-      "name": "veyq-web-cr110",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-lc", "cd /Users/kevin.raddatz/IdeaProjects/veyq/web && VEYQ_API_TARGET=http://127.0.0.1:8082 VITE_PORT=8090 npm run dev"],
-      "port": 8090,
       "autoPort": false
     }
   ]
