@@ -475,7 +475,7 @@ class MediaStore(private val membership: MembershipStore) {
         return BucketRow(sub.id, sub.ownerKey, sub.parentBucketId, false, sub.sealedName, 0)
     }
 
-    /** A bucket in this scope+node (for the handler's own-bucket authz + primary check), or null. */
+    /** A bucket in this scope+node (for the handler's member-gated sub-bucket ops + primary check), or null. */
     fun findBucket(scopeId: String, nodeId: String, bucketId: String): BucketEntity? =
         BucketEntity.findById(bucketId)?.takeIf { it.scopeId == scopeId && it.nodeId == nodeId }
 
