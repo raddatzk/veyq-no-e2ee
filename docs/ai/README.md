@@ -63,8 +63,12 @@ Five rules follow:
    only runs forward, and nothing ever asks *"is this still true?"*. Read it **both ways** — a disagreement is
    a **question back to the refinement** ("which side is right?"), never automatically a work item:
    - **Code ahead** — a CR changed behaviour and the doc never learned. The doc is the stale side; do **not**
-     plan the code back to it. cr-0123 relaxed the bucket gate — *"the rule the user chose"*, in its own words
-     — while ADR 0034 §6 went on asserting the opposite.
+     plan the code back to it. cr-0123 relaxed the bucket gate to member — *"the rule the user chose"*, in its
+     own words — while ADR 0034 §6 and its enabler kept asserting the owner-only `owner_key == caller`; the drift
+     even survived a **false close** (a review finding waved through as "already-resolved" without re-measuring)
+     before #87 aligned the docs to the code. A close is a claim like any other: **re-derive it, don't trust the
+     status word** — that false close had misread `owner_key == caller` as *member*-gated, the very thing it
+     wasn't.
    - **Doc ahead** — a decision nobody built. *That* is the CR.
    - **Doc unbuildable** — it asks for something the stack has no form of, so the code never could follow.
      V35 was told to add a partial unique index the H2 ∩ MariaDB subset does not have.

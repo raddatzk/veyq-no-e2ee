@@ -43,7 +43,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - ★ [en.memory.buckets](enablers/en.memory.buckets.md) — **refined** (the bucket data layer: a per-uploader
   container within a Memory, a real `owner_key`-keyed `veyq_bucket` table — `user:{id}` / `share:{id}` — with a
   lazy virtual primary + one-level sub-buckets, names sealed under `K_mem`, media linked via a nullable `bucket_id`
-  + denormalized `created_by`; reparent-on-delete + own-bucket authz;
+  + denormalized `created_by`; reparent-on-delete + member-gated sub-bucket authz (cr-0123);
   [ADR 0034](../../decisions/0034-media-uploader-buckets.md))
 
 ## Use-cases (on the tree + media enablers)
@@ -76,7 +76,7 @@ media + sensitive metadata; **the share grain**) `→ K_blob` (per media blob). 
 - [uc.memory.buckets](use-cases/uc.memory.buckets.md) — **refined** ([ADR 0034](../../decisions/0034-media-uploader-buckets.md),
   on [en.memory.buckets](enablers/en.memory.buckets.md)): group a Memory's media by **who contributed it** — the
   attribution axis, orthogonal to Chapters; a real **`owner_key`-keyed bucket table** (lazy virtual primary +
-  one-level sub-buckets, `K_mem`-sealed names, reparent-on-delete, own-bucket authz).
+  one-level sub-buckets, `K_mem`-sealed names, reparent-on-delete, member-gated sub-bucket authz).
   **cr-0113** (planned) ships the full data layer + backend + the primary-grouping **"Beiträge"** tab (reusing the
   gallery grid); the **sub-bucket management UI** is the next slice, camera-filter/batch later
 - Memory journal — markdown sealed under `K_mem`

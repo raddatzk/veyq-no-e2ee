@@ -66,8 +66,9 @@ Uploaders span **members** (`owner_key = user:{userId}`, display name = the per-
   shipped endpoints.
 - **Reuse, not a new surface.** The organizer reuses the gallery **`MediaGrid` + lightbox**; the picker (a
   hierarchy Select), the dialogs, and the tile checkbox/menu are existing components — never invent UI.
-- **Ownership is server-enforced.** Create / rename / delete a sub-bucket + move media are gated to
-  **`owner_key == caller`** (you organize only your **own** buckets; a contributor's is read-only to you);
+- **Membership is server-enforced (cr-0123).** Create / rename / delete a sub-bucket + move media are gated to
+  **scope membership** — **any member** may organize **any owner-root's** sub-buckets (yours *or* a
+  contributor's), but **never a primary** and **never across owners** (a move stays within one owner-root);
   **delete media** + **edit capture time** stay any key-holder.
 
 ## What this means for you / Was das für dich bedeutet
