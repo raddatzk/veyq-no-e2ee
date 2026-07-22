@@ -16,6 +16,7 @@ import {
   acceptGroupInvitation,
   declineGroupInvitation,
 } from '../features/spaces/members'
+import { refreshMyInvitations } from '../features/spaces/invitations'
 import { openInviteeName } from '../features/spaces/inviteName'
 import { useAsyncData, loadErrorKind } from '../shared/state/useAsyncData'
 import { handle401 } from '../shared/handle401'
@@ -48,6 +49,7 @@ async function runRowAction(inv: InvitationRow, action: (scopeId: string) => Pro
   try {
     await action(inv.scopeId)
     data.value = invitations.value.filter((i) => i.scopeId !== inv.scopeId)
+    void refreshMyInvitations() // keep the top-bar badge count in sync (self-clearing — the row is gone)
   } catch (e) {
     on401(e)
     if (!isUnauthorized(e)) actionError.value = t('invitations.actionFailed')

@@ -10,6 +10,7 @@ import Breadcrumb from 'primevue/breadcrumb'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { breadcrumb } from '../../app/breadcrumb'
+import InvitationsBadge from '../../features/spaces/InvitationsBadge.vue'
 import UploadStatusMenu from '../../features/memory/components/UploadStatusMenu.vue'
 import { useThemeState, setThemePreference, type ThemePreference } from '../../shared/state/useThemeState'
 
@@ -67,6 +68,7 @@ const items = computed<MenuItem[]>(() =>
         <span class="pi pi-chevron-down topbar-icon-caret" />
       </button>
       <Menu ref="themeMenu" :model="themeMenuItems" popup />
+      <InvitationsBadge />
       <UploadStatusMenu />
       <button
         type="button"

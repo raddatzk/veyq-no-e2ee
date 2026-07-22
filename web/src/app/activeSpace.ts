@@ -14,6 +14,7 @@ import { resetTree, loadTree } from '../features/memory/treeStore'
 import { clearFavorites, loadFavoritesFor } from './favoritesStore'
 import { startGrantDeliveryPolling, stopGrantDeliveryPolling } from '../features/tasks/grantDeliveryPolling'
 import { startScopeRotationPolling, stopScopeRotationPolling } from '../features/tasks/scopeRotationPolling'
+import { refreshMyInvitations, clearMyInvitations } from '../features/spaces/invitations'
 import { isUnlocked } from './vault'
 
 export type SpaceStatus = 'idle' | 'loading' | 'ready' | 'no-tenant' | 'error'
@@ -123,6 +124,10 @@ export async function enterScope(token: string): Promise<void> {
     // cr-0114: refresh the tenant's terms status so the router accept-gate knows if a (re-)accept is due. The
     // tenant is the same regardless of which scope (tenant/personal/group) is open, and terms are member-readable.
     await refreshTenantTerms(opened.tenantId)
+    // cr-invitations-topbar-badge: refresh the pending group-invitation count for the active tenant so the top-bar
+    // attention badge reflects it. Not awaited — the badge updates whenever it resolves; scope entry never blocks
+    // on it, and a failure just leaves the count at 0 (fail-quiet in refreshMyInvitations).
+    void refreshMyInvitations()
     // As a key-holder, keep delivering the scope key to any pending member (cr-0076/cr-0077, first-online-wins):
     // deliver on entry and then poll in the background so "awaiting access" closes without a re-entry (cr-0079).
     // A shared TENANT/GROUP scope may have grant-less members; Personal never does, so it just stops any poll.
@@ -165,6 +170,7 @@ export async function refreshActiveScope(): Promise<void> {
 export function clearActiveSpace(): void {
   stopGrantDeliveryPolling()
   stopScopeRotationPolling()
+  clearMyInvitations()
   activeSpace.status = 'idle'
   activeSpace.scopeId = null
   activeSpace.tenantId = null

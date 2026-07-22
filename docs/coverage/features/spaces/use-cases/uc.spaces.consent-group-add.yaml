@@ -39,3 +39,7 @@ acceptanceCriteria:
     coverage:
       backend: { integration: [ConsentGroupAddSliceTest.consentOnAddRecordsSoftRowAndGrantDeliverySkipsIt] }
       web: { unit: [src/features/spaces/inviteName.test.ts] }
+  - id: invitee-attention-badge
+    text: The invitee's open proposals surface as an appears-on-demand top-bar attention badge (cr-invitations-topbar-badge) — hidden at zero, showing the count and routing to the invitations view, self-clearing as accept/decline drops the row, fail-quiet on a fetch error. The count derives client-side from the existing listMyGroupInvitations (the blind server already holds the pendingConsent rows) — no new endpoint, no server-visible signal, and no read/unread state.
+    coverage:
+      web: { unit: [src/features/spaces/InvitationsBadge.test.ts] }

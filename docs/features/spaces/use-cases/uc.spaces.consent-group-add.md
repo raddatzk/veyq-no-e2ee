@@ -41,9 +41,11 @@ group's **canonical** name (not an owner-typed claim), and the **accept/decline*
    invitation. Handing the *key* — not a name — is the crux of [ADR 0027](../../../decisions/0027-group-invite-name-shared-key.md):
    the invitee opens the **same** ciphertext the members hold, so a modified owner **cannot** privately show a
    divergent name. `K_name` is one-way from `E_e` (HKDF), so it leaks the name and nothing else — not `E_e`, not `K_SC`.
-4. **The invitee decides.** In a **"group invitations"** view the invitee unwraps `sealedNameKey` with their own
-   identity private key → `K_name`, decrypts the canonical `encryptedName` under it, and sees **the group's
-   (group-consistent) name + who added them** (the owner's per-tenant username, already visible to them) + the tenant.
+4. **The invitee decides.** In a **group-invitations** view — reached from an **appears-on-demand attention badge**
+   in the top bar (beside the upload-queue tray; rendered only while at least one proposal is open) — the invitee
+   unwraps `sealedNameKey` with their own identity private key → `K_name`, decrypts the canonical `encryptedName`
+   under it, and sees **the group's (group-consistent) name + who added them** (the owner's per-tenant username,
+   already visible to them) + the tenant.
    - **Accept** → the server clears `pendingConsent`; the proposal is now a normal grant-less membership, and the
      ordinary directory-driven grant-delivery wraps `K_SC` to them (first-online-wins, *awaiting access* →
      Active). From here it is identical to direct-add step 3+.
@@ -114,6 +116,15 @@ sequenceDiagram
 - **Pending is owner-visible only.** A `pendingConsent` invitee shows in the group's member directory as *invited
   — awaiting consent* to **owners** only; ordinary members see them only once they accept. The invitee's own
   invitations view is theirs alone.
+- **The invitee's attention badge is a client-derived, self-clearing count — no new server signal, no read-state.**
+  The top-bar badge counts the invitee's open proposals from the **same** `listMyGroupInvitations` the view already
+  fetches; the blind server holds those `pendingConsent` rows regardless, so surfacing a count adds nothing it does
+  not already see. Accept/Decline removes the row, so the count falls on its own — there is **no read/unread state**
+  to persist (no per-user engagement metadata, no store beyond what consent already needs). It is deliberately a
+  single-signal badge, **not** a persistent notifications hub: a multi-source hub, a server-persisted read-state, and
+  folding the terms-acceptance gate ([uc.account.accept-terms](../../account/use-cases/uc.account.accept-terms.md),
+  a hard router gate) into it are all out of scope — each would add a store or server-visible metadata this
+  presentation surface does not need.
 - **Additive, reversible cheaply.** Accept flips one flag → the existing grant-delivery does the rest; Decline /
   Rescind is a single row delete. No rotation, no re-seal, no second standing key.
 - **Consent's strength tracks the client tier ([ADR 0026](../../../decisions/0026-client-trust-tiers.md)).** The

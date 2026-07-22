@@ -39,9 +39,9 @@ const menuItems = computed<MenuItem[]>(() => [
   // All settings (personal + tenant + server, scope/role-filtered) live in the hub (cr-0078, ADR 0022); the
   // menu keeps the language quick-picker + this one entry into the hub. Theme is a one-tap top-bar toggle.
   { label: t('shell.settings'), icon: 'pi pi-cog', command: () => void router.push('/settings') },
-  // The invitee's group-consent proposals inbox (cr-0094). A quiet entry (no live badge in v1 — a poll/badge
-  // is a deferred polish, like grant-delivery's).
-  { label: t('shell.invitations'), icon: 'pi pi-inbox', command: () => void router.push('/invitations') },
+  // Group invitations moved out of this menu into the top-bar attention badge (cr-invitations-topbar-badge,
+  // InvitationsBadge.vue) — an appears-on-demand badge routing to /invitations, so it is no longer a quiet,
+  // always-present menu row here.
   { label: t('shell.language'), icon: 'pi pi-language', items: languageMenuItems.value },
   { separator: true },
   { label: t('shell.logout'), icon: 'pi pi-sign-out', command: () => void signOut() },
