@@ -14,14 +14,19 @@ import exifr from 'exifr'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
 import { isHttpStatus } from '../../shared/httpError'
-import { mediaApi, bucketsApi } from '../../api/client'
+import { mediaApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import { type MediaSummary, type BucketSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
+import { type MediaSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
 import { createBrowserDeriver, deriveTiers, type MediaDeriver, type AddMediaSource, type Dimensions } from './mediaDeriver'
 
 // The on-device pixel stage lives in `./mediaDeriver` (cr-0143). Re-exported here so existing importers of
 // `./media` (share.ts, useOptimisticTiles.ts, uploadQueue.ts, tests) keep their import path unchanged.
 export { scaleToMaxEdge, TIER_SPECS, createBrowserDeriver, type MediaDeriver, type AddMediaSource, type Dimensions } from './mediaDeriver'
+
+// The per-uploader "Beiträge" buckets (en.memory.buckets, ADR 0034) live in `./mediaBuckets` (#96) — uploader
+// metadata, not blob data. Re-exported here so existing importers of `./media` (MemoryBuckets.vue, tests) keep
+// their import path unchanged.
+export { openBucketName, listBuckets, createBucket, renameBucket, deleteBucket, moveBucketMedia, type BucketItem } from './mediaBuckets'
 
 const KBLOB_CTX = 'blob-key'
 /**
@@ -32,10 +37,6 @@ const KBLOB_CTX = 'blob-key'
 const MEDIA_META_CTX = 'media-meta'
 /** AAD context binding the sealed heavy EXIF tier to its purpose (cr-0064) — distinct from the listed tier's. */
 const MEDIA_EXIF_CTX = 'media-exif'
-// AAD contexts for bucket names sealed under K_mem (cr-0113): a contributor primary's name is the identity's
-// sealed display name (cr-0101, copied server-side onto the bucket); a user-created sub-bucket seals with its own.
-const SHARE_IDENTITY_NAME_CTX = 'share-identity-name'
-const BUCKET_NAME_CTX = 'bucket-name'
 
 /** Plaintext bytes per chunk before sealing (each frame is this + a 12-byte nonce + a 16-byte tag). */
 export const CHUNK_SIZE = 256 * 1024
@@ -528,74 +529,6 @@ export async function listTrash(scopeId: string, nodeId: string): Promise<MediaI
  */
 export async function purgeMedia(scopeId: string, mediaId: string): Promise<void> {
   await withRefresh(() => mediaApi().purgeMedia({ scopeId, mediaId }))
-}
-
-// --- buckets (en.memory.buckets, ADR 0034, cr-0113) — the per-uploader "Beiträge" grouping -------------------
-
-/** One uploader bucket in a node: the opaque owner_key + structure + the (sealed) name + a live media count. */
-export type BucketItem = {
-  bucketId: string
-  ownerKey: string
-  parentBucketId?: string
-  isPrimary: boolean
-  /** The K_mem-sealed name (opaque base64): a contributor primary + every sub-bucket carry one; a member's primary
-   *  is undefined (the client shows the operator-visible username). Unwrap with [openBucketName]. */
-  sealedName?: string
-  mediaCount: number
-}
-
-/**
- * Unwrap a bucket name under K_mem — best-effort (null when absent/unopenable, so the picker falls back to a
- * neutral label). A **contributor** primary's name is the identity's sealed display name (cr-0101, copied
- * server-side); a **sub-bucket** seals with its own tag (cr-0113). Operator-blind — the server relays ciphertext.
- */
-export function openBucketName(memoryKey: Uint8Array, sealedName: string, kind: 'contributor' | 'sub'): string | null {
-  const ctx = kind === 'contributor' ? SHARE_IDENTITY_NAME_CTX : BUCKET_NAME_CTX
-  try {
-    return new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealedName), ctx))
-  } catch {
-    return null // not openable → the picker uses a neutral fallback label
-  }
-}
-
-function toBucket(b: BucketSummary): BucketItem {
-  return {
-    bucketId: b.bucketId,
-    ownerKey: b.ownerKey,
-    parentBucketId: b.parentBucketId ?? undefined,
-    isPrimary: b.isPrimary,
-    sealedName: b.sealedName ?? undefined,
-    mediaCount: b.mediaCount,
-  }
-}
-
-/** List a node's uploader buckets for the "Beiträge" tab (primaries + sub-buckets) with per-bucket counts. */
-export async function listBuckets(scopeId: string, nodeId: string): Promise<BucketItem[]> {
-  const res = await withRefresh(() => bucketsApi().listNodeBuckets({ scopeId, nodeId }))
-  return res.buckets.map(toBucket)
-}
-
-/** Create a sub-bucket under a primary root — the client seals the folder name under K_mem. `parentBucketId` nests
- *  it under that root (a contributor's, to curate contributions — cr-0123); omitted ⇒ the caller's own primary. */
-export async function createBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, name: string, parentBucketId?: string): Promise<BucketItem> {
-  const sealedName = b64std(v1.symWrap(memoryKey, v1.utf8(name), BUCKET_NAME_CTX, v1.randomBytes(12)))
-  return toBucket(await withRefresh(() => bucketsApi().createBucket({ scopeId, nodeId, createBucketRequest: { sealedName, parentBucketId } })))
-}
-
-/** Rename one of the caller's own sub-buckets — re-seal the name under K_mem (a later slice's UI). */
-export async function renameBucket(scopeId: string, nodeId: string, memoryKey: Uint8Array, bucketId: string, name: string): Promise<BucketItem> {
-  const sealedName = b64std(v1.symWrap(memoryKey, v1.utf8(name), BUCKET_NAME_CTX, v1.randomBytes(12)))
-  return toBucket(await withRefresh(() => bucketsApi().renameBucket({ scopeId, nodeId, bucketId, renameBucketRequest: { sealedName } })))
-}
-
-/** Delete one of the caller's own sub-buckets — its media reparent to the primary (a later slice's UI). */
-export async function deleteBucket(scopeId: string, nodeId: string, bucketId: string): Promise<void> {
-  await withRefresh(() => bucketsApi().deleteBucket({ scopeId, nodeId, bucketId }))
-}
-
-/** Move the caller's own media into a target bucket (null = the caller's primary) — a later slice's UI. */
-export async function moveBucketMedia(scopeId: string, nodeId: string, mediaIds: string[], targetBucketId: string | null): Promise<void> {
-  await withRefresh(() => bucketsApi().moveBucketMedia({ scopeId, nodeId, moveMediaRequest: { mediaIds, targetBucketId } }))
 }
 
 // --- read-back -------------------------------------------------------------
