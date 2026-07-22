@@ -11,13 +11,17 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { listScopeMembers, addGroupMember, resolveGroupMember, setMemberRole, removeGroupMember, memberError, SetMemberRoleRequestRoleEnum, type ScopeMember } from './members'
-import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup } from './scopes'
+import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapGroupNameKeyForInvitee, renameGroup, setSpaceIcon, clearSpaceIcon, openGroupIcon } from './scopes'
 import { acceptKeyChange, IdentityChangedError } from '../account/identityPins'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
-import { isUnauthorized } from '../../shared/httpError'
+import { isUnauthorized, isCodedError } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
+import { useObjectUrl } from '../../shared/state/useObjectUrls'
+import { bumpSpaceIcon } from './spaceIconSignal'
 import { useToast } from '../../shared/state/useToast'
+import SpaceIconDialog from './SpaceIconDialog.vue'
+import TenantAvatar from '../../components/app/TenantAvatar.vue'
 import ChangedKeyReviewDialog from './ChangedKeyReviewDialog.vue'
 
 // Addressed by scope id (cr-0087) — the settings hub renders one panel per group the caller owns, not the
@@ -45,6 +49,12 @@ const nameDraft = ref('')
 const renameBusy = ref(false)
 const renameError = ref('')
 const displayName = computed(() => props.name ?? '')
+// The group's icon (uc.spaces.set-space-icon, GROUP slice) — its avatar; owner-only set/replace/remove. Sealed
+// under K_icon and opened on-device against the caller's own grant (peeling the epoch chain, unlike a tenant).
+const groupIcon = useObjectUrl() // an owned object URL for the decrypted icon (revoked on replace/unmount)
+const iconDialogOpen = ref(false)
+const iconBusy = ref(false)
+const iconError = ref('')
 // Group lifecycle (cr-0090): the group's own pending-deletion state + the danger-zone controls.
 const purgeAfter = ref<Date | null>(null)
 const isPending = computed(() => purgeAfter.value !== null)
@@ -60,11 +70,15 @@ const { members, isOwner, trust, reviewTarget, reviewOpen, loading, loadError, r
   useMemberDirectory(async () => {
     addError.value = ''
     if (!props.scopeId) throw new Error('no-scope')
-    const [rows, me, lifecycle] = await Promise.all([
+    const [rows, me, lifecycle, iconBytes] = await Promise.all([
       listScopeMembers(props.scopeId), getMyProfile().catch(() => null), scopeLifecycle(props.scopeId).catch(() => null),
+      openGroupIcon(props.scopeId).catch(() => null),
     ])
     myUsername.value = me?.username ?? ''
     purgeAfter.value = lifecycle?.purgeAfter ?? null
+    // The identity header's avatar: the group's icon opened on-device against our own grant (null → the initial).
+    if (iconBytes) groupIcon.set(new Blob([iconBytes as BlobPart], { type: 'image/webp' }))
+    else groupIcon.clear()
     return { rows, isOwner: !!me && rows.some((m) => m.username === me.username && m.role === 'OWNER') }
   })
 watch(() => props.scopeId, () => reload())
@@ -264,6 +278,42 @@ async function saveRename() {
   }
 }
 
+// Set/replace the group icon: the dialog baked + encoded the bytes; here setSpaceIcon seals + POSTs (retry-once-
+// on-stale is inside it), then we refresh the header and signal the always-mounted sidebar to re-decrypt.
+async function onIconSave(bytes: Uint8Array) {
+  iconBusy.value = true
+  iconError.value = ''
+  try {
+    await setSpaceIcon(props.scopeId, bytes)
+    iconDialogOpen.value = false
+    bumpSpaceIcon()
+    await reload()
+    toast.success(t('spaceIcon.saved'))
+  } catch (e) {
+    on401(e)
+    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, 409, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
+  } finally {
+    iconBusy.value = false
+  }
+}
+
+async function removeIcon() {
+  if (!window.confirm(t('spaceIcon.removeConfirm'))) return
+  iconBusy.value = true
+  iconError.value = ''
+  try {
+    await clearSpaceIcon(props.scopeId)
+    bumpSpaceIcon()
+    await reload()
+    toast.success(t('spaceIcon.removed'))
+  } catch (e) {
+    on401(e)
+    if (!isUnauthorized(e)) iconError.value = t('spaceIcon.failed')
+  } finally {
+    iconBusy.value = false
+  }
+}
+
 /** Restore the group from pending-deletion (owner-only, in-window). */
 async function onRestore() {
   lifecycleError.value = ''
@@ -301,11 +351,33 @@ async function onRestore() {
           <Button :label="t('common.cancel')" severity="secondary" outlined size="small" :disabled="renameBusy" @click="renaming = false" />
         </template>
         <template v-else>
+          <TenantAvatar :name="displayName" :icon="groupIcon.url.value ?? undefined" />
           <h1 class="group-name-title">{{ displayName || t('groups.untitled') }}</h1>
           <Button v-if="isOwner" :label="t('groups.rename')" icon="pi pi-pencil" text size="small" @click="startRename" />
+          <div v-if="isOwner" class="group-icon-actions">
+            <Button
+              :label="groupIcon.url.value ? t('spaceIcon.change') : t('spaceIcon.add')"
+              icon="pi pi-image"
+              text
+              size="small"
+              :disabled="iconBusy"
+              @click="iconDialogOpen = true"
+            />
+            <Button
+              v-if="groupIcon.url.value"
+              :label="t('spaceIcon.remove')"
+              icon="pi pi-trash"
+              text
+              severity="danger"
+              size="small"
+              :disabled="iconBusy"
+              @click="removeIcon"
+            />
+          </div>
         </template>
       </div>
       <Message v-if="renameError" severity="error" :closable="false">{{ renameError }}</Message>
+      <Message v-if="iconError" severity="error" :closable="false">{{ iconError }}</Message>
 
       <div class="settings-section-header">
         <div>
@@ -464,6 +536,10 @@ async function onRestore() {
       </section>
     </section>
 
+    <!-- The owner's icon editor (uc.spaces.set-space-icon): pick + frame 1:1; on save the crop is baked + encoded
+         on-device and this panel seals + POSTs it (peeling the epoch chain to seal under the current epoch). -->
+    <SpaceIconDialog v-if="iconDialogOpen" :busy="iconBusy" @save="onIconSave" @close="iconDialogOpen = false" />
+
     <!-- Review a changed identity key (cr-0099) — the only verify surface until scope-wide strict-mode (cr-0100). -->
     <ChangedKeyReviewDialog v-if="reviewTarget" v-model:visible="reviewOpen" :member="reviewTarget" @accepted="refreshTrust" />
   </section>
@@ -503,6 +579,10 @@ async function onRestore() {
   margin: 0;
   flex: 1;
   min-width: 0;
+}
+.group-icon-actions {
+  display: flex;
+  gap: 0.25rem;
 }
 .group-name-input {
   flex: 1;

@@ -104,8 +104,8 @@ describe('SettingsHubView — section filtering by scope × role', () => {
 
   it('a Group scope: the gear opens that group’s detail page, and the Gruppen collection lists owned groups by name', async () => {
     vi.mocked(listMyGroups).mockResolvedValue([
-      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER', deletedAt: null, purgeAfter: null },
-      { scopeId: 'g-2', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER', deletedAt: null, purgeAfter: null },
+      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER', deletedAt: null, purgeAfter: null, icon: null },
+      { scopeId: 'g-2', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER', deletedAt: null, purgeAfter: null, icon: null },
     ])
     activeSpace.tenantId = 't-1'
     activeSpace.kind = ScopeKind.Group
@@ -119,8 +119,8 @@ describe('SettingsHubView — section filtering by scope × role', () => {
 
   it('clicking a group in the collection routes to its per-entity detail page', async () => {
     vi.mocked(listMyGroups).mockResolvedValue([
-      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER', deletedAt: null, purgeAfter: null },
-      { scopeId: 'g-9', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER', deletedAt: null, purgeAfter: null },
+      { scopeId: 'g-1', tenantId: 't-1', name: 'Familie Raddatz', role: 'OWNER', deletedAt: null, purgeAfter: null, icon: null },
+      { scopeId: 'g-9', tenantId: 't-1', name: 'Reise-Crew', role: 'OWNER', deletedAt: null, purgeAfter: null, icon: null },
     ])
     activeSpace.tenantId = 't-1'
     activeSpace.kind = ScopeKind.Group

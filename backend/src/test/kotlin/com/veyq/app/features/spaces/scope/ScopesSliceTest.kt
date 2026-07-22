@@ -392,14 +392,136 @@ class ScopesSliceTest {
     }
 
     @Test
-    fun setScopeIconOnANonTenantScopeIs404InV1() {
-        // v1 is TENANT-only (the group slice lifts the kind guard). A GROUP owner setting an icon → 404, the same
-        // uniform not-found a non-member gets — the kind guard never leaks that the scope exists.
+    fun setScopeIconOnAPersonalScopeIs404() {
+        // The residual of the old TENANT-only guard (the group slice lifted it for GROUP): a PERSONAL scope has
+        // no icon — nothing tells it apart from its owner — so the kind guard rejects it with the same uniform
+        // 404 a non-member gets, never leaking that the scope exists. Reverting the guard to `!= TENANT` reds the
+        // GROUP tests below; reverting it to `!= GROUP` reds this one.
+        val (userId, domain) = seedMember()
+        val personalId = given().header("Authorization", "Bearer ${token(userId)}")
+            .header("X-Forwarded-Host", domain).contentType(ContentType.JSON)
+            .body("""{"wrappedGrant":"$personalGrant"}""")
+            .`when`().post("/api/scopes").then().statusCode(201).extract().path<String>("scopeId")
+        given().header("Authorization", "Bearer ${token(userId)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$personalId/icon").then().statusCode(404)
+    }
+
+    @Test
+    fun setScopeIconOnAGroupByOwnerThenCoOwnerUpdatesSealedIcon() {
         val (owner, domain) = seedMember()
         val groupId = createGroupAs(owner, domain)
+
+        // The group owner sets the icon at the current epoch (0) → 204, and it shows on the group's scope row.
         given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
             .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.sealedIcon", equalTo(sealedIcon))
+            .body("find { it.id == '$groupId' }.iconEpoch", equalTo(0))
+
+        // A promoted co-owner (G3/ADR 0014) is an OWNER too and may replace it → 204 — the owner gate needs no
+        // change (isScopeOwner is true for any OWNER-role membership on the scope, the same gate renameGroup uses).
+        val partner = seedTenantMember(tenantIdOf(domain), "partner")
+        addToGroup(owner, domain, groupId, "partner")
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"role":"OWNER"}""").`when`().patch("/api/scopes/$groupId/members/$partner").then().statusCode(200)
+        given().header("Authorization", "Bearer ${token(partner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$replacedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.sealedIcon", equalTo(replacedIcon))
+    }
+
+    @Test
+    fun setScopeIconOnAGroupNonOwnerIs403AndNonMemberIs404() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        val member = seedTenantMember(tenantIdOf(domain), "member")
+        addToGroup(owner, domain, groupId, "member")
+
+        // A plain group member (not an owner) → 403 not_scope_owner.
+        given().header("Authorization", "Bearer ${token(member)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(403).body("code", equalTo("not_scope_owner"))
+
+        // A non-member gets the uniform 404 (membership first, ADR 0042) — never leaks that the group exists.
+        val outsider = seedUser()
+        given().header("Authorization", "Bearer ${token(outsider)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
             .`when`().post("/api/scopes/$groupId/icon").then().statusCode(404)
+    }
+
+    @Test
+    fun setScopeIconOnAGroupAfterRotationIsStaleAtOldEpochThenSealsAtNew() {
+        // The group-only interaction a tenant can't exercise (a tenant never rotates, so its icon epoch is always
+        // 0). A member-removal rotation (ADR 0024) advances currentEpoch; a set claiming the OLD epoch is stale
+        // (409), a set at the NEW epoch seals and the row reports that iconEpoch (a later-epoch reader peels the
+        // chain down to it). Rotation itself never touches sealed_icon/icon_epoch.
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+
+        // Rotate 0 → 1 (owner mints E1 + re-grants self).
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"wrappedPrev":"$rotPrev","grants":[{"userId":"$owner","wrappedGrant":"$newGrant"}]}""")
+            .`when`().post("/api/scopes/$groupId/epochs").then().statusCode(201).body("epoch", equalTo(1))
+
+        // A set at the OLD epoch 0 is now stale → 409; the icon stays unset.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(409).body("code", equalTo("stale_epoch"))
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.sealedIcon", nullValue())
+
+        // A set at the CURRENT epoch 1 succeeds; the row reports iconEpoch 1.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":1}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.sealedIcon", equalTo(sealedIcon))
+            .body("find { it.id == '$groupId' }.iconEpoch", equalTo(1))
+    }
+
+    @Test
+    fun setScopeIconOnAGroupPendingDeletionIs409() {
+        // A group has a grace-delete a tenant lacks — a set during the grace period writes epoch-current
+        // ciphertext and is rejected (unlike a clear, which is allowed; see clearScopeIconOnAGroup...).
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(204) // enters the grace period
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon")
+            .then().statusCode(409).body("code", equalTo("scope_pending_deletion"))
+    }
+
+    @Test
+    fun clearScopeIconOnAGroupIsIdempotentAndAllowedDuringGrace() {
+        val (owner, domain) = seedMember()
+        val groupId = createGroupAs(owner, domain)
+        // Set then clear → 204, back to null.
+        given().header("Authorization", "Bearer ${token(owner)}").contentType(ContentType.JSON)
+            .body("""{"sealedIcon":"$sealedIcon","iconEpoch":0}""")
+            .`when`().post("/api/scopes/$groupId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId/icon").then().statusCode(204)
+        given().header("Authorization", "Bearer ${token(owner)}").header("X-Forwarded-Host", domain)
+            .`when`().get("/api/scopes").then().statusCode(200)
+            .body("find { it.id == '$groupId' }.sealedIcon", nullValue())
+        // Idempotent: clearing an already-iconless group → 204.
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId/icon").then().statusCode(204)
+        // A clear is allowed even after the group enters grace-deletion (planning decision: dropping an icon off a
+        // dying scope is inconsequential; unlike a set, it writes no epoch-current ciphertext).
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId").then().statusCode(204) // grace
+        given().header("Authorization", "Bearer ${token(owner)}")
+            .`when`().delete("/api/scopes/$groupId/icon").then().statusCode(204)
     }
 
     @Test

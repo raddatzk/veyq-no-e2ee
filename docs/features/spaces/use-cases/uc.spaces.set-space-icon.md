@@ -2,14 +2,14 @@
 
 - **ID:** uc.spaces.set-space-icon
 - **Primary actor:** the space's **OWNER** — the **TenantOwner** (`OWNER` on the tenant **root** scope,
-  `scopeId == tenantId`) in the v1 slice, the **GroupOwner** in the group slice. The owner is the space's
+  `scopeId == tenantId`) on a TENANT, the **GroupOwner** (incl. a promoted co-owner) on a GROUP. The owner is the space's
   **icon authority**, exactly as they are its name authority ([uc.spaces.rename-group](uc.spaces.rename-group.md)).
 - **Secondary actor:** every other member — they **read** the icon; they never write it.
 - **Goal:** give a space a **face** — one square image, framed on device and **sealed** so the server never
   sees it — shown wherever the space appears: the sidebar's active row and the tenant overview
   ([uc.spaces.switch-spaces](uc.spaces.switch-spaces.md)). The **initial** stays the fallback.
 - **Preconditions:** an **authenticated, unlocked** `OWNER` who holds a grant at the scope's **current**
-  content-key epoch (the write key). The scope is a **TENANT** (v1) or a **GROUP** (later slice) — a
+  content-key epoch (the write key). The scope is a **TENANT** or a **GROUP** — a
   **PERSONAL** scope has no icon, there being nothing to tell it apart from. It is **active**, not
   pending-deletion ([uc.spaces.delete-group](uc.spaces.delete-group.md) A4).
 - **Postconditions (success):** the scope row carries `sealedIcon` — one **constant-length** ciphertext,
@@ -218,8 +218,9 @@ Icon zeigt einfach seinen Anfangsbuchstaben; ausgewählt wird nie etwas für dic
 - Enablers: [en.spaces.tenant-scope](../enablers/en.spaces.tenant-scope.md) (the scope the v1 slice gives a
   face, and the owner of the widened cross-tenant read path),
   [en.spaces.scope-key-rotation](../enablers/en.spaces.scope-key-rotation.md) (the epoch chain `iconEpoch`
-  indexes into), [en.spaces.group-scope](../enablers/en.spaces.group-scope.md) (the later slice — the
-  identical field one level down, and its name is already sealed on the same row)
+  indexes into — and which a GROUP icon read PEELS, since a group rotates on member-removal),
+  [en.spaces.group-scope](../enablers/en.spaces.group-scope.md) (the identical field one level down, its
+  name already sealed on the same row)
 - Use-cases: [uc.spaces.switch-spaces](uc.spaces.switch-spaces.md) (where the icon shows, and the widened
   `my-tenants` read), [uc.spaces.rename-group](uc.spaces.rename-group.md) (the sibling sealed-field write —
   same epoch rule, same owner gate, same stale-epoch `409`),

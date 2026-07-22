@@ -1,11 +1,14 @@
 useCase: uc.spaces.set-space-icon
 feature: spaces
 title: Space icon
-# Built — v1 TENANT slice (cr-space-icon). The icon is a chosen image, baked to a fixed square, re-encoded to WebP,
-# padded to a CONSTANT plaintext length, and sealed under K_icon = HKDF(E_e, "veyq/v1/space-icon-key") — the first
-# sealed content on a TENANT row. Owner-gated on the root scope (isScopeOwner against id == tenantId, ADR 0007), the
-# server rejects a stale iconEpoch (409) and stores only sealed_icon (opaque, constant length) + icon_epoch. GROUP is
-# the identical field one scope-kind down and is deferred (the backend gates kind != TENANT); PERSONAL never has one.
+# Built — TENANT (cr-space-icon) + GROUP (cr-group-space-icon). The icon is a chosen image, baked to a fixed square,
+# re-encoded to WebP, padded to a CONSTANT plaintext length, and sealed under K_icon = HKDF(E_e, "veyq/v1/space-icon-key").
+# Owner-gated on the root scope (isScopeOwner, ADR 0007; a GROUP co-owner is an OWNER too), the server rejects a stale
+# iconEpoch (409) and stores only sealed_icon (opaque, constant length) + icon_epoch. The GROUP slice lifted the kind
+# guard (only PERSONAL is now rejected — it never has an icon) and adds the group settings-panel icon header + the
+# sidebar group avatar. Its only real difference is behavioral: a GROUP rotates its content key on member-removal
+# (ADR 0024), so its iconEpoch may sit BELOW the current epoch and the read PEELS the epoch chain down to iconEpoch —
+# openMyTenantIcon shortcuts to epoch 0 (a tenant never rotates) and is deliberately not reused for groups.
 #
 # THREE claims are structurally invisible to the hermetic suites (ADR 0040 — a test no CI run executes makes no
 # coverage claim), so their refs below prove the CI-provable PART and the DoD live smoke on veyq.localhost:8081
@@ -16,14 +19,20 @@ title: Space icon
 # a SECOND tenant renders the first's icon end-to-end. The refs never claim the smoke as coverage.
 acceptanceCriteria:
   - id: owner-gated-icon-write
-    text: Only the space's OWNER may set, replace or remove the icon; a plain member gets 403 not_scope_owner and a non-member gets the same 404 as a bogus scope id (membership guard first, ADR 0042). For a TENANT the gate is isScopeOwner against the root scope row (id == tenantId) — a member who owns only a personal or group scope carrying the same tenantId is refused, which is the cr-0163 escalation shape and must be pinned by a test that seeds exactly that actor.
+    text: Only the space's OWNER may set, replace or remove the icon; a plain member gets 403 not_scope_owner and a non-member gets the same 404 as a bogus scope id (membership guard first, ADR 0042). For a TENANT the gate is isScopeOwner against the root scope row (id == tenantId) — a member who owns only a personal or group scope carrying the same tenantId is refused, which is the cr-0163 escalation shape and must be pinned by a test that seeds exactly that actor. For a GROUP the same owner gate applies and a promoted co-owner (OWNER role) qualifies too; a set is rejected while the group is pending-deletion (409). A PERSONAL scope has no icon and returns 404. The web panel shows the icon controls only to an owner.
     coverage:
       backend:
         integration:
           - ScopesSliceTest.setScopeIconNonOwnerIs403EvenWithAPersonalScopeOwnerRow
           - ScopesSliceTest.clearScopeIconIsIdempotentAndOwnerGated
-          - ScopesSliceTest.setScopeIconOnANonTenantScopeIs404InV1
+          - ScopesSliceTest.setScopeIconOnAPersonalScopeIs404
+          - ScopesSliceTest.setScopeIconOnAGroupByOwnerThenCoOwnerUpdatesSealedIcon
+          - ScopesSliceTest.setScopeIconOnAGroupNonOwnerIs403AndNonMemberIs404
+          - ScopesSliceTest.setScopeIconOnAGroupPendingDeletionIs409
           - OperatorBlindProbeTest.noScopeAddressedEndpointDistinguishesANonMemberFromANonExistentScope
+      web:
+        unit:
+          - src/features/spaces/GroupMembersPanel.test.ts
   - id: operator-blind-icon
     text: The server stores only sealed_icon (opaque ciphertext) + icon_epoch (a small integer) and never the image, a key, or an image size. It performs no image decode and no key derivation. Proven at the DB against a live instance — the stored bytes are not a decodable image and match no plaintext of the uploaded file.
     coverage:
@@ -50,10 +59,12 @@ acceptanceCriteria:
         integration:
           - ScopesSliceTest.setScopeIconStaleEpochIs409AndLeavesTheIconUnset
           - ScopesSliceTest.setScopeIconUpdatesSealedIconAndIconEpochThenClearResets
+          - ScopesSliceTest.setScopeIconOnAGroupAfterRotationIsStaleAtOldEpochThenSealsAtNew
       web:
         unit:
           - src/shared/crypto/v1.conformance.test.ts
           - src/features/spaces/spaceIcon.test.ts
+          - src/features/spaces/scopes.test.ts
   - id: initial-fallback-without-grant
     text: A reader who holds no grant for the space — the awaiting-access window before grant-delivery wraps K_SC to a newly admitted member — sees the initial, not an error, a blank, or a broken image. The same holds for a malformed or wrong-key sealed_icon, and for a space with no icon set. The initial is never a failure state.
     coverage:
@@ -74,3 +85,4 @@ acceptanceCriteria:
         integration:
           - ScopesSliceTest.clearScopeIconIsIdempotentAndOwnerGated
           - ScopesSliceTest.setScopeIconUpdatesSealedIconAndIconEpochThenClearResets
+          - ScopesSliceTest.clearScopeIconOnAGroupIsIdempotentAndAllowedDuringGrace

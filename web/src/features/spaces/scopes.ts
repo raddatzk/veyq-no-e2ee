@@ -116,9 +116,25 @@ function openGroupName(epochs: EpochKeys, nameEpoch: number, encryptedName: stri
   }
 }
 
+/** A group's icon from its epoch keys (uc.spaces.set-space-icon): derive `K_icon` from the **icon-epoch** key —
+ *  peeled from the chain, because a group's `iconEpoch` may sit below `currentEpoch` (it rotates on member-removal,
+ *  ADR 0024, but a rotation never re-seals the icon) — then open + unpad the sealed icon. Null when unopenable →
+ *  the caller renders the initial. Unlike {@link openMyTenantIcon}, this must peel the chain (a tenant never rotates). */
+function openGroupIconAt(epochs: EpochKeys, iconEpoch: number, sealedIcon: string): Uint8Array | null {
+  const iconKey = deriveSpaceIconKey(keyAt(epochs, iconEpoch))
+  try {
+    return openIcon(iconKey, sealedIcon)
+  } catch {
+    return null
+  } finally {
+    iconKey.fill(0)
+  }
+}
+
 /** A group the member holds — the switcher/settings row: opaque id + tenant + the **decrypted** (client-side)
- *  name + the caller's own `role` in it (OWNER/MEMBER, cr-0087 — lets the settings hub list groups I own). */
-export type GroupSpace = { scopeId: string; tenantId: string; name: string; role: string; deletedAt: Date | null; purgeAfter: Date | null }
+ *  name + its decrypted `icon` bytes (null → the initial) + the caller's own `role` in it (OWNER/MEMBER, cr-0087 —
+ *  lets the settings hub list groups I own). */
+export type GroupSpace = { scopeId: string; tenantId: string; name: string; icon: Uint8Array | null; role: string; deletedAt: Date | null; purgeAfter: Date | null }
 
 /**
  * The member's groups in the active tenant with their names decrypted on-device (en.spaces.group-scope). Each
@@ -139,7 +155,8 @@ export async function listMyGroups(): Promise<GroupSpace[]> {
           // derives that epoch's key and decrypts its name.
           epochs = await epochKeysFor(g, unwrapGrant(g, priv))
           const name = g.encryptedName ? openGroupName(epochs, g.nameEpoch, g.encryptedName) : ''
-          return { scopeId: g.id, tenantId: g.tenantId, name, role: g.role, deletedAt: g.deletedAt ?? null, purgeAfter: g.purgeAfter ?? null }
+          const icon = g.sealedIcon ? openGroupIconAt(epochs, g.iconEpoch, g.sealedIcon) : null
+          return { scopeId: g.id, tenantId: g.tenantId, name, icon, role: g.role, deletedAt: g.deletedAt ?? null, purgeAfter: g.purgeAfter ?? null }
         } catch {
           return null
         } finally {
@@ -382,6 +399,31 @@ export async function openMyTenantIcon(tenant: MyTenant): Promise<Uint8Array | n
   } finally {
     scopeKey?.fill(0)
     iconKey?.fill(0)
+    zero(priv)
+  }
+}
+
+/**
+ * Open a single group's icon for its settings-panel header (uc.spaces.set-space-icon) — unwrap the caller's own
+ * grant on that group transiently, **peel the epoch chain** to `iconEpoch` (a group's icon may sit below the
+ * current epoch, unlike a tenant), derive `K_icon`, and open + unpad the `sealedIcon` → the encoded image bytes,
+ * or **null** (no icon / unopenable → the initial). Zeroes the epoch keys + the identity copy in `finally`. The
+ * batched sidebar/hub read goes through {@link listMyGroups} (which opens every group's icon in one pass); this is
+ * the single-scope read the owner's panel re-runs after a set/replace/remove.
+ */
+export async function openGroupIcon(scopeId: string): Promise<Uint8Array | null> {
+  const priv = identityPrivate()
+  if (!priv) return null
+  let epochs: EpochKeys | null = null
+  try {
+    const g = (await listMyScopes()).find((s) => s.id === scopeId && s.kind === ScopeKind.Group)
+    if (!g || !g.sealedIcon) return null
+    epochs = await epochKeysFor(g, unwrapGrant(g, priv))
+    return openGroupIconAt(epochs, g.iconEpoch, g.sealedIcon)
+  } catch {
+    return null
+  } finally {
+    if (epochs) zeroEpochKeys(epochs)
     zero(priv)
   }
 }

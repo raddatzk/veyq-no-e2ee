@@ -609,10 +609,12 @@ paths:
         `sealed_icon` + `icon_epoch` — **only** when `iconEpoch == currentEpoch` (else `409 stale_epoch`: a
         concurrent rotation advanced the epoch under the caller, refetch + retry) and the scope is active (else
         `409 scope_pending_deletion`). Sealing under the current epoch makes a replaced icon forward-secret. The
-        scope must be a **TENANT** — the v1 slice; the identical endpoint serves a **GROUP** in a later slice, so
-        until then any non-TENANT scope (a PERSONAL, or a GROUP) answers `404`. Membership-gated first (a
+        scope must be a **TENANT** or a **GROUP** — a **PERSONAL** scope has no icon (nothing to tell it apart
+        from) and answers `404`. For a GROUP the `iconEpoch` may sit below `currentEpoch` (a group rotates its
+        content-key on member-removal, ADR 0024, but a rotation never re-seals the icon), so a reader peels the
+        epoch chain down to `iconEpoch` to derive `K_icon`. Membership-gated first (a
         non-member gets `404 scope_not_found`, ADR 0042), then owner-gated (`403 not_scope_owner`; ADR 0007 — the
-        owner gate keys on the root scope). Because every `sealedIcon` is padded to an identical length, the
+        owner gate keys on the root scope; a GROUP co-owner is an OWNER too). Because every `sealedIcon` is padded to an identical length, the
         server cannot tell a logo from a photo. Operator-blind — the server never sees a key or the image
         (ADR 0008).
       security:
@@ -630,7 +632,7 @@ paths:
         "400": { description: Malformed request (blank/wrong-length/invalid sealedIcon)., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: invalid_request } } } }
         "401": { description: Generic authentication failure., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: authentication_failed } } } }
         "403": { description: The caller is a member of the scope but not its OWNER., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: not_scope_owner } } } }
-        "404": { description: "No such scope (or already hard-purged) — or the caller is not a member of it (indistinguishable, ADR 0042) — or it is not a TENANT scope (a PERSONAL, or a GROUP until the group slice, carries no icon here).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
+        "404": { description: "No such scope (or already hard-purged) — or the caller is not a member of it (indistinguishable, ADR 0042) — or it is a PERSONAL scope (which carries no icon).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: scope_not_found } } } }
         "409": { description: "The submitted `iconEpoch` is stale (a concurrent rotation moved the epoch — `stale_epoch`, refetch + retry), or the scope is pending-deletion (`scope_pending_deletion`).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" }, example: { code: stale_epoch } } } }
     delete:
       tags: [scopes]

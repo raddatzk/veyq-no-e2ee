@@ -19,7 +19,7 @@ vi.mock('../account/identityPins', () => ({
   },
 }))
 
-import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup, openMyTenantIcon, SCOPE_GRANT } from './scopes'
+import { ensurePersonalScope, openPersonalScope, openScope, openScopeById, openGroupByToken, listMyTenants, createGroup, listMyGroups, rotateGroupForRemoval, renameGroup, deleteGroup, restoreGroup, openMyTenantIcon, openGroupIcon, SCOPE_GRANT } from './scopes'
 import { ScopeKind, type MyTenant, type ScopeMember } from '../../api/generated/scopes'
 import { scopesApi } from '../../api/client'
 import { checkAndPin } from '../account/identityPins'
@@ -154,7 +154,51 @@ describe('listMyGroups', () => {
     ])
     mockScopes(list, vi.fn())
 
-    expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew', deletedAt: null, purgeAfter: null }])
+    expect(await listMyGroups()).toEqual([{ scopeId: 'g1', tenantId: 't', name: 'Reise-Crew', icon: null, deletedAt: null, purgeAfter: null }])
+  })
+
+  it('opens a group icon sealed under an OLDER epoch by peeling the chain (a rotated group: iconEpoch < currentEpoch)', async () => {
+    // The group-only path a tenant never hits — openMyTenantIcon shortcuts to epoch 0, so listMyGroups must peel.
+    // Seal the icon under K_icon of E_0 while the caller holds E_1 (grantedEpoch 1); the chain link lets it peel down.
+    const e0 = v1.randomBytes(32)
+    const e1 = v1.randomBytes(32)
+    const grant1 = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), e1, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const wrappedPrev = b64std(v1.symWrap(e1, e0, 'scope-epoch', v1.randomBytes(12))) // E_0 sealed under E_1
+    const image = new Uint8Array([9, 8, 7, 6, 5, 4, 3, 2, 1])
+    const sealedIcon = sealIcon(deriveSpaceIconKey(e0), image) // K_icon of E_0, iconEpoch 0
+    const encryptedName = sealName(deriveGroupNameKey(e0), 'Alte Crew') // name also at epoch 0
+    const list = vi.fn().mockResolvedValue([
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant1, encryptedName, nameEpoch: 0, grantedEpoch: 1, iconEpoch: 0, sealedIcon },
+    ])
+    const epochs = vi.fn().mockResolvedValue([{ epoch: 1, wrappedPrev }])
+    vi.mocked(scopesApi).mockReturnValue({ listMyScopes: list, listScopeEpochs: epochs } as unknown as ReturnType<typeof scopesApi>)
+
+    const [g] = await listMyGroups()
+    expect(g.name).toBe('Alte Crew')
+    expect(g.icon).not.toBeNull()
+    expect(Array.from(g.icon!)).toEqual(Array.from(image)) // peeled E_1 → E_0, derived K_icon, opened + unpadded
+  })
+})
+
+describe('openGroupIcon (the settings-panel single-scope read)', () => {
+  it('peels the chain to open a rotated group’s icon, and returns null for a group with none / an unknown id', async () => {
+    const e0 = v1.randomBytes(32)
+    const e1 = v1.randomBytes(32)
+    const grant1 = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), e1, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const grant0 = b64std(v1.asymWrap(v1.hybridPublic(copyPriv()), e0, 'scope-grant', { nonce: v1.randomBytes(12) }))
+    const wrappedPrev = b64std(v1.symWrap(e1, e0, 'scope-epoch', v1.randomBytes(12)))
+    const image = new Uint8Array([1, 2, 3, 4, 5])
+    const sealedIcon = sealIcon(deriveSpaceIconKey(e0), image)
+    const list = vi.fn().mockResolvedValue([
+      { id: 'g1', kind: 'GROUP', tenantId: 't', wrappedGrant: grant1, nameEpoch: 0, grantedEpoch: 1, iconEpoch: 0, sealedIcon },
+      { id: 'g2', kind: 'GROUP', tenantId: 't', wrappedGrant: grant0, nameEpoch: 0, grantedEpoch: 0 }, // no icon
+    ])
+    const epochs = vi.fn().mockResolvedValue([{ epoch: 1, wrappedPrev }])
+    vi.mocked(scopesApi).mockReturnValue({ listMyScopes: list, listScopeEpochs: epochs } as unknown as ReturnType<typeof scopesApi>)
+
+    expect(Array.from((await openGroupIcon('g1'))!)).toEqual(Array.from(image)) // peels then opens
+    expect(await openGroupIcon('g2')).toBeNull() // no sealedIcon → the initial
+    expect(await openGroupIcon('nope')).toBeNull() // unknown id
   })
 })
 

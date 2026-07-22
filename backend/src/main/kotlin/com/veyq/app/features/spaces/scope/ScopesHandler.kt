@@ -105,8 +105,8 @@ sealed interface RenameGroupOutcome {
     object StaleEpoch : RenameGroupOutcome, HttpFailure by httpFailure("stale_epoch", CONFLICT)
 }
 
-/** Outcome of setting/replacing a scope icon (uc.spaces.set-space-icon). Owner-gated, TENANT-only (v1),
- *  active-only, current-epoch-only — the [RenameGroupOutcome] shape one scope-kind up. */
+/** Outcome of setting/replacing a scope icon (uc.spaces.set-space-icon). Owner-gated, TENANT or GROUP
+ *  (PERSONAL has no icon), active-only, current-epoch-only — the [RenameGroupOutcome] shape one scope-kind up. */
 sealed interface SetScopeIconOutcome {
     object Ok : SetScopeIconOutcome
     object ScopeNotFound : SetScopeIconOutcome, HttpFailure by Failures.scopeNotFound
@@ -115,7 +115,7 @@ sealed interface SetScopeIconOutcome {
     object StaleEpoch : SetScopeIconOutcome, HttpFailure by httpFailure("stale_epoch", CONFLICT)
 }
 
-/** Outcome of clearing a scope icon (uc.spaces.set-space-icon A5). Owner-gated, TENANT-only (v1); no epoch —
+/** Outcome of clearing a scope icon (uc.spaces.set-space-icon A5). Owner-gated, TENANT or GROUP; no epoch —
  *  a removal carries no ciphertext that could be stale — and idempotent. */
 sealed interface ClearScopeIconOutcome {
     object Ok : ClearScopeIconOutcome
@@ -206,16 +206,19 @@ class ScopesHandler(
     /**
      * Set or replace a space icon (uc.spaces.set-space-icon). Owner-gated on the scope **root** row — for a
      * `kind=TENANT` row `isScopeOwner(caller, scopeId==tenantId)` **is** the tenant-owner check (ADR 0007 — no new
-     * query, and no opening to the `tenantId`-only gate cr-0163 fixed). TENANT-only in the v1 slice (the group
-     * slice lifts the kind guard); rejected while pending-deletion. The client sealed the padded, constant-length
+     * query, and no opening to the `tenantId`-only gate cr-0163 fixed); a GROUP root gates the same way and a GROUP
+     * **co-owner** is an OWNER too. TENANT or GROUP only — a PERSONAL scope has no icon (rejected); rejected while
+     * pending-deletion. The client sealed the padded, constant-length
      * icon under `K_icon` of the **current** epoch and sends that epoch back; the server enforces `iconEpoch ==
      * currentEpoch` (`StaleEpoch` on a concurrent rotation) so a replace stays forward-secret, then overwrites the
-     * row's ciphertext icon + icon-epoch. Guard order is [renameGroup]'s exactly (membership → kind → owner →
-     * active → epoch, ADR 0042). Operator-blind: the server never sees a key or the image.
+     * row's ciphertext icon + icon-epoch. (A GROUP rotates on member-removal, ADR 0024, so its `iconEpoch` may
+     * later sit below `currentEpoch` — the read peels the chain; a rotation never re-seals the icon here.) Guard
+     * order is [renameGroup]'s exactly (membership → kind → owner → active → epoch, ADR 0042). Operator-blind: the
+     * server never sees a key or the image.
      */
     fun setScopeIcon(callerId: String, scopeId: String, sealedIcon: String, iconEpoch: Int): SetScopeIconOutcome {
         if (!store.isScopeMember(callerId, scopeId)) return SetScopeIconOutcome.ScopeNotFound
-        if (store.scopeKind(scopeId) != ScopeEntity.TENANT) return SetScopeIconOutcome.ScopeNotFound
+        if (store.scopeKind(scopeId) == ScopeEntity.PERSONAL) return SetScopeIconOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return SetScopeIconOutcome.NotOwner
         if (store.deletedAt(scopeId) != null) return SetScopeIconOutcome.PendingDeletion
         if (store.currentEpoch(scopeId) != iconEpoch) return SetScopeIconOutcome.StaleEpoch
@@ -226,11 +229,13 @@ class ScopesHandler(
     /**
      * Remove a space icon (uc.spaces.set-space-icon A5) — reset the row's icon + epoch; every member falls back to
      * the initial. Same owner gate as the set, but **no epoch check** (a removal carries no ciphertext that could
-     * be sealed under a stale epoch) and idempotent. Membership-gated first (ADR 0042), then TENANT-kind, then owner.
+     * be sealed under a stale epoch) and idempotent. Membership-gated first (ADR 0042), then kind (PERSONAL is
+     * rejected), then owner. A clear is not blocked while pending-deletion — dropping an icon off a dying scope is
+     * inconsequential (unlike a set, which writes ciphertext that must stay epoch-current).
      */
     fun clearScopeIcon(callerId: String, scopeId: String): ClearScopeIconOutcome {
         if (!store.isScopeMember(callerId, scopeId)) return ClearScopeIconOutcome.ScopeNotFound
-        if (store.scopeKind(scopeId) != ScopeEntity.TENANT) return ClearScopeIconOutcome.ScopeNotFound
+        if (store.scopeKind(scopeId) == ScopeEntity.PERSONAL) return ClearScopeIconOutcome.ScopeNotFound
         if (!store.isScopeOwner(callerId, scopeId)) return ClearScopeIconOutcome.NotOwner
         store.clearIcon(scopeId)
         return ClearScopeIconOutcome.Ok

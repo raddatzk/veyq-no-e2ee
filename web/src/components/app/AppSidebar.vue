@@ -61,6 +61,12 @@ const personalActive = computed(() => isPersonalScope(activeScope.value))
 // The member's groups (en.spaces.group-scope, cr-0032): names decrypted on-device (the server only ever stored
 // ciphertext). A group is entered via the `#@<id>` fragment; the active one is highlighted from the leading token.
 const groups = ref<GroupSpace[]>([])
+// Each group's decrypted icon as an owned object URL keyed by scopeId (uc.spaces.set-space-icon, GROUP slice) —
+// opened on-device by listMyGroups (peeling the epoch chain). Absent → the pi-users glyph.
+const groupIcons = useObjectUrls()
+function groupIcon(scopeId: string): string | undefined {
+  return groupIcons.get(scopeId) ?? undefined
+}
 // A group's fragment token is its readable slug (`slugify(name)`, e.g. `#@familie-sued`) when that slug is unique
 // among the caller's groups, else its opaque scopeId — groups have no server-enforced slug uniqueness (unlike
 // content nodes), so a name collision falls back to the unambiguous id (cr-0120). Old `#@<id>` links keep working:
@@ -89,6 +95,10 @@ function groupActive(scopeId: string): boolean {
 async function loadGroups() {
   try {
     groups.value = await listMyGroups()
+    for (const g of groups.value) {
+      if (g.icon) groupIcons.set(g.scopeId, new Blob([g.icon as BlobPart], { type: 'image/webp' }))
+      else groupIcons.drop(g.scopeId)
+    }
   } catch {
     /* the switcher tolerates an empty groups section */
   }
@@ -111,7 +121,7 @@ async function loadTenants() {
     }),
   )
 }
-watch(spaceIconVersion, () => void loadTenants())
+watch(spaceIconVersion, () => { void loadTenants(); void loadGroups() })
 
 // Create-group dialog. On success: refresh the list + switch into the new group (`#@<id>`).
 const createGroupOpen = ref(false)
@@ -388,7 +398,8 @@ function closeMobileMenu() {
           :class="{ 'router-link-active': groupActive(group.scopeId) }"
           @click="navigate"
         >
-          <span class="sidebar-scope-icon pi pi-users" />
+          <TenantAvatar v-if="groupIcon(group.scopeId)" :name="group.name" :icon="groupIcon(group.scopeId)" />
+          <span v-else class="sidebar-scope-icon pi pi-users" />
           <span><strong>{{ group.name }}</strong></span>
         </a>
       </RouterLink>
@@ -408,7 +419,8 @@ function closeMobileMenu() {
               :class="{ 'router-link-active': groupActive(group.scopeId) }"
               @click="navigate"
             >
-              <span class="sidebar-scope-icon pi pi-users" />
+              <TenantAvatar v-if="groupIcon(group.scopeId)" :name="group.name" :icon="groupIcon(group.scopeId)" />
+              <span v-else class="sidebar-scope-icon pi pi-users" />
               <span><strong>{{ group.name }}</strong></span>
             </a>
           </RouterLink>
@@ -507,7 +519,7 @@ function closeMobileMenu() {
               :class="{ 'mobile-nav-item-active': groupActive(group.scopeId) }"
               @click="closeMobileMenu"
             >
-              <span class="sidebar-scope-icon pi pi-users" /><span><strong>{{ group.name }}</strong></span>
+              <TenantAvatar v-if="groupIcon(group.scopeId)" :name="group.name" :icon="groupIcon(group.scopeId)" /><span v-else class="sidebar-scope-icon pi pi-users" /><span><strong>{{ group.name }}</strong></span>
             </RouterLink>
             <button v-if="canCreateGroup" class="mobile-nav-item" type="button" @click="createGroupOpen = true; closeMobileMenu()">
               <span class="sidebar-scope-icon pi pi-plus" /><span>{{ t('shell.groupCreate') }}</span>
