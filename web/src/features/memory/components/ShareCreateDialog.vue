@@ -13,6 +13,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
+import DatePicker from 'primevue/datepicker'
 import LocaleMarkdownEditor from './LocaleMarkdownEditor.vue'
 import { createShare, updateShare, readShareNoteMap, readShareName, readSharePassword, hasLocaleText, type LocaleMap, type ManagedShare } from '../share'
 import { ShareRole } from '../../../api/generated/sharing'
@@ -53,6 +54,12 @@ const revealPw = ref(false)
 // from the existing share (a note present / a password set); on create both start off.
 const noteEnabled = ref(false)
 const passwordEnabled = ref(false)
+// cr-share-link-expiry-ui: an optional expiry, CREATE-only. `expiresAt` is already accepted + enforced by the
+// backend (a share past it resolves 404), but UpdateShareRequest carries no expiresAt — so changing it in place
+// would need a contract/backend change and is deferred; the edit dialog omits this card. minExpiry = today.
+const expiryEnabled = ref(false)
+const expiresAt = ref<Date | null>(null)
+const minExpiry = new Date()
 const error = ref(false)
 const link = ref('')
 const copied = ref(false)
@@ -105,8 +112,11 @@ const { run: runSubmit, pending: busy } = useAsyncAction(
       emit('saved')
       emit('close')
     } else {
+      // Expiry (create-only): the picker gives a local date; the link should work THROUGH that day, so expire at
+      // its end. Off / no date → null (no expiry). The backend stores + enforces it opaquely.
+      const expiry = expiryEnabled.value && expiresAt.value ? endOfDay(expiresAt.value) : null
       const minted = await createShare(
-        props.nodeId, props.memoryKey, props.memoryName, role.value, null,
+        props.nodeId, props.memoryKey, props.memoryName, role.value, expiry,
         effectiveNote, name.value, passwordEnabled.value ? password.value : '',
       )
       link.value = minted.link
@@ -130,6 +140,13 @@ async function onCopy() {
   } catch {
     /* clipboard denied — the field stays selectable */
   }
+}
+
+/** End of the picked local day — so "expires on 1 Aug" lets the link work through 1 Aug, not from its midnight. */
+function endOfDay(d: Date): Date {
+  const e = new Date(d)
+  e.setHours(23, 59, 59, 999)
+  return e
 }
 </script>
 
@@ -234,6 +251,31 @@ async function onCopy() {
             />
           </div>
           <p v-if="password.length > 0 && passwordTooShort" class="share-error">{{ t('share.passwordTooShort', { min: MIN_PW }) }}</p>
+        </div>
+      </div>
+
+      <!-- cr-share-link-expiry-ui: an optional expiry, CREATE-only (UpdateShareRequest carries no expiresAt, so
+           changing it in place is deferred). On → a date picker; the link stops working after that day. -->
+      <div v-if="!isEdit" class="share-group">
+        <div class="share-group-head">
+          <div class="share-group-headings">
+            <div class="share-group-title">{{ t('share.expirySection') }}</div>
+            <p class="share-group-sub">{{ t('share.expirySectionHint') }}</p>
+          </div>
+          <ToggleSwitch v-model="expiryEnabled" :aria-label="t('share.expirySection')" :disabled="busy" />
+        </div>
+        <div v-if="expiryEnabled" class="share-group-body">
+          <label for="share-create-expiry">{{ t('share.expiryLabel') }}</label>
+          <DatePicker
+            id="share-create-expiry"
+            v-model="expiresAt"
+            :min-date="minExpiry"
+            date-format="yy-mm-dd"
+            show-icon
+            icon-display="input"
+            :disabled="busy"
+            fluid
+          />
         </div>
       </div>
 

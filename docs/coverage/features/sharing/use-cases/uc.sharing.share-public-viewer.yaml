@@ -36,6 +36,13 @@ acceptanceCriteria:
         integration: [ShareSliceTest.revokeMakesGuestPaths404, ShareSliceTest.expiredShareResolves404]
       web:
         unit: [src/features/memory/share.test.ts]
+  - id: set-and-show-expiry-web
+    text: The web curator can set an optional expiry when creating a share (a date picker; the link works through the end of the chosen day) and sees it on the manage list next to "created". Create-only for now — UpdateShareRequest carries no expiresAt, so changing an expiry in place is deferred; the edit dialog omits the picker.
+    coverage:
+      web:
+        unit:
+          - src/features/memory/components/ShareCreateDialog.test.ts
+          - src/features/memory/components/ShareDialog.test.ts
   - id: least-privilege-personal-only
     text: A share exposes only that one Memory subtree — K_mem is random and independently wrapped, so the link reveals neither K_SC (the rest of the scope) nor any sibling Memory's K_mem (crypto-enforced least privilege, ADR 0012). Only a MEMORY node is shareable (a folder is rejected 422). This use-case's v1 was personal-scope only; group/tenant Memories became shareable in cr-0104 (uc.sharing.share-shared-scope), gated on scope membership.
     coverage:

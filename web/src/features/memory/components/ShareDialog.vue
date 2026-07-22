@@ -168,6 +168,7 @@ function fmtDate(d: Date): string {
         <div class="share-list-meta">
           <strong class="share-list-title">{{ titleFor(share) }}</strong>
           <span class="share-list-when">{{ t('share.created', { date: fmtDate(share.createdAt) }) }}</span>
+          <span v-if="share.expiresAt" class="share-list-when share-list-expires">{{ t('share.expires', { date: fmtDate(share.expiresAt) }) }}</span>
           <div class="share-list-badges">
             <span class="share-list-role">{{ roleLabel(share.role) }}</span>
             <span v-if="decoded.get(share.shareId)?.hasNote" class="veyq-badge">{{ t('share.hasNote') }}</span>

@@ -8,8 +8,9 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 
 // The dialog decrypts an editShare on mount; stub the share data layer so it mounts crypto/network-free.
+const createShare = vi.fn().mockResolvedValue({ link: 'https://x/s/s1#k=abc' })
 vi.mock('../share', () => ({
-  createShare: vi.fn(),
+  createShare: (...a: unknown[]) => createShare(...a),
   updateShare: vi.fn(),
   readShareName: vi.fn(() => ''),
   readShareNoteMap: vi.fn(() => ({})),
@@ -33,6 +34,7 @@ const i18n = createI18n({
         roleViewerHint: 'h', roleContributorHint: 'h', roleUploaderHint: 'A drop-box.',
         name: 'Name', nameOptional: 'opt', noteLabel: 'Message', noteHint: 'h',
         create: 'Create link', creating: '…',
+        expirySection: 'Expiry date', expirySectionHint: 'h', expiryLabel: 'Expires on',
       },
     },
   },
@@ -44,9 +46,11 @@ const stubs = {
     props: ['options'],
     template: '<div class="select-button"><span v-for="o in options" :key="o.value" class="opt">{{ o.label }}</span></div>',
   },
-  Button: { props: ['label'], template: '<button>{{ label }}</button>' },
+  Button: { props: ['label'], emits: ['click'], template: '<button @click="$emit(\'click\')">{{ label }}</button>' },
   InputText: true,
-  ToggleSwitch: true,
+  // Controllable toggle/date stubs so a test can enable expiry + pick a date; $attrs forwards the aria-label.
+  ToggleSwitch: { props: ['modelValue'], emits: ['update:modelValue'], template: '<button v-bind="$attrs" @click="$emit(\'update:modelValue\', !modelValue)" />' },
+  DatePicker: { props: ['modelValue'], emits: ['update:modelValue'], template: '<input class="datepicker" />' },
   LocaleMarkdownEditor: true,
 }
 
@@ -81,5 +85,41 @@ describe('ShareCreateDialog (cr-0116)', () => {
     expect(w.find('.select-button').exists()).toBe(true)
     expect(w.text()).toContain('View only')
     expect(w.text()).toContain('View + add photos')
+  })
+
+  it('the expiry card shows on CREATE (expiresAt has no UpdateShareRequest field)', () => {
+    expect(mountDialog({}).find('[aria-label="Expiry date"]').exists()).toBe(true)
+  })
+
+  it('the expiry card is absent on EDIT (changing expiry in place is deferred)', () => {
+    const editShare = {
+      shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
+      createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
+      passwordRequired: false, sealedPassword: null,
+    }
+    expect(mountDialog({ editShare }).find('[aria-label="Expiry date"]').exists()).toBe(false)
+  })
+
+  it('create with expiry: createShare gets the picked day at its END (works through that day)', async () => {
+    createShare.mockClear()
+    const w = mountDialog({})
+    await w.find('[aria-label="Expiry date"]').trigger('click') // enable the expiry card
+    const picker = w.findComponent('.datepicker') as unknown as { vm: { $emit: (e: string, v: unknown) => void } }
+    picker.vm.$emit('update:modelValue', new Date(2026, 7, 1)) // 1 Aug 2026, local midnight
+    await w.vm.$nextTick()
+    await w.findAll('button').find((b) => b.text() === 'Create link')!.trigger('click')
+
+    expect(createShare).toHaveBeenCalledTimes(1)
+    const expiry = createShare.mock.calls[0][4] as Date // the 5th positional arg is expiresAt
+    expect(expiry).toBeInstanceOf(Date)
+    expect([expiry.getFullYear(), expiry.getMonth(), expiry.getDate()]).toEqual([2026, 7, 1])
+    expect(expiry.getHours()).toBe(23) // end of the picked day, not its midnight
+  })
+
+  it('create WITHOUT enabling expiry: createShare gets null', async () => {
+    createShare.mockClear()
+    const w = mountDialog({})
+    await w.findAll('button').find((b) => b.text() === 'Create link')!.trigger('click')
+    expect(createShare.mock.calls[0][4]).toBeNull()
   })
 })
