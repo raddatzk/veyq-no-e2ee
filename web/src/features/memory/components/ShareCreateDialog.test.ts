@@ -1,17 +1,19 @@
 // @vitest-environment happy-dom
-// The share CREATE dialog is shared by both flows via the `uploader` flag. The NORMAL flow shows a VIEWER/CONTRIBUTOR
-// role switcher (never the uploader — that is its own action/dialog); the UPLOADER flow hides the switcher entirely
-// (role fixed to UPLOADER). That absence of the switcher is the ONLY difference between the two dialogs. The uploader
-// action itself is capability-gated in MemoryDetail, and the server 422-rejects createShare(UPLOADER) when off.
+// The share CREATE/EDIT dialog is shared by both flows via the `uploader` flag. The NORMAL flow shows a
+// VIEWER/CONTRIBUTOR role switcher (never the uploader — that is its own action/dialog); the UPLOADER flow hides
+// the switcher entirely (role fixed to UPLOADER). cr-share-link-expiry-ui/-edit adds an optional expiry on both
+// create and edit: the picked day is sent at its END (works through that day), and on edit it is a FULL REPLACE
+// (pre-filled from the current share, always re-sent — an edit that drops it clears it).
 import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 
 // The dialog decrypts an editShare on mount; stub the share data layer so it mounts crypto/network-free.
 const createShare = vi.fn().mockResolvedValue({ link: 'https://x/s/s1#k=abc' })
+const updateShare = vi.fn().mockResolvedValue(undefined)
 vi.mock('../share', () => ({
   createShare: (...a: unknown[]) => createShare(...a),
-  updateShare: vi.fn(),
+  updateShare: (...a: unknown[]) => updateShare(...a),
   readShareName: vi.fn(() => ''),
   readShareNoteMap: vi.fn(() => ({})),
   readSharePassword: vi.fn(() => ''),
@@ -33,7 +35,7 @@ const i18n = createI18n({
         roleViewer: 'View only', roleContributor: 'View + add photos', roleUploader: 'Add photos only',
         roleViewerHint: 'h', roleContributorHint: 'h', roleUploaderHint: 'A drop-box.',
         name: 'Name', nameOptional: 'opt', noteLabel: 'Message', noteHint: 'h',
-        create: 'Create link', creating: '…',
+        create: 'Create link', creating: '…', noteSave: 'Save', noteSaving: '…', editTitle: 'Edit share',
         expirySection: 'Expiry date', expirySectionHint: 'h', expiryLabel: 'Expires on',
       },
     },
@@ -61,6 +63,12 @@ function mountDialog(props: Record<string, unknown>) {
   })
 }
 
+const editShareWith = (over: Record<string, unknown>) => ({
+  shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
+  createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
+  passwordRequired: false, sealedPassword: null, ...over,
+})
+
 describe('ShareCreateDialog (cr-0116)', () => {
   it('normal flow: the switcher offers view-only + view+add, never the uploader', () => {
     const w = mountDialog({})
@@ -76,28 +84,14 @@ describe('ShareCreateDialog (cr-0116)', () => {
   })
 
   it('edit flow (normal): shows the switcher so the role can be re-graded in place (cr-0119)', () => {
-    const editShare = {
-      shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
-      createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
-      passwordRequired: false, sealedPassword: null,
-    }
-    const w = mountDialog({ editShare })
+    const w = mountDialog({ editShare: editShareWith({}) })
     expect(w.find('.select-button').exists()).toBe(true)
     expect(w.text()).toContain('View only')
     expect(w.text()).toContain('View + add photos')
   })
 
-  it('the expiry card shows on CREATE (expiresAt has no UpdateShareRequest field)', () => {
+  it('the expiry card shows on CREATE', () => {
     expect(mountDialog({}).find('[aria-label="Expiry date"]').exists()).toBe(true)
-  })
-
-  it('the expiry card is absent on EDIT (changing expiry in place is deferred)', () => {
-    const editShare = {
-      shareId: 's1', nodeId: 'n1', role: ShareRole.Viewer, enabled: true, mine: true,
-      createdAt: new Date(0), expiresAt: null, sealedNote: null, sealedShareName: null, sealedShareKey: 'k',
-      passwordRequired: false, sealedPassword: null,
-    }
-    expect(mountDialog({ editShare }).find('[aria-label="Expiry date"]').exists()).toBe(false)
   })
 
   it('create with expiry: createShare gets the picked day at its END (works through that day)', async () => {
@@ -121,5 +115,25 @@ describe('ShareCreateDialog (cr-0116)', () => {
     const w = mountDialog({})
     await w.findAll('button').find((b) => b.text() === 'Create link')!.trigger('click')
     expect(createShare.mock.calls[0][4]).toBeNull()
+  })
+
+  it('the expiry card shows on EDIT, pre-filled; an unchanged edit re-sends it (full replace)', async () => {
+    updateShare.mockClear()
+    const w = mountDialog({ editShare: editShareWith({ expiresAt: new Date(2026, 7, 1, 23, 59, 59) }) })
+    await flushPromises() // let onMounted's pre-fill propagate to the stubs
+    expect(w.find('[aria-label="Expiry date"]').exists()).toBe(true) // shown on edit
+
+    await w.findAll('button').find((b) => b.text() === 'Save')!.trigger('click') // save without touching expiry
+    const expiry = updateShare.mock.calls[0][5] as Date // updateShare arg 6 (index 5) is expiresAt
+    expect([expiry.getFullYear(), expiry.getMonth(), expiry.getDate()]).toEqual([2026, 7, 1]) // preserved
+  })
+
+  it('EDIT with the expiry toggled off clears it (updateShare gets null)', async () => {
+    updateShare.mockClear()
+    const w = mountDialog({ editShare: editShareWith({ expiresAt: new Date(2026, 7, 1, 23, 59, 59) }) })
+    await flushPromises() // pre-fill first, so the toggle sees modelValue=true
+    await w.find('[aria-label="Expiry date"]').trigger('click') // toggle the pre-filled expiry OFF
+    await w.findAll('button').find((b) => b.text() === 'Save')!.trigger('click')
+    expect(updateShare.mock.calls[0][5]).toBeNull()
   })
 })

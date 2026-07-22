@@ -37,8 +37,10 @@ acceptanceCriteria:
       web:
         unit: [src/features/memory/share.test.ts]
   - id: set-and-show-expiry-web
-    text: The web curator can set an optional expiry when creating a share (a date picker; the link works through the end of the chosen day) and sees it on the manage list next to "created". Create-only for now — UpdateShareRequest carries no expiresAt, so changing an expiry in place is deferred; the edit dialog omits the picker.
+    text: The web curator can set an optional expiry on a share — on create AND edit (a date picker; the link works through the end of the chosen day) — and sees it on the manage list next to the created date. On edit expiresAt is a full replace like sealedNote/sealedShareName — the dialog pre-fills it and re-sends it, so an unrelated edit keeps it, and toggling it off clears it. The backend accepts + enforces expiresAt on both create and update.
     coverage:
+      backend:
+        integration: [ShareNoteSliceTest.ownerSetsAnExpiryInPlaceAndAnExpiredShareResolves404, ShareNoteSliceTest.ownerClearsAnExpiryInPlaceAndTheShareResolvesAgain, ShareNoteSliceTest.aFullReplaceEditThatOmitsExpiresAtClearsIt]
       web:
         unit:
           - src/features/memory/components/ShareCreateDialog.test.ts

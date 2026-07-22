@@ -112,6 +112,7 @@ class SharingResource(
         when (val o = handler.updateShare(
             identity.principal.name, shareId,
             updateShareRequest.sealedNote, updateShareRequest.sealedShareName, updateShareRequest.role?.value,
+            updateShareRequest.expiresAt?.toInstant(),
             updateShareRequest.passwordRequired, updateShareRequest.pwSalt, updateShareRequest.pwVerifier, updateShareRequest.sealedPassword,
         )) {
             UpdateShareOutcome.Done -> Response.noContent().build()

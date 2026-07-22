@@ -216,7 +216,8 @@ export async function createShare(
  * Owner-gated server-side; the link/`K_share` are untouched throughout.
  */
 export async function updateShare(
-  shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string, role?: ShareRole,
+  shareId: string, memoryKey: Uint8Array, sealedShareKey: string, note: LocaleMap, name: string,
+  expiresAt: Date | null, role?: ShareRole,
   passwordChange?: { set: string } | { remove: true },
 ): Promise<void> {
   const kShare = recoverShareKey(memoryKey, sealedShareKey)
@@ -230,7 +231,11 @@ export async function updateShare(
         ? { passwordRequired: false }
         : {}
   await withRefresh(() =>
-    sharesApi().updateShare({ shareId, updateShareRequest: { sealedNote, sealedShareName, role, ...passwordPatch } }),
+    sharesApi().updateShare({
+      // expiresAt is a full replace (like sealedNote/sealedShareName): send the current value to preserve it,
+      // null to clear. The edit dialog always passes the pre-filled expiry, so an unrelated edit keeps it.
+      shareId, updateShareRequest: { sealedNote, sealedShareName, expiresAt: expiresAt ?? null, role, ...passwordPatch },
+    }),
   )
 }
 

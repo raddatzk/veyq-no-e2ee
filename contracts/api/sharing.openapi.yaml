@@ -656,6 +656,9 @@ components:
         unchanged. `passwordRequired` is an **optional tri-state** (cr-0118): `true` sets/changes the password (send
         `pwSalt` + `pwVerifier` + `sealedPassword` with it), `false` removes it (the pw fields are cleared),
         **omitted** leaves the password untouched — all in place, the link/`K_share` untouched.
+        `expiresAt` is a **full replace** like `sealedNote`/`sealedShareName` (cr-share-link-expiry-edit): the new
+        instant, or `null`/absent to clear the expiry — the manage UI holds the current value and re-sends it, so an
+        unrelated edit must include it to preserve it.
       properties:
         sealedNote:
           type: [string, "null"]
@@ -673,6 +676,12 @@ components:
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 512) @field:jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9+/]*={0,2}")'
         role:
           $ref: "#/components/schemas/ShareRole"
+        expiresAt:
+          x-veyq-visibility: time
+          type: [string, "null"]
+          format: date-time
+          description: New expiry instant (full replace, cr-share-link-expiry-edit); `null`/absent clears it. Send the current value to preserve it.
+          example: null
         passwordRequired:
           x-veyq-visibility: flag
           type: [boolean, "null"]

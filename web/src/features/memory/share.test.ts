@@ -226,7 +226,7 @@ describe('share note + name (cr-0115 / cr-0116)', () => {
     await createShare(NODE_ID, kMem, 'Rom', undefined, null, { en: 'v1 note' }, 'For friends')
     const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
 
-    await updateShare('share-n2', kMem, sealedShareKey, { en: 'v2 note' }, 'For Grandma')
+    await updateShare('share-n2', kMem, sealedShareKey, { en: 'v2 note' }, 'For Grandma', null)
     const patch = update.mock.calls[0][0]
     expect(patch.shareId).toBe('share-n2')
     // both ciphertexts round-trip to the new values via the recovered K_share
@@ -242,7 +242,7 @@ describe('share note + name (cr-0115 / cr-0116)', () => {
     await createShare(NODE_ID, kMem, 'Rom', undefined, null, { en: 'note' }, 'name')
     const { sealedShareKey } = create.mock.calls[0][0].createShareRequest
 
-    await updateShare('share-n3', kMem, sealedShareKey, { en: '  ' }, '   ')
+    await updateShare('share-n3', kMem, sealedShareKey, { en: '  ' }, '   ', null)
     expect(update.mock.calls[0][0].updateShareRequest.sealedNote).toBeNull()
     expect(update.mock.calls[0][0].updateShareRequest.sealedShareName).toBeNull()
   })

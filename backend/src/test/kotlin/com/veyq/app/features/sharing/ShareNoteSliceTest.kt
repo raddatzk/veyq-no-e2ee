@@ -206,6 +206,60 @@ class ShareNoteSliceTest {
         given().`when`().get("/api/shares/$shareId").then().statusCode(200).body("role", equalTo("UPLOADER"))
     }
 
+    // --- expiry set / clear in place (uc.sharing.share-public-viewer §5 "set an expiry", cr-share-link-expiry-edit) ---
+
+    @Test
+    fun ownerSetsAnExpiryInPlaceAndAnExpiredShareResolves404() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val shareId = createWithNote(userId, memory, note1)
+        given().`when`().get("/api/shares/$shareId").then().statusCode(200) // live
+
+        val past = Instant.now().minusSeconds(60).toString()
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"sealedNote":"$note1","expiresAt":"$past"}""")
+            .`when`().patch("/api/shares/$shareId").then().statusCode(204)
+
+        given().`when`().get("/api/shares/$shareId").then().statusCode(404).body("code", equalTo("share_not_found"))
+    }
+
+    @Test
+    fun ownerClearsAnExpiryInPlaceAndTheShareResolvesAgain() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val past = Instant.now().minusSeconds(60).toString()
+        val shareId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"nodeId":"$memory","role":"VIEWER","wrap":"$wrap","sealedName":"$sealedName","sealedShareKey":"$shareKey","expiresAt":"$past"}""")
+            .`when`().post("/api/shares").then().statusCode(201).extract().path<String>("shareId")
+        given().`when`().get("/api/shares/$shareId").then().statusCode(404) // expired at birth
+
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"expiresAt":null}""")
+            .`when`().patch("/api/shares/$shareId").then().statusCode(204)
+
+        given().`when`().get("/api/shares/$shareId").then().statusCode(200) // live again
+    }
+
+    @Test
+    fun aFullReplaceEditThatOmitsExpiresAtClearsIt() {
+        val (userId, scopeId) = seedMemberScope()
+        val memory = seedMemory(scopeId)
+        val future = Instant.now().plusSeconds(3600).toString()
+        val shareId = given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"nodeId":"$memory","role":"VIEWER","wrap":"$wrap","sealedName":"$sealedName","sealedShareKey":"$shareKey","expiresAt":"$future"}""")
+            .`when`().post("/api/shares").then().statusCode(201).extract().path<String>("shareId")
+
+        // full replace, like sealedNote/sealedShareName: an edit that omits expiresAt clears it — the manage UI
+        // therefore re-sends the current value to preserve it.
+        given().header("Authorization", token(userId)).contentType(ContentType.JSON)
+            .body("""{"sealedShareName":"$name2"}""")
+            .`when`().patch("/api/shares/$shareId").then().statusCode(204)
+
+        given().header("Authorization", token(userId)).`when`().get("/api/shares")
+            .then().statusCode(200)
+            .body("find { it.shareId == '$shareId' }.expiresAt", equalTo(null))
+    }
+
     // --- helpers ---
 
     private fun createWithRole(userId: String, nodeId: String, role: String): String =

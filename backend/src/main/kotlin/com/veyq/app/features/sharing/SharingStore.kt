@@ -113,7 +113,7 @@ class SharingStore(
     @Transactional
     fun updateShare(
         ownerAccount: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?,
-        passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
+        expiresAt: Instant?, passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
     ): UpdateResult {
         val share = ShareEntity.findById(shareId)?.takeIf { it.ownerAccount == ownerAccount } ?: return UpdateResult.NOT_FOUND
         if (role != null) {
@@ -128,6 +128,7 @@ class SharingStore(
         }
         share.sealedNote = sealedNote
         share.sealedShareName = sealedShareName
+        share.expiresAt = expiresAt // full replace (cr-share-link-expiry-edit) — the manage UI re-sends the current value
         return UpdateResult.DONE
     }
 

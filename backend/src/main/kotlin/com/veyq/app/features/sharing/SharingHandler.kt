@@ -205,9 +205,9 @@ class SharingHandler(
      *  the wrap/`K_share`/link are untouched. */
     fun updateShare(
         userId: String, shareId: String, sealedNote: String?, sealedShareName: String?, role: String?,
-        passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
+        expiresAt: Instant?, passwordRequired: Boolean?, pwSalt: String?, pwVerifier: String?, sealedPassword: String?,
     ): UpdateShareOutcome =
-        when (store.updateShare(userId, shareId, sealedNote, sealedShareName, role, passwordRequired, pwSalt, pwVerifier, sealedPassword)) {
+        when (store.updateShare(userId, shareId, sealedNote, sealedShareName, role, expiresAt, passwordRequired, pwSalt, pwVerifier, sealedPassword)) {
             SharingStore.UpdateResult.DONE -> UpdateShareOutcome.Done
             SharingStore.UpdateResult.NOT_FOUND -> UpdateShareOutcome.NotFound
             SharingStore.UpdateResult.INVALID_ROLE -> UpdateShareOutcome.InvalidRole

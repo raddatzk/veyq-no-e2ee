@@ -54,9 +54,9 @@ const revealPw = ref(false)
 // from the existing share (a note present / a password set); on create both start off.
 const noteEnabled = ref(false)
 const passwordEnabled = ref(false)
-// cr-share-link-expiry-ui: an optional expiry, CREATE-only. `expiresAt` is already accepted + enforced by the
-// backend (a share past it resolves 404), but UpdateShareRequest carries no expiresAt — so changing it in place
-// would need a contract/backend change and is deferred; the edit dialog omits this card. minExpiry = today.
+// cr-share-link-expiry-ui / -edit: an optional expiry, on create AND edit. The backend accepts + enforces
+// `expiresAt` on both create and update (a share past it resolves 404); on edit it is a full replace, so the card
+// is pre-filled from the current share and always re-sent. minExpiry = today.
 const expiryEnabled = ref(false)
 const expiresAt = ref<Date | null>(null)
 const minExpiry = new Date()
@@ -77,6 +77,8 @@ onMounted(() => {
     password.value = currentPassword.value
     noteEnabled.value = hasLocaleText(note.value)
     passwordEnabled.value = !!s.passwordRequired || currentPassword.value.length > 0
+    expiryEnabled.value = !!s.expiresAt
+    expiresAt.value = s.expiresAt
   }
 })
 
@@ -93,6 +95,9 @@ const { run: runSubmit, pending: busy } = useAsyncAction(
   async () => {
     // A disabled toggle means "no note / no password" — send an empty note / clear the password.
     const effectiveNote = noteEnabled.value ? note.value : {}
+    // Expiry: the picker gives a local date; the link should work THROUGH that day, so expire at its end. Off /
+    // no date → null (no expiry). Full replace on edit — always sent so an unrelated edit keeps it.
+    const expiry = expiryEnabled.value && expiresAt.value ? endOfDay(expiresAt.value) : null
     if (isEdit.value && props.editShare?.sealedShareKey) {
       // cr-0118: the password tri-state from the toggle — off clears any existing one, on sets/changes it, an
       // unchanged value is left untouched.
@@ -107,14 +112,11 @@ const { run: runSubmit, pending: busy } = useAsyncAction(
       // cr-0119: a normal-flow edit may re-grade the role (VIEWER ↔ CONTRIBUTOR); the uploader variant never sends one.
       await updateShare(
         props.editShare.shareId, props.memoryKey, props.editShare.sealedShareKey,
-        effectiveNote, name.value, props.uploader ? undefined : role.value, passwordChange,
+        effectiveNote, name.value, expiry, props.uploader ? undefined : role.value, passwordChange,
       )
       emit('saved')
       emit('close')
     } else {
-      // Expiry (create-only): the picker gives a local date; the link should work THROUGH that day, so expire at
-      // its end. Off / no date → null (no expiry). The backend stores + enforces it opaquely.
-      const expiry = expiryEnabled.value && expiresAt.value ? endOfDay(expiresAt.value) : null
       const minted = await createShare(
         props.nodeId, props.memoryKey, props.memoryName, role.value, expiry,
         effectiveNote, name.value, passwordEnabled.value ? password.value : '',
@@ -254,9 +256,9 @@ function endOfDay(d: Date): Date {
         </div>
       </div>
 
-      <!-- cr-share-link-expiry-ui: an optional expiry, CREATE-only (UpdateShareRequest carries no expiresAt, so
-           changing it in place is deferred). On → a date picker; the link stops working after that day. -->
-      <div v-if="!isEdit" class="share-group">
+      <!-- cr-share-link-expiry-ui / -edit: an optional expiry, on create AND edit. On → a date picker; the link
+           stops working after that day. On edit it is pre-filled from the current share and always re-sent. -->
+      <div class="share-group">
         <div class="share-group-head">
           <div class="share-group-headings">
             <div class="share-group-title">{{ t('share.expirySection') }}</div>
