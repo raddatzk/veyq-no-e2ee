@@ -33,7 +33,7 @@ acceptanceCriteria:
       backend: { integration: [AccountWrapsSliceTest.deleteByIdRemovesTheWrap] }
       web: { unit: [src/features/account/trustDevice/trustDevice.test.ts] }
   - id: untrust-from-settings-ui
-    text: A user can untrust the current device from the settings hub — the "This device" panel reflects the trust state and its untrust action (behind a confirm) invokes the untrust logic, flipping the device to untrusted.
+    text: A user can forget the current device from the settings hub — the "This device" panel reflects the device's unlock tier (remembered / trusted / none) and its forget action (behind a confirm) drops whichever convenience tier this device holds, flipping it to none.
     coverage:
       web: { unit: [src/features/account/trustDevice/DeviceTrustPanel.test.ts] }
   - id: multi-device
