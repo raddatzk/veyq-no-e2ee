@@ -15,6 +15,7 @@ vi.mock('../features/admin/serverRole', () => ({
 vi.mock('../features/spaces/scopes', () => ({ listMyGroups: vi.fn().mockResolvedValue([]) }))
 vi.mock('../features/admin/createTenant/tenants', () => ({ listTenants: vi.fn().mockResolvedValue([]) }))
 vi.mock('../features/settings/AppearancePanel.vue', () => ({ default: { template: '<div class="stub-appearance" />' } }))
+vi.mock('../features/account/trustDevice/DeviceTrustPanel.vue', () => ({ default: { template: '<div class="stub-device" />' } }))
 vi.mock('../features/spaces/TenantMembersPanel.vue', () => ({ default: { template: '<div class="stub-members" />' } }))
 vi.mock('../features/spaces/GroupMembersPanel.vue', () => ({ default: { template: '<div class="stub-group-members" />' } }))
 vi.mock('../features/admin/createTenant/TenantDetailPanel.vue', () => ({ default: { template: '<div class="stub-tenant-detail" />' } }))
@@ -41,7 +42,7 @@ const i18n = createI18n({
       shell: { groups: 'Groups', groupCreate: 'New group' },
       settings: {
         title: 'Settings', back: 'Back', personal: 'Personal', tenant: 'Shared space', group: 'Group', server: 'Server',
-        appearance: 'Appearance', appearanceTitle: 'A', appearanceSub: 's', serverTenants: 'Tenants',
+        appearance: 'Appearance', appearanceTitle: 'A', appearanceSub: 's', device: 'This device', serverTenants: 'Tenants',
       },
     },
   },
