@@ -28,8 +28,9 @@
 - **`owner_key`** — **one opaque string** identifying the uploader: `user:{userId}` for a **member**,
   `share:{shareIdentityId}` for a **contributor** (reusing the existing cr-0101 identity as the grouping key). It
   is **operator-visible** (like membership and the existing `share_identity_id` stamp) and lets the server
-  authorize **`owner_key == caller`** without knowing identity semantics — collapsing the fragile pre-E2EE
-  two-column `uploader_user_id`/`share_identity_id` XOR into one field.
+  **scope** each medium and bucket to an opaque **`owner_key`** without knowing identity semantics — collapsing
+  the fragile pre-E2EE two-column `uploader_user_id`/`share_identity_id` XOR into one field. (It scopes *moves*
+  and grouping; it is **not** the authz gate — sub-bucket curation is member-gated, see below.)
 - **`veyq_bucket`** (a row per materialized bucket):
 
   ```
@@ -64,14 +65,20 @@
 - **Reparent-on-delete.** Deleting a sub-bucket sets its media **`bucket_id = null`** (they fall back to the
   owner's primary) — media are **never lost**. **Primaries are not deletable.** *(This reverses the pre-E2EE
   code, which hard-deleted a sub-bucket's media — see ADR 0034.)*
-- **Move.** Media move (bulk) **between the caller's own buckets** only.
+- **Move.** Media move (bulk) **within a single owner-root** — the target bucket must share the source media's
+  `owner_key`; there is **no cross-owner move**. Any member may do it, even re-bucketing a contributor's media
+  within that contributor's root (see authz below).
 
 ## Ownership & operator-blindness
 
-- **Own-bucket authz (server-enforced).** Create / rename / delete / move-media are gated to
-  **`owner_key == caller`** (a member's `user:{me}`, a guest's `share:{myIdentity}`). **Delete media** and **edit
-  capture time** stay **any key-holder** (unchanged from the media data layer). The server enforces this on the
-  opaque `owner_key`, never on content.
+- **Member-gated sub-bucket authz (server-enforced, cr-0123).** Create / rename / delete a **sub-bucket** and
+  **move media** are gated to **scope membership** only — **any member** may curate **any owner-root's**
+  sub-buckets (its own *or* a contributor's), but **never a primary** (primaries are neither created, renamed,
+  nor deleted through these ops) and **never across owners** (a move stays within one owner-root). **Delete
+  media** and **edit capture time** stay **any key-holder** (unchanged from the media data layer). The server
+  enforces on membership + the opaque `owner_key`'s structural role, never on content. *(cr-0123 deliberately
+  relaxed the original owner-only gate to member — so a curator can tidy a contributor's uploads; a reader must
+  not infer the stronger `owner_key == caller` guarantee, which the code does not give.)*
 - **What the operator sees** ([security-model](../../../crosscutting/security-model.md)): the opaque `owner_key`s,
   the **bucket structure** (node, parentage, `is_primary`, per-bucket counts), and `bucket_id`/`created_by` on
   media — **coarse operational metadata**, consistent with membership + the cr-0101 contributor stamp. **What it
