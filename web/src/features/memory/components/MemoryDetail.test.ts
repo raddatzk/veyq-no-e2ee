@@ -159,6 +159,24 @@ describe('MemoryDetail (gallery grid + header)', () => {
     expect(store.api.presignBlobDownloads).toHaveBeenCalled()
   })
 
+  it('draws a play badge only on a video tile — from the sealed mediaType (#104/#105)', async () => {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(1), mediaType: 'image/png' }, stubDeriver())
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array(8).fill(2), mediaType: 'video/mp4' }, stubDeriver())
+
+    const wrapper = mountDetail(memoryKey)
+    await flushPromises()
+    await flushPromises()
+
+    // exactly one tile carries the play badge — the video; the image tile has none
+    const badged = wrapper.findAll('.media-tile').filter((t) => t.find('.media-tile-play').exists())
+    expect(badged).toHaveLength(1)
+    expect(wrapper.findAll('.media-tile-play')).toHaveLength(1)
+  })
+
   it('sorts the grid by capture time — newest first by default, and toggles to oldest first (cr-0066)', async () => {
     const store = galleryFakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)

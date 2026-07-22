@@ -14,7 +14,7 @@ vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
 import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import MediaLightbox from './MediaLightbox.vue'
-import { addMedia, listMedia, type MediaDeriver, type MediaItem } from '../media'
+import { addMedia, listMedia, unsealMeta, type MediaDeriver, type MediaItem } from '../media'
 import exifr from 'exifr'
 import { mediaApi } from '../../../api/client'
 import * as v1 from '../../../shared/crypto/v1'
@@ -33,6 +33,7 @@ const i18n = createI18n({
       media: {
         itemPosition: '{index} of {count}',
         download: 'Download original',
+        playVideo: 'Play video',
         close: 'Close',
         delete: 'Move to trash',
         previous: 'Previous',
@@ -219,6 +220,92 @@ describe('MediaLightbox (preview, prev/next, download)', () => {
     expect(presigned).toEqual(['up-0'])
     // the original decrypts to the stub's 8 bytes filled with 1 → not a known signature → .bin
     expect(anchors.at(-1)!.getAttribute('download')).toBe('Rom 2026 1.bin')
+  })
+})
+
+describe('MediaLightbox — video playback + mediaType backfill (cr-inline-video-playback, #104/#105)', () => {
+  const FTYP_MP4 = new Uint8Array([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]) // "....ftypisom"
+
+  /** Seed one media with an explicit source type + original bytes. */
+  async function seedVideoLike(memoryKey: Uint8Array, mediaType: string, bytes: Uint8Array) {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes, mediaType }, stubDeriver())
+    const items = await listMedia(SCOPE_ID, NODE_ID)
+    return { store, items }
+  }
+
+  it('a typed video shows a poster + play affordance, then plays the ORIGINAL from a <video> on click', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { store, items } = await seedVideoLike(memoryKey, 'video/mp4', FTYP_MP4)
+
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+
+    // the video shows its poster (PREVIEW tier) with a play button — not a bare <img>, no <video> yet
+    expect(wrapper.find('.media-lightbox-video-poster').exists()).toBe(true)
+    const play = wrapper.find('[aria-label="Play video"]')
+    expect(play.exists()).toBe(true)
+    expect(wrapper.find('.media-lightbox-stage video').exists()).toBe(false)
+
+    store.api.presignBlobDownloads.mockClear()
+    await play.trigger('click')
+    await flushPromises()
+
+    // play fetched the ORIGINAL (up-0), never a derivative, and swapped in a typed <video>
+    const presigned = store.api.presignBlobDownloads.mock.calls.flatMap(
+      (c: any) => c[0].blobDownloadsBatchRequest.items.map((it: any) => it.blobId),
+    )
+    expect(presigned).toEqual(['up-0'])
+    const video = wrapper.find('.media-lightbox-stage video')
+    expect(video.exists()).toBe(true)
+    expect(video.attributes('src')).toBeTruthy()
+  })
+
+  it('an image shows no play affordance (the <video> branch is video-only)', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { items } = await seedVideoLike(memoryKey, 'image/png', new Uint8Array(8).fill(1))
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+    expect(wrapper.find('[aria-label="Play video"]').exists()).toBe(false)
+    expect(wrapper.find('.media-lightbox-stage img').exists()).toBe(true)
+  })
+
+  it('lazily back-fills the sealed mediaType on the download of a pre-field media, then emits updated', async () => {
+    const memoryKey = v1.randomBytes(32)
+    // pre-field: an EMPTY source type → nothing sealed at upload, but the original sniffs as mp4
+    const { store, items } = await seedVideoLike(memoryKey, '', FTYP_MP4)
+    expect(unsealMeta(memoryKey, items[0])?.mediaType).toBeUndefined() // no signal yet
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+    await wrapper.find('[aria-label="Download original"]').trigger('click')
+    await flushPromises()
+
+    // the download sniffed the original and wrote the type back — opaque on the wire, video/mp4 once unsealed
+    const sent = store.api.updateMediaMeta.mock.calls.at(-1)![0].mediaMetaUpdate.wrappedMeta
+    expect(typeof sent).toBe('string')
+    expect(sent).not.toContain('video/mp4')
+    expect(unsealMeta(memoryKey, { wrappedMeta: sent } as MediaItem)?.mediaType).toBe('video/mp4')
+    expect(wrapper.emitted('updated')?.at(-1)?.[0]).toMatchObject({ mediaId: items[0].mediaId })
+  })
+
+  it('does NOT back-fill in the read-only public viewer (no authed write path)', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { store, items } = await seedVideoLike(memoryKey, '', FTYP_MP4)
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    const wrapper = mount(MediaLightbox, {
+      props: { scopeId: SCOPE_ID, memoryKey, items, startIndex: 0, memoryName: 'Rom 2026', coverMediaId: null, readonly: true },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    await wrapper.find('[aria-label="Download original"]').trigger('click')
+    await flushPromises()
+
+    expect(store.api.updateMediaMeta).not.toHaveBeenCalled()
   })
 })
 

@@ -29,8 +29,13 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
     :data-upload-id="tile.fileId"
     :aria-label="t('media.uploadTilePreview', { name: tile.name })"
   >
-    <img v-if="tile.url && !tile.isVideo" class="media-grid-tile-media" :src="tile.url" :alt="tile.name" />
+    <!-- The poster (image OR a derived video first-frame) shows once ready; a video with no poster yet keeps the
+         icon. The play badge marks a settled video (during upload the progress ring below is the signal, #105). -->
+    <img v-if="tile.url" class="media-grid-tile-media" :src="tile.url" :alt="tile.name" />
     <span v-else class="media-grid-icon pi pi-video" />
+    <span v-if="tile.isVideo && tile.url && tile.status === 'done'" class="optimistic-tile-play" aria-hidden="true">
+      <span class="pi pi-play" />
+    </span>
     <!-- cr-0102 uploader: a settled tile is the session-only own-view — no ring, just a delete affordance -->
     <div v-if="isDoneDeletable()" class="upload-tile-done">
       <button
@@ -134,6 +139,25 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
   width: 100%;
   height: 100%;
   font-size: 1.5rem;
+}
+/* Play badge over a settled video's poster — matches the persisted MediaTile badge so the two states agree (#105). */
+.optimistic-tile-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 55%, transparent);
+  color: #fff;
+  pointer-events: none;
+}
+.optimistic-tile-play .pi {
+  font-size: 1.1rem;
+  margin-left: 0.15rem;
 }
 .upload-tile-state {
   position: absolute;

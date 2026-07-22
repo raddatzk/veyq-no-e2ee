@@ -1,9 +1,54 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { sniffExtension, derivedDownloadName, saveBytes } from './download'
+import { sniffMediaType, sniffExtension, derivedDownloadName, saveBytes } from './download'
 
 const bytes = (...b: number[]) => new Uint8Array(b)
 const ascii = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0))
+
+/** A minimal EBML header: the 4-byte magic, then a `DocType` element (id 42 82, single-byte-vint length) = `doc`. */
+const ebml = (doc: string) => {
+  const head = [0x1a, 0x45, 0xdf, 0xa3, 0x42, 0x82, 0x80 | doc.length]
+  return Uint8Array.from([...head, ...ascii(doc)])
+}
+
+describe('sniffMediaType (full MIME — feeds the sealed mediaType + the <video> branch, #104/#105)', () => {
+  it('reads the full MIME for the image / document signatures', () => {
+    expect(sniffMediaType(bytes(0xff, 0xd8, 0xff, 0xe0))).toBe('image/jpeg')
+    expect(sniffMediaType(bytes(0x89, 0x50, 0x4e, 0x47))).toBe('image/png')
+    expect(sniffMediaType(bytes(0x47, 0x49, 0x46, 0x38))).toBe('image/gif')
+    expect(sniffMediaType(bytes(0x25, 0x50, 0x44, 0x46))).toBe('application/pdf')
+
+    const webp = new Uint8Array(16)
+    webp.set(ascii('RIFF'), 0)
+    webp.set(ascii('WEBP'), 8)
+    expect(sniffMediaType(webp)).toBe('image/webp')
+  })
+
+  it('distinguishes the ISO-BMFF brands: heic (image), quicktime (.mov), else mp4', () => {
+    const bmff = (brand: string) => {
+      const b = new Uint8Array(16)
+      b.set(ascii('ftyp'), 4)
+      b.set(ascii(brand), 8)
+      return b
+    }
+    expect(sniffMediaType(bmff('heic'))).toBe('image/heic')
+    expect(sniffMediaType(bmff('qt  '))).toBe('video/quicktime')
+    expect(sniffMediaType(bmff('isom'))).toBe('video/mp4')
+    expect(sniffMediaType(bmff('mp42'))).toBe('video/mp4')
+  })
+
+  it('handles EBML video — WebM vs Matroska via the DocType (no ftyp box, the ftyp-only trap)', () => {
+    expect(sniffMediaType(ebml('webm'))).toBe('video/webm')
+    expect(sniffMediaType(ebml('matroska'))).toBe('video/x-matroska')
+    // EBML magic but an unreadable/absent DocType → the common playable case
+    expect(sniffMediaType(bytes(0x1a, 0x45, 0xdf, 0xa3, 0x00, 0x00))).toBe('video/webm')
+  })
+
+  it('is undefined for an unknown / too-short signature', () => {
+    expect(sniffMediaType(bytes(0x00, 0x01))).toBeUndefined()
+    expect(sniffMediaType(new Uint8Array(0))).toBeUndefined()
+  })
+})
 
 describe('sniffExtension (operator-blind magic-byte sniff)', () => {
   it('recognises a known set of image / video / document signatures', () => {
@@ -28,6 +73,11 @@ describe('sniffExtension (operator-blind magic-byte sniff)', () => {
     heic.set(ascii('ftyp'), 4)
     heic.set(ascii('heic'), 8)
     expect(sniffExtension(heic)).toBe('heic')
+  })
+
+  it('derives the video extensions, including EBML WebM / MKV', () => {
+    expect(sniffExtension(ebml('webm'))).toBe('webm')
+    expect(sniffExtension(ebml('matroska'))).toBe('mkv')
   })
 
   it('falls back to bin for an unknown / too-short signature', () => {

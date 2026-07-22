@@ -34,7 +34,10 @@ export type OptimisticTileVM = {
 export function useOptimisticTiles(key: Ref<string>, listedMediaIds: Ref<ReadonlySet<string>>) {
   const { batches } = useUploadQueue()
   const deriver = createBrowserDeriver()
-  type Preview = { url: string; aspectRatio: number; donated: boolean }
+  // `url` is null for a video until its first-frame poster is derived: an <img> can't decode raw video bytes, so a
+  // video's preview is a locally-derived poster (badge drawn over it, #105) — matching the persisted tile. Images
+  // use the raw file blob url directly.
+  type Preview = { url: string | null; aspectRatio: number; donated: boolean }
   const previews = reactive(new Map<string, Preview>())
 
   const optimisticFiles = computed(() => selectOptimisticUploads(batches.value, key.value, listedMediaIds.value))
@@ -55,33 +58,45 @@ export function useOptimisticTiles(key: Ref<string>, listedMediaIds: Ref<Readonl
     }),
   )
 
-  // Own the preview lifecycle: mint a local objectURL + probe the aspect ratio as each file appears; revoke +
-  // prune when it drops (cancelled / reconciled). A donated url is skipped — the caller's thumbs own its revoke.
+  // Own the preview lifecycle: mint a local preview + probe the aspect ratio (and, for a video, a poster) as each
+  // file appears; revoke + prune when it drops (cancelled / reconciled). A donated url is skipped — the caller's
+  // thumbs own its revoke.
   watch(
     optimisticFiles,
     (files) => {
       const present = new Set(files.map((f) => f.id))
       for (const [fileId, p] of previews) {
         if (present.has(fileId)) continue
-        if (!p.donated) URL.revokeObjectURL(p.url)
+        if (!p.donated && p.url) URL.revokeObjectURL(p.url)
         previews.delete(fileId)
       }
       for (const f of files) {
         if (previews.has(f.id)) continue
-        previews.set(f.id, { url: URL.createObjectURL(f.file), aspectRatio: galleryDisplayAspectRatio(undefined, undefined), donated: false })
-        void probeAspectRatio(f)
+        const isVideo = f.mediaType.startsWith('video/')
+        // image: the raw file is a valid <img> source; video: no <img>-decodable source yet — a poster follows.
+        previews.set(f.id, {
+          url: isVideo ? null : URL.createObjectURL(f.file),
+          aspectRatio: galleryDisplayAspectRatio(undefined, undefined),
+          donated: false,
+        })
+        void probePreview(f, isVideo)
       }
     },
     { immediate: true },
   )
 
-  async function probeAspectRatio(f: UploadFile) {
+  async function probePreview(f: UploadFile, isVideo: boolean) {
     try {
       const dims = await deriver.probeDimensions?.(f.file, f.mediaType)
+      const withDims = previews.get(f.id)
+      if (withDims && dims) previews.set(f.id, { ...withDims, aspectRatio: galleryDisplayAspectRatio(dims.w, dims.h) })
+      if (!isVideo) return
+      // derive the first-frame poster so a video shows a picture + a play badge, not a bare icon (#105)
+      const poster = await deriver.deriveVideoPoster(f.file)
       const p = previews.get(f.id)
-      if (p && dims) previews.set(f.id, { ...p, aspectRatio: galleryDisplayAspectRatio(dims.w, dims.h) })
+      if (p) previews.set(f.id, { ...p, url: URL.createObjectURL(new Blob([poster as BlobPart], { type: 'image/jpeg' })) })
     } catch {
-      // best-effort: keep the fallback aspect ratio
+      // best-effort: keep the fallback aspect ratio; a video with no derivable poster stays icon-only
     }
   }
 
@@ -91,7 +106,7 @@ export function useOptimisticTiles(key: Ref<string>, listedMediaIds: Ref<Readonl
       for (const f of b.files) {
         if (f.status !== 'done' || f.mediaId !== mediaId) continue
         const p = previews.get(f.id)
-        if (p && !p.donated) {
+        if (p && p.url && !p.donated) {
           previews.set(f.id, { ...p, donated: true })
           return p.url
         }
@@ -101,7 +116,7 @@ export function useOptimisticTiles(key: Ref<string>, listedMediaIds: Ref<Readonl
   }
 
   onBeforeUnmount(() => {
-    for (const p of previews.values()) if (!p.donated) URL.revokeObjectURL(p.url) // donated urls are owned by the caller's thumbs
+    for (const p of previews.values()) if (!p.donated && p.url) URL.revokeObjectURL(p.url) // donated urls are owned by the caller's thumbs
     previews.clear()
   })
 

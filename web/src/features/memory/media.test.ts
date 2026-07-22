@@ -26,6 +26,8 @@ import {
   scaleToMaxEdge,
   unsealMeta,
   setMediaMeta,
+  backfillMediaType,
+  isVideoMediaType,
   effectiveCapturedAt,
   CHUNK_SIZE,
   COVER_SPEC,
@@ -401,29 +403,47 @@ describe('addMedia — E2EE-sealed layout + EXIF tiers (cr-0059/cr-0064)', () =>
     expect(meta).toMatchObject({ w: 640, h: 480 }) // geometry still rides the tier
   })
 
-  it('seals no metadata tier when the source is undecodable (probe returns null) → unseal falls back to null', async () => {
+  it('seals only the mediaType when the source is undecodable (probe returns null) — no geometry/date/gps', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
     const deriver = stubDeriver()
-    deriver.probeDimensions = vi.fn(async () => null) // e.g. an empty MIME / non-image
+    deriver.probeDimensions = vi.fn(async () => null) // e.g. a non-image / undecodable codec
 
     const memoryKey = v1.randomBytes(32)
+    // The tier still seals — the persisted mediaType signal (#104/#105) rides it even with no derivable metadata.
     await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'application/pdf' }, deriver)
 
-    expect(store.captured.completeItem.wrappedMeta ?? null).toBeNull()
     expect(store.captured.completeItem.wrappedExif ?? null).toBeNull()
     const [item] = await listMedia(SCOPE_ID, NODE_ID)
-    expect(unsealMeta(memoryKey, item)).toBeNull()
+    const meta = unsealMeta(memoryKey, item)
+    expect(meta).toMatchObject({ mediaType: 'application/pdf' })
+    expect(meta?.w).toBeUndefined()
+    expect(meta?.capturedAt).toBeUndefined()
+    expect(meta?.gpsLat).toBeUndefined()
   })
 
-  it('a deriver with no probeDimensions seals no metadata tier (best-effort, optional)', async () => {
+  it('a deriver with no probeDimensions still seals the mediaType (best-effort — probe optional)', async () => {
     const store = fakeStore()
     vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
     vi.stubGlobal('fetch', store.fetchStub)
 
-    await addMedia(SCOPE_ID, NODE_ID, v1.randomBytes(32), { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver())
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1]), mediaType: 'image/png' }, stubDeriver())
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(unsealMeta(memoryKey, item)).toMatchObject({ mediaType: 'image/png' })
+  })
+
+  it('seals NO metadata tier when there is truly nothing — an empty MIME + no derivable metadata', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1]), mediaType: '' }, stubDeriver())
     expect(store.captured.completeItem.wrappedMeta ?? null).toBeNull()
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    expect(unsealMeta(memoryKey, item)).toBeNull()
   })
 })
 
@@ -490,6 +510,64 @@ describe('setMediaMeta — sealed capturedAt override in the listed-metadata tie
 
     expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, capturedAtOverride: CORRECTED })
     expect(effectiveCapturedAt(updated.tier)).toBe(CORRECTED)
+  })
+})
+
+describe('mediaType — the persisted video signal (cr-inline-video-playback, #104/#105)', () => {
+  const MEDIA_ID = 'media-1'
+  function decodeMeta(memoryKey: Uint8Array, sealed: string): MediaMeta {
+    return JSON.parse(new TextDecoder().decode(v1.symUnwrap(memoryKey, fromB64std(sealed), 'media-meta')))
+  }
+
+  it('isVideoMediaType matches only video/* MIME types', () => {
+    expect(isVideoMediaType('video/mp4')).toBe(true)
+    expect(isVideoMediaType('video/webm')).toBe(true)
+    expect(isVideoMediaType('image/jpeg')).toBe(false)
+    expect(isVideoMediaType('application/pdf')).toBe(false)
+    expect(isVideoMediaType(undefined)).toBe(false)
+    expect(isVideoMediaType('')).toBe(false)
+  })
+
+  it('seals the video mediaType at upload and round-trips it through unsealMeta', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+
+    const memoryKey = v1.randomBytes(32)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: new Uint8Array([1, 2, 3]), mediaType: 'video/mp4' }, stubDeriver())
+
+    // the wire is opaque ciphertext — the MIME never crosses in the clear
+    expect(store.captured.completeItem.wrappedMeta).not.toContain('video/mp4')
+    const [item] = await listMedia(SCOPE_ID, NODE_ID)
+    const meta = unsealMeta(memoryKey, item)
+    expect(meta?.mediaType).toBe('video/mp4')
+    expect(isVideoMediaType(meta?.mediaType)).toBe(true)
+  })
+
+  it('backfillMediaType merges the sniffed type into the tier, leaving every other field untouched', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+    // a pre-field media that already carries geometry + a capture date, but no sealed type
+    const existing: MediaMeta = { v: 1, w: 1920, h: 1080, capturedAt: Date.UTC(2020, 0, 1) }
+
+    const updated = await backfillMediaType(SCOPE_ID, MEDIA_ID, memoryKey, existing, 'video/webm')
+
+    // the re-sealed tier carries the new type AND the untouched originals — operator-blind (opaque on the wire)
+    expect(store.captured.updatedMeta).not.toContain('video/webm')
+    expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, w: 1920, h: 1080, capturedAt: Date.UTC(2020, 0, 1), mediaType: 'video/webm' })
+    expect(updated.tier?.mediaType).toBe('video/webm')
+  })
+
+  it('backfillMediaType seals a fresh tier for a media that had no metadata at all', async () => {
+    const store = fakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    const memoryKey = v1.randomBytes(32)
+
+    const updated = await backfillMediaType(SCOPE_ID, MEDIA_ID, memoryKey, null, 'video/quicktime')
+
+    expect(decodeMeta(memoryKey, store.captured.updatedMeta)).toEqual({ v: 1, mediaType: 'video/quicktime' })
+    expect(updated.tier?.mediaType).toBe('video/quicktime')
   })
 })
 

@@ -80,6 +80,15 @@ These operational fields are exactly what lets the server **sort, paginate, rout
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"
 mode is possible at the cost of those capabilities. The server never sees content — only structure.
 
+**One access-pattern finer than "coarse timestamps" is knowingly conceded, for range-streamed video playback.**
+Every non-streamed read fetches a blob **whole**, so the operator normally learns only *that* a blob was accessed.
+Playing a video streams it **range by range** ([ADR 0047](../decisions/0047-inline-video-playback-range-streaming.md)):
+the object store then observes **which ciphertext chunks a playing client fetches, and when** — an *intra-media*
+access pattern (which parts were watched, re-watched, skipped, seeked to), more granular than the coarse
+timestamps or sizes above. The owner accepted this for playback: hiding it would mean either downloading the whole
+original first or proxying bytes through the server (breaking operator-blindness). It is scoped to playback and
+changes nothing about content, which the server still never reads.
+
 This split is written in *kinds*; the contracts are written in *field names*. [ADR 0044](../decisions/0044-field-visibility-declared-at-the-field.md)
 is what connects them: every field in `contracts/api/` declares which of these kinds it is, or the build fails.
 This section stays the reason; the ADR carries the mechanism and does not restate it.

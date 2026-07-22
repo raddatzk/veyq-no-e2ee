@@ -14,6 +14,8 @@ defineProps<{
   openLabel: string
   /** Draw the selection outline. */
   selected?: boolean
+  /** Draw the play badge over the poster — the media is a video (#105, from the sealed mediaType). */
+  isVideo?: boolean
 }>()
 defineEmits<{ open: [] }>()
 </script>
@@ -25,6 +27,7 @@ defineEmits<{ open: [] }>()
       <span v-else-if="!hasDerivatives" class="media-grid-icon pi pi-file" aria-hidden="true" />
       <span v-else class="media-grid-tile-placeholder" aria-hidden="true" />
     </button>
+    <span v-if="isVideo" class="media-tile-play" aria-hidden="true"><span class="pi pi-play" /></span>
     <slot name="overlay" />
   </div>
 </template>
@@ -58,5 +61,25 @@ defineEmits<{ open: [] }>()
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+/* Play badge over a video poster (#105): centered, non-interactive (clicks fall through to the open button). A
+   soft scrim disc + a play glyph — the persisted counterpart to the optimistic tile's badge, so both agree. */
+.media-tile-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 55%, transparent);
+  color: #fff;
+  pointer-events: none; /* the tile's open button owns the click */
+}
+.media-tile-play .pi {
+  font-size: 1.1rem;
+  margin-left: 0.15rem; /* optically center the play triangle */
 }
 </style>

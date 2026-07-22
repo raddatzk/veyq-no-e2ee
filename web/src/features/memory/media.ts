@@ -64,6 +64,12 @@ export type MediaDerivative = { kind: MediaDerivativeKind; ref: BlobRef }
  *   file's modification date, a fallback that must NOT feed a Memory's `auto` date range — an edited photo's
  *   file date would wrongly stretch it);
  * - **GPS** `gpsLat,gpsLng` (decimal degrees) — the source of a Memory's place medoid (cr-0068, uc.memory.place).
+ * - **media type** `mediaType` — the original's full MIME (cr-inline-video-playback, #104/#105). Sealed here
+ *   rather than exposed as a contract field precisely because a server-visible one would leak photo-vs-video-vs-PDF
+ *   for every medium ([ADR 0044](../../../docs/decisions/0044-field-visibility-declared-at-the-field.md)). It is
+ *   the persisted video signal: `video/*` draws the tile's play badge and the lightbox's `<video>` branch without
+ *   fetching the original. Set at upload from the file's own type; back-filled for pre-field media on first
+ *   original-fetch ([sniffMediaType]).
  *
  * Every field is optional (best-effort). Versioned `v`, opaque — grows without a contract change.
  */
@@ -76,6 +82,7 @@ export type MediaMeta = {
   capturedAtSource?: 'exif' | 'file'
   gpsLat?: number
   gpsLng?: number
+  mediaType?: string
 }
 
 /**
@@ -163,6 +170,7 @@ export function unsealMeta(memoryKey: Uint8Array, item: MediaItem): MediaMeta | 
         capturedAtSource: source,
         gpsLat: finiteNum(m.gpsLat),
         gpsLng: finiteNum(m.gpsLng),
+        mediaType: cleanStr(m.mediaType),
       }
     }
   } catch {
@@ -289,8 +297,11 @@ async function sealMetadata(
     capturedAtSource: capturedAt !== undefined ? capturedAtSource : undefined,
     gpsLat: meta.gpsLat,
     gpsLng: meta.gpsLng,
+    mediaType: cleanStr(source.mediaType), // the persisted video signal (#104/#105); the file's own type, sealed
   }
-  const hasMeta = metaTier.w !== undefined || metaTier.capturedAt !== undefined || metaTier.gpsLat !== undefined || metaTier.gpsLng !== undefined
+  const hasMeta =
+    metaTier.w !== undefined || metaTier.capturedAt !== undefined || metaTier.gpsLat !== undefined ||
+    metaTier.gpsLng !== undefined || metaTier.mediaType !== undefined
   const wrappedMeta = hasMeta ? sealJson(memoryKey, prune(metaTier), MEDIA_META_CTX) : null
   const wrappedExif = meta.exif ? sealJson(memoryKey, meta.exif, MEDIA_EXIF_CTX) : null
   return { wrappedMeta, wrappedExif }
@@ -628,14 +639,51 @@ export async function setMediaMeta(
   meta: MediaMeta | null,
   overrideMs: number | null,
 ): Promise<{ tier: MediaMeta | null; wrappedMeta: string | null }> {
-  const next: MediaMeta = { ...(meta ?? { v: 1 }), capturedAtOverride: overrideMs ?? undefined }
-  const hasContent =
-    next.w !== undefined || next.capturedAt !== undefined || next.capturedAtOverride !== undefined ||
-    next.gpsLat !== undefined || next.gpsLng !== undefined
-  const wrappedMeta = hasContent ? sealJson(memoryKey, prune(next), MEDIA_META_CTX) : null
+  return persistMeta(scopeId, mediaId, memoryKey, { ...(meta ?? { v: 1 }), capturedAtOverride: overrideMs ?? undefined })
+}
+
+/**
+ * Lazily back-fill a pre-field media's sealed **`mediaType`** (cr-inline-video-playback, #104/#105). Called on the
+ * first original-fetch (download or play) of an item that carries no sealed type: re-seal the listed tier with the
+ * sniffed MIME merged in — every other field untouched — and PUT it, so the **next** listing carries the video
+ * signal (the tile play badge + the lightbox `<video>` branch). Operator-blind: the MIME is sniffed on device from
+ * plaintext the client already holds ([sniffMediaType]); the server only ever sees the re-sealed ciphertext. The
+ * accepted boundary (ADR 0047 / #105): a pre-field video that is never fetched stays without a signal — there is
+ * **no** eager original-fetch just to back-fill.
+ */
+export async function backfillMediaType(
+  scopeId: string,
+  mediaId: string,
+  memoryKey: Uint8Array,
+  meta: MediaMeta | null,
+  mediaType: string,
+): Promise<{ tier: MediaMeta | null; wrappedMeta: string | null }> {
+  return persistMeta(scopeId, mediaId, memoryKey, { ...(meta ?? { v: 1 }), mediaType })
+}
+
+/** Whether a metadata tier carries anything worth sealing (else it drops to null on a re-seal). */
+function metaHasContent(m: MediaMeta): boolean {
+  return (
+    m.w !== undefined || m.capturedAt !== undefined || m.capturedAtOverride !== undefined ||
+    m.gpsLat !== undefined || m.gpsLng !== undefined || m.mediaType !== undefined
+  )
+}
+
+/**
+ * Re-seal a metadata tier under `K_mem` and PUT it verbatim (`updateMediaMeta`) — the shared write path behind the
+ * capturedAt edit ([setMediaMeta]) and the mediaType backfill ([backfillMediaType]). Drops to null when nothing is
+ * left worth sealing. Returns both the unsealed tier (for local state) and the sealed blob (so the grid item stays
+ * consistent).
+ */
+async function persistMeta(
+  scopeId: string,
+  mediaId: string,
+  memoryKey: Uint8Array,
+  next: MediaMeta,
+): Promise<{ tier: MediaMeta | null; wrappedMeta: string | null }> {
+  const wrappedMeta = metaHasContent(next) ? sealJson(memoryKey, prune(next), MEDIA_META_CTX) : null
   await withRefresh(() => mediaApi().updateMediaMeta({ scopeId, mediaId, mediaMetaUpdate: { wrappedMeta } }))
-  // return both the unsealed tier (for local state) and the sealed blob (so the grid item stays consistent)
-  return { tier: wrappedMeta ? prune(next) as MediaMeta : null, wrappedMeta }
+  return { tier: wrappedMeta ? (prune(next) as MediaMeta) : null, wrappedMeta }
 }
 
 function tierRef(item: MediaItem, kind: MediaDerivativeKind): BlobRef | undefined {
@@ -649,6 +697,12 @@ function tierRef(item: MediaItem, kind: MediaDerivativeKind): BlobRef | undefine
  */
 export function hasDerivatives(item: MediaItem): boolean {
   return item.derivatives.length > 0
+}
+
+/** Whether a sealed `mediaType` names a video — the persisted signal for the tile play badge + the lightbox
+ *  `<video>` branch (#104/#105). Pure; the caller unseals the tier ([unsealMeta]) and passes `meta.mediaType`. */
+export function isVideoMediaType(mediaType: string | undefined): boolean {
+  return typeof mediaType === 'string' && mediaType.startsWith('video/')
 }
 
 /** Grid tier (small): the thumbnail derivative, or the original when a media has no derivatives. */

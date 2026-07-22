@@ -41,7 +41,11 @@
   this and is not an option** — the server never sees a pixel (operator-blind). That constraint is why this
   enabler exists at all.
 - **Video:** decode the **first frame** to a JPEG **poster**, used for **both** the thumbnail and the preview
-  (a still — no motion preview this pass); the original video is fetched only on download.
+  (a still — no motion preview tier this pass). The poster is no longer the *only* way to see a video: the
+  lightbox **plays the original in place** ([ADR 0047](../../../decisions/0047-inline-video-playback-range-streaming.md),
+  cr-inline-video-playback) — the poster is what the grid + the un-played lightbox show, and the original is
+  fetched on **play or download**. A compressed/streamable video *tier* is still future work (it needs a
+  transcode enabler).
 - Each tier is sealed **exactly like any media blob** — chunked AEAD under its **own fresh random `K_blob`**
   wrapped under the Memory's `K_mem` ([en.memory.media](en.memory.media.md)). **No new crypto primitive** — a
   derivative is another blob with a role tag.

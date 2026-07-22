@@ -15,12 +15,14 @@ import {
   loadMediaExif,
   unsealMeta,
   setMediaMeta,
+  backfillMediaType,
+  isVideoMediaType,
   effectiveCapturedAt,
   type MediaItem,
   type MediaExif,
   type MediaMeta,
 } from '../media'
-import { derivedDownloadName, saveBytes } from '../download'
+import { derivedDownloadName, saveBytes, sniffMediaType } from '../download'
 import { useObjectUrl } from '../../../shared/state/useObjectUrls'
 
 const props = defineProps<{
@@ -60,6 +62,9 @@ const exifOf = (it: MediaItem): Promise<MediaExif | null> =>
 const current = ref(props.startIndex)
 // The current item's decrypted preview tier as an object URL — minted + revoked (on switch/unmount) by the primitive.
 const { url: previewUrl, set: setPreview, clear: clearPreview } = useObjectUrl()
+// A video's decrypted original, played from a typed blob URL (Slice 1 interim, ADR 0047) — its own object-URL owner.
+const { url: videoUrl, set: setVideo, clear: clearVideo } = useObjectUrl()
+const videoLoading = ref(false)
 const loading = ref(false)
 const error = ref(false)
 const downloading = ref(false)
@@ -80,11 +85,17 @@ const isCover = computed(() => !!item.value && item.value.mediaId === props.cove
 const canPrev = computed(() => current.value > 0)
 const canNext = computed(() => current.value < props.items.length - 1)
 const previewable = computed(() => (item.value ? hasDerivatives(item.value) : false))
+// The persisted video signal (#104): the sealed mediaType of the shown item, when it names a video. Drives the
+// <video> branch + the play affordance. Undefined for images and for pre-field media (no sealed type yet — those
+// stay a poster image until a download back-fills the type, ADR 0047).
+const videoType = computed(() => (isVideoMediaType(captured.value?.mediaType) ? captured.value!.mediaType : undefined))
 
 // Load the current item's preview tier (operator-blind: ciphertext → decrypt → object URL). A non-derivable
 // item (E1) carries no preview tier, so the stage shows a download fallback instead of fetching its original.
 async function loadPreview() {
   clearPreview()
+  clearVideo() // drop the previous item's playing video (revoke its blob URL)
+  videoLoading.value = false
   error.value = false
   if (!item.value || !previewable.value) return
   loading.value = true
@@ -237,17 +248,58 @@ watch(
   },
 )
 
+// Slice 1 interim playback (ADR 0047): fetch + decrypt the WHOLE original via the existing originalOf path and
+// play it from a **typed** blob URL (a <video> needs a usable type to pick a demuxer). No size cap — a large video
+// simply waits for its full decrypt (the download button stays the escape hatch); Slice 2's service-worker range
+// layer replaces this with `src="/__media/<blobId>"`, deleting only this one fetch. Click-to-play, so autoplay with
+// sound is allowed (the user gesture drove it).
+async function playVideo() {
+  const target = item.value
+  const type = videoType.value
+  if (!target || !type || videoLoading.value) return
+  videoLoading.value = true
+  error.value = false
+  try {
+    const bytes = await originalOf(target)
+    if (item.value !== target) return // navigated away mid-decrypt — drop it
+    setVideo(new Blob([bytes as BlobPart], { type }))
+  } catch {
+    if (item.value === target) error.value = true
+  } finally {
+    if (item.value === target) videoLoading.value = false
+  }
+}
+
 async function download() {
   if (!item.value || downloading.value) return
   downloading.value = true
   const target = item.value
+  const targetMeta = captured.value // snapshot the shown item's tier — the backfill merges mediaType into it
   try {
     const bytes = await originalOf(target)
     saveBytes(bytes, derivedDownloadName(props.memoryName, current.value, bytes))
+    await maybeBackfillMediaType(target, targetMeta, bytes)
   } catch {
     error.value = true
   } finally {
     downloading.value = false
+  }
+}
+
+// Lazy mediaType backfill (ADR 0047 / #105): a pre-field media carries no sealed type, so on the download that
+// already fetched its original we sniff the bytes and write the type back — the NEXT listing then shows the play
+// badge + the <video> branch. Never in the read-only public viewer (no authed write path). Best-effort: a failed
+// sniff/write just means the item stays untyped (no badge yet).
+async function maybeBackfillMediaType(target: MediaItem, targetMeta: MediaMeta | null, bytes: Uint8Array) {
+  if (props.readonly || targetMeta?.mediaType) return
+  const sniffed = sniffMediaType(bytes)
+  if (!sniffed) return
+  try {
+    const updated = await backfillMediaType(props.scopeId, target.mediaId, props.memoryKey, targetMeta, sniffed)
+    if (item.value === target) captured.value = updated.tier
+    emit('updated', { mediaId: target.mediaId, wrappedMeta: updated.wrappedMeta }) // let the grid re-list with the badge
+  } catch {
+    /* best-effort — a failed backfill just means no badge yet */
   }
 }
 
@@ -341,6 +393,22 @@ onBeforeUnmount(() => {
 
         <div class="media-lightbox-stage">
           <p v-if="error" class="media-lightbox-error">{{ t('media.loadError') }}</p>
+          <!-- Slice 1 video playback (#104, ADR 0047): once the user clicks play, the decrypted original plays from
+               a typed blob URL. Before that, a video shows its poster (the PREVIEW tier) + a play affordance. -->
+          <video v-else-if="videoUrl" :src="videoUrl" controls autoplay playsinline />
+          <div v-else-if="videoType && previewUrl" class="media-lightbox-video-poster">
+            <img :src="previewUrl" :alt="memoryName" />
+            <button
+              type="button"
+              class="media-lightbox-play"
+              :disabled="videoLoading"
+              :aria-label="t('media.playVideo')"
+              :title="t('media.playVideo')"
+              @click="playVideo"
+            >
+              <span class="pi" :class="videoLoading ? 'pi-spin pi-spinner' : 'pi-play'" />
+            </button>
+          </div>
           <img v-else-if="previewUrl" :src="previewUrl" :alt="memoryName" />
           <span v-else-if="loading" class="media-original-loading">
             <span class="pi pi-spin pi-spinner" />
@@ -497,5 +565,40 @@ onBeforeUnmount(() => {
 }
 .media-lightbox-file-fallback .pi {
   font-size: 2rem;
+}
+/* A video's poster (the PREVIEW tier) with a centered play affordance over it (#104). The poster <img> keeps the
+   global `.media-lightbox-stage img` sizing; the wrapper just anchors the play button. */
+.media-lightbox-video-poster {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  max-height: 100%;
+}
+.media-lightbox-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-backdrop-strong) 60%, transparent);
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.media-lightbox-play:hover:not(:disabled) {
+  background: var(--app-accent);
+}
+.media-lightbox-play:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+.media-lightbox-play .pi {
+  margin-left: 0.2rem; /* optically center the play triangle */
 }
 </style>

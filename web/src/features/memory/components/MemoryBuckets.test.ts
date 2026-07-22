@@ -15,6 +15,7 @@ vi.mock('../media', () => ({
   restoreMedia: vi.fn(async () => {}),
   openBucketName: vi.fn(() => 'Aaa Contributor'),
   unsealMeta: vi.fn(() => ({ w: 100, h: 100 })),
+  isVideoMediaType: vi.fn(() => false),
   hasDerivatives: vi.fn(() => true),
 }))
 vi.mock('../../spaces/members', () => ({ listScopeMembers: vi.fn(async () => []) }))

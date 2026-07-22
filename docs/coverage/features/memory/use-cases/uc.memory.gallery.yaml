@@ -67,3 +67,31 @@ acceptanceCriteria:
         unit:
           - src/features/memory/media.test.ts
           - src/features/memory/components/MediaLightbox.test.ts
+  - id: sealed-media-type
+    text: A media's full MIME type is sealed under K_mem inside the always-listed metadata tier (wrappedMeta) at upload — never a server-visible field (an application of ADR 0044 — a plaintext mediaType would leak photo-vs-video-vs-PDF per medium; ADR 0047). The blind server relays the same opaque blob it already does (its opaque relay is proven under justified-grid-sealed-dimensions); the client unseals it (isVideoMediaType) to drive the video signal. cr-inline-video-playback (#104/#105).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+  - id: lightbox-video-playback
+    text: Opening a video (sealed mediaType video/*) shows its poster (the PREVIEW tier) with a play affordance; clicking play fetches + decrypts the pristine original on device and plays it from a typed blob URL in a <video> element (Slice 1 interim, ADR 0047 — no service-worker range layer yet, no size cap). An image shows no play affordance. Operator-blind — the original is fetched as ciphertext via presigned GET and decrypted under K_mem. cr-inline-video-playback (#104).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MediaLightbox.test.ts
+  - id: video-play-badge
+    text: A video tile draws a play badge over its poster in the gallery grid, the Beiträge (buckets) grid, and the Trash grid — driven by the sealed mediaType (isVideoMediaType), with no extra fetch. An uploading video shows a locally-derived first-frame poster + badge (not a bare icon) once settled, so the in-flight and persisted states agree. cr-inline-video-playback (#105).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/components/MemoryDetail.test.ts
+  - id: media-type-lazy-backfill
+    text: A pre-field media (uploaded before the sealed mediaType existed) carries no video signal; on the first download of its original the client sniffs the decrypted bytes (magic bytes, incl. WebM/MKV via the EBML DocType) and re-seals the type into the tier (updateMediaMeta), so the next listing shows the badge + the <video> branch. Never in the read-only public viewer (no authed write path); a never-fetched pre-field video stays without a signal — the accepted boundary (ADR 0047). cr-inline-video-playback (#104/#105).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/features/memory/download.test.ts
+          - src/features/memory/components/MediaLightbox.test.ts

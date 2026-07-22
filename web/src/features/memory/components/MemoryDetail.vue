@@ -15,7 +15,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import type { TreeNode } from '../tree'
-import { hasDerivatives } from '../media'
+import { hasDerivatives, unsealMeta, isVideoMediaType, type MediaItem } from '../media'
 import { useMemoryDate } from '../useMemoryDate'
 import { useMemoryLocation } from '../useMemoryLocation'
 import { useMemoryCover } from '../useMemoryCover'
@@ -119,6 +119,19 @@ const {
   reloadGallery: () => void load(),
   liftTombstone,
 })
+// The persisted video signal (#104/#105): a media is a video iff its sealed `mediaType` (in the listed tier) is
+// `video/*`. Unseal once per item on a list change (not per render), so the tile draws its play badge with no
+// extra fetch. Pre-field media carry no type → no badge until the lazy backfill lands one (accepted, ADR 0047).
+function videoIdSet(list: readonly MediaItem[]): Set<string> {
+  const key = props.memoryKey
+  const set = new Set<string>()
+  if (!key) return set
+  for (const it of list) if (isVideoMediaType(unsealMeta(key, it)?.mediaType)) set.add(it.mediaId)
+  return set
+}
+const galleryVideoIds = computed(() => videoIdSet(items.value))
+const trashVideoIds = computed(() => videoIdSet(trashedItems.value))
+
 const activeTab = ref<'gallery' | 'chapters' | 'beitraege' | 'trash'>('gallery') // local (the #fragment carries the tree path, cr-0031)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -445,6 +458,7 @@ watch(
                   }"
                   :src="thumbs.get(item.media.mediaId)"
                   :has-derivatives="hasDerivatives(item.media)"
+                  :is-video="galleryVideoIds.has(item.media.mediaId)"
                   :open-label="t('media.openItem', { index: item.index + 1 })"
                   @open="openLightboxAt(item.index)"
                 />
@@ -537,6 +551,7 @@ watch(
                   }"
                   :src="trashThumbs.get(item.media.mediaId)"
                   :has-derivatives="hasDerivatives(item.media)"
+                  :is-video="trashVideoIds.has(item.media.mediaId)"
                   :open-label="t('media.openItem', { index: item.index + 1 })"
                   :selected="selectedTrash.has(item.media.mediaId)"
                   @open="toggleTrashSelect(item.media.mediaId)"

@@ -18,7 +18,7 @@ import MediaTile from './MediaTile.vue'
 import { galleryDisplayAspectRatio } from '../mediaGridLayout'
 import {
   listBuckets, createBucket, renameBucket, deleteBucket, moveBucketMedia, openBucketName, deleteMedia, restoreMedia,
-  unsealMeta, hasDerivatives, type MediaItem, type BucketItem,
+  unsealMeta, isVideoMediaType, hasDerivatives, type MediaItem, type BucketItem,
 } from '../media'
 import { listScopeMembers } from '../../spaces/members'
 import { useToast } from '../../../shared/state/useToast'
@@ -177,11 +177,20 @@ const filteredMedia = computed<MediaItem[]>(() => {
   return props.media.filter((m) => m.bucketId === b.id)
 })
 
-const aspectFor = (m: MediaItem) => {
-  const dims = props.memoryKey ? unsealMeta(props.memoryKey, m) : null
-  return galleryDisplayAspectRatio(dims?.w, dims?.h)
-}
-const layoutItems = computed(() => filteredMedia.value.map((m, index) => ({ id: m.mediaId, aspectRatio: aspectFor(m), media: m, index })))
+// Unseal each tile's listed metadata once (operator-blind, under K_mem): the aspect ratio (cr-0059) AND the video
+// signal (#105, from the sealed mediaType) both come from it — one unwrap, not two.
+const layoutItems = computed(() =>
+  filteredMedia.value.map((m, index) => {
+    const meta = props.memoryKey ? unsealMeta(props.memoryKey, m) : null
+    return {
+      id: m.mediaId,
+      aspectRatio: galleryDisplayAspectRatio(meta?.w, meta?.h),
+      media: m,
+      index,
+      isVideo: isVideoMediaType(meta?.mediaType),
+    }
+  }),
+)
 
 // where you may move the selection: any bucket sharing the active bucket's owner-root, excluding the active one.
 // A member may re-bucket within one root (own or a contributor's) but never across owners (cr-0123 authz), so the
@@ -429,6 +438,7 @@ function openTile(index: number) { emit('openLightbox', { items: filteredMedia.v
             :style="{ transform: `translate(${tile.left}px, ${tile.top}px)`, width: `${tile.renderedWidth}px`, height: `${tile.renderedHeight}px` }"
             :src="thumbs.get(item.media.mediaId)"
             :has-derivatives="hasDerivatives(item.media)"
+            :is-video="item.isVideo"
             :open-label="t('media.openItem', { index: item.index + 1 })"
             :selected="selected.has(item.media.mediaId)"
             @open="openTile(item.index)"
