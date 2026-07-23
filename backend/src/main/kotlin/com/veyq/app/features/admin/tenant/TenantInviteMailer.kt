@@ -21,20 +21,23 @@ interface TenantInviteMailer {
 }
 
 /**
- * Dev/test impl: logs the invite link instead of sending mail. Replace with an SMTP-backed impl in infra.
+ * Dev/test impl: does not send mail. Replace with an SMTP-backed impl in infra.
  *
  * Two safeguards so this dev convenience never becomes a prod liability:
- *  - the raw bootstrap token (a secret that must live only in the URL fragment, ADR 0006) is logged **only
- *    outside production**; a production runtime logs a secret-free warning instead of the link, so the
- *    invite secret never lands in server logs;
- *  - the owner-supplied `domain` is validated as a bare hostname before it is interpolated into the link,
- *    so it can't inject a different scheme/host/path (phishing / link-injection) once a real mailer ships.
+ *  - the raw bootstrap token (a redeemable secret that must live only in the URL fragment, ADR 0006) is
+ *    **never logged**, in any launch mode (cr-invite-token-log-redaction): a production runtime logs a
+ *    secret-free warning that nothing was delivered, and a dev/test runtime logs a secret-free info line —
+ *    so the invite secret never lands in server logs regardless of `LaunchMode`. The token reaches those who
+ *    need it via the API response or the opt-in dev-file below, not the console;
+ *  - the owner-supplied `domain` is validated as a bare hostname up front, so once a real mailer builds a
+ *    link from it, it can't be tricked into a different scheme/host/path (phishing / link-injection).
  *
- * Dev-only invite **file** (cr-0046): when `veyq.tenant.invite.dev-file` is set, each invite is also appended
- * as one JSON line `{ownerEmail, token, expiresAt}` so the local seed orchestrator can read the bootstrap
- * secret back deterministically (no console-log scraping / ANSI / flush race). The append sits **after** the
- * production early-return, so a `LaunchMode.NORMAL` runtime never writes the secret; the default is empty
- * (no file). Best-effort: a file error is logged and never breaks invite delivery.
+ * Dev-only invite **file** (cr-0046): when `veyq.tenant.invite.dev-file` is set, each invite is appended as
+ * one JSON line `{ownerEmail, token, expiresAt}` so the local seed orchestrator can read the bootstrap secret
+ * back deterministically (no console-log scraping / ANSI / flush race). This is the **sole** place the raw
+ * token is written, and the append sits **after** the production early-return, so a `LaunchMode.NORMAL`
+ * runtime never writes the secret; the default is empty (no file). Best-effort: a file error is logged and
+ * never breaks invite delivery.
  */
 @ApplicationScoped
 class LoggingTenantInviteMailer(
@@ -53,8 +56,14 @@ class LoggingTenantInviteMailer(
             )
             return
         }
-        val link = "https://$domain/tenant/accept#$token"
-        log.infof("Tenant invite for %s (expires %s): %s", ownerEmail, expiresAt, link)
+        // The raw bootstrap token is a redeemable secret (cr-invite-token-log-redaction): never emit it — or
+        // the accept link that embeds it — to a log, in any launch mode. Whoever needs it gets it from the
+        // opt-in dev-file (below) or the API response, never the console. TenantInviteMailerDevFileTest pins
+        // both halves: the token stays out of the log AND still reaches the dev-file the seed loop reads.
+        log.infof(
+            "Tenant invite minted for %s (expires %s); secret delivered via dev-file / API response, not logged.",
+            ownerEmail, expiresAt,
+        )
         appendDevFile(ownerEmail, token, expiresAt)
     }
 

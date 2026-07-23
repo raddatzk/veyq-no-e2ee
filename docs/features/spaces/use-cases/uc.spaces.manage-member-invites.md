@@ -42,6 +42,9 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
 - **Operator-blind.** Listing returns only invite **metadata** (email, status, expiry) the server already
   stores; the secret is never stored plaintext (only its hash) and a re-issue returns the new secret only to
   the owner-gated caller over TLS.
+- **The invite secret is never logged.** The delivery mailer emits only non-secret metadata (email + expiry);
+  the redeemable bootstrap token reaches the invitee via the re-issue API response or the opt-in dev-file,
+  never a server log — in any launch mode. A production runtime logs a secret-free "not delivered" warning.
 - **Admission stays owner-only.** Every action here is gated on the tenant OWNER membership — the same gate that
   mints a member invite.
 - **Invites, not memberships.** This never removes a joined member or rotates a scope key — those are a separate,
