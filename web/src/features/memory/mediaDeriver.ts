@@ -64,19 +64,28 @@ export function createBrowserDeriver(): MediaDeriver {
     },
     async deriveVideoPoster(source) {
       const url = URL.createObjectURL(source)
+      const video = document.createElement('video')
       try {
-        const video = document.createElement('video')
         video.muted = true
+        video.playsInline = true // Safari: decode inline without demanding a user gesture / fullscreen
         video.preload = 'auto'
         video.src = url
-        await onceEvent(video, 'loadeddata') // first frame decoded
-        if (video.currentTime !== 0) {
-          video.currentTime = 0
-          await onceEvent(video, 'seeked')
-        }
+        // Safari will NOT decode a frame of an offscreen, never-played <video>: `loadeddata`/`seeked` either never
+        // fire (upload hangs — works in Chrome/Firefox, which are lax) or fire with no decoded frame to draw (an
+        // empty poster). So once metadata is in: seek to a representative offset (0 is often a black/undecoded
+        // frame), NUDGE the decoder with a muted play() (autoplay-allowed; fire-and-forget so it can't re-introduce
+        // a hang), then wait for a genuinely PRESENTED frame. All waits are timeout-guarded, so a source the
+        // browser can't decode falls back cleanly (deriveTiers' catch → original-only) instead of hanging.
+        await onceEvent(video, 'loadedmetadata')
+        video.currentTime = Math.min(0.1, (video.duration || 0) / 2)
+        void video.play().catch(() => {}) // prime the decode pipeline; never awaited
+        await firstPresentedFrame(video)
+        video.pause()
         // the poster is encoded at the preview tier and reused for the (smaller) thumbnail tier as-is
         return drawEncoded(video, video.videoWidth, video.videoHeight, TIER_SPECS.PREVIEW.maxEdge, TIER_SPECS.PREVIEW.quality)
       } finally {
+        video.removeAttribute('src')
+        video.load() // detach the source so Safari releases the decoder/buffers promptly
         URL.revokeObjectURL(url)
       }
     },
@@ -96,7 +105,7 @@ export function createBrowserDeriver(): MediaDeriver {
           video.muted = true
           video.preload = 'metadata'
           video.src = url
-          await onceEvent(video, 'loadeddata')
+          await onceEvent(video, 'loadedmetadata') // width/height are known here — Safari never fires `loadeddata` offscreen
           return { w: video.videoWidth, h: video.videoHeight }
         } finally {
           URL.revokeObjectURL(url)
@@ -153,13 +162,46 @@ function drawStep(src: CanvasImageSource, width: number, height: number, backgro
   return canvas
 }
 
-function onceEvent(el: HTMLMediaElement, ev: 'loadeddata' | 'seeked'): Promise<void> {
+/** Cap the wait for a <video> to expose metadata / decode a seeked frame. Safari silently fires NEITHER the event
+ *  NOR `error` for an offscreen, never-played element, which would hang the whole upload before its first network
+ *  call. On timeout the caller's catch falls back to original-only (no poster), so the upload still proceeds.
+ *  Generous, so a slow decode of a large frame on a slow machine is not cut off spuriously. Exported for tests. */
+export const VIDEO_EVENT_TIMEOUT_MS = 15_000
+
+/** Resolve on the first `ev`, reject on `error` OR after `timeoutMs` (the guard against Safari's silent no-op). */
+export function onceEvent(
+  el: HTMLMediaElement,
+  ev: 'loadedmetadata' | 'seeked',
+  timeoutMs = VIDEO_EVENT_TIMEOUT_MS,
+): Promise<void> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { cleanup(); reject(new Error(`video_${ev}_timeout`)) }, timeoutMs)
     const ok = () => { cleanup(); resolve() }
     const bad = () => { cleanup(); reject(new Error(`video_${ev}_failed`)) }
-    const cleanup = () => { el.removeEventListener(ev, ok); el.removeEventListener('error', bad) }
+    const cleanup = () => {
+      clearTimeout(timer)
+      el.removeEventListener(ev, ok)
+      el.removeEventListener('error', bad)
+    }
     el.addEventListener(ev, ok, { once: true })
     el.addEventListener('error', bad, { once: true })
+  })
+}
+
+/** Resolve once a decoded frame is actually PRESENTED (and thus drawable). `requestVideoFrameCallback` is the only
+ *  signal a frame reached the compositor, so prefer it; otherwise fall back to the post-seek `seeked` event.
+ *  Timeout-guarded (Safari can present nothing for an offscreen source), so the caller's catch degrades to
+ *  original-only rather than hanging. Exported for tests. */
+export function firstPresentedFrame(video: HTMLVideoElement, timeoutMs = VIDEO_EVENT_TIMEOUT_MS): Promise<void> {
+  const rvfc = (video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number })
+    .requestVideoFrameCallback
+  if (typeof rvfc !== 'function') return onceEvent(video, 'seeked', timeoutMs)
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('video_frame_timeout')), timeoutMs)
+    rvfc.call(video, () => {
+      clearTimeout(timer)
+      resolve()
+    })
   })
 }
 

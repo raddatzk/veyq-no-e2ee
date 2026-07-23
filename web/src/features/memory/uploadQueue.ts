@@ -7,7 +7,11 @@
 import { reactive, computed } from 'vue'
 import { addMedia, type AddMediaSource, type AddMediaOptions } from './media'
 
-export type UploadStatus = 'queued' | 'uploading' | 'done' | 'failed' | 'cancelled'
+// `preparing` = picked up, but still in the pre-network phase (read into memory, derive poster/dimensions, seal).
+// For a video this can take a visible moment — especially the on-device frame decode — so it gets its own state
+// instead of masquerading as a stuck 0% `uploading`. It flips to `uploading` the instant the first PUT progress
+// arrives (media.ts `onProgress?.(0)`, right before the chunk PUTs).
+export type UploadStatus = 'queued' | 'preparing' | 'uploading' | 'done' | 'failed' | 'cancelled'
 
 /** How one file is sealed + uploaded — the authed `addMedia` (default) or a share-scoped transport (cr-0101). */
 export type UploadFn = (source: AddMediaSource, opts: AddMediaOptions) => Promise<{ blobId: string; mediaId: string }>
@@ -132,7 +136,7 @@ function finalize(batch: UploadBatch): void {
 async function uploadOne(file: UploadFile): Promise<void> {
   const batch = batches.find((b) => b.files.includes(file))
   if (!batch) return
-  file.status = 'uploading'
+  file.status = 'preparing' // pre-network: read + derive + seal; flips to 'uploading' on the first PUT progress
   file.progress = 0
   file.attempts += 1
   try {
@@ -143,6 +147,7 @@ async function uploadOne(file: UploadFile): Promise<void> {
     const upload: UploadFn = t.upload ?? ((source, opts) => addMedia(t.scopeId!, t.nodeId!, t.memoryKey!, source, undefined, opts))
     const { mediaId } = await upload({ bytes, mediaType: file.mediaType, lastModified: file.file.lastModified }, {
       onProgress: (p) => {
+        if (file.status === 'preparing') file.status = 'uploading' // first PUT progress → the network phase began
         file.progress = p
       },
       signal: file.controller.signal,
@@ -217,7 +222,8 @@ export function cancelFile(fileId: string): void {
     const file = batch.files.find((f) => f.id === fileId)
     if (!file) continue
     if (file.status === 'queued') file.status = 'cancelled'
-    else if (file.status === 'uploading') file.controller.abort() // the runner maps the AbortError → cancelled
+    // in-flight (preparing or uploading): abort — uploadMediaVia's throwIfAborted checkpoints map it → cancelled
+    else if (file.status === 'preparing' || file.status === 'uploading') file.controller.abort()
     finalize(batch)
     return
   }
@@ -281,7 +287,10 @@ export function clearUploads(): void {
 export function useUploadQueue() {
   const visibleBatches = computed(() => batches.filter((b) => !b.acknowledged))
   const activeFileCount = computed(() =>
-    batches.reduce((n, b) => n + b.files.filter((f) => f.status === 'queued' || f.status === 'uploading').length, 0),
+    batches.reduce(
+      (n, b) => n + b.files.filter((f) => f.status === 'queued' || f.status === 'preparing' || f.status === 'uploading').length,
+      0,
+    ),
   )
   return { batches: visibleBatches, activeFileCount }
 }

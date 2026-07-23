@@ -95,6 +95,7 @@ describe('uploadQueue — runner', () => {
     vi.mocked(addMedia).mockImplementation(
       (_s, _n, _k, _src, _d, opts) =>
         new Promise((_resolve, reject) => {
+          opts?.onProgress?.(0) // first PUT progress → the file flips preparing → uploading (cr-0105 follow-up)
           const abort = () => reject(new DOMException('cancelled', 'AbortError'))
           if (opts?.signal?.aborted) return abort() // cancel may land before addMedia is reached (real addMedia throws upfront too)
           opts?.signal?.addEventListener('abort', abort)
@@ -105,6 +106,26 @@ describe('uploadQueue — runner', () => {
     const file = batches.value[0].files[0]
 
     await vi.waitFor(() => expect(file.status).toBe('uploading'))
+    cancelFile(file.id)
+    await vi.waitFor(() => expect(file.status).toBe('cancelled'))
+  })
+
+  it('cancelling a still-preparing file (no progress yet) also aborts it → cancelled', async () => {
+    // The pre-network phase (read + derive + seal) reports no progress, so the file sits in `preparing`. A video
+    // whose on-device decode is slow lives here — cancel must abort it, not no-op (cr-0105 follow-up).
+    vi.mocked(addMedia).mockImplementation(
+      (_s, _n, _k, _src, _d, opts) =>
+        new Promise((_resolve, reject) => {
+          const abort = () => reject(new DOMException('cancelled', 'AbortError'))
+          if (opts?.signal?.aborted) return abort()
+          opts?.signal?.addEventListener('abort', abort)
+        }), // deliberately never calls onProgress → stays 'preparing'
+    )
+    const { batches } = useUploadQueue()
+    enqueueUploads(TARGET, [sel(png())], { label: '1' })
+    const file = batches.value[0].files[0]
+
+    await vi.waitFor(() => expect(file.status).toBe('preparing'))
     cancelFile(file.id)
     await vi.waitFor(() => expect(file.status).toBe('cancelled'))
   })

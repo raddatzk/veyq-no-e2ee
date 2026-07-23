@@ -3,11 +3,16 @@
 // file, status and badge, and the cancel control aborts it.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// addMedia stays pending until aborted, so the file sits in 'uploading' for the assertions.
+// addMedia emits one progress tick (→ the file flips preparing → uploading, cr-0105 follow-up) then stays pending
+// until aborted, so it sits in 'uploading' for the assertions.
 vi.mock('../media', () => ({
   addMedia: vi.fn(
-    (_s: unknown, _n: unknown, _k: unknown, _src: unknown, _d: unknown, opts?: { signal?: AbortSignal }) =>
+    (
+      _s: unknown, _n: unknown, _k: unknown, _src: unknown, _d: unknown,
+      opts?: { signal?: AbortSignal; onProgress?: (p: number) => void },
+    ) =>
       new Promise((_resolve, reject) => {
+        opts?.onProgress?.(0) // first PUT progress → 'uploading' (past the pre-network 'preparing' phase)
         const abort = () => reject(new DOMException('cancelled', 'AbortError'))
         if (opts?.signal?.aborted) return abort()
         opts?.signal?.addEventListener('abort', abort)
@@ -33,7 +38,7 @@ const i18n = createI18n({
         uploadCancel: 'Cancel',
         uploadRetry: 'Retry',
         close: 'Close',
-        uploadStatus: { queued: 'Queued', uploading: 'Uploading…', done: 'Done', failed: 'Failed', cancelled: 'Cancelled' },
+        uploadStatus: { queued: 'Queued', preparing: 'Preparing…', uploading: 'Uploading…', done: 'Done', failed: 'Failed', cancelled: 'Cancelled' },
       },
     },
   },

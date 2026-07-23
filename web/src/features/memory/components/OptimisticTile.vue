@@ -29,10 +29,10 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
     :data-upload-id="tile.fileId"
     :aria-label="t('media.uploadTilePreview', { name: tile.name })"
   >
-    <!-- The poster (image OR a derived video first-frame) shows once ready; a video with no poster yet keeps the
-         icon. The play badge marks a settled video (during upload the progress ring below is the signal, #105). -->
+    <!-- The poster (image OR a derived video first-frame) shows once ready; until then the dimmed background + the
+         progress ring below carry the state — no separate placeholder glyph (the ring is the signal, #105). The
+         play badge marks a settled video. -->
     <img v-if="tile.url" class="media-grid-tile-media" :src="tile.url" :alt="tile.name" />
-    <span v-else class="media-grid-icon pi pi-video" />
     <span v-if="tile.isVideo && tile.url && tile.status === 'done'" class="optimistic-tile-play" aria-hidden="true">
       <span class="pi pi-play" />
     </span>
@@ -61,7 +61,7 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
         <circle class="upload-ring-track" cx="18" cy="18" r="16" />
         <circle
           class="upload-ring-fill"
-          :class="{ 'is-indeterminate': tile.status === 'queued' }"
+          :class="{ 'is-indeterminate': tile.status === 'queued' || tile.status === 'preparing' }"
           cx="18"
           cy="18"
           r="16"
@@ -132,13 +132,6 @@ const isDoneDeletable = () => props.deletable === true && props.tile.status === 
 .upload-tile-delete:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
-}
-.gallery-tile-optimistic .media-grid-icon {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  font-size: 1.5rem;
 }
 /* Play badge over a settled video's poster — matches the persisted MediaTile badge so the two states agree (#105). */
 .optimistic-tile-play {

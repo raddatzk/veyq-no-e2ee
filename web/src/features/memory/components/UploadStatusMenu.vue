@@ -35,7 +35,7 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') close()
 }
 
-const canCancel = (f: UploadFile) => f.status === 'queued' || f.status === 'uploading'
+const canCancel = (f: UploadFile) => f.status === 'queued' || f.status === 'preparing' || f.status === 'uploading'
 const percent = (fraction: number) => Math.round(fraction * 100)
 function batchProgress(batch: UploadBatch): number {
   if (batch.files.length === 0) return 0
@@ -45,7 +45,7 @@ function statusIcon(f: UploadFile): string {
   if (f.status === 'done') return 'pi pi-check'
   if (f.status === 'failed') return 'pi pi-times'
   if (f.status === 'cancelled') return 'pi pi-ban'
-  if (f.status === 'uploading') return 'pi pi-spin pi-spinner'
+  if (f.status === 'preparing' || f.status === 'uploading') return 'pi pi-spin pi-spinner' // both are active work
   return 'pi pi-clock'
 }
 
