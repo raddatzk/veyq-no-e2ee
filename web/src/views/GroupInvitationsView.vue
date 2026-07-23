@@ -109,7 +109,3 @@ const decline = (inv: InvitationRow) => runRowAction(inv, declineGroupInvitation
     </section>
   </section>
 </template>
-
-<style scoped>
-
-</style>
