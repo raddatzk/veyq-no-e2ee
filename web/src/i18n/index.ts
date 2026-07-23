@@ -101,6 +101,7 @@ const en = {
     untrustConfirmBody: 'This device forgets its saved key. Your next unlock here will need your Secret Key again. Your other devices are unaffected.',
     untrustFailed: 'This device could not be forgotten. Please try again.',
     serverTenants: 'Tenants',
+    serverTenantsEmpty: 'No tenants on this server yet.',
   },
   profile: {
     title: 'Your profile',
@@ -740,6 +741,7 @@ const de: typeof en = {
     untrustConfirmBody: 'Dieses Gerät vergisst seinen gespeicherten Schlüssel. Beim nächsten Entsperren brauchst du hier wieder deinen Secret Key. Deine anderen Geräte sind nicht betroffen.',
     untrustFailed: 'Dieses Gerät konnte nicht vergessen werden. Bitte versuche es erneut.',
     serverTenants: 'Tenants',
+    serverTenantsEmpty: 'Auf diesem Server gibt es noch keine Tenants.',
   },
   profile: {
     title: 'Dein Profil',

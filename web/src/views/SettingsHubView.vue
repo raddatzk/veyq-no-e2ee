@@ -26,7 +26,7 @@ import { useCapabilities } from '../shared/state/useCapabilities'
 import { SPACES_GROUPS } from '../features/platform/capabilities'
 
 type NavItem = { id: string; label: string; icon: string }
-type NavCategory = { key: string; label: string; items: NavItem[]; collapsible: boolean; create?: { label: string; run: () => void } }
+type NavCategory = { key: string; label: string; items: NavItem[]; collapsible: boolean; create?: { label: string; run: () => void }; empty?: string }
 
 const { t } = useI18n()
 const { hasCapability } = useCapabilities()
@@ -91,6 +91,7 @@ const categories = computed<NavCategory[]>(() => {
       key: 'groups',
       label: t('shell.groups'),
       collapsible: true,
+      empty: t('groups.noneOwned'),
       // Group creation is gated on the `spaces.groups` capability (ADR 0032): a personal-only instance disables
       // it, so the create affordance is dropped (owned groups stay listed/manageable — only creation is gated).
       ...(hasCapability(SPACES_GROUPS)
@@ -106,6 +107,7 @@ const categories = computed<NavCategory[]>(() => {
       key: 'server',
       label: t('settings.serverTenants'),
       collapsible: true,
+      empty: t('settings.serverTenantsEmpty'),
       create: { label: t('tenant.create'), run: () => { createTenantOpen.value = true } },
       items: tenants.value.map((tn) => ({ id: `tenant-${tn.tenantId}`, label: tn.name, icon: 'pi pi-server' })),
     })
@@ -217,7 +219,7 @@ watch(() => route.params.section, () => void loadTenants())
               <i :class="it.icon" aria-hidden="true" />
               <span>{{ it.label }}</span>
             </button>
-            <p v-if="c.collapsible && c.items.length === 0" class="settings-nav-empty">{{ t('groups.noneOwned') }}</p>
+            <p v-if="c.collapsible && c.items.length === 0 && c.empty" class="settings-nav-empty">{{ c.empty }}</p>
           </template>
         </template>
       </nav>
