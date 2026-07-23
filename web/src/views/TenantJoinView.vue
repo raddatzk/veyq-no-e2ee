@@ -255,13 +255,15 @@ async function mapError(e: unknown): Promise<string> {
             <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
           </label>
           <template v-if="!isMember">
-            <label>{{ t('profile.firstName') }}
-              <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
-            </label>
-            <label>{{ t('profile.lastName') }}
-              <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
-              <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
-            </label>
+            <div class="name-row">
+              <label>{{ t('profile.firstName') }}
+                <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
+              </label>
+              <label>{{ t('profile.lastName') }}
+                <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
+              </label>
+            </div>
+            <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
           </template>
           <label>{{ t('common.password') }}<Password v-model="password" :feedback="false" toggleMask inputId="join-password" /></label>
           <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
@@ -288,13 +290,15 @@ async function mapError(e: unknown): Promise<string> {
           <small class="field-hint">{{ t('tenant.join.usernameHint') }}</small>
         </label>
         <template v-if="!isMember">
-          <label class="veyq-form-field">{{ t('profile.firstName') }}
-            <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
-          </label>
-          <label class="veyq-form-field">{{ t('profile.lastName') }}
-            <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
-            <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
-          </label>
+          <div class="name-row">
+            <label class="veyq-form-field">{{ t('profile.firstName') }}
+              <InputText v-model="firstName" name="given-name" autocomplete="given-name" />
+            </label>
+            <label class="veyq-form-field">{{ t('profile.lastName') }}
+              <InputText v-model="lastName" name="family-name" autocomplete="family-name" />
+            </label>
+          </div>
+          <small class="field-hint">{{ t('tenant.join.nameHint') }}</small>
         </template>
 
         <!-- Fast path: this browser already holds the invited owner's unlocked vault → accept in one click,

@@ -184,6 +184,17 @@
   min-width: 0;
 }
 
+/* Two related fields side by side (e.g. first name + last name) so a single hint below reads as covering the
+   pair, not just the last field. Each half fills its track; the controls stretch via the global `label` grid. */
+.name-row {
+  display: flex;
+  gap: 1rem;
+}
+.name-row > label {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Inline validation error inside a .veyq-form, shown under the failing field (cr-0154). */
 .veyq-form-error {
   margin: 0;

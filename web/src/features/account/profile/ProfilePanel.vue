@@ -119,14 +119,6 @@ async function save() {
 
 <style scoped>
 
-.name-row {
-  display: flex;
-  gap: 1rem;
-}
-.name-row label {
-  flex: 1;
-  min-width: 0;
-}
 .consent-row {
   display: flex;
   gap: 0.6rem;
