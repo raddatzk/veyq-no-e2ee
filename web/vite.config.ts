@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { loadEnv, type Plugin } from 'vite'
 // `vitest/config`'s defineConfig extends Vite's with the `test` block (setupFiles below) while staying a valid
 // Vite config for `npm run dev`/`build`.
@@ -45,13 +46,55 @@ function cspPlugin(env: Record<string, string>, dev: boolean): Plugin {
   }
 }
 
+// cr-inline-video-playback Slice 2 (ADR 0047): serve the media Service Worker at a stable root `/sw.js` in DEV
+// too, so dev == prod (register.ts always registers `/sw.js`). Vite transforms the module on the fly; the
+// `Service-Worker-Allowed: /` header lets a script served from `/sw.js` claim the whole origin (needed to
+// intercept `/__media/*`). Best-effort dev convenience — the SW path always has the Slice-1 fallback if a dev
+// browser can't register it. NOTE: not yet live-verified end-to-end (rides #102 like the rest of the SW slice).
+function mediaSwDevPlugin(): Plugin {
+  return {
+    name: 'veyq-media-sw-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if ((req.url ?? '').split('?')[0] !== '/sw.js') return next()
+        server
+          .transformRequest('/src/sw/mediaSw.ts')
+          .then((result) => {
+            if (!result) return next()
+            res.setHeader('Content-Type', 'application/javascript')
+            res.setHeader('Service-Worker-Allowed', '/')
+            res.setHeader('Cache-Control', 'no-cache')
+            res.end(result.code)
+          })
+          .catch(next)
+      })
+    },
+  }
+}
+
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
-    plugins: [vue(), cspPlugin(env, command === 'serve')],
+    plugins: [vue(), cspPlugin(env, command === 'serve'), mediaSwDevPlugin()],
     test: {
       // Provide the PrimeVue toast service to every mounted component (cr-0157) — see src/test/setup.ts.
       setupFiles: ['./src/test/setup.ts'],
+    },
+    build: {
+      rollupOptions: {
+        // Two entries: the app (from index.html) and the media Service Worker (cr-inline-video-playback Slice 2).
+        // The SW must land at a stable, UNHASHED `/sw.js` so a redeploy is detectable (`updateViaCache:'none'`);
+        // the app keeps its hashed assets. `chunk.name === 'media-sw'` → `sw.js` at the dist root; all else keeps
+        // the default hashed `assets/` layout.
+        input: {
+          main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          'media-sw': fileURLToPath(new URL('./src/sw/mediaSw.ts', import.meta.url)),
+        },
+        output: {
+          entryFileNames: (chunk) => (chunk.name === 'media-sw' ? 'sw.js' : 'assets/[name]-[hash].js'),
+        },
+      },
     },
     server: {
       host: '127.0.0.1',

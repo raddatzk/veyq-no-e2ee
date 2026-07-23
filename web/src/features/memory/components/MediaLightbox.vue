@@ -11,6 +11,8 @@ import { useI18n } from 'vue-i18n'
 import {
   openLightbox,
   openOriginal,
+  chunkProvider,
+  downloadRef,
   hasDerivatives,
   loadMediaExif,
   unsealMeta,
@@ -21,8 +23,10 @@ import {
   type MediaItem,
   type MediaExif,
   type MediaMeta,
+  type ChunkProvider,
 } from '../media'
 import { derivedDownloadName, saveBytes, sniffMediaType } from '../download'
+import { registerPlayback, revokePlayback, handleFromUrl } from '../../../sw/register'
 import { useObjectUrl } from '../../../shared/state/useObjectUrls'
 
 const props = defineProps<{
@@ -40,6 +44,10 @@ const props = defineProps<{
   originalLoader?: (item: MediaItem) => Promise<Uint8Array> // fetch+decrypt the original (default: authed openOriginal)
   exifLoader?: (item: MediaItem) => Promise<MediaExif | null> // lazy heavy-EXIF (default: authed getMediaExif; skipped when readonly + absent)
   metaResolver?: (item: MediaItem) => MediaMeta | null // unseal the listed date/GPS tier (default: unsealMeta under memoryKey)
+  // Slice 2 (ADR 0047): the per-item key-free chunk source for SW range playback. Default (authed) presigns via
+  // the media API; the share viewer injects its share-scoped provider (per-item K_mem + guest pwToken), so the SW
+  // path covers the anonymous viewer without the SW learning the route. Absent → the authed provider is used.
+  videoChunkProvider?: (item: MediaItem) => ChunkProvider
   suspendKeys?: boolean // pause the global Escape/arrow handler while a modal (the cover cropper) is open over the lightbox
 }>()
 const emit = defineEmits<{
@@ -55,6 +63,10 @@ const { t, locale } = useI18n()
 // viewer), else the built-in authed media-API path (the internal Memory). Keeps behaviour identical by default.
 const previewOf = (it: MediaItem) => (props.previewLoader ?? ((x: MediaItem) => openLightbox(props.scopeId, props.memoryKey, x)))(it)
 const originalOf = (it: MediaItem) => (props.originalLoader ?? ((x: MediaItem) => openOriginal(props.scopeId, props.memoryKey, x)))(it)
+// The Slice-2 chunk provider for the shown item's ORIGINAL (the video streams the pristine original). Injected by
+// the share viewer; else the authed media-API provider. Keys never leave the page — the SW only pulls plaintext.
+const videoProviderOf = (it: MediaItem): ChunkProvider =>
+  (props.videoChunkProvider ?? ((x: MediaItem) => chunkProvider(props.scopeId, props.memoryKey, downloadRef(x))))(it)
 const metaOf = (it: MediaItem) => (props.metaResolver ?? ((x: MediaItem) => unsealMeta(props.memoryKey, x)))(it)
 const exifOf = (it: MediaItem): Promise<MediaExif | null> =>
   props.exifLoader ? props.exifLoader(it) : props.readonly ? Promise.resolve(null) : loadMediaExif(props.scopeId, it.mediaId, props.memoryKey)
@@ -62,8 +74,13 @@ const exifOf = (it: MediaItem): Promise<MediaExif | null> =>
 const current = ref(props.startIndex)
 // The current item's decrypted preview tier as an object URL — minted + revoked (on switch/unmount) by the primitive.
 const { url: previewUrl, set: setPreview, clear: clearPreview } = useObjectUrl()
-// A video's decrypted original, played from a typed blob URL (Slice 1 interim, ADR 0047) — its own object-URL owner.
+// A video's decrypted original, played from a typed blob URL — the Slice-1 FALLBACK path (no/stale SW). Its own
+// object-URL owner (revoked on switch/unmount).
 const { url: videoUrl, set: setVideo, clear: clearVideo } = useObjectUrl()
+// Slice 2 (ADR 0047): the active SW playback. `videoSwUrl` is the synthetic `/__media/<handle>` src (NOT a blob
+// URL — never an object-URL owner); `videoHandle` is kept so we can revoke the playback on switch/close/unmount.
+const videoSwUrl = ref<string | null>(null)
+const videoHandle = ref<string | null>(null)
 const videoLoading = ref(false)
 const loading = ref(false)
 const error = ref(false)
@@ -95,6 +112,7 @@ const videoType = computed(() => (isVideoMediaType(captured.value?.mediaType) ? 
 async function loadPreview() {
   clearPreview()
   clearVideo() // drop the previous item's playing video (revoke its blob URL)
+  stopSwPlayback() // and tear down any SW playback of the previous item (revoke handle + port)
   videoLoading.value = false
   error.value = false
   if (!item.value || !previewable.value) return
@@ -248,11 +266,21 @@ watch(
   },
 )
 
-// Slice 1 interim playback (ADR 0047): fetch + decrypt the WHOLE original via the existing originalOf path and
-// play it from a **typed** blob URL (a <video> needs a usable type to pick a demuxer). No size cap — a large video
-// simply waits for its full decrypt (the download button stays the escape hatch); Slice 2's service-worker range
-// layer replaces this with `src="/__media/<blobId>"`, deleting only this one fetch. Click-to-play, so autoplay with
-// sound is allowed (the user gesture drove it).
+/** Tear down the active SW playback (revoke the handle + close the page's port). Idempotent. */
+function stopSwPlayback() {
+  if (videoHandle.value) revokePlayback(videoHandle.value)
+  videoHandle.value = null
+  videoSwUrl.value = null
+}
+
+// Click-to-play (ADR 0047), so autoplay with sound is allowed (the user gesture drove it). Two paths:
+//  - **Slice 2 (preferred):** register a key-free playback with the controlling Service Worker and set the video
+//    src to a synthetic `/__media/<handle>`; the SW streams byte ranges, pulling decrypted chunks from the page's
+//    ChunkProvider on demand. Keys never leave the page.
+//  - **Slice 1 fallback (retained):** no SW, a stale/mismatched SW, or a registration failure → fetch + decrypt
+//    the WHOLE original via `originalOf` and play it from a **typed** blob URL. No size cap; a large video simply
+//    waits for its full decrypt (the download button is the escape hatch). This is a necessity for missing/old
+//    SWs, not throwaway code.
 async function playVideo() {
   const target = item.value
   const type = videoType.value
@@ -260,9 +288,24 @@ async function playVideo() {
   videoLoading.value = true
   error.value = false
   try {
-    const bytes = await originalOf(target)
-    if (item.value !== target) return // navigated away mid-decrypt — drop it
-    setVideo(new Blob([bytes as BlobPart], { type }))
+    const provider = videoProviderOf(target)
+    const url = await registerPlayback(
+      { chunkCount: provider.chunkCount, byteSize: provider.byteSize, mediaType: type },
+      provider,
+    )
+    if (url) {
+      const handle = handleFromUrl(url)
+      if (item.value !== target) {
+        if (handle) revokePlayback(handle) // navigated away mid-register — don't leak the session
+        return
+      }
+      videoHandle.value = handle
+      videoSwUrl.value = url // the <video> src; the SW answers its range requests
+    } else {
+      const bytes = await originalOf(target) // Slice-1 fallback: no usable SW
+      if (item.value !== target) return // navigated away mid-decrypt — drop it
+      setVideo(new Blob([bytes as BlobPart], { type }))
+    }
   } catch {
     if (item.value === target) error.value = true
   } finally {
@@ -319,6 +362,7 @@ window.addEventListener('keydown', onKeydown)
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  stopSwPlayback() // revoke any live SW playback (its port + in-SW plaintext cache) when the lightbox unmounts
 })
 </script>
 
@@ -393,9 +437,10 @@ onBeforeUnmount(() => {
 
         <div class="media-lightbox-stage">
           <p v-if="error" class="media-lightbox-error">{{ t('media.loadError') }}</p>
-          <!-- Slice 1 video playback (#104, ADR 0047): once the user clicks play, the decrypted original plays from
-               a typed blob URL. Before that, a video shows its poster (the PREVIEW tier) + a play affordance. -->
-          <video v-else-if="videoUrl" :src="videoUrl" controls autoplay playsinline />
+          <!-- Video playback (#104, ADR 0047): once the user clicks play, the video plays either from the SW range
+               path (`videoSwUrl` = /__media/<handle>, Slice 2) or, as a fallback, a decrypted typed blob URL
+               (`videoUrl`, Slice 1). Before that, a video shows its poster (the PREVIEW tier) + a play affordance. -->
+          <video v-else-if="videoSwUrl || videoUrl" :src="videoSwUrl ?? videoUrl ?? undefined" controls autoplay playsinline />
           <div v-else-if="videoType && previewUrl" class="media-lightbox-video-poster">
             <img :src="previewUrl" :alt="memoryName" />
             <button

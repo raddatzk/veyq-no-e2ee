@@ -23,16 +23,21 @@ video the user scrubs through.
 
 ## Decision
 
-**Play video through a Service Worker that intercepts a synthetic in-origin media URL, translates the native
-demuxer's plaintext byte-range requests into the covering ciphertext chunks, decrypts them on-device, and answers
-`206 Partial Content`.** The browser's own `<video>` demuxer drives the ranges; there is no MSE and no remux.
+**Play video through a Service Worker that intercepts a synthetic in-origin media URL and answers `206 Partial
+Content`, while the page — not the SW — presigns, fetches and decrypts.** The browser's own `<video>` demuxer
+drives the byte ranges; there is no MSE and no remux. The SW holds **no key material and no auth**: it maps the
+demuxer's plaintext byte-range to the covering ciphertext chunk indices and requests the **decrypted plaintext**
+of those chunks from the owning page over a `MessagePort`; the page runs the existing presign→`openFrame` path
+in its own context and transfers the plaintext back. The SW slices the requested window and responds with
+`Content-Range` + `Accept-Ranges: bytes`.
 
-Concretely: a `<video src="/__media/<blobId>">` request is caught by the SW. For a `Range: bytes=A-B` request the
-SW computes the chunk indices `[⌊A/CHUNK⌋ … ⌊B/CHUNK⌋]` that overlap the plaintext range, fetches exactly those
-ciphertext chunks via presigned GET, `openFrame`-decrypts them (the `index ‖ total` AAD check still applies),
-slices the requested window out of the decrypted span, and responds with `Content-Range` + `Accept-Ranges:
-bytes`. `K_mem`/`K_blob` live only in the client (the page hands the SW the unwrap material); no key and no
-plaintext ever leave the device.
+Concretely: before playback the page **registers** it with the SW (`postMessage`: an opaque per-playback handle
++ `{chunkCount, byteSize}` + a `MessagePort`), then sets `<video src="/__media/<handle>">`. For a `Range:
+bytes=A-B` request the SW computes the covering chunk indices `[⌊A/CHUNK⌋ … ⌊B/CHUNK⌋]` from the registered
+`{chunkCount, byteSize}`, asks the page for those chunks' plaintext over the port (with a small in-memory
+read-ahead cache), assembles the window and answers `206`. **No key, no auth token and no plaintext-at-rest ever
+enters the SW; the URL carries only an opaque handle, never a credential.** `K_blob`/`K_mem` stay exactly where
+they live today — in the page.
 
 ### Why not the rejected options
 
@@ -51,16 +56,21 @@ plaintext ever leave the device.
 ```mermaid
 sequenceDiagram
   participant V as native video demuxer
-  participant SW as Service Worker (in-origin)
+  participant SW as Service Worker (in-origin, key-free)
+  participant P as page (holds K_blob + auth)
   participant B as backend (blind, presign)
   participant O as object store (blind)
-  V->>SW: GET /__media/blobId  Range bytes=A-B
+  Note over P,SW: before play — page registers {handle, chunkCount, byteSize, MessagePort}
+  V->>SW: GET /__media/&lt;handle&gt;  Range bytes=A-B
   SW->>SW: chunks = overlap(A..B, CHUNK_SIZE)
-  SW->>B: presign GET for those chunk objects
-  B-->>SW: presigned URLs
-  SW->>O: GET the ciphertext chunks (direct)
-  O-->>SW: AEAD frames
-  SW->>SW: openFrame each (K_blob under K_mem), slice A..B
+  SW->>P: (port) need plaintext for chunk indices
+  P->>B: presign GET (bearer / share-token) — whole blob, cached
+  B-->>P: presigned URLs
+  P->>O: GET the ciphertext chunks (direct)
+  O-->>P: AEAD frames
+  P->>P: openFrame(K_blob, index, total = chunkCount)
+  P-->>SW: (port) plaintext chunks
+  SW->>SW: slice A..B, assemble 206
   SW-->>V: 206 Partial Content, Content-Range, Accept-Ranges bytes
 ```
 
@@ -95,8 +105,8 @@ server never sees it. This is not a new decision to record separately — it is
 [ADR 0044](0044-field-visibility-declared-at-the-field.md) applied: a **server-visible** `mediaType` would tell
 the operator photo-vs-video-vs-PDF for every medium, exactly the plaintext ADR 0044 forces someone to justify.
 The mechanics (which field, backfill of pre-field media) belong in the CR, not here. Note the synthetic SW route
-keys only on **`blobId`** — already an `id`-class field the server holds — plus range offsets; it exposes nothing
-new about *what* a blob is.
+keys on an **opaque per-playback handle** (not `blobId`) plus range offsets; the "exposes nothing new about *what*
+a blob is" reasoning holds a fortiori — a random handle reveals even less than the `id`-class `blobId`.
 
 ## Consequences
 
@@ -116,3 +126,28 @@ new about *what* a blob is.
 - **Native surfaces.** A Service Worker is a web-only mechanism; a future native client feeds its own player the
   same decrypted ranges through the platform equivalent. This ADR governs the **web** playback path (the current
   V1 priority); it does not bind native to a SW.
+
+## Revision — 2026-07-22 (before build)
+
+Refining Slice 2 (the SW slice) against the code showed the original mechanism is not buildable as written and
+that a strictly better design exists. The **decision** (SW range shim; option C over A/B) is unchanged; the
+**mechanism** is corrected as above.
+
+- **Why it changed — `blobId` alone cannot carry the auth context.** `/__media/<blobId>` assumed the SW could
+  presign a chunk GET from `blobId`. It cannot: presigning is bearer-authed for the internal app
+  (`presignBlobDownloads`, token in page memory + `withRefresh`) and share-token-authed for the anonymous
+  **share viewer** (`resolveShareBlob`, `shareId` + guest `pwToken`), and both are whole-blob only. A SW keyed on
+  `blobId` has neither credential and cannot tell the routes apart — it breaks first, and most visibly, at the
+  share viewer. The corrected route carries an **opaque per-playback handle**; the auth context lives behind the
+  registered `MessagePort`, in the page.
+- **Keys never leave the page — the key-in-SW variant is deliberately rejected.** Because presign+auth must stay
+  in the page anyway, the page also keeps the keys and does the decrypt; the SW receives **plaintext**, never key
+  material. Handing a key to the SW — even a per-blob `K_blob` — was considered and rejected: it adds a second
+  key-bearing context whose lifetime must be managed and whose key must be purged on vault-lock, for no benefit.
+  **The safest way to clean up a key in the SW is to never put one there.** `K_mem` in the SW is strictly worse
+  (it opens every blob of the Memory) and was never an option. This makes the trust-tier note above *stronger*,
+  not weaker: the SW is operator-served code that now holds no confidential key.
+- **The plaintext cache is in-memory and size-bounded only — never Cache Storage, never IndexedDB.** The SW
+  keeps at most a small read-ahead window of decrypted chunks in memory, evicted by size and dropped when
+  playback ends. Persisting decrypted media to disk would be a real regression against today (no plaintext is
+  ever stored) and is forbidden here explicitly — it is the shortcut a later change is most tempted to take.

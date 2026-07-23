@@ -95,3 +95,37 @@ acceptanceCriteria:
           - src/features/memory/media.test.ts
           - src/features/memory/download.test.ts
           - src/features/memory/components/MediaLightbox.test.ts
+  - id: sw-range-streaming
+    text: A playing video is streamed, not fetched whole — a Service Worker intercepts a synthetic in-origin URL, parses the demuxer's HTTP Range (first probe, closed, open-ended, suffix; no-Range → 200 + Accept-Ranges), maps the plaintext byte-range to the covering ciphertext chunk indices (plaintextTotal = byteSize − 28·chunkCount), assembles the window and answers 206 Partial Content with Content-Range. The range↔chunk math is pure + unit-tested; the SW's fetch/206 assembly is tested against a mocked page port. cr-inline-video-playback Slice 2 (ADR 0047).
+    coverage:
+      web:
+        unit:
+          - src/sw/range.test.ts
+          - src/sw/mediaSw.test.ts
+  - id: sw-key-free-delegation
+    text: The Service Worker holds no key and no auth — it maps ranges to chunk indices and requests those chunks' decrypted plaintext from the owning page over a MessagePort; the page runs the existing presign→openFrame path in its own context (K_blob/K_mem never leave the page) and transfers plaintext back. The synthetic URL carries an opaque per-playback handle, never a blobId or credential. The SW's only cache is a bounded in-memory plaintext LRU — never Cache Storage / IndexedDB. The AAD `total` bound at openFrame is the whole blob's chunkCount, never the range subset (a subset total is proven to fail). cr-inline-video-playback Slice 2 (ADR 0047).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+          - src/sw/mediaSw.test.ts
+          - src/features/memory/components/MediaLightbox.test.ts
+  - id: sw-presign-expiry
+    text: The page-side chunk provider presigns the whole blob once and caches the URLs by issue time; on a stale-URL 403 (the backend's 600 s presign TTL elapsed) it re-presigns the whole blob and retries the chunk once, so a long playback never breaks on expiry. cr-inline-video-playback Slice 2 (ADR 0047).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/media.test.ts
+  - id: sw-share-viewer
+    text: The anonymous public-share viewer streams video through the SAME SW path — the page passes a share-scoped chunk provider (per-item K_mem + guest pwToken over the gated share-scoped presign, resolveShareBlob) that shares the authed provider's openFrame core, so the SW never learns which route served the bytes. cr-inline-video-playback Slice 2 (ADR 0047).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/share.test.ts
+          - src/features/memory/media.test.ts
+  - id: sw-no-sw-fallback
+    text: When no Service Worker controls the page (unsupported browser, a first load before activation, or a protocol-version handshake mismatch with a stale SW), playback falls back to the Slice-1 path — fetch + decrypt the whole original and play it from a typed blob URL — so video always plays. The switchover is per-play and revokes the SW playback on item switch / close / unmount. cr-inline-video-playback Slice 2 (ADR 0047).
+    coverage:
+      web:
+        unit:
+          - src/features/memory/components/MediaLightbox.test.ts

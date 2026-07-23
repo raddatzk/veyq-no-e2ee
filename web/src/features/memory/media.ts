@@ -734,16 +734,24 @@ export async function openBlobFromUrls(memoryKey: Uint8Array, ref: BlobRef, getU
 }
 
 /**
+ * Presign GETs for **every** chunk of a blob — the whole-blob presign the authed read paths share (the batch
+ * endpoint is whole-blob only; there is no per-chunk presign). Returned as URLs ordered by chunk index.
+ */
+async function presignAllChunks(scopeId: string, blobId: string): Promise<string[]> {
+  const presigned = await withRefresh(() =>
+    mediaApi().presignBlobDownloads({ scopeId, blobDownloadsBatchRequest: { items: [{ blobId }] } }),
+  )
+  const d = presigned.results[0]
+  if (!d || d.error || !d.presignedGets) throw new Error(d?.error ?? 'store_unavailable')
+  return byIndex(d.presignedGets)
+}
+
+/**
  * Open a blob: unwrap its `K_blob` under `K_mem`, presign the chunk GETs, fetch the ciphertext frames
  * direct-from-store, and `openFrame` them back to plaintext (the AAD position check still applies).
  */
 export async function openBlob(scopeId: string, memoryKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
-  const presigned = await withRefresh(() =>
-    mediaApi().presignBlobDownloads({ scopeId, blobDownloadsBatchRequest: { items: [{ blobId: ref.blobId }] } }),
-  )
-  const d = presigned.results[0]
-  if (!d || d.error || !d.presignedGets) throw new Error(d?.error ?? 'store_unavailable')
-  return openBlobFromUrls(memoryKey, ref, byIndex(d.presignedGets))
+  return openBlobFromUrls(memoryKey, ref, await presignAllChunks(scopeId, ref.blobId))
 }
 
 /** Open the grid tier (thumbnail) of a media. */
@@ -752,6 +760,83 @@ export const openGrid = (scopeId: string, memoryKey: Uint8Array, item: MediaItem
 export const openLightbox = (scopeId: string, memoryKey: Uint8Array, item: MediaItem) => openBlob(scopeId, memoryKey, lightboxRef(item))
 /** Open the pristine original of a media (download). */
 export const openOriginal = (scopeId: string, memoryKey: Uint8Array, item: MediaItem) => openBlob(scopeId, memoryKey, downloadRef(item))
+
+// --- Slice-2 range streaming: the page-side chunk provider (ADR 0047) --------
+//
+// The Service-Worker range layer (cr-inline-video-playback Slice 2) holds NO key and NO auth: it asks the page
+// for the decrypted *plaintext* of individual chunks over a MessagePort and assembles the byte ranges the
+// <video> demuxer requests. This is that page-side seam — a per-blob source of plaintext chunks over the same
+// presign→openFrame plumbing the whole-blob read paths use. K_blob and the auth context never leave the page.
+
+/** A per-blob source of decrypted plaintext chunks, addressed by chunk index. Backs the SW range layer; the SW
+ *  never sees a key — it calls {@link ChunkProvider.getPlaintextChunk} over a port and slices the result. */
+export type ChunkProvider = {
+  /** Total chunk count of the whole blob — the AAD `total` every `getPlaintextChunk` binds (never a subset). */
+  readonly chunkCount: number
+  /** Total ciphertext byte size (sum of framed chunk sizes); plaintext size = `byteSize − 28·chunkCount`. */
+  readonly byteSize: number
+  /** Open exactly chunk `index` to plaintext. Re-presigns the whole blob once on a stale-URL 403, then retries. */
+  getPlaintextChunk(index: number): Promise<Uint8Array>
+}
+
+/** Re-presign a little before the backend's 600 s TTL (`application.properties`) so a long playback never races expiry. */
+const PRESIGN_REFRESH_MS = 9 * 60 * 1000
+
+/** Parse the HTTP status out of a {@link getChunk} failure (`chunk_get_failed:<status>`), or undefined if not one. */
+function chunkGetStatus(e: unknown): number | undefined {
+  const m = e instanceof Error ? /^chunk_get_failed:(\d+)$/.exec(e.message) : null
+  return m ? Number(m[1]) : undefined
+}
+
+/**
+ * Build a {@link ChunkProvider} over a `presignAll` that yields the whole blob's per-chunk GET URLs (ordered by
+ * index). The two auth contexts — the authed app ({@link chunkProvider}) and the anonymous share
+ * (`shareChunkProvider`, share.ts) — differ ONLY in that function; the unwrap + `openFrame` core here is
+ * identical, so the SW never learns which route served the bytes. `K_blob` is unwrapped once; the presigned URLs
+ * are cached with their issue time and re-presigned on TTL/expiry or a store `403`.
+ */
+export function makeChunkProvider(
+  memoryKey: Uint8Array,
+  ref: BlobRef,
+  presignAll: () => Promise<string[]>,
+): ChunkProvider {
+  const blobKey = v1.symUnwrap(memoryKey, fromB64std(ref.wrappedBlobKey), KBLOB_CTX)
+  let urls: string[] | undefined
+  let issuedAt = 0
+  async function freshUrls(force: boolean): Promise<string[]> {
+    if (force || !urls || Date.now() - issuedAt > PRESIGN_REFRESH_MS) {
+      urls = await presignAll()
+      issuedAt = Date.now()
+    }
+    return urls
+  }
+  return {
+    chunkCount: ref.chunkCount,
+    byteSize: ref.byteSize,
+    async getPlaintextChunk(index: number): Promise<Uint8Array> {
+      if (!Number.isInteger(index) || index < 0 || index >= ref.chunkCount) {
+        throw new Error(`chunk_out_of_range:${index}/${ref.chunkCount}`)
+      }
+      let all = await freshUrls(false)
+      let frame: Uint8Array
+      try {
+        frame = await getChunk(all[index])
+      } catch (e) {
+        if (chunkGetStatus(e) !== 403) throw e
+        all = await freshUrls(true) // presign expired → re-presign the WHOLE blob, retry the one chunk once
+        frame = await getChunk(all[index])
+      }
+      // AAD trap (load-bearing): `total` is the WHOLE blob's chunkCount, never the streamed range subset —
+      // openFrame binds `index‖total` (v1.ts), so a subset `total` fails every open. See the CR Slice-2 §5b.
+      return v1.openFrame(blobKey, index, ref.chunkCount, frame)
+    },
+  }
+}
+
+/** A {@link ChunkProvider} for the authed app: presigns the whole blob via the media endpoint (bearer, `withRefresh`). */
+export function chunkProvider(scopeId: string, memoryKey: Uint8Array, ref: BlobRef): ChunkProvider {
+  return makeChunkProvider(memoryKey, ref, () => presignAllChunks(scopeId, ref.blobId))
+}
 
 // --- transport helpers -----------------------------------------------------
 

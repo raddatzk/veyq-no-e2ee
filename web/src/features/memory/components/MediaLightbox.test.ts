@@ -11,12 +11,21 @@ vi.mock('../../../api/client', () => ({
 // exifr does the real parse in the browser; here we drive it so the sealed EXIF tier is deterministic.
 vi.mock('exifr', () => ({ default: { parse: vi.fn(async () => undefined) } }))
 
+// The Slice-2 SW registrar (there is no real Service Worker in the test env). Default: no usable SW → every play
+// takes the Slice-1 fallback; individual tests override registerPlayback to simulate a controlling SW.
+vi.mock('../../../sw/register', () => ({
+  registerPlayback: vi.fn(async () => null),
+  revokePlayback: vi.fn(),
+  handleFromUrl: (url: string) => url.replace('/__media/', ''),
+}))
+
 import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import MediaLightbox from './MediaLightbox.vue'
 import { addMedia, listMedia, unsealMeta, type MediaDeriver, type MediaItem } from '../media'
 import exifr from 'exifr'
 import { mediaApi } from '../../../api/client'
+import { registerPlayback, revokePlayback } from '../../../sw/register'
 import * as v1 from '../../../shared/crypto/v1'
 import { galleryFakeStore } from './galleryFakeStore'
 
@@ -306,6 +315,65 @@ describe('MediaLightbox — video playback + mediaType backfill (cr-inline-video
     await flushPromises()
 
     expect(store.api.updateMediaMeta).not.toHaveBeenCalled()
+  })
+})
+
+describe('MediaLightbox — Slice 2 SW switchover (cr-inline-video-playback, ADR 0047)', () => {
+  const FTYP_MP4 = new Uint8Array([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d])
+
+  async function seedVideo(memoryKey: Uint8Array) {
+    const store = galleryFakeStore()
+    vi.mocked(mediaApi).mockReturnValue(store.api as unknown as ReturnType<typeof mediaApi>)
+    vi.stubGlobal('fetch', store.fetchStub)
+    await addMedia(SCOPE_ID, NODE_ID, memoryKey, { bytes: FTYP_MP4, mediaType: 'video/mp4' }, stubDeriver())
+    return { store, items: await listMedia(SCOPE_ID, NODE_ID) }
+  }
+
+  it('plays via the SW handle when a controlling SW answered — no whole-original fetch — and revokes on unmount', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { store, items } = await seedVideo(memoryKey)
+    vi.mocked(registerPlayback).mockResolvedValueOnce('/__media/handle-1')
+
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+    store.api.presignBlobDownloads.mockClear()
+
+    await wrapper.find('[aria-label="Play video"]').trigger('click')
+    await flushPromises()
+
+    // registered a key-free playback with {chunkCount, byteSize, mediaType} + the page's chunk provider
+    expect(registerPlayback).toHaveBeenCalledTimes(1)
+    const [meta, provider] = vi.mocked(registerPlayback).mock.calls[0]
+    expect(meta.mediaType).toBe('video/mp4')
+    expect(meta.chunkCount).toBeGreaterThan(0)
+    expect(typeof provider.getPlaintextChunk).toBe('function')
+    // the <video> src is the synthetic handle URL, and the page never fetched the whole original (the point of the SW path)
+    expect(wrapper.find('.media-lightbox-stage video').attributes('src')).toBe('/__media/handle-1')
+    expect(store.api.presignBlobDownloads).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+    expect(revokePlayback).toHaveBeenCalledWith('handle-1')
+  })
+
+  it('falls back to the Slice-1 full-blob path when no SW is usable', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const { store, items } = await seedVideo(memoryKey)
+    vi.mocked(registerPlayback).mockResolvedValueOnce(null) // no / stale / mismatched SW
+
+    const wrapper = mountLightbox(memoryKey, items, 0)
+    await flushPromises()
+    store.api.presignBlobDownloads.mockClear()
+
+    await wrapper.find('[aria-label="Play video"]').trigger('click')
+    await flushPromises()
+
+    // fell back: fetched the ORIGINAL (up-0) and played a decrypted blob: URL — no SW handle
+    const presigned = store.api.presignBlobDownloads.mock.calls.flatMap(
+      (c: any) => c[0].blobDownloadsBatchRequest.items.map((it: any) => it.blobId),
+    )
+    expect(presigned).toEqual(['up-0'])
+    expect(wrapper.find('.media-lightbox-stage video').attributes('src')).toMatch(/^blob:/)
+    expect(revokePlayback).not.toHaveBeenCalled()
   })
 })
 

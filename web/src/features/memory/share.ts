@@ -19,9 +19,11 @@ import {
   lightboxRef,
   downloadRef,
   openBlobFromUrls,
+  makeChunkProvider,
   uploadMediaVia,
   createBrowserDeriver,
   type BlobRef,
+  type ChunkProvider,
   type MediaItem,
   type MediaUploadTransport,
   type AddMediaSource,
@@ -550,6 +552,18 @@ async function openShareBlob(shareId: string, memoryKey: Uint8Array, ref: BlobRe
   const dl = await publicSharesApi().resolveShareBlob({ shareId, blobId: ref.blobId, xSharePassword: pwToken })
   const getUrls = [...dl.presignedGets].sort((a, b) => a.index - b.index).map((u) => u.url)
   return openBlobFromUrls(memoryKey, ref, getUrls)
+}
+
+/**
+ * A {@link ChunkProvider} for the anonymous share viewer — the Slice-2 SW range seam over the gated share-scoped
+ * presign (`resolveShareBlob`: `shareId` + guest `pwToken`, whole-blob only). Same `openFrame` core as the authed
+ * `chunkProvider`; only the presign differs, so the SW never learns which route served the bytes (ADR 0047).
+ */
+export function shareChunkProvider(shareId: string, memoryKey: Uint8Array, ref: BlobRef, pwToken?: string): ChunkProvider {
+  return makeChunkProvider(memoryKey, ref, async () => {
+    const dl = await publicSharesApi().resolveShareBlob({ shareId, blobId: ref.blobId, xSharePassword: pwToken })
+    return [...dl.presignedGets].sort((a, b) => a.index - b.index).map((u) => u.url)
+  })
 }
 
 /** Open a shared media's grid (thumbnail) tier. */

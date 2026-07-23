@@ -7,7 +7,7 @@ vi.mock('../../api/client', () => ({
   tokenApi: vi.fn(),
 }))
 
-import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShare, readShareNoteMap, readShareName, pickLocaleText, recoverShareLink, derivePasswordToken, readSharePassword, ShareUnavailableError, SharePasswordRequiredError } from './share'
+import { createShare, resolveShare, createContributorIdentity, deleteSharePhoto, listSharesFor, reactivateShare, updateShare, readShareNoteMap, readShareName, pickLocaleText, recoverShareLink, derivePasswordToken, readSharePassword, shareChunkProvider, ShareUnavailableError, SharePasswordRequiredError } from './share'
 import { unsealMeta } from './media'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import * as v1 from '../../shared/crypto/v1'
@@ -321,5 +321,37 @@ describe('password protection (cr-0118)', () => {
     await expect(resolveShare('share-p2', fragment)).rejects.toBeInstanceOf(SharePasswordRequiredError)
     const resolved = await resolveShare('share-p2', fragment, 'token')
     expect(resolved.memoryName).toBe('Rom')
+  })
+})
+
+describe('shareChunkProvider (Slice 2 SW range seam for the anonymous viewer, ADR 0047)', () => {
+  const KBLOB_CTX = 'blob-key' // == media.ts KBLOB_CTX
+
+  it('presigns via the gated share endpoint and opens exactly the requested chunk to plaintext', async () => {
+    const memoryKey = v1.randomBytes(32)
+    const blobKey = v1.randomBytes(32)
+    const chunks = [new Uint8Array([10, 20, 30]), new Uint8Array([40, 50])]
+    const frames = chunks.map((pt, i) => v1.sealFrame(blobKey, i, chunks.length, pt, v1.randomBytes(12)))
+    const wrappedBlobKey = b64std(v1.symWrap(memoryKey, blobKey, KBLOB_CTX, v1.randomBytes(12)))
+    const byteSize = frames.reduce((n, f) => n + f.length, 0)
+    const ref = { blobId: 'blob-s', chunkCount: chunks.length, byteSize, wrappedBlobKey }
+
+    const resolveShareBlob = vi.fn(async () => ({
+      presignedGets: frames.map((_, i) => ({ index: i, url: `u/${i}` })),
+    }))
+    vi.mocked(publicSharesApi).mockReturnValue({ resolveShareBlob } as unknown as ReturnType<typeof publicSharesApi>)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const i = Number(/^u\/(\d+)$/.exec(url)![1])
+        return { ok: true, status: 200, arrayBuffer: async () => frames[i].buffer } as unknown as Response
+      }),
+    )
+
+    const provider = shareChunkProvider('share-1', memoryKey, ref, 'pw-token')
+    expect(provider.chunkCount).toBe(2)
+    expect(Array.from(await provider.getPlaintextChunk(1))).toEqual([40, 50])
+    // the anonymous viewer's gated presign was used, forwarding the guest password token
+    expect(resolveShareBlob).toHaveBeenCalledWith({ shareId: 'share-1', blobId: 'blob-s', xSharePassword: 'pw-token' })
   })
 })

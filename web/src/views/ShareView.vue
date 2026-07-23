@@ -16,6 +16,7 @@ import {
   openShareGrid,
   openShareLightbox,
   openShareOriginal,
+  shareChunkProvider,
   createContributorIdentity,
   addSharePhoto,
   deleteSharePhoto,
@@ -30,7 +31,7 @@ import {
   type ShareItem,
   type ContributorSession,
 } from '../features/memory/share'
-import { unsealMeta, effectiveCapturedAt, hasDerivatives, type MediaItem } from '../features/memory/media'
+import { unsealMeta, effectiveCapturedAt, hasDerivatives, downloadRef, type MediaItem } from '../features/memory/media'
 import { isSupportedMediaFile, inferMediaType, enqueueUploads, retryFile, removeFile } from '../features/memory/uploadQueue'
 import { useOptimisticTiles, type OptimisticTileVM } from '../features/memory/useOptimisticTiles'
 import { useThumbnailPipeline } from '../features/memory/useThumbnailPipeline'
@@ -266,6 +267,10 @@ const unusedMemoryKey = new Uint8Array()
 const previewLoader = (item: MediaItem) => openShareLightbox(shareId, shareById.value.get(item.mediaId)!, pwToken.value)
 const originalLoader = (item: MediaItem) => openShareOriginal(shareId, shareById.value.get(item.mediaId)!, pwToken.value)
 const metaResolver = (item: MediaItem) => unsealMeta(shareById.value.get(item.mediaId)!.memoryKey, item)
+// Slice 2 (ADR 0047): the share-scoped key-free chunk provider for the SW range path — the anonymous viewer's
+// per-item K_mem + guest pwToken, over the gated share presign. The SW never learns it is the share route.
+const videoChunkProvider = (item: MediaItem) =>
+  shareChunkProvider(shareId, shareById.value.get(item.mediaId)!.memoryKey, downloadRef(item), pwToken.value)
 
 // --- resolve (on mount + after a contribution) ------------------------------
 async function load() {
@@ -509,6 +514,7 @@ onBeforeUnmount(() => pipeline.revokeAll())
       :preview-loader="previewLoader"
       :original-loader="originalLoader"
       :meta-resolver="metaResolver"
+      :video-chunk-provider="videoChunkProvider"
       @close="lightboxIndex = null"
     />
   </div>

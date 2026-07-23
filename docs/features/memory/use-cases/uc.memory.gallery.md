@@ -23,8 +23,11 @@
 3. **Lightbox:** clicking an item opens it full-view; the client fetches that item's **preview**, decrypts, and
    displays it; **prev/next** page through the grid order. (The preview — not the multi-MB original — keeps the
    lightbox fast.) A **video** (known from its sealed `mediaType`, [ADR 0047](../../../decisions/0047-inline-video-playback-range-streaming.md))
-   shows its poster with a **play** control; playing it fetches + decrypts the **original** on device and plays it
-   from a typed blob URL in a `<video>`. A **play badge** marks a video's grid tile (#104/#105).
+   shows its poster with a **play** control; playing it **streams** the **original** on device — a key-free Service
+   Worker answers the `<video>` demuxer's byte-range requests, pulling + decrypting only the covering chunks from
+   the page as the demuxer needs them (no whole-blob wait). Where no Service Worker is available it falls back to
+   fetching + decrypting the whole original into a typed blob URL. A **play badge** marks a video's grid tile
+   (#104/#105).
 4. **Download:** an explicit download fetches the **original** (the only pristine, full-resolution copy) and
    saves it.
 5. **Favorite:** the header toggle pins / unpins the Memory ([en.memory.favorites](../enablers/en.memory.favorites.md)).
@@ -53,16 +56,18 @@
 A **video** shows a small ▶ badge on its tile — open it and press play to watch it right there. Everything is
 decrypted on **your own device** — the server only ever stores scrambled files and never sees your pictures or
 videos. To keep it quick, the grid and the large view use **compact copies your device made**; the
-**full-quality original is only fetched when you actually download it** (or, for a video, when you press play).
-Journal, chapters, maps and playlists come in later steps.
+**full-quality original is only fetched when you actually download it** — and a video is **streamed piece by
+piece as you watch**, so only the parts you actually play are fetched, not the whole file. Journal, chapters,
+maps and playlists come in later steps.
 
 **DE —** Öffne eine Erinnerung und du siehst ihre Fotos als Raster; tippe eines an, um es groß zu sehen und
 durch die anderen zu blättern. Ein **Video** zeigt ein kleines ▶-Abzeichen auf seiner Kachel — öffne es und
 drücke Play, um es direkt dort anzusehen. Alles wird auf **deinem eigenen Gerät** entschlüsselt — der Server
 speichert nur verschlüsselte Dateien und sieht deine Bilder und Videos nie. Damit es flott bleibt, nutzen das
 Raster und die Großansicht **kompakte Kopien, die dein Gerät erstellt hat**; das **Original in voller Qualität
-wird nur geladen, wenn du es wirklich herunterlädst** (bei einem Video, wenn du Play drückst). Journal, Kapitel,
-Karten und Playlists kommen in späteren Schritten.
+wird nur geladen, wenn du es wirklich herunterlädst** — und ein Video wird beim Ansehen **Stück für Stück
+gestreamt**, sodass nur die tatsächlich abgespielten Teile geladen werden, nicht die ganze Datei. Journal,
+Kapitel, Karten und Playlists kommen in späteren Schritten.
 
 ## Related
 
