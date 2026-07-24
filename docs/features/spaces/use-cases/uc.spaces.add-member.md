@@ -107,6 +107,17 @@ sequenceDiagram
   before key transparency, and self-hosted makes it moot ([security-model](../../../crosscutting/security-model.md)).
   The identity **fingerprint / safety-number** derivation is left as an explicit seam for a later hardening
   slice ([ADR 0020](../../../decisions/0020-grant-distribution-invite-wrap.md)).
+- **Delivery result, never silent (cr-email-invite-send-hardening).** The mint reports how the invite went —
+  **SENT** (the tenant's SMTP accepted it), **FALLBACK_COPYLINK** (no SMTP configured → the owner copies the
+  link, unchanged for self-hosters), or **FAILED** (SMTP configured but the send errored). A send error is
+  surfaced, **not swallowed**, so the owner falls back to the copy-link the response still carries — never a
+  silent onboarding failure. The send runs **after the mint transaction commits** (a hung SMTP server can't hold
+  a DB connection), and the result is request-scoped and **never persisted** — no new operator-visible metadata
+  ([ADR 0049](../../../decisions/0049-email-delivery-boundary.md)).
+- **Anti-bombing rate limit (cr-email-invite-send-hardening).** Once mail is a real channel, repeated invites to
+  one address are **rate-limited** — per-(tenant, recipient) as the primary guard and per-tenant as a volume cap
+  (429 + `Retry-After`, no invite minted). It is enforced in the handler on the tenant-owner member paths (the
+  per-IP auth limiter can't key on a recipient); the re-issue loop against one address is the sharpest vector.
 - **Additive only.** This use-case only **adds** a grant. Removing a member, rotating `K_SC` so a removed member
   can't read future content, and re-inviting are a separate later slice.
 

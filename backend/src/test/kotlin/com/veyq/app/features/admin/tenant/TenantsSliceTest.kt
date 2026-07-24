@@ -43,6 +43,9 @@ class TenantsSliceTest {
             .body("status", equalTo("PENDING"))
             .body("tenantId", notNullValue())
             .body("inviteExpiresAt", notNullValue())
+            // cr-email-invite-send-hardening: a PENDING tenant has no mail settings, so the bootstrap invite always
+            // reports the copy-link fallback (there is no SMTP path to reach on create/resend/reassign).
+            .body("delivery", equalTo("FALLBACK_COPYLINK"))
     }
 
     @Test

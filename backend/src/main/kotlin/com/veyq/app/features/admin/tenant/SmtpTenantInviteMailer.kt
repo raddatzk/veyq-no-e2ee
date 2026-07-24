@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.generated.model.DeliveryResult
 import com.veyq.app.shared.crypto.ConfigSecretSeal
 import com.veyq.app.shared.crypto.SealedSecret
 import io.vertx.core.Vertx
@@ -30,9 +31,11 @@ import java.util.concurrent.TimeUnit
  * the plain [LoggingTenantInviteMailer] bean (which it injects **by concrete type** for the fallback — a concrete
  * bean type is never ambiguous, ADR 0048). No call site changes.
  *
- * **Best-effort, like the logging mailer:** a send failure is logged **secret-free** and swallowed — the invite
- * was already minted and its raw token is returned to the owner for the copy-link, so a transient SMTP error must
- * not roll back the mint. The raw token / accept link is **never** logged, in any mode.
+ * **Best-effort, and now first-class about it:** a send failure is logged **secret-free** and surfaced as
+ * [DeliveryResult.FAILED] (it is no longer swallowed to `void`). The invite is already minted and its raw token
+ * is returned to the owner for the copy-link fallback, so a transient SMTP error must not roll back the mint —
+ * the caller sends **after** the mint transaction commits (cr-email-invite-send-hardening). The raw token /
+ * accept link is **never** logged, in any mode.
  */
 @Alternative
 @Priority(1)
@@ -47,13 +50,13 @@ class SmtpTenantInviteMailer(
 
     private val log = Logger.getLogger(SmtpTenantInviteMailer::class.java)
 
-    override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant) {
+    override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant): DeliveryResult {
         val s = store.mailSettingsByDomain(domain)
         // Not sendable ⇒ the unchanged copy-link + dev-file path (ADR 0048 §4). Covers: no settings row, sending
-        // disabled, an incomplete config, no stored password, or no env KEK to unseal it.
+        // disabled, an incomplete config, no stored password, or no env KEK to unseal it. The fallback reports
+        // FALLBACK_COPYLINK.
         if (s == null || !s.enabled || s.host.isNullOrBlank() || s.passwordCiphertext == null || !seal.configured) {
-            fallback.sendInvite(domain, ownerEmail, token, expiresAt)
-            return
+            return fallback.sendInvite(domain, ownerEmail, token, expiresAt)
         }
         // The accept link mirrors web/src/shared/inviteLink.ts: the secret rides the URL fragment (ADR 0020). The
         // domain is a bare hostname validated at tenant creation (CreateTenantRequest pattern), so it is safe here.
@@ -65,11 +68,16 @@ class SmtpTenantInviteMailer(
         val subject = renderer.render(s.subjectTemplate ?: renderer.defaultSubject(), ctx)
         val body = renderer.render(s.bodyTemplate ?: renderer.defaultBody(), ctx)
         val from = s.from?.takeUnless { it.isBlank() } ?: "noreply@$domain"
-        deliver(s, from, ownerEmail, subject, body)
+        return deliver(s, from, ownerEmail, subject, body)
     }
 
-    /** Build a per-tenant SMTP client and send. Best-effort: any failure is logged secret-free and swallowed. */
-    private fun deliver(s: MailSettingsRow, from: String, to: String, subject: String, body: String) {
+    /**
+     * Build a per-tenant SMTP client and send. Best-effort: any failure is logged secret-free and reported as
+     * [DeliveryResult.FAILED] (not swallowed). This runs **after** the mint transaction has committed (the
+     * handler sends outside `@Transactional`), so the bounded [SEND_TIMEOUT_SECONDS] block no longer holds a DB
+     * connection open.
+     */
+    private fun deliver(s: MailSettingsRow, from: String, to: String, subject: String, body: String): DeliveryResult {
         val cfg = MailConfig()
             .setHostname(s.host)
             .setPort(s.port ?: DEFAULT_SMTP_PORT)
@@ -80,12 +88,14 @@ class SmtpTenantInviteMailer(
                 .setLogin(LoginOption.REQUIRED)
         }
         val client = MailClient.create(vertx, cfg)
-        try {
+        return try {
             val message = MailMessage().setFrom(from).setTo(to).setSubject(subject).setText(body)
             client.sendMail(message).toCompletionStage().toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            DeliveryResult.SENT
         } catch (e: Exception) {
             // Never log the token or the accept link; only the recipient + a cause message.
             log.warnf("SMTP delivery of a tenant invite to %s failed: %s", to, e.message)
+            DeliveryResult.FAILED
         } finally {
             client.close()
         }
@@ -93,7 +103,9 @@ class SmtpTenantInviteMailer(
 
     private companion object {
         const val DEFAULT_SMTP_PORT = 587
-        const val SEND_TIMEOUT_SECONDS = 30L
+        // Bounded, and now outside the mint transaction (cr-email-invite-send-hardening) — 10 s, down from 30 s:
+        // enough for a healthy MTA handshake, short enough that a hung server does not hold the request thread.
+        const val SEND_TIMEOUT_SECONDS = 10L
         val EXPIRY_FMT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC)
     }

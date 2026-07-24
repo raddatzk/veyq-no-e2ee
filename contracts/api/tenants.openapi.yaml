@@ -1085,7 +1085,7 @@ components:
 
     TenantCreated:
       type: object
-      required: [tenantId, status, inviteExpiresAt, bootstrapSecret]
+      required: [tenantId, status, inviteExpiresAt, bootstrapSecret, delivery]
       properties:
         tenantId:
           x-veyq-visibility: id
@@ -1103,6 +1103,8 @@ components:
           example: 2026-07-03T12:00:00Z
         bootstrapSecret:
           $ref: "#/components/schemas/InviteBootstrapSecret"
+        delivery:
+          $ref: "#/components/schemas/DeliveryResult"
 
     TenantSummary:
       type: object
@@ -1147,7 +1149,7 @@ components:
 
     TenantInviteState:
       type: object
-      required: [ownerEmail, inviteStatus, inviteExpiresAt, bootstrapSecret]
+      required: [ownerEmail, inviteStatus, inviteExpiresAt, bootstrapSecret, delivery]
       properties:
         ownerEmail:
           x-veyq-visibility: pii
@@ -1166,6 +1168,8 @@ components:
           example: 2026-07-03T12:00:00Z
         bootstrapSecret:
           $ref: "#/components/schemas/InviteBootstrapSecret"
+        delivery:
+          $ref: "#/components/schemas/DeliveryResult"
 
     TenantStatus:
       type: string
@@ -1189,6 +1193,19 @@ components:
         later by a key-holder (cr-0076/cr-0077).
       enum: [OWNER, MEMBER]
       example: MEMBER
+
+    DeliveryResult:
+      x-veyq-visibility: enum
+      type: string
+      description: >
+        How the invite reached (or did not reach) its recipient, returned inline to the minting owner
+        (cr-email-invite-send-hardening; ADR 0048/0049). Request-scoped only — never persisted, so it adds no
+        stored metadata (operator-blind untouched). SENT = the tenant's SMTP is configured and the mail was
+        accepted by the server. FALLBACK_COPYLINK = no sendable SMTP (unconfigured tenant, or the owner-bootstrap
+        PENDING tenant that has no mail settings) — the copy-link is the channel, unchanged. FAILED = SMTP is
+        configured but the send errored; the returned `bootstrapSecret` copy-link is the fallback.
+      enum: [SENT, FALLBACK_COPYLINK, FAILED]
+      example: SENT
 
     MemberInviteRequest:
       type: object
@@ -1234,7 +1251,7 @@ components:
 
     MemberInviteState:
       type: object
-      required: [email, inviteStatus, inviteExpiresAt, bootstrapSecret]
+      required: [email, inviteStatus, inviteExpiresAt, bootstrapSecret, delivery]
       properties:
         email:
           x-veyq-visibility: pii
@@ -1253,6 +1270,8 @@ components:
           example: 2026-07-11T12:00:00Z
         bootstrapSecret:
           $ref: "#/components/schemas/InviteBootstrapSecret"
+        delivery:
+          $ref: "#/components/schemas/DeliveryResult"
 
     InviteBootstrapSecret:
       type: string

@@ -6,7 +6,11 @@ title: Create a tenant & invite its owner
 # via register-and-accept (new owner) or sign-in accept (existing owner).
 acceptanceCriteria:
   - id: create-pending-tenant
-    text: A Server Owner creates a PENDING tenant (201) with an owner invite.
+    # cr-email-invite-send-hardening: create/resend/reassign responses also carry the delivery result field. A
+    # PENDING tenant has no mail settings, so the bootstrap invite is always FALLBACK_COPYLINK (the copy-link is
+    # the channel) — the SENT/FAILED states and the rate-limiter apply only to the tenant-owner member paths
+    # (uc.spaces.add-member / uc.spaces.manage-member-invites). Never persisted → operator-blind untouched.
+    text: A Server Owner creates a PENDING tenant (201) with an owner invite; the response reports the delivery result, which for a bootstrap invite is always FALLBACK_COPYLINK (no SMTP for a PENDING tenant).
     coverage:
       backend: { integration: [TenantsSliceTest.createReturns201Pending] }
       web: { unit: [src/features/admin/createTenant/CreateTenantDialog.test.ts] }

@@ -3,6 +3,7 @@ package com.veyq.app.features.admin.tenant
 import com.veyq.app.features.sharing.SharingStore
 import com.veyq.app.features.spaces.scope.ScopesStore
 import com.veyq.app.features.tasks.TasksStore
+import com.veyq.app.generated.model.DeliveryResult
 import com.veyq.app.shared.config.VeyqConfig
 import com.veyq.app.shared.crypto.Tokens
 import com.veyq.app.shared.http.FailureStatus
@@ -10,20 +11,21 @@ import com.veyq.app.shared.http.Failures
 import com.veyq.app.shared.http.HttpFailure
 import com.veyq.app.shared.http.httpFailure
 import com.veyq.app.shared.membership.MembershipEntity
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
 
-/** Result of a create-tenant attempt. */
+/** Result of a create-tenant attempt. `delivery` reports how the invite reached the owner (cr-email-invite-send-hardening). */
 sealed interface CreateTenantOutcome {
-    data class Created(val tenantId: String, val expiresAt: Instant, val bootstrapSecret: String) : CreateTenantOutcome
+    data class Created(val tenantId: String, val expiresAt: Instant, val bootstrapSecret: String, val delivery: DeliveryResult) : CreateTenantOutcome
     data object DomainTaken : CreateTenantOutcome, HttpFailure by httpFailure("domain_taken", FailureStatus.CONFLICT)
 }
 
 /** Result of a resend/reassign on a pending tenant's invite. */
 sealed interface InviteOutcome {
-    data class Done(val invite: InviteView) : InviteOutcome
+    data class Done(val invite: InviteView, val delivery: DeliveryResult) : InviteOutcome
     data object NotFound : InviteOutcome, HttpFailure by Failures.tenantNotFound
     data object NotPending : InviteOutcome, HttpFailure by httpFailure("tenant_not_pending", FailureStatus.CONFLICT)
 }
@@ -37,7 +39,9 @@ sealed interface RevokeOutcome {
 
 /** Result of a tenant owner inviting a member by email (cr-0077). */
 sealed interface MemberInviteOutcome {
-    data class Done(val invite: InviteView) : MemberInviteOutcome
+    data class Done(val invite: InviteView, val delivery: DeliveryResult) : MemberInviteOutcome
+    /** Over the invite-mail rate limit (cr-email-invite-send-hardening) — mapped to 429 + Retry-After, no mint. */
+    data class RateLimited(val retryAfterSeconds: Long) : MemberInviteOutcome
     data object NotFound : MemberInviteOutcome, HttpFailure by Failures.tenantNotFound
     data object NotOwner : MemberInviteOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
     data object NotActive : MemberInviteOutcome, HttpFailure by httpFailure("tenant_not_active", FailureStatus.CONFLICT)
@@ -53,7 +57,9 @@ sealed interface MemberInvitesOutcome {
 
 /** Result of re-issuing a pending member invite (cr-0082). */
 sealed interface ReissueOutcome {
-    data class Done(val invite: InviteView) : ReissueOutcome
+    data class Done(val invite: InviteView, val delivery: DeliveryResult) : ReissueOutcome
+    /** Over the invite-mail rate limit (cr-email-invite-send-hardening) — mapped to 429 + Retry-After, no mint. */
+    data class RateLimited(val retryAfterSeconds: Long) : ReissueOutcome
     data object NotFound : ReissueOutcome, HttpFailure by Failures.tenantNotFound        // no such tenant
     data object NotOwner : ReissueOutcome, HttpFailure by httpFailure("not_tenant_owner", FailureStatus.FORBIDDEN)
     data object InviteNotFound : ReissueOutcome, HttpFailure by httpFailure("invite_not_found", FailureStatus.NOT_FOUND)  // no such pending invite for this tenant
@@ -90,42 +96,72 @@ class TenantHandler(
     private val scopes: ScopesStore,
     private val tasks: TasksStore,
     private val mailer: TenantInviteMailer,
+    private val inviteRateLimiter: InviteMailRateLimiter,
     private val shares: SharingStore,
     config: VeyqConfig,
 ) {
     private val inviteTtl: Duration = config.tenant().invite().ttl()
     private val maxAttempts: Int = config.tasks().maxAttempts()
 
-    @Transactional
+    /**
+     * A minted invite is committed **then** sent: the send is a blocking network call that must not run under an
+     * open DB transaction (a hung SMTP server would hold a pooled connection, cr-email-invite-send-hardening). So
+     * the mint runs in an explicit [QuarkusTransaction] block and the mailer is called **after** it commits —
+     * never as a self-invoked `@Transactional` method, which would silently share this call's transaction
+     * (CDI self-invocation bypasses the proxy). The tx block returns either a terminal [MintResult.Rejected]
+     * (guards / rate-limit tripped — nothing to send) or a [MintResult.ToSend] payload whose `build` folds the
+     * [DeliveryResult] into the final outcome.
+     */
+    private sealed interface MintResult<out O> {
+        data class Rejected<O>(val outcome: O) : MintResult<O>
+        data class ToSend<O>(
+            val domain: String,
+            val recipient: String,
+            val token: String,
+            val expiresAt: Instant,
+            val build: (DeliveryResult) -> O,
+        ) : MintResult<O>
+    }
+
+    private fun <O> commitThenSend(mint: () -> MintResult<O>): O =
+        when (val r = QuarkusTransaction.requiringNew().call(mint)) {
+            is MintResult.Rejected -> r.outcome
+            is MintResult.ToSend -> r.build(mailer.sendInvite(r.domain, r.recipient, r.token, r.expiresAt))
+        }
+
     fun create(name: String, domain: String, ownerEmail: String): CreateTenantOutcome {
         val normalizedDomain = domain.lowercase()
         val normalizedEmail = ownerEmail.lowercase()
-        if (store.domainExists(normalizedDomain)) return CreateTenantOutcome.DomainTaken
-
-        val token = Tokens.random()
-        val expiresAt = Instant.now().plus(inviteTtl)
-        val (tenantId, expiry) = store.createPendingTenant(name, normalizedDomain, normalizedEmail, Tokens.hash(token), expiresAt)
-        mailer.sendInvite(normalizedDomain, normalizedEmail, token, expiry)
-        // Return the raw token so the Server Owner can copy the invite link (works without a mailer, cr-0080).
-        return CreateTenantOutcome.Created(tenantId, expiry, token)
+        return commitThenSend {
+            if (store.domainExists(normalizedDomain)) return@commitThenSend MintResult.Rejected(CreateTenantOutcome.DomainTaken)
+            val token = Tokens.random()
+            val expiresAt = Instant.now().plus(inviteTtl)
+            val (tenantId, expiry) = store.createPendingTenant(name, normalizedDomain, normalizedEmail, Tokens.hash(token), expiresAt)
+            // Return the raw token so the Server Owner can copy the invite link (works without a mailer, cr-0080).
+            MintResult.ToSend(normalizedDomain, normalizedEmail, token, expiry) { delivery ->
+                CreateTenantOutcome.Created(tenantId, expiry, token, delivery)
+            }
+        }
     }
 
     @Transactional
     fun list(): List<TenantView> = store.listAll()
 
     /** Resend: re-mint to the SAME owner email. */
-    @Transactional
-    fun resendInvite(tenantId: String): InviteOutcome =
-        onPendingTenant(tenantId) { tenant -> mintTo(tenant.id, tenant.ownerEmail, tenant.domain) }
+    fun resendInvite(tenantId: String): InviteOutcome = commitThenSend {
+        val tenant = store.findTenant(tenantId) ?: return@commitThenSend MintResult.Rejected(InviteOutcome.NotFound)
+        if (tenant.status != TenantEntity.PENDING) return@commitThenSend MintResult.Rejected(InviteOutcome.NotPending)
+        mintToSend(tenant.id, tenant.ownerEmail, tenant.domain)
+    }
 
     /** Reassign: re-bind to a NEW owner email, then re-mint. */
-    @Transactional
-    fun reassignInvite(tenantId: String, newOwnerEmail: String): InviteOutcome =
-        onPendingTenant(tenantId) { tenant ->
-            val email = newOwnerEmail.lowercase()
-            store.updateOwnerEmail(tenant.id, email)
-            mintTo(tenant.id, email, tenant.domain)
-        }
+    fun reassignInvite(tenantId: String, newOwnerEmail: String): InviteOutcome = commitThenSend {
+        val tenant = store.findTenant(tenantId) ?: return@commitThenSend MintResult.Rejected(InviteOutcome.NotFound)
+        if (tenant.status != TenantEntity.PENDING) return@commitThenSend MintResult.Rejected(InviteOutcome.NotPending)
+        val email = newOwnerEmail.lowercase()
+        store.updateOwnerEmail(tenant.id, email)
+        mintToSend(tenant.id, email, tenant.domain)
+    }
 
     @Transactional
     fun revoke(tenantId: String): RevokeOutcome {
@@ -141,20 +177,22 @@ class TenantHandler(
      * the same cold-birth accept flow with the invite's MEMBER role. The scope key is delivered afterward by a
      * key-holder (cr-0076) — this only mints the admission token.
      */
-    @Transactional
-    fun inviteMember(callerId: String, tenantId: String, email: String): MemberInviteOutcome {
-        if (!store.hasMembership(callerId, tenantId)) return MemberInviteOutcome.NotFound
-        val tenant = store.findTenant(tenantId) ?: return MemberInviteOutcome.NotFound
-        if (!store.isOwner(callerId, tenantId)) return MemberInviteOutcome.NotOwner
-        if (tenant.status != TenantEntity.ACTIVE) return MemberInviteOutcome.NotActive
+    fun inviteMember(callerId: String, tenantId: String, email: String): MemberInviteOutcome = commitThenSend {
+        if (!store.hasMembership(callerId, tenantId)) return@commitThenSend MintResult.Rejected(MemberInviteOutcome.NotFound)
+        val tenant = store.findTenant(tenantId) ?: return@commitThenSend MintResult.Rejected(MemberInviteOutcome.NotFound)
+        if (!store.isOwner(callerId, tenantId)) return@commitThenSend MintResult.Rejected(MemberInviteOutcome.NotOwner)
+        if (tenant.status != TenantEntity.ACTIVE) return@commitThenSend MintResult.Rejected(MemberInviteOutcome.NotActive)
         val normalizedEmail = email.lowercase()
-        if (store.isEmailMember(tenantId, normalizedEmail)) return MemberInviteOutcome.AlreadyMember
+        if (store.isEmailMember(tenantId, normalizedEmail)) return@commitThenSend MintResult.Rejected(MemberInviteOutcome.AlreadyMember)
+        // Authorized owner + real recipient ⇒ enforce the anti-bombing limit before minting (no orphan on a 429).
+        inviteRateLimiter.check(tenantId, normalizedEmail)?.let { return@commitThenSend MintResult.Rejected(MemberInviteOutcome.RateLimited(it)) }
 
         val token = Tokens.random()
         val expiresAt = Instant.now().plus(inviteTtl)
         store.mintMemberInvite(tenantId, normalizedEmail, Tokens.hash(token), expiresAt)
-        mailer.sendInvite(tenant.domain, normalizedEmail, token, expiresAt)
-        return MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt, token))
+        MintResult.ToSend(tenant.domain, normalizedEmail, token, expiresAt) { delivery ->
+            MemberInviteOutcome.Done(InviteView(normalizedEmail, TenantInviteEntity.ACTIVE, expiresAt, token), delivery)
+        }
     }
 
     /** List a tenant's pending member invites — owner-gated (cr-0082). */
@@ -167,18 +205,20 @@ class TenantHandler(
     }
 
     /** Re-issue a pending member invite: supersede it + mint a fresh secret for the same email (cr-0082). */
-    @Transactional
-    fun reissueMemberInvite(callerId: String, tenantId: String, inviteId: String): ReissueOutcome {
-        if (!store.hasMembership(callerId, tenantId)) return ReissueOutcome.NotFound
-        val tenant = store.findTenant(tenantId) ?: return ReissueOutcome.NotFound
-        if (!store.isOwner(callerId, tenantId)) return ReissueOutcome.NotOwner
-        val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return ReissueOutcome.InviteNotFound
+    fun reissueMemberInvite(callerId: String, tenantId: String, inviteId: String): ReissueOutcome = commitThenSend {
+        if (!store.hasMembership(callerId, tenantId)) return@commitThenSend MintResult.Rejected(ReissueOutcome.NotFound)
+        val tenant = store.findTenant(tenantId) ?: return@commitThenSend MintResult.Rejected(ReissueOutcome.NotFound)
+        if (!store.isOwner(callerId, tenantId)) return@commitThenSend MintResult.Rejected(ReissueOutcome.NotOwner)
+        val invite = store.findPendingMemberInvite(tenantId, inviteId) ?: return@commitThenSend MintResult.Rejected(ReissueOutcome.InviteNotFound)
+        // The reissue loop against one address is the sharpest bombing vector — limit before minting anew.
+        inviteRateLimiter.check(tenantId, invite.ownerEmail)?.let { return@commitThenSend MintResult.Rejected(ReissueOutcome.RateLimited(it)) }
         val token = Tokens.random()
         val expiresAt = Instant.now().plus(inviteTtl)
         // mintMemberInvite supersedes the current ACTIVE invite for this email (i.e. the one we found) + mints anew.
         store.mintMemberInvite(tenantId, invite.ownerEmail, Tokens.hash(token), expiresAt)
-        mailer.sendInvite(tenant.domain, invite.ownerEmail, token, expiresAt)
-        return ReissueOutcome.Done(InviteView(invite.ownerEmail, TenantInviteEntity.ACTIVE, expiresAt, token))
+        MintResult.ToSend(tenant.domain, invite.ownerEmail, token, expiresAt) { delivery ->
+            ReissueOutcome.Done(InviteView(invite.ownerEmail, TenantInviteEntity.ACTIVE, expiresAt, token), delivery)
+        }
     }
 
     /** Revoke a pending member invite (soft-terminal, additive-safe) — owner-gated (cr-0082). */
@@ -251,17 +291,13 @@ class TenantHandler(
         if (step.rotateAfter) tasks.originateScopeRotation(step.scopeId, maxAttempts)
     }
 
-    private fun mintTo(tenantId: String, ownerEmail: String, domain: String): InviteView {
+    /** Supersede + mint a bootstrap invite (resend/reassign), returning the payload to send **after** commit. */
+    private fun mintToSend(tenantId: String, ownerEmail: String, domain: String): MintResult<InviteOutcome> {
         val token = Tokens.random()
         val expiresAt = Instant.now().plus(inviteTtl)
         val invite = store.supersedeAndMintInvite(tenantId, ownerEmail, Tokens.hash(token), expiresAt)
-        mailer.sendInvite(domain, ownerEmail, token, expiresAt)
-        return invite.copy(bootstrapSecret = token)
-    }
-
-    private inline fun onPendingTenant(tenantId: String, block: (TenantEntity) -> InviteView): InviteOutcome {
-        val tenant = store.findTenant(tenantId) ?: return InviteOutcome.NotFound
-        if (tenant.status != TenantEntity.PENDING) return InviteOutcome.NotPending
-        return InviteOutcome.Done(block(tenant))
+        return MintResult.ToSend(domain, ownerEmail, token, expiresAt) { delivery ->
+            InviteOutcome.Done(invite.copy(bootstrapSecret = token), delivery)
+        }
     }
 }

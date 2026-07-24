@@ -31,6 +31,19 @@ acceptanceCriteria:
         integration: [MemberInviteManagementSliceTest.revokeMakesTheSecretNoLongerAcceptableAndDropsItFromTheList, MemberInviteManagementSliceTest.reissueAndRevokeOfAnUnknownInviteAre404]
       web:
         unit: [src/features/spaces/TenantMembersPanel.test.ts]
+  - id: reissue-delivery-and-rate-limit
+    # cr-email-invite-send-hardening: the re-issue path gains the same two hardenings as the initial mint. It
+    # reports a first-class delivery result (SENT / FALLBACK_COPYLINK / FAILED, sent after the tx commits, never
+    # persisted → operator-blind untouched), and it is rate-limited per-(tenant,recipient) + per-tenant — re-issue
+    # is the SHARPEST bombing vector (repeated fresh links to one address), so over the limit is 429 + Retry-After
+    # before any fresh mint. The limiter core is the shared, mutation-verified RateLimitWindow (unit-tested in
+    # InviteMailRateLimiterTest, listed under uc.spaces.add-member's member-invite-rate-limited).
+    text: A re-issue reports its delivery result inline (SENT / FALLBACK_COPYLINK / FAILED) and is rate-limited per-(tenant,recipient) + per-tenant; over the limit it is refused with 429 + Retry-After before any fresh secret is minted, and the web surfaces the sent/copy-link/failed states and the throttle message.
+    coverage:
+      backend:
+        integration: [MemberInviteManagementSliceTest.reissueReportsTheDeliveryResult, MemberInviteManagementSliceTest.reissuingOneRecipientPastTheLimitIs429WithRetryAfter]
+      web:
+        unit: [src/features/spaces/TenantMembersPanel.test.ts]
   - id: invite-secret-never-logged
     text: The raw invite bootstrap token — a redeemable secret — is never emitted to a log, in any launch mode. Every invite the shared delivery mailer sends (mint, resend, re-issue) logs only non-secret metadata (email + expiry); the secret reaches the invitee via the API response or the opt-in dev-file only. A production runtime logs a secret-free "not delivered" warning instead of the link.
     coverage:

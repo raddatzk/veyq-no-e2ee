@@ -53,6 +53,11 @@ has for tenant-owner invites ([uc.admin.create-tenant](../../admin/use-cases/uc.
   *pending* invite is additive-safe: it touches no grant and no member.
 - **Reuse.** The soft invite-lifecycle (ACTIVE → SUPERSEDED / EXPIRED, matched by hash, replay-rejected) already
   exists for owner invites; this applies it to MEMBER-role invites.
+- **Re-issue delivery + rate limit (cr-email-invite-send-hardening).** A re-issue reports its delivery result
+  inline (SENT / FALLBACK_COPYLINK / FAILED, sent after the tx commits, never persisted — see
+  [uc.spaces.add-member](uc.spaces.add-member.md)) and is **rate-limited** per-(tenant, recipient) + per-tenant
+  (429 + `Retry-After`, no fresh mint). Re-issue is the **sharpest email-bombing vector** — repeated fresh links
+  to one address — so it is the primary thing the limiter bounds.
 
 ## What this means for you / Was das für dich bedeutet
 

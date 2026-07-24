@@ -24,6 +24,7 @@ import com.veyq.app.generated.model.TenantStatus
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.generated.model.TenantTerms
 import com.veyq.app.generated.model.TenantTermsUpdate
+import com.veyq.app.shared.http.Failures
 import com.veyq.app.shared.http.HttpFailure
 import com.veyq.app.shared.http.httpError
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
@@ -62,7 +63,7 @@ class TenantsResource(
             createTenantRequest.ownerEmail,
         )) {
             is CreateTenantOutcome.Created -> Response.status(Response.Status.CREATED)
-                .entity(TenantCreated(UUID.fromString(outcome.tenantId), TenantStatus.PENDING, outcome.expiresAt.utc(), outcome.bootstrapSecret))
+                .entity(TenantCreated(UUID.fromString(outcome.tenantId), TenantStatus.PENDING, outcome.expiresAt.utc(), outcome.bootstrapSecret, outcome.delivery))
                 .build()
             is HttpFailure -> httpError(outcome)
         }
@@ -83,13 +84,18 @@ class TenantsResource(
         }
 
     // Member invite (cr-0077): NOT Server-Owner — the tenant OWNER admits members. @Authenticated overrides the
-    // class gate; the owner-membership check lives in the handler (403 not_tenant_owner).
+    // class gate; the owner-membership check lives in the handler (403 not_tenant_owner). The anti-bombing guard is
+    // the handler's per-(tenant,recipient) InviteMailRateLimiter, surfaced as MemberInviteOutcome.RateLimited →
+    // 429 + Retry-After (cr-email-invite-send-hardening). NOT the per-IP @RateLimited filter: that keys on IP (an
+    // owner sits behind one) and shares one global window with the unauthenticated auth endpoints, so an active
+    // owner could trip the login limit — see the CR's declarative-posture-annotation follow-up.
     @Authenticated
     override fun inviteTenantMember(tenantId: UUID, memberInviteRequest: MemberInviteRequest): Response =
         when (val outcome = handler.inviteMember(identity.principal.name, tenantId.toString(), memberInviteRequest.email)) {
             is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
-                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!, outcome.delivery),
             ).build()
+            is MemberInviteOutcome.RateLimited -> rateLimited(outcome.retryAfterSeconds)
             is HttpFailure -> httpError(outcome)
         }
 
@@ -110,8 +116,9 @@ class TenantsResource(
     override fun reissueMemberInvite(tenantId: UUID, inviteId: UUID): Response =
         when (val outcome = handler.reissueMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
             is ReissueOutcome.Done -> Response.ok(
-                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!),
+                MemberInviteState(outcome.invite.ownerEmail, InviteStatus.decode(outcome.invite.status), outcome.invite.expiresAt.utc(), outcome.invite.bootstrapSecret!!, outcome.delivery),
             ).build()
+            is ReissueOutcome.RateLimited -> rateLimited(outcome.retryAfterSeconds)
             is HttpFailure -> httpError(outcome)
         }
 
@@ -262,10 +269,15 @@ class TenantsResource(
 
     private fun InviteOutcome.toResponse(): Response = when (this) {
         is InviteOutcome.Done -> Response.ok(
-            TenantInviteState(invite.ownerEmail, InviteStatus.decode(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!),
+            TenantInviteState(invite.ownerEmail, InviteStatus.decode(invite.status), invite.expiresAt.utc(), invite.bootstrapSecret!!, delivery),
         ).build()
         is HttpFailure -> httpError(this)
     }
+
+    /** 429 + `Retry-After` for an invite-mail rate-limit hit — same shape the AuthRateLimitFilter emits, but
+     *  driven by the handler's per-(tenant,recipient) limiter (cr-email-invite-send-hardening). */
+    private fun rateLimited(retryAfterSeconds: Long): Response =
+        Response.fromResponse(httpError(Failures.rateLimited)).header("Retry-After", retryAfterSeconds).build()
 
     private fun TenantView.toSummary() = TenantSummary(
         tenantId = UUID.fromString(id),

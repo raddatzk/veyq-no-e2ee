@@ -23,7 +23,9 @@ import java.util.UUID
  * lists their pending MEMBER invites, **re-issues** one (superseding the old secret + minting a fresh copyable
  * link), and **revokes** one (soft-terminal so its secret replays as no-longer-valid). All membership-gated
  * first (a non-member gets 404, indistinguishable from an unknown tenant — ADR 0042), then owner-gated (403).
- * Distinct domains/emails so the JVM-lived H2 mem DB can't bleed state.
+ * Distinct domains/emails **and seed secrets** so the JVM-lived H2 mem DB can't bleed state: `token_hash` carries
+ * a **global** unique index (`UX_TENANT_INVITE_TOKEN_HASH`), so a secret reused across classes collides at commit
+ * (green in isolation, `RollbackException` in the full suite) — treat a seeded secret as a suite-wide fixture.
  */
 @QuarkusTest
 class MemberInviteManagementSliceTest {
@@ -79,6 +81,37 @@ class MemberInviteManagementSliceTest {
         given().contentType(ContentType.JSON).body(memberRegisterBody(freshSecret))
             .`when`().post("/api/tenants/accept/register")
             .then().statusCode(201).body("status", equalTo("ACTIVE"))
+    }
+
+    @Test
+    fun reissueReportsTheDeliveryResult() {
+        // cr-email-invite-send-hardening: the reissue response carries the first-class delivery result. No SMTP
+        // configured ⇒ FALLBACK_COPYLINK (the copy-link is the channel), threaded end-to-end from the mailer.
+        val (tenantId, owner) = seedActiveTenant("reissue-del.example.com", "owner@reissue-del.example.com")
+        seedMemberInvite(tenantId, "m@reissue-del.example.com", "reissue-del-seed-secret") // token_hash is globally unique
+        val inviteId = firstPendingInviteId(tenantId)
+        given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+            .`when`().post("/api/tenants/$tenantId/member-invites/$inviteId/reissue")
+            .then().statusCode(200).body("delivery", equalTo("FALLBACK_COPYLINK"))
+    }
+
+    @Test
+    fun reissuingOneRecipientPastTheLimitIs429WithRetryAfter() {
+        // Re-issue is the sharpest bombing vector (repeated fresh links to the same address). The default
+        // per-recipient cap is 3, so the 4th re-issue to the same email is refused with 429 + Retry-After — before
+        // any fresh mint. Unique tenant + email keeps the shared in-memory limiter isolated from other tests.
+        val (tenantId, owner) = seedActiveTenant("reissue-flood.example.com", "owner@reissue-flood.example.com")
+        seedMemberInvite(tenantId, "victim@reissue-flood.example.com", "reissue-flood-seed-secret") // token_hash is globally unique
+        repeat(3) {
+            val id = firstPendingInviteId(tenantId)
+            given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+                .`when`().post("/api/tenants/$tenantId/member-invites/$id/reissue")
+                .then().statusCode(200)
+        }
+        val id = firstPendingInviteId(tenantId)
+        given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+            .`when`().post("/api/tenants/$tenantId/member-invites/$id/reissue")
+            .then().statusCode(429).header("Retry-After", notNullValue()).body("code", equalTo("rate_limited"))
     }
 
     @Test

@@ -100,6 +100,38 @@ class MemberAddSliceTest {
     }
 
     @Test
+    fun theMintResponseReportsTheDeliveryResult() {
+        // cr-email-invite-send-hardening: the mint response carries a first-class delivery result. This tenant has
+        // no SMTP configured ⇒ the copy-link fallback, reported honestly as FALLBACK_COPYLINK (not a false
+        // "sent"). SENT/FAILED are proven at the mailer level (SmtpInviteMailSendTest); here we prove the field is
+        // threaded end-to-end into the API response.
+        val (tenantId, owner) = seedActiveTenant("delivery.example.com", "owner@delivery.example.com")
+        given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+            .body("""{"email":"newbie@delivery.example.com"}""")
+            .`when`().post("/api/tenants/$tenantId/member-invites")
+            .then().statusCode(201).body("delivery", equalTo("FALLBACK_COPYLINK"))
+    }
+
+    @Test
+    fun invitingOneRecipientPastTheLimitIs429WithRetryAfter() {
+        // The anti-bombing guard at the HTTP boundary (cr-email-invite-send-hardening): the default per-recipient
+        // cap is 3, so the 4th invite to the SAME address is refused with 429 + Retry-After — before any mint. A
+        // unique tenant + email keeps the shared in-memory limiter isolated from the other tests in this JVM.
+        val (tenantId, owner) = seedActiveTenant("flood.example.com", "owner@flood.example.com")
+        val victim = "victim@flood.example.com"
+        repeat(3) {
+            given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+                .body("""{"email":"$victim"}""")
+                .`when`().post("/api/tenants/$tenantId/member-invites")
+                .then().statusCode(201)
+        }
+        given().header("Authorization", bearer(owner)).contentType(ContentType.JSON)
+            .body("""{"email":"$victim"}""")
+            .`when`().post("/api/tenants/$tenantId/member-invites")
+            .then().statusCode(429).header("Retry-After", notNullValue()).body("code", equalTo("rate_limited"))
+    }
+
+    @Test
     fun existingAccountAcceptsMemberInviteAndJoinsGrantLess() {
         // The second onboarding flow (uc.spaces.add-member): the invited email ALREADY has an account, so it
         // signs in and accepts (POST /api/tenants/accept) rather than cold-registering. A member joins grant-

@@ -3,6 +3,7 @@ package com.veyq.app.features.admin.tenant
 import com.icegreen.greenmail.util.GreenMail
 import com.icegreen.greenmail.util.GreenMailUtil
 import com.icegreen.greenmail.util.ServerSetup
+import com.veyq.app.generated.model.DeliveryResult
 import com.veyq.app.shared.crypto.ConfigSecretSeal
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
@@ -51,8 +52,9 @@ class SmtpInviteMailSendTest {
                 )
             }
 
-            mailer.sendInvite(domain, "invitee@elsewhere.example", "TOKEN-abc123", Instant.parse("2026-07-31T12:00:00Z"))
+            val delivery = mailer.sendInvite(domain, "invitee@elsewhere.example", "TOKEN-abc123", Instant.parse("2026-07-31T12:00:00Z"))
 
+            assertEquals(DeliveryResult.SENT, delivery, "a configured tenant that sends OK reports SENT")
             assertTrue(greenMail.waitForIncomingEmail(5_000, 1), "the invite mail should be delivered")
             val messages = greenMail.receivedMessages
             assertEquals(1, messages.size)
@@ -77,13 +79,38 @@ class SmtpInviteMailSendTest {
             val domain = "no-smtp.example.com"
             seedTenant(domain) // deliberately no mail-settings row ⇒ the copy-link fallback
 
-            mailer.sendInvite(domain, "x@elsewhere.example", "TOKEN-xyz", Instant.parse("2026-07-31T12:00:00Z"))
+            val delivery = mailer.sendInvite(domain, "x@elsewhere.example", "TOKEN-xyz", Instant.parse("2026-07-31T12:00:00Z"))
 
+            assertEquals(DeliveryResult.FALLBACK_COPYLINK, delivery, "an unconfigured tenant falls back to the copy-link")
             assertFalse(greenMail.waitForIncomingEmail(1_000, 1), "an unconfigured tenant must not send SMTP")
             assertEquals(0, greenMail.receivedMessages.size)
         } finally {
             greenMail.stop()
         }
+    }
+
+    @Test
+    fun aConfiguredTenantWhoseSmtpIsUnreachableReportsFailed() {
+        // A tenant with enabled + fully-configured SMTP, but nothing is listening on the configured port. The send
+        // errors (connection refused) and must surface as FAILED — no longer silently swallowed. The owner still
+        // holds the returned copy-link (the mint already committed, in the real flow, before this send ran).
+        val domain = "dead-smtp.example.com"
+        seedTenant(domain)
+        val sealed = seal.seal("smtppass")
+        QuarkusTransaction.requiringNew().run {
+            store.saveMailSettings(
+                tenantIdByDomain(domain),
+                MailSettingsRow(
+                    host = "127.0.0.1", port = DEAD_SMTP_PORT, from = "noreply@$domain", username = "smtpuser",
+                    passwordCiphertext = sealed.ciphertext, passwordNonce = sealed.nonce,
+                    tls = false, enabled = true, subjectTemplate = null, bodyTemplate = null,
+                ),
+            )
+        }
+
+        val delivery = mailer.sendInvite(domain, "invitee@elsewhere.example", "TOKEN-dead", Instant.parse("2026-07-31T12:00:00Z"))
+
+        assertEquals(DeliveryResult.FAILED, delivery, "a configured tenant whose SMTP send errors reports FAILED")
     }
 
     private fun seedTenant(domain: String) {
@@ -101,5 +128,6 @@ class SmtpInviteMailSendTest {
     private companion object {
         const val SMTP_PORT = 13925
         const val SMTP_PORT_2 = 13926
+        const val DEAD_SMTP_PORT = 13927 // nothing ever binds this — the send must fail fast (connection refused)
     }
 }

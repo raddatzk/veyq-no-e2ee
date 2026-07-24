@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.generated.model.DeliveryResult
 import com.veyq.app.shared.config.VeyqConfig
 import io.quarkus.runtime.LaunchMode
 import jakarta.enterprise.context.ApplicationScoped
@@ -17,7 +18,14 @@ import java.util.Optional
  * targets the tenant's own domain, where the invited owner accepts and cold-births the scope (Slice B).
  */
 interface TenantInviteMailer {
-    fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant)
+    /**
+     * Delivers the invite (or falls back to copy-link) and reports **how it went** as a [DeliveryResult]:
+     * `SENT` (SMTP accepted it), `FALLBACK_COPYLINK` (no sendable SMTP — the copy-link is the channel), or
+     * `FAILED` (SMTP configured but the send errored). The result is **request-scoped only, never persisted**
+     * (operator-blind untouched — ADR 0049); the returned `bootstrapSecret` copy-link is the FAILED/FALLBACK
+     * fallback the caller hands back to the owner.
+     */
+    fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant): DeliveryResult
 }
 
 /**
@@ -46,7 +54,7 @@ class LoggingTenantInviteMailer(
     private val devFile: Optional<String> = config.tenant().invite().devFile()
     private val log = Logger.getLogger(LoggingTenantInviteMailer::class.java)
 
-    override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant) {
+    override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant): DeliveryResult {
         require(HOSTNAME.matches(domain)) { "invalid tenant domain" }
         if (LaunchMode.current() == LaunchMode.NORMAL) {
             // Production: never write the bootstrap secret to logs. A real SMTP-backed mailer must be wired.
@@ -54,7 +62,8 @@ class LoggingTenantInviteMailer(
                 "No SMTP mailer configured: tenant invite for %s (expires %s) was NOT delivered.",
                 ownerEmail, expiresAt,
             )
-            return
+            // No mail sent — the copy-link is the channel (this bean is the fallback / SMTP-less path).
+            return DeliveryResult.FALLBACK_COPYLINK
         }
         // The raw bootstrap token is a redeemable secret (cr-invite-token-log-redaction): never emit it — or
         // the accept link that embeds it — to a log, in any launch mode. Whoever needs it gets it from the
@@ -65,6 +74,7 @@ class LoggingTenantInviteMailer(
             ownerEmail, expiresAt,
         )
         appendDevFile(ownerEmail, token, expiresAt)
+        return DeliveryResult.FALLBACK_COPYLINK
     }
 
     /** Dev-only: append the invite as one JSON line so the seed orchestrator can read the bootstrap secret. */

@@ -13,6 +13,7 @@ import InviteMemberDialog from './InviteMemberDialog.vue'
 import SpaceIconDialog from './SpaceIconDialog.vue'
 import TenantAvatar from '../../components/app/TenantAvatar.vue'
 import {
+  DeliveryResult,
   listMemberInvites,
   listScopeMembers,
   reissueMemberInvite,
@@ -54,6 +55,12 @@ const iconError = ref('')
 // After a re-issue, show the fresh invite link to copy (cr-0080) — the owner hands it off again, no mailer.
 const reissueUrl = ref('')
 const reissueCopied = ref(false)
+// How the re-issued invite went (cr-email-invite-send-hardening): SENT tucks the link behind a toggle (mail is
+// the channel); FAILED / FALLBACK_COPYLINK show it with the matching intro.
+const reissueDelivery = ref<DeliveryResult | ''>('')
+const reissueShowLink = ref(false)
+const reissueIsSent = computed(() => reissueDelivery.value === DeliveryResult.Sent)
+const reissueIsFailed = computed(() => reissueDelivery.value === DeliveryResult.Failed)
 
 const inTenant = computed(() => activeSpace.kind === ScopeKind.Tenant && activeSpace.scopeId !== null)
 
@@ -132,14 +139,19 @@ async function reissue(invite: PendingMemberInvite) {
   actionError.value = ''
   reissueUrl.value = ''
   reissueCopied.value = false
+  reissueDelivery.value = ''
+  reissueShowLink.value = false
   try {
     const state = await reissueMemberInvite(activeSpace.tenantId!, invite.inviteId)
+    reissueDelivery.value = state.delivery
     reissueUrl.value = buildInviteLink(state.bootstrapSecret) // same host — the owner invites into their tenant
-    toast.success(t('members.inviteReissued'))
+    toast.success(state.delivery === DeliveryResult.Sent ? t('members.inviteSentTo', { email: invite.email }) : t('members.inviteReissued'))
     await reload()
   } catch (e) {
     on401(e)
-    if (!isUnauthorized(e)) actionError.value = t('members.actionFailed')
+    if (!isUnauthorized(e)) {
+      actionError.value = (await isCodedError(e, 429, 'rate_limited')) ? t('members.inviteRateLimited') : t('members.actionFailed')
+    }
   }
 }
 
@@ -227,10 +239,35 @@ async function revoke(invite: PendingMemberInvite) {
 
       <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
 
-      <!-- Fresh re-issued link to copy (cr-0080) — shown until the owner copies/dismisses it. -->
+      <!-- Fresh re-issued invite (cr-0080 / cr-email-invite-send-hardening) — shown until the owner copies/dismisses
+           it. SENT tucks the link behind a toggle (the mail is the channel); FAILED / FALLBACK show it with the
+           matching intro. -->
       <div v-if="reissueUrl" class="reissue-link">
-        <p class="settings-muted">{{ t('members.copyLinkIntro') }}</p>
-        <div class="invite-link-row">
+        <div class="reissue-link-head">
+          <p v-if="reissueIsSent" class="settings-muted">{{ t('members.inviteReissuedSent') }}</p>
+          <p v-else class="settings-muted">
+            {{ reissueIsFailed ? t('members.deliveryFailedIntro') : t('members.copyLinkIntro') }}
+          </p>
+          <Button
+            v-if="reissueIsSent"
+            type="button"
+            text
+            size="small"
+            :icon="reissueShowLink ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+            :label="reissueShowLink ? t('members.hideLink') : t('members.showLink')"
+            @click="reissueShowLink = !reissueShowLink"
+          />
+          <Button
+            icon="pi pi-times"
+            severity="secondary"
+            outlined
+            size="small"
+            :aria-label="t('common.done')"
+            :title="t('common.done')"
+            @click="reissueUrl = ''"
+          />
+        </div>
+        <div v-if="!reissueIsSent || reissueShowLink" class="invite-link-row">
           <InputText
             :model-value="reissueUrl"
             readonly
@@ -242,14 +279,6 @@ async function revoke(invite: PendingMemberInvite) {
             :aria-label="t('members.copyLink')"
             :title="reissueCopied ? t('members.copied') : t('members.copyLink')"
             @click="copyReissueLink"
-          />
-          <Button
-            icon="pi pi-times"
-            severity="secondary"
-            outlined
-            :aria-label="t('common.done')"
-            :title="t('common.done')"
-            @click="reissueUrl = ''"
           />
         </div>
       </div>
@@ -377,6 +406,15 @@ async function revoke(invite: PendingMemberInvite) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+.reissue-link-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.reissue-link-head p {
+  margin: 0;
+  flex: 1;
 }
 
 /* The tenant identity header — the avatar + name on one row, owner actions trailing (mirrors group-name-header).

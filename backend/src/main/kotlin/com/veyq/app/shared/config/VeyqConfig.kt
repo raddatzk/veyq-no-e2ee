@@ -166,11 +166,30 @@ interface VeyqConfig {
     interface RateLimit {
         fun auth(): Auth
 
+        /** `veyq.ratelimit.invite.*` — the member-invite mail limiter (cr-email-invite-send-hardening): the real
+         *  anti-bombing guard, keyed per-(tenant,recipient) AND per-tenant, applied in the handler before the mint.
+         *  Defaults are **deliberately set, not empirically calibrated — revidierbar**: 3 per recipient / 20 per
+         *  tenant, per hour. */
+        fun invite(): Invite
+
         interface Auth {
             @WithDefault("60")
             fun maxRequests(): Long
 
             @WithDefault("60")
+            fun windowSeconds(): Long
+        }
+
+        interface Invite {
+            /** The tighter, primary guard: how many invites one tenant may send to the **same recipient** per window. */
+            @WithDefault("3")
+            fun perRecipientMaxRequests(): Int
+
+            /** The volume cap against an owner-as-sender: total invites a **tenant** may send per window. */
+            @WithDefault("20")
+            fun perTenantMaxRequests(): Int
+
+            @WithDefault("3600")
             fun windowSeconds(): Long
         }
     }

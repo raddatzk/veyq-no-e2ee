@@ -7,6 +7,7 @@ import { createI18n } from 'vue-i18n'
 import { createRouter, createMemoryHistory } from 'vue-router'
 
 vi.mock('./members', () => ({
+  DeliveryResult: { Sent: 'SENT', FallbackCopylink: 'FALLBACK_COPYLINK', Failed: 'FAILED' },
   listScopeMembers: vi.fn(),
   listMemberInvites: vi.fn(),
   reissueMemberInvite: vi.fn(),
@@ -44,6 +45,8 @@ const i18n = createI18n({
         pendingTitle: 'Pending invites', pendingSub: 'pending sub', statusInvited: 'Invited', reissue: 'New link',
         revoke: 'Cancel invite', revokeConfirm: 'Cancel?', inviteReissued: 'Fresh link ready.', inviteRevoked: 'Invite cancelled.',
         actionFailed: 'Action failed', copyLinkIntro: 'Copy it.', copyLink: 'Copy link', copied: 'Copied',
+        inviteSentTo: 'Sent to {email}.', inviteReissuedSent: 'A fresh invitation was sent.', showLink: 'Show link',
+        hideLink: 'Hide link', deliveryFailedIntro: 'mail failed, copy it', inviteRateLimited: 'Too many invites',
       },
     },
   },
@@ -124,7 +127,8 @@ describe('TenantMembersPanel (uc.spaces.add-member, web)', () => {
   })
 
   it('re-issues an invite and surfaces the fresh copyable link', async () => {
-    vi.mocked(reissueMemberInvite).mockResolvedValue({ bootstrapSecret: 'fresh-secret' } as never)
+    // No SMTP configured ⇒ FALLBACK_COPYLINK: the link is shown for the owner to copy (the pre-existing behaviour).
+    vi.mocked(reissueMemberInvite).mockResolvedValue({ bootstrapSecret: 'fresh-secret', delivery: 'FALLBACK_COPYLINK' } as never)
     const wrapper = await mountPanel('OWNER')
     await wrapper.find('[aria-label="New link"]').trigger('click')
     await flushPromises()
@@ -132,6 +136,18 @@ describe('TenantMembersPanel (uc.spaces.add-member, web)', () => {
     const link = wrapper.find('.invite-link-input')
     expect(link.exists()).toBe(true)
     expect((link.element as HTMLInputElement).value).toContain('fresh-secret')
+  })
+
+  it('on SENT tucks the re-issued link behind a toggle (mail is the channel)', async () => {
+    vi.mocked(reissueMemberInvite).mockResolvedValue({ bootstrapSecret: 'sent-secret', delivery: 'SENT' } as never)
+    const wrapper = await mountPanel('OWNER')
+    await wrapper.find('[aria-label="New link"]').trigger('click')
+    await flushPromises()
+    // SENT ⇒ the link is not shown until the owner reveals it via the toggle.
+    expect(wrapper.find('.invite-link-input').exists()).toBe(false)
+    const toggle = wrapper.findAll('button').find((b) => b.text() === 'Show link')!
+    await toggle.trigger('click')
+    expect(wrapper.find('.invite-link-input').exists()).toBe(true)
   })
 
   it('revokes an invite after confirmation', async () => {

@@ -11,6 +11,9 @@ import { SetMemberRoleRequestRoleEnum, type ScopeMember, type ResolvedGroupCandi
 export type { ScopeMember, ResolvedGroupCandidate, GroupInvitation } from '../../api/generated/scopes'
 export { SetMemberRoleRequestRoleEnum } from '../../api/generated/scopes'
 export type { MemberInviteState, PendingMemberInvite } from '../../api/generated/tenants'
+// The invite delivery result (cr-email-invite-send-hardening): SENT / FALLBACK_COPYLINK / FAILED — the three-state
+// signal the invite dialogs branch on so the owner always knows whether the mail actually went out.
+export { DeliveryResult } from '../../api/generated/tenants'
 
 /** Invite a person (by email) into the active tenant as a MEMBER — owner-gated (403 `not_tenant_owner`). */
 export function inviteMember(tenantId: string, email: string): Promise<MemberInviteState> {

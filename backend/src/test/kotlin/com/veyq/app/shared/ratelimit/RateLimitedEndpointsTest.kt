@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test
  * limiter is name-bound, so a silently dropped annotation would un-limit an unauthenticated write with no other
  * signal. The filter *mechanism* (per-IP fixed window, 429) is covered by `AuthRateLimitTest` /
  * `AuthRateLimitWindowResetTest`; this test guards the wiring.
+ *
+ * The two tenant-owner member-invite mint endpoints deliberately do **not** carry `@RateLimited`
+ * (cr-email-invite-send-hardening): the per-IP filter shares one global window with the unauthenticated auth
+ * endpoints, so an active owner could trip the login limit. Their anti-bombing guard is the handler-level,
+ * per-(tenant,recipient) `InviteMailRateLimiter` instead (see `MemberAddSliceTest`). A future declarative
+ * auth+rate-limit **posture** annotation + guard is the right home for asserting their declaration.
  */
 class RateLimitedEndpointsTest {
 

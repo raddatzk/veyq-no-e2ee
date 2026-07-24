@@ -34,6 +34,32 @@ acceptanceCriteria:
       backend:
         integration: [SmtpInviteMailSendTest.aConfiguredTenantSendsARenderedInviteCarryingOnlyTheClosedSet, SmtpInviteMailSendTest.anUnconfiguredTenantSendsNoSmtpAndFallsBack]
         unit: [InviteMailRendererTest.theRenderContextIsClosedToExactlyThreeNonSecretFields]
+  - id: member-invite-delivery-result
+    # cr-email-invite-send-hardening: the mint reports a first-class delivery result inline — SENT (SMTP accepted),
+    # FALLBACK_COPYLINK (no sendable SMTP → the copy-link is the channel), or FAILED (SMTP configured but the send
+    # errored, no longer silently swallowed). The send runs AFTER the mint transaction commits (a hung SMTP server
+    # no longer holds a DB connection); the FAILED path proves the send is best-effort and surfaced, not swallowed.
+    # Request-scoped only, never persisted → operator-blind untouched (ADR 0049). The web branches the three states:
+    # SENT = "sent to X" with the copy-link behind a toggle, FALLBACK = unchanged copy-link, FAILED = "copy the link".
+    text: The invite mint reports a first-class delivery result inline (SENT / FALLBACK_COPYLINK / FAILED), sent after the mint transaction commits and never persisted (operator-blind untouched); the web surfaces each state so the owner always knows whether the mail went out, with the returned copy-link as the FAILED/FALLBACK fallback.
+    coverage:
+      backend:
+        integration: [SmtpInviteMailSendTest.aConfiguredTenantSendsARenderedInviteCarryingOnlyTheClosedSet, SmtpInviteMailSendTest.anUnconfiguredTenantSendsNoSmtpAndFallsBack, SmtpInviteMailSendTest.aConfiguredTenantWhoseSmtpIsUnreachableReportsFailed, MemberAddSliceTest.theMintResponseReportsTheDeliveryResult]
+      web:
+        unit: [src/features/spaces/InviteMemberDialog.test.ts, src/features/spaces/TenantMembersPanel.test.ts]
+  - id: member-invite-rate-limited
+    # cr-email-invite-send-hardening: the anti-bombing guard. A dedicated handler-level limiter keyed
+    # per-(tenant,recipient) [the primary guard] AND per-tenant [the volume cap], enforced after the authorization
+    # guards and before the mint, so a limited request creates no orphan invite. Over-limit → 429 + Retry-After.
+    # Built on the pure, mutation-verified RateLimitWindow (not the per-IP AuthRateLimitFilter, which cannot key on
+    # a recipient). Defaults (3/recipient, 20/tenant, per hour) are deliberately set, not calibrated — revidierbar.
+    text: Member-invite sends are rate-limited per-(tenant,recipient) and per-tenant to bound email-bombing of one address (the reissue-loop vector); over the limit the request is refused with 429 + Retry-After before any invite is minted, and the web surfaces a "try again later" message.
+    coverage:
+      backend:
+        integration: [MemberAddSliceTest.invitingOneRecipientPastTheLimitIs429WithRetryAfter]
+        unit: [InviteMailRateLimiterTest.theFourthInviteToOneRecipientIsRateLimited, InviteMailRateLimiterTest.aDifferentRecipientHasItsOwnBudget, InviteMailRateLimiterTest.theRecipientKeyIsCaseInsensitiveSoAliasCasingCannotEvadeIt, InviteMailRateLimiterTest.theTenantVolumeCapTripsAcrossDistinctRecipients, InviteMailRateLimiterTest.adifferentTenantIsIsolated]
+      web:
+        unit: [src/features/spaces/InviteMemberDialog.test.ts, src/features/spaces/TenantMembersPanel.test.ts]
   - id: scope-member-directory
     text: An authorized granter lists a scope's memberships with each member's identity public key + grant status (granted vs pending). The operator-blind server returns only already-stored operational metadata (pubkeys/roles/grant-present) — never a scope key — and the directory is scoped to that scope's members, not a global user search.
     coverage:
