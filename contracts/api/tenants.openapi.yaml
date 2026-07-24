@@ -1344,7 +1344,7 @@ components:
         A tenant's mail configuration as **read back**: the SMTP transport fields, the send toggle, whether a
         password is stored (never the password itself, ADR 0050), and the owner-authored invite templates. The
         transport fields and templates are operator-authored config (`public`), not user data.
-      required: [tls, enabled, passwordSet]
+      required: [tls, enabled, passwordSet, configSecretState]
       properties:
         host:
           x-veyq-visibility: public
@@ -1402,6 +1402,19 @@ components:
             Null ⇒ veyq's bilingual EN+DE default.
           maxLength: 8000
           example: null
+        configSecretState:
+          x-veyq-visibility: enum
+          type: string
+          description: >
+            The server's config-secret subsystem state ([ADR 0050](../../docs/decisions/0050-operator-config-secret-encryption.md)
+            amendment), so the owner sees honestly whether a stored SMTP password can actually be used. `OK` = a KEK
+            is present and matches the DB fingerprint that sealed the stored secrets. `ABSENT` = no KEK is available
+            (generation failed / read-only FS) — sealing and sending are unavailable, the copy-link fallback stands.
+            `MISMATCH` = a KEK is present but is **not** the one that sealed the stored password (the key file
+            changed or was lost/restored differently) — the stored password can't be decrypted; re-enter it to
+            reseal under the current key. Server self-description, not user data.
+          enum: [OK, ABSENT, MISMATCH]
+          example: OK
 
     TenantMailSettingsUpdate:
       type: object

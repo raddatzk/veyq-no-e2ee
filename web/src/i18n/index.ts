@@ -304,6 +304,7 @@ const en = {
     saveFailed: 'Couldn’t save the email settings.',
     invalidTemplate: 'Your template uses a placeholder that isn’t allowed. Only {vars} can be used.',
     kekUnavailable: 'This server can’t encrypt secrets yet, so the password can’t be saved. An administrator needs to configure the encryption key (KEK) first.',
+    keyMismatch: 'The server’s encryption key has changed, so your saved SMTP password can’t be decrypted anymore. Re-enter the password below to save it under the new key, or restore the original key file. Until then, invitations are shared as a copy link.',
   },
   shell: {
     appName: 'veyq',
@@ -989,6 +990,7 @@ const de: typeof en = {
     saveFailed: 'E-Mail-Einstellungen konnten nicht gespeichert werden.',
     invalidTemplate: 'Deine Vorlage nutzt einen nicht erlaubten Platzhalter. Nur {vars} sind möglich.',
     kekUnavailable: 'Dieser Server kann noch keine Secrets verschlüsseln, daher lässt sich das Passwort nicht speichern. Ein Administrator muss zuerst den Verschlüsselungsschlüssel (KEK) konfigurieren.',
+    keyMismatch: 'Der Verschlüsselungsschlüssel des Servers hat sich geändert, daher lässt sich dein gespeichertes SMTP-Passwort nicht mehr entschlüsseln. Gib das Passwort unten neu ein, um es unter dem neuen Schlüssel zu speichern, oder stelle die ursprüngliche Schlüsseldatei wieder her. Bis dahin werden Einladungen als Kopierlink geteilt.',
   },
   shell: {
     appName: 'veyq',

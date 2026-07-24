@@ -4,7 +4,9 @@ import com.icegreen.greenmail.util.GreenMail
 import com.icegreen.greenmail.util.GreenMailUtil
 import com.icegreen.greenmail.util.ServerSetup
 import com.veyq.app.generated.model.DeliveryResult
+import com.veyq.app.shared.crypto.ConfigSecretKeyGuard
 import com.veyq.app.shared.crypto.ConfigSecretSeal
+import com.veyq.app.shared.instance.InstanceStore
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -29,6 +31,8 @@ class SmtpInviteMailSendTest {
     @Inject lateinit var mailer: TenantInviteMailer // the @Alternative SmtpTenantInviteMailer wins this injection
     @Inject lateinit var store: TenantStore
     @Inject lateinit var seal: ConfigSecretSeal
+    @Inject lateinit var keyState: ConfigSecretKeyGuard
+    @Inject lateinit var instance: InstanceStore
 
     @Test
     fun aConfiguredTenantSendsARenderedInviteCarryingOnlyTheClosedSet() {
@@ -113,6 +117,42 @@ class SmtpInviteMailSendTest {
         assertEquals(DeliveryResult.FAILED, delivery, "a configured tenant whose SMTP send errors reports FAILED")
     }
 
+    @Test
+    fun aConfiguredTenantWhoseConfigSecretKeyChangedFallsBackNotSends() {
+        // Enabled + fully-configured SMTP, but the config-secret key no longer matches the one that sealed the
+        // password (the key file changed/was lost ⇒ MISMATCH, ADR 0050 amendment). The stored password can't be
+        // unsealed, so the send path must DEGRADE to the copy-link fallback — never attempt a send with a bad key.
+        val greenMail = GreenMail(ServerSetup(MISMATCH_SMTP_PORT, "127.0.0.1", "smtp"))
+        greenMail.start()
+        try {
+            greenMail.setUser("smtpuser", "smtppass")
+            val domain = "key-changed.example.com"
+            seedTenant(domain)
+            val sealed = seal.seal("smtppass") // sealed under the CURRENT (OK) key
+            QuarkusTransaction.requiringNew().run {
+                store.saveMailSettings(
+                    tenantIdByDomain(domain),
+                    MailSettingsRow(
+                        host = "127.0.0.1", port = MISMATCH_SMTP_PORT, from = "noreply@$domain", username = "smtpuser",
+                        passwordCiphertext = sealed.ciphertext, passwordNonce = sealed.nonce,
+                        tls = false, enabled = true, subjectTemplate = null, bodyTemplate = null,
+                    ),
+                )
+            }
+            // Simulate the running key no longer matching what the DB fingerprint recorded ⇒ state() = MISMATCH.
+            QuarkusTransaction.requiringNew().run { instance.setConfigSecretFingerprint("not-the-current-key") }
+
+            val delivery = mailer.sendInvite(domain, "x@elsewhere.example", "TOKEN-k", Instant.parse("2026-07-31T12:00:00Z"))
+
+            assertEquals(DeliveryResult.FALLBACK_COPYLINK, delivery, "a MISMATCH key ⇒ copy-link fallback, not a send")
+            assertFalse(greenMail.waitForIncomingEmail(1_000, 1), "a MISMATCH key must not send SMTP")
+            assertEquals(0, greenMail.receivedMessages.size)
+        } finally {
+            keyState.recordReseal() // restore OK for the rest of the JVM-shared suite
+            greenMail.stop()
+        }
+    }
+
     private fun seedTenant(domain: String) {
         QuarkusTransaction.requiringNew().run {
             TenantEntity().apply {
@@ -129,5 +169,6 @@ class SmtpInviteMailSendTest {
         const val SMTP_PORT = 13925
         const val SMTP_PORT_2 = 13926
         const val DEAD_SMTP_PORT = 13927 // nothing ever binds this — the send must fail fast (connection refused)
+        const val MISMATCH_SMTP_PORT = 13928 // a live server that must NOT receive anything (the MISMATCH gate falls back first)
     }
 }

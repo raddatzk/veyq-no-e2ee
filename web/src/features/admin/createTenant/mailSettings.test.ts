@@ -17,7 +17,7 @@ const TENANT = '7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c'
 
 const VIEW = {
   host: 'smtp.example.com', port: 587, from: 'noreply@x.z', username: 'fam',
-  tls: true, enabled: true, passwordSet: true, subjectTemplate: null, bodyTemplate: null,
+  tls: true, enabled: true, passwordSet: true, subjectTemplate: null, bodyTemplate: null, configSecretState: 'OK',
 }
 
 function stubApi() {

@@ -67,9 +67,14 @@ AUTH over plain (dev only) and exposes an HTTP API, so a harness can read what a
 - **Smoke the send path**: bring the profile up, then (as a tenant owner) `PUT /api/tenants/{id}/mail-settings`
   with `host=localhost`, `port=11025`, any `username`/`password`, `enabled=true`, `tls=false`. The next
   **member** invite is emailed; read it at `http://localhost:18025` or fetch it from the API
-  (`GET http://localhost:18025/api/v1/messages`). Sealing the SMTP password needs the env KEK
-  `VEYQ_SECURITY_CONFIG_SECRET_KEY` ([ADR 0050](../docs/decisions/0050-operator-config-secret-encryption.md)); with
-  none set, the owner cannot enable sending and stays on the copy-link.
+  (`GET http://localhost:18025/api/v1/messages`). Sealing the SMTP password needs the **config-secret KEK**
+  ([ADR 0050](../docs/decisions/0050-operator-config-secret-encryption.md) + amendment): the server **generates
+  and manages** this key as a `0600` file on first start (default `config-secret.key` in the process CWD — a local
+  `quarkusDev` drops one there, gitignored), so a fresh instance can seal secrets with **no** operator setup. To
+  supply your own key (e.g. a mounted K8s/Docker secret), point `VEYQ_SECURITY_CONFIG_SECRET_FILE` at it. **In a
+  container the key file MUST live on a persisted volume** — otherwise every recreate loses it, and the server
+  then reports the stored SMTP password as undecryptable (`configSecretState: MISMATCH`, the fingerprint tripwire
+  firing loudly) and stays on the copy-link until the key is restored or the password re-entered.
 - The automated coverage is hermetic (an in-JVM GreenMail server in `SmtpInviteMailSendTest`), so `./gradlew
   check` needs **no** container; this profile is for a manual, eyes-on smoke.
 

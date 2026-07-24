@@ -264,3 +264,9 @@ gradle-app.setting
 
 # End of https://www.toptal.com/developers/gitignore/api/git,intellij+all,vue,vuejs,gradle,kotlin,macos,windows,linux
 .venv/
+
+# The server-managed config-secret KEK file (ADR 0050 amendment). Generated on first start at the default path
+# (relative to the process CWD); it is a real secret and must never be committed. Operators keep it on a persisted
+# volume; a local dev/quarkusDev run drops one here.
+config-secret.key
+**/config-secret.key

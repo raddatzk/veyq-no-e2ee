@@ -1,7 +1,7 @@
-# ADR 0050 — Operator config secrets are encrypted at rest with an env-supplied KEK
+# ADR 0050 — Operator config secrets are encrypted at rest with a server-managed KEK
 
 - Status: Accepted
-- Date: 2026-07-24
+- Date: 2026-07-24 (amended 2026-07-24 — see [Amendment](#amendment-2026-07-24--the-kek-is-a-managed-key-file-guarded-by-a-db-fingerprint))
 
 ## Context
 
@@ -58,3 +58,40 @@ Key-Encryption-Key supplied via the operator's environment.** Concretely:
   secret protected, not a multi-operator key hierarchy. This ADR is deliberately smaller and cited from #43.
 - **Rejected — keeping the password in env, keyed per tenant.** Cannot self-service (a tenant can't edit env at
   runtime) and does not scale to many tenants; the whole point of per-tenant settings is runtime configuration.
+
+## Amendment (2026-07-24) — the KEK is a managed key file, guarded by a DB fingerprint
+
+The original decision required the operator to supply the KEK as an env **value**
+(`VEYQ_SECURITY_CONFIG_SECRET_KEY`). Two problems: a self-hoster who omits it hits a silent copy-link fallback,
+and a lost/changed key fails **silently** (unseal errors, no signal). This amends the **source** of the KEK and
+adds a **tripwire** (cr-config-secret-key-file-and-fingerprint). The envelope (AES-256-GCM via JCA, ciphertext +
+nonce in the DB, operator-side, not #43) is unchanged.
+
+- **Source: a server-managed key file, not an env value.** On first start the server generates a 32-byte KEK,
+  writes it `0600`, and logs loudly to back it up. An operator supplying their own key mounts it and points
+  `veyq.security.config-secret-file` at it — the K8s/Docker-secret shape (a mounted *file*). The env **value**
+  channel is dropped (it was greenfield — wired only in test properties + docs, no deployment). Rationale: an env
+  value is **not** strictly safer — it has its own leak surface (`/proc/<pid>/environ`, `docker inspect`, crash
+  dumps, child-process inheritance) — and a file is the standard secret-injection path.
+- **Tripwire: an HKDF fingerprint of the active KEK in the DB.**
+  `HKDF-SHA256(ikm=KEK, info="veyq/v1/config-secret-key-fingerprint")`, one server-global row. First start with no
+  row **adopts** the current key (writes the fingerprint); a later **mismatch** means the loaded key is not the one
+  that sealed the stored secrets. Safe to store: a 256-bit full-entropy key is **not** brute-forceable from its
+  hash (unlike a password, which needs salt + a slow KDF), so the "no usable secret in a DB dump" property holds —
+  the DB gains a fingerprint, never the key.
+- **Mismatch posture: degrade, don't brick.** The operator-blind rest of veyq needs no KEK, so only the
+  config-secret subsystem degrades — the send path falls back to copy-link and a loud startup log names the
+  recovery. The owner recovers by re-entering the SMTP password (reseal under the current key → the stored
+  fingerprint is updated → back to OK). The mismatch row is never auto-overwritten (that would defeat detection);
+  it clears only on a deliberate reseal. With one config secret today this fully recovers; it scales with #43 (a
+  key change then needs re-entering **all** stored secrets).
+
+**Threat-model shift (honest):** a key file + DB fingerprint defend the **leaked DB backup** — the common real
+leak — but **not** a full-host compromise (file + DB on one box). This is a deliberate move from "env-only" toward
+zero-config self-hostability, with key loss now **detected** rather than silent. KEK **rotation** stays the open
+limitation (loss is no longer silent, but rotation — re-sealing every record under a new KEK — is still a later
+concern, now cleanly signalled by the same fingerprint).
+
+This supersedes the original **Decision** bullet "The KEK is a 32-byte key from env …" and the **Consequences**
+line on env trust: the trust tier is now a `0600` file on the app host (or a mounted secret), and the header title
+reflects "server-managed" rather than "env-supplied".

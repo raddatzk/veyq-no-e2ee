@@ -1,6 +1,8 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.generated.model.DeliveryResult
+import com.veyq.app.shared.crypto.ConfigSecretKeyGuard
+import com.veyq.app.shared.crypto.ConfigSecretKeyState
 import com.veyq.app.shared.crypto.ConfigSecretSeal
 import com.veyq.app.shared.crypto.SealedSecret
 import io.vertx.core.Vertx
@@ -43,6 +45,7 @@ import java.util.concurrent.TimeUnit
 class SmtpTenantInviteMailer(
     private val store: TenantStore,
     private val seal: ConfigSecretSeal,
+    private val keyState: ConfigSecretKeyGuard,
     private val renderer: InviteMailRenderer,
     private val fallback: LoggingTenantInviteMailer,
     private val vertx: Vertx,
@@ -53,9 +56,12 @@ class SmtpTenantInviteMailer(
     override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant): DeliveryResult {
         val s = store.mailSettingsByDomain(domain)
         // Not sendable ⇒ the unchanged copy-link + dev-file path (ADR 0048 §4). Covers: no settings row, sending
-        // disabled, an incomplete config, no stored password, or no env KEK to unseal it. The fallback reports
-        // FALLBACK_COPYLINK.
-        if (s == null || !s.enabled || s.host.isNullOrBlank() || s.passwordCiphertext == null || !seal.configured) {
+        // disabled, an incomplete config, no stored password, or the KEK can't open it — `state() != OK` is both
+        // ABSENT (no KEK) and MISMATCH (a changed key ⇒ the stored password can't be unsealed, ADR 0050 amendment).
+        // The fallback reports FALLBACK_COPYLINK.
+        if (s == null || !s.enabled || s.host.isNullOrBlank() || s.passwordCiphertext == null ||
+            keyState.state() != ConfigSecretKeyState.OK
+        ) {
             return fallback.sendInvite(domain, ownerEmail, token, expiresAt)
         }
         // The accept link mirrors web/src/shared/inviteLink.ts: the secret rides the URL fragment (ADR 0020). The

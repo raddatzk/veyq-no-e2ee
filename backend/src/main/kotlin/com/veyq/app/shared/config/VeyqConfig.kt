@@ -196,9 +196,15 @@ interface VeyqConfig {
 
     /** `veyq.security.*` — operator-side security knobs. */
     interface Security {
-        /** Base64 32-byte KEK that seals server-held config secrets at rest (ADR 0050). Env-only, absent by
-         *  default (a feature needing it fails loudly rather than storing a secret in the clear). */
-        fun configSecretKey(): Optional<String>
+        /** Path to the file holding the base64 32-byte KEK that seals server-held config secrets at rest
+         *  ([ADR 0050](../../../../../../../docs/decisions/0050-operator-config-secret-encryption.md) amendment).
+         *  The server **generates and manages** this file on first start (`0600`, base64 32-byte key) if it does
+         *  not exist; an operator supplying their own key mounts it and points this at it (the K8s/Docker-secret
+         *  shape). Default `config-secret.key` (relative to the process CWD) — put it on a **persisted volume** in
+         *  a container, else every recreate loses the key (the DB fingerprint tripwire then flags it loudly). The
+         *  old env **value** `veyq.security.config-secret-key` is gone. */
+        @WithDefault("config-secret.key")
+        fun configSecretFile(): String
     }
 
     /** `veyq.share.upload.rate.*` — the uploader-link rate limiter. */

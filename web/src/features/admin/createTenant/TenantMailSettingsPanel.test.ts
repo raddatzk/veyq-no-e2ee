@@ -33,7 +33,7 @@ function httpError(status: number, code?: string): Error {
 
 const READY_VIEW = {
   host: 'smtp.example.com', port: 587, from: 'noreply@x.z', username: 'fam',
-  tls: true, enabled: true, passwordSet: true, subjectTemplate: null, bodyTemplate: null,
+  tls: true, enabled: true, passwordSet: true, subjectTemplate: null, bodyTemplate: null, configSecretState: 'OK',
 }
 
 const stubs = {
@@ -130,6 +130,21 @@ describe('TenantMailSettingsPanel (uc.admin.tenant-mail-settings, web)', () => {
     vi.mocked(getTenantMailSettings).mockResolvedValue(READY_VIEW as never)
     const wrapper = await mountPanel()
     expect(wrapper.text()).toContain(i18n.global.t('mail.sendReady'))
+  })
+
+  it('proactively flags a changed config-secret key (MISMATCH) and is not send-ready', async () => {
+    // The stored password was sealed under a key the server no longer has — a real, detected state (ADR 0050 amendment).
+    vi.mocked(getTenantMailSettings).mockResolvedValue({ ...READY_VIEW, configSecretState: 'MISMATCH' } as never)
+    const wrapper = await mountPanel()
+    expect(wrapper.text()).toContain(i18n.global.t('mail.keyMismatch'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('mail.sendReady'))
+  })
+
+  it('proactively shows the KEK-unavailable message when the server can’t seal secrets (ABSENT)', async () => {
+    vi.mocked(getTenantMailSettings).mockResolvedValue({ ...READY_VIEW, configSecretState: 'ABSENT' } as never)
+    const wrapper = await mountPanel()
+    expect(wrapper.text()).toContain(i18n.global.t('mail.kekUnavailable'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('mail.sendReady'))
   })
 
   it('is honest that enabled alone does not send — it lists what is still missing', async () => {

@@ -1,5 +1,7 @@
 package com.veyq.app.features.admin.tenant
 
+import com.veyq.app.shared.crypto.ConfigSecretKeyGuard
+import com.veyq.app.shared.crypto.ConfigSecretKeyState
 import com.veyq.app.shared.crypto.ConfigSecretSeal
 import com.veyq.app.shared.http.FailureStatus
 import com.veyq.app.shared.http.Failures
@@ -8,7 +10,9 @@ import com.veyq.app.shared.http.httpFailure
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
-/** A tenant's mail settings **as they leave the server** — the SMTP password redacted to [passwordSet] (ADR 0050). */
+/** A tenant's mail settings **as they leave the server** — the SMTP password redacted to [passwordSet] (ADR 0050).
+ *  [configSecretState] is the server's config-secret KEK state so the owner sees honestly whether a stored password
+ *  can actually be used (ADR 0050 amendment). */
 data class MailSettingsView(
     val host: String?,
     val port: Int?,
@@ -19,6 +23,7 @@ data class MailSettingsView(
     val passwordSet: Boolean,
     val subjectTemplate: String?,
     val bodyTemplate: String?,
+    val configSecretState: ConfigSecretKeyState,
 )
 
 /** Result of an owner reading a tenant's mail settings. */
@@ -54,16 +59,19 @@ sealed interface MailSettingsUpdateOutcome {
 class TenantMailSettingsHandler(
     private val store: TenantStore,
     private val seal: ConfigSecretSeal,
+    private val keyState: ConfigSecretKeyGuard,
     private val renderer: InviteMailRenderer,
 ) {
 
     /** Read the tenant's mail settings — owner-gated (a non-owner member is 403, a non-member 404). Redacts the
-     *  password to `passwordSet`. A tenant that configured nothing reads back the empty default. */
+     *  password to `passwordSet`. A tenant that configured nothing reads back the empty default. Carries the
+     *  server's config-secret KEK state so the owner sees whether a stored password can actually be used. */
     fun read(callerId: String, tenantId: String): MailSettingsReadOutcome {
         if (!store.hasMembership(callerId, tenantId)) return MailSettingsReadOutcome.NotFound
         if (store.findTenant(tenantId) == null) return MailSettingsReadOutcome.NotFound
         if (!store.isOwner(callerId, tenantId)) return MailSettingsReadOutcome.NotOwner
-        return MailSettingsReadOutcome.Ok(store.mailSettingsFor(tenantId)?.toView() ?: EMPTY_VIEW)
+        val state = keyState.state()
+        return MailSettingsReadOutcome.Ok(store.mailSettingsFor(tenantId)?.toView(state) ?: emptyView(state))
     }
 
     /**
@@ -124,23 +132,26 @@ class TenantMailSettingsHandler(
             bodyTemplate = body,
         )
         store.saveMailSettings(tenantId, row)
-        return MailSettingsUpdateOutcome.Ok(row.toView())
+        // A freshly-sealed password was sealed under the CURRENT key: advance the stored fingerprint so a prior
+        // MISMATCH clears to OK (the recovery path). A no-op when the fingerprint already matches.
+        if (supplied != null) keyState.recordReseal()
+        return MailSettingsUpdateOutcome.Ok(row.toView(keyState.state()))
     }
 
-    private fun MailSettingsRow.toView() = MailSettingsView(
+    private fun MailSettingsRow.toView(state: ConfigSecretKeyState) = MailSettingsView(
         host = host, port = port, from = from, username = username,
         tls = tls, enabled = enabled, passwordSet = passwordSet,
         subjectTemplate = subjectTemplate, bodyTemplate = bodyTemplate,
+        configSecretState = state,
+    )
+
+    /** What a tenant that configured nothing reads back: transport unset, sending off, no password, defaults. */
+    private fun emptyView(state: ConfigSecretKeyState) = MailSettingsView(
+        host = null, port = null, from = null, username = null,
+        tls = true, enabled = false, passwordSet = false,
+        subjectTemplate = null, bodyTemplate = null,
+        configSecretState = state,
     )
 
     private fun String?.blankToNull(): String? = this?.takeUnless { it.isBlank() }
-
-    private companion object {
-        /** What a tenant that configured nothing reads back: transport unset, sending off, no password, defaults. */
-        val EMPTY_VIEW = MailSettingsView(
-            host = null, port = null, from = null, username = null,
-            tls = true, enabled = false, passwordSet = false,
-            subjectTemplate = null, bodyTemplate = null,
-        )
-    }
 }

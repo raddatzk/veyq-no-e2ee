@@ -24,6 +24,7 @@ import com.veyq.app.generated.model.TenantStatus
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.generated.model.TenantTerms
 import com.veyq.app.generated.model.TenantTermsUpdate
+import com.veyq.app.shared.crypto.ConfigSecretKeyState
 import com.veyq.app.shared.http.Failures
 import com.veyq.app.shared.http.HttpFailure
 import com.veyq.app.shared.http.httpError
@@ -258,6 +259,11 @@ class TenantsResource(
         tls = tls,
         enabled = enabled,
         passwordSet = passwordSet,
+        configSecretState = when (configSecretState) {
+            ConfigSecretKeyState.OK -> TenantMailSettings.ConfigSecretState.OK
+            ConfigSecretKeyState.ABSENT -> TenantMailSettings.ConfigSecretState.ABSENT
+            ConfigSecretKeyState.MISMATCH -> TenantMailSettings.ConfigSecretState.MISMATCH
+        },
         host = host,
         port = port,
         from = from,

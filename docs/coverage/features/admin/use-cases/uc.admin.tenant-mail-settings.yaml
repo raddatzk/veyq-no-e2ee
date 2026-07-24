@@ -50,3 +50,19 @@ acceptanceCriteria:
     coverage:
       web:
         unit: [src/features/admin/createTenant/TenantMailSettingsPanel.test.ts]
+  - id: config-secret-kek-managed-as-a-file
+    text: The config-secret KEK (ADR 0050 amendment) is a server-managed key file — generated (32 random bytes, 0600) on first construction when absent, and read rather than regenerated when present. The env value channel is gone; an operator supplies their own key via a file path override.
+    coverage:
+      backend:
+        unit: [ConfigSecretSealTest.generatesAKeyFileOnFirstConstructionWith0600Perms, ConfigSecretSealTest.readsAnExistingKeyFileRatherThanRegenerating, ConfigSecretSealTest.anUnavailableKekIsAnErrorNotAPlaintextLeak]
+  - id: config-secret-key-loss-is-detected-and-degrades
+    text: A lost or changed config-secret key is DETECTED via a non-invertible HKDF fingerprint stored in the DB (a hash of a full-entropy key, never the key — the "no usable secret in a DB dump" property holds), not a silent unseal failure. On a mismatch the send path degrades to the copy-link fallback (never attempts a send with a bad key), and a reseal under the current key recovers to OK.
+    coverage:
+      backend:
+        unit: [ConfigSecretSealTest.theFingerprintIsStableAndIsNotTheRawKey, ConfigSecretSealTest.aDifferentKeyHasADifferentFingerprint, ConfigSecretKeyGuardTest.detectsAChangedKeyThenRecoversOnReseal]
+        integration: [SmtpInviteMailSendTest.aConfiguredTenantWhoseConfigSecretKeyChangedFallsBackNotSends]
+  - id: changed-key-surfaced-and-recoverable-in-ui
+    text: The owner sees the config-secret key state proactively on the mail-settings read — a MISMATCH (the stored password can't be decrypted; re-enter it) or an ABSENT server (can't seal at all) is shown as its own message and blocks the "send-ready" state, rather than the panel falsely reporting a usable config.
+    coverage:
+      web:
+        unit: [src/features/admin/createTenant/TenantMailSettingsPanel.test.ts]
