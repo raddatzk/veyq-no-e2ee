@@ -11,6 +11,7 @@ import { refreshSession } from '../features/account/login/login'
 import { restoreVaultFromCache } from '../features/account/unlock/unlock'
 import { clearDeviceKey } from '../features/account/rememberMe/deviceKeyWrap'
 import { clearSessionVault } from '../features/account/rememberMe/sessionVault'
+import { maybeDevAutoUnlock } from './devAutoUnlock'
 
 /**
  * Discover the instance state and prepare the app shell. The result is reflected in the shared server
@@ -46,4 +47,7 @@ export async function boot(): Promise<void> {
     await clearSessionVault().catch(() => {})
     await clearDeviceKey(false).catch(() => {})
   }
+  // DEV-ONLY (cr-dev-auto-unlock): if still locked, an opt-in (`?devlogin`) local-dev auto-unlock from seed creds.
+  // A no-op — and tree-shaken to nothing — in any prod build (import.meta.env.DEV-gated). Best-effort, never blocks.
+  await maybeDevAutoUnlock()
 }

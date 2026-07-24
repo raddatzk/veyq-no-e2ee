@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { loadEnv, type Plugin } from 'vite'
 // `vitest/config`'s defineConfig extends Vite's with the `test` block (setupFiles below) while staying a valid
@@ -73,10 +74,51 @@ function mediaSwDevPlugin(): Plugin {
   }
 }
 
+// cr-dev-auto-unlock — a DEV-SERVER-ONLY endpoint serving the local dev-seed credentials to the browser, so an
+// operator who cannot type the password (a phone, or an agent barred from entering credentials into a field) can
+// reach the unlocked dev app hands-off (consumed by src/app/devAutoUnlock.ts behind an `import.meta.env.DEV` gate).
+// SECURITY: `apply: 'serve'` + `configureServer` ⇒ this is dev-server code and is **never** part of `vite build`,
+// so the endpoint and the creds cannot exist in a prod build. The creds are read from `.run/.env`, which is already
+// gitignored plaintext on disk; the dev server binds 127.0.0.1 only. The guard `scripts/assert-no-dev-backdoor-in-dist.mjs`
+// fails the build if `__dev/seed-credentials` ever appears in dist/.
+function devSeedCredentialsPlugin(): Plugin {
+  return {
+    name: 'veyq-dev-seed-credentials',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if ((req.url ?? '').split('?')[0] !== '/__dev/seed-credentials') return next()
+        try {
+          // `.run/.env` lives at the repo root (one level up from web/), written by `npm run bootstrap:user`.
+          const raw = readFileSync(fileURLToPath(new URL('../.run/.env', import.meta.url)), 'utf8')
+          const val = (key: string) => {
+            const line = raw.split('\n').find((l) => l.startsWith(key + '='))
+            return line ? line.slice(key.length + 1).trim() : ''
+          }
+          const email = val('VEYQ_EMAIL')
+          const password = val('VEYQ_PASSWORD')
+          const secretKey = val('VEYQ_SECRET_KEY')
+          if (!email || !password || !secretKey) {
+            res.statusCode = 404
+            res.end('{}') // never seeded on this machine — the dev-unlock stays a no-op
+            return
+          }
+          res.setHeader('Content-Type', 'application/json')
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(JSON.stringify({ email, password, secretKey }))
+        } catch {
+          res.statusCode = 404
+          res.end('{}')
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
-    plugins: [vue(), cspPlugin(env, command === 'serve'), mediaSwDevPlugin()],
+    plugins: [vue(), cspPlugin(env, command === 'serve'), mediaSwDevPlugin(), devSeedCredentialsPlugin()],
     test: {
       // Provide the PrimeVue toast service to every mounted component (cr-0157) — see src/test/setup.ts.
       setupFiles: ['./src/test/setup.ts'],

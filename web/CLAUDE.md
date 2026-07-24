@@ -27,6 +27,13 @@ here; the server is blind.
     were written against the old DB), so **re-run `npm run bootstrap:user`** against the fresh backend first — it
     reseeds `veyq.localhost` and rewrites those two keys — then browse `veyq.localhost:<viteport>`. Prefer this
     over `seed:dev` for a manual smoke: it is one command and needs no dev-invite file.
+    - **DEV auto-unlock (cr-dev-auto-unlock) — reach the unlocked dev app without typing the password.** Browse
+      `veyq.localhost:<viteport>/?devlogin` and `boot()` logs in + unlocks from `.run/.env` via the app's real
+      `login`+`unlockMasterKey` (then enrols the device key, so later loads restore without the param). For a phone,
+      or an agent barred from entering credentials into a field. **Strictly dev-only:** the creds come from an
+      `apply:'serve'` Vite middleware (`/__dev/seed-credentials`, never built) and the consumer is
+      `import.meta.env.DEV`-gated (tree-shaken); `npm run verify:no-backdoor` fails the build if either sentinel
+      reaches `dist/`. A plain `npm run dev` (no `?devlogin`) is unchanged. **Never remove the DEV gate.**
   - **`npm run seed:dev` (cr-0046, the e2e-test seeder).** Mints a Server Owner + a **`127.0.0.1`** tenant owner
     and writes **`web/scripts/.seed/dev-seed.json`** (gitignored) with creds **and** raw key material; loaded by
     `scripts/devSeed.mts` → `loadDevSeed()` / `vaultFromSeed()` and read automatically by `media.e2e.test.ts`
