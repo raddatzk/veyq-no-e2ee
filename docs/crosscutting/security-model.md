@@ -74,7 +74,15 @@ request the **user** turned on, straight to the chosen provider.
   bucket/uploader **names stay sealed** under `K_mem`, [ADR 0034](../decisions/0034-media-uploader-buckets.md));
   per-parent blinded tokens; the tenant's **terms text + `terms_version`** (the operator's *public* policy,
   served to everyone incl. pre-auth) and a member's **`accepted_terms_version`** (coarse acceptance metadata, like
-  membership — never content, [ADR 0035](../decisions/0035-server-terms-of-service.md)).
+  membership — never content, [ADR 0035](../decisions/0035-server-terms-of-service.md)); the **account email**
+  (plaintext — the login identifier and the source of the deterministic auth salt,
+  [ADR 0003](../decisions/0003-operator-blind-password-auth.md); named here to close a prior inventory gap); a
+  tenant's **per-tenant SMTP config** (host/port/from/username/TLS + the owner-authored invite **template text** —
+  operator-visible operational config) and the **send-fact** of an invite mail (recipient + coarse timing, once a
+  tenant has configured SMTP), while the SMTP **password is a server-held secret sealed at rest** (AES-256-GCM
+  under an env KEK — ciphertext + nonce only, [ADR 0050](../decisions/0050-operator-config-secret-encryption.md));
+  a mail itself carries only link + domain + expiry + neutral copy, never sealed metadata
+  ([ADR 0049](../decisions/0049-email-delivery-boundary.md)).
 
 These operational fields are exactly what lets the server **sort, paginate, route, authorize and
 bill** without decrypting. It is a conscious trade-off: a stricter "encrypt operational metadata too"

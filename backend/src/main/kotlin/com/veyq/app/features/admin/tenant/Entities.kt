@@ -80,6 +80,56 @@ class TenantTermsAcceptanceEntity : PanacheEntityBase {
 }
 
 /**
+ * A tenant's own SMTP + invite-template configuration (cr-email-smtp-transport, ADR 0048/0049/0050). One row per
+ * tenant (PK == tenant_id). Nullable transport fields = "not configured" ⇒ the copy-link fallback. The SMTP
+ * **password is never stored in plaintext**: [passwordCiphertext] + [passwordNonce] hold the `ConfigSecretSeal`
+ * output (AES-256-GCM under the env KEK, ADR 0050); null ciphertext = no password. [subjectTemplate] /
+ * [bodyTemplate] are the owner-authored invite templates (null = veyq's bilingual EN+DE default), rendered over
+ * the closed variable set `{{link}}`/`{{domain}}`/`{{expiry}}` (ADR 0049) — operator-visible config, not content.
+ */
+@Entity
+@Table(name = "veyq_tenant_mail_settings")
+class TenantMailSettingsEntity : PanacheEntityBase {
+    @Id
+    @Column(name = "tenant_id", length = 36)
+    lateinit var tenantId: String
+
+    @Column(name = "host", length = 253)
+    var host: String? = null
+
+    @Column(name = "port")
+    var port: Int? = null
+
+    @Column(name = "from_address", length = 254)
+    var fromAddress: String? = null
+
+    @Column(name = "username", length = 254)
+    var username: String? = null
+
+    /** The SMTP password sealed at rest (ADR 0050): base64 AES-256-GCM ciphertext. Null = no password stored. */
+    @Column(name = "password_ciphertext")
+    var passwordCiphertext: String? = null
+
+    /** The random nonce for [passwordCiphertext] (base64). Non-null iff the ciphertext is. */
+    @Column(name = "password_nonce")
+    var passwordNonce: String? = null
+
+    @Column(name = "tls", nullable = false)
+    var tls: Boolean = true
+
+    @Column(name = "enabled", nullable = false)
+    var enabled: Boolean = false
+
+    @Column(name = "subject_template", length = 200)
+    var subjectTemplate: String? = null
+
+    @Column(name = "body_template")
+    var bodyTemplate: String? = null
+
+    companion object : PanacheCompanionBase<TenantMailSettingsEntity, String>
+}
+
+/**
  * An owner invite (one tenant has a history of them). Only the SHA-256 token hash is stored — never the
  * token (ADR 0004 model). status: ACTIVE → SUPERSEDED on resend/reassign, → CONSUMED on acceptance
  * (Slice B), → EXPIRED past its TTL. Soft transitions; a scheduled purge removes terminal rows later.

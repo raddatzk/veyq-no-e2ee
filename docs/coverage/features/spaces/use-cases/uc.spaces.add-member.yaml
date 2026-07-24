@@ -23,6 +23,17 @@ acceptanceCriteria:
         integration: [MemberAddSliceTest.mintedMemberInviteReturnsAUsableBootstrapSecretForCopyLinkHandoff]
       web:
         unit: [src/features/spaces/InviteMemberDialog.test.ts, src/shared/inviteLink.test.ts]
+  - id: member-invite-emailed-when-smtp-configured
+    # cr-email-smtp-transport (ADR 0048/0049): a second delivery channel alongside the copy-link. When the tenant
+    # has configured + enabled SMTP, the member invite is emailed from the tenant's own address; the body is
+    # rendered from the tenant's template (or veyq's EN+DE default) over the CLOSED set {{link}}/{{domain}}/
+    # {{expiry}} — veyq interpolates nothing sealed. With no config the copy-link path (above) is unchanged. The
+    # web settings UI to configure this is a deferred slice (uc.admin.tenant-mail-settings), so no web ref yet.
+    text: When the tenant has configured + enabled per-tenant SMTP, a member invite is delivered by email from the tenant's own address (the accept link's secret in the URL fragment; body over the closed {{link}}/{{domain}}/{{expiry}} set, nothing sealed injected by veyq); with no config the copy-link path is unchanged (self-hostable by default).
+    coverage:
+      backend:
+        integration: [SmtpInviteMailSendTest.aConfiguredTenantSendsARenderedInviteCarryingOnlyTheClosedSet, SmtpInviteMailSendTest.anUnconfiguredTenantSendsNoSmtpAndFallsBack]
+        unit: [InviteMailRendererTest.theRenderContextIsClosedToExactlyThreeNonSecretFields]
   - id: scope-member-directory
     text: An authorized granter lists a scope's memberships with each member's identity public key + grant status (granted vs pending). The operator-blind server returns only already-stored operational metadata (pubkeys/roles/grant-present) — never a scope key — and the directory is scoped to that scope's members, not a global user search.
     coverage:

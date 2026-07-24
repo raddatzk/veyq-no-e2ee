@@ -1,6 +1,6 @@
 # ADR 0049 — Sending mail is a send-time metadata + third-party boundary; a mail carries only delivery essentials
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-24
 
 ## Context
@@ -30,32 +30,47 @@ consented third party.**
    **From the tenant's own address** (`noreply@<tenant.domain>` or the configured `from`,
    [ADR 0048](0048-provider-neutral-smtp-mail-transport.md)) — the recipient sees the domain they are invited to,
    and no cross-tenant identity leaks.
-2. **A mail carries no confidential metadata:** no scope / group / memory names, no member lists, no real names
-   (those are sealed under `K_tenant`), no content — nothing the operator is otherwise blind to. The mail must
-   not become a side-channel that leaks what the database does not. An invite says only that *someone* invited
-   you to *this domain*.
+2. **veyq's machinery injects no confidential metadata; owner-authored template prose is a consented
+   disclosure.** The subject + body are rendered over a **closed, non-secret variable set** (`{{link}}`,
+   `{{domain}}`, `{{expiry}}`, [ADR 0048](0048-provider-neutral-smtp-mail-transport.md) §6): veyq itself never
+   interpolates a scope / group / memory name, a member list, a real name, or any content — those are sealed
+   under `K_tenant` and the renderer cannot reach them, so the server never turns a mail into a side-channel for
+   what the database seals. What a tenant **owner types** into their own template is different: it is a
+   **consented disclosure by the owner**, of the owner's *own* tenant, to a recipient the owner is inviting to
+   that tenant — and it is operator- and provider-visible like the rest of the mail. veyq therefore does **not**
+   guarantee the body is content-free where the owner authored it; it guarantees only that *its own machinery*
+   adds nothing sealed. The shipped default template is content-free — it says only that *someone* invited you to
+   *this domain*.
 3. **The SMTP provider is fenced like ADR 0016:** it receives only the recipient address + the message
    (link / domain / expiry) — never a veyq session, user-id, or content. In a **self-hosted** deployment the
    operator runs their own SMTP, so this boundary collapses to the operator themselves (moot, as with the
    self-hosted operator-blind case).
 4. **Send-time recipient + coarse timing is conceded operational metadata, like membership** — stated in the
-   security-model inventory (which also now lists the account email), never treated as content.
+   security-model inventory (which also now lists the account email and the owner-authored template text, a
+   server-held operator-visible field), never treated as content.
 
 ## Consequences
 
 - **Honest model.** The send-time recipient/timing concession and the provider boundary are named, not hidden;
-  the security-model metadata inventory gains the account email + the mail send-fact.
-- **A hard rule on every mail template, now and later.** Invite mail today; verification and (a future topic)
-  recovery mail tomorrow — all bound to *link + domain + expiry + neutral copy only*. The content boundary is a
-  candidate for a promoted guard (a check that a mail body references no scope/member field).
+  the security-model metadata inventory gains the account email + the mail send-fact + the owner-authored
+  template text (server-held, operator-visible).
+- **A hard rule on the renderer, now and later.** Invite mail today; verification and (a future topic) recovery
+  mail tomorrow — every mail is rendered over the same **closed, non-secret variable set**; no sealed field is
+  ever reachable by interpolation. This is a **promoted guard**: a check that the renderer's variable set is
+  closed to `{{link}}` / `{{domain}}` / `{{expiry}}` and that no sealed field (scope / member / real-name /
+  content) is wired into a mail render context. The guard binds *veyq's machinery*, not the owner's literal
+  prose — which is a consented disclosure (Decision §2), out of the guard's reach by decision, not by oversight.
 - **Self-hosted vs SaaS.** Self-hosted: the provider boundary collapses to the operator. SaaS: the operator's
   chosen relay is a documented third party, feeding the SaaS-ops (#38) and legal (#40) topics.
 - **The SMTP credential is now a server-held secret.** Per-tenant SMTP means the operator holds each tenant's
   SMTP password (encrypted at rest, [ADR 0050](0050-operator-config-secret-encryption.md)) — inherent to sending
   on the tenant's behalf; self-hosted, moot.
-- **Rejected — richer, friendlier mails** ("You've been invited to the *Smith Family* album by *Alice*"). Warmer,
-  but it leaks scope / member / relationship metadata — to the operator's mail logs *and* to the provider — that
-  veyq otherwise seals. The friendliness is not worth re-exposing sealed metadata over an unsealed channel.
+- **Rejected — veyq *auto-injecting* richer content** ("You've been invited to the *Smith Family* album by
+  *Alice*", assembled by the server from sealed fields). The server never reads scope / member / relationship
+  metadata into a mail — that would leak, to the operator's logs *and* the provider, what veyq otherwise seals,
+  with nobody consenting. This is the line that stays hard: an owner who *types* their tenant's name into their
+  own template discloses it themselves (Decision §2); veyq assembling it from sealed data does not, and remains
+  rejected. The mechanism enforcing it is the closed variable set — the renderer is never handed a sealed field.
 - **Rejected — proxying mail through the veyq backend to "hide" the provider.** The backend already holds the
   address, and the provider is downstream regardless; proxying buys nothing. The fence is *minimal content + no
   veyq identity to the provider*, not proxying.

@@ -1,11 +1,13 @@
 # infra — local dev stack
 
-Docker Compose for the local dev dependencies. Two profiles:
+Docker Compose for the local dev dependencies. Three profiles:
 
 - **default** — `mariadb`: the persistent dev database (prod-parity for `quarkusDev`). The test suites use
   in-memory H2 and need none of this.
 - **`s3`** (opt-in) — `garage` + `traefik`: the bundled object store for **media blobs**
   ([ADR 0013](../docs/decisions/0013-blob-storage-presigned-direct-to-store.md), cr-0028 / cr-0029).
+- **`mail`** (opt-in) — `mailpit`: a throwaway test mailbox for the per-tenant SMTP send path
+  ([ADR 0048](../docs/decisions/0048-provider-neutral-smtp-mail-transport.md)).
 
 ```sh
 # database only (the usual dev loop)
@@ -16,6 +18,9 @@ docker compose -f infra/docker-compose.yml down -v      # stop AND wipe (fresh i
 # + the bundled object store (media transport) — the garage-init sidecar sets up
 # layout + bucket + dev key automatically (idempotent; also after a `down -v` wipe)
 docker compose -f infra/docker-compose.yml --profile s3 up -d
+
+# + the test mailbox (per-tenant SMTP smoke) — SMTP on :11025, web UI/API on :18025
+docker compose -f infra/docker-compose.yml --profile mail up -d
 ```
 
 ## Object store (media, `--profile s3`)
@@ -48,6 +53,25 @@ unless the store is **same-origin**. `traefik` path-routes the bucket so it is: 
 stripPrefix or host rewrite would break the signature). Entry is `http://localhost:18080`; sign presigned URLs
 for that public endpoint via `veyq.blob-store.public-endpoint=http://localhost:18080` (CORS-free, ADR 0013 §4).
 (The backend + web are added behind Traefik in a fuller deployment; this profile routes only the bucket path.)
+
+## Mail (test mailbox, `--profile mail`)
+
+A tenant can configure its **own SMTP** so member invites are emailed from its own domain
+([ADR 0048](../docs/decisions/0048-provider-neutral-smtp-mail-transport.md)); with none configured the invite
+falls back to the copy-link. **Mailpit** is a throwaway mailbox to smoke that send path locally — MIT-licensed
+and actively maintained (**not** the archived MailHog; root `CLAUDE.md` forbids EOL deps). It accepts any SMTP
+AUTH over plain (dev only) and exposes an HTTP API, so a harness can read what arrived without scraping a UI.
+
+- **SMTP** → `localhost:11025`; **web UI + HTTP API** → `http://localhost:18025` (nothing persists across
+  restarts — a test mailbox, by design).
+- **Smoke the send path**: bring the profile up, then (as a tenant owner) `PUT /api/tenants/{id}/mail-settings`
+  with `host=localhost`, `port=11025`, any `username`/`password`, `enabled=true`, `tls=false`. The next
+  **member** invite is emailed; read it at `http://localhost:18025` or fetch it from the API
+  (`GET http://localhost:18025/api/v1/messages`). Sealing the SMTP password needs the env KEK
+  `VEYQ_SECURITY_CONFIG_SECRET_KEY` ([ADR 0050](../docs/decisions/0050-operator-config-secret-encryption.md)); with
+  none set, the owner cannot enable sending and stays on the copy-link.
+- The automated coverage is hermetic (an in-JVM GreenMail server in `SmtpInviteMailSendTest`), so `./gradlew
+  check` needs **no** container; this profile is for a manual, eyes-on smoke.
 
 ## Seeding a reproducible dev instance (cr-0046)
 

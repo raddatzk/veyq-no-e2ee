@@ -694,6 +694,136 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
               example: { code: terms_version_changed }
 
+  /api/tenants/{tenantId}/mail-settings:
+    get:
+      tags: [tenants]
+      operationId: getTenantMailSettings
+      summary: Read a tenant's SMTP + invite-template settings (owner-gated; password never returned).
+      description: >
+        Returns the tenant's per-tenant mail configuration — SMTP host/port/from/username/TLS, whether sending is
+        `enabled`, whether a password is stored (`passwordSet`), and the owner-authored invite subject/body
+        templates (null ⇒ veyq's bilingual EN+DE default is used). The SMTP **password is never returned** — only
+        `passwordSet` ([ADR 0050](../../docs/decisions/0050-operator-config-secret-encryption.md)). Owner-gated: a
+        member who is not the owner gets `403 not_tenant_owner`, a non-member `404` (indistinguishable, ADR 0042).
+        Enforced by code (ADR 0008, [ADR 0048](../../docs/decisions/0048-provider-neutral-smtp-mail-transport.md)).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: The tenant's current mail settings (the password redacted to `passwordSet`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantMailSettings" }
+              example:
+                host: smtp.example.com
+                port: 587
+                from: noreply@family.example.com
+                username: family
+                tls: true
+                enabled: true
+                passwordSet: true
+                subjectTemplate: null
+                bodyTemplate: null
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is a member of this tenant but not its owner (only the owner may read mail settings).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: >
+            No tenant with that id — or the caller is not a member of it (deliberately indistinguishable,
+            ADR 0042: membership is the first gate).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+    put:
+      tags: [tenants]
+      operationId: updateTenantMailSettings
+      summary: Set/replace a tenant's SMTP + invite-template settings (owner-gated; password write-only).
+      description: >
+        The tenant **owner** configures per-tenant SMTP so member invites are emailed from the tenant's own
+        domain ([ADR 0048](../../docs/decisions/0048-provider-neutral-smtp-mail-transport.md)). The **password is
+        write-only** — supplied here, sealed at rest under the env KEK
+        ([ADR 0050](../../docs/decisions/0050-operator-config-secret-encryption.md)), never returned or logged;
+        **omit it to keep** the stored one. The optional `subjectTemplate` / `bodyTemplate` are owner-authored and
+        rendered over a **closed variable set** — `{{link}}`, `{{domain}}`, `{{expiry}}` only (ADR 0048 §6,
+        [ADR 0049](../../docs/decisions/0049-email-delivery-boundary.md)); a template that references any other
+        `{{tag}}` is rejected (`400 invalid_mail_template`). Omit them for veyq's bilingual EN+DE default. The PUT
+        **replaces** the settings (password excepted). Owner-gated (`403 not_tenant_owner`; a non-member `404`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TenantMailSettingsUpdate" }
+            example:
+              host: smtp.example.com
+              port: 587
+              from: noreply@family.example.com
+              username: family
+              password: hunter2
+              tls: true
+              enabled: true
+              subjectTemplate: "You're invited to {{domain}}"
+              bodyTemplate: "You've been invited to {{domain}}. Accept: {{link}} (expires {{expiry}})."
+      responses:
+        "200":
+          description: The settings were stored; the current state (password redacted) is returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantMailSettings" }
+              example:
+                host: smtp.example.com
+                port: 587
+                from: noreply@family.example.com
+                username: family
+                tls: true
+                enabled: true
+                passwordSet: true
+                subjectTemplate: "You're invited to {{domain}}"
+                bodyTemplate: "You've been invited to {{domain}}. Accept: {{link}} (expires {{expiry}})."
+        "400":
+          description: >
+            The request was malformed (invalid host/port/from/username), or a template references a `{{tag}}`
+            outside the closed set (`invalid_mail_template`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: invalid_mail_template }
+        "401":
+          description: Generic authentication failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: authentication_failed }
+        "403":
+          description: The caller is a member of this tenant but not its owner (only the owner may edit mail settings).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: not_tenant_owner }
+        "404":
+          description: >
+            No tenant with that id — or the caller is not a member of it (deliberately indistinguishable,
+            ADR 0042: membership is the first gate).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              example: { code: tenant_not_found }
+
   /api/tenants/accept/preview:
     post:
       tags: [tenants]
@@ -1187,6 +1317,145 @@ components:
           minimum: 1
           example: 3
           x-field-extra-annotation: '@field:jakarta.validation.constraints.Min(1)'
+
+    # --- cr-email-smtp-transport (ADR 0048/0049/0050): per-tenant SMTP + owner-authored invite templates ---
+    TenantMailSettings:
+      type: object
+      description: >
+        A tenant's mail configuration as **read back**: the SMTP transport fields, the send toggle, whether a
+        password is stored (never the password itself, ADR 0050), and the owner-authored invite templates. The
+        transport fields and templates are operator-authored config (`public`), not user data.
+      required: [tls, enabled, passwordSet]
+      properties:
+        host:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: SMTP server host (operator infra config). Null ⇒ not configured.
+          maxLength: 253
+          example: smtp.example.com
+        port:
+          x-veyq-visibility: public
+          type: [integer, "null"]
+          format: int32
+          description: SMTP server port (operator infra config).
+          example: 587
+        from:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: The From address invites are sent from (null ⇒ noreply@<tenant.domain>).
+          maxLength: 254
+          example: noreply@family.example.com
+        username:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: SMTP auth username (operator infra config).
+          maxLength: 254
+          example: family
+        tls:
+          x-veyq-visibility: flag
+          type: boolean
+          description: Whether to use STARTTLS on the SMTP connection.
+          example: true
+        enabled:
+          x-veyq-visibility: flag
+          type: boolean
+          description: Whether email sending is enabled; else the copy-link fallback is used (ADR 0048).
+          example: true
+        passwordSet:
+          x-veyq-visibility: flag
+          type: boolean
+          description: Whether an SMTP password is stored — the password itself is never returned (ADR 0050).
+          example: true
+        subjectTemplate:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: >
+            Owner-authored invite subject, rendered over the closed set `{{link}}`/`{{domain}}`/`{{expiry}}`
+            (ADR 0048 §6). Null ⇒ veyq's bilingual EN+DE default.
+          maxLength: 200
+          example: null
+        bodyTemplate:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: >
+            Owner-authored invite body, rendered over the closed set `{{link}}`/`{{domain}}`/`{{expiry}}`
+            (ADR 0048 §6, ADR 0049). Owner literal prose is a consented, operator/provider-visible disclosure.
+            Null ⇒ veyq's bilingual EN+DE default.
+          maxLength: 8000
+          example: null
+
+    TenantMailSettingsUpdate:
+      type: object
+      description: >
+        Owner-supplied mail configuration. The password is **write-only** (sealed at rest, ADR 0050) — omit it to
+        keep the stored one; every other field is a full replace. The template fields are optional (null ⇒ veyq's
+        EN+DE default) and validated against the closed variable set at write time (an unknown `{{tag}}` ⇒
+        `400 invalid_mail_template`).
+      required: [tls, enabled]
+      properties:
+        host:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: SMTP server host (a bare hostname). Null ⇒ clear (unconfigured).
+          maxLength: 253
+          example: smtp.example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(max = 253) @field:jakarta.validation.constraints.Pattern(regexp = "^([a-z0-9](-?[a-z0-9])*\\.)+[a-z]{2,}$")'
+        port:
+          x-veyq-visibility: public
+          type: [integer, "null"]
+          format: int32
+          description: SMTP server port.
+          example: 587
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Min(1) @field:jakarta.validation.constraints.Max(65535)'
+        from:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: The From address (null ⇒ noreply@<tenant.domain>).
+          maxLength: 254
+          example: noreply@family.example.com
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Email @field:jakarta.validation.constraints.Size(max = 254)'
+        username:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: SMTP auth username.
+          maxLength: 254
+          example: family
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(max = 254)'
+        password:
+          x-veyq-visibility: token
+          type: [string, "null"]
+          description: >
+            WRITE-ONLY SMTP password; sealed at rest under the env KEK (ADR 0050), never returned or logged. Omit
+            (or null) to keep the stored one.
+          maxLength: 256
+          example: hunter2
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 256)'
+        tls:
+          x-veyq-visibility: flag
+          type: boolean
+          description: Whether to use STARTTLS.
+          example: true
+        enabled:
+          x-veyq-visibility: flag
+          type: boolean
+          description: Whether email sending is enabled (else copy-link fallback).
+          example: true
+        subjectTemplate:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: >
+            Owner-authored invite subject over the closed set `{{link}}`/`{{domain}}`/`{{expiry}}`. Null ⇒ default.
+          maxLength: 200
+          example: "You're invited to {{domain}}"
+          x-field-extra-annotation: '@field:com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.veyq.app.shared.validation.TrimmingStringDeserializer::class) @field:jakarta.validation.constraints.Size(max = 200)'
+        bodyTemplate:
+          x-veyq-visibility: public
+          type: [string, "null"]
+          description: >
+            Owner-authored invite body over the closed set `{{link}}`/`{{domain}}`/`{{expiry}}`. Null ⇒ default.
+          maxLength: 8000
+          example: "You've been invited to {{domain}}. Accept: {{link}} (expires {{expiry}})."
+          x-field-extra-annotation: '@field:jakarta.validation.constraints.Size(max = 8000)'
 
     ErrorResponse:
       $ref: '_common.openapi.yaml#/components/schemas/ErrorResponse'

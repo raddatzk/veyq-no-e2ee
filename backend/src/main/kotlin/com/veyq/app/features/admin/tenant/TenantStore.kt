@@ -36,6 +36,23 @@ data class TenantTermsRow(val version: Int, val acceptedVersion: Int, val markdo
  *  caller's acceptedVersion; an accountless visitor has no account, so there is nothing to report. */
 data class TenantGuestTermsRow(val version: Int, val markdownByLocale: String?)
 
+/** A tenant's mail configuration (cr-email-smtp-transport). Carries the **sealed** SMTP password (ciphertext +
+ *  nonce, ADR 0050) for internal use; the handler redacts it to `passwordSet` before it leaves the server. */
+data class MailSettingsRow(
+    val host: String?,
+    val port: Int?,
+    val from: String?,
+    val username: String?,
+    val passwordCiphertext: String?,
+    val passwordNonce: String?,
+    val tls: Boolean,
+    val enabled: Boolean,
+    val subjectTemplate: String?,
+    val bodyTemplate: String?,
+) {
+    val passwordSet: Boolean get() = passwordCiphertext != null
+}
+
 /**
  * Persistence for tenant creation + invite lifecycle (cr-0009). The invite is its own row history; only the
  * SHA-256 token hash is stored (never the token), and transitions are soft (ACTIVE → SUPERSEDED/CONSUMED/
@@ -270,6 +287,43 @@ class TenantStore(private val membership: MembershipStore) {
             }.persist()
         }
     }
+
+    // --- per-tenant mail settings (cr-email-smtp-transport, ADR 0048/0049/0050) ---
+
+    /** The tenant's mail settings (sealed password included), or null if it never configured any. */
+    fun mailSettingsFor(tenantId: String): MailSettingsRow? =
+        TenantMailSettingsEntity.findById(tenantId)?.toRow()
+
+    /** The mail settings of the tenant owning [domain] (the mailer resolves by the domain it is handed), or null
+     *  if there is no such tenant or it configured none. Domain is unique per tenant (`veyq_tenant.domain`). */
+    fun mailSettingsByDomain(domain: String): MailSettingsRow? {
+        val tenant = TenantEntity.find("domain", domain).firstResult() ?: return null
+        return TenantMailSettingsEntity.findById(tenant.id)?.toRow()
+    }
+
+    /** Upsert a tenant's mail settings verbatim. The caller has already sealed (or preserved) the password and
+     *  validated the templates — this only persists the given row. */
+    @Transactional
+    fun saveMailSettings(tenantId: String, row: MailSettingsRow) {
+        val e = TenantMailSettingsEntity.findById(tenantId) ?: TenantMailSettingsEntity().apply { this.tenantId = tenantId }
+        e.host = row.host
+        e.port = row.port
+        e.fromAddress = row.from
+        e.username = row.username
+        e.passwordCiphertext = row.passwordCiphertext
+        e.passwordNonce = row.passwordNonce
+        e.tls = row.tls
+        e.enabled = row.enabled
+        e.subjectTemplate = row.subjectTemplate
+        e.bodyTemplate = row.bodyTemplate
+        e.persist()
+    }
+
+    private fun TenantMailSettingsEntity.toRow() = MailSettingsRow(
+        host = host, port = port, from = fromAddress, username = username,
+        passwordCiphertext = passwordCiphertext, passwordNonce = passwordNonce,
+        tls = tls, enabled = enabled, subjectTemplate = subjectTemplate, bodyTemplate = bodyTemplate,
+    )
 
     // --- scheduled cleanup (see TenantInvitePurge) ---
 

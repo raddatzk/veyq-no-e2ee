@@ -89,6 +89,24 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
+  # --- Test mailbox for per-tenant SMTP (cr-email-smtp-transport, ADR 0048) — opt-in: `docker compose --profile
+  # mail up -d`. A dev tenant points its mail settings at this (host `localhost`, port 11025, any username/
+  # password) to smoke the real send path; the web UI + HTTP API on :18025 let you read what arrived. **Mailpit**
+  # (MIT, actively maintained) — NOT the archived MailHog (root CLAUDE.md: no EOL deps). Nothing is stored across
+  # restarts (in-memory), which is exactly what a throwaway test mailbox wants.
+  mailpit:
+    image: axllent/mailpit:v1.20.0
+    container_name: veyq-mailpit
+    profiles: ["mail"]
+    restart: unless-stopped
+    environment:
+      # Accept any AUTH over plain SMTP so a dev tenant's configured username/password is not a setup hurdle.
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "11025:1025"   # SMTP — a tenant's mail settings point here (host localhost, port 11025)
+      - "18025:8025"   # web UI + HTTP API — read delivered invites (http://localhost:18025)
+
 volumes:
   veyq-mariadb-data:
   veyq-garage-meta:

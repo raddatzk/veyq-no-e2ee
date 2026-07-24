@@ -15,6 +15,7 @@ handling of reported shares.
 - Invite members, grant access & assign roles — planned
 - Manage server users & roles — planned
 - ★ [Set tenant terms (versioned)](use-cases/uc.admin.tenant-terms.md) — **built (web, cr-0114)** (ADR 0035; per-locale markdown + `terms_version`; the member accept-gate consumes the version)
+- ★ [Configure per-tenant mail (SMTP + invite template)](use-cases/uc.admin.tenant-mail-settings.md) — **planned** (cr-email-smtp-transport; ADR 0048/0049/0050; per-tenant SMTP, password sealed at rest, invite templates over a closed variable set)
 - Set tenant branding — planned
 - Back up & upgrade the instance — planned (mostly runbook)
 - Act on a reported public share — planned

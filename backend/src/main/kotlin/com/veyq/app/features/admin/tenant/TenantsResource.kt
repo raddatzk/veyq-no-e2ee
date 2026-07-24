@@ -14,6 +14,8 @@ import com.veyq.app.generated.model.PendingMemberInvite
 import com.veyq.app.generated.model.ReassignOwnerRequest
 import com.veyq.app.generated.model.InvitePreview
 import com.veyq.app.generated.model.RegisterAndAcceptRequest
+import com.veyq.app.generated.model.TenantMailSettings
+import com.veyq.app.generated.model.TenantMailSettingsUpdate
 import com.veyq.app.generated.model.TenantActivated
 import com.veyq.app.generated.model.TenantActivatedWithUser
 import com.veyq.app.generated.model.TenantCreated
@@ -49,6 +51,7 @@ class TenantsResource(
     private val handler: TenantHandler,
     private val acceptHandler: TenantAcceptHandler,
     private val termsHandler: TenantTermsHandler,
+    private val mailSettingsHandler: TenantMailSettingsHandler,
     private val identity: SecurityIdentity,
 ) : TenantsApi {
 
@@ -212,6 +215,49 @@ class TenantsResource(
         }
 
     private fun TermsContent.toDto() = LocalizedMarkdown(de, en)
+
+    // --- Mail settings (cr-email-smtp-transport, ADR 0048/0049/0050). @Authenticated (not Server-Owner): both
+    // owner-gated in the handler (403 not_tenant_owner; a non-member 404). The SMTP password is write-only —
+    // supplied on update, never returned (a read exposes only passwordSet, ADR 0050). ---
+    @Authenticated
+    override fun getTenantMailSettings(tenantId: UUID): Response =
+        when (val o = mailSettingsHandler.read(identity.principal.name, tenantId.toString())) {
+            is MailSettingsReadOutcome.Ok -> Response.ok(o.settings.toDto()).build()
+            is HttpFailure -> httpError(o)
+        }
+
+    @Authenticated
+    override fun updateTenantMailSettings(tenantId: UUID, tenantMailSettingsUpdate: TenantMailSettingsUpdate): Response =
+        when (
+            val o = mailSettingsHandler.update(
+                callerId = identity.principal.name,
+                tenantId = tenantId.toString(),
+                host = tenantMailSettingsUpdate.host,
+                port = tenantMailSettingsUpdate.port,
+                from = tenantMailSettingsUpdate.from,
+                username = tenantMailSettingsUpdate.username,
+                password = tenantMailSettingsUpdate.password,
+                tls = tenantMailSettingsUpdate.tls,
+                enabled = tenantMailSettingsUpdate.enabled,
+                subjectTemplate = tenantMailSettingsUpdate.subjectTemplate,
+                bodyTemplate = tenantMailSettingsUpdate.bodyTemplate,
+            )
+        ) {
+            is MailSettingsUpdateOutcome.Ok -> Response.ok(o.settings.toDto()).build()
+            is HttpFailure -> httpError(o)
+        }
+
+    private fun MailSettingsView.toDto() = TenantMailSettings(
+        tls = tls,
+        enabled = enabled,
+        passwordSet = passwordSet,
+        host = host,
+        port = port,
+        from = from,
+        username = username,
+        subjectTemplate = subjectTemplate,
+        bodyTemplate = bodyTemplate,
+    )
 
 
     private fun InviteOutcome.toResponse(): Response = when (this) {

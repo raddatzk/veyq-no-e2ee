@@ -1,6 +1,6 @@
 # ADR 0048 — Tenant invites are sent over per-tenant SMTP, configured as runtime settings
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-24
 
 ## Context
@@ -51,9 +51,15 @@ at send time. No tenant SMTP configured ⇒ the copy-link path, unchanged.**
 5. **The owner-bootstrap invite stays copy-link.** A PENDING tenant has no owner yet to configure SMTP and there
    is no server-level fallback (per-tenant only), so the Server-Owner → tenant-owner bootstrap invite uses the
    copy-link (as today). **Member** invites are emailed once the tenant owner has configured SMTP.
-6. **Plain bilingual (EN + DE) body, from the tenant's own address.** No template engine (the body is
-   link + domain + expiry, [ADR 0049](0049-email-delivery-boundary.md)); the from-address is the tenant's
-   (`noreply@<tenant.domain>` or the configured `from`), reinforcing the delivery boundary.
+6. **Owner-authored bilingual body over a closed variable set, from the tenant's own address.** The invite
+   subject + body are rendered from a per-tenant, owner-authored template (optional; veyq ships a bilingual
+   EN + DE default) via a **minimal, logic-less `{{variable}}` substitution over a closed, non-secret variable
+   set** — `{{link}}`, `{{domain}}`, `{{expiry}}` only. No sections, no partials, no lambdas, and **no** variable
+   that resolves to a sealed field: the renderer is handed only those three values and can reach nothing else
+   (the mechanical half of the [ADR 0049](0049-email-delivery-boundary.md) boundary). What an owner *types* into
+   their own template is a consented, operator/provider-visible disclosure — [ADR 0049](0049-email-delivery-boundary.md)
+   §2. The from-address is the tenant's (`noreply@<tenant.domain>` or the configured `from`), reinforcing the
+   delivery boundary.
 
 ## Consequences
 
@@ -63,8 +69,9 @@ at send time. No tenant SMTP configured ⇒ the copy-link path, unchanged.**
   `seed:dev` still reads the token. A **Mailpit** (`mail` profile) container is available for a tenant to point
   at for smoke. (MailHog archived → Mailpit, per no-EOL-deps.)
 - **New machinery:** the first server-held secret at rest ([ADR 0050](0050-operator-config-secret-encryption.md));
-  a per-tenant `MailClient` built (and cached, invalidated on settings change) at send time; an owner-gated
-  settings resource (a contract change — the earlier "no contract change" held only for the static variant).
+  a per-tenant `MailClient` built at send time (a per-tenant client cache is a deferred optimization — invites are
+  low-frequency, so build-per-send keeps correctness simple with no stale-config window); an owner-gated settings
+  resource (a contract change — the earlier "no contract change" held only for the static variant).
 - **Shared-instance trust (stated honestly).** Configuring per-tenant SMTP entrusts the **Server Operator** with
   that credential — the operator holds the [ADR 0050](0050-operator-config-secret-encryption.md) KEK *and* runs
   the send path, so it can decrypt the tenant's SMTP password. This is inherent to "the server sends mail on the
@@ -80,5 +87,9 @@ at send time. No tenant SMTP configured ⇒ the copy-link path, unchanged.**
   (bootstrap + unconfigured tenants).
 - **Rejected — plaintext password in the DB.** Breaks the "a DB dump yields no usable secret" property; encrypted
   at rest instead ([ADR 0050](0050-operator-config-secret-encryption.md)).
-- **Rejected — Qute/`MailTemplate` now.** Ceremony over a two-line fixed body; the plain builder is replaced the
-  day a mail needs real layout.
+- **Rejected — a full templating engine (Qute/`MailTemplate`/jmustache).** Sections, partials, lambdas and
+  model reflection are ceremony for a three-variable invite body — and every extra capability is a wider surface
+  to audit against the [ADR 0049](0049-email-delivery-boundary.md) boundary. A minimal, logic-less `{{variable}}`
+  substitution over the closed set is the proportionate mechanism (no new dependency, and the closed set is a
+  property *by construction* rather than one a general engine must be fenced into); a real engine is reconsidered
+  the day a mail needs real layout.

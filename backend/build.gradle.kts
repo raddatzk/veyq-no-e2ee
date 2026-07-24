@@ -37,10 +37,12 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("org.flywaydb:flyway-mysql") // Flyway 12 keeps MariaDB/MySQL support out of flyway-core
     implementation("software.amazon.awssdk:s3:2.31.78") // S3 blob store: vendor-neutral S3 client + presigner (ADR 0013)
+    implementation("io.quarkus:quarkus-mailer") // generic SMTP transport (transitive Vert.x MailClient), no vendor SDK (ADR 0048)
 
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation(kotlin("test"))
+    testImplementation("com.icegreen:greenmail:2.1.2") // hermetic in-JVM SMTP server: assert the real sent mail (ADR 0048/0049)
 
     // PIT's JUnit-5 runner (our tests are JUnit Platform). 1.2.3 requires PIT >= 1.19.4 — pinned together below.
     pitest("org.pitest:pitest-junit5-plugin:1.2.3")
