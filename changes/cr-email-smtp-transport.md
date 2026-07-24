@@ -42,6 +42,12 @@ or the dev loop. This is the reshaped Slice 1 of the Email theme.
   resolves the tenant by the `domain` already passed to `sendInvite` (unique per tenant); with no/disabled
   settings it **delegates to `LoggingTenantInviteMailer`** (copy-link + the cr-0046 dev-file), so
   `web/scripts/devSeed.mts awaitInvite()` and `seed:dev` are untouched (no dev tenant has settings).
+  **CDI:** the port is single-impl today (`LoggingTenantInviteMailer` is injected directly into `TenantHandler`),
+  so a second bean makes that interface injection ambiguous. Resolve it by marking `SmtpTenantInviteMailer`
+  `@Alternative @Priority(1)` (a priority-enabled alternative wins the interface injection point globally in ArC)
+  and injecting `LoggingTenantInviteMailer` **by concrete type** for the fallback (a concrete bean type is never
+  ambiguous) — no other injection point or qualifier changes. The owner-bootstrap invite needs no call-site
+  special-casing: a PENDING tenant has no settings, so it resolves to the fallback automatically.
 - **Transport:** add `io.quarkus:quarkus-mailer` (BOM-managed) for the transitive Vert.x `MailClient`; construct
   it per-tenant at send time (cache keyed by tenant, invalidate on settings update). Not the static injected
   `quarkus-mailer` (ADR 0048 rejected instance-wide).
