@@ -11,6 +11,8 @@ import type {
   TenantActivatedWithUser,
   TenantCreated,
   TenantInviteState,
+  TenantMailSettings,
+  TenantMailSettingsUpdate,
   TenantSummary,
   TenantTerms,
 } from '../../../api/generated/tenants'
@@ -21,6 +23,7 @@ import type { AccountMaterial } from '../../account/register/accountBirth'
 
 export type { TenantSummary, TenantInviteState, TenantCreated, InvitePreview } from '../../../api/generated/tenants'
 export type { TenantTerms, LocalizedMarkdown } from '../../../api/generated/tenants'
+export type { TenantMailSettings, TenantMailSettingsUpdate } from '../../../api/generated/tenants'
 
 /** Create a PENDING tenant and mint an owner invite. */
 export function createTenant(tenantName: string, domain: string, ownerEmail: string): Promise<TenantCreated> {
@@ -62,6 +65,25 @@ export function updateTenantTerms(tenantId: string, terms: LocalizedMarkdown): P
 /** Member: accept the tenant's current terms at [version] — must equal the current version, else 409. */
 export function acceptTenantTerms(tenantId: string, version: number): Promise<TenantTerms> {
   return tenantsApi().acceptTenantTerms({ tenantId, acceptTermsRequest: { version } })
+}
+
+// --- Mail settings (cr-email-tenant-mail-settings-web, ADR 0048/0049/0050) ---
+
+/** Owner-only: read the tenant's SMTP + invite-template settings. The password is never returned — only
+ *  `passwordSet` (ADR 0050). A non-owner member is 403 `not_tenant_owner`, a non-member 404 (indistinguishable). */
+export function getTenantMailSettings(tenantId: string): Promise<TenantMailSettings> {
+  return tenantsApi().getTenantMailSettings({ tenantId })
+}
+
+/** Owner-only: set/replace the tenant's mail settings. The password is write-only — the caller **omits** it (leaves
+ *  it out of `update`) to keep the stored one; a supplied one is sealed at rest (ADR 0050). A template referencing a
+ *  `{{tag}}` outside `{{link}}`/`{{domain}}`/`{{expiry}}` is rejected 400 `invalid_mail_template`; a supplied password
+ *  with no server KEK is 503 `mail_secret_unavailable`. */
+export function updateTenantMailSettings(
+  tenantId: string,
+  update: TenantMailSettingsUpdate,
+): Promise<TenantMailSettings> {
+  return tenantsApi().updateTenantMailSettings({ tenantId, tenantMailSettingsUpdate: update })
 }
 
 // --- Slice B (cr-0010): invite acceptance / activation ---

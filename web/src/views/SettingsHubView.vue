@@ -13,6 +13,7 @@ import DeviceTrustPanel from '../features/account/trustDevice/DeviceTrustPanel.v
 import ProfilePanel from '../features/account/profile/ProfilePanel.vue'
 import TenantMembersPanel from '../features/spaces/TenantMembersPanel.vue'
 import TenantTermsPanel from '../features/admin/createTenant/TenantTermsPanel.vue'
+import TenantMailSettingsPanel from '../features/admin/createTenant/TenantMailSettingsPanel.vue'
 import GroupMembersPanel from '../features/spaces/GroupMembersPanel.vue'
 import TenantDetailPanel from '../features/admin/createTenant/TenantDetailPanel.vue'
 import CreateGroupDialog from '../features/spaces/CreateGroupDialog.vue'
@@ -83,6 +84,8 @@ const categories = computed<NavCategory[]>(() => {
     cats.push({ key: 'tenant', label: t('settings.tenant'), collapsible: false, items: [
       { id: 'tenant-members', label: t('members.title'), icon: 'pi pi-users' },
       { id: 'terms', label: t('terms.navTitle'), icon: 'pi pi-file-edit' },
+      // Mail settings are owner-only (the read is owner-gated); the item shows to every member, the panel gates.
+      { id: 'mail', label: t('mail.navTitle'), icon: 'pi pi-envelope' },
     ] })
   }
   // Gruppen collection — every group I own + a create affordance (management hub, decoupled from active scope).
@@ -143,6 +146,7 @@ const activeView = computed<{ component: Component; props: Record<string, unknow
   const id = activeId.value
   if (id === 'tenant-members') return { component: TenantMembersPanel, props: {} }
   if (id === 'terms') return { component: TenantTermsPanel, props: {} }
+  if (id === 'mail') return { component: TenantMailSettingsPanel, props: {} }
   if (id.startsWith('group-')) {
     const scopeId = id.slice('group-'.length)
     return { component: GroupMembersPanel, props: { scopeId, name: ownedGroups.value.find((g) => g.scopeId === scopeId)?.name ?? '' } }
