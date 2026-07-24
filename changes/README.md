@@ -128,10 +128,26 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
   (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
   Snapshot-restore is the interactive one-shot; a copy is its automated form.
+- **A test that mutates shared singleton/global state writes its restore in the *same edit* as the mutation, not
+  after a flake.** The `%test` H2 mem DB — and any generated file like the config-secret key — is **JVM-shared
+  across test classes**, so a test that pokes a singleton (cr-config-secret-key-file-and-fingerprint forced a
+  `veyq_instance` config-secret fingerprint to a bogus value to exercise the MISMATCH gate) must `finally`-restore
+  it, or it cascades failures into every later test that assumed the clean value. This is the *write*-side sibling
+  of the *insert*-side seed-uniqueness rule (distinct domains/emails/**secrets** so the mem DB can't bleed —
+  cr-email-invite-send-hardening's `token_hash` collision): the same JVM-shared-state trap. Run the **full**
+  `./gradlew check`, never just the touched class, before calling backend done.
 - **`git status` before the first edit of a contracts-phase CR — a dirty shared spec is stop-and-confirm, not
   proceed.** Two CRs touching one `*.openapi.yaml` mix unrelated deltas into a single commit: #103's mechanical
   enum narrowing landed on top of uncommitted `cr-space-icon` WIP in `scopes.openapi.yaml`, and only a pre-edit
   `git status` caught it. Split the go — land one, then the other as its own commit — and the history stays legible.
+- **Before adding a read field to expose a server fact, prove the fact isn't already *implied* — and that the
+  server can *reliably know* it.** A new field earns its place only when the value is both (a) not derivable from
+  what the read already carries and (b) something the server can determine truthfully. cr-email-tenant-mail-settings-web
+  dropped a proposed `sealAvailable` because `passwordSet: true` already implied the KEK was present at seal time;
+  cr-config-secret-key-file-and-fingerprint then *added* `configSecretState` — not a reversal, but because a new
+  capability (the DB fingerprint tripwire) let the server *detect* a state it previously could not. The deciding
+  question is the server's knowledge, not the client's wish — name that dependency when first weighing the field,
+  not a CR later.
 - **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
   in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
   would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
