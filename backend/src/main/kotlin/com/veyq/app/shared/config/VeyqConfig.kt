@@ -34,6 +34,7 @@ interface VeyqConfig {
     fun tasks(): Tasks
     fun ratelimit(): RateLimit
     fun share(): Share
+    fun security(): Security
 
     /** A scheduled cleanup interval (`*.purge.every` / `*.reconcile.every`); read by the `@Scheduled` sibling. */
     interface Interval {
@@ -172,6 +173,13 @@ interface VeyqConfig {
             @WithDefault("60")
             fun windowSeconds(): Long
         }
+    }
+
+    /** `veyq.security.*` — operator-side security knobs. */
+    interface Security {
+        /** Base64 32-byte KEK that seals server-held config secrets at rest (ADR 0050). Env-only, absent by
+         *  default (a feature needing it fails loudly rather than storing a secret in the clear). */
+        fun configSecretKey(): Optional<String>
     }
 
     /** `veyq.share.upload.rate.*` — the uploader-link rate limiter. */
