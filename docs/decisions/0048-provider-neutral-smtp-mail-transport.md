@@ -9,8 +9,7 @@ veyq has no mail-send capability. Tenant/member invites are minted and the raw a
 by the owner ([`InviteBootstrapSecret`](../../contracts/api/tenants.openapi.yaml) — "works without any email
 infrastructure, the mailer is optional", cr-0080) or written to a dev-only file for the seed loop (cr-0046).
 The `TenantInviteMailer` port exists with a single `LoggingTenantInviteMailer` impl; its own doc says "a real
-SMTP-backed mailer must be wired". The Email theme ([`../../changes/scoping-email-v1.md`](../../changes/scoping-email-v1.md))
-needs that real send path.
+SMTP-backed mailer must be wired". The Email theme needs that real send path.
 
 **A veyq instance is multi-tenant under a single Server Owner** (measured): one Server Owner
 (`POST /api/setup/owner`, 409 on a second) hosts **many tenants, each with its own unique `domain` and its own

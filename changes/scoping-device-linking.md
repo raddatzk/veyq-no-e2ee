@@ -2,8 +2,8 @@
 
 > **Status: refine / scoping only. Not a CR, nothing built.** Pre-work that will become `cr-device-linking-*`
 > once the decisions below are made and a "go" is given. Deliberately not named `cr-*.md` so the
-> change-request guard ignores it. Spun off from the Email theme (`scoping-email-v1.md` §11) — this is **not
-> an email feature** (needs no mail). All `path:line` facts are **measured**; anything inferred is marked.
+> change-request guard ignores it. Spun off from the Email theme (whose scoping doc has since been retired to
+> the inbox) — this is **not an email feature** (needs no mail). All `path:line` facts are **measured**; anything inferred is marked.
 > **[DECISION]** marks a call the owner must make.
 
 ## What we want to achieve (one paragraph)
