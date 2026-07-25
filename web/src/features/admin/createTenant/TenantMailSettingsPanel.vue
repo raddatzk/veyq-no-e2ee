@@ -21,7 +21,7 @@ import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
 import { useToast } from '../../../shared/state/useToast'
 import { handle401 } from '../../../shared/handle401'
-import { decodeHttpError, isUnauthorized } from '../../../shared/httpError'
+import { decodeHttpError, isUnauthorized, HttpStatus } from '../../../shared/httpError'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -121,7 +121,7 @@ const { run: runSave, pending: saving } = useAsyncAction(
           ? t('mail.invalidTemplate', { vars: TEMPLATE_VARS })
           : code === 'mail_secret_unavailable'
             ? t('mail.kekUnavailable')
-            : status === 403
+            : status === HttpStatus.forbidden
               ? t('mail.notOwner')
               : t('mail.saveFailed')
     },

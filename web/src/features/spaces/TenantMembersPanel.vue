@@ -28,7 +28,7 @@ import { activeSpace, activeScopeKey } from '../../app/activeSpace'
 import { ScopeKind } from '../../api/generated/scopes'
 import { buildInviteLink, copyText } from '../../shared/inviteLink'
 import { unsealName, type MemberName } from '../account/profile/profile'
-import { isUnauthorized, isCodedError } from '../../shared/httpError'
+import { isUnauthorized, isCodedError, HttpStatus } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
 import { useObjectUrl } from '../../shared/state/useObjectUrls'
 import { useToast } from '../../shared/state/useToast'
@@ -112,7 +112,7 @@ async function onIconSave(bytes: Uint8Array) {
     toast.success(t('spaceIcon.saved'))
   } catch (e) {
     on401(e)
-    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, 409, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
+    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, HttpStatus.conflict, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
   } finally {
     iconBusy.value = false
   }
@@ -150,7 +150,7 @@ async function reissue(invite: PendingMemberInvite) {
   } catch (e) {
     on401(e)
     if (!isUnauthorized(e)) {
-      actionError.value = (await isCodedError(e, 429, 'rate_limited')) ? t('members.inviteRateLimited') : t('members.actionFailed')
+      actionError.value = (await isCodedError(e, HttpStatus.tooManyRequests, 'rate_limited')) ? t('members.inviteRateLimited') : t('members.actionFailed')
     }
   }
 }

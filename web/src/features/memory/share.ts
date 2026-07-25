@@ -12,7 +12,7 @@ import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std, b64url, fromB64url } from '../../shared/base64'
 import { sharesApi, publicSharesApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
-import { isHttpStatus } from '../../shared/httpError'
+import { isHttpStatus, HttpStatus } from '../../shared/httpError'
 import { openName, sealName } from './tree'
 import {
   gridRef,
@@ -518,7 +518,7 @@ export async function resolveShare(shareId: string, fragmentKey: string, pwToken
   try {
     share = await publicSharesApi().resolveShare({ shareId, xSharePassword: pwToken }) // cr-0118: the guest token gates it
   } catch (e) {
-    if (isHttpStatus(e, 403)) throw new SharePasswordIncorrectError() // wrong password
+    if (isHttpStatus(e, HttpStatus.forbidden)) throw new SharePasswordIncorrectError() // wrong password
     throw new ShareUnavailableError('not_found') // 404 (revoked/expired/unknown) or a network error
   }
   // cr-0118: a locked share (password required, no/valid-less token) serves only the challenge — prompt the viewer.

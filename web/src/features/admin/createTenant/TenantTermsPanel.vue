@@ -17,7 +17,7 @@ import { useAsyncData, loadErrorKind } from '../../../shared/state/useAsyncData'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
 import { useToast } from '../../../shared/state/useToast'
 import { handle401 } from '../../../shared/handle401'
-import { httpStatus, isUnauthorized } from '../../../shared/httpError'
+import { httpStatus, HttpStatus, isUnauthorized } from '../../../shared/httpError'
 
 const { t, locale } = useI18n()
 const toast = useToast()
@@ -63,7 +63,7 @@ const { run: runSave, pending: saving } = useAsyncAction(
     onError: (e) => {
       on401(e)
       if (isUnauthorized(e)) return
-      actionError.value = httpStatus(e) === 403 ? t('terms.notOwner') : t('terms.saveFailed')
+      actionError.value = httpStatus(e) === HttpStatus.forbidden ? t('terms.notOwner') : t('terms.saveFailed')
     },
   },
 )

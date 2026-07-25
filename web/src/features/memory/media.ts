@@ -13,7 +13,7 @@
 import exifr from 'exifr'
 import * as v1 from '../../shared/crypto/v1'
 import { b64std, fromB64std } from '../../shared/base64'
-import { isHttpStatus } from '../../shared/httpError'
+import { isHttpStatus, HttpStatus } from '../../shared/httpError'
 import { mediaApi } from '../../api/client'
 import { withRefresh } from '../account/login/login'
 import { type MediaSummary, type PresignedUrl, type MediaDerivativeKind } from '../../api/generated/media'
@@ -573,7 +573,7 @@ export async function listMediaPage(
       mediaIds: page.mediaIds ?? null,
     }
   } catch (e) {
-    if (isHttpStatus(e, 304)) return { notModified: true } // idle fast path — nothing changed
+    if (isHttpStatus(e, HttpStatus.notModified)) return { notModified: true } // idle fast path — nothing changed
     throw e
   }
 }
@@ -822,7 +822,7 @@ export function makeChunkProvider(
       try {
         frame = await getChunk(all[index])
       } catch (e) {
-        if (chunkGetStatus(e) !== 403) throw e
+        if (chunkGetStatus(e) !== HttpStatus.forbidden) throw e
         all = await freshUrls(true) // presign expired → re-presign the WHOLE blob, retry the one chunk once
         frame = await getChunk(all[index])
       }

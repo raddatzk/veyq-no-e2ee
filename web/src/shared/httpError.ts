@@ -11,6 +11,23 @@
  * response body is only ever read for its machine-readable `code`; it is never surfaced verbatim.
  */
 
+/**
+ * Named HTTP status codes the client actually branches on — so a status check reads by name instead of a bare
+ * magic number (audit #78 P4b). Only the codes some call site checks live here; add one when a new check needs
+ * it. Response *construction* (e.g. the media service worker returning a `404`) keeps its own literal — this is
+ * for the branching/decoding side, not for building responses.
+ */
+export const HttpStatus = {
+  notModified: 304,
+  unauthorized: 401,
+  forbidden: 403,
+  notFound: 404,
+  conflict: 409,
+  gone: 410,
+  unprocessable: 422,
+  tooManyRequests: 429,
+} as const
+
 /** The `Response` carried by a thrown generated-client error, or `null` for a non-HTTP failure (network, etc.). */
 function responseOf(e: unknown): Response | null {
   const res = (e as { response?: Response } | null)?.response
@@ -32,7 +49,7 @@ export function isHttpStatus(e: unknown, status: number): boolean {
  * component layer performs; `withRefresh` uses it to decide whether to refresh-and-retry.
  */
 export function isUnauthorized(e: unknown): boolean {
-  return httpStatus(e) === 401
+  return httpStatus(e) === HttpStatus.unauthorized
 }
 
 /**

@@ -15,7 +15,7 @@ import { rotateGroupForRemoval, deleteGroup, restoreGroup, scopeLifecycle, wrapG
 import { acceptKeyChange, IdentityChangedError } from '../account/identityPins'
 import { activeSpace, refreshActiveScope } from '../../app/activeSpace'
 import { getMyProfile } from '../account/profile/profile'
-import { isUnauthorized, isCodedError } from '../../shared/httpError'
+import { isUnauthorized, isCodedError, HttpStatus } from '../../shared/httpError'
 import { useMemberDirectory } from './useMemberDirectory'
 import { useObjectUrl } from '../../shared/state/useObjectUrls'
 import { bumpSpaceIcon } from './spaceIconSignal'
@@ -291,7 +291,7 @@ async function onIconSave(bytes: Uint8Array) {
     toast.success(t('spaceIcon.saved'))
   } catch (e) {
     on401(e)
-    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, 409, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
+    if (!isUnauthorized(e)) iconError.value = (await isCodedError(e, HttpStatus.conflict, 'stale_epoch')) ? t('spaceIcon.stale') : t('spaceIcon.failed')
   } finally {
     iconBusy.value = false
   }

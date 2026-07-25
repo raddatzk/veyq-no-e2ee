@@ -18,7 +18,7 @@ import { createFolder, createMemory, createChapter, renameNode, type TreeNode } 
 import type { EpochKeys } from '../../spaces/epochs'
 import { useMapConfig } from '../../../shared/state/useMapConfig'
 import { useAsyncAction } from '../../../shared/state/useAsyncAction'
-import { httpStatus } from '../../../shared/httpError'
+import { httpStatus, HttpStatus } from '../../../shared/httpError'
 
 type Mode = 'create-folder' | 'create-memory' | 'create-chapter' | 'rename'
 
@@ -71,7 +71,7 @@ const { run: runSubmit, pending: loading } = useAsyncAction(
   {
     onError: (e) => {
       const status = httpStatus(e)
-      error.value = status === 409 ? t('memory.slugTaken') : status === 422 ? t('memory.illegalStructure') : t('memory.saveFailed')
+      error.value = status === HttpStatus.conflict ? t('memory.slugTaken') : status === HttpStatus.unprocessable ? t('memory.illegalStructure') : t('memory.saveFailed')
     },
   },
 )

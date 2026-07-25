@@ -5,7 +5,7 @@
 // `loadError` view from `error` — the shape differs (a bool here, the `notAuthorized | failed` enum there, see
 // `loadErrorKind`), so the primitive stays un-opinionated about it.
 import { ref, shallowRef, onMounted, type Ref } from 'vue'
-import { httpStatus } from '../httpError'
+import { httpStatus, HttpStatus } from '../httpError'
 
 export interface AsyncDataOptions {
   /** Run the loader on component mount (default true). Pass false to trigger it yourself via `reload`. */
@@ -54,7 +54,7 @@ export function useAsyncData<T>(
 export function loadErrorKind(e: unknown): 'notAuthorized' | 'failed' | null {
   if (e == null) return null
   const status = httpStatus(e)
-  if (status === 401) return null
-  if (status === 403) return 'notAuthorized'
+  if (status === HttpStatus.unauthorized) return null
+  if (status === HttpStatus.forbidden) return 'notAuthorized'
   return 'failed'
 }

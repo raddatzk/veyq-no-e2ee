@@ -24,7 +24,7 @@ import { account } from '../app/account'
 import { setupApi } from '../api/client'
 import { fromB64std } from '../shared/base64'
 import { hybridPublic } from '../shared/crypto/v1'
-import { isUnauthorized } from '../shared/httpError'
+import { HttpStatus, isUnauthorized } from '../shared/httpError'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -89,7 +89,7 @@ onMounted(async () => {
     phase.value = p.hasAccount ? 'signin' : 'register'
   } catch (e) {
     const { status } = await tenantError(e)
-    phase.value = status === 410 ? 'expired' : 'invalid'
+    phase.value = status === HttpStatus.gone ? 'expired' : 'invalid'
   }
 })
 
@@ -228,8 +228,8 @@ async function reauthAndAccept() {
 
 async function mapError(e: unknown): Promise<string> {
   const { status, code } = await tenantError(e)
-  if (status === 410) return t('tenant.join.expired')
-  if (status === 404) return t('tenant.join.invalid')
+  if (status === HttpStatus.gone) return t('tenant.join.expired')
+  if (status === HttpStatus.notFound) return t('tenant.join.invalid')
   if (code === 'email_taken') return t('tenant.join.emailTaken')
   if (code === 'username_taken') return t('tenant.join.usernameTaken')
   if (code === 'not_invited_owner') return t('tenant.join.wrongOwner')
