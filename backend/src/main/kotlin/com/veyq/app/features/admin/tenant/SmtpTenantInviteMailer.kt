@@ -55,12 +55,15 @@ class SmtpTenantInviteMailer(
 
     override fun sendInvite(domain: String, ownerEmail: String, token: String, expiresAt: Instant): DeliveryResult {
         val s = store.mailSettingsByDomain(domain)
-        // Not sendable ⇒ the unchanged copy-link + dev-file path (ADR 0048 §4). Covers: no settings row, sending
-        // disabled, an incomplete config, no stored password, or the KEK can't open it — `state() != OK` is both
-        // ABSENT (no KEK) and MISMATCH (a changed key ⇒ the stored password can't be unsealed, ADR 0050 amendment).
-        // The fallback reports FALLBACK_COPYLINK.
-        if (s == null || !s.enabled || s.host.isNullOrBlank() || s.passwordCiphertext == null ||
-            keyState.state() != ConfigSecretKeyState.OK
+        // Not sendable ⇒ the unchanged copy-link + dev-file path (ADR 0048 §4). Sendability MIRRORS `deliver`:
+        // SMTP auth is keyed on `username` (an auth-less MTA — e.g. a trusted LAN relay — sends with no login),
+        // so a stored password + an openable KEK are required ONLY when a username is set. Without a username the
+        // KEK is irrelevant (nothing to unseal). Covers: no settings row, sending disabled, no host — plus, for an
+        // authenticating host, a missing password or a KEK that can't open it (`state() != OK` = ABSENT (no KEK)
+        // or MISMATCH (a changed key ⇒ the stored password can't be unsealed, ADR 0050 amendment)). The fallback
+        // reports FALLBACK_COPYLINK.
+        if (s == null || !s.enabled || s.host.isNullOrBlank() ||
+            (!s.username.isNullOrBlank() && (s.passwordCiphertext == null || keyState.state() != ConfigSecretKeyState.OK))
         ) {
             return fallback.sendInvite(domain, ownerEmail, token, expiresAt)
         }

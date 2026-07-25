@@ -94,6 +94,39 @@ class SmtpInviteMailSendTest {
     }
 
     @Test
+    fun anAuthlessHostSendsWithNoLoginEvenWithoutAPassword() {
+        // A legit auth-less MTA (e.g. a trusted LAN relay): enabled + host, but NO username ⇒ no SMTP login, so no
+        // password (and no KEK) is needed. The send-gate keys auth on `username` like `deliver` does, so this must
+        // SEND — it must NOT wrongly fall back to the copy-link just because `passwordCiphertext` is null.
+        val greenMail = GreenMail(ServerSetup(AUTHLESS_SMTP_PORT, "127.0.0.1", "smtp")) // no setUser ⇒ accepts anonymously
+        greenMail.start()
+        try {
+            val domain = "authless.example.com"
+            seedTenant(domain)
+            QuarkusTransaction.requiringNew().run {
+                store.saveMailSettings(
+                    tenantIdByDomain(domain),
+                    MailSettingsRow(
+                        host = "127.0.0.1", port = AUTHLESS_SMTP_PORT, from = "noreply@$domain",
+                        username = null, passwordCiphertext = null, passwordNonce = null,
+                        tls = false, enabled = true, subjectTemplate = "Invite to {{domain}}",
+                        bodyTemplate = "Accept {{link}} before {{expiry}}.",
+                    ),
+                )
+            }
+
+            val delivery = mailer.sendInvite(domain, "invitee@elsewhere.example", "TOKEN-authless", Instant.parse("2026-07-31T12:00:00Z"))
+
+            assertEquals(DeliveryResult.SENT, delivery, "an auth-less host (no username/password) still sends — no copy-link fallback")
+            assertTrue(greenMail.waitForIncomingEmail(5_000, 1), "the invite mail should be delivered over the anonymous MTA")
+            assertEquals(1, greenMail.receivedMessages.size)
+            assertEquals("noreply@authless.example.com", greenMail.receivedMessages[0].from[0].toString())
+        } finally {
+            greenMail.stop()
+        }
+    }
+
+    @Test
     fun aConfiguredTenantWhoseSmtpIsUnreachableReportsFailed() {
         // A tenant with enabled + fully-configured SMTP, but nothing is listening on the configured port. The send
         // errors (connection refused) and must surface as FAILED — no longer silently swallowed. The owner still
@@ -170,5 +203,6 @@ class SmtpInviteMailSendTest {
         const val SMTP_PORT_2 = 13926
         const val DEAD_SMTP_PORT = 13927 // nothing ever binds this — the send must fail fast (connection refused)
         const val MISMATCH_SMTP_PORT = 13928 // a live server that must NOT receive anything (the MISMATCH gate falls back first)
+        const val AUTHLESS_SMTP_PORT = 13929 // an anonymous (no-AUTH) MTA — an auth-less host must still send here
     }
 }

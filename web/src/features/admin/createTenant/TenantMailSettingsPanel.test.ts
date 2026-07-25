@@ -157,4 +157,23 @@ describe('TenantMailSettingsPanel (uc.admin.tenant-mail-settings, web)', () => {
     expect(wrapper.text()).not.toContain(i18n.global.t('mail.missingEnabled')) // enabled IS on
     expect(wrapper.text()).not.toContain(i18n.global.t('mail.sendReady'))
   })
+
+  it('shows an auth-less host (no username, no password) as send-ready and never demands a password', async () => {
+    // A legit auth-less MTA: enabled + host but NO username ⇒ the backend sends with no login (SmtpTenantInviteMailer
+    // keys auth on `username`), so the panel must mirror that — send-ready, and a password is NOT listed as missing.
+    vi.mocked(getTenantMailSettings).mockResolvedValue({ ...READY_VIEW, username: null, passwordSet: false } as never)
+    const wrapper = await mountPanel()
+    expect(wrapper.text()).toContain(i18n.global.t('mail.sendReady'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('mail.missingPassword'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('mail.notSendReady'))
+  })
+
+  it('does not let an ABSENT KEK block an auth-less host — the KEK is irrelevant with no password to unseal', async () => {
+    // No username ⇒ nothing is ever unsealed, so the config-secret KEK state must not dominate the readiness view
+    // (else the panel would show "KEK unavailable" while the backend happily sends). Send-ready, no KEK banner.
+    vi.mocked(getTenantMailSettings).mockResolvedValue({ ...READY_VIEW, username: null, passwordSet: false, configSecretState: 'ABSENT' } as never)
+    const wrapper = await mountPanel()
+    expect(wrapper.text()).toContain(i18n.global.t('mail.sendReady'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('mail.kekUnavailable'))
+  })
 })

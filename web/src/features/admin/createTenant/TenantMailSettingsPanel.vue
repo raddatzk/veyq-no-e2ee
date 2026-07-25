@@ -72,22 +72,29 @@ const { pending: loading, error: loadErr } = useAsyncData(async () => {
 // loaded (the caller is the owner — the read is owner-gated) or a 401 the redirect already handles.
 const loadError = computed(() => loadErrorKind(loadErr.value))
 
-// Whether the saved-or-about-to-be-saved config can actually send. The backend send-gate is
-// `enabled ∧ host ∧ password-ciphertext ∧ KEK` (SmtpTenantInviteMailer); `passwordSet: true` already implies the
-// KEK was present at seal time (without it the seal 503s and nothing is stored), so this is honest client-side.
-// A freshly typed (unsaved) password counts — it will be stored on save (the KEK reality surfaces as the 503 below).
+// Whether the saved-or-about-to-be-saved config can actually send. Mirrors the backend send-gate
+// (SmtpTenantInviteMailer): SMTP auth is keyed on `username`, so an auth-less host (no username — e.g. a trusted
+// LAN relay) sends with NO login, and a password + an openable KEK are required ONLY when a username is set.
+const needsAuth = computed(() => username.value.trim().length > 0)
+// A stored `passwordSet: true` already implies the KEK was present at seal time (without it the seal 503s and
+// nothing is stored). A freshly typed (unsaved) password counts — it stores on save (the KEK reality surfaces as
+// the 503 below).
 const hasPassword = computed(() => passwordSet.value || password.value.trim().length > 0)
-// ...and the KEK must actually be able to open the stored password: `configSecretState === 'OK'` (ADR 0050
-// amendment). ABSENT/MISMATCH ⇒ not send-ready, surfaced by their own banners rather than the missing-list.
+// Auth-less ⇒ send-ready on `enabled ∧ host` alone. Authenticating ⇒ also needs a password AND a KEK that can open
+// it (`configSecretState === 'OK'`, ADR 0050 amendment); ABSENT/MISMATCH there ⇒ not send-ready (their own banners).
 const sendReady = computed(
-  () => enabled.value && host.value.trim().length > 0 && hasPassword.value && configSecretState.value === 'OK',
+  () =>
+    enabled.value &&
+    host.value.trim().length > 0 &&
+    (!needsAuth.value || (hasPassword.value && configSecretState.value === 'OK')),
 )
-// What still blocks sending, in order — so an owner who only ticked `enabled` sees why no real mail goes out.
+// What still blocks sending, in order — so an owner who only ticked `enabled` sees why no real mail goes out. A
+// password only blocks an AUTHENTICATING host (one with a username); an auth-less host never lists it.
 const missing = computed(() => {
   const m: string[] = []
   if (!enabled.value) m.push(t('mail.missingEnabled'))
   if (!host.value.trim()) m.push(t('mail.missingHost'))
-  if (!hasPassword.value) m.push(t('mail.missingPassword'))
+  if (needsAuth.value && !hasPassword.value) m.push(t('mail.missingPassword'))
   return m
 })
 
@@ -151,10 +158,12 @@ async function save() {
       <template v-else>
         <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
 
-        <!-- Config-secret KEK state (ADR 0050 amendment) dominates the readiness view when not OK: a changed key
-             (MISMATCH) or an absent one means the stored password can't be used, whatever the other fields say. -->
-        <Message v-if="configSecretState === 'MISMATCH'" severity="error" :closable="false" class="mail-readiness">{{ t('mail.keyMismatch') }}</Message>
-        <Message v-else-if="configSecretState === 'ABSENT'" severity="warn" :closable="false" class="mail-readiness">{{ t('mail.kekUnavailable') }}</Message>
+        <!-- Config-secret KEK state (ADR 0050 amendment) dominates the readiness view when not OK — but ONLY for an
+             AUTHENTICATING host: a changed key (MISMATCH) or an absent one means the stored password can't be used.
+             An auth-less host (no username) has no password to unseal, so the KEK is irrelevant and it falls through
+             to the send-readiness view below (mirrors the backend gate, which keys auth on `username`). -->
+        <Message v-if="needsAuth && configSecretState === 'MISMATCH'" severity="error" :closable="false" class="mail-readiness">{{ t('mail.keyMismatch') }}</Message>
+        <Message v-else-if="needsAuth && configSecretState === 'ABSENT'" severity="warn" :closable="false" class="mail-readiness">{{ t('mail.kekUnavailable') }}</Message>
         <template v-else>
           <!-- Send-readiness (the brief's point 2): `enabled` alone doesn't send — make what's still missing visible. -->
           <Message v-if="sendReady" severity="success" :closable="false" class="mail-readiness">{{ t('mail.sendReady') }}</Message>
