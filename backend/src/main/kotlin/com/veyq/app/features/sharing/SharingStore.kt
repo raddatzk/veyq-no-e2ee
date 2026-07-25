@@ -239,8 +239,8 @@ class SharingStore(
         val media = MediaEntity.find("scopeId = ?1 and nodeId in ?2 and deletedAt is null", scopeId, subtreeIds).list().mapNotNull { m ->
             val blob = BlobEntity.findById(m.blobId) ?: return@mapNotNull null
             val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
-                val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
-                ShareDerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, decodeManifest(db.manifest), db.wrappedBlobKey)
+                val derivBlob = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
+                ShareDerivativeRow(d.kind, derivBlob.id, derivBlob.chunkCount, derivBlob.byteSize, decodeManifest(derivBlob.manifest), derivBlob.wrappedBlobKey)
             }
             ShareMediaRow(m.nodeId, m.id, blob.id, blob.chunkCount, blob.byteSize, decodeManifest(blob.manifest), blob.wrappedBlobKey, derivatives, m.wrappedMeta, m.shareIdentityId)
         }

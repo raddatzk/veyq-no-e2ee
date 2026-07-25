@@ -293,8 +293,8 @@ class MediaStore(private val membership: MembershipStore) {
     private fun toRow(m: MediaEntity): MediaRow? {
         val blob = BlobEntity.findById(m.blobId) ?: return null
         val derivatives = MediaDerivativeEntity.find("mediaId = ?1", m.id).list().mapNotNull { d ->
-            val db = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
-            DerivativeRow(d.kind, db.id, db.chunkCount, db.byteSize, db.wrappedBlobKey, decodeManifest(db.manifest))
+            val derivBlob = BlobEntity.findById(d.blobId) ?: return@mapNotNull null
+            DerivativeRow(d.kind, derivBlob.id, derivBlob.chunkCount, derivBlob.byteSize, derivBlob.wrappedBlobKey, decodeManifest(derivBlob.manifest))
         }
         return MediaRow(
             m.id, blob.id, blob.chunkCount, blob.byteSize, blob.wrappedBlobKey, decodeManifest(blob.manifest),
