@@ -197,6 +197,48 @@ failed this rule:
 **Nothing enters the coverage model before a CI run executes it.** The claim follows the build, never the
 intention — and "the test exists" is an intention.
 
+## The verification layer — a map, not a copy
+
+The pipeline above is what we *do*; this is what **checks** it. Every item has exactly one canonical home and
+this section only points at it (rule 2) — assembling this picture by hand each session was the cost
+[ADR 0046](../decisions/0046-operative-lore-in-skills-and-agents.md) was written against.
+
+- **The guards** — `scripts/`. **The glob is the registry:** CI loops over `scripts/validate_*.py`, so a new
+  guard runs the moment it lands, with nothing to register — which is why no list of them exists here or
+  anywhere else. **`scripts/` is the list**; each module docstring owns what that guard asserts, the defect
+  that bought it, and its stated limit. Run the chain locally exactly as CI does:
+  `for f in scripts/validate_*.py; do python3 "$f"; done`.
+- **Three CI runs, three triggers.** [`trust-chain.yml`](../../.github/workflows/trust-chain.yml) —
+  deliberately unfiltered and buildless, the whole guard glob; a docs-only change is validated **there and
+  nowhere else**, because [`ci.yml`](../../.github/workflows/ci.yml) `paths-ignore`s `docs/**`.
+  [`mutation.yml`](../../.github/workflows/mutation.yml) /
+  [`mutation-backend.yml`](../../.github/workflows/mutation-backend.yml) are path-gated onto their scope files.
+- **What green proves — and where it stops.** A reference **resolves**; not that what it points at carries
+  weight. Those limits are **executable, not prose**:
+  [`validate_guard_gaps.py`](../../scripts/validate_guard_gaps.py) injects each documented gap into a
+  throwaway tree and asserts the guard's documented verdict, so *closing* a gap turns that guard red instead
+  of landing silently. The synthesis and the **four principled edges** (oracle / timing / cross-feature /
+  scope-completeness — limits, not a backlog) live in the
+  [`trust-chain` skill](../../.claude/skills/trust-chain/SKILL.md).
+- **Assertion strength** is the one edge no resolvability guard can reach — a test that asserts nothing still
+  resolves. [ADR 0045](../decisions/0045-mutation-testing-trust-chain-unit-layer.md) closes it on the **unit
+  layer only**, via mutation score (Stryker on `web`, PIT on `backend`), scoped by the two manifests
+  [`web/stryker.mutate.json`](../../web/stryker.mutate.json) +
+  [`backend/pitest.scope.json`](../../backend/pitest.scope.json) and self-checked by
+  `scripts/mutation_meta_check*.py` — which sit **outside** the `validate_*` glob on purpose (they need a
+  built report).
+- **The skills layer** — [ADR 0046](../decisions/0046-operative-lore-in-skills-and-agents.md): conditional
+  lore loads **on a trigger** from `.claude/skills/` rather than taxing every turn from CLAUDE.md, and it
+  **points instead of restating** — with `validate_skill_links.py` keeping those pointers honest. It also
+  records why there are **no** `.claude/agents/` role files: *a subagent is a child of a session, but the
+  clean-room refine/implement split is a top-level-session property*, so a write-boundary on a `refine`
+  subagent would be a false guarantee. § Session topology above is what actually enforces it.
+- **Claim-provenance** — every claim in a report, CR or handoff is marked **measured** (naming the command
+  that proves it) or **remembered**. Carried by the
+  [`trust-chain` skill](../../.claude/skills/trust-chain/SKILL.md); rationale in
+  [ADR 0046](../decisions/0046-operative-lore-in-skills-and-agents.md) § 4. It is § the pipeline's
+  *"measured, not recalled"* applied to prose.
+
 ## Working rules
 
 - **Sparring partner, not yes-man.** Critically question proposals — the user's and my own — surface

@@ -35,7 +35,7 @@ Four invariants:
    tenant lifecycle to satisfy a grep — the same failure mode invariant 2's signpost carve-out exists to avoid.
    So this keys on `ACTIVE` sitting **adjacent** to a membership word, with only whitespace/emphasis between.
 
-   **Line-scope is a proxy for clause-scope** (as in `validate_webfirst_authority.py`, for its own case). The
+   **Line-scope is a proxy for clause-scope.** The
    line this was written for carried both a phantom and a legitimate state at once —
    `owner = ACTIVE tenant-owner; tenant = ACTIVE` (`uc.admin.create-tenant.md`, a diagram step) — so a line
    cannot be judged as a whole. Two costs, both real and accepted: a phantom phrased without any of these words
