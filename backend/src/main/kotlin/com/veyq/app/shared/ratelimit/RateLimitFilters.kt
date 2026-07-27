@@ -41,7 +41,7 @@ private val rateLimitConfig: VeyqConfig.RateLimit
     get() = (ConfigProvider.getConfig() as SmallRyeConfig).getConfigMapping(VeyqConfig::class.java).ratelimit()
 
 /**
- * Enforces `@RateLimit(key = IP)`: a best-effort, per-client-IP fixed window over the **public** surface —
+ * Enforces `@RateLimit(key = IP)`: a best-effort, per-client-IP token bucket over the **public** surface —
  * defense-in-depth against brute-force, challenge-spam and cheap DoS. Ed25519 makes login forgery infeasible, so
  * the real value is bounding DoS, challenge-row churn, and the rate of any offline-grind enabling traffic.
  *
@@ -55,9 +55,9 @@ private val rateLimitConfig: VeyqConfig.RateLimit
  * (default 60) per client IP; set the max very high to effectively disable (the `%test` profile does this so the
  * slice tests, all from 127.0.0.1, don't trip it).
  *
- * **All `key = IP` endpoints share one window per IP.** That is a deliberate property, not an oversight: it bounds
+ * **All `key = IP` endpoints share one bucket per IP.** That is a deliberate property, not an oversight: it bounds
  * an attacker's total public-surface spend rather than handing them a fresh budget per route. It is also why the
- * tenant-invite mint does *not* use this key — an authenticated owner would be counted against the same window as
+ * tenant-invite mint does *not* use this key — an authenticated owner would be counted against the same bucket as
  * anonymous login traffic, so its bound is the per-(tenant,recipient) [RateLimitKey.RECIPIENT] marker instead.
  */
 @Provider
@@ -71,7 +71,7 @@ class IpRateLimitFilter : ContainerRequestFilter {
     @Context
     private lateinit var resourceInfo: ResourceInfo
 
-    private val counter = FixedWindowCounter()
+    private val counter = TokenBucketCounter()
 
     override fun filter(ctx: ContainerRequestContext) {
         RateLimitPosture.enforcedKey(resourceInfo.resourceClass, resourceInfo.resourceMethod, RateLimitKey.IP)
@@ -81,7 +81,7 @@ class IpRateLimitFilter : ContainerRequestFilter {
         val auth = rateLimitConfig.auth()
         val retryAfter = counter.consume(
             key = ip,
-            nowSec = System.currentTimeMillis() / 1000,
+            nowNanos = System.nanoTime(),
             maxRequests = auth.maxRequests(),
             windowSeconds = auth.windowSeconds(),
         )
@@ -90,7 +90,7 @@ class IpRateLimitFilter : ContainerRequestFilter {
 }
 
 /**
- * Enforces `@RateLimit(key = USER)`: a per-principal fixed window on an authenticated endpoint, where the caller's
+ * Enforces `@RateLimit(key = USER)`: a per-principal token bucket on an authenticated endpoint, where the caller's
  * identity — not their address — is the axis worth counting. Attributable and revocable by construction, so the
  * default is generous: it bounds runaway automation, it is not an anti-abuse measure.
  *
@@ -111,7 +111,7 @@ class UserRateLimitFilter : ContainerRequestFilter {
     @Context
     private lateinit var resourceInfo: ResourceInfo
 
-    private val counter = FixedWindowCounter()
+    private val counter = TokenBucketCounter()
 
     override fun filter(ctx: ContainerRequestContext) {
         RateLimitPosture.enforcedKey(resourceInfo.resourceClass, resourceInfo.resourceMethod, RateLimitKey.USER)
@@ -121,7 +121,7 @@ class UserRateLimitFilter : ContainerRequestFilter {
         val user = rateLimitConfig.user()
         val retryAfter = counter.consume(
             key = principal,
-            nowSec = System.currentTimeMillis() / 1000,
+            nowNanos = System.nanoTime(),
             maxRequests = user.maxRequests(),
             windowSeconds = user.windowSeconds(),
         )

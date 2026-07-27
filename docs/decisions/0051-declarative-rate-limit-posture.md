@@ -40,8 +40,10 @@ is **rate-limited** has no such statement. The forces:
   `@Authenticated` is placed today; a method-level annotation wins.
 - **The annotation carries the key axis only — never the numbers.** Limit values stay in `VeyqConfig`
   (`veyq.ratelimit.*`, `veyq.share.*.rate.*`), tunable per instance ([invariant] self-hostable). This
-  indirection is also what lets the limiter *core* change later (a fixed-window → token-bucket consolidation is
-  a separate enabler) without touching a single annotation.
+  indirection is what lets the limiter *core* change without touching a single annotation — and it has since
+  been collected on: the fixed window → token-bucket swap ([ADR 0052](0052-token-bucket-rate-limit-core.md))
+  replaced every bound's algorithm with `grep -rn "@RateLimit(key" backend/src/main` byte-identical before and
+  after.
 - **Enforcement and declaration are not the same thing, and the split is by key.**
   - `IP` and `USER` are **runtime-enforced** by a generalized boundary filter. `IP` keys on the remote address
     pre-auth; `USER` keys on the resolved `SecurityIdentity` principal.
@@ -88,9 +90,10 @@ the sweep runs in `./gradlew check`, not in the buildless
 - **The fail-open default is gone.** A new endpoint that says nothing about throttling fails the build, the way
   one that says nothing about auth already fails the request. Absence of a limiter now carries information: it
   means someone wrote a reason.
-- **The un-throttled public surface becomes visible, and closing it is real work** — new limiters (reusing the
-  mutation-verified `RateLimitWindow`, [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md), never a
-  re-implemented window) with conservative values, or an honest exemption. The risk runs both ways: a limit set
+- **The un-throttled public surface becomes visible, and closing it is real work** — new limiters (on the
+  mutation-verified `TokenBucket` core, [ADR 0052](0052-token-bucket-rate-limit-core.md) +
+  [ADR 0045](0045-mutation-testing-trust-chain-unit-layer.md), never a re-implemented one — a rule
+  `scripts/validate_ratelimit_core.py` now enforces) with conservative values, or an honest exemption. The risk runs both ways: a limit set
   too tight locks out a legitimate bulk contributor, which is why the values are config and the defaults are
   deliberately loose.
 - **Operator-blind is untouched.** Every limiter key — IP, `userId`, `shareId`, recipient address (already

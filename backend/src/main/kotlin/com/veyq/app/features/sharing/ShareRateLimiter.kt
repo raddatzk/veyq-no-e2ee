@@ -1,9 +1,8 @@
 package com.veyq.app.features.sharing
 
 import com.veyq.app.shared.config.VeyqConfig
-import com.veyq.app.shared.ratelimit.FixedWindowCounter
+import com.veyq.app.shared.ratelimit.TokenBucketCounter
 import jakarta.enterprise.context.ApplicationScoped
-import java.time.Instant
 
 /**
  * The per-share bounds on the **anonymous contributor write path** (cr-0101, ADR 0030) — the handler-side
@@ -30,23 +29,23 @@ class ShareRateLimiter(
     private val uploadRate = config.share().upload().rate()
     private val identityRate = config.share().identity().rate()
 
-    private val uploads = FixedWindowCounter()
-    private val identities = FixedWindowCounter()
+    private val uploads = TokenBucketCounter()
+    private val identities = TokenBucketCounter()
 
-    /** Consume one upload slot for [shareId]; false when the current window's cap is exceeded. */
+    /** Spend one upload token for [shareId]; false once the budget is exhausted. */
     fun allowUpload(shareId: String): Boolean =
         uploads.consume(
             key = shareId,
-            nowSec = Instant.now().epochSecond,
+            nowNanos = System.nanoTime(),
             maxRequests = uploadRate.maxPerWindow().toLong(),
             windowSeconds = uploadRate.windowSeconds(),
         ) == null
 
-    /** Consume one identity-creation slot for [shareId]; false when the current window's cap is exceeded. */
+    /** Spend one identity-creation token for [shareId]; false once the budget is exhausted. */
     fun allowIdentity(shareId: String): Boolean =
         identities.consume(
             key = shareId,
-            nowSec = Instant.now().epochSecond,
+            nowNanos = System.nanoTime(),
             maxRequests = identityRate.maxPerWindow().toLong(),
             windowSeconds = identityRate.windowSeconds(),
         ) == null

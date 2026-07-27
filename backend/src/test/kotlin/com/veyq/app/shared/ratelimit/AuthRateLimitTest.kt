@@ -18,8 +18,9 @@ import org.junit.jupiter.api.Test
  * Runs under a profile that drops the limit to 3/window and turns on proxy-address-forwarding so each test can
  * present its **own** synthetic client IP via `X-Forwarded-For`. That gives every method an isolated bucket —
  * the tests are order-independent (they don't share the 127.0.0.1 counter) and the per-IP property is testable
- * directly. The window here is long (60s) so the count never resets mid-test; window **reset** is its own,
- * short-window sibling ([AuthRateLimitWindowResetTest]). None of these endpoints need a seeded user: the
+ * directly. The window here is long (60s), so at 3 per 60s a token takes 20s to accrue and no refill lands
+ * mid-test; the **refill** is its own short-window sibling ([AuthRateLimitRefillTest]). None of these endpoints
+ * need a seeded user: the
  * limiter is an AUTHENTICATION-priority request filter that runs *before* the handler, so a 429 fires on the
  * (N+1)th call regardless of whether the request body would otherwise 200/400/401.
  */

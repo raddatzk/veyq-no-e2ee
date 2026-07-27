@@ -1,11 +1,9 @@
 package com.veyq.app.features.admin.tenant
 
 import com.veyq.app.shared.config.VeyqConfig
-import com.veyq.app.shared.ratelimit.RateLimitWindow
+import com.veyq.app.shared.ratelimit.TokenBucketCounter
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The member-invite mail limiter (cr-email-invite-send-hardening) — the **real** anti-bombing guard.
@@ -17,10 +15,13 @@ import java.util.concurrent.ConcurrentHashMap
  * **after** the authorization guards pass and **before** the mint, so a limited request creates no orphan invite
  * and only authorized owners consume a slot.
  *
- * Two fixed windows over the pure, mutation-verified [RateLimitWindow] arithmetic (ADR 0045 §2) — unlike
- * `ShareRateLimiter`, which reimplements the window inline; this reuses the tested core:
+ * Two buckets on the shared [TokenBucketCounter] (ADR 0052, over the mutation-verified core of ADR 0045 §2) —
+ * two axes, one core, no arithmetic of its own:
  *  - **per (tenantId, recipient)** — the tighter, primary guard against bombing one address;
  *  - **per tenantId** — the volume cap against an owner-as-sender.
+ *
+ * The bucket's gradual refill is an **improvement** on this axis specifically (ADR 0052 § Consequences): 3 mails
+ * per hour per recipient stops arriving as a burst of 3 and becomes one per 20 minutes.
  *
  * In-memory + per-instance — defense-in-depth, not a distributed quota (a gateway bucket is the production answer,
  * as for the auth limiter). Operator-blind is untouched: the state is ephemeral and the recipient address it keys
@@ -41,37 +42,22 @@ class InviteMailRateLimiter(
         config.ratelimit().invite().windowSeconds(),
     )
 
-    private data class Slot(val windowStart: Long, val count: Int)
-
-    private val recipientWindows = ConcurrentHashMap<String, Slot>()
-    private val tenantWindows = ConcurrentHashMap<String, Slot>()
+    private val recipientBuckets = TokenBucketCounter()
+    private val tenantBuckets = TokenBucketCounter()
 
     /**
-     * Consume one invite-send slot for [tenantId] → [recipientEmail]. Returns `null` when allowed, or the
-     * `Retry-After` seconds when a window's cap is exceeded. The recipient (tighter) window is checked first, so a
+     * Spend one invite-send token for [tenantId] → [recipientEmail]. Returns `null` when allowed, or the
+     * `Retry-After` seconds when a budget is exhausted. The recipient (tighter) bucket is charged first, so a
      * rejected recipient does not consume the tenant budget; if the recipient passes but the tenant cap trips, the
-     * recipient slot was already consumed — a deliberate, slightly-conservative over-count (fails safe).
+     * recipient token was already spent — a deliberate, slightly-conservative over-count (fails safe).
      */
     fun check(tenantId: String, recipientEmail: String): Long? {
-        val nowSec = Instant.now().epochSecond
+        val nowNanos = System.nanoTime()
         // Key on the same lowercase normalization the mint uses (idempotent — callers already normalize).
         // NUL joins the two key parts unambiguously — it cannot occur in a UUID tenantId or an email.
         val recipientKey = "$tenantId\u0000${recipientEmail.lowercase()}"
-        consume(recipientWindows, recipientKey, perRecipientMax, nowSec)?.let { return it }
-        return consume(tenantWindows, tenantId, perTenantMax, nowSec)
-    }
-
-    /** Increment [key]'s current fixed window and return the `Retry-After` seconds iff it is now over [max]. */
-    private fun consume(windows: ConcurrentHashMap<String, Slot>, key: String, max: Int, nowSec: Long): Long? {
-        val ws = RateLimitWindow.windowStart(nowSec, windowSeconds)
-        val slot = windows.compute(key) { _, cur ->
-            if (cur == null || RateLimitWindow.hasElapsed(nowSec, cur.windowStart, windowSeconds)) Slot(ws, 1)
-            else cur.copy(count = cur.count + 1)
-        }!!
-        return if (RateLimitWindow.isOverLimit(slot.count.toLong(), max.toLong())) {
-            RateLimitWindow.retryAfter(nowSec, windowSeconds)
-        } else {
-            null
-        }
+        recipientBuckets.consume(recipientKey, nowNanos, perRecipientMax.toLong(), windowSeconds)
+            ?.let { return it }
+        return tenantBuckets.consume(tenantId, nowNanos, perTenantMax.toLong(), windowSeconds)
     }
 }

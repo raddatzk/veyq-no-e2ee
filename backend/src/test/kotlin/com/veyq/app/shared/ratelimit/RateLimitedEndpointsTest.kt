@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
 /**
  * Pins that the public (`@PermitAll`) account-creation endpoints declare `@RateLimit(key = IP)` (cr-0130, folded
  * onto the ADR 0051 vocabulary). The limiter is name-bound, so a silently dropped annotation would un-limit an
- * unauthenticated write with no other signal. The filter *mechanism* (per-IP fixed window, 429) is covered by
- * `AuthRateLimitTest` / `AuthRateLimitWindowResetTest`; this test guards the wiring.
+ * unauthenticated write with no other signal. The filter *mechanism* (per-IP token bucket, 429) is covered by
+ * `AuthRateLimitTest` / `AuthRateLimitRefillTest`; this test guards the wiring.
  *
  * It is a **spot-check on three endpoints** — the universal *every endpoint declares a posture* sweep is
  * `RateLimitPostureSweepTest`. The two are not redundant: the sweep proves a posture exists, this proves these

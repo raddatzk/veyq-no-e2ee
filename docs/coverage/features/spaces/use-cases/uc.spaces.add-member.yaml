@@ -51,8 +51,8 @@ acceptanceCriteria:
     # cr-email-invite-send-hardening: the anti-bombing guard. A dedicated handler-level limiter keyed
     # per-(tenant,recipient) [the primary guard] AND per-tenant [the volume cap], enforced after the authorization
     # guards and before the mint, so a limited request creates no orphan invite. Over-limit → 429 + Retry-After.
-    # Built on the pure, mutation-verified RateLimitWindow (not the per-IP AuthRateLimitFilter, which cannot key on
-    # a recipient). Defaults (3/recipient, 20/tenant, per hour) are deliberately set, not calibrated — revidierbar.
+    # Built on the pure, mutation-verified TokenBucket core (not the per-IP IpRateLimitFilter, which cannot key on
+    # a recipient); its gradual refill turns 3/hour from a burst of 3 into one per 20 minutes (ADR 0052). Defaults (3/recipient, 20/tenant, per hour) are deliberately set, not calibrated — revidierbar.
     text: Member-invite sends are rate-limited per-(tenant,recipient) and per-tenant to bound email-bombing of one address (the reissue-loop vector); over the limit the request is refused with 429 + Retry-After before any invite is minted, and the web surfaces a "try again later" message.
     coverage:
       backend:

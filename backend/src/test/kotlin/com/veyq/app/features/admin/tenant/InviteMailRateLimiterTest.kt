@@ -7,8 +7,9 @@ import org.junit.jupiter.api.Test
 
 /**
  * Bite tests for the member-invite anti-bombing limiter (cr-email-invite-send-hardening). Pure — no Quarkus boot;
- * the value constructor lets us pin tight limits and cross the boundary deterministically. The pure fixed-window
- * arithmetic itself is mutation-verified in `RateLimitWindowTest`; this asserts the two-key wiring on top of it.
+ * the value constructor lets us pin tight limits and cross the boundary deterministically. The pure token-bucket
+ * arithmetic itself is mutation-verified in `TokenBucketTest` (ADR 0052); this asserts the two-axis wiring on top
+ * of it.
  */
 class InviteMailRateLimiterTest {
 

@@ -36,7 +36,7 @@ acceptanceCriteria:
     # reports a first-class delivery result (SENT / FALLBACK_COPYLINK / FAILED, sent after the tx commits, never
     # persisted → operator-blind untouched), and it is rate-limited per-(tenant,recipient) + per-tenant — re-issue
     # is the SHARPEST bombing vector (repeated fresh links to one address), so over the limit is 429 + Retry-After
-    # before any fresh mint. The limiter core is the shared, mutation-verified RateLimitWindow (unit-tested in
+    # before any fresh mint. The limiter core is the shared, mutation-verified TokenBucket (unit-tested in
     # InviteMailRateLimiterTest, listed under uc.spaces.add-member's member-invite-rate-limited).
     text: A re-issue reports its delivery result inline (SENT / FALLBACK_COPYLINK / FAILED) and is rate-limited per-(tenant,recipient) + per-tenant; over the limit it is refused with 429 + Retry-After before any fresh secret is minted, and the web surfaces the sent/copy-link/failed states and the throttle message.
     coverage:

@@ -105,6 +105,17 @@ layer.**
    meta-check** asserts *mutants > 0 over the intended glob* only when that glob has changed files — a run that
    mutates nothing and reports 100% is itself a claim nothing backs.
 
+   **A change that moves the mutate scope runs the gate; reading the manifest does not settle it.** The threshold
+   is an **aggregate over the whole scope**, so a weak new member passes on its siblings' backs: when the
+   rate-limit core was re-scoped ([ADR 0052](0052-token-bucket-rate-limit-core.md)) every structural check was
+   green — the glob matches, the class exists, both workflow `paths:` blocks point at real files — and the run
+   scored 56/58 = 97% against a threshold of 95 while the newly-scoped class **alone** was 23/25 = 92%, with
+   *both* survivors in it. The two mutants were invisible for a reason that generalizes: a boundary is pinned only
+   by a case where its two sides differ — `capacity - tokens` equals `capacity + tokens` from an *empty* bucket,
+   and saturating vs. not-saturating leave identical state when the elapsed time divides *exactly*. The gate costs
+   ~20 s incremental, which is less than the claim it replaces. Whether the aggregate should gain a per-glob score
+   floor is open (inbox #116); that a scope move must be *run* is not.
+
 This extends [ADR 0040](0040-coverage-gaps-and-http-not-a-surface.md): that decision fixed *a ref counts only
 when CI runs it*; this one adds *a test that runs proves only as much as its assertions pin* — the next link.
 

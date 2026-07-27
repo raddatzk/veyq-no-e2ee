@@ -20,8 +20,8 @@ The coupling is the point: if someone tightens a validator to close a gap, the d
 happens the fix is *not* to relax this guard blindly: confirm the gap really closed, then move the skill's map
 and this table together.
 
-Scope — eight file-based cases: four the guard must **reject** (a closed hole, pinned so it can't silently
-re-open) and four still-**open** gaps (the limit is documented, not yet closed). Two further documented gaps
+Scope — nine file-based cases: four the guard must **reject** (a closed hole, pinned so it can't silently
+re-open) and five still-**open** gaps (the limit is documented, not yet closed). Two further documented gaps
 stay out on purpose (below).
 
 Rejected — regression-pins for closed holes (a forgery the guard must now catch):
@@ -48,6 +48,11 @@ Open gaps — a forgery the guard still passes (a documented limit, not a defect
      catching it needs the field→column map the guard deliberately does not carry (a manifest that rots); the
      one real free-text-on-`TEXT` column was instead *widened to MEDIUMTEXT* in #94, closing that instance by
      construction. The gap is the class, not that column.
+  9  rate-limit state in a limiter named neither `*Limiter*` nor `*Counter*` passes `validate_ratelimit_core`,
+     which matches on the **filename** (ADR 0052). **Left open on purpose** — the reach of a buildless grep *is*
+     the naming convention, and no grep can enforce a name that has not been written yet; closing it needs the
+     reflection sweep the posture guard already pays for, which would leave this glob entirely. Pinned so the
+     limit stated in that guard's docstring is executable rather than a sentence.
 Out of reach by construction, not deferred work: the mutation **total-vs-per-glob** asymmetry (needs a report
 fixture + git, so it belongs to a mutation-job-local test, not this buildless glob) and the **rate-limit posture
 sweep** (ADR 0051). The sweep is a JVM test — it enumerates JAX-RS endpoints by reflection over compiled classes
@@ -180,6 +185,24 @@ def forge_freetext_cap_over_column(root: pathlib.Path) -> str:
     return f"free-text cap {old} → {new} (guard reasons only about base64 — the open gap)"
 
 
+def forge_ratelimit_state_under_another_name(root: pathlib.Path) -> str:
+    # validate_ratelimit_core matches on the FILENAME (*Limiter*/*Counter*), so a limiter that avoids both name
+    # parts holds its own map unseen. This is the whole reach of a buildless grep — pinned, not fixed: enforcing a
+    # name nobody has written yet is not decidable, and the alternative (a reflection sweep) leaves the glob.
+    (root / "backend/src/main/kotlin/com/veyq/app/features/sharing/ShareThrottle.kt").write_text(textwrap.dedent("""\
+        package com.veyq.app.features.sharing
+
+        import java.util.concurrent.ConcurrentHashMap
+
+        /** A guard-gap probe: rate-limit state under a name the filename grep does not match. */
+        class ShareThrottle {
+            private val windows = ConcurrentHashMap<String, Long>()
+            fun allow(shareId: String): Boolean = windows.putIfAbsent(shareId, 1L) == null
+        }
+        """))
+    return "rate-limit state in a limiter named neither *Limiter* nor *Counter* (the filename-grep open gap)"
+
+
 # id, target guard, forgery, expect_pass (True = guard passes the forgery = gap still open; False = must reject)
 CASES = [
     ("1",  "validate_coverage.py",  forge_web_ref_nontest,      False),
@@ -190,6 +213,7 @@ CASES = [
     ("6",  "validate_doc_links.py", forge_doc_dead_fragment,    True),
     ("7",  "validate_maxlength_storage.py", forge_b64_cap_over_text,          False),
     ("8",  "validate_maxlength_storage.py", forge_freetext_cap_over_column,   True),
+    ("9",  "validate_ratelimit_core.py",    forge_ratelimit_state_under_another_name, True),
 ]
 
 

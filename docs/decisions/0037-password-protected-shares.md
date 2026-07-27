@@ -81,8 +81,10 @@ CONTRIBUTOR album, and an UPLOADER drop-box alike; the password field lives in t
   from the locked resolve) can brute-force the password offline against nothing — they'd have to guess against the
   *server* (online), since the verifier isn't served. That online path is bounded by a **per-share limit on wrong
   attempts** ([cc.security.rate-limit](../crosscutting/cc.security.rate-limit.md)): each `share_password_incorrect`
-  consumes one slot of a per-`shareId` fixed window; over the cap the guest gets `429` instead of the `403`
-  oracle. **Per share, not per IP** — behind a reverse proxy every anonymous guest shares one source address, so a
+  spends one token of a per-`shareId` bucket ([ADR 0052](0052-token-bucket-rate-limit-core.md)); over the cap the
+  guest gets `429` instead of the `403` oracle. What bounds the attack is guess **throughput**, which the bucket
+  keeps at the configured `max / window` — an exhausted guesser regains one attempt per `window / max` seconds
+  rather than facing a wall, and the window model's 2× slot-edge burst is gone. **Per share, not per IP** — behind a reverse proxy every anonymous guest shares one source address, so a
   per-IP bound would collapse to a global cap on the share (throttling its honest visitors) while an attacker
   rotating IPs would evade it; the attack targets one `shareId`, so that is the axis the counter keys on. Only a
   *wrong* attempt spends budget — a correct password is admitted first, so a legitimate guest is never locked out,

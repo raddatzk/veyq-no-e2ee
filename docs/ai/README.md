@@ -156,7 +156,10 @@ A refined CR nails **decisions, not keystrokes**:
   [`changes/README.md`](../../changes/README.md) owns that rule. **The inventory greps the *test* trees too, not
   just source** — a symbol move/rename's blast radius includes every test that references it: cr-0160's guessed
   "~8 cross-slice imports" was really +2 same-package users **and 22 test files**, a gap a `grep -rc` at refine
-  would have closed instead of the build.
+  would have closed instead of the build. **And it greps the *flow* surfaces — `docs/inbox.md` + `changes/` —
+  whenever the CR deletes or renames a symbol**: `cr-token-bucket-rate-limit-core`'s locator covered code,
+  contracts and `docs/`, and the row left naming the deleted class was inbox #114's inventory line — a *live*
+  finding made unreadable by a rename nobody pointed at it.
 - **Run the locator here — from two angles, and read the output as a list.** Handing one over unrun is the
   estimate wearing a command's clothes. And the first command you reach for is a paraphrase of what you already
   believe, so it fails silently wherever that belief is wrong: cr-0171's refine measured "246 scalars" with a
