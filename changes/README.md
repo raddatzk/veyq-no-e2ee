@@ -21,178 +21,218 @@ Nothing durable dies with it, because nothing durable was ever *only* there:
 
 So: no `changes/cr-*` archive. `changes/` holds this file and any live review/finding backlog.
 
-- **One file per CR: `cr-<slug>.md`** — a descriptive slug, **no number**. The number was dropped once it
-  proved a pure liability rather than a convenience. Its only live job — telling two *parallel* CRs apart — the
-  slug already does (two open CRs are about different things). Its damage was entirely in its *durability*: a
-  number is stamped into immutable git history and code comments, so when a done CR is deleted and its number
-  reused, `git log --grep cr-0174` returns two unrelated changes and every comment citing it is ambiguous (this
-  bit in practice — the ADR-0009 sweep first collided with a since-deleted mutation-gate cr-0174). A slug is
-  unique **by meaning** among live CRs and, if one ever recurred years later, collides *visibly* — not as the
-  silent numeric ambiguity that cost. So there is nothing to allocate, no max-ever to track, and no history to
-  scan; `scripts/validate_changes.py` checks only that the filename is a lowercase slug and `id` matches it. The
-  `cr-` prefix stays as a pure namespace marker — it is what separates a CR from this file and any `review-*.md`
-  backlog. (This retired inbox #107, whose remedy was going to be a monotonic next-number helper; dropping the
-  number is the simpler dissolution — the counter never has to exist.)
-- **Self-contained as a work order:** it *links* to the durable truth (use-cases, contracts,
-  crosscutting concerns, ADRs) and *contains* the delta + plan + acceptance. Never copy state docs
-  into a CR — if you feel the urge, the state doc is what should be updated instead.
-- **Phases only above real size.** A small CR is single-phase. Each phase ends with the repo in a
-  working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
-  contracts → backend → web.
-- **Genuinely independent work = separate CRs, not phases.**
-- **The CR carries the locator, not the number — run it, don't estimate, don't freeze.** A CR's inventory states
-  code-confirmable facts (a symbol, a path, "all of X do Y") as a **command written into the CR that finds the
-  sites**, never a guess and never a frozen tally. This is a *format* requirement, not a "be careful" plea (which
-  broke nine times, e.g. cr-0162's phantom `tasks.createJob`): in this repo's history every bare estimate was an
-  under-count. Three reasons the number itself does not belong in the file:
-  - **A count rots; a locator re-runs.** The code drifts between refine and implement, and a stale `→ 4` reads
-    as current. The command is the only part that stays true, so it is the part that ships.
-  - **The number's one real job happens before the CR exists.** *"Is this worth doing at all?"* is decided in the
-    refine conversation, looking at the output. Once that call is made the tally has no further reader — the
-    implementer needs the **sites**, and the CR already says implementation discovers the exact *where*.
-  - **Where the CR builds a guard, the guard is the completeness proof** — infinitely stronger than a tally in
-    prose. cr-0171 could not under-deliver on 235 fields: the validator stays red while one is missing. Prefer
-    that over a number every time (see *promote one-shot proofs*, below).
-  **Find the sites from two angles keyed on different things — the easiest command encodes what you already
-  believe.** The locator you reach for first is a paraphrase of your own model of the code, so it fails exactly
-  where that model is wrong: silently, and with a plausible number. Ask a second time on a **different key** — a
-  different marker, a different tree, the opposite direction — and compare. **The disagreement is the finding**,
-  and it names the sites rather than merely raising doubt. cr-0171's refine asked the container's *declaration*
-  (`type == "array"` → 49) where the reliable key is its *target* (`$ref` anywhere in the property → 60); the
-  11-property gap was the entire miscount, and it listed every offender. This is the only rule here that works
-  **without foreknowledge** — *match the marker, not a paraphrase* (below) assumes you already know which is
-  which, and not knowing is the whole miss. Two conditions:
-  - **Agreement is worth exactly what the independence is worth.** Two angles that share a blind spot agree, and
-    the agreement then reads as confirmation — worse than a single angle, because it manufactures confidence.
-    `grep -c` against `grep -rc` is one angle twice: cost paid, nothing bought.
-  - **Spend it where the number decides something** — a go/no-go call, or a predicate that *is* the CR's own rule
-    ("what counts as a container" was ADR 0044's decision, measured by a probe that quietly re-implemented it).
-    Not on every grep: this repo dies of ceremony faster than of arithmetic.
+### Naming — one file per CR, `cr-<slug>.md`
 
-  **Emit the list, not the tally.** A number cannot look wrong; a list can. Printing the items behind cr-0171's
-  "246 scalars" puts `derivatives: ['array','null'] items={$ref}` in front of you and the fault is unmissable.
-  Cheaper than a second angle and it catches a wrong *predicate* — but not a wrong *scope*: a list of the sites
-  you searched can never reveal the tree you didn't (cr-0160's "~8 imports" were 2 **and 22 test files**). The
-  two defenses cover different failures; neither replaces the other.
+A descriptive slug, **no number**. The number was dropped once it
+proved a pure liability rather than a convenience. Its only live job — telling two *parallel* CRs apart — the
+slug already does (two open CRs are about different things). Its damage was entirely in its *durability*: a
+number is stamped into immutable git history and code comments, so when a done CR is deleted and its number
+reused, `git log --grep cr-0174` returns two unrelated changes and every comment citing it is ambiguous (this
+bit in practice — the ADR-0009 sweep first collided with a since-deleted mutation-gate cr-0174). A slug is
+unique **by meaning** among live CRs and, if one ever recurred years later, collides *visibly* — not as the
+silent numeric ambiguity that cost. So there is nothing to allocate, no max-ever to track, and no history to
+scan; `scripts/validate_changes.py` checks only that the filename is a lowercase slug and `id` matches it. The
+`cr-` prefix stays as a pure namespace marker — it is what separates a CR from this file and any `review-*.md`
+backlog. (This retired inbox #107, whose remedy was going to be a monotonic next-number helper; dropping the
+number is the simpler dissolution — the counter never has to exist.)
 
-  A cited command is re-runnable, which is the point; it is not automatically right, and **a locator is only as
-  true as its predicate** — over a structured format, enumerate the format's spellings, not the one in front of
-  you, and trace the predicate to the *rule's own words* rather than to a paraphrase of them. Three further
-  traps: a null result counts only once you've confirmed the search hit the right place; a **truncated** result
-  is not a null result (cr-0171 piped an inline-YAML probe through `head -10`, read the empty tail as "there are
-  none", and broke three specs on the assumption); and match the **marker**, not a hand-rolled regex
-  (`grep -c '@Test'`, not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's
-  phantom `/api/token`).
+### Self-contained as a work order
 
-  **Upstream of every trap above — which all assume a command ran — is the claim that never reached for one.** A
-  statement of *where* or *how* something is built is a locatable claim even when it reads as settled fact, and
-  the statements that read *most* as fact are the ones this repo's invariants invert. The world's default is
-  `crypto → a JVM backend module, gated by a JVM mutation tool`; operator-blindness puts content crypto in the
-  **client**, so #99's refine wrote "PIT against the Gradle/Quarkus setup" with `backend/CLAUDE.md`'s *"no content
-  crypto"* loaded every turn and the repo map already naming `web/src/shared/crypto`. This is not a locator being
-  subtly wrong — it is no locator at all, because the claim did not feel like a claim. So: where a world-default
-  (`crypto → backend`, `auth → server`, `storage → a path you name`) meets one of the hard invariants, the
-  one-line `grep` goes **before** the sentence, not after the correction. The tell is the feeling of already
-  knowing — that is exactly where the imported prior is, and exactly where this repo most often inverts it.
-- **Coverage is part of the work, not a follow-up.** Every CR updates `docs/coverage/` for the
-  use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
-  entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
-  while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
-  coverage file that gaps every target surface.)
-- **The trust-chain guards stay green.** *Every* deterministic check in `scripts/` gates a CR — all of them, not
-  a remembered subset: `for f in scripts/validate_*.py; do python3 "$f"; done`. The glob is the point: it cannot
-  go stale. CI runs that same glob, unfiltered, in
-  [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml). **`scripts/` is the list**, and
-  no file restates it, because a restated list drifts out of step with the one that runs. This file's own
-  *"point at a canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
-  (The glob sees files, not commits: CI runs it over the **committed** tree, so an *untracked* guard — or an
-  untracked file a guard would have rejected — is green locally and unchecked in CI. Commit before believing a
-  local green.)
+It *links* to the durable truth (use-cases, contracts,
+crosscutting concerns, ADRs) and *contains* the delta + plan + acceptance. Never copy state docs
+into a CR — if you feel the urge, the state doc is what should be updated instead.
 
-  **What a guard's module docstring must carry — three fields, and this is the only place that says so.** The
-  docstring is a validator's whole documentation; every other file points here rather than re-listing the fields.
-  1. **What it asserts** — the invariant, in the terms a reader can check the code against.
-  2. **The defect that bought it** — the incident, named concretely enough to re-find. Where there was none,
-     say so: *"no incident — built with cr-X because …"*. A guard nobody can trace to a cost is a guard nobody
-     can later argue away.
-  3. **Its limit** — what a green run does **not** prove. **"None, because …" is a statable value; silence is
-     not.** This field is load-bearing, not courtesy: `scripts/validate_guard_gaps.py` can only pin a gap that
-     is *documented*, so an unwritten limit silently shrinks the meta-guard's reach, and no reader can tell
-     "this guard has no limit" from "nobody wrote it down". It already slipped once — the limit of
-     `validate_changes.py` lives in `validate_guard_gaps.py`'s docstring, not in its own.
+### Phases only above real size
 
-  The `scripts/mutation_meta_check*.py` follow the same three, and additionally state **why they sit outside the
-  `validate_*` glob** (they need a built report, so they run from the mutation jobs).
-- **Before reshaping a symbol, grep `scripts/` for *every* guard that anchors on it — not just the one the task
-  names.** A guard's anchor is part of that symbol's contract, and the task naming one guard is exactly what hides
-  the sibling the reshape breaks. #103 nearly re-homed the role enum into a shared `ScopeRole` `$ref` because only
-  the *drift* guard (`validate_contracts_common.py`) was named; `validate_scope_model_vocabulary.py` silently
-  anchors on `SetMemberRoleRequest.role.enum`, and a `$ref` would have broken it. Enumerate the guards on the
-  symbol first, then choose the shape — the shape that keeps every anchor green is a constraint, not an afterthought.
-- **Promote one-shot proofs to permanent guards.** When a CR's correctness rests on a structural invariant it
-  proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that
-  check is added as a **permanent guard** (a `scripts/` validator step or CI grep) so the invariant can't
-  silently regress. The tell that this was needed: an audit finding for a rule that already existed *in prose* but
-  nothing enforced (e.g. the styleguide mandated `@ConfigMapping`, yet 28 sites drifted). If a one-shot check
-  genuinely suffices, the CR says why.
-- **Bite-proof a guard by snapshot-and-restore, never `git checkout`.** To prove a new test bites, revert the
-  fix and watch it red — the revert must be exact and reversible. Protocol: `cp <file> /tmp/snap` **before** the
-  injection, break the code, run the one test, then `command cp -f /tmp/snap <file>` (the `command` prefix skips
-  any interactive `cp -i` alias). **Never `git checkout -- <file>` to restore** — it resets to HEAD and silently
-  discards *uncommitted* work in that file; `git checkout` is safe only when the baseline is committed. Confirm
-  the restore (grep the fix marker) before moving on. For an **automated, repeated** guard that re-injects on
-  every run, work on a throwaway *copy* of the tree, not the live one: `scripts/validate_guard_gaps.py`
-  copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
-  (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
-  Snapshot-restore is the interactive one-shot; a copy is its automated form.
-- **A bite test must tell "the guard held" apart from "nothing ran" — assert the expected test goes red *by
-  name*, never that "something failed".** An injection can break compilation instead of the assertion, and a
-  harness that greps for a failing test name then reads *no match* as **green** reports the exact false negative
-  the guard exists to prevent (cr-ratelimit-posture's first sweep-bite did this: the injection had swallowed two
-  neighbouring methods, nothing compiled, and the run was scored as "the guard does not bite"). Two corollaries:
-  read the full build output, not a filtered line; and for a **surgical** injection anchor on the target and cut
-  **backwards** from it — a forward non-greedy multi-line regex latches onto the first sibling member and eats
-  everything up to the anchor.
-- **A new *universal* check meets every existing *local* one — grep the surface it sweeps for tests that already
-  assert something about it.** This is the inverse of the guard-anchor rule below, and it bites the other way:
-  there, a reshape breaks a guard; here, a new guard breaks a *test*. `DefaultDenyTest` declares a deliberately
-  annotation-free `@Path` resource in **test** scope, which `@QuarkusTest` deploys like any other — so the
-  obvious CDI-based enumeration in cr-ratelimit-posture's posture sweep red-flagged it, and the obvious fix
-  (annotate the probe) would have destroyed the default-deny proof. The exclusion belongs in the sweep, and it
-  is a **named blind spot**, not a silent filter. A refine that lists the guard being built but not the guards
-  standing next to it hands that collision to implement time.
-- **A test that mutates shared singleton/global state writes its restore in the *same edit* as the mutation, not
-  after a flake.** The `%test` H2 mem DB — and any generated file like the config-secret key — is **JVM-shared
-  across test classes**, so a test that pokes a singleton (cr-config-secret-key-file-and-fingerprint forced a
-  `veyq_instance` config-secret fingerprint to a bogus value to exercise the MISMATCH gate) must `finally`-restore
-  it, or it cascades failures into every later test that assumed the clean value. This is the *write*-side sibling
-  of the *insert*-side seed-uniqueness rule (distinct domains/emails/**secrets** so the mem DB can't bleed —
-  cr-email-invite-send-hardening's `token_hash` collision): the same JVM-shared-state trap. Run the **full**
-  `./gradlew check`, never just the touched class, before calling backend done.
-- **`git status` before the first edit of a contracts-phase CR — a dirty shared spec is stop-and-confirm, not
-  proceed.** Two CRs touching one `*.openapi.yaml` mix unrelated deltas into a single commit: #103's mechanical
-  enum narrowing landed on top of uncommitted `cr-space-icon` WIP in `scopes.openapi.yaml`, and only a pre-edit
-  `git status` caught it. Split the go — land one, then the other as its own commit — and the history stays legible.
-- **Before adding a read field to expose a server fact, prove the fact isn't already *implied* — and that the
-  server can *reliably know* it.** A new field earns its place only when the value is both (a) not derivable from
-  what the read already carries and (b) something the server can determine truthfully. cr-email-tenant-mail-settings-web
-  dropped a proposed `sealAvailable` because `passwordSet: true` already implied the KEK was present at seal time;
-  cr-config-secret-key-file-and-fingerprint then *added* `configSecretState` — not a reversal, but because a new
-  capability (the DB fingerprint tripwire) let the server *detect* a state it previously could not. The deciding
-  question is the server's knowledge, not the client's wish — name that dependency when first weighing the field,
-  not a CR later.
-- **Every CR closes with a short, honest retrospective.** A `## Retrospective` section: what went wrong
-  in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
-  would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
-  direction (a premature instruction, a missing constraint, a process gap) are both fair game and
-  explicitly wanted. Cover **process & collaboration**, not just the technical work — in particular,
-  did we honor the conventions and feedback we already agreed (language, style, workflow rules, the
-  memory notes)? A rule that already exists but was ignored is a *real* miss, not a non-event. Each
-  retro ends with a forward-looking **"next time"** — one concrete, actionable thing to do differently.
-  Two or three bullets is enough; the goal is a compounding record of process lessons, not ceremony.
-  If genuinely nothing went wrong, say so in one line — don't manufacture a fault. **The process/collaboration
-  part is also delivered *actively* to the user at implement-session close** — spoken in the conversation, not
-  only written into this section (see the closing process retro in [`docs/ai/README.md`](../docs/ai/README.md)).
+A small CR is single-phase. Each phase ends with the repo in a
+working, verifiable state (its own "Done when:"). The natural seam is the dependency order:
+contracts → backend → web. **Genuinely independent work = separate CRs, not phases.**
+
+### The CR carries the locator, not the number — run it, don't estimate, don't freeze
+
+A CR's inventory states
+code-confirmable facts (a symbol, a path, "all of X do Y") as a **command written into the CR that finds the
+sites**, never a guess and never a frozen tally. This is a *format* requirement, not a "be careful" plea (which
+broke nine times, e.g. cr-0162's phantom `tasks.createJob`): in this repo's history every bare estimate was an
+under-count. Three reasons the number itself does not belong in the file:
+- **A count rots; a locator re-runs.** The code drifts between refine and implement, and a stale `→ 4` reads
+  as current. The command is the only part that stays true, so it is the part that ships.
+- **The number's one real job happens before the CR exists.** *"Is this worth doing at all?"* is decided in the
+  refine conversation, looking at the output. Once that call is made the tally has no further reader — the
+  implementer needs the **sites**, and the CR already says implementation discovers the exact *where*.
+- **Where the CR builds a guard, the guard is the completeness proof** — infinitely stronger than a tally in
+  prose. cr-0171 could not under-deliver on 235 fields: the validator stays red while one is missing. Prefer
+  that over a number every time (see *promote one-shot proofs*, below).
+
+**Find the sites from two angles keyed on different things — the easiest command encodes what you already
+believe.** The locator you reach for first is a paraphrase of your own model of the code, so it fails exactly
+where that model is wrong: silently, and with a plausible number. Ask a second time on a **different key** — a
+different marker, a different tree, the opposite direction — and compare. **The disagreement is the finding**,
+and it names the sites rather than merely raising doubt. cr-0171's refine asked the container's *declaration*
+(`type == "array"` → 49) where the reliable key is its *target* (`$ref` anywhere in the property → 60); the
+11-property gap was the entire miscount, and it listed every offender. This is the only rule here that works
+**without foreknowledge** — *match the marker, not a paraphrase* (below) assumes you already know which is
+which, and not knowing is the whole miss. Two conditions:
+- **Agreement is worth exactly what the independence is worth.** Two angles that share a blind spot agree, and
+  the agreement then reads as confirmation — worse than a single angle, because it manufactures confidence.
+  `grep -c` against `grep -rc` is one angle twice: cost paid, nothing bought.
+- **Spend it where the number decides something** — a go/no-go call, or a predicate that *is* the CR's own rule
+  ("what counts as a container" was ADR 0044's decision, measured by a probe that quietly re-implemented it).
+  Not on every grep: this repo dies of ceremony faster than of arithmetic.
+
+**Emit the list, not the tally.** A number cannot look wrong; a list can. Printing the items behind cr-0171's
+"246 scalars" puts `derivatives: ['array','null'] items={$ref}` in front of you and the fault is unmissable.
+Cheaper than a second angle and it catches a wrong *predicate* — but not a wrong *scope*: a list of the sites
+you searched can never reveal the tree you didn't (cr-0160's "~8 imports" were 2 **and 22 test files**). The
+two defenses cover different failures; neither replaces the other.
+
+A cited command is re-runnable, which is the point; it is not automatically right, and **a locator is only as
+true as its predicate** — over a structured format, enumerate the format's spellings, not the one in front of
+you, and trace the predicate to the *rule's own words* rather than to a paraphrase of them. Three further
+traps: a null result counts only once you've confirmed the search hit the right place; a **truncated** result
+is not a null result (cr-0171 piped an inline-YAML probe through `head -10`, read the empty tail as "there are
+none", and broke three specs on the assumption); and match the **marker**, not a hand-rolled regex
+(`grep -c '@Test'`, not `fun \w+`). And still: **point at a canonical source, don't restate it** (cr-0044's
+phantom `/api/token`).
+
+#### Upstream of every trap
+
+Everything above assumes a command ran. Upstream of all of it is the claim that never reached for one. A
+statement of *where* or *how* something is built is a locatable claim even when it reads as settled fact, and
+the statements that read *most* as fact are the ones this repo's invariants invert. The world's default is
+`crypto → a JVM backend module, gated by a JVM mutation tool`; operator-blindness puts content crypto in the
+**client**, so #99's refine wrote "PIT against the Gradle/Quarkus setup" with `backend/CLAUDE.md`'s *"no content
+crypto"* loaded every turn and the repo map already naming `web/src/shared/crypto`. This is not a locator being
+subtly wrong — it is no locator at all, because the claim did not feel like a claim. So: where a world-default
+(`crypto → backend`, `auth → server`, `storage → a path you name`) meets one of the hard invariants, the
+one-line `grep` goes **before** the sentence, not after the correction. The tell is the feeling of already
+knowing — that is exactly where the imported prior is, and exactly where this repo most often inverts it.
+
+### Coverage is part of the work, not a follow-up
+
+Every CR updates `docs/coverage/` for the
+use-case(s) it `satisfies:` — each new acceptance criterion gets a test ref (or an explicit `gaps:`
+entry with a reason) — and leaves `python3 scripts/validate_coverage.py` **green**. A CR is not done
+while the trust chain is red. (A use-case refined ahead of any implementation ships a `status: planned`
+coverage file that gaps every target surface.)
+
+### The trust-chain guards stay green
+
+*Every* deterministic check in `scripts/` gates a CR — all of them, not
+a remembered subset: `for f in scripts/validate_*.py; do python3 "$f"; done`. The glob is the point: it cannot
+go stale. CI runs that same glob, unfiltered, in
+[`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml). **`scripts/` is the list**, and
+no file restates it, because a restated list drifts out of step with the one that runs. This file's own
+*"point at a canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
+(The glob sees files, not commits: CI runs it over the **committed** tree, so an *untracked* guard — or an
+untracked file a guard would have rejected — is green locally and unchecked in CI. Commit before believing a
+local green.)
+
+**What a guard's module docstring must carry — three fields, and this is the only place that says so.** The
+docstring is a validator's whole documentation; every other file points here rather than re-listing the fields.
+1. **What it asserts** — the invariant, in the terms a reader can check the code against.
+2. **The defect that bought it** — the incident, named concretely enough to re-find. Where there was none,
+   say so: *"no incident — built with cr-X because …"*. A guard nobody can trace to a cost is a guard nobody
+   can later argue away.
+3. **Its limit** — what a green run does **not** prove. **"None, because …" is a statable value; silence is
+   not.** This field is load-bearing, not courtesy: `scripts/validate_guard_gaps.py` can only pin a gap that
+   is *documented*, so an unwritten limit silently shrinks the meta-guard's reach, and no reader can tell
+   "this guard has no limit" from "nobody wrote it down". It already slipped once — the limit of
+   `validate_changes.py` lives in `validate_guard_gaps.py`'s docstring, not in its own.
+
+The `scripts/mutation_meta_check*.py` follow the same three, and additionally state **why they sit outside the
+`validate_*` glob** (they need a built report, so they run from the mutation jobs).
+
+### Before reshaping a symbol, grep `scripts/` for every guard that anchors on it
+
+**Not just the one the task names.** A guard's anchor is part of that symbol's contract, and the task naming one guard is exactly what hides
+the sibling the reshape breaks. #103 nearly re-homed the role enum into a shared `ScopeRole` `$ref` because only
+the *drift* guard (`validate_contracts_common.py`) was named; `validate_scope_model_vocabulary.py` silently
+anchors on `SetMemberRoleRequest.role.enum`, and a `$ref` would have broken it. Enumerate the guards on the
+symbol first, then choose the shape — the shape that keeps every anchor green is a constraint, not an afterthought.
+
+### Promote one-shot proofs to permanent guards
+
+When a CR's correctness rests on a structural invariant it
+proves with a one-shot check — a `grep` that "X is no longer duplicated", "Y lives only in `shared/`" — that
+check is added as a **permanent guard** (a `scripts/` validator step or CI grep) so the invariant can't
+silently regress. The tell that this was needed: an audit finding for a rule that already existed *in prose* but
+nothing enforced (e.g. the styleguide mandated `@ConfigMapping`, yet 28 sites drifted). If a one-shot check
+genuinely suffices, the CR says why.
+
+### Bite-proof a guard by snapshot-and-restore, never `git checkout`
+
+To prove a new test bites, revert the
+fix and watch it red — the revert must be exact and reversible. Protocol: `cp <file> /tmp/snap` **before** the
+injection, break the code, run the one test, then `command cp -f /tmp/snap <file>` (the `command` prefix skips
+any interactive `cp -i` alias). **Never `git checkout -- <file>` to restore** — it resets to HEAD and silently
+discards *uncommitted* work in that file; `git checkout` is safe only when the baseline is committed. Confirm
+the restore (grep the fix marker) before moving on. For an **automated, repeated** guard that re-injects on
+every run, work on a throwaway *copy* of the tree, not the live one: `scripts/validate_guard_gaps.py`
+copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
+(every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
+Snapshot-restore is the interactive one-shot; a copy is its automated form.
+
+### A bite test must tell "the guard held" apart from "nothing ran"
+
+**Assert the expected test goes red by name, never that "something failed".** An injection can break compilation instead of the assertion, and a
+harness that greps for a failing test name then reads *no match* as **green** reports the exact false negative
+the guard exists to prevent (cr-ratelimit-posture's first sweep-bite did this: the injection had swallowed two
+neighbouring methods, nothing compiled, and the run was scored as "the guard does not bite"). Two corollaries:
+read the full build output, not a filtered line; and for a **surgical** injection anchor on the target and cut
+**backwards** from it — a forward non-greedy multi-line regex latches onto the first sibling member and eats
+everything up to the anchor.
+
+### A new universal check meets every existing local one
+
+**Grep the surface it sweeps for tests that already assert something about it.** This is the inverse of the guard-anchor rule below, and it bites the other way:
+there, a reshape breaks a guard; here, a new guard breaks a *test*. `DefaultDenyTest` declares a deliberately
+annotation-free `@Path` resource in **test** scope, which `@QuarkusTest` deploys like any other — so the
+obvious CDI-based enumeration in cr-ratelimit-posture's posture sweep red-flagged it, and the obvious fix
+(annotate the probe) would have destroyed the default-deny proof. The exclusion belongs in the sweep, and it
+is a **named blind spot**, not a silent filter. A refine that lists the guard being built but not the guards
+standing next to it hands that collision to implement time.
+
+### A test that mutates shared singleton/global state writes its restore in the same edit
+
+**As the mutation, not after a flake.** The `%test` H2 mem DB — and any generated file like the config-secret key — is **JVM-shared
+across test classes**, so a test that pokes a singleton (cr-config-secret-key-file-and-fingerprint forced a
+`veyq_instance` config-secret fingerprint to a bogus value to exercise the MISMATCH gate) must `finally`-restore
+it, or it cascades failures into every later test that assumed the clean value. This is the *write*-side sibling
+of the *insert*-side seed-uniqueness rule (distinct domains/emails/**secrets** so the mem DB can't bleed —
+cr-email-invite-send-hardening's `token_hash` collision): the same JVM-shared-state trap. Run the **full**
+`./gradlew check`, never just the touched class, before calling backend done.
+
+### `git status` before the first edit of a contracts-phase CR
+
+**A dirty shared spec is stop-and-confirm, not proceed.** Two CRs touching one `*.openapi.yaml` mix unrelated deltas into a single commit: #103's mechanical
+enum narrowing landed on top of uncommitted `cr-space-icon` WIP in `scopes.openapi.yaml`, and only a pre-edit
+`git status` caught it. Split the go — land one, then the other as its own commit — and the history stays legible.
+
+### Before adding a read field to expose a server fact
+
+**Prove the fact isn't already *implied* — and that the server can *reliably know* it.** A new field earns its place only when the value is both (a) not derivable from
+what the read already carries and (b) something the server can determine truthfully. cr-email-tenant-mail-settings-web
+dropped a proposed `sealAvailable` because `passwordSet: true` already implied the KEK was present at seal time;
+cr-config-secret-key-file-and-fingerprint then *added* `configSecretState` — not a reversal, but because a new
+capability (the DB fingerprint tripwire) let the server *detect* a state it previously could not. The deciding
+question is the server's knowledge, not the client's wish — name that dependency when first weighing the field,
+not a CR later.
+
+### Every CR closes with a short, honest retrospective
+
+A `## Retrospective` section: what went wrong
+in *planning* and in *execution* (not what went right), the root cause, and one concrete change that
+would have prevented it. Criticism flows **both ways** — the assistant's misses *and* the human's
+direction (a premature instruction, a missing constraint, a process gap) are both fair game and
+explicitly wanted. Cover **process & collaboration**, not just the technical work — in particular,
+did we honor the conventions and feedback we already agreed (language, style, workflow rules, the
+memory notes)? A rule that already exists but was ignored is a *real* miss, not a non-event. Each
+retro ends with a forward-looking **"next time"** — one concrete, actionable thing to do differently.
+Two or three bullets is enough; the goal is a compounding record of process lessons, not ceremony.
+If genuinely nothing went wrong, say so in one line — don't manufacture a fault. **The process/collaboration
+part is also delivered *actively* to the user at implement-session close** — spoken in the conversation, not
+only written into this section (see the closing process retro in [`docs/ai/README.md`](../docs/ai/README.md)).
 
 ## Template
 
