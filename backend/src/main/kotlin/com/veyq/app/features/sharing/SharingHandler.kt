@@ -276,6 +276,9 @@ class SharingHandler(
             PwCheck.OK -> {}
         }
         if (!ShareAccessPolicy.canUpload(share.role)) return CreateIdentityOutcome.NotContributable
+        // The only guest call that writes a row before any upload exists — bounded per share (ADR 0051,
+        // `@RateLimit(key = SHARE)`), after the authorization gates so an unauthorized caller spends nothing.
+        if (!rateLimiter.allowIdentity(shareId)) return CreateIdentityOutcome.RateLimited
         val (identityId, token) = store.createIdentity(shareId, sealedDisplayName)
         return CreateIdentityOutcome.Created(identityId, token)
     }
@@ -291,7 +294,7 @@ class SharingHandler(
         }
         if (!ShareAccessPolicy.canUpload(share.role)) return ShareUploadOutcome.NotContributable
         if (store.findIdentity(shareId, contributorToken) == null) return ShareUploadOutcome.NotContributable
-        if (!rateLimiter.allow(shareId)) return ShareUploadOutcome.RateLimited
+        if (!rateLimiter.allowUpload(shareId)) return ShareUploadOutcome.RateLimited
         return ShareUploadOutcome.Results(mediaHandler.startForScope(share.scopeId, declares))
     }
 
@@ -306,6 +309,9 @@ class SharingHandler(
         }
         if (!ShareAccessPolicy.canUpload(share.role)) return ShareCompleteOutcome.NotContributable
         val identity = store.findIdentity(shareId, contributorToken) ?: return ShareCompleteOutcome.NotContributable
+        // Same per-share upload budget as the start call (ADR 0051, `@RateLimit(key = SHARE)`): the two are one
+        // contributor write flow, and attaching is what actually creates the media rows.
+        if (!rateLimiter.allowUpload(shareId)) return ShareCompleteOutcome.RateLimited
         val completeItems = items.map {
             CompleteItem(
                 nodeId = share.nodeId, // contributors attach to the shared Memory root — server-set, not client-chosen

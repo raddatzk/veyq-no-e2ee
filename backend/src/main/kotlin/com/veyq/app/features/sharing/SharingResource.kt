@@ -34,6 +34,9 @@ import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Response
 import java.time.ZoneOffset
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimit
+import com.veyq.app.shared.ratelimit.RateLimitExempt
+import com.veyq.app.shared.ratelimit.RateLimitKey
 
 /**
  * HTTP adapter for public viewer shares (uc.sharing.share-public-viewer, cr-0100). Implements the generated
@@ -43,6 +46,11 @@ import java.util.UUID
  * Operator-blind: only ciphertext wraps + opaque metadata + presigned URLs cross.
  */
 @Authenticated
+@RateLimitExempt(
+    reason = "Curator surface: authenticated + owner-gated on the caller's own shares. The guest (@PermitAll) " +
+        "operations each declare their own posture and override this — a class-level default must never be what " +
+        "silently covers the unauthenticated ones.",
+)
 class SharingResource(
     private val handler: SharingHandler,
     private val identity: SecurityIdentity,
@@ -120,6 +128,11 @@ class SharingResource(
         }
 
     @PermitAll
+    @RateLimitExempt(
+        reason = "Guest read of the sealed subtree. Volume is unbounded BY DECISION, not by omission: neither " +
+            "available axis fits, and the residual gap is recorded in cc.security.rate-limit " +
+            "(§ Unbounded by decision) rather than left silent.",
+    )
     override fun resolveShare(shareId: String, xSharePassword: String?): Response =
         when (val o = handler.resolve(shareId, xSharePassword)) {
             is ResolveShareOutcome.Found -> Response.ok(
@@ -149,6 +162,11 @@ class SharingResource(
         }
 
     @PermitAll
+    @RateLimitExempt(
+        reason = "Guest presign of one share blob — the costliest of the three guest reads, since it mints a " +
+            "presigned URL. Unbounded by the same decision as resolveShare; cc.security.rate-limit " +
+            "(§ Unbounded by decision) names it as the open item rather than waving it away.",
+    )
     override fun resolveShareBlob(shareId: String, blobId: UUID, xSharePassword: String?): Response =
         when (val o = handler.resolveBlob(shareId, blobId.toString(), xSharePassword)) {
             is ShareBlobOutcome.Found -> Response.ok(
@@ -162,6 +180,10 @@ class SharingResource(
     // the client can gate acceptance in localStorage. NOTE: this endpoint records NOTHING about the visitor — the
     // accountless acceptance is an operational client-side gate, not enforcement (see SharingHandler.shareTerms).
     @PermitAll
+    @RateLimitExempt(
+        reason = "Account-less read of a share's terms — a constant document with no per-caller state. Same " +
+            "guest-read volume decision as resolveShare (cc.security.rate-limit § Unbounded by decision).",
+    )
     override fun getShareTerms(shareId: String): Response =
         when (val o = handler.shareTerms(shareId)) {
             is ShareTermsOutcome.Found -> Response.ok(
@@ -209,6 +231,9 @@ class SharingResource(
     // --- contributor guest ops (cr-0101; @PermitAll — account-less, gated only by share state + token) ---
 
     @PermitAll
+    // The one guest call that writes a row before any upload exists, so an unbounded link holder could grow the
+    // identity table on its own. Bounded per share in the handler (ShareRateLimiter.allowIdentity).
+    @RateLimit(key = RateLimitKey.SHARE)
     override fun createShareIdentity(shareId: String, createShareIdentityRequest: CreateShareIdentityRequest, xSharePassword: String?): Response =
         when (val o = handler.createIdentity(shareId, xSharePassword, createShareIdentityRequest.sealedDisplayName)) {
             is CreateIdentityOutcome.Created -> Response.status(Response.Status.CREATED)
@@ -217,6 +242,10 @@ class SharingResource(
         }
 
     @PermitAll
+    // The one guest write that already carries a real volume bound: ShareRateLimiter, per shareId, checked in the
+    // handler before any presign is minted. SHARE is a handler-enforced marker (ADR 0051) — a per-IP bound would
+    // be the wrong axis here, since a share's guests can all sit behind one proxy address.
+    @RateLimit(key = RateLimitKey.SHARE)
     override fun startShareBlobUploads(shareId: String, shareBlobUploadsRequest: ShareBlobUploadsRequest, xSharePassword: String?): Response {
         val declares = shareBlobUploadsRequest.items.map { UploadDeclare(it.chunkCount, it.byteSize, it.wrappedBlobKey) }
         return when (val o = handler.startUploads(shareId, xSharePassword, shareBlobUploadsRequest.contributorToken, declares)) {
@@ -236,6 +265,9 @@ class SharingResource(
     }
 
     @PermitAll
+    // The attach half of the contributor upload flow — it creates the media rows, so it rides the same per-share
+    // upload budget as startShareBlobUploads (ShareRateLimiter.allowUpload).
+    @RateLimit(key = RateLimitKey.SHARE)
     override fun completeShareMedia(shareId: String, shareMediaBatchRequest: ShareMediaBatchRequest, xSharePassword: String?): Response {
         val items = shareMediaBatchRequest.items.map { item ->
             ShareCompleteItem(
@@ -256,6 +288,11 @@ class SharingResource(
     }
 
     @PermitAll
+    @RateLimitExempt(
+        reason = "Delete-own is bounded by what the caller contributed: the store authorizes by single-row " +
+            "ownership (the media's share_identity_id must equal the token's identity), and those rows are " +
+            "already capped by the per-share upload budget. A separate delete bound would cap nothing new.",
+    )
     override fun deleteShareMedia(shareId: String, mediaId: UUID, xContributorToken: String, xSharePassword: String?): Response =
         when (val o = handler.deleteMedia(shareId, xSharePassword, xContributorToken, mediaId.toString())) {
             ShareDeleteOutcome.Done -> Response.noContent().build()

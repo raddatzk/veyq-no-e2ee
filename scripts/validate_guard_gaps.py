@@ -48,8 +48,13 @@ Open gaps — a forgery the guard still passes (a documented limit, not a defect
      catching it needs the field→column map the guard deliberately does not carry (a manifest that rots); the
      one real free-text-on-`TEXT` column was instead *widened to MEDIUMTEXT* in #94, closing that instance by
      construction. The gap is the class, not that column.
-Deferred (see cr-0180 / inbox): the mutation **total-vs-per-glob** asymmetry (needs a report fixture + git, so
-it belongs to a mutation-job-local test, not this buildless glob). (The other historical deferral here —
+Out of reach by construction, not deferred work: the mutation **total-vs-per-glob** asymmetry (needs a report
+fixture + git, so it belongs to a mutation-job-local test, not this buildless glob) and the **rate-limit posture
+sweep** (ADR 0051). The sweep is a JVM test — it enumerates JAX-RS endpoints by reflection over compiled classes
+and a live CDI container — so this guard, which forges *files* and runs a *Python* validator as a subprocess,
+has no way to inject into it. Its boundary (green proves every endpoint **declares** a posture, never that a
+domain-keyed limiter **fires**) is therefore held where it can be: in the sweep's own docstring, in the
+`trust-chain` skill's gap-map, and in `docs/crosscutting/cc.security.rate-limit.md`. (The other historical deferral here —
 CR-number reuse against history, old inbox #107 — is *gone*, not deferred: CRs are named by slug, not an
 allocated number, so there is no number to reuse and nothing to guard. See `changes/README.md` § naming.)
 

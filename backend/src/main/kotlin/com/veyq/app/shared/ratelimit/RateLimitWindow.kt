@@ -1,9 +1,9 @@
 package com.veyq.app.shared.ratelimit
 
 /**
- * The pure fixed-window arithmetic of the auth rate limiter (ADR 0045 §2), lifted out of [AuthRateLimitFilter] so
- * the window/expiry/over-limit boundaries are unit-tested and mutation-verified without a Quarkus boot. The filter
- * stays the imperative shell: it resolves the client IP, reads the clock, and drives the `ConcurrentHashMap` /
+ * The pure fixed-window arithmetic of the rate limiters (ADR 0045 §2), lifted out of the filters so the
+ * window/expiry/over-limit boundaries are unit-tested and mutation-verified without a Quarkus boot.
+ * [FixedWindowCounter] stays the imperative shell: it reads the clock and drives the `ConcurrentHashMap` /
  * `AtomicLong` plumbing; it asks these functions for every number and boundary it acts on.
  *
  * All times are epoch seconds; `windowSeconds` is the configured window length.

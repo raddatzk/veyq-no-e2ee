@@ -6,6 +6,7 @@ import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for session lifecycle. Implements the generated [SessionApi]; reads the bearer access token and
@@ -14,6 +15,11 @@ import jakarta.ws.rs.core.Response
  * `@Authenticated`. This is the one endpoint that still parses the header itself.
  */
 @PermitAll
+@RateLimitExempt(
+    reason = "Logout is a lenient, idempotent 204 no-op for ANY token — valid, expired or absent — so it is " +
+        "no oracle and reveals nothing to spend requests on. The only work it does is revoking a session " +
+        "family the caller already holds, which strictly REDUCES what an attacker can reach.",
+)
 class SessionResource(private val sessions: SessionService, private val cookie: SessionCookie) : SessionApi {
 
     @Context

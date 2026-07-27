@@ -30,7 +30,9 @@ import com.veyq.app.shared.http.HttpFailure
 import com.veyq.app.shared.http.httpError
 import com.veyq.app.shared.identity.ServerRoles.SERVER_OWNER
 import com.veyq.app.shared.identity.WrapData
-import com.veyq.app.shared.ratelimit.RateLimited
+import com.veyq.app.shared.ratelimit.RateLimit
+import com.veyq.app.shared.ratelimit.RateLimitExempt
+import com.veyq.app.shared.ratelimit.RateLimitKey
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.annotation.security.PermitAll
@@ -49,6 +51,12 @@ import java.util.UUID
  * carries no `unauthorized()`/`forbidden()`, and only sees already-authorized calls.
  */
 @RolesAllowed(SERVER_OWNER)
+@RateLimitExempt(
+    reason =
+        "Authenticated tenant administration — owner- or server-owner-gated. The two unauthenticated " +
+        "methods (invite preview, register-and-accept) and the two invite mints carry their own posture " +
+        "and override this.",
+)
 class TenantsResource(
     private val handler: TenantHandler,
     private val acceptHandler: TenantAcceptHandler,
@@ -87,10 +95,11 @@ class TenantsResource(
     // Member invite (cr-0077): NOT Server-Owner — the tenant OWNER admits members. @Authenticated overrides the
     // class gate; the owner-membership check lives in the handler (403 not_tenant_owner). The anti-bombing guard is
     // the handler's per-(tenant,recipient) InviteMailRateLimiter, surfaced as MemberInviteOutcome.RateLimited →
-    // 429 + Retry-After (cr-email-invite-send-hardening). NOT the per-IP @RateLimited filter: that keys on IP (an
-    // owner sits behind one) and shares one global window with the unauthenticated auth endpoints, so an active
-    // owner could trip the login limit — see the CR's declarative-posture-annotation follow-up.
+    // 429 + Retry-After (cr-email-invite-send-hardening). Deliberately NOT key = IP: an owner sits behind one
+    // address and would share the single per-IP window with the unauthenticated auth endpoints, so an active owner
+    // could trip the login limit. RECIPIENT is a handler-enforced marker (ADR 0051) — the filters pass it through.
     @Authenticated
+    @RateLimit(key = RateLimitKey.RECIPIENT)
     override fun inviteTenantMember(tenantId: UUID, memberInviteRequest: MemberInviteRequest): Response =
         when (val outcome = handler.inviteMember(identity.principal.name, tenantId.toString(), memberInviteRequest.email)) {
             is MemberInviteOutcome.Done -> Response.status(Response.Status.CREATED).entity(
@@ -114,6 +123,7 @@ class TenantsResource(
         }
 
     @Authenticated
+    @RateLimit(key = RateLimitKey.RECIPIENT) // same per-(tenant,recipient) mail bound as the first mint
     override fun reissueMemberInvite(tenantId: UUID, inviteId: UUID): Response =
         when (val outcome = handler.reissueMemberInvite(identity.principal.name, tenantId.toString(), inviteId.toString())) {
             is ReissueOutcome.Done -> Response.ok(
@@ -143,7 +153,7 @@ class TenantsResource(
     // @RolesAllowed: preview + register are @PermitAll (secret-gated), accept is @Authenticated (any user;
     // the email-match is a domain check, not the Server-Owner role).
     @PermitAll
-    @RateLimited // unauthenticated bootstrap-secret lookup oracle — per-IP bound it
+    @RateLimit(key = RateLimitKey.IP) // unauthenticated bootstrap-secret lookup oracle — per-IP bound it
     override fun previewTenantInvite(acceptPreviewRequest: AcceptPreviewRequest): Response =
         when (val outcome = acceptHandler.preview(acceptPreviewRequest.bootstrapSecret)) {
             is PreviewOutcome.Found -> Response.ok(
@@ -174,7 +184,7 @@ class TenantsResource(
         }
 
     @PermitAll
-    @RateLimited // unauthenticated account creation — per-IP bound it
+    @RateLimit(key = RateLimitKey.IP) // unauthenticated account creation — per-IP bound it
     override fun registerAndAcceptTenantInvite(registerAndAcceptRequest: RegisterAndAcceptRequest): Response {
         val a = registerAndAcceptRequest.account
         val account = NewAccount(

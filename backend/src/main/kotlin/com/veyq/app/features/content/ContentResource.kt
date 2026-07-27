@@ -12,6 +12,7 @@ import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for the Memory tree (en.memory.tree, cr-0027). Implements the generated [ContentApi]; thin
@@ -20,6 +21,11 @@ import java.util.UUID
  * opaque tokens cross. The scope root's parent slot is the scope id; the API surfaces it as `parentId = null`.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated + membership-gated node CRUD. Every call touches one scope the caller already " +
+        "belongs to; no external cost and no anonymous surface.",
+)
 class ContentResource(
     private val handler: NodesHandler,
     private val identity: SecurityIdentity,

@@ -2,30 +2,31 @@ package com.veyq.app.shared.ratelimit
 
 import com.veyq.app.features.admin.setup.SetupResource
 import com.veyq.app.features.admin.tenant.TenantsResource
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 /**
- * Pins that the public (`@PermitAll`) account-creation endpoints carry `@RateLimited` (cr-0130). The auth
- * limiter is name-bound, so a silently dropped annotation would un-limit an unauthenticated write with no other
- * signal. The filter *mechanism* (per-IP fixed window, 429) is covered by `AuthRateLimitTest` /
- * `AuthRateLimitWindowResetTest`; this test guards the wiring.
+ * Pins that the public (`@PermitAll`) account-creation endpoints declare `@RateLimit(key = IP)` (cr-0130, folded
+ * onto the ADR 0051 vocabulary). The limiter is name-bound, so a silently dropped annotation would un-limit an
+ * unauthenticated write with no other signal. The filter *mechanism* (per-IP fixed window, 429) is covered by
+ * `AuthRateLimitTest` / `AuthRateLimitWindowResetTest`; this test guards the wiring.
  *
- * The two tenant-owner member-invite mint endpoints deliberately do **not** carry `@RateLimited`
- * (cr-email-invite-send-hardening): the per-IP filter shares one global window with the unauthenticated auth
- * endpoints, so an active owner could trip the login limit. Their anti-bombing guard is the handler-level,
- * per-(tenant,recipient) `InviteMailRateLimiter` instead (see `MemberAddSliceTest`). A future declarative
- * auth+rate-limit **posture** annotation + guard is the right home for asserting their declaration.
+ * It is a **spot-check on three endpoints** — the universal *every endpoint declares a posture* sweep is
+ * `RateLimitPostureSweepTest`. The two are not redundant: the sweep proves a posture exists, this proves these
+ * three carry the *right* one.
  */
 class RateLimitedEndpointsTest {
 
-    private fun rateLimited(cls: Class<*>, method: String): Boolean =
-        cls.methods.any { it.name == method && it.isAnnotationPresent(RateLimited::class.java) }
+    // Bridge/synthetic overloads carry no annotations — resolving to one of those would read as "undeclared" and
+    // make this test pass or fail for a reason that has nothing to do with the posture.
+    private fun postureOf(cls: Class<*>, method: String): RateLimitPosture =
+        RateLimitPosture.of(cls, cls.methods.single { it.name == method && !it.isBridge && !it.isSynthetic })
 
     @Test
-    fun publicAccountCreationEndpointsAreRateLimited() {
-        assertTrue(rateLimited(SetupResource::class.java, "createServerOwner"), "SetupResource.createServerOwner missing @RateLimited")
-        assertTrue(rateLimited(TenantsResource::class.java, "previewTenantInvite"), "TenantsResource.previewTenantInvite missing @RateLimited")
-        assertTrue(rateLimited(TenantsResource::class.java, "registerAndAcceptTenantInvite"), "TenantsResource.registerAndAcceptTenantInvite missing @RateLimited")
+    fun publicAccountCreationEndpointsAreIpRateLimited() {
+        val expected = RateLimitPosture.Limited(RateLimitKey.IP)
+        assertEquals(expected, postureOf(SetupResource::class.java, "createServerOwner"))
+        assertEquals(expected, postureOf(TenantsResource::class.java, "previewTenantInvite"))
+        assertEquals(expected, postureOf(TenantsResource::class.java, "registerAndAcceptTenantInvite"))
     }
 }

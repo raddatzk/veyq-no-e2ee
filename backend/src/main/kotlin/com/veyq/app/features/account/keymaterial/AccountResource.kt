@@ -10,6 +10,7 @@ import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
 import org.jboss.logging.Logger
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter serving the authenticated caller's wrapped key material for client-side unlock
@@ -26,6 +27,11 @@ import org.jboss.logging.Logger
  * only by the (future) email-gated recovery flow (cr-0052), so a session alone never opens the vault.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated; a single read of the caller's own key material. No amplification and no oracle — " +
+        "the caller already holds the session those wraps belong to.",
+)
 class AccountResource(
     private val handler: KeyMaterialHandler,
     private val identity: SecurityIdentity,

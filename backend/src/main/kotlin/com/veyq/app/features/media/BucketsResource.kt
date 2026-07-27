@@ -12,6 +12,7 @@ import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for uploader buckets (en.memory.buckets, ADR 0034, cr-0113). Implements the generated [BucketsApi];
@@ -21,6 +22,11 @@ import java.util.UUID
  * (cr-0123). Operator-blind — opaque owner_key + bucket structure + sealed names cross, never a cleartext name.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated + membership-gated bucket curation inside one owner-root. No external cost and no " +
+        "fan-out.",
+)
 class BucketsResource(
     private val handler: MediaHandler,
     private val identity: SecurityIdentity,

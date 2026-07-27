@@ -8,6 +8,7 @@ import com.veyq.app.shared.http.httpError
 import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for adding/removing the caller's Master Key wraps (uc.account.trust-device). Implements the
@@ -18,6 +19,11 @@ import jakarta.ws.rs.core.Response
  * PASSWORD floor can't be removed and delete is idempotent (always 204).
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated; adds or removes a wrap on the caller's own account. Bounded by the DEVICE " +
+        "whitelist and the caller's own session, not by request volume.",
+)
 class AccountWrapsResource(
     private val handler: KeyMaterialHandler,
     private val identity: SecurityIdentity,

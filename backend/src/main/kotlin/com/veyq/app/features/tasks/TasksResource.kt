@@ -19,6 +19,7 @@ import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
 import java.time.ZoneOffset
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for the operator-blind background-task pull queue (ADR 0021, cr-0076). Implements the generated
@@ -28,6 +29,12 @@ import java.util.UUID
  * the membership boundary above it (ADR 0042) is the handler's first guard.
  */
 @Authenticated
+@RateLimitExempt(
+    reason = "The operator-blind pull queue (ADR 0021), where high-frequency polling IS the design: clients " +
+        "short-poll claim and heartbeat by construction, so a per-user request cap would throttle the " +
+        "mechanism rather than an abuse of it. What a claim can actually consume is bounded by the lease " +
+        "and attempt machinery, not by request count.",
+)
 class TasksResource(
     private val handler: TasksHandler,
     private val identity: SecurityIdentity,

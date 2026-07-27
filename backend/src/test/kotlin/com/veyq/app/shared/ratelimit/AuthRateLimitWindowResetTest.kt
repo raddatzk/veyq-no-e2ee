@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 
 /**
- * Verifies [AuthRateLimitFilter]'s **fixed window actually resets**: past the limit an IP is throttled, but
+ * Verifies [IpRateLimitFilter]'s **fixed window actually resets**: past the limit an IP is throttled, but
  * once the window elapses its counter clears and requests are allowed again. Split out from [AuthRateLimitTest]
  * because it needs a **1-second** window (so the reset is observable in real time without a long wait) — a
  * different build-time/runtime config, hence its own profile. Proxy-address-forwarding is on so this test keys

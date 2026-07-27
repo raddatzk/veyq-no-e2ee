@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * The member-invite mail limiter (cr-email-invite-send-hardening) — the **real** anti-bombing guard.
  *
- * The per-IP `@RateLimited`/`AuthRateLimitFilter` machinery keys on the client IP, which an authenticated owner
+ * The per-IP `@RateLimit(key = IP)`/`IpRateLimitFilter` machinery keys on the client IP, which an authenticated owner
  * sits behind and which cannot express the thing that actually needs bounding: **how many invites reach one
  * victim address**. So this is a dedicated, handler-level limiter — a sibling of `ShareRateLimiter` — consumed in
  * [TenantHandler] on the two tenant-owner member paths that drive SMTP mail (`inviteMember`, `reissueMemberInvite`),

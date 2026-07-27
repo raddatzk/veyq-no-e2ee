@@ -8,7 +8,8 @@ import com.veyq.app.shared.http.FailureStatus.UNAUTHORIZED
 import com.veyq.app.shared.http.Failures
 import com.veyq.app.shared.http.httpError
 import com.veyq.app.shared.http.httpFailure
-import com.veyq.app.shared.ratelimit.RateLimited
+import com.veyq.app.shared.ratelimit.RateLimit
+import com.veyq.app.shared.ratelimit.RateLimitKey
 import jakarta.annotation.security.PermitAll
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
@@ -20,7 +21,7 @@ import jakarta.ws.rs.core.Response
  *  cr-0052) or the request **body** (native). The cookie wins when present; the new token then rides a fresh
  *  cookie and is omitted from the body, so the refresh token never reaches JS on the web path. */
 @PermitAll
-@RateLimited
+@RateLimit(key = RateLimitKey.IP)
 class TokenResource(private val sessions: SessionService, private val cookie: SessionCookie) : TokenApi {
 
     @Context

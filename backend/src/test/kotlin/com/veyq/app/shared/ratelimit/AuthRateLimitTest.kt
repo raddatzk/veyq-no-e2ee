@@ -11,8 +11,8 @@ import org.hamcrest.CoreMatchers.not
 import org.junit.jupiter.api.Test
 
 /**
- * Verifies [AuthRateLimitFilter] throttles **every** governed public-auth endpoint (login challenge/verify +
- * token refresh — the three that carry `@RateLimited`), keys the window **per client IP**, and rejects with a
+ * Verifies [IpRateLimitFilter] throttles **every** governed public-auth endpoint (login challenge/verify +
+ * token refresh — the three that carry `@RateLimit(key = IP)`), keys the window **per client IP**, and rejects with a
  * `429` + `rate_limited` past the limit. Mechanism + matrix: `docs/crosscutting/cc.security.rate-limit.md`.
  *
  * Runs under a profile that drops the limit to 3/window and turns on proxy-address-forwarding so each test can

@@ -162,9 +162,18 @@ interface VeyqConfig {
         }
     }
 
-    /** `veyq.ratelimit.auth.*` — the per-IP auth rate limiter (cr-0130). */
+    /** `veyq.ratelimit.*` — the boundary rate limiters. Values live here, never in an annotation: the
+     *  `@RateLimit(key)` posture (ADR 0051) declares the *axis* so a self-hosted instance can still tune the
+     *  *numbers* ([invariant] self-hostable). */
     interface RateLimit {
+        /** `veyq.ratelimit.auth.*` — the per-IP bound. The prefix is historical (it began as the auth-only
+         *  limiter); the bound is `@RateLimit(key = IP)` wherever it is declared. Renaming it would break every
+         *  self-hosted instance's config file for no behavioural gain, so it stays. */
         fun auth(): Auth
+
+        /** `veyq.ratelimit.user.*` — the per-principal bound for `@RateLimit(key = USER)`. Deliberately generous:
+         *  an authenticated caller is attributable and revocable, so this bounds runaway automation, not abuse. */
+        fun user(): User
 
         /** `veyq.ratelimit.invite.*` — the member-invite mail limiter (cr-email-invite-send-hardening): the real
          *  anti-bombing guard, keyed per-(tenant,recipient) AND per-tenant, applied in the handler before the mint.
@@ -174,6 +183,14 @@ interface VeyqConfig {
 
         interface Auth {
             @WithDefault("60")
+            fun maxRequests(): Long
+
+            @WithDefault("60")
+            fun windowSeconds(): Long
+        }
+
+        interface User {
+            @WithDefault("600")
             fun maxRequests(): Long
 
             @WithDefault("60")
@@ -215,6 +232,11 @@ interface VeyqConfig {
          *  from [upload] — an order of magnitude tighter, since a password guess is an attack and an upload is not. */
         fun password(): Password
 
+        /** `veyq.share.identity.rate.*` — the bound on anonymous contributor-identity creation, the one guest call
+         *  that writes a row before any upload exists. A real guest names itself **once** per share, so this is
+         *  deliberately much tighter than [upload] and still far above honest traffic. */
+        fun identity(): Identity
+
         interface Upload {
             fun rate(): Rate
 
@@ -223,6 +245,18 @@ interface VeyqConfig {
                 fun maxPerWindow(): Int
 
                 @WithDefault("60")
+                fun windowSeconds(): Long
+            }
+        }
+
+        interface Identity {
+            fun rate(): Rate
+
+            interface Rate {
+                @WithDefault("30")
+                fun maxPerWindow(): Int
+
+                @WithDefault("3600")
                 fun windowSeconds(): Long
             }
         }

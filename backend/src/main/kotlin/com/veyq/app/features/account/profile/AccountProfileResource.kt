@@ -10,6 +10,7 @@ import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.HttpHeaders
 import jakarta.ws.rs.core.Response
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for the caller's per-tenant identity profile (username + sealed real name, ADR 0023). Implements
@@ -18,6 +19,10 @@ import jakarta.ws.rs.core.Response
  * caller's own profile (userId from the principal) — no id/email in the request.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated; reads and updates the caller's own profile row. No fan-out, no external cost.",
+)
 class AccountProfileResource(
     private val handler: AccountProfileHandler,
     private val identity: SecurityIdentity,

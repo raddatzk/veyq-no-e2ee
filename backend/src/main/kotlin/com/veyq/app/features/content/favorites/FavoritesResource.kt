@@ -9,6 +9,7 @@ import io.quarkus.security.Authenticated
 import io.quarkus.security.identity.SecurityIdentity
 import jakarta.ws.rs.core.Response
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for per-(user, scope) favorites (en.memory.favorites, cr-0031). Implements the generated
@@ -17,6 +18,11 @@ import java.util.UUID
  * the caller's sealed ciphertext crosses; the server never sees which Memories are pinned.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated; one size-capped sealed blob per scope, membership-gated. Nothing to enumerate and " +
+        "nothing to amplify.",
+)
 class FavoritesResource(
     private val handler: FavoritesHandler,
     private val identity: SecurityIdentity,

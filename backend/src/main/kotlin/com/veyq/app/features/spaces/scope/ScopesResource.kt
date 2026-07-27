@@ -29,6 +29,7 @@ import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for a member's scopes (en.spaces.personal-scope, cr-0026). Implements the generated
@@ -39,6 +40,11 @@ import java.util.UUID
  * ciphertext grants, never a scope key.
  */
 @Authenticated
+@RateLimitExempt(
+    reason =
+        "Authenticated; every method is membership- or owner-gated on a scope the caller already belongs " +
+        "to. Rotation is the costliest and is already serialized by the epoch chain.",
+)
 class ScopesResource(
     private val handler: ScopesHandler,
     private val identity: SecurityIdentity,

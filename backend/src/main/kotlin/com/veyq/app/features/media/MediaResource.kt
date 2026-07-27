@@ -29,6 +29,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import com.veyq.app.shared.ratelimit.RateLimitExempt
 
 /**
  * HTTP adapter for media blobs (en.memory.media, cr-0028). Implements the generated [MediaApi]; thin
@@ -38,6 +39,12 @@ import java.util.UUID
  * access/auth failures are top-level.
  */
 @Authenticated
+@RateLimitExempt(
+    reason = "Authenticated + membership-gated media plumbing. Deliberately NOT key = USER yet: presign " +
+        "minting is a real amplification axis, but a per-user cap on the main upload and browse path has " +
+        "to be verified against real traffic before it ships, or it throttles a legitimate bulk upload. " +
+        "Recorded as the open item in cc.security.rate-limit (\u00a7 Unbounded by decision).",
+)
 class MediaResource(
     private val handler: MediaHandler,
     private val identity: SecurityIdentity,

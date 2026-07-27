@@ -145,6 +145,22 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
   copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
   (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
   Snapshot-restore is the interactive one-shot; a copy is its automated form.
+- **A bite test must tell "the guard held" apart from "nothing ran" — assert the expected test goes red *by
+  name*, never that "something failed".** An injection can break compilation instead of the assertion, and a
+  harness that greps for a failing test name then reads *no match* as **green** reports the exact false negative
+  the guard exists to prevent (cr-ratelimit-posture's first sweep-bite did this: the injection had swallowed two
+  neighbouring methods, nothing compiled, and the run was scored as "the guard does not bite"). Two corollaries:
+  read the full build output, not a filtered line; and for a **surgical** injection anchor on the target and cut
+  **backwards** from it — a forward non-greedy multi-line regex latches onto the first sibling member and eats
+  everything up to the anchor.
+- **A new *universal* check meets every existing *local* one — grep the surface it sweeps for tests that already
+  assert something about it.** This is the inverse of the guard-anchor rule below, and it bites the other way:
+  there, a reshape breaks a guard; here, a new guard breaks a *test*. `DefaultDenyTest` declares a deliberately
+  annotation-free `@Path` resource in **test** scope, which `@QuarkusTest` deploys like any other — so the
+  obvious CDI-based enumeration in cr-ratelimit-posture's posture sweep red-flagged it, and the obvious fix
+  (annotate the probe) would have destroyed the default-deny proof. The exclusion belongs in the sweep, and it
+  is a **named blind spot**, not a silent filter. A refine that lists the guard being built but not the guards
+  standing next to it hands that collision to implement time.
 - **A test that mutates shared singleton/global state writes its restore in the *same edit* as the mutation, not
   after a flake.** The `%test` H2 mem DB — and any generated file like the config-secret key — is **JVM-shared
   across test classes**, so a test that pokes a singleton (cr-config-secret-key-file-and-fingerprint forced a

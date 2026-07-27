@@ -81,7 +81,7 @@ the moment a validator is tightened — the very failure this section is about, 
 deliberate — closing a gap flips a documented pass/fail and turns that guard red, forcing the closure to be
 recorded here, not landed silently.
 
-Two documented gaps sit **outside** that guard, on purpose (cr-0180):
+Three documented gaps sit **outside** that guard, on purpose:
 
 - the mutation **total-vs-per-glob** asymmetry: `mutation_meta_check.py` (crypto) asserts a **total** mutant
   count > 0 (`:53-55`); the **backend** one is **per-glob** (`mutation_meta_check_backend.py:54-63`). (The
@@ -89,6 +89,16 @@ Two documented gaps sit **outside** that guard, on purpose (cr-0180):
   synthetic report fixture + a git tree (the web check gates on `git diff`), so it belongs to a
   mutation-job-local test, not the buildless glob — and it is self-documented in both meta-check docstrings,
   beside the code.
+- the **rate-limit posture sweep's declaration ≠ enforcement** boundary
+  ([ADR 0051](../../../docs/decisions/0051-declarative-rate-limit-posture.md)):
+  `backend/src/test/kotlin/com/veyq/app/shared/ratelimit/RateLimitPostureSweepTest.kt` asserts every JAX-RS
+  endpoint **declares** `@RateLimit(key)` or `@RateLimitExempt(reason)` — it does **not** assert the
+  domain-keyed limiters (`SHARE`/`RECIPIENT`/`OWNER`/`TENANT`) actually **fire**; only the per-endpoint runtime
+  `429` tests do (`ShareIdentityBoundTest`, `SharePasswordAttemptBoundTest`, `InviteMailRateLimiterTest`). It is
+  a **JVM test needing a Gradle build**, so it is outside the buildless glob for the same reason as the mutation
+  asymmetry, and outside `validate_guard_gaps.py`, which forges files and runs a *Python* validator as a
+  subprocess. Its second, narrower blind spot is **test-scope resources**, excluded by file existence in the
+  test output dir — `DefaultDenyTest`'s deliberately annotation-free probe must stay annotation-free.
 - **history-blindness** (e.g. a deleted cited ADR that now resolves to nothing) is a **principled edge** (§4
   below), not a fixable gap — a guard never sees history, so a forgery-assertion can't reach it. (The old
   "burned CR number" instance of this is gone entirely: CRs are named by slug, not an allocated number — nothing
