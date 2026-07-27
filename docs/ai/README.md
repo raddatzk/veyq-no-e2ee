@@ -73,6 +73,17 @@ Five rules follow:
    - **Doc unbuildable** — it asks for something the stack has no form of, so the code never could follow.
      V35 was told to add a partial unique index the H2 ∩ MariaDB subset does not have.
 
+   **A measurement is only as true as the tree it ran against.** *Measured, not recalled* guards the **claim**;
+   nothing guards the **substrate**. The command ran, its output is real, and it still proves nothing if it read
+   the wrong tree — a stale checkout, another branch, a sibling repo mid-edit. So name the substrate before the
+   sweep, not after the correction: which branch, how current, what is uncommitted. Observed, not imagined: on
+   2026-07-27 a delegated inbox sweep ran while a **parallel session** was editing `docs/inbox.md` underneath it
+   (`wc -l` → 126, ten minutes later 127) — it caught the shift itself and qualified its numbers, which is the
+   save. Two consequences: a measurement whose substrate is *named* can be re-run, one whose substrate is
+   *assumed* cannot be checked at all; and where the question is a **status** ("is this built?"), the substrate
+   is the **whole branch** — `git log --all --grep` plus the files' existence — never the recent log window,
+   which is how the 2026-07-22 sweep found seven rows that had been stale for weeks.
+
    **What this step cannot see: a rule the docs never wrote.** A public share served trashed media for the
    whole retention window because the trash CR and the sharing CRs both read `veyq_media` and never met —
    the doc↔code delta there was **empty**, and the defect was real. Doc drift and cross-feature gaps are
@@ -205,8 +216,9 @@ this section only points at it (rule 2) — assembling this picture by hand each
 
 - **The guards** — `scripts/`. **The glob is the registry:** CI loops over `scripts/validate_*.py`, so a new
   guard runs the moment it lands, with nothing to register — which is why no list of them exists here or
-  anywhere else. **`scripts/` is the list**; each module docstring owns what that guard asserts, the defect
-  that bought it, and its stated limit. Run the chain locally exactly as CI does:
+  anywhere else. **`scripts/` is the list**; each module docstring is that guard's whole documentation, and
+  what it must carry is defined once in [`../../changes/README.md`](../../changes/README.md) § trust-chain
+  guards. Run the chain locally exactly as CI does:
   `for f in scripts/validate_*.py; do python3 "$f"; done`.
 - **Three CI runs, three triggers.** [`trust-chain.yml`](../../.github/workflows/trust-chain.yml) —
   deliberately unfiltered and buildless, the whole guard glob; a docs-only change is validated **there and

@@ -5,16 +5,16 @@ description: >-
   scripts/ guard; or when a green trust-chain is about to be used as evidence for a claim. Carries the
   claim-provenance convention (mark every claim measured vs. remembered) and the map of what a green
   trust-chain does — and does not — prove. Entry point into veyq's doc↔code validation; per-guard detail
-  lives in each scripts/validate_*.py docstring, the mutation-testing deep-dive in ADR 0045.
+  lives in that guard's own module docstring, the mutation-testing deep-dive in ADR 0045.
 ---
 
 # trust-chain
 
-The doc↔code validation layer, as an entry point. This skill is **not** the guards' documentation — each
-guard's own module docstring owns what it asserts and the defect that bought it (`scripts/` is the list,
-per [`changes/README.md`](../../../changes/README.md) § trust-chain guards). This skill adds only what no
-single file holds: the **one convention** that governs every claim, and the **map of the chain's edges** —
-what green proves and where it stops.
+The doc↔code validation layer, as an entry point. This skill is **not** the guards' documentation — that is
+each guard's own module docstring, whose required fields are defined once in
+[`changes/README.md`](../../../changes/README.md) § trust-chain guards (`scripts/` is the list). This skill
+adds only what no single file holds: the **one convention** that governs every claim, and the **map of the
+chain's edges** — what green proves and where it stops.
 
 ## When this fires
 
@@ -68,9 +68,10 @@ cheaply decidable, that the target is the right *kind* of thing (a web coverage 
 file, a backend ref has a non-empty body); it never asserts that what it points at **carries weight** — a
 `*.test` file whose body asserts nothing still passes (oracle correctness is edge #1 below). The meta-guard
 `validate_guard_gaps.py` is the exception that proves the rule: it asserts these very limits still hold, and
-pins each closed hole so it can't silently re-open — below. The per-guard limit is each validator's own
-docstring (e.g. `validate_field_visibility.py`: "a marker permits, it does not verify"); this skill only
-names the pattern.
+pins each closed hole so it can't silently re-open — below. The per-guard limit is a **required field** of that
+validator's docstring (e.g. `validate_field_visibility.py`: "a marker permits, it does not verify") — see
+[`changes/README.md`](../../../changes/README.md) § trust-chain guards, which also says why an *unwritten*
+limit shrinks the meta-guard's reach. This skill only names the pattern.
 
 Concrete: the specific gaps are **executable, not prose** — `scripts/validate_guard_gaps.py` (in the
 trust-chain glob) injects each into a throwaway copy of the tree and asserts the guard still passes (or, for
@@ -149,4 +150,5 @@ each has a canonical home — point there, don't try to build past it:
 - [ADR 0040](../../../docs/decisions/0040-coverage-gaps-and-http-not-a-surface.md) — a test counts only when CI runs it.
 - [ADR 0045](../../../docs/decisions/0045-mutation-testing-trust-chain-unit-layer.md) — the assertion-strength last link.
 - [ADR 0046](../../../docs/decisions/0046-operative-lore-in-skills-and-agents.md) — why this skill exists at all.
-- Each `scripts/validate_*.py` module docstring — what that one guard asserts, and the defect that bought it.
+- Each `scripts/validate_*.py` module docstring — that guard's whole documentation; its required fields are
+  defined in [`changes/README.md`](../../../changes/README.md) § trust-chain guards.

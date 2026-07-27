@@ -111,8 +111,9 @@ docs/
 - **Architecture** sits above all and **indexes** them — a map kept current as work lands, not a satisfiable
   record.
 - The wiring is machine-checked by **every** guard in `scripts/` (`scripts/validate_*.py`), not by a subset
-  worth naming here. Each validator's module docstring says what it asserts and names the defect that bought it,
-  so **`scripts/` is the list** — this bullet points at it rather than restating it, because a list restated in
+  worth naming here. Each validator's module docstring is that guard's whole documentation (the three fields it
+  must carry are defined once, in [`../changes/README.md`](../changes/README.md) § trust-chain guards), so
+  **`scripts/` is the list** — this bullet points at it rather than restating it, because a list restated in
   prose drifts out of step with the one that actually runs. CI runs the glob, unfiltered on every push and PR,
   in [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml).
 

@@ -102,10 +102,27 @@ So: no `changes/cr-*` archive. `changes/` holds this file and any live review/fi
 - **The trust-chain guards stay green.** *Every* deterministic check in `scripts/` gates a CR — all of them, not
   a remembered subset: `for f in scripts/validate_*.py; do python3 "$f"; done`. The glob is the point: it cannot
   go stale. CI runs that same glob, unfiltered, in
-  [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml). What each guard asserts — and
-  the defect that bought it — is that validator's own module docstring: **`scripts/` is the list**, and no file
-  restates it, because a restated list drifts out of step with the one that runs. This file's own *"point at a
-  canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
+  [`../.github/workflows/trust-chain.yml`](../.github/workflows/trust-chain.yml). **`scripts/` is the list**, and
+  no file restates it, because a restated list drifts out of step with the one that runs. This file's own
+  *"point at a canonical source, don't restate it"*, applied to itself. A red guard means the CR isn't done.
+  (The glob sees files, not commits: CI runs it over the **committed** tree, so an *untracked* guard — or an
+  untracked file a guard would have rejected — is green locally and unchecked in CI. Commit before believing a
+  local green.)
+
+  **What a guard's module docstring must carry — three fields, and this is the only place that says so.** The
+  docstring is a validator's whole documentation; every other file points here rather than re-listing the fields.
+  1. **What it asserts** — the invariant, in the terms a reader can check the code against.
+  2. **The defect that bought it** — the incident, named concretely enough to re-find. Where there was none,
+     say so: *"no incident — built with cr-X because …"*. A guard nobody can trace to a cost is a guard nobody
+     can later argue away.
+  3. **Its limit** — what a green run does **not** prove. **"None, because …" is a statable value; silence is
+     not.** This field is load-bearing, not courtesy: `scripts/validate_guard_gaps.py` can only pin a gap that
+     is *documented*, so an unwritten limit silently shrinks the meta-guard's reach, and no reader can tell
+     "this guard has no limit" from "nobody wrote it down". It already slipped once — the limit of
+     `validate_changes.py` lives in `validate_guard_gaps.py`'s docstring, not in its own.
+
+  The `scripts/mutation_meta_check*.py` follow the same three, and additionally state **why they sit outside the
+  `validate_*` glob** (they need a built report, so they run from the mutation jobs).
 - **Before reshaping a symbol, grep `scripts/` for *every* guard that anchors on it — not just the one the task
   names.** A guard's anchor is part of that symbol's contract, and the task naming one guard is exactly what hides
   the sibling the reshape breaks. #103 nearly re-homed the role enum into a shared `ScopeRole` `$ref` because only
