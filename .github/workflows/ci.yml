@@ -71,10 +71,12 @@ jobs:
 
   web-e2e:
     name: Web E2E (live backend)
-    # Disabled: scripts/run_web_e2e.py is in the tree but not yet ported — it still globs frontend/, passes
-    # VEYQ_API_BASE where the suites read VEYQ_BASE, and sets two backend knobs that never existed. Drop
-    # `if: false` once the port lands. See architecture/README.md §11 + changes/cr-e2e-orchestrator.md.
-    if: false
+    # The only end-to-end coverage any CI run executes: web's *.e2e.test.ts drive real crypto against a real
+    # backend and a real object store. They are gated on VEYQ_E2E, which nothing but this job sets — so a test
+    # that is skipped here makes no coverage claim at all (ADR 0040), and four coverage refs depend on this job
+    # staying green. scripts/run_web_e2e.py supplies the whole world itself: it brings up the bundled compose
+    # stack (MariaDB + Garage), then per e2e file gives it its own database and a fresh %e2e backend boot. That
+    # is why this job declares no `services:` and no `env:` — adding either would split the truth in two.
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -96,8 +98,14 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # Build the runnable fast-jar once; the orchestrator boots a fresh copy (fresh in-mem DB) per e2e file,
-      # because every suite registers its own single-owner-per-boot Server Owner.
+      # Build the runnable fast-jar ONCE; the orchestrator boots it again per e2e file, because every suite
+      # cold-births its own Server Owner and asserts setupRequired===true, and an instance has one.
+      #
+      # Each boot gets its own MariaDB DATABASE, not a fresh in-memory DB — this comment used to claim the
+      # latter and it does not work: quarkus.datasource.db-kind is a build-time property baked at augmentation
+      # under %prod, so a runtime QUARKUS_DATASOURCE_DB_KIND=h2 is ignored and the MariaDB driver rejects the
+      # H2 URL. `CREATE DATABASE veyq_e2e_<n>` is a fresh instance in the only sense the suites care about, and
+      # it keeps this build-once step intact instead of needing a second, differently-configured jar.
       - name: Build backend fast-jar
         working-directory: backend
         run: ./gradlew --no-daemon quarkusBuild

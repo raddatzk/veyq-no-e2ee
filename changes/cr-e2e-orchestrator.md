@@ -249,7 +249,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       (`architecture/README.md` §11 link, `ci.yml:78` prose) at this CR **in the same commit**.
       · Done when: `python3 scripts/validate_doc_links.py` and `python3 scripts/validate_changes.py` green.
 
-- [ ] **1 · backend** — New `backend/src/main/resources/application-e2e.properties`: datasource (URL overridable
+- [x] **1 · backend** — New `backend/src/main/resources/application-e2e.properties`: datasource (URL overridable
       per boot via env), `veyq.blob-store.{endpoint,access-key,secret-key}` at the bundled Garage,
       `veyq.session.cookie.secure=false`, the auth + user + three invite budgets, `veyq.share.password.rate.*`,
       and `veyq.security.config-secret-file`. `public-endpoint` deliberately **unset**, with the comment saying
@@ -259,7 +259,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       · Done when: `cd backend && ./gradlew check` green, and a hand boot with `-Dquarkus.profile=e2e` reaches
       `/q/health/ready` against the compose stack.
 
-- [ ] **2 · web** — Extract the cold-birth bootstrap out of `scopeRotation.e2e.test.ts` into a shared e2e test
+- [x] **2 · web** — Extract the cold-birth bootstrap out of `scopeRotation.e2e.test.ts` into a shared e2e test
       helper; migrate `scopeRotation` onto it (no second bootstrap path), then converge
       `media.e2e.test.ts`, `memoryCover.e2e.test.ts` and `memoryLocation.e2e.test.ts` onto it — they stop
       reading `web/scripts/.seed/dev-seed.json` **and** the `VEYQ_EMAIL`/`VEYQ_PASSWORD`/`VEYQ_SECRET` fallbacks
@@ -271,7 +271,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       · Done when: `cd web && npm run check` green (the four still *skip* here — that is correct), and each of
       the four passes by hand: `VEYQ_E2E=1 npx vitest run <file>` against the stack.
 
-- [ ] **3 · the orchestrator** — Port `scripts/run_web_e2e.py`: stdlib only, no args, run from the repo root.
+- [x] **3 · the orchestrator** — Port `scripts/run_web_e2e.py`: stdlib only, no args, run from the repo root.
       Compose up `--profile s3` with the two-step wait → per e2e file: `CREATE DATABASE veyq_e2e_<n>`, a fresh
       boot with `-Dquarkus.profile=e2e` + its own config-secret path + a per-run `VEYQ_STAMP`, poll
       `/q/health/ready`, run **that one file** with `VEYQ_E2E=1`, tear the boot down → aggregate exit: report
@@ -284,7 +284,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       · Done when: `python3 scripts/run_web_e2e.py` green locally from a clean `docker compose down -v`, and
       green **twice in a row** without a manual reset in between.
 
-- [ ] **4 · bite test — and the one part of it that becomes permanent.** Four injections, each of which must exit
+- [x] **4 · bite test — and the one part of it that becomes permanent.** Four injections, each of which must exit
       non-zero *and* say which one happened: (a) store absent — stop the garage container; (b) backend never
       becomes ready — point a boot at a dead port; (c) a suite fails — invert one assertion; (d) **zero e2e files
       matched** — point discovery at a directory with none. (d) is the load-bearing one: an orchestrator that
@@ -305,6 +305,23 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       · Done when: (a)–(c) recorded in this CR with their observed exit code and identifying message, and the (d)
       guard committed, red on the injected empty tree, green after — `for f in scripts/validate_*.py; do
       python3 "$f"; done` green with it in the glob.
+
+      **Observed, 2026-07-30 at `0e2095d4`.** Every injection exited **1** and named its own cause:
+
+      | Injection | How | Reported |
+      |---|---|---|
+      | a1 · store unreachable | `VEYQ_BLOB_STORE_ENDPOINT=http://127.0.0.1:19999` | `media.e2e.test.ts: the suite failed (vitest exit 1)` — the PUT, exactly where trap 2 says it surfaces |
+      | a2 · store absent | `VEYQ_BLOB_STORE_ENDPOINT=` (blank) | `the JVM exited with code 1 before becoming ready`, and the tailed boot log carries `veyq.blob-store.endpoint is required outside the %test profile` — `BlobStoreStartupCheck` firing |
+      | b · never ready | `VEYQ_BOOT_SECS=1` | `nothing answered the readiness probe http://127.0.0.1:8080/api/setup within 1s` |
+      | c · a suite fails | one assertion in `memoryCover.e2e.test.ts` inverted to `.not.toEqual(cover)` | `the suite failed (vitest exit 1)`, with vitest's `expected { …(2) } to not deeply equal { …(2) }` above it |
+      | d · zero files | now `validate_e2e_discovery.py`, bitten three ways | `discover() on an empty tree returned [] instead of raising` / `does not re-raise as SystemExit — the error is swallowed` / `does not read \`else discover()\`` |
+
+      (c) used snapshot-and-restore and the restore was confirmed by re-running the file green, not by grep alone.
+      Two notes for whoever repeats this. **The literal "(a) stop the garage container" injection does not work**
+      against this orchestrator: its own `compose up -d` restarts a stopped container, which is correct behaviour
+      and makes the container the wrong lever — drive the endpoint instead, as a1/a2 do. And (a2)+(b) are worth
+      keeping distinct even though both read as "not ready": they exercise the **JVM-died** and the **timeout**
+      branches, and it was the *absence* of that distinction that made the first real run unreadable.
 
 - [ ] **5 · CI + docs** — Drop `if: false` from the `web-e2e` job and replace its disabled-comment block with
       what the job now does. Correct the *"fresh in-mem DB per file"* claim in the fast-jar step's comment (F2

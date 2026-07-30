@@ -201,12 +201,14 @@ valuable, that every CI run **skips**. A surface being built is no alibi for a t
 failed this rule:
 
 - **`http/`** was IntelliJ requests fired by hand. ADR 0040 stopped counting it; it has since been **deleted**.
-- **`web`'s `*.e2e.test.ts`** need a live backend, so they are gated on `VEYQ_E2E` and skipped by every CI run;
-  the `web-e2e` job that would set it is `if: false`, because its orchestrator no longer exists. They are a
-  hand-run smoke — the same shape as `http/`, only inside a surface that is otherwise built. Their four refs
-  are gone; every criterion
-  they touched keeps CI-run coverage. Rebuilding that job is real, tracked debt
-  ([architecture §11](../architecture/README.md)) — and the day it is green, the refs come back.
+- **`web`'s `*.e2e.test.ts`** need a live backend, so they are gated on `VEYQ_E2E`, which only the `web-e2e` job
+  sets. That job carried `if: false` for as long as its orchestrator was missing, which made them a hand-run
+  smoke — the same shape as `http/`, inside a surface that is otherwise built — so their four refs were removed
+  and every criterion they touched kept CI-run coverage. The orchestrator (`scripts/run_web_e2e.py`) is now
+  ported and the job is enabled. **The refs come back on the first green CI run and not before**: an enabled job
+  is an intention too, and this exact claim has been false once already
+  ([ADR 0040](../decisions/0040-coverage-gaps-and-http-not-a-surface.md) § Correction). Tracked in
+  [architecture §11](../architecture/README.md).
 
 **Nothing enters the coverage model before a CI run executes it.** The claim follows the build, never the
 intention — and "the test exists" is an intention.

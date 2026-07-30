@@ -36,19 +36,22 @@ Two facts from the corpus + the real CI config decide the shape:
 | Fact | Measured |
 |---|---|
 | CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` (lint+typecheck+**unit**+build), the trust-chain validators |
-| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, skipped by every run; the `web-e2e` job that would set it is `if: false` |
+| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, which only the `web-e2e` job sets. That job is **enabled** again now that its orchestrator exists, but no green run has executed yet, so nothing has moved into the row above and the four refs stay withheld. An enabled job is an intention; the row moves on a green run. |
 | `http` as **sole** coverage area | **1 of 256** criteria (`uc.account.login/boundary-validation`) — the other 66 pair it with a backend SliceTest that proves the same behaviour in CI |
 
 So **"CI-proven" is not a function of area alone**: an env-gated smoke inside an otherwise-CI area is not
 proven, whatever colour its column is. **The unit is the test, not the surface.**
 
-> **Correction (2026-07-14).** This table originally read *"web `npm run check` + `run_web_e2e.py` (unit+e2e)"*
-> and the sentence above it began *"web e2e runs"*. Both were false when written: `run_web_e2e.py` had already
-> been lost in the greenfield reset, and its job carries `if: false` to this day. The measurement
-> that **carries this ADR's core decision** was itself unmeasured — a table headed "Measured" that nobody ran.
-> The decision survives (its argument is about `http`, which the table gets right), but four web `e2e` coverage
-> refs had been riding on the false half and are now removed; each criterion they touched keeps a CI-run ref.
-> The rule as stated above was always right — this ADR simply did not apply it to its own surface.
+> **The obligation this table carries.** It once read *"web `npm run check` + `run_web_e2e.py` (unit+e2e)"* and
+> the sentence above it began *"web e2e runs"*. Both were false when written: the orchestrator did not exist and
+> its job was disabled. A table headed **Measured**, carrying this ADR's core decision, that nobody had run —
+> and four web `e2e` coverage refs were riding on the false half. They were removed; each criterion they touched
+> keeps a CI-run ref. The rule above was always right; the ADR simply had not applied it to its own surface.
+>
+> So the standing obligation, which outlives the incident: **a row moves into "CI actually runs" only after a run
+> has executed it.** Not when the test is written, not when the job is enabled — those are intentions, and this
+> is the one claim in the repo that has already been false once. Whoever restores the four refs re-reads this
+> first.
 
 ## Decision
 
