@@ -244,7 +244,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
 
 ## Phases
 
-- [ ] **0 · scaffolding** — Land `git show a838b794:scripts/run_web_e2e.py > scripts/run_web_e2e.py` as its own
+- [x] **0 · scaffolding** — Land `git show a838b794:scripts/run_web_e2e.py > scripts/run_web_e2e.py` as its own
       commit, unported. Delete `changes/scoping-e2e-orchestrator.md` and repoint its two citers
       (`architecture/README.md` §11 link, `ci.yml:78` prose) at this CR **in the same commit**.
       · Done when: `python3 scripts/validate_doc_links.py` and `python3 scripts/validate_changes.py` green.
