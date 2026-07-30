@@ -108,6 +108,18 @@ subtly wrong — it is no locator at all, because the claim did not feel like a 
 one-line `grep` goes **before** the sentence, not after the correction. The tell is the feeling of already
 knowing — that is exactly where the imported prior is, and exactly where this repo most often inverts it.
 
+**A second tell: the claim was inherited.** A fact copied forward from an older doc, a recovered file, or a
+previous CR arrives *feeling* measured, because it is written down — and `[inferred]` markings do not catch it,
+since nobody marks what they never noticed was a claim. It is worst on **infrastructure boilerplate**: an
+endpoint, a port, a config-key name, a file path. cr-e2e-orchestrator inherited `/q/health/ready` from the
+recovered orchestrator skeleton via the scoping doc and wrote it into a phase; this backend has no
+`smallrye-health` extension, so `grep -rn 'q/health'` over the repo returns **nothing** — one second, versus a
+run that failed all four suites with "the backend never became ready" while every boot log said it started in
+2.3s. **So an endpoint a plan polls is a locator too**, as is a path it writes and a key it sets. Before freezing
+a CR, run *everything it names*, not only the commands under § Locators. The same CR had already caught this
+class one paragraph earlier — a recorded sweep output naming two files that match nothing — and fixed only that
+instance instead of re-checking its siblings; one found instance of an unrun claim is the cue to sweep the rest.
+
 ### Coverage is part of the work, not a follow-up
 
 Every CR updates `docs/coverage/` for the
