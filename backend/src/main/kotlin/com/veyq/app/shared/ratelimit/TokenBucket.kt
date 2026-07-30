@@ -28,6 +28,15 @@ object TokenBucket {
 
     private const val NANOS_PER_SECOND = 1_000_000_000L
 
+    /** Nanos of elapsed time per milli-token at one token per second — the conversion factor below. */
+    private const val NANOS_PER_MILLI_TOKEN_AT_ONE_PER_SECOND = NANOS_PER_SECOND / MILLI_PER_TOKEN
+
+    /**
+     * The largest window the conversion can represent. Not a policy ceiling — it is exactly the overflow
+     * boundary: one second more and `windowSeconds * NANOS_PER_MILLI_TOKEN_AT_ONE_PER_SECOND` wraps a `Long`.
+     */
+    private const val MAX_WINDOW_SECONDS = Long.MAX_VALUE / NANOS_PER_MILLI_TOKEN_AT_ONE_PER_SECOND
+
     /** A bucket's whole state: what it holds, and the instant up to which it has been credited. */
     data class State(val tokensMilli: Long, val lastRefillNanos: Long)
 
@@ -41,14 +50,22 @@ object TokenBucket {
      * The refill rate, inverted into "nanos of elapsed time that buy one milli-token" — the form the integer
      * arithmetic needs. Derived from the window config: `max` tokens per `window` seconds.
      *
-     * Both inputs are clamped so a degenerate config cannot throw where the window model divided by zero: a
-     * `maxRequests` of 0 yields a zero capacity (every request refused, `Retry-After` = the window) rather than an
-     * `ArithmeticException`, and the floor of 1 nano keeps an absurdly high max — the `%test` profile's
-     * effectively-disabled 1 000 000 — a plain fast refill.
+     * **Every input is clamped, and each clamp fails in the safe direction** — a degenerate config must never
+     * throw where the window model divided by zero, and must never silently *widen* a limit:
+     * - `maxRequests` of 0 yields a zero capacity (every request refused, `Retry-After` = the window) rather than
+     *   an `ArithmeticException`;
+     * - the floor of 1 nano keeps an absurdly high max — the `%test` profile's effectively-disabled 1 000 000 — a
+     *   plain fast refill;
+     * - `windowSeconds` saturates at [MAX_WINDOW_SECONDS]. Without that it **wrapped**: the product went
+     *   negative and the trailing floor turned it into *one nano per milli-token*, the fastest refill there is.
+     *   An absurd window therefore **disabled** the limiter instead of slowing it — the wrong direction to fail
+     *   in, and the one asymmetry left when the other two inputs were already guarded.
      */
     fun nanosPerMilliToken(maxRequests: Long, windowSeconds: Long): Long =
-        (windowSeconds.coerceAtLeast(0) * (NANOS_PER_SECOND / MILLI_PER_TOKEN) / maxRequests.coerceAtLeast(1))
-            .coerceAtLeast(1)
+        (
+            windowSeconds.coerceIn(0, MAX_WINDOW_SECONDS) * NANOS_PER_MILLI_TOKEN_AT_ONE_PER_SECOND /
+                maxRequests.coerceAtLeast(1)
+            ).coerceAtLeast(1)
 
     /** A never-seen key starts **full**: a fresh bucket must grant the same burst the first window did. */
     fun full(capacityMilli: Long, nowNanos: Long): State = State(capacityMilli, nowNanos)

@@ -159,4 +159,29 @@ class TokenBucketTest {
             "an absurdly high max clamps to the fastest representable refill instead of dividing to zero",
         )
     }
+
+    @Test
+    fun anAbsurdWindowSaturatesInsteadOfWrappingTheConversion() {
+        // The conversion multiplies the window by NANOS_PER_SECOND / MILLI_PER_TOKEN. Both other inputs were
+        // clamped and this one was not — and the asymmetry was the tell. The damage is the wrap: a window past
+        // Long.MAX_VALUE / 1_000_000 overflowed to a negative product, which the trailing coerceAtLeast(1) then
+        // turned into ONE nano per milli-token — the fastest refill representable. An absurd window silently
+        // *disabled* the limiter instead of slowing it to a crawl, which is the wrong direction to fail in.
+        val largestRepresentable = Long.MAX_VALUE / 1_000_000L
+        val atTheCeiling = TokenBucket.nanosPerMilliToken(maxRequests = 1, windowSeconds = largestRepresentable)
+
+        assertEquals(
+            largestRepresentable * 1_000_000L, atTheCeiling,
+            "the largest representable window still converts exactly — the clamp must not bite one below it",
+        )
+        assertEquals(
+            atTheCeiling, TokenBucket.nanosPerMilliToken(1, largestRepresentable + 1),
+            "one second past the ceiling saturates instead of wrapping",
+        )
+        assertEquals(
+            atTheCeiling, TokenBucket.nanosPerMilliToken(1, Long.MAX_VALUE),
+            "and so does the extreme",
+        )
+        assertTrue(atTheCeiling > 0, "a wrapped conversion goes non-positive, which is how it became unlimited")
+    }
 }
