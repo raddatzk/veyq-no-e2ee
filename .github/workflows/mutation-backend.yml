@@ -18,15 +18,22 @@ on:
   pull_request:
     branches: [main]
     # Source AND tests: a change to either can move the score (a weakened assertion lives in a *Test.kt), so either
-    # must re-run the gate. The manifest/build/meta-check/workflow gate themselves. A new policy enters via a
-    # pitest.scope.json edit, which is listed here, so adding one always triggers the gate.
+    # must re-run the gate. The manifest/build/meta-check/workflow gate themselves. This list mirrors
+    # backend/pitest.scope.json one-for-one, in the same order, and `scripts/validate_mutation_trigger_paths.py`
+    # KEEPS it there — because editing the manifest alone does not: `b15807a7` added ShareAccessPolicy and
+    # MembershipPolicy to the scope and left this filter behind, so a PR touching only those never ran the gate
+    # (inbox #114). Adding a policy means editing both, and the guard is what says so.
     paths:
       - "backend/src/main/kotlin/com/veyq/app/features/spaces/scope/RotationPolicy.kt"
       - "backend/src/main/kotlin/com/veyq/app/features/admin/tenant/RemovalPolicy.kt"
       - "backend/src/main/kotlin/com/veyq/app/shared/ratelimit/TokenBucket.kt"
+      - "backend/src/main/kotlin/com/veyq/app/features/sharing/ShareAccessPolicy.kt"
+      - "backend/src/main/kotlin/com/veyq/app/features/spaces/scope/MembershipPolicy.kt"
       - "backend/src/test/kotlin/com/veyq/app/features/spaces/scope/RotationPolicyTest.kt"
       - "backend/src/test/kotlin/com/veyq/app/features/admin/tenant/RemovalPolicyTest.kt"
       - "backend/src/test/kotlin/com/veyq/app/shared/ratelimit/TokenBucketTest.kt"
+      - "backend/src/test/kotlin/com/veyq/app/features/sharing/ShareAccessPolicyTest.kt"
+      - "backend/src/test/kotlin/com/veyq/app/features/spaces/scope/MembershipPolicyTest.kt"
       - "backend/pitest.scope.json"
       - "backend/build.gradle.kts"
       - "scripts/mutation_meta_check_backend.py"
@@ -35,16 +42,21 @@ on:
   # Also on main. A PR gates before the merge, so this is a backstop, not the primary gate: it catches what the PR
   # job structurally cannot — a direct push, an admin/force merge, or a green PR that lands on a main which has
   # meanwhile drifted. The same filter is repeated because Actions supports no YAML anchors; ci.yml duplicates its
-  # own filter the same way.
+  # own filter the same way. The guard checks the two blocks SEPARATELY, not as a union — hand-duplicated lists
+  # drift apart, and a backstop that has quietly stopped covering a class is worse than none.
   push:
     branches: [main]
     paths:
       - "backend/src/main/kotlin/com/veyq/app/features/spaces/scope/RotationPolicy.kt"
       - "backend/src/main/kotlin/com/veyq/app/features/admin/tenant/RemovalPolicy.kt"
       - "backend/src/main/kotlin/com/veyq/app/shared/ratelimit/TokenBucket.kt"
+      - "backend/src/main/kotlin/com/veyq/app/features/sharing/ShareAccessPolicy.kt"
+      - "backend/src/main/kotlin/com/veyq/app/features/spaces/scope/MembershipPolicy.kt"
       - "backend/src/test/kotlin/com/veyq/app/features/spaces/scope/RotationPolicyTest.kt"
       - "backend/src/test/kotlin/com/veyq/app/features/admin/tenant/RemovalPolicyTest.kt"
       - "backend/src/test/kotlin/com/veyq/app/shared/ratelimit/TokenBucketTest.kt"
+      - "backend/src/test/kotlin/com/veyq/app/features/sharing/ShareAccessPolicyTest.kt"
+      - "backend/src/test/kotlin/com/veyq/app/features/spaces/scope/MembershipPolicyTest.kt"
       - "backend/pitest.scope.json"
       - "backend/build.gradle.kts"
       - "scripts/mutation_meta_check_backend.py"

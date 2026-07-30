@@ -173,6 +173,18 @@ copies → forges → runs → discards, so even an abort leaves an orphaned tem
 (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
 Snapshot-restore is the interactive one-shot; a copy is its automated form.
 
+### Where the defect is still live, order it guard → red → fix → green
+
+**The unfixed defect is a stronger bite test than any injection, and it is free.** A forged one proves the guard fires on a shape *you*
+chose; the live defect proves it fires on the shape that actually occurred — which is the one your model of the
+code got wrong. cr-mutation-gate-completeness' trigger-path guard printed all eight missing workflow entries on
+its first run, before a line of the fix existed, and it named them: the same run was the discovery, the bite and
+the fix-list. So when a CR both builds a guard and repairs what it guards, **write the guard first and record the
+red**; reaching for the fix first destroys the evidence and leaves you injecting a reconstruction of it. This
+does not replace snapshot-and-restore — that is what you fall back to when the defect is already fixed, when the
+guard must also reject shapes that never occurred here, or when the case belongs in
+`validate_guard_gaps.py`'s repeated harness.
+
 ### A bite test must tell "the guard held" apart from "nothing ran"
 
 **Assert the expected test goes red by name, never that "something failed".** An injection can break compilation instead of the assertion, and a

@@ -53,6 +53,13 @@ Open gaps — a forgery the guard still passes (a documented limit, not a defect
      the naming convention, and no grep can enforce a name that has not been written yet; closing it needs the
      reflection sweep the posture guard already pays for, which would leave this glob entirely. Pinned so the
      limit stated in that guard's docstring is executable rather than a sentence.
+  10 a mutated policy that gains a dependency on a file no `paths:` filter lists passes
+     `validate_mutation_trigger_paths` — it derives one path per manifest entry and cannot follow imports, so
+     editing that dependency alone moves a mutation score without triggering the gate. **Left open on purpose**
+     — a path filter is a *file* trigger; following imports would mean a Kotlin dependency graph in a buildless
+     Python guard, and the honest alternative (widen the filter to the four scope directories) costs ~70 files'
+     worth of no-op mutation runs against the 10 that are in scope. Pinned so the limit in that guard's
+     docstring is executable rather than a sentence.
 Out of reach by construction, not deferred work: the mutation **total-vs-per-glob** asymmetry (needs a report
 fixture + git, so it belongs to a mutation-job-local test, not this buildless glob) and the **rate-limit posture
 sweep** (ADR 0051). The sweep is a JVM test — it enumerates JAX-RS endpoints by reflection over compiled classes
@@ -203,6 +210,31 @@ def forge_ratelimit_state_under_another_name(root: pathlib.Path) -> str:
     return "rate-limit state in a limiter named neither *Limiter* nor *Counter* (the filename-grep open gap)"
 
 
+def forge_scoped_policy_gains_unlisted_dependency(root: pathlib.Path) -> str:
+    # validate_mutation_trigger_paths derives ONE path per manifest entry, so it sees a scoped class's own file
+    # and nothing it depends on. Plant exactly that: a scoped policy now imports a helper whose file is in no
+    # `paths:` filter, so editing the helper alone moves the mutation score without triggering the gate. Not
+    # fixable by this guard's mechanism — a path filter cannot follow imports — so it is pinned, not closed. If
+    # someone ever teaches the guard to walk dependencies, this case flips red instead of landing silently.
+    helper = root / "backend/src/main/kotlin/com/veyq/app/shared/membership/PolicyHelper.kt"
+    helper.write_text(textwrap.dedent("""\
+        package com.veyq.app.shared.membership
+
+        /** A guard-gap probe: a dependency of a mutated policy that no `paths:` filter lists. */
+        object PolicyHelper {
+            fun isLastOwner(owners: Int): Boolean = owners <= 1
+        }
+        """))
+    policy = root / "backend/src/main/kotlin/com/veyq/app/features/spaces/scope/MembershipPolicy.kt"
+    src = policy.read_text()
+    if "import com.veyq.app.shared.membership.MembershipEntity" not in src:
+        raise ForgeError("MembershipPolicy's MembershipEntity import drifted — re-anchor this forgery")
+    policy.write_text(_sub(src, "import com.veyq.app.shared.membership.MembershipEntity",
+                           "import com.veyq.app.shared.membership.MembershipEntity\n"
+                           "import com.veyq.app.shared.membership.PolicyHelper"))
+    return "a mutated policy depending on a file in no `paths:` filter (the transitive-dependency open gap)"
+
+
 # id, target guard, forgery, expect_pass (True = guard passes the forgery = gap still open; False = must reject)
 CASES = [
     ("1",  "validate_coverage.py",  forge_web_ref_nontest,      False),
@@ -214,6 +246,7 @@ CASES = [
     ("7",  "validate_maxlength_storage.py", forge_b64_cap_over_text,          False),
     ("8",  "validate_maxlength_storage.py", forge_freetext_cap_over_column,   True),
     ("9",  "validate_ratelimit_core.py",    forge_ratelimit_state_under_another_name, True),
+    ("10", "validate_mutation_trigger_paths.py", forge_scoped_policy_gains_unlisted_dependency, True),
 ]
 
 

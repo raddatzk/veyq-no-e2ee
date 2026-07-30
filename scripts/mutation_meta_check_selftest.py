@@ -47,14 +47,19 @@ def _run_check(tree: pathlib.Path, name: str, *args: str) -> int:
     ).returncode
 
 
-def _pit_report(classes: list[str]) -> str:
-    muts = "".join(f"<mutation><mutatedClass>{c}</mutatedClass></mutation>" for c in classes)
+def _pit_report(mutations: list[tuple[str, bool]]) -> str:
+    """`mutations`: (mutatedClass, detected) pairs. The `detected` attribute is PIT's own kill flag and the
+    survivor-budget check keys on it, so the fixture must carry it — an attribute-less mutation would read as
+    undetected and quietly turn every legacy case into a budget case."""
+    muts = "".join(f'<mutation detected="{str(d).lower()}" status="{"KILLED" if d else "SURVIVED"}">'
+                   f"<mutatedClass>{c}</mutatedClass></mutation>" for c, d in mutations)
     return f'<?xml version="1.0" encoding="UTF-8"?>\n<mutations>{muts}</mutations>\n'
 
 
-def backend_case(beta_mutations: int) -> int:
-    """Two scope globs (Alpha, Beta); Alpha always carries 1 mutation, Beta carries `beta_mutations`. So
-    beta=0 is the 'one stale glob among non-empty siblings' the per-glob check must catch."""
+def backend_case(alpha: tuple[int, int] = (1, 0), beta: tuple[int, int] = (0, 0)) -> int:
+    """Two scope globs (Alpha, Beta), each given as (mutations, undetected). Alpha defaults to one killed
+    mutant — the healthy sibling — so `beta=(0, 0)` is the 'one stale glob among non-empty siblings' the
+    per-glob non-empty check must catch, and a loaded `beta` exercises the survivor budget."""
     with tempfile.TemporaryDirectory() as d:
         tree = pathlib.Path(d)
         _copy_check(tree, "mutation_meta_check_backend.py")
@@ -63,13 +68,22 @@ def backend_case(beta_mutations: int) -> int:
             json.dumps({"targetClasses": ["com.veyq.app.Alpha", "com.veyq.app.Beta"]}))
         rep = tree / "backend" / "build" / "reports" / "pitest"
         rep.mkdir(parents=True)
-        classes = ["com.veyq.app.Alpha"] + ["com.veyq.app.Beta"] * beta_mutations
-        (rep / "mutations.xml").write_text(_pit_report(classes))
+        muts: list[tuple[str, bool]] = []
+        for cls, (total, undetected) in (("com.veyq.app.Alpha", alpha), ("com.veyq.app.Beta", beta)):
+            muts += [(cls, i >= undetected) for i in range(total)]
+        (rep / "mutations.xml").write_text(_pit_report(muts))
         return _run_check(tree, "mutation_meta_check_backend.py")
 
 
 def _git(tree: pathlib.Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=tree, check=True, capture_output=True, text=True)
+    # `-c commit.gpgsign=false`: the fabricated repo inherits the DEVELOPER's global git config, and a machine
+    # that signs commits (ssh-format signing via a 1Password/gpg agent) fails the commit outright — "failed to
+    # fill whole buffer", exit 128 — whenever that agent is locked. veyq's own checkout masks it with a local
+    # `commit.gpgsign=false`, and CI has no signing config at all, so this only ever bites on a dev machine,
+    # intermittently, in a check whose subject has nothing to do with git. A throwaway fixture must not depend
+    # on the host's signing setup.
+    subprocess.run(["git", "-c", "commit.gpgsign=false", *args],
+                   cwd=tree, check=True, capture_output=True, text=True)
 
 
 def web_case(mutate: list[str], diff_file: str, total_mutants: int) -> int:
@@ -119,8 +133,19 @@ def main() -> int:
     print("mutation meta-check selftest — pinning the total-vs-per-glob asymmetry (ADR 0045 §4):")
 
     # Backend = per-glob: a 0-mutation glob among non-empty siblings must fail; all-non-empty passes.
-    expect("backend: a 0-mutation glob among non-empty siblings FAILS (per-glob)", backend_case(0), 1)
-    expect("backend: every glob non-empty PASSES", backend_case(2), 0)
+    expect("backend: a 0-mutation glob among non-empty siblings FAILS (per-glob)",
+           backend_case(beta=(0, 0)), 1)
+    expect("backend: every glob non-empty PASSES", backend_case(beta=(2, 0)), 0)
+
+    # The survivor budget (inbox #116), replayed on the real incident's shape: 56/58 = 96.6 % is ABOVE the
+    # build's aggregate threshold of 95, yet both survivors sit in one glob (Beta = TokenBucket at 23/25).
+    # The aggregate stays green; the per-glob budget is what must red.
+    expect("backend: 2 survivors in ONE glob FAILS though the total is 56/58 = 96.6 % (> 95)",
+           backend_case(alpha=(33, 0), beta=(25, 2)), 1)
+    expect("backend: exactly 1 survivor PASSES — the budget is the threshold's headroom, per class",
+           backend_case(alpha=(33, 0), beta=(25, 1)), 0)
+    expect("backend: a 1-mutation glob whose only mutant survived FAILS (within budget, nothing killed)",
+           backend_case(beta=(1, 1)), 1)
 
     # Web = total-count + diff-aware.
     expect("web: diff in scope + total 0 mutants FAILS (total-count)", web_case([V1], "web/" + V1, 0), 1)
@@ -128,7 +153,7 @@ def main() -> int:
     expect("web: diff NOT in scope PASSES regardless of report", web_case([V1], "web/other.ts", 0), 0)
 
     # The asymmetry itself, on the SAME 'one member empty, a sibling full' shape:
-    expect("asymmetry — backend REJECTS one-empty-sibling", backend_case(0), 1)
+    expect("asymmetry — backend REJECTS one-empty-sibling", backend_case(beta=(0, 0)), 1)
     expect("asymmetry — web ACCEPTS one-empty-sibling (total > 0)",
            web_case([V1, V2], "web/" + V1, 3), 0)
 
