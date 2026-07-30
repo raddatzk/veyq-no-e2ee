@@ -128,13 +128,20 @@ no file restates it, because a restated list drifts out of step with the one tha
 untracked file a guard would have rejected — is green locally and unchecked in CI. Commit before believing a
 local green.)
 
-**Where a CR's done-when says "green in CI", pushing the branch is usually not enough.**
-[`ci.yml`](../.github/workflows/ci.yml) triggers only on `main` and on PRs *targeting* `main`, so a push of a
-feature branch runs **nothing** — cr-e2e-orchestrator's Phase 5 said "push the branch so the job runs" and the
-push produced zero runs. `ci.yml` carries `workflow_dispatch`, so the way to get a real run on a branch is
-`gh workflow run ci.yml --ref <branch>`; `trust-chain.yml` is the unfiltered one. Then **read the job's log, not
-its tick**: a job that ran nothing and a job whose suites all passed render identically, which is why
-`scripts/validate_e2e_discovery.py` exists at all.
+**Where a CR's done-when says "green in CI", know which jobs can even run.** Two independent gates, and both bit
+during cr-e2e-orchestrator:
+- **Branch filters.** [`ci.yml`](../.github/workflows/ci.yml) triggers only on `main` and on PRs *targeting*
+  `main`, so pushing a feature branch runs **nothing**. That CR's Phase 5 said "push the branch so the job runs";
+  the push produced zero runs. `ci.yml` carries `workflow_dispatch`, so `gh workflow run ci.yml --ref <branch>`
+  is how a branch gets a real run.
+- **`workflow_dispatch` resolves against the DEFAULT branch.** A workflow file that exists only on the feature
+  branch cannot be dispatched at all — `HTTP 404: not found on the default branch`. `trust-chain.yml`,
+  `mutation*.yml` and `wiki-sync.yml` are in exactly that state: they live on `starting-something-new` and not on
+  `main`, so **the whole trust-chain job has never executed in CI** and cannot until the branch lands. Its local
+  run over the committed tree is the strongest available proof; say that, rather than "green in CI".
+
+Then **read the job's log, not its tick**: a job that ran nothing and a job whose suites all passed render
+identically, which is why `scripts/validate_e2e_discovery.py` exists at all.
 
 **What a guard's module docstring must carry — three fields, and this is the only place that says so.** The
 docstring is a validator's whole documentation; every other file points here rather than re-listing the fields.
