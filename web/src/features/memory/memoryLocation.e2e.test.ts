@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { session } from '../../app/session'
-import { login } from '../account/login/login'
-import { unlockMasterKey } from '../account/unlock/unlock'
+import { birthInstance } from '../../test/e2eBootstrap'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../spaces/scopes'
 import { epochsOf } from '../spaces/epochsTestUtil'
 import { createMemory, listTree, openContentKey } from './tree'
@@ -18,31 +15,23 @@ import { ScopeKind } from '../../api/generated/scopes'
  * on the same node **survives** a location write (read-modify-write), a location removal keeps the date, a
  * pre-armed `auto` location is born at creation, and reverse geocoding hits a **real third-party provider**.
  *
- * Gated on `VEYQ_E2E=1`; default `npm run check` skips it. Credentials fall back to the seed (cr-0046):
- *   docker compose -f infra/docker-compose.yml --profile s3 up -d && (start backend) && npm run seed:dev
+ * Gated on `VEYQ_E2E=1`; default `npm run check` skips it. The instance is cold-birthed over the real API by
+ * `src/test/e2eBootstrap.ts`, so this needs a FRESH instance and no seeder:
+ *   docker compose -f infra/docker-compose.yml --profile s3 up -d && (start backend)
  *   VEYQ_E2E=1 npx vitest run memoryLocation.e2e
- * The geocode leg additionally needs `VEYQ_GEOCODER` (e.g. https://nominatim.openstreetmap.org); without it
- * the geocode assertion is skipped (the seal legs still run).
+ * Or `python3 scripts/run_web_e2e.py`, which is what CI runs.
+ *
+ * The geocode leg is OPT-IN via `VEYQ_GEOCODER` (e.g. https://nominatim.openstreetmap.org) and the orchestrator
+ * leaves it unset on purpose: it makes a real third-party network call, which is a flake source in CI and reaches
+ * the public internet from a harness that is supposed to run self-hosted. Unset, exactly one assertion drops (that
+ * the geocoder returned levels) and every assertion about veyq still runs, with `nameSource: 'manual'`.
  */
-function seedCreds(): { base: string; email: string; password: string; secret: string } | null {
-  try {
-    const seed = JSON.parse(readFileSync(new URL('../../../scripts/.seed/dev-seed.json', import.meta.url), 'utf8'))
-    const t = seed.tenants?.['127.0.0.1']
-    return t ? { base: `http://${t.domain}:8080`, email: t.email, password: t.password, secret: t.secretKey } : null
-  } catch {
-    return null
-  }
-}
-
 const TENERIFE_A = { lat: 28.2916, lng: -16.6291 }
 const TENERIFE_B = { lat: 28.4682, lng: -16.2546 }
 
 describe.skipIf(!process.env.VEYQ_E2E)('memory location e2e (live, operator-blind seal)', () => {
   it('seals a location operator-blind, preserves the date (RMW), removes it, pre-arms at creation', async () => {
-    const seed = seedCreds()
-    session.apiBase = process.env.VEYQ_BASE ?? seed?.base ?? 'http://localhost:8080'
-    await login(process.env.VEYQ_EMAIL ?? seed?.email ?? '', process.env.VEYQ_PASSWORD ?? seed?.password ?? '')
-    await unlockMasterKey(process.env.VEYQ_PASSWORD ?? seed?.password ?? '', process.env.VEYQ_SECRET ?? seed?.secret ?? '')
+    await birthInstance('E2E Location')
     await ensurePersonalScope()
     const personal = (await listMyScopes()).find((s) => s.kind === ScopeKind.Personal)!
     const scopeId = personal.id

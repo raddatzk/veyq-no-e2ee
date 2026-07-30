@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { session } from '../../app/session'
-import { login } from '../account/login/login'
-import { unlockMasterKey } from '../account/unlock/unlock'
+import { birthInstance } from '../../test/e2eBootstrap'
 import { ensurePersonalScope, listMyScopes, openPersonalScope } from '../spaces/scopes'
 import { epochsOf } from '../spaces/epochsTestUtil'
 import { ScopeKind } from '../../api/generated/scopes'
@@ -15,32 +12,17 @@ import { setMemoryCover, unsealMemoryCover, type MemoryCover } from './memoryCov
  * Opt-in live smoke for the Memory cover (cr-0072) — the one path the API-mocked unit tests cannot cover: the
  * sealed `cover` sub-object round-tripping through the **real** operator-blind backend (`updateNode` → `listNodes`)
  * beside the sibling date + location, read back from the SERVER-returned `wrappedMeta`. Gated on `VEYQ_E2E=1`;
- * default `npm run check` skips it. Reuses the `seed:dev` 127.0.0.1 tenant owner (cr-0046) — the seed is read here,
- * never printed.
+ * default `npm run check` skips it. The instance is cold-birthed over the real API by `src/test/e2eBootstrap.ts`,
+ * so this needs a FRESH instance and no seeder.
  *
  *   docker compose -f infra/docker-compose.yml --profile s3 up -d
  *   VEYQ_E2E=1 npx vitest run memoryCover.e2e
+ *
+ * Or `python3 scripts/run_web_e2e.py`, which is what CI runs.
  */
-function seedCreds(): { base: string; email: string; password: string; secret: string } | null {
-  try {
-    const seed = JSON.parse(readFileSync(new URL('../../../scripts/.seed/dev-seed.json', import.meta.url), 'utf8'))
-    const t = seed.tenants?.['127.0.0.1']
-    return t ? { base: `http://${t.domain}:8080`, email: t.email, password: t.password, secret: t.secretKey } : null
-  } catch {
-    return null
-  }
-}
-
 describe.skipIf(!process.env.VEYQ_E2E)('memory cover e2e (live, operator-blind round-trip)', () => {
   it('a sealed cover survives updateNode → listNodes beside the date + location, and remove drops only it', async () => {
-    const seed = seedCreds()
-    session.apiBase = process.env.VEYQ_BASE ?? seed?.base ?? 'http://localhost:8080'
-    const email = process.env.VEYQ_EMAIL ?? seed?.email ?? ''
-    const password = process.env.VEYQ_PASSWORD ?? seed?.password ?? ''
-    const secret = process.env.VEYQ_SECRET ?? seed?.secret ?? ''
-
-    await login(email, password)
-    await unlockMasterKey(password, secret)
+    await birthInstance('E2E Cover')
     await ensurePersonalScope()
     const personal = (await listMyScopes()).find((s) => s.kind === ScopeKind.Personal)
     expect(personal).toBeDefined()
