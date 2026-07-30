@@ -42,8 +42,10 @@ script still runs by hand from the host (`./infra/garage-init.sh`, via `docker e
   `VEYQ_S3_ENDPOINT`/`VEYQ_S3_ACCESS_KEY`/`VEYQ_S3_SECRET_KEY`/`VEYQ_S3_BUCKET`/`VEYQ_S3_REGION`).
 - **Backend against the store** (`quarkusDev`): point it at the store via env —
   `veyq.blob-store.endpoint=http://localhost:19000`, `…access-key=GK0123456789abcdef01234567`,
-  `…secret-key=0123…`. A blank `endpoint` keeps the in-memory dev store (no presign, no byte path); `/api/setup`
-  then reports `directTransport: false`.
+  `…secret-key=0123…`. A blank `endpoint` **aborts startup** outside the hermetic `%test` profile
+  (`BlobStoreStartupCheck`, ADR 0013 §1 / cr-0105) — media is not an optional feature, so a store-less instance
+  is misconfigured, not gracefully degraded. The in-memory stub exists only in `%test`, and there is no
+  client-facing `directTransport` flag left to soft-gate on.
 
 ### Same-origin via Traefik (web, no CORS)
 

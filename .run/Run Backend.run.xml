@@ -14,9 +14,11 @@
         </list>
       </option>
       <option name="vmOptions" />
-      <!-- Store config for the IntelliJ dev flow. Without an endpoint the backend falls back to the in-memory
-           dev store (canPresign=false) → blob-uploads-batch returns presignedPuts=null → every media upload fails
-           with store_unavailable. Endpoint + creds point at the bundled compose Garage; these are the documented
+      <!-- Store config for the IntelliJ dev flow. Without an endpoint the backend does NOT degrade — it aborts
+           startup (BlobStoreStartupCheck, ADR 0013 §1 / cr-0105: media is not optional, so a store-less instance
+           is misconfigured, not gracefully degraded). The in-memory stub survives only in the %test profile, and
+           there is no client-facing directTransport flag left to soft-gate on.
+           Endpoint + creds point at the bundled compose Garage; these are the documented
            throwaway dev creds (infra/README.md, garage.toml) — not secrets.
            PUBLIC_ENDPOINT is the browser origin the presigned PUT/GET URLs are signed for: it MUST equal the host
            in the address bar (SigV4 signs host+path; the Vite dev server proxies /veyq same-origin to the store).
