@@ -73,6 +73,13 @@ DB_APP_USER = "veyq"
 
 GARAGE_INIT_CONTAINER = "veyq-garage-init"
 
+# Readiness is probed on `GET /api/setup`, NOT on `/q/health/ready`. This backend has no `smallrye-health`
+# extension — grep the repo for `q/health` and you get nothing — so the health endpoint the recovered skeleton
+# polled has never existed here, and polling it just times out behind a backend that started fine 118s earlier.
+# `/api/setup` is the better probe anyway: unauthenticated, reachable whether or not setup is complete, served
+# only once Flyway has migrated, and the first call every suite makes.
+READY_URL = f"http://127.0.0.1:{PORT}/api/setup"
+
 
 class NoE2eFilesError(RuntimeError):
     """Discovery matched no e2e file. A hard error, never an empty-but-successful run.
@@ -169,9 +176,9 @@ def fresh_database(name: str) -> None:
 
 
 def port_is_taken() -> bool:
-    """Something already answering on our port would be health-polled as if it were ours."""
+    """Something already answering on our port would be readiness-polled as if it were ours."""
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/q/health/ready", timeout=2):
+        with urllib.request.urlopen(READY_URL, timeout=2):
             return True
     except urllib.error.HTTPError:
         return True  # answering, just not 200 — still not ours to use
@@ -179,19 +186,30 @@ def port_is_taken() -> bool:
         return False
 
 
-def wait_ready(deadline: float, proc: subprocess.Popen) -> bool:
-    url = f"http://127.0.0.1:{PORT}/q/health/ready"
+def wait_ready(deadline: float, proc: subprocess.Popen) -> str | None:
+    """Poll until the backend serves the readiness probe. Returns None when ready, else why it never was.
+
+    A wrong status is reported rather than retried into the timeout. That distinction is not hypothetical: polling
+    a path this backend does not serve looks exactly like a slow boot, and a 404 retried for 120s reads as "the
+    backend never came up" while the log says it started in 2.3s.
+    """
+    last_status: int | None = None
     while time.time() < deadline:
         if proc.poll() is not None:
-            return False  # the JVM died — no point polling a dead port until the deadline
+            return f"the JVM exited with code {proc.returncode} before becoming ready"
         try:
-            with urllib.request.urlopen(url, timeout=2) as r:
+            with urllib.request.urlopen(READY_URL, timeout=2) as r:
                 if r.status == 200:
-                    return True
+                    return None
+                last_status = r.status
+        except urllib.error.HTTPError as e:
+            last_status = e.code
         except (urllib.error.URLError, OSError):
             pass
         time.sleep(0.5)
-    return False
+    if last_status is not None:
+        return f"the readiness probe {READY_URL} answered {last_status}, expected 200"
+    return f"nothing answered the readiness probe {READY_URL} within {BOOT_SECS}s"
 
 
 def boot(database: str, secret_file: Path, log_path: Path) -> subprocess.Popen:
@@ -248,9 +266,10 @@ def run_file(index: int, test_path: Path, workdir: Path, stamp: str) -> str | No
     proc = boot(database, secret_file, boot_log)
     try:
         log(f"waiting up to {BOOT_SECS}s for the backend to become ready")
-        if not wait_ready(time.time() + BOOT_SECS, proc):
+        not_ready = wait_ready(time.time() + BOOT_SECS, proc)
+        if not_ready:
             tail(boot_log)
-            return f"the backend never became ready within {BOOT_SECS}s (boot log above)"
+            return f"{not_ready} (boot log above)"
         log(f"backend ready on {BASE} — running the suite")
         # VEYQ_GEOCODER is dropped rather than inherited: set, memoryLocation.e2e makes a real third-party
         # Nominatim call, which is a flake source in CI and reaches the public internet from a harness meant to
