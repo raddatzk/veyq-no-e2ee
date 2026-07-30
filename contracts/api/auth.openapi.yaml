@@ -248,7 +248,7 @@ components:
           x-veyq-visibility: id
           type: string
           format: uuid
-          description: Opaque id of the session family (one login / device). The E2EE name is attached later (uc.account.sessions).
+          description: Opaque id of the session family (one login / device). The E2EE name is attached later by a planned use-case (uc.account.sessions — reserved in ADR 0004, not yet written or built).
           example: 7c3f0e2a-9b1d-4a6e-8b2c-1f2d3e4a5b6c
 
     TokenPair:

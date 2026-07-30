@@ -90,7 +90,7 @@ stateDiagram-v2
   biometric) is the **"Trust this device"** use-case — so this floor path is typically the *first* unlock
   on a device.
 - **Unlocks the E2EE layer.** Once unlocked, the account key is available — this is what lets the client
-  decrypt **E2EE session names** (uc.account.sessions) and all content.
+  decrypt **E2EE session names** (planned — `uc.account.sessions` is reserved in ADR 0004, not yet written) and all content.
 
 ## What this means for you / Was das für dich bedeutet
 
