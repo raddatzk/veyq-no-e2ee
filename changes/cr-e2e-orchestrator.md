@@ -323,7 +323,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       keeping distinct even though both read as "not ready": they exercise the **JVM-died** and the **timeout**
       branches, and it was the *absence* of that distinction that made the first real run unreadable.
 
-- [ ] **5 · CI + docs** — Drop `if: false` from the `web-e2e` job and replace its disabled-comment block with
+- [x] **5 · CI + docs** — Drop `if: false` from the `web-e2e` job and replace its disabled-comment block with
       what the job now does. Correct the *"fresh in-mem DB per file"* claim in the fast-jar step's comment (F2
       disproved it). Update `architecture/README.md` §11: the row closes, and its link into `changes/` goes away
       with it (this CR is deleted at close — a dangling pointer here is what `validate_doc_links.py` would catch,
@@ -331,7 +331,7 @@ because undici strips a manually set `Host`. → the base URL must carry the ten
       · Done when: `for f in scripts/validate_*.py; do python3 "$f"; done` green, and the branch pushed so the
       real `web-e2e` job runs.
 
-- [ ] **6 · coverage — only after a green CI run** — Restore the four refs removed by `52bca34b`. Their home
+- [x] **6 · coverage — only after a green CI run** — Restore the four refs removed by `52bca34b`. Their home
       **moved** since that commit: the use-case specs are now `.md` under `docs/features/`, and coverage refs
       live in a separate tree under `docs/coverage/features/`. So:
       `docs/coverage/features/memory/use-cases/uc.memory.cover.yaml` → `memoryCover.e2e.test.ts`, and
@@ -362,5 +362,36 @@ knowingly manual. If a cheap automatable form of it appears later, it belongs in
 
 ## Retrospective
 
-Written at close — planning, execution, **and** process/collaboration (were the conventions we already agreed
-honored: language, the workflow rules, the memory notes?), both directions, ending in one concrete "next time".
+**Everything durable this taught has already been moved to where it binds** — this section is the record, not the
+home. The `%e2e` runtime-only trap and the unset `public-endpoint` are comments in
+`application-e2e.properties`; the readiness-probe finding, the GRANT and the dropped `VEYQ_GEOCODER` are comments
+in `run_web_e2e.py`; the "green must mean it ran" obligation is ADR 0040's; and the two reusable working lessons
+went to `changes/README.md` (a bite lever the tool repairs is not a lever; a branch push does not run `ci.yml`).
+
+**Planning.** The refinement was unusually strong on the expensive things — F1–F5 and the three traps each saved
+real time, and trap 2 in particular would have cost a full debug cycle inside a PUT. It was weakest on the thing
+that looked most certain: `/q/health/ready`. Three documents asserted that endpoint and none had run it, so the
+first real run failed all four files with "the backend never became ready" while every boot log said it started
+in 2.3s. The pattern is exact and worth naming: **the unmeasured claims that survive are the ones that read like
+infrastructure boilerplate.** `grep -rn 'q/health'` over the repo would have returned nothing in one second, and
+nobody ran it because nobody doubted it. The CR's own § Locators had already caught the *same* class of error one
+paragraph earlier — the guard-anchor sweep whose recorded output named two files that match nothing — and that
+near-miss should have prompted a sweep of the CR's *other* unrun assertions rather than a fix to the one found.
+
+**Execution.** Ordering held (contracts → backend → web → script → guard → CI → coverage) and the phase
+boundaries were real: Phase 2's `npm run check` and Phase 4's bite tests each caught their own class. The
+`%e2e`-is-runtime-only inference cost nothing and paid: `db-kind` was never written, so the boot's success was
+never mistakenly attributed to it. Two things the CR did not have and the work found: the **GRANT** (the compose
+`veyq` user has no rights on a new database, and the failure reads as access-denied rather than
+missing-database) and the fact that **`ci.yml` never triggers on a feature branch**, which made Phase 5's stated
+done-when unachievable as written.
+
+**Process, both directions.** German throughout, English in the repo, sparring rather than agreeing — including
+overturning the CR's own "this invariant gets no permanent guard", which was true of only half the invariant and
+had blocked a cheap durable check. The bite-before-trust rule was applied to the new guard *and* it bit three
+distinct ways. From the other side: the CR's `[inferred]` markings were honest but incomplete — a claim inherited
+from an older doc arrives feeling measured, and `/q/health/ready` had no marker at all because nobody had noticed
+it was a claim. A CR that carried a "claims inherited, never re-run here" list would have caught it.
+
+**Next time.** Before freezing a CR, re-run **every** command and endpoint it names — not just the locators it
+labels as such. The endpoint a plan polls is a locator too.

@@ -128,6 +128,14 @@ no file restates it, because a restated list drifts out of step with the one tha
 untracked file a guard would have rejected — is green locally and unchecked in CI. Commit before believing a
 local green.)
 
+**Where a CR's done-when says "green in CI", pushing the branch is usually not enough.**
+[`ci.yml`](../.github/workflows/ci.yml) triggers only on `main` and on PRs *targeting* `main`, so a push of a
+feature branch runs **nothing** — cr-e2e-orchestrator's Phase 5 said "push the branch so the job runs" and the
+push produced zero runs. `ci.yml` carries `workflow_dispatch`, so the way to get a real run on a branch is
+`gh workflow run ci.yml --ref <branch>`; `trust-chain.yml` is the unfiltered one. Then **read the job's log, not
+its tick**: a job that ran nothing and a job whose suites all passed render identically, which is why
+`scripts/validate_e2e_discovery.py` exists at all.
+
 **What a guard's module docstring must carry — three fields, and this is the only place that says so.** The
 docstring is a validator's whole documentation; every other file points here rather than re-listing the fields.
 1. **What it asserts** — the invariant, in the terms a reader can check the code against.
@@ -172,6 +180,13 @@ every run, work on a throwaway *copy* of the tree, not the live one: `scripts/va
 copies → forges → runs → discards, so even an abort leaves an orphaned tempdir, never a dirty tree
 (every guard's `__file__`-relative `ROOT` makes a copied `scripts/<guard>.py` resolve to the copy).
 Snapshot-restore is the interactive one-shot; a copy is its automated form.
+
+**And check the lever survives the tool.** An injection is only an injection if the thing under test cannot undo
+it. cr-e2e-orchestrator planned *"store absent — stop the garage container"*; the orchestrator's own
+`docker compose up -d` restarts a stopped container, so that injection silently becomes a green run — correct
+behaviour in the tool, useless as a lever. Drive the **configuration** it reads instead (a blank endpoint aborted
+the boot, a dead one failed the PUT: two distinct injections, two distinct messages). Before injecting, ask what
+the tool does to repair itself, because that is exactly what it will do to your test case.
 
 ### Where the defect is still live, order it guard → red → fix → green
 

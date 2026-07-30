@@ -35,8 +35,8 @@ Two facts from the corpus + the real CI config decide the shape:
 
 | Fact | Measured |
 |---|---|
-| CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` (lint+typecheck+**unit**+build), the trust-chain validators |
-| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), env-gated smokes (`LiveRoundTrip*`, `BlobBatchE2E*`), **and web's own `*.e2e.test.ts`** — gated on `VEYQ_E2E`, which only the `web-e2e` job sets. That job is **enabled** again now that its orchestrator exists, but no green run has executed yet, so nothing has moved into the row above and the four refs stay withheld. An enabled job is an intention; the row moves on a green run. |
+| CI actually runs | backend `gradlew check` (unit+integration), web `npm run check` (lint+typecheck+**unit**+build), the trust-chain validators, **and web's `*.e2e.test.ts`** via the `web-e2e` job (`scripts/run_web_e2e.py` — it brings up the bundled stack and gives each file its own database + a fresh `%e2e` backend boot) |
+| CI does **not** run | `.http` (no `ijhttp`/`httpyac` in any workflow), env-gated backend smokes (`LiveRoundTrip*`, `BlobBatchE2E*`) |
 | `http` as **sole** coverage area | **1 of 256** criteria (`uc.account.login/boundary-validation`) — the other 66 pair it with a backend SliceTest that proves the same behaviour in CI |
 
 So **"CI-proven" is not a function of area alone**: an env-gated smoke inside an otherwise-CI area is not
@@ -50,8 +50,12 @@ proven, whatever colour its column is. **The unit is the test, not the surface.*
 >
 > So the standing obligation, which outlives the incident: **a row moves into "CI actually runs" only after a run
 > has executed it.** Not when the test is written, not when the job is enabled — those are intentions, and this
-> is the one claim in the repo that has already been false once. Whoever restores the four refs re-reads this
-> first.
+> is the one claim in the repo that has already been false once.
+>
+> It was honoured on the way back. The four refs returned only after a green `web-e2e` run whose log was read to
+> confirm it had executed four suites rather than discovered none — `total: 4  passed: 4  failed: 0`. Reading that
+> log is the step, not the green tick: "the job passed" and "the job ran nothing" render identically in the UI,
+> which is why `scripts/validate_e2e_discovery.py` now guards the difference.
 
 ## Decision
 

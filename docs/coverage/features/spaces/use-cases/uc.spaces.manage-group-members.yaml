@@ -45,7 +45,7 @@ acceptanceCriteria:
       group they don't hold) — one mechanism, cr-0092.
     coverage:
       backend: { integration: [MemberRemoveSliceTest.removalQueuesRotationOnlyForCoSharedGroupsNotOwnScopesOrTenant, MemberRemoveSliceTest.queuedRotationClaimableByRemainingKeyHolderOnlyThenCompletionClearsIt, MemberRemoveSliceTest.secondRemovalCoalescesIntoTheOneLiveRotationJob] }
-      web: { unit: [src/features/tasks/scopeRotationWorker.test.ts] }
+      web: { unit: [src/features/tasks/scopeRotationWorker.test.ts], e2e: [src/features/tasks/scopeRotation.e2e.test.ts] }
   - id: operator-blind-rotation
     text: The server sees only role/membership metadata + opaque epoch-chain links, per-member grants, and per-node epoch indices — never a key or a name. The client posts only ciphertext (the chain-link + per-member grants).
     coverage:

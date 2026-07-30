@@ -29,7 +29,7 @@ acceptanceCriteria:
       by the reconciler and re-delivered at the current epoch. Idempotent + first-online-wins.
     coverage:
       backend: { integration: [TasksSliceTest.grantDeliveryIntoARotatedScopeRecordsTheDeliveredEpoch, TasksSliceTest.staleMemberIsReconciledAndReDeliveredAtTheCurrentEpoch] }
-      web: { }
+      web: { e2e: [src/features/tasks/scopeRotation.e2e.test.ts] }
   - id: operator-blind-group-add
     text: The server sees only the membership row, identity public keys, and opaque grant ciphertext — never K_SC, never the group's plaintext name; the add response never exposes email.
     coverage:

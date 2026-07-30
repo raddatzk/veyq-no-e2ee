@@ -14,6 +14,8 @@ acceptanceCriteria:
       web:
         unit:
           - src/features/memory/memoryCover.test.ts
+        e2e:
+          - src/features/memory/memoryCover.e2e.test.ts
   - id: deliberate-no-auto-cover
     text: A cover exists only by a deliberate pick (choose a media, or upload a cover image); there is no auto-cover. Unset ⇒ the placeholder (the soft-accent images tile) shows on every surface. A dangling source (the chosen media was deleted) falls back to the placeholder, never a broken card/pin.
     coverage:
