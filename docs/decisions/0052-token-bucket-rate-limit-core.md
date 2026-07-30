@@ -69,7 +69,9 @@ the change is that the boundary burst is a real weakness in a *security* bound (
 - **Eviction gets simpler and stricter.** The bounded map (`MAX_TRACKED_KEYS`, against a flood of spoofed keys)
   stays, but the drop predicate becomes "**the bucket is full**": a full bucket is indistinguishable from an
   absent one, so dropping it is exactly free — where the window model had to reason about elapsed slots. Both
-  hand-rolled limiters that are **unbounded** today inherit this bound by moving onto the shell.
+  hand-rolled limiters that are **unbounded** today inherit this bound by moving onto the shell. The bound holds
+  **in steady state only** — what that condition is, and why it is not a hole, is stated once in
+  [`cc.security.rate-limit`](../crosscutting/cc.security.rate-limit.md) § Known limits, not restated here.
 
 - **`@RateLimit` is untouched.** Not a single annotation changes, which is [ADR 0051](0051-declarative-rate-limit-posture.md)'s
   `key`-indirection paying out exactly as claimed. It is **checked, not asserted**: the change is only complete

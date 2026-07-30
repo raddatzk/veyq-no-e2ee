@@ -138,7 +138,13 @@ is gone with the algorithm ([ADR 0052](../decisions/0052-token-bucket-rate-limit
 - **Trusts the client IP.** Behind a proxy this depends on correct forwarded-IP handling; a spoofable/NAT'd
   source can blur per-IP isolation.
 - **A full bucket may be evicted under key-flood pressure** (past `MAX_TRACKED_KEYS`). Behaviourally free — a
-  full bucket is indistinguishable from an absent one — and it is what keeps the map bounded.
+  full bucket is indistinguishable from an absent one.
+- **The key map is bounded in steady state, not absolutely** — the weakness that pairs with the eviction above,
+  and the one this list exists to not round off. The pass drops only **full** buckets, and a bucket refills one
+  token's worth of time after its last request, so an idle flood is reclaimed. A flood arriving **faster than one
+  token refills** leaves every bucket partly spent, nothing is evictable, and the map grows for as long as the
+  flood outpaces the refill. At the per-IP bound's one-token-per-second that needs on the order of 100 000
+  distinct keys per second — a documented shape, not a hole, and the same shape the fixed window had.
 
 These are **deferred** hardening items (a distributed store, hardened proxy-IP trust), recorded so the limit
 isn't mistaken for a strong guarantee. It raises the cost of automated abuse; it does not make it impossible.

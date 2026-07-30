@@ -16,9 +16,16 @@ import java.util.concurrent.ConcurrentHashMap
  * **Deliberate limitations** (a gateway / distributed bucket is the production answer, see backend CLAUDE.md):
  * buckets are **per-instance** (not shared across a horizontally-scaled deployment) and **reset on restart**.
  *
- * The map is bounded: past [maxTrackedKeys] every **full** bucket is dropped, so a flood of distinct (possibly
- * spoofed) keys cannot grow it without limit. A full bucket is indistinguishable from an absent one, so the
- * eviction is free of behavioural cost — the caller cannot tell whether its key was kept or re-created.
+ * The map is bounded **in steady state**, not absolutely, and the difference is worth stating rather than
+ * rounding off: past [maxTrackedKeys] the eviction pass drops every **full** bucket, and a bucket is full again
+ * one token's worth of time after its last request — so a flood of distinct (possibly spoofed) keys is reclaimed
+ * as fast as it goes idle. What it does *not* do is bound a flood that arrives **faster than one token refills**:
+ * those buckets are all partly spent, nothing is evictable, and the map grows for as long as the flood outpaces
+ * the refill. At the per-IP bound's one-token-per-second that needs ~100 000 distinct keys per second, which is
+ * why this is a documented shape rather than a hole — and it is the same shape the fixed window had.
+ *
+ * A full bucket is indistinguishable from an absent one (a never-seen key starts full), so the eviction is free
+ * of behavioural cost — the caller cannot tell whether its key was kept or re-created.
  */
 class TokenBucketCounter(private val maxTrackedKeys: Int = MAX_TRACKED_KEYS) {
 

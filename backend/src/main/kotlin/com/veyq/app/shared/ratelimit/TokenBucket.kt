@@ -14,7 +14,8 @@ package com.veyq.app.shared.ratelimit
  * assertions. The trap that follows from integers, and the one most token-bucket implementations get wrong: on
  * refill, [refill] advances `lastRefillNanos` by **the nanos actually converted into tokens**, never to `now` —
  * setting it to `now` discards the sub-token remainder on every call and systematically under-refills under high
- * call rates. `TokenBucketTest.theSubTokenRemainderIsCarried` fails any implementation that does that.
+ * call rates. `TokenBucketTest.theSubTokenRemainderIsCarriedInsteadOfDiscardedOnEveryCall` fails any
+ * implementation that does that.
  *
  * The bucket is **derived from the existing window config** and adds no key (ADR 0052): `capacity =
  * max-per-window` tokens, refilled at `max-per-window / window-seconds` tokens per second — so the sustained rate
