@@ -90,7 +90,9 @@ The point is the **default**. Today silence means "nobody classified this". Afte
   carrying `contentEncoding: base64` is *permitted* to be opaque; nothing here observes whether the client put
   ciphertext in it. A client that writes plaintext into a field marked opaque satisfies this ADR completely. The
   marker closes the **design** hole — a field that should never have existed in plaintext — and only that. What
-  the server actually receives is a different sensor, with the wire as its oracle, and it does not exist yet.
+  the server actually receives is a different sensor, with the wire as its oracle:
+  [ADR 0053](0053-wire-assertion-canary-sweep.md) decides it. The boundary is deliberate and stays — this is the
+  **design** sensor, that is the **traffic** sensor, and they do not overlap.
 - **The claim is narrow, and the validator's docstring must say so.** This is a **body-surface** sensor. It does
   not see: 11 path params, 4 query params, `X-Contributor-Token` / `X-Share-Password` (capability secrets that
   cross the wire outside any schema), presigned-URL query strings, 67 DB column names with no contract, error
